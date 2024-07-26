@@ -767,6 +767,14 @@ func (db *Database) SetPeerSyncingEnabled(value bool) error {
 	return db.SaveSettingField(PeerSyncingEnabled, value)
 }
 
+func (db *Database) SetSyncingOnMobileNetwork(value bool) error {
+	err := db.SaveSettingField(SyncingOnMobileNetwork, value)
+	if err != nil {
+		return err
+	}
+	return db.SaveSettingField(RememberSyncingChoice, true)
+}
+
 func (db *Database) GetPeerSyncingEnabled() (result bool, err error) {
 	err = db.makeSelectRow(PeerSyncingEnabled).Scan(&result)
 	if err == sql.ErrNoRows {

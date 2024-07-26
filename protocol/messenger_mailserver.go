@@ -261,12 +261,19 @@ func (m *Messenger) syncBackup() error {
 	if filter == nil {
 		return errors.New("personal topic filter not loaded")
 	}
+	canSync, err := m.canSyncWithStoreNodes()
+	if err != nil {
+		return err
+	}
+	if !canSync {
+		return nil
+	}
 
 	from, to := m.calculateMailserverTimeBounds(oneMonthDuration)
 
 	batch := MailserverBatch{From: from, To: to, Topics: []types.TopicType{filter.ContentTopic}}
 	ms := m.getActiveMailserver(filter.ChatID)
-	err := m.processMailserverBatch(*ms, batch)
+	err = m.processMailserverBatch(*ms, batch)
 	if err != nil {
 		return err
 	}
@@ -365,16 +372,20 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 			if err != nil {
 				return nil, err
 			}
-			allResponses.AddChats(response.Chats())
-			allResponses.AddMessages(response.Messages())
+			if response != nil {
+				allResponses.AddChats(response.Chats())
+				allResponses.AddMessages(response.Messages())
+			}
 			continue
 		}
 		response, err := m.syncFilters(*ms, filtersForMs)
 		if err != nil {
 			return nil, err
 		}
-		allResponses.AddChats(response.Chats())
-		allResponses.AddMessages(response.Messages())
+		if response != nil {
+			allResponses.AddChats(response.Chats())
+			allResponses.AddMessages(response.Messages())
+		}
 	}
 	return allResponses, nil
 }
@@ -415,6 +426,14 @@ func getPrioritizedBatches() []int {
 }
 
 func (m *Messenger) syncFiltersFrom(ms mailservers.Mailserver, filters []*transport.Filter, lastRequest uint32) (*MessengerResponse, error) {
+	canSync, err := m.canSyncWithStoreNodes()
+	if err != nil {
+		return nil, err
+	}
+	if !canSync {
+		return nil, nil
+	}
+
 	response := &MessengerResponse{}
 	topicInfo, err := m.mailserversDatabase.Topics()
 	if err != nil {
@@ -866,12 +885,27 @@ loop:
 	return result
 }
 
+func (m *Messenger) canSyncWithStoreNodes() (bool, error) {
+	if m.featureFlags.StoreNodesDisabled {
+		return false, nil
+	}
+	if m.connectionState.IsExpensive() {
+		return m.settings.CanSyncOnMobileNetwork()
+	}
+
+	return true, nil
+}
+
 func (m *Messenger) DisableStoreNodes() {
 	m.featureFlags.StoreNodesDisabled = true
 }
 
 func (m *Messenger) processMailserverBatch(ms mailservers.Mailserver, batch MailserverBatch) error {
-	if m.featureFlags.StoreNodesDisabled {
+	canSync, err := m.canSyncWithStoreNodes()
+	if err != nil {
+		return err
+	}
+	if !canSync {
 		return nil
 	}
 
@@ -884,7 +918,11 @@ func (m *Messenger) processMailserverBatch(ms mailservers.Mailserver, batch Mail
 }
 
 func (m *Messenger) processMailserverBatchWithOptions(ms mailservers.Mailserver, batch MailserverBatch, pageLimit uint32, shouldProcessNextPage func(int) (bool, uint32), processEnvelopes bool) error {
-	if m.featureFlags.StoreNodesDisabled {
+	canSync, err := m.canSyncWithStoreNodes()
+	if err != nil {
+		return err
+	}
+	if !canSync {
 		return nil
 	}
 
@@ -914,6 +952,14 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 	ms := m.getActiveMailserver(chat.CommunityID)
 	var from uint32
 	_, err := m.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
+		canSync, err := m.canSyncWithStoreNodes()
+		if err != nil {
+			return nil, err
+		}
+		if !canSync {
+			return nil, nil
+		}
+
 		pubsubTopic, topics, err := m.topicsForChat(chatID)
 		if err != nil {
 			return nil, nil
@@ -1094,6 +1140,14 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 
 	ms := m.getActiveMailserver(chat.CommunityID)
 	_, err := m.performMailserverRequest(ms, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
+		canSync, err := m.canSyncWithStoreNodes()
+		if err != nil {
+			return nil, err
+		}
+		if !canSync {
+			return nil, nil
+		}
+
 		m.logger.Debug("fetching messages", zap.String("chatID", chatID), zap.String("mailserver", ms.Name))
 		pubsubTopic, topics, err := m.topicsForChat(chatID)
 		if err != nil {

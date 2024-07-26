@@ -18,6 +18,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/services/mailservers"
@@ -433,9 +434,7 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 			m.transport.SetStorePeerID(peerID)
 
 			// Query mailserver
-			if m.config.codeControlFlags.AutoRequestHistoricMessages {
-				m.asyncRequestAllHistoricMessages()
-			}
+			m.asyncRequestAllHistoricMessages()
 		}
 	}
 	return nil
@@ -623,7 +622,12 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 }
 
 func (m *Messenger) asyncRequestAllHistoricMessages() {
+	if !m.config.codeControlFlags.AutoRequestHistoricMessages {
+		return
+	}
+
 	m.logger.Debug("asyncRequestAllHistoricMessages")
+
 	go func() {
 		_, err := m.RequestAllHistoricMessages(false, true)
 		if err != nil {

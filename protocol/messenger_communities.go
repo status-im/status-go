@@ -1205,6 +1205,9 @@ func (m *Messenger) SpectateCommunity(communityID types.HexBytes) (*MessengerRes
 		return nil, err
 	}
 
+	// sync community
+	m.asyncRequestAllHistoricMessages()
+
 	return response, nil
 }
 

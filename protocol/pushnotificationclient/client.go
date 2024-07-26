@@ -907,6 +907,50 @@ func (c *Client) handlePublicMessageSent(sentMessage *common.SentMessage) error 
 	}
 
 	c.config.Logger.Debug("message found", zap.Binary("messageID", messageID))
+
+	if message.ResponseTo != "" {
+		reply, err := c.getMessage(message.ResponseTo)
+		if err != nil {
+			c.config.Logger.Error("could not retrieve message", zap.Error(err))
+		}
+		if reply != nil {
+			pkString := reply.From
+			c.config.Logger.Debug("handling mention", zap.String("publickey", pkString))
+			pubkeyBytes, err := types.DecodeHex(pkString)
+			if err != nil {
+				return err
+			}
+
+			publicKey, err := crypto.UnmarshalPubkey(pubkeyBytes)
+			if err != nil {
+				return err
+			}
+
+			// we use a synthetic installationID for mentions, as all devices need to be notified
+			shouldNotify, err := c.shouldNotifyOn(publicKey, mentionInstallationID, messageID)
+			if err != nil {
+				return err
+			}
+
+			c.config.Logger.Debug("should no mention", zap.Any("publickey", shouldNotify))
+			// we send the notifications and return the info of the devices notified
+			infos, err := c.SendNotification(publicKey, nil, messageID, message.LocalChatID, protobuf.PushNotification_MENTION)
+			if err != nil {
+				return err
+			}
+
+			// mark message as sent so we don't notify again
+			for _, i := range infos {
+				c.config.Logger.Debug("marking as sent ", zap.Binary("mid", messageID), zap.String("id", i.InstallationID))
+				if err := c.notifiedOn(publicKey, i.InstallationID, messageID, message.LocalChatID, protobuf.PushNotification_MESSAGE); err != nil {
+					return err
+				}
+
+			}
+		}
+
+	}
+
 	for _, pkString := range message.Mentions {
 		c.config.Logger.Debug("handling mention", zap.String("publickey", pkString))
 		pubkeyBytes, err := types.DecodeHex(pkString)
