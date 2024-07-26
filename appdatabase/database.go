@@ -132,6 +132,13 @@ func FixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 		log.Error("Migrating accounts: failed to update key_uid/derived_from", "err", err.Error())
 		return err
 	}
+	// fix the default wallet account color issue https://github.com/status-im/status-mobile/issues/20476
+	// we don't care the other type of account's color
+	_, err = sqlTx.Exec(`UPDATE accounts SET color = 'blue',emoji='🐳' WHERE wallet = 1`)
+	if err != nil {
+		log.Error("Migrating accounts: failed to update default wallet account's color to blue", "err", err.Error())
+		return err
+	}
 	return nil
 }
 
