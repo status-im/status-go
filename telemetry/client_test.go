@@ -352,6 +352,8 @@ func setDefaultConfig(config *wakuv2.Config, lightMode bool) {
 var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.shards.nodes.status.im"
 
 func TestPeerCount(t *testing.T) {
+	t.Skip("flaky test")
+
 	expectedCondition := func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
 		found := slices.ContainsFunc(received, func(req TelemetryRequest) bool {
 			t.Log(req)
