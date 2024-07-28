@@ -64,11 +64,13 @@ type ServerConfig struct {
 	// Connection fields, not json (un)marshalled
 	// Required for the server, but MUST NOT come from client
 
-	PK          *ecdsa.PublicKey `json:"-"`
-	EK          []byte           `json:"-"`
-	Cert        *tls.Certificate `json:"-"`
-	ListenIP    net.IP           `json:"-"`
-	IPAddresses []net.IP         `json:"-"`
+	PK             *ecdsa.PublicKey `json:"-"`
+	EK             []byte           `json:"-"`
+	Cert           *tls.Certificate `json:"-"`
+	ListenIP       net.IP           `json:"-"`
+	IPAddresses    []net.IP         `json:"-"`
+	InstallationID string           `json:"-"`
+	KeyUID         string           `json:"-"`
 }
 
 type ClientConfig struct{}

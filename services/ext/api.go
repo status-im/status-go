@@ -1060,6 +1060,14 @@ func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) err
 	return api.service.messenger.SyncDevices(ctx, name, picture, nil)
 }
 
+func (api *PublicAPI) EnableAndSyncInstallation(request *requests.EnableAndSyncInstallation) error {
+	return api.service.messenger.EnableAndSyncInstallation(request)
+}
+
+func (api *PublicAPI) FinishPairingThroughSeedPhraseProcess(request *requests.FinishPairingThroughSeedPhraseProcess) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.FinishPairingThroughSeedPhraseProcess(request)
+}
+
 func (api *PublicAPI) AddBookmark(ctx context.Context, bookmark browsers.Bookmark) error {
 	return api.service.messenger.AddBookmark(ctx, bookmark)
 }
