@@ -2563,7 +2563,7 @@ func (m *Messenger) KeyUID() string {
 	return m.account.KeyUID
 }
 
-// // syncChat sync a chat with paired devices
+// syncChat sync a chat with paired devices
 func (m *Messenger) syncChat(ctx context.Context, chatToSync *Chat, rawMessageHandler RawMessageHandler) error {
 	var err error
 	if !m.hasPairedDevices() {
