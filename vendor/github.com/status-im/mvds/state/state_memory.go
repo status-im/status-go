@@ -72,3 +72,19 @@ func (s *memorySyncState) MapWithPeerId(peerID PeerID, process func(State) State
 
 	return nil
 }
+
+func (s *memorySyncState) Clear(count uint64) error {
+	s.Lock()
+	defer s.Unlock()
+
+	var newState []State
+	for _, state := range s.state {
+		if state.SendCount <= count {
+			newState = append(newState, state)
+		}
+	}
+
+	s.state = newState
+
+	return nil
+}

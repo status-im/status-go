@@ -40,6 +40,7 @@ const (
 )
 
 const FreshEventPeriod = 10 // seconds
+const MaxSendCount = 15     // stop resend the message after 15 times (~10 days)
 
 type PeerStatusChangeEvent struct {
 	PeerID    state.PeerID
@@ -222,6 +223,10 @@ func (n *Node) Start(duration time.Duration) {
 				err := n.sendMessages()
 				if err != nil {
 					n.logger.Error("Error sending messages.", zap.Error(err))
+				}
+				err = n.syncState.Clear(MaxSendCount)
+				if err != nil {
+					n.logger.Error("Error clearing sync state.", zap.Error(err))
 				}
 				atomic.AddInt64(&n.epoch, 1)
 				// When a persistent node is used, the epoch needs to be saved.
