@@ -28,7 +28,7 @@ type SwapParaswapTxArgs struct {
 }
 
 type SwapParaswapProcessor struct {
-	paraswapClient *paraswap.ClientV5
+	paraswapClient paraswap.ClientInterface
 	transactor     transactions.TransactorIface
 	priceRoute     sync.Map // [fromChainName-toChainName-fromTokenSymbol-toTokenSymbol, paraswap.Route]
 }
@@ -73,6 +73,8 @@ func createSwapParaswapErrorResponse(err error) error {
 		return ErrPriceTimeout
 	case "No routes found with enough liquidity":
 		return ErrNotEnoughLiquidity
+	case "ESTIMATED_LOSS_GREATER_THAN_MAX_IMPACT":
+		return ErrPriceImpactTooHigh
 	}
 	return createErrorResponse(ProcessorSwapParaswapName, err)
 }
