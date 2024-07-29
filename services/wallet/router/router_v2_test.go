@@ -210,9 +210,6 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 	// Test blocking endpoints
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.flaky {
-				t.Skip("Flaky test")
-			}
 
 			routes, err := router.SuggestedRoutesV2(context.Background(), tt.input)
 
@@ -234,9 +231,6 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 	// Test async endpoints
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.flaky {
-				t.Skip("Flaky test")
-			}
 
 			router.SuggestedRoutesV2Async(tt.input)
 
