@@ -506,7 +506,16 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 		// No best route found, but no error given.
 		if len(processorErrors) > 0 {
 			// Return one of the path processor errors if present.
-			err = errors.CreateErrorResponseFromError(processorErrors[0].Error)
+			// Give precedence to the custom error message.
+			for _, processorError := range processorErrors {
+				if processorError.Error != nil && pathprocessor.IsCustomError(processorError.Error) {
+					err = processorError.Error
+					break
+				}
+			}
+			if err == nil {
+				err = errors.CreateErrorResponseFromError(processorErrors[0].Error)
+			}
 		} else {
 			err = ErrNoBestRouteFound
 		}
@@ -1003,7 +1012,7 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*
 		return new(big.Int).Set(v.(*big.Int))
 	}).(map[string]*big.Int)
 	if balanceMapCopy == nil {
-		return ErrCannotCheckReceiverBalance
+		return ErrCannotCheckBalance
 	}
 
 	// check the best route for the required balances
@@ -1100,6 +1109,10 @@ func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, can
 				allRoutes = removeBestRouteFromAllRouters(allRoutes, best)
 				continue
 			} else {
+				sort.Slice(best, func(i, j int) bool {
+					return best[i].AmountInLocked
+				})
+				suggestedRoutes.Best = best
 				return suggestedRoutes, errors.CreateErrorResponseFromError(err)
 			}
 		}
