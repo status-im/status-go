@@ -170,6 +170,10 @@ func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signe
 	fmt.Printf("erc1155StoreAndTrackPendingTxArgs2: %v\n", sendArgs.ChainID)
 	fmt.Printf("erc1155StoreAndTrackPendingTxArgs3: %v\n", sendArgs.ERC1155TransferTx.MultiTransactionID)
 	fmt.Printf("erc1155StoreAndTrackPendingTxArgs4: %v\n", tx)
+	fmt.Printf("erc1155StoreAndTrackPendingTxArgs5: %v\n", txOpts)
+	fmt.Printf("erc1155StoreAndTrackPendingTxArgs6: %v\n", sendArgs.ERC1155TransferTx.Recipient)
+	fmt.Printf("erc1155StoreAndTrackPendingTxArgs7: %v\n", sendArgs.ERC1155TransferTx.TokenID.ToInt())
+	fmt.Printf("erc1155StoreAndTrackPendingTxArgs8: %v\n", sendArgs.ERC1155TransferTx.Amount.ToInt())
 	//err = s.transactor.StoreAndTrackPendingTx(from, sendArgs.ERC1155TransferTx.Symbol, sendArgs.ChainID, sendArgs.ERC1155TransferTx.MultiTransactionID, tx)
 	return tx, nil
 }

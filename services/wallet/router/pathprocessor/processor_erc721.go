@@ -163,6 +163,9 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 	fmt.Printf("erc721StoreAndTrackPendingTxArgs2: %v\n", sendArgs.ChainID)
 	fmt.Printf("erc721StoreAndTrackPendingTxArgs3: %v\n", sendArgs.ERC721TransferTx.MultiTransactionID)
 	fmt.Printf("erc721StoreAndTrackPendingTxArgs4: %v\n", tx)
+	fmt.Printf("erc721StoreAndTrackPendingTxArgs5: %v\n", txOpts)
+	fmt.Printf("erc721StoreAndTrackPendingTxArgs6: %v\n", sendArgs.ERC721TransferTx.Recipient)
+	fmt.Printf("erc721StoreAndTrackPendingTxArgs7: %v\n", sendArgs.ERC721TransferTx.TokenID.ToInt())
 	//err = s.transactor.StoreAndTrackPendingTx(from, sendArgs.ERC721TransferTx.Symbol, sendArgs.ChainID, sendArgs.ERC721TransferTx.MultiTransactionID, tx)
 	//if err != nil {
 	//	return tx, createERC721ErrorResponse(err)
