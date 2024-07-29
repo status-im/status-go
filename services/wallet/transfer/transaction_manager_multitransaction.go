@@ -45,6 +45,10 @@ func (tm *TransactionManager) CreateMultiTransactionFromCommand(command *MultiTr
 		if multiTransaction.FromNetworkID == wallet_common.UnknownChainID && len(data) == 1 {
 			multiTransaction.FromNetworkID = data[0].ChainID
 		}
+	case MultiTransactionBridge:
+		break
+	default:
+		return nil, fmt.Errorf("unsupported multi transaction type: %v", multiTransaction.Type)
 	}
 
 	return multiTransaction, nil

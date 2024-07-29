@@ -319,7 +319,7 @@ func TestCreateMultiTransactionFromCommand(t *testing.T) {
 	var command *MultiTransactionCommand
 
 	// Test types that should get chainID from the data
-	mtTypes := []MultiTransactionType{MultiTransactionSend, MultiTransactionApprove, MultiTransactionSwap}
+	mtTypes := []MultiTransactionType{MultiTransactionSend, MultiTransactionApprove, MultiTransactionSwap, MultiTransactionType(7)}
 
 	for _, mtType := range mtTypes {
 		fromAmount := hexutil.Big(*big.NewInt(1000000000000000000))
@@ -340,6 +340,11 @@ func TestCreateMultiTransactionFromCommand(t *testing.T) {
 		})
 
 		multiTransaction, err := tm.CreateMultiTransactionFromCommand(command, data)
+		if mtType > MultiTransactionApprove {
+			// Unsupported type
+			require.Error(t, err)
+			break
+		}
 		require.NoError(t, err)
 		require.NotNil(t, multiTransaction)
 		require.Equal(t, command.FromAddress, multiTransaction.FromAddress)
