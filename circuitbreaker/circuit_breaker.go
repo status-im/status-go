@@ -141,3 +141,15 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 func (c *CircuitBreaker) SetOverrideCircuitNameHandler(f func(string) string) {
 	c.circuitNameHandler = f
 }
+
+// Expects a circuit to exist because a new circuit is always closed.
+// Call CircuitExists to check if a circuit exists.
+func IsCircuitOpen(circuitName string) bool {
+	circuit, wasCreated, _ := hystrix.GetCircuit(circuitName)
+	return !wasCreated && circuit.IsOpen()
+}
+
+func CircuitExists(circuitName string) bool {
+	_, wasCreated, _ := hystrix.GetCircuit(circuitName)
+	return !wasCreated
+}

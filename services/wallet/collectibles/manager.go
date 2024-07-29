@@ -53,13 +53,13 @@ type ManagerInterface interface {
 }
 
 type Manager struct {
-	rpcClient *rpc.Client
+	rpcClient rpc.ClientInterface
 	providers thirdparty.CollectibleProviders
 
 	httpClient *http.Client
 
-	collectiblesDataDB *CollectibleDataDB
-	collectionsDataDB  *CollectionDataDB
+	collectiblesDataDB CollectibleDataStorage
+	collectionsDataDB  CollectionDataStorage
 	communityManager   *community.Manager
 	ownershipDB        *OwnershipDB
 
@@ -73,14 +73,20 @@ type Manager struct {
 
 func NewManager(
 	db *sql.DB,
-	rpcClient *rpc.Client,
+	rpcClient rpc.ClientInterface,
 	communityManager *community.Manager,
 	providers thirdparty.CollectibleProviders,
 	mediaServer *server.MediaServer,
 	feed *event.Feed) *Manager {
 
-	ownershipDB := NewOwnershipDB(db)
-	statuses := initStatuses(ownershipDB)
+	var ownershipDB *OwnershipDB
+	var statuses *sync.Map
+	var statusNotifier *connection.StatusNotifier
+	if db != nil {
+		ownershipDB = NewOwnershipDB(db)
+		statuses = initStatuses(ownershipDB)
+		statusNotifier = createStatusNotifier(statuses, feed)
+	}
 
 	cb := circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
 		Timeout:                10000,
@@ -102,7 +108,7 @@ func NewManager(
 		ownershipDB:        ownershipDB,
 		mediaServer:        mediaServer,
 		statuses:           statuses,
-		statusNotifier:     createStatusNotifier(statuses, feed),
+		statusNotifier:     statusNotifier,
 		feed:               feed,
 		circuitBreaker:     cb,
 	}
@@ -1167,8 +1173,12 @@ func getCircuitName(provider thirdparty.CollectibleProvider, chainID walletCommo
 	return provider.ID() + chainID.String()
 }
 
+func getCircuitNameForTokenURI(mainCircuitName string) string {
+	return mainCircuitName + "_tokenURI"
+}
+
 // As we don't use hystrix internal way of switching to another circuit, just its metrics,
-// we still can switch to another provider without tripping the circuit due to metrics.
+// we still can switch to another provider without tripping the circuit.
 func getClientWithNoCircuitTripping(backend chain.ClientInterface) chain.ClientInterface {
 	copyable := backend.(chain.Copyable)
 	if copyable != nil {
@@ -1182,7 +1192,7 @@ func getClientWithNoCircuitTripping(backend chain.ClientInterface) chain.ClientI
 				ErrorPercentThreshold: 101, // Always healthy
 			})
 			cb.SetOverrideCircuitNameHandler(func(circuitName string) string {
-				return circuitName + "_tokenURI"
+				return getCircuitNameForTokenURI(circuitName)
 			})
 			hm.SetCircuitBreaker(cb)
 			backend = backendCopy

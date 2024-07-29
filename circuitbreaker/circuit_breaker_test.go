@@ -173,6 +173,8 @@ func TestCircuitBreaker_ExecuteHealthCheckOnWindowTimeout(t *testing.T) {
 
 	assert.Less(t, prov1Called, 3) // most of the time only 1 call is made, but occasionally 2 can happen
 	assert.Equal(t, 10, prov2Called)
+	assert.True(t, CircuitExists(circuitName+"1"))
+	assert.True(t, IsCircuitOpen(circuitName+"1"))
 
 	// Wait for the sleep window to expire
 	time.Sleep(time.Duration(sleepWindow+1) * time.Millisecond)
@@ -229,4 +231,20 @@ func TestCircuitBreaker_EmptyOrNilCommand(t *testing.T) {
 	require.Error(t, result.Error())
 	result = cb.Execute(nil)
 	require.Error(t, result.Error())
+}
+
+func TestCircuitBreaker_CircuitExistsAndClosed(t *testing.T) {
+	timestamp := time.Now().Nanosecond()
+	nonExCircuit := fmt.Sprintf("nonexistent_%d", timestamp) // unique name to avoid conflicts with go tests `-count` option
+	require.False(t, CircuitExists(nonExCircuit))
+
+	cb := NewCircuitBreaker(Config{})
+	cmd := NewCommand(context.TODO(), nil)
+	existCircuit := fmt.Sprintf("existing_%d", timestamp) // unique name to avoid conflicts with go tests `-count` option
+	cmd.Add(NewFunctor(func() ([]interface{}, error) {
+		return nil, nil
+	}, existCircuit))
+	_ = cb.Execute(cmd)
+	require.True(t, CircuitExists(existCircuit))
+	require.False(t, IsCircuitOpen(existCircuit))
 }
