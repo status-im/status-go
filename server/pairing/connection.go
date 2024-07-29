@@ -12,6 +12,7 @@ import (
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/google/uuid"
+
 	"github.com/status-im/status-go/server/pairing/versioning"
 )
 
@@ -191,7 +192,7 @@ func (cp *ConnectionParams) FromString(s string) error {
 	cp.publicKey.Curve = elliptic.P256()
 	cp.aesKey = base58.Decode(sData[4])
 
-	if len(sData) > 4 && len(sData[5]) != 0 {
+	if len(sData) > 5 && len(sData[5]) != 0 {
 		installationIDBytes := base58.Decode(sData[5])
 		installationID, err := uuid.FromBytes(installationIDBytes)
 		if err != nil {
@@ -200,7 +201,7 @@ func (cp *ConnectionParams) FromString(s string) error {
 		cp.installationID = installationID.String()
 	}
 
-	if len(sData) > 5 && len(sData[6]) != 0 {
+	if len(sData) > 6 && len(sData[6]) != 0 {
 		decodedBytes := base58.Decode(sData[6])
 		cp.keyUID = string(decodedBytes)
 	}
