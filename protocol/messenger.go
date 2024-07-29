@@ -2555,7 +2555,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 	m.logger.Debug("inside sendChatMessage",
 		zap.String("id", message.ID),
-		zap.String("text", message.Text),
 		zap.String("from", message.From),
 		zap.String("displayName", message.DisplayName),
 		zap.String("ChatId", message.ChatId),
