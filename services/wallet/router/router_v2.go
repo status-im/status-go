@@ -175,7 +175,6 @@ func newSuggestedRoutesV2(
 	suggestedRoutes := &SuggestedRoutesV2{
 		Uuid:                  uuid,
 		Candidates:            candidates,
-		Best:                  candidates,
 		TokenPrice:            tokenPrice,
 		NativeChainTokenPrice: nativeChainTokenPrice,
 	}
