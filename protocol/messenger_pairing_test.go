@@ -20,7 +20,7 @@ type MessengerPairingSuite struct {
 
 func (s *MessengerPairingSuite) TestEnableNonExistingInstallation() {
 	installationID := uuid.New().String()
-	_, err := s.m.FinishPairingThroughSeedPhraseProcess(&requests.FinishPairingThroughSeedPhraseProcess{InstallationID: installationID})
+	_, err := s.m.EnableInstallationAndPair(&requests.EnableInstallationAndPair{InstallationID: installationID})
 	s.Require().NoError(err)
 
 	installations := s.m.Installations()
@@ -66,7 +66,7 @@ func (s *MessengerPairingSuite) TestMessengerPairAfterSeedPhrase() {
 	installationID1 := alice1.installationID
 	installationID2 := alice2.installationID
 	s.Require().NotEqual(installationID1, installationID2)
-	_, err = alice2.FinishPairingThroughSeedPhraseProcess(&requests.FinishPairingThroughSeedPhraseProcess{InstallationID: installationID1})
+	_, err = alice2.EnableInstallationAndPair(&requests.EnableInstallationAndPair{InstallationID: installationID1})
 	s.Require().NoError(err)
 
 	// alice1 should get the installationID1 from alice2

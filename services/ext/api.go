@@ -1064,8 +1064,8 @@ func (api *PublicAPI) EnableAndSyncInstallation(request *requests.EnableAndSyncI
 	return api.service.messenger.EnableAndSyncInstallation(request)
 }
 
-func (api *PublicAPI) FinishPairingThroughSeedPhraseProcess(request *requests.FinishPairingThroughSeedPhraseProcess) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.FinishPairingThroughSeedPhraseProcess(request)
+func (api *PublicAPI) EnableInstallationAndPair(request *requests.EnableInstallationAndPair) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EnableInstallationAndPair(request)
 }
 
 func (api *PublicAPI) AddBookmark(ctx context.Context, bookmark browsers.Bookmark) error {

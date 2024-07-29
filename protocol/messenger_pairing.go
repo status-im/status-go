@@ -27,7 +27,7 @@ func (m *Messenger) EnableAndSyncInstallation(request *requests.EnableAndSyncIns
 	return m.SyncDevices(context.Background(), "", "", nil)
 }
 
-func (m *Messenger) FinishPairingThroughSeedPhraseProcess(request *requests.FinishPairingThroughSeedPhraseProcess) (*MessengerResponse, error) {
+func (m *Messenger) EnableInstallationAndPair(request *requests.EnableInstallationAndPair) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}

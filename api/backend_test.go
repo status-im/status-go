@@ -883,7 +883,7 @@ func TestLoginAccount(t *testing.T) {
 	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
 }
 
-func TestFinishPairingThroughSeedPhraseProcess(t *testing.T) {
+func TestEnableInstallationAndPair(t *testing.T) {
 	// create account acc
 	utils.Init()
 	displayName := "some-display-name"
@@ -946,7 +946,7 @@ func TestFinishPairingThroughSeedPhraseProcess(t *testing.T) {
 	require.True(t, n == 0)
 
 	// pair installation
-	_, err = b2.Messenger().FinishPairingThroughSeedPhraseProcess(&requests.FinishPairingThroughSeedPhraseProcess{InstallationID: s.InstallationID})
+	_, err = b2.Messenger().EnableInstallationAndPair(&requests.EnableInstallationAndPair{InstallationID: s.InstallationID})
 	require.NoError(t, err)
 	// ensure acc received the installation from acc2
 	err = tt.RetryWithBackOff(func() error {
