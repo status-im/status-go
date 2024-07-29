@@ -4,7 +4,7 @@ import (
 	"errors"
 )
 
-var ErrEnableAndSyncInstallationInvalidID = errors.New("deactivate-chat: invalid id")
+var ErrEnableAndSyncInstallationInvalidID = errors.New("enable and sync installation: invalid installation id")
 
 type EnableAndSyncInstallation struct {
 	InstallationID string `json:"installationId"`

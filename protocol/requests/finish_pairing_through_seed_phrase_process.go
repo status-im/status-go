@@ -4,7 +4,7 @@ import (
 	"errors"
 )
 
-var ErrFinishPairingThroughSeedPhraseProcessInvalidID = errors.New("deactivate-chat: invalid id")
+var ErrFinishPairingThroughSeedPhraseProcessInvalidID = errors.New("finish pairing through seed phrase process: invalid installation id")
 
 type FinishPairingThroughSeedPhraseProcess struct {
 	InstallationID string `json:"installationId"`
