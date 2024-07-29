@@ -856,17 +856,17 @@ var testFetchRealCommunityExample = []struct {
 	ExpectedDescriptionEnvelopes []string
 }{
 	{
-		//Example 1, status.prod fleet
+		//Example 1,
 		CommunityID:    "0x03073514d4c14a7d10ae9fc9b0f05abc904d84166a6ac80add58bf6a3542a4e50a",
 		CommunityShard: nil,
 		Fleet:          params.FleetStatusProd,
 		ClusterID:      shard.MainStatusShardCluster,
 	},
 	{
-		// Example 3, shards.test fleet
+		// Example 3,
 		// https://status.app/c/CxiACi8KFGFwIHJlcSAxIHN0dCBiZWMgbWVtEgdkc2Fkc2FkGAMiByM0MzYwREYqAxkrHAM=#zQ3shwDYZHtrLE7NqoTGjTWzWUu6hom5D4qxfskLZfgfyGRyL
 		CommunityID: "0x03f64be95ed5c925022265f9250f538f65ed3dcf6e4ef6c139803dc02a3487ae7b",
-		Fleet:       params.FleetShardsTest,
+		Fleet:       params.FleetStatusProd,
 		ClusterID:   shard.MainStatusShardCluster,
 
 		CheckExpectedEnvelopes: true,
@@ -967,9 +967,9 @@ var testFetchRealCommunityExample = []struct {
 		},
 	},
 	{
-		//Example 1, shards.test fleet
+		//Example 1,
 		CommunityID:            "0x02471dd922756a3a50b623e59cf3b99355d6587e43d5c517eb55f9aea9d3fe9fe9",
-		Fleet:                  params.FleetShardsTest,
+		Fleet:                  params.FleetStatusProd,
 		ClusterID:              shard.MainStatusShardCluster,
 		CheckExpectedEnvelopes: true,
 		ExpectedShardEnvelopes: []string{
@@ -986,7 +986,7 @@ var testFetchRealCommunityExample = []struct {
 	{
 		CommunityURL: "https://status.app/c/G4IAAMQn9ucHF-V3W5Ouuy0xf0BtTjlwCANJEmwB2CG5p2xKUYzK_l37kzXulUppltT1t6mBcCEJsljRoGrKCP7rWommQomrMA2gBN7RrvCMkFqQwnCNzkNYWrLG85E6GVoM_nolTtfIzl53J1N-tj8fz4_TnO4IIw==#zQ3shZeEJqTC1xhGUjxuS4rtHSrhJ8vUYp64v6qWkLpvdy9L9",
 		//CommunityID:            "0x02b5bdaf5a25fcfe2ee14c501fab1836b8de57f61621080c3d52073d16de0d98d6",
-		Fleet:          params.FleetShardsTest,
+		Fleet:          params.FleetStatusProd,
 		OwnerPublicKey: "0x04953f5f0d355b37c39d1d6460a31ed1114455f8263b3fd1b84406c5f12c9eb7dfb76ba7513b92186010928254984fe98aee069b4c7e20f9ea3da497c3ae769477",
 		CommunityTokens: []testFetchRealCommunityExampleTokenInfo{
 			{

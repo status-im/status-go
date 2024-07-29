@@ -41,7 +41,7 @@ const DefaultVerifyTransactionChainID = 1
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet, pathEncryption}
 
-var DefaultFleet = params.FleetShardsTest
+var DefaultFleet = params.FleetStatusProd
 
 var overrideApiConfig = overrideApiConfigProd
 
@@ -154,7 +154,7 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	nodeConfig.ClusterConfig.WakuNodes = params.DefaultWakuNodes(fleet)
 	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = params.DefaultDiscV5Nodes(fleet)
 
-	if fleet == params.FleetShardsTest {
+	if fleet == params.FleetStatusProd {
 		nodeConfig.ClusterConfig.ClusterID = shardsTestClusterID
 	}
 
