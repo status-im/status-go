@@ -11,6 +11,14 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
+type CollectibleDataStorage interface {
+	SetData(collectibles []thirdparty.CollectibleData, allowUpdate bool) error
+	GetIDsNotInDB(ids []thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleUniqueID, error)
+	GetData(ids []thirdparty.CollectibleUniqueID) (map[string]thirdparty.CollectibleData, error)
+	SetCommunityInfo(id thirdparty.CollectibleUniqueID, communityInfo thirdparty.CollectibleCommunityInfo) error
+	GetCommunityInfo(id thirdparty.CollectibleUniqueID) (*thirdparty.CollectibleCommunityInfo, error)
+}
+
 type CollectibleDataDB struct {
 	db *sql.DB
 }
