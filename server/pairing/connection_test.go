@@ -139,3 +139,17 @@ func (s *ConnectionParamsSuite) TestConnectionParams_ParseNetIps() {
 
 	s.Require().Equal(in, out)
 }
+
+func (s *ConnectionParamsSuite) TestParse229() {
+	cp := new(ConnectionParams)
+	s.Require().NoError(cp.FromString(connectionString229Compatibility))
+}
+
+func (s *ConnectionParamsSuite) TestParseConnectionStringWithKeyUIDAndInstallationID() {
+	cp := new(ConnectionParams)
+	err := cp.FromString(connectionString)
+	s.Require().NoError(err)
+
+	s.Require().NotEmpty(cp.InstallationID)
+	s.Require().NotEmpty(cp.KeyUID)
+}
