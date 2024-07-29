@@ -1217,7 +1217,8 @@ func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 	params := &pairing.ConnectionParams{}
 	err = params.FromString(cs)
 	if err != nil {
-		return makeJSONResponse(fmt.Errorf("could not parse connection string"))
+		response := &inputConnectionStringForBootstrappingResponse{}
+		return response.toJSON(fmt.Errorf("could not parse connection string"))
 	}
 	response := &inputConnectionStringForBootstrappingResponse{
 		InstallationID: params.InstallationID(),
