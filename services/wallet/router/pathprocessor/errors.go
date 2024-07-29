@@ -95,3 +95,30 @@ func createErrorResponse(processorName string, err error) error {
 	customErrResp.Details = genericErrResp.Details
 	return customErrResp
 }
+
+func IsCustomError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errResp, ok := err.(*errors.ErrorResponse)
+	if !ok {
+		return false
+	}
+
+	switch errResp {
+	case ErrTransferCustomError,
+		ErrERC721TransferCustomError,
+		ErrERC1155TransferCustomError,
+		ErrBridgeHopCustomError,
+		ErrBridgeCellerCustomError,
+		ErrSwapParaswapCustomError,
+		ErrENSRegisterCustomError,
+		ErrENSReleaseCustomError,
+		ErrENSPublicKeyCustomError,
+		ErrStickersBuyCustomError:
+		return true
+	default:
+		return false
+	}
+}
