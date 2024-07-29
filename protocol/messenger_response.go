@@ -803,12 +803,10 @@ func (r *MessengerResponse) AddContacts(contacts []*Contact) {
 }
 
 func (r *MessengerResponse) AddInstallation(i *multidevice.Installation) {
-
 	if len(r.installations) == 0 {
 		r.installations = make(map[string]*multidevice.Installation)
 	}
-	r.installations[i.ID+i.Identity] = i
-
+	r.installations[i.UniqueKey()] = i
 }
 
 func (r *MessengerResponse) AddInstallations(installations []*multidevice.Installation) {
