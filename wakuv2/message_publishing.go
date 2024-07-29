@@ -1,57 +1,18 @@
 package wakuv2
 
 import (
-	"container/heap"
-	"context"
 	"errors"
 
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 )
-
-const defaultPriority = 2
-
-type envelopePriority struct {
-	envelope *protocol.Envelope
-	priority int
-	index    int
-}
-
-type envelopePriorityQueue []*envelopePriority
-
-func (pq envelopePriorityQueue) Len() int { return len(pq) }
-
-func (pq envelopePriorityQueue) Less(i, j int) bool {
-	return pq[i].priority > pq[j].priority
-}
-
-func (pq envelopePriorityQueue) Swap(i, j int) {
-	pq[i], pq[j] = pq[j], pq[i]
-	pq[i].index = i
-	pq[j].index = j
-}
-
-func (pq *envelopePriorityQueue) Push(x any) {
-	n := len(*pq)
-	item := x.(*envelopePriority)
-	item.index = n
-	*pq = append(*pq, item)
-}
-
-func (pq *envelopePriorityQueue) Pop() any {
-	old := *pq
-	n := len(old)
-	item := old[n-1]
-	item.index = -1
-	*pq = old[0 : n-1]
-	return item
-}
 
 type PublishMethod int
 
@@ -74,11 +35,6 @@ func (pm PublishMethod) String() string {
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
 func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]byte, error) {
-	msgPriority := defaultPriority
-	if priority != nil {
-		msgPriority = *priority
-	}
-
 	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
 	if w.protectedTopicStore != nil {
 		privKey, err := w.protectedTopicStore.FetchPrivateKey(pubsubTopic)
@@ -96,13 +52,10 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]b
 
 	envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
 
-	if w.cfg.UseThrottledPublish {
-		w.throttledPrioritySendQueue <- &envelopePriority{
-			envelope: envelope,
-			priority: msgPriority,
-		}
+	if priority != nil {
+		w.sendQueue.Push(envelope, *priority)
 	} else {
-		w.sendQueue <- envelope
+		w.sendQueue.Push(envelope)
 	}
 
 	w.poolMu.Lock()
@@ -117,31 +70,12 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]b
 	return envelope.Hash().Bytes(), nil
 }
 
-func (w *Waku) handleEnvelopePriority() {
-	if !w.cfg.UseThrottledPublish {
-		return
-	}
-
-	for {
-		select {
-		case envelopePriority := <-w.throttledPrioritySendQueue:
-			heap.Push(&w.envelopePriorityQueue, envelopePriority)
-			w.envelopeToSendAvailable <- struct{}{}
-		case <-w.ctx.Done():
-			return
-		}
-	}
-}
-
 func (w *Waku) broadcast() {
 	for {
 		var envelope *protocol.Envelope
 
 		select {
-		case <-w.envelopeToSendAvailable:
-			envelope = heap.Pop(&w.envelopePriorityQueue).(*envelopePriority).envelope
-
-		case envelope = <-w.sendQueue:
+		case envelope = <-w.sendQueue.Pop():
 
 		case <-w.ctx.Done():
 			return
@@ -149,7 +83,7 @@ func (w *Waku) broadcast() {
 
 		logger := w.logger.With(zap.Stringer("envelopeHash", envelope.Hash()), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().GetTimestamp()))
 
-		var fn publishFn
+		var fn publish.PublishFn
 		var publishMethod PublishMethod
 
 		if w.cfg.SkipPublishToTopic {
@@ -175,6 +109,8 @@ func (w *Waku) broadcast() {
 			}
 		}
 
+		fn = w.limiter.ThrottlePublishFn(w.ctx, fn)
+
 		// Wraps the publish function with a call to the telemetry client
 		if w.statusTelemetryClient != nil {
 			sendFn := fn
@@ -194,23 +130,8 @@ func (w *Waku) broadcast() {
 	}
 }
 
-type publishFn = func(envelope *protocol.Envelope, logger *zap.Logger) error
-
-func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn, logger *zap.Logger) {
+func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publish.PublishFn, logger *zap.Logger) {
 	defer w.wg.Done()
-
-	if w.cfg.UseThrottledPublish {
-		if err := w.limiter.Wait(w.ctx); err != nil {
-			if !errors.Is(err, context.Canceled) {
-				w.logger.Error("could not send message (limiter)", zap.Error(err))
-			}
-			w.SendEnvelopeEvent(common.EnvelopeEvent{
-				Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-				Event: common.EventEnvelopeExpired,
-			})
-			return
-		}
-	}
 
 	if err := publishFn(envelope, logger); err != nil {
 		logger.Error("could not send message", zap.Error(err))

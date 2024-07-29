@@ -57,6 +57,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
+	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
@@ -93,8 +94,8 @@ const maxRelayPeers = 300
 const randomPeersKeepAliveInterval = 5 * time.Second
 const allPeersKeepAliveInterval = 5 * time.Minute
 const peersToPublishForLightpush = 2
-const publishingLimiterRate = rate.Limit(3)
-const publishingLimiterBurst = 5
+const publishingLimiterRate = rate.Limit(2)
+const publishingLimitBurst = 4
 
 type SentEnvelope struct {
 	Envelope      *protocol.Envelope
@@ -138,12 +139,8 @@ type Waku struct {
 
 	protectedTopicStore *persistence.ProtectedTopicsStore
 
-	sendQueue                  chan *protocol.Envelope
-	throttledPrioritySendQueue chan *envelopePriority
-
-	limiter                 *rate.Limiter
-	envelopeToSendAvailable chan struct{}
-	envelopePriorityQueue   envelopePriorityQueue
+	sendQueue *publish.MessageQueue
+	limiter   *publish.PublishRateLimiter
 
 	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
@@ -257,20 +254,16 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
-		envelopePriorityQueue:           make(envelopePriorityQueue, 0),
-		envelopeToSendAvailable:         make(chan struct{}),
-		throttledPrioritySendQueue:      make(chan *envelopePriority, 1000),
-		sendQueue:                       make(chan *protocol.Envelope, 1000),
+		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
 	}
 
-	if cfg.UseThrottledPublish {
-		if testing.Testing() {
-			// To avoid delaying the tests, we set up an infinite rate limiter, basically
-			// disabling the rate limit functionality
-			waku.limiter = rate.NewLimiter(rate.Inf, 0)
-		} else {
-			waku.limiter = rate.NewLimiter(publishingLimiterRate, publishingLimiterBurst)
-		}
+	if !cfg.UseThrottledPublish || testing.Testing() {
+		// To avoid delaying the tests, or for when we dont want to rate limit, we set up an infinite rate limiter,
+		// basically disabling the rate limit functionality
+		waku.limiter = publish.NewPublishRateLimiter(rate.Inf, 1)
+
+	} else {
+		waku.limiter = publish.NewPublishRateLimiter(publishingLimiterRate, publishingLimitBurst)
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
@@ -1323,7 +1316,7 @@ func (w *Waku) Start() error {
 
 	go w.broadcast()
 
-	go w.handleEnvelopePriority()
+	go w.sendQueue.Start(w.ctx)
 
 	go w.checkIfMessagesStored()
 

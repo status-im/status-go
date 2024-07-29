@@ -50,7 +50,7 @@ type MessagePriority = int
 
 var (
 	LowPriority    MessagePriority = 0
-	MediumPriority MessagePriority = 1
+	NormalPriority MessagePriority = 1
 	HighPriority   MessagePriority = 2
 )
 
