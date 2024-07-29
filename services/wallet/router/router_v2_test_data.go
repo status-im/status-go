@@ -2594,7 +2594,6 @@ type noBalanceTestParams struct {
 	expectedCandidates []*PathV2
 	expectedBest       []*PathV2
 	expectedError      *errors.ErrorResponse
-	flaky              bool
 }
 
 func getNoBalanceTestParamsList() []noBalanceTestParams {
@@ -2727,10 +2726,9 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			flaky: true,
 			expectedError: &errors.ErrorResponse{
 				Code:    ErrNotEnoughTokenBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, pathprocessor.UsdcSymbol, walletCommon.EthereumMainnet),
+				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, pathprocessor.UsdcSymbol, walletCommon.ArbitrumMainnet),
 			},
 			expectedCandidates: []*PathV2{
 				{
@@ -2788,10 +2786,9 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			flaky: true,
 			expectedError: &errors.ErrorResponse{
 				Code:    ErrNotEnoughNativeBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.EthereumMainnet),
+				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.ArbitrumMainnet),
 			},
 			expectedCandidates: []*PathV2{
 				{
