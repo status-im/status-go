@@ -29,6 +29,6 @@ var (
 	ErrLockedAmountExcludesAllSupported          = &errors.ErrorResponse{Code: errors.ErrorCode("WR-021"), Details: "all supported chains are excluded, routing impossible"}
 	ErrTokenNotFound                             = &errors.ErrorResponse{Code: errors.ErrorCode("WR-022"), Details: "token not found"}
 	ErrNoBestRouteFound                          = &errors.ErrorResponse{Code: errors.ErrorCode("WR-023"), Details: "no best route found"}
-	ErrCannotCheckReceiverBalance                = &errors.ErrorResponse{Code: errors.ErrorCode("WR-024"), Details: "cannot check receiver balance"}
+	ErrCannotCheckBalance                        = &errors.ErrorResponse{Code: errors.ErrorCode("WR-024"), Details: "cannot check balance"}
 	ErrCannotCheckLockedAmounts                  = &errors.ErrorResponse{Code: errors.ErrorCode("WR-025"), Details: "cannot check locked amounts"}
 )

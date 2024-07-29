@@ -68,3 +68,38 @@ func TestNonGenericErrorResponse(t *testing.T) {
 	require.Equal(t, errResp.Code, castPPErrResp.Code)
 	require.Equal(t, errResp.Details, castPPErrResp.Details)
 }
+
+func TestCustomErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "no error - nil",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "not error response error",
+			err:      errors.New("unknown error"),
+			expected: false,
+		},
+		{
+			name:     "not custom error",
+			err:      ErrFromChainNotSupported,
+			expected: false,
+		},
+		{
+			name:     "custom error",
+			err:      ErrTransferCustomError,
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, IsCustomError(tt.err))
+		})
+	}
+}

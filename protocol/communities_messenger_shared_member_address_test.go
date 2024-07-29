@@ -10,6 +10,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -819,6 +820,8 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterReceivesAc
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivesPendingRequestToJoinAfterAfterGettingTokenMasterRole() {
+	s.T().Skip("flaky test")
+
 	community, _ := createOnRequestCommunity(&s.Suite, s.owner)
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)

@@ -230,20 +230,23 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 
 	// Test async endpoints
 	for _, tt := range tests {
-		router.SuggestedRoutesV2Async(tt.input)
+		t.Run(tt.name, func(t *testing.T) {
 
-		select {
-		case asyncRoutes := <-suggestedRoutesCh:
-			assert.Equal(t, tt.input.Uuid, asyncRoutes.Uuid)
-			assert.Equal(t, tt.expectedError, asyncRoutes.ErrorResponse)
-			assertPathsEqual(t, tt.expectedCandidates, asyncRoutes.Candidates)
-			if tt.expectedError == nil {
-				assertPathsEqual(t, tt.expectedBest, asyncRoutes.Best)
+			router.SuggestedRoutesV2Async(tt.input)
+
+			select {
+			case asyncRoutes := <-suggestedRoutesCh:
+				assert.Equal(t, tt.input.Uuid, asyncRoutes.Uuid)
+				assert.Equal(t, tt.expectedError, asyncRoutes.ErrorResponse)
+				assertPathsEqual(t, tt.expectedCandidates, asyncRoutes.Candidates)
+				if tt.expectedError == nil {
+					assertPathsEqual(t, tt.expectedBest, asyncRoutes.Best)
+				}
+				break
+			case <-time.After(10 * time.Second):
+				t.FailNow()
 			}
-			break
-		case <-time.After(10 * time.Second):
-			t.FailNow()
-		}
+		})
 	}
 }
 

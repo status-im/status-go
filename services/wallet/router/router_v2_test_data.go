@@ -2728,7 +2728,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 			},
 			expectedError: &errors.ErrorResponse{
 				Code:    ErrNotEnoughTokenBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, pathprocessor.UsdcSymbol, walletCommon.EthereumMainnet),
+				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, pathprocessor.UsdcSymbol, walletCommon.ArbitrumMainnet),
 			},
 			expectedCandidates: []*PathV2{
 				{
@@ -2788,7 +2788,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 			},
 			expectedError: &errors.ErrorResponse{
 				Code:    ErrNotEnoughNativeBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.EthereumMainnet),
+				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.ArbitrumMainnet),
 			},
 			expectedCandidates: []*PathV2{
 				{

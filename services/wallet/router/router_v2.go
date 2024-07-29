@@ -175,7 +175,6 @@ func newSuggestedRoutesV2(
 	suggestedRoutes := &SuggestedRoutesV2{
 		Uuid:                  uuid,
 		Candidates:            candidates,
-		Best:                  candidates,
 		TokenPrice:            tokenPrice,
 		NativeChainTokenPrice: nativeChainTokenPrice,
 	}
@@ -189,6 +188,14 @@ func newSuggestedRoutesV2(
 	}
 	allRoutes := node.buildAllRoutesV2()
 	allRoutes = filterRoutesV2(allRoutes, amountIn, fromLockedAmount)
+
+	if len(allRoutes) > 0 {
+		sort.Slice(allRoutes, func(i, j int) bool {
+			iRoute := getRoutePriority(allRoutes[i])
+			jRoute := getRoutePriority(allRoutes[j])
+			return iRoute <= jRoute
+		})
+	}
 
 	return suggestedRoutes, allRoutes
 }
@@ -507,7 +514,16 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 		// No best route found, but no error given.
 		if len(processorErrors) > 0 {
 			// Return one of the path processor errors if present.
-			err = errors.CreateErrorResponseFromError(processorErrors[0].Error)
+			// Give precedence to the custom error message.
+			for _, processorError := range processorErrors {
+				if processorError.Error != nil && pathprocessor.IsCustomError(processorError.Error) {
+					err = processorError.Error
+					break
+				}
+			}
+			if err == nil {
+				err = errors.CreateErrorResponseFromError(processorErrors[0].Error)
+			}
 		} else {
 			err = ErrNoBestRouteFound
 		}
@@ -995,6 +1011,12 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 		})
 	}
 
+	sort.Slice(candidates, func(i, j int) bool {
+		iChain := getChainPriority(candidates[i].FromChain.ChainID)
+		jChain := getChainPriority(candidates[j].FromChain.ChainID)
+		return iChain <= jChain
+	})
+
 	group.Wait()
 	return candidates, processorErrors, nil
 }
@@ -1004,7 +1026,7 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*
 		return new(big.Int).Set(v.(*big.Int))
 	}).(map[string]*big.Int)
 	if balanceMapCopy == nil {
-		return ErrCannotCheckReceiverBalance
+		return ErrCannotCheckBalance
 	}
 
 	// check the best route for the required balances
@@ -1071,6 +1093,27 @@ func removeBestRouteFromAllRouters(allRoutes [][]*PathV2, best []*PathV2) [][]*P
 	return nil
 }
 
+func getChainPriority(chainID uint64) int {
+	switch chainID {
+	case walletCommon.EthereumMainnet, walletCommon.EthereumSepolia:
+		return 1
+	case walletCommon.OptimismMainnet, walletCommon.OptimismSepolia:
+		return 2
+	case walletCommon.ArbitrumMainnet, walletCommon.ArbitrumSepolia:
+		return 3
+	default:
+		return 0
+	}
+}
+
+func getRoutePriority(route []*PathV2) int {
+	priority := 0
+	for _, path := range route {
+		priority += getChainPriority(path.FromChain.ChainID)
+	}
+	return priority
+}
+
 func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, candidates []*PathV2, balanceMap map[string]*big.Int) (suggestedRoutes *SuggestedRoutesV2, err error) {
 	var prices map[string]float64
 	if input.testsMode {
@@ -1088,6 +1131,16 @@ func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, can
 	var allRoutes [][]*PathV2
 	suggestedRoutes, allRoutes = newSuggestedRoutesV2(input.Uuid, input.AmountIn.ToInt(), candidates, input.FromLockedAmount, tokenPrice, nativeTokenPrice)
 
+	defer func() {
+		if suggestedRoutes.Best != nil && len(suggestedRoutes.Best) > 0 {
+			sort.Slice(suggestedRoutes.Best, func(i, j int) bool {
+				iChain := getChainPriority(suggestedRoutes.Best[i].FromChain.ChainID)
+				jChain := getChainPriority(suggestedRoutes.Best[j].FromChain.ChainID)
+				return iChain <= jChain
+			})
+		}
+	}()
+
 	for len(allRoutes) > 0 {
 		best := findBestV2(allRoutes, tokenPrice, nativeTokenPrice)
 
@@ -1098,18 +1151,16 @@ func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, can
 			if (input.SendType == Transfer ||
 				input.SendType == Bridge) &&
 				len(allRoutes) > 1 {
+
 				allRoutes = removeBestRouteFromAllRouters(allRoutes, best)
 				continue
 			} else {
+				suggestedRoutes.Best = best
 				return suggestedRoutes, errors.CreateErrorResponseFromError(err)
 			}
 		}
 
 		if len(best) > 0 {
-			sort.Slice(best, func(i, j int) bool {
-				return best[i].AmountInLocked
-			})
-
 			// At this point we have to do the final check and update the amountIn (subtracting fees) if complete balance is going to be sent for native token (ETH)
 			for _, path := range best {
 				if path.subtractFees && path.FromToken.IsNative() {
