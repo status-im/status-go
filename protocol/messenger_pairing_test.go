@@ -55,21 +55,26 @@ func (s *MessengerPairingSuite) TestEnableNonExistingInstallation() {
 }
 
 func (s *MessengerPairingSuite) TestMessengerPairAfterSeedPhrase() {
+	// assuming alice2 want to sync with alice1
+	// alice1 generated the connection string for bootstraping alice2
+	// alice2 failed to connect to alice1 and restored from seed phrase
+	// alice2 get the installationID1 from alice1 via parsing the connection string
 	alice1 := s.m
 	alice2, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
 	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, alice2)
 	installationID1 := alice1.installationID
-	installationID2 := alice1.installationID
-	_, err = alice1.FinishPairingThroughSeedPhraseProcess(&requests.FinishPairingThroughSeedPhraseProcess{InstallationID: installationID2})
+	installationID2 := alice2.installationID
+	s.Require().NotEqual(installationID1, installationID2)
+	_, err = alice2.FinishPairingThroughSeedPhraseProcess(&requests.FinishPairingThroughSeedPhraseProcess{InstallationID: installationID1})
 	s.Require().NoError(err)
 
-	// alice 1 advertise her device to alice2
+	// alice1 should get the installationID1 from alice2
 	_, err = WaitOnMessengerResponse(
 		alice2,
 		func(r *MessengerResponse) bool {
 			for _, i := range r.Installations() {
-				if i.ID == installationID1 {
+				if i.ID == installationID2 {
 					return true
 				}
 			}
