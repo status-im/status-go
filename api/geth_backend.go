@@ -84,12 +84,10 @@ var _ StatusBackend = (*GethStatusBackend)(nil)
 type GethStatusBackend struct {
 	mu sync.Mutex
 	// rootDataDir is the same for all networks.
-	rootDataDir    string
-	appDB          *sql.DB
-	walletDB       *sql.DB
-	config         *params.NodeConfig
-	installationID string
-	keyUID         string
+	rootDataDir string
+	appDB       *sql.DB
+	walletDB    *sql.DB
+	config      *params.NodeConfig
 
 	statusNode               *node.StatusNode
 	personalAPI              *personal.PublicAPI
@@ -2660,21 +2658,25 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager
 		b.statusNode.ChatService(accDB).Init(messenger)
 		b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
 		b.statusNode.CommunityTokensService().Init(messenger)
-		if messenger != nil {
-			b.installationID = messenger.InstallationID()
-			b.keyUID = messenger.KeyUID()
-		}
 	}
 
 	return nil
 }
 
 func (b *GethStatusBackend) InstallationID() string {
-	return b.installationID
+	m := b.Messenger()
+	if m != nil {
+		return m.InstallationID()
+	}
+	return ""
 }
 
 func (b *GethStatusBackend) KeyUID() string {
-	return b.keyUID
+	m := b.Messenger()
+	if m != nil {
+		return m.KeyUID()
+	}
+	return ""
 }
 
 func (b *GethStatusBackend) injectAccountsIntoServices() error {
