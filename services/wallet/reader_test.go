@@ -1040,3 +1040,24 @@ func TestReaderRestart(t *testing.T) {
 	require.NotNil(t, reader.walletEventsWatcher)
 	require.NotEqual(t, previousWalletEventsWatcher, reader.walletEventsWatcher)
 }
+
+func TestFetchOrGetCachedWalletBalances(t *testing.T) {
+	// Test the behavior of FetchOrGetCachedWalletBalances when fetching new balances fails.
+	// This focuses on the error handling path where the function should return the cached balances as a fallback.
+	// We don't explicitly test the contents of fetched or cached balances here, as those
+	// are covered in other dedicated tests. The main goal is to ensure the correct flow of
+	// execution and data retrieval in this specific failure scenario.
+
+	reader, _, tokenPersistence, mockCtrl := setupReader(t)
+	defer mockCtrl.Finish()
+
+	reader.invalidateBalanceCache()
+
+	tokenPersistence.EXPECT().GetTokens().Return(nil, errors.New("error")).AnyTimes()
+
+	clients := map[uint64]chain.ClientInterface{}
+	addresses := []common.Address{}
+
+	_, err := reader.FetchOrGetCachedWalletBalances(context.TODO(), clients, addresses)
+	require.Error(t, err)
+}
