@@ -142,9 +142,12 @@ type Logger interface {
 }
 
 type LoggerOptions struct {
-	AddSource   bool
+	// Number of callers to skip in case when
+	// source code location is required
+	// (useful e.g. when using wrappers like zap)
 	SkipCallers int
-	UseUTC      bool
+	// Use UTC time when creating a slog.Record instance
+	UseUTC bool
 }
 
 type logger struct {

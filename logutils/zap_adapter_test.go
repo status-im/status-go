@@ -57,7 +57,7 @@ func TestNewZapLoggerWithAdapter(t *testing.T) {
 
 func TestZapLoggerTerminalFormat(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-	logger := log.NewLoggerWithOpts(log.LogfmtHandlerWithSource(buf), &log.LoggerOptions{AddSource: true, SkipCallers: 2})
+	logger := log.NewLoggerWithOpts(log.NewTerminalHandlerWithSource(buf, log.LevelTrace, false), &log.LoggerOptions{SkipCallers: 2})
 
 	zapLogger, err := NewZapLoggerWithAdapter(logger)
 	require.NoError(t, err)
