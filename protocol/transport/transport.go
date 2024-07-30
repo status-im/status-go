@@ -500,18 +500,18 @@ func (t *Transport) createMessagesRequestV2(
 	ctx context.Context,
 	peerID []byte,
 	from, to uint32,
-	previousStoreCursor *types.StoreRequestCursor,
+	previousStoreCursor types.StoreRequestCursor,
 	pubsubTopic string,
 	contentTopics []types.TopicType,
 	limit uint32,
 	waitForResponse bool,
 	processEnvelopes bool,
-) (storeCursor *types.StoreRequestCursor, envelopesCount int, err error) {
+) (storeCursor types.StoreRequestCursor, envelopesCount int, err error) {
 	r := createMessagesRequest(from, to, nil, previousStoreCursor, pubsubTopic, contentTopics, limit)
 
 	if waitForResponse {
 		resultCh := make(chan struct {
-			storeCursor    *types.StoreRequestCursor
+			storeCursor    types.StoreRequestCursor
 			envelopesCount int
 			err            error
 		})
@@ -519,7 +519,7 @@ func (t *Transport) createMessagesRequestV2(
 		go func() {
 			storeCursor, envelopesCount, err = t.waku.RequestStoreMessages(ctx, peerID, r, processEnvelopes)
 			resultCh <- struct {
-				storeCursor    *types.StoreRequestCursor
+				storeCursor    types.StoreRequestCursor
 				envelopesCount int
 				err            error
 			}{storeCursor, envelopesCount, err}
@@ -548,13 +548,13 @@ func (t *Transport) SendMessagesRequestForTopics(
 	peerID []byte,
 	from, to uint32,
 	previousCursor []byte,
-	previousStoreCursor *types.StoreRequestCursor,
+	previousStoreCursor types.StoreRequestCursor,
 	pubsubTopic string,
 	contentTopics []types.TopicType,
 	limit uint32,
 	waitForResponse bool,
 	processEnvelopes bool,
-) (cursor []byte, storeCursor *types.StoreRequestCursor, envelopesCount int, err error) {
+) (cursor []byte, storeCursor types.StoreRequestCursor, envelopesCount int, err error) {
 	switch t.waku.Version() {
 	case 2:
 		storeCursor, envelopesCount, err = t.createMessagesRequestV2(ctx, peerID, from, to, previousStoreCursor, pubsubTopic, contentTopics, limit, waitForResponse, processEnvelopes)
@@ -566,7 +566,7 @@ func (t *Transport) SendMessagesRequestForTopics(
 	return
 }
 
-func createMessagesRequest(from, to uint32, cursor []byte, storeCursor *types.StoreRequestCursor, pubsubTopic string, topics []types.TopicType, limit uint32) types.MessagesRequest {
+func createMessagesRequest(from, to uint32, cursor []byte, storeCursor types.StoreRequestCursor, pubsubTopic string, topics []types.TopicType, limit uint32) types.MessagesRequest {
 	aUUID := uuid.New()
 	// uuid is 16 bytes, converted to hex it's 32 bytes as expected by types.MessagesRequest
 	id := []byte(hex.EncodeToString(aUUID[:]))

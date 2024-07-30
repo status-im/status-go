@@ -15,7 +15,7 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/libp2p/go-libp2p/core/metrics"
-	"github.com/libp2p/go-libp2p/core/protocol"
+	libp2pprotocol "github.com/libp2p/go-libp2p/core/protocol"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -29,11 +29,13 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
+	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
@@ -237,14 +239,13 @@ func TestBasicWakuV2(t *testing.T) {
 		_, envelopeCount, err := w.Query(
 			context.Background(),
 			storeNode.PeerID,
-			legacy_store.Query{
-				PubsubTopic:   config.DefaultShardPubsubTopic,
-				ContentTopics: []string{contentTopic.ContentTopic()},
-				StartTime:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
-				EndTime:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
+			store.FilterCriteria{
+				ContentFilter: protocol.NewContentFilter(config.DefaultShardPubsubTopic, contentTopic.ContentTopic()),
+				TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
+				TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
 			},
 			nil,
-			[]legacy_store.HistoryRequestOption{},
+			nil,
 			false,
 		)
 		if err != nil || envelopeCount == 0 {
@@ -454,6 +455,8 @@ func TestWakuV2Filter(t *testing.T) {
 }
 
 func TestWakuV2Store(t *testing.T) {
+	t.Skip("deprecated. Storenode must use nwaku")
+
 	// Configuration for the first Waku node
 	config1 := &Config{
 		Port:           0,
@@ -543,14 +546,13 @@ func TestWakuV2Store(t *testing.T) {
 	_, envelopeCount, err := w1.Query(
 		context.Background(),
 		w2.node.Host().ID(),
-		legacy_store.Query{
-			PubsubTopic:   config1.DefaultShardPubsubTopic,
-			ContentTopics: []string{contentTopic.ContentTopic()},
-			StartTime:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
-			EndTime:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
+		store.FilterCriteria{
+			TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
+			TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
+			ContentFilter: protocol.NewContentFilter(config1.DefaultShardPubsubTopic, contentTopic.ContentTopic()),
 		},
 		nil,
-		[]legacy_store.HistoryRequestOption{},
+		nil,
 		false,
 	)
 	require.NoError(t, err)
@@ -804,7 +806,7 @@ func TestTelemetryFormat(t *testing.T) {
 		RateOut:  40,
 	}
 
-	m := make(map[protocol.ID]metrics.Stats)
+	m := make(map[libp2pprotocol.ID]metrics.Stats)
 	m[relay.WakuRelayID_v200] = s
 	m[filter.FilterPushID_v20beta1] = s
 	m[filter.FilterSubscribeID_v20beta1] = s

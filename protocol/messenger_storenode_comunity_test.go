@@ -30,6 +30,7 @@ import (
 )
 
 func TestMessengerStoreNodeCommunitySuite(t *testing.T) {
+	t.Skip("requires storev3 node")
 	suite.Run(t, new(MessengerStoreNodeCommunitySuite))
 }
 
@@ -283,7 +284,8 @@ func (s *MessengerStoreNodeCommunitySuite) TestSetCommunityStorenodesAndFetch() 
 }
 
 func (s *MessengerStoreNodeCommunitySuite) TestSetStorenodeForCommunity_fetchMessagesFromNewStorenode() {
-	s.T().Skip("flaky test")
+	s.T().Skip("flaky")
+
 	err := s.owner.DialPeer(s.storeNodeAddress)
 	s.Require().NoError(err)
 	err = s.bob.DialPeer(s.storeNodeAddress)

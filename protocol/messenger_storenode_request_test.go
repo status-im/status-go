@@ -44,6 +44,7 @@ const (
 )
 
 func TestMessengerStoreNodeRequestSuite(t *testing.T) {
+	t.Skip("requires storev3 node")
 	suite.Run(t, new(MessengerStoreNodeRequestSuite))
 }
 
@@ -382,7 +383,7 @@ func (s *MessengerStoreNodeRequestSuite) ensureStoreNodeEnvelopes(contentTopic *
 		PubsubTopic:   "",
 		ContentTopics: []string{contentTopic.ContentTopic()},
 	}
-	result, err := s.wakuStoreNode.StoreNode().Query(context.Background(), query, queryOptions...)
+	result, err := s.wakuStoreNode.LegacyStoreNode().Query(context.Background(), query, queryOptions...)
 	s.Require().NoError(err)
 	s.Require().GreaterOrEqual(len(result.Messages), minimumCount)
 	s.logger.Debug("store node query result", zap.Int("messagesCount", len(result.Messages)))

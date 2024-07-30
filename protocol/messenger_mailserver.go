@@ -707,7 +707,7 @@ type work struct {
 	pubsubTopic   string
 	contentTopics []types.TopicType
 	cursor        []byte
-	storeCursor   *types.StoreRequestCursor
+	storeCursor   types.StoreRequestCursor
 	limit         uint32
 }
 
@@ -717,13 +717,13 @@ type messageRequester interface {
 		peerID []byte,
 		from, to uint32,
 		previousCursor []byte,
-		previousStoreCursor *types.StoreRequestCursor,
+		previousStoreCursor types.StoreRequestCursor,
 		pubsubTopic string,
 		contentTopics []types.TopicType,
 		limit uint32,
 		waitForResponse bool,
 		processEnvelopes bool,
-	) (cursor []byte, storeCursor *types.StoreRequestCursor, envelopesCount int, err error)
+	) (cursor []byte, storeCursor types.StoreRequestCursor, envelopesCount int, err error)
 }
 
 func processMailserverBatch(
