@@ -58,7 +58,7 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 
 // MakeConnectionParams generates a *ConnectionParams based on the Server's current state
 func (s *BaseServer) MakeConnectionParams() (*ConnectionParams, error) {
-	return NewConnectionParams(s.config.IPAddresses, s.MustGetPort(), s.config.PK, s.config.EK), nil
+	return NewConnectionParams(s.config.IPAddresses, s.MustGetPort(), s.config.PK, s.config.EK, s.config.InstallationID, s.config.KeyUID), nil
 }
 
 func MakeServerConfig(config *ServerConfig) error {
@@ -160,6 +160,8 @@ func (s *SenderServer) startSendingData() error {
 
 // MakeFullSenderServer generates a fully configured and randomly seeded SenderServer
 func MakeFullSenderServer(backend *api.GethStatusBackend, config *SenderServerConfig) (*SenderServer, error) {
+	config.ServerConfig.InstallationID = backend.InstallationID()
+	config.ServerConfig.KeyUID = backend.KeyUID()
 	err := MakeServerConfig(config.ServerConfig)
 	if err != nil {
 		return nil, err
@@ -268,6 +270,9 @@ func (s *ReceiverServer) startReceivingData() error {
 
 // MakeFullReceiverServer generates a fully configured and randomly seeded ReceiverServer
 func MakeFullReceiverServer(backend *api.GethStatusBackend, config *ReceiverServerConfig) (*ReceiverServer, error) {
+	config.ServerConfig.InstallationID = backend.InstallationID()
+	config.ServerConfig.KeyUID = backend.KeyUID()
+
 	err := MakeServerConfig(config.ServerConfig)
 	if err != nil {
 		return nil, err
@@ -370,6 +375,9 @@ func (s *KeystoreFilesSenderServer) startSendingData() error {
 
 // MakeFullSenderServer generates a fully configured and randomly seeded KeystoreFilesSenderServer
 func MakeKeystoreFilesSenderServer(backend *api.GethStatusBackend, config *KeystoreFilesSenderServerConfig) (*KeystoreFilesSenderServer, error) {
+	config.ServerConfig.InstallationID = backend.InstallationID()
+	config.ServerConfig.KeyUID = backend.KeyUID()
+
 	err := MakeServerConfig(config.ServerConfig)
 	if err != nil {
 		return nil, err

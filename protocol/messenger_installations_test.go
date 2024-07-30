@@ -52,12 +52,12 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Installations()) > 0 },
 		"installation not received",
 	)
 
 	s.Require().NoError(err)
-	actualInstallation := response.Installations[0]
+	actualInstallation := response.Installations()[0]
 	s.Require().Equal(theirMessenger.installationID, actualInstallation.ID)
 	s.Require().NotNil(actualInstallation.InstallationMetadata)
 	s.Require().Equal("their-name", actualInstallation.InstallationMetadata.Name)
@@ -251,12 +251,12 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Installations()) > 0 },
 		"installation not received",
 	)
 
 	s.Require().NoError(err)
-	actualInstallation := response.Installations[0]
+	actualInstallation := response.Installations()[0]
 	s.Require().Equal(theirMessenger.installationID, actualInstallation.ID)
 	s.Require().NotNil(actualInstallation.InstallationMetadata)
 	s.Require().Equal("their-name", actualInstallation.InstallationMetadata.Name)
@@ -375,12 +375,12 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		bob1,
-		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Installations()) > 0 },
 		"installation not received",
 	)
 
 	s.Require().NoError(err)
-	actualInstallation := response.Installations[0]
+	actualInstallation := response.Installations()[0]
 	s.Require().Equal(bob2.installationID, actualInstallation.ID)
 	err = bob1.EnableInstallation(bob2.installationID)
 	s.Require().NoError(err)

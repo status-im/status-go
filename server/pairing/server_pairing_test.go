@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -319,4 +320,51 @@ func (s *PairingServerSuite) TestGetOutboundIPWithFullServerE2e() {
 	content, err := ioutil.ReadAll(response.Body)
 	s.Require().NoError(err)
 	s.Require().Equal("Hello I like to be a tls server. You said: `"+thing+"`", string(content[:109]))
+}
+
+func (s *PairingServerSuite) TestFromStringInstallationID() {
+	pm := NewMockPayloadMounter(s.EphemeralAES)
+	s.SS.accountMounter = pm
+
+	err := s.SS.startSendingData()
+	s.Require().NoError(err)
+
+	// Server generates a QR code connection string
+	cp, err := s.SS.MakeConnectionParams()
+	s.Require().NoError(err)
+
+	installationID := uuid.New().String()
+	cp.installationID = installationID
+	qr := cp.ToString()
+
+	// Client reads QR code and parses the connection string
+	ccp := new(ConnectionParams)
+	err = ccp.FromString(qr)
+	s.Require().NoError(err)
+
+	s.Require().Equal(installationID, ccp.installationID)
+}
+
+func (s *PairingServerSuite) TestFromStringForwardCompatibility() {
+	pm := NewMockPayloadMounter(s.EphemeralAES)
+	s.SS.accountMounter = pm
+
+	err := s.SS.startSendingData()
+	s.Require().NoError(err)
+
+	// Server generates a QR code connection string
+	cp, err := s.SS.MakeConnectionParams()
+	s.Require().NoError(err)
+
+	installationID := uuid.New().String()
+	cp.installationID = installationID
+	qr := cp.ToString()
+
+	qr += ":for-gods-sake-this-should-not-break:anything"
+
+	// Client reads QR code and parses the connection string
+	ccp := new(ConnectionParams)
+	err = ccp.FromString(qr)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(ccp.netIPs)
 }

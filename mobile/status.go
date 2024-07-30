@@ -1188,6 +1188,18 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 	return cs
 }
 
+type inputConnectionStringForBootstrappingResponse struct {
+	InstallationID string `json:"installationId"`
+	KeyUID         string `json:"keyUID"`
+	Error          error  `json:"error"`
+}
+
+func (i *inputConnectionStringForBootstrappingResponse) toJSON(err error) string {
+	i.Error = err
+	j, _ := json.Marshal(i)
+	return string(j)
+}
+
 // InputConnectionStringForBootstrapping starts a pairing.ReceiverClient
 // The given server.ConnectionParams string will determine the server.Mode
 //
@@ -1202,18 +1214,30 @@ func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 		return makeJSONResponse(fmt.Errorf("no config given, ReceiverClientConfig is expected"))
 	}
 
+	params := &pairing.ConnectionParams{}
+	err = params.FromString(cs)
+	if err != nil {
+		response := &inputConnectionStringForBootstrappingResponse{}
+		return response.toJSON(fmt.Errorf("could not parse connection string"))
+	}
+	response := &inputConnectionStringForBootstrappingResponse{
+		InstallationID: params.InstallationID(),
+		KeyUID:         params.KeyUID(),
+	}
+
 	err = statusBackend.LocalPairingStateManager.StartPairing(cs)
 	defer func() { statusBackend.LocalPairingStateManager.StopPairing(cs, err) }()
 	if err != nil {
-		return makeJSONResponse(err)
+		return response.toJSON(err)
 	}
 
 	err = pairing.StartUpReceivingClient(statusBackend, cs, configJSON)
 	if err != nil {
-		return makeJSONResponse(err)
+		return response.toJSON(err)
+
 	}
 
-	return makeJSONResponse(statusBackend.Logout())
+	return response.toJSON(statusBackend.Logout())
 }
 
 // InputConnectionStringForBootstrappingAnotherDevice starts a pairing.SendingClient
