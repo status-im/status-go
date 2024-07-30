@@ -31,6 +31,10 @@ type Installation struct {
 	InstallationMetadata *InstallationMetadata `json:"metadata"`
 }
 
+func (i *Installation) UniqueKey() string {
+	return i.ID + i.Identity
+}
+
 type Config struct {
 	MaxInstallations int
 	ProtocolVersion  uint32

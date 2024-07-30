@@ -540,6 +540,10 @@ func (p *Protocol) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *
 	return p.multidevice.AddInstallations(bundle.GetIdentity(), bundle.GetTimestamp(), installations, enabled)
 }
 
+func (p *Protocol) AddInstallation(identity []byte, timestamp int64, installation *multidevice.Installation, enabled bool) ([]*multidevice.Installation, error) {
+	return p.multidevice.AddInstallations(identity, timestamp, []*multidevice.Installation{installation}, enabled)
+}
+
 func (p *Protocol) GetMultiDevice() *multidevice.Multidevice {
 	return p.multidevice
 }

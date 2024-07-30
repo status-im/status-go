@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	connectionStringV1 = "cs2:4FHRnp:Q4:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6"
-	connectionStringV2 = "cs3:kDDauj5:Q4:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6"
-	port               = 1337
+	connectionString = "cs3:kDDauj5:Q4:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6:XxovYsfDefUHFJy8U98wtV:3BM1jGMPFuHMhJqEB"
+
+	connectionString229Compatibility = "cs3:kDDauj5:Q4:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6"
+	port                             = 1337
 )
 
 func TestConnectionParamsSuite(t *testing.T) {
@@ -44,11 +45,13 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 	s.Require().NoError(err)
 
 	sc := ServerConfig{
-		PK:          &s.PK.PublicKey,
-		EK:          s.AES,
-		Cert:        &cert,
-		IPAddresses: ips,
-		ListenIP:    net.IPv4zero,
+		PK:             &s.PK.PublicKey,
+		EK:             s.AES,
+		Cert:           &cert,
+		IPAddresses:    ips,
+		ListenIP:       net.IPv4zero,
+		InstallationID: "fabcfc11-6ed9-46d1-b723-de5d4ad1657a",
+		KeyUID:         "some-key-uid",
 	}
 
 	bs := server.NewServer(&cert, net.IPv4zero.String(), nil, s.Logger)
@@ -62,11 +65,12 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 }
 
 func (s *ConnectionParamsSuite) TestConnectionParams_ToString() {
+	keep229Compatibility = false
 	cp, err := s.server.MakeConnectionParams()
 	s.Require().NoError(err)
 
 	cps := cp.ToString()
-	s.Require().Equal(connectionStringV2, cps)
+	s.Require().Equal(connectionString, cps)
 }
 
 func (s *ConnectionParamsSuite) TestConnectionParams_Generate() {
@@ -75,14 +79,13 @@ func (s *ConnectionParamsSuite) TestConnectionParams_Generate() {
 		description string
 		cs          string
 	}{
-		{description: "ConnectionString_version1", cs: connectionStringV1},
-		{description: "ConnectionString_version2", cs: connectionStringV2},
+		{description: "ConnectionString", cs: connectionString},
 	}
 
 	for _, tc := range testCases {
 		s.T().Run(tc.description, func(t *testing.T) {
 			cp := new(ConnectionParams)
-			err := cp.FromString(connectionStringV2)
+			err := cp.FromString(connectionString)
 			s.Require().NoError(err)
 
 			u, err := cp.URL(0)
@@ -135,4 +138,18 @@ func (s *ConnectionParamsSuite) TestConnectionParams_ParseNetIps() {
 	})
 
 	s.Require().Equal(in, out)
+}
+
+func (s *ConnectionParamsSuite) TestParse229() {
+	cp := new(ConnectionParams)
+	s.Require().NoError(cp.FromString(connectionString229Compatibility))
+}
+
+func (s *ConnectionParamsSuite) TestParseConnectionStringWithKeyUIDAndInstallationID() {
+	cp := new(ConnectionParams)
+	err := cp.FromString(connectionString)
+	s.Require().NoError(err)
+
+	s.Require().NotEmpty(cp.InstallationID)
+	s.Require().NotEmpty(cp.KeyUID)
 }

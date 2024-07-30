@@ -2663,6 +2663,22 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager
 	return nil
 }
 
+func (b *GethStatusBackend) InstallationID() string {
+	m := b.Messenger()
+	if m != nil {
+		return m.InstallationID()
+	}
+	return ""
+}
+
+func (b *GethStatusBackend) KeyUID() string {
+	m := b.Messenger()
+	if m != nil {
+		return m.KeyUID()
+	}
+	return ""
+}
+
 func (b *GethStatusBackend) injectAccountsIntoServices() error {
 	if b.statusNode.WakuService() != nil {
 		return b.injectAccountsIntoWakuService(b.statusNode.WakuService(), func() *ext.Service {
