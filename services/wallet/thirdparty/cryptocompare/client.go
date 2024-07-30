@@ -34,9 +34,16 @@ type MarketValuesContainer struct {
 	Raw map[string]map[string]thirdparty.TokenMarketValues `json:"Raw"`
 }
 
+type Params struct {
+	URL      string
+	User     string
+	Password string
+}
+
 type Client struct {
 	httpClient *thirdparty.HTTPClient
 	baseURL    string
+	creds      *thirdparty.BasicCreds
 }
 
 func NewClient() *Client {
@@ -46,10 +53,19 @@ func NewClient() *Client {
 	}
 }
 
-func NewClientWithURL(url string) *Client {
+func NewClientWithParams(params Params) *Client {
+	var creds *thirdparty.BasicCreds
+	if params.User != "" {
+		creds = &thirdparty.BasicCreds{
+			User:     params.User,
+			Password: params.Password,
+		}
+	}
+
 	return &Client{
 		httpClient: thirdparty.NewHTTPClient(),
-		baseURL:    url,
+		baseURL:    params.URL,
+		creds:      creds,
 	}
 }
 
@@ -66,7 +82,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 		params.Add("extraParams", extraParamStatus)
 
 		url := fmt.Sprintf("%s/data/pricemulti", c.baseURL)
-		response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
+		response, err := c.httpClient.DoGetRequest(context.Background(), url, params, c.creds)
 		if err != nil {
 			return nil, err
 		}
@@ -89,7 +105,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 
 func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
 	url := fmt.Sprintf("%s/data/all/coinlist", c.baseURL)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, nil)
+	response, err := c.httpClient.DoGetRequest(context.Background(), url, nil, c.creds)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +138,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		params.Add("extraParams", extraParamStatus)
 
 		url := fmt.Sprintf("%s/data/pricemultifull", c.baseURL)
-		response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
+		response, err := c.httpClient.DoGetRequest(context.Background(), url, params, c.creds)
 		if err != nil {
 			return nil, err
 		}
@@ -155,7 +171,7 @@ func (c *Client) FetchHistoricalHourlyPrices(symbol string, currency string, lim
 	params.Add("extraParams", extraParamStatus)
 
 	url := fmt.Sprintf("%s/data/v2/histohour", c.baseURL)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
+	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, c.creds)
 	if err != nil {
 		return item, err
 	}
@@ -183,7 +199,7 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 	params.Add("extraParams", extraParamStatus)
 
 	url := fmt.Sprintf("%s/data/v2/histoday", c.baseURL)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params)
+	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, c.creds)
 	if err != nil {
 		return item, err
 	}

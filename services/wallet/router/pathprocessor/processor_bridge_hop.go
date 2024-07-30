@@ -422,7 +422,7 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 	reqParams.Add("slippage", "0.5") // menas 0.5%
 
 	url := "https://api.hop.exchange/v1/quote"
-	response, err := h.httpClient.DoGetRequest(context.Background(), url, reqParams)
+	response, err := h.httpClient.DoGetRequest(context.Background(), url, reqParams, nil)
 	if err != nil {
 		return nil, nil, err
 	}

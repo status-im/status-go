@@ -24,7 +24,7 @@ type TokensResponse struct {
 
 func (c *ClientV5) FetchTokensList(ctx context.Context) ([]Token, error) {
 	url := fmt.Sprintf(tokensURL, c.chainID)
-	response, err := c.httpClient.DoGetRequest(ctx, url, nil)
+	response, err := c.httpClient.DoGetRequest(ctx, url, nil, nil)
 	if err != nil {
 		return nil, err
 	}
