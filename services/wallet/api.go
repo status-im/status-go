@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
+	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -904,4 +905,9 @@ func (api *API) SafeSignTypedDataForDApps(typedJson string, address string, pass
 
 func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
 	return api.s.reader.Restart()
+}
+
+func (api *API) IsChecksumValidForAddress(address string) (bool, error) {
+	log.Debug("wallet.api.isChecksumValidForAddress", "address", address)
+	return abi_spec.CheckAddressChecksum(address)
 }
