@@ -52,6 +52,7 @@ type CreateAccount struct {
 	WakuV2Nameserver                             *string `json:"wakuV2Nameserver"`
 	WakuV2LightClient                            bool    `json:"wakuV2LightClient"`
 	WakuV2EnableStoreConfirmationForMessagesSent bool    `json:"wakuV2EnableStoreConfirmationForMessagesSent"`
+	WakuV2EnableMissingMessageVerification       bool    `json:"wakuV2EnableMissingMessageVerification"`
 	WakuV2Fleet                                  string  `json:"wakuV2Fleet"`
 
 	LogLevel    *string `json:"logLevel"`
