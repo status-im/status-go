@@ -306,11 +306,6 @@ func TestBalanceFetcherGetBalancesAtByChain(t *testing.T) {
 	chainClientOpt.EXPECT().NetworkID().Return(w_common.OptimismMainnet).AnyTimes()
 	chainClientArb := mock_client.NewMockClientInterface(ctrl)
 	chainClientArb.EXPECT().NetworkID().Return(w_common.ArbitrumMainnet).AnyTimes()
-	chainClients := map[uint64]chain.ClientInterface{
-		w_common.EthereumMainnet: chainClient,
-		w_common.OptimismMainnet: chainClientOpt,
-		w_common.ArbitrumMainnet: chainClientArb,
-	}
 
 	expectedEthBalances := map[common.Address]*big.Int{
 		accounts[0]: big.NewInt(100),
@@ -378,9 +373,21 @@ func TestBalanceFetcherGetBalancesAtByChain(t *testing.T) {
 
 	bf := NewDefaultBalanceFetcher(contractMaker)
 
-	// Fetch native balances and token balances using scan contract
+	// Fetch native balances and token balances using scan contract for Ethereum Mainnet and Optimism Mainnet
+	chainClients := map[uint64]chain.ClientInterface{
+		w_common.EthereumMainnet: chainClient,
+		w_common.OptimismMainnet: chainClientOpt,
+	}
 	balances, err := bf.GetBalancesAtByChain(ctx, chainClients, accounts, tokens, atBlocks)
 
 	require.NoError(t, err)
 	require.Equal(t, expectedBalances, balances)
+
+	// Fetch native balances and token balances using scan contract for Arbitrum Mainnet
+	chainClientsArb := map[uint64]chain.ClientInterface{w_common.ArbitrumMainnet: chainClientArb}
+	balancesArb, errArb := bf.GetBalancesAtByChain(ctx, chainClientsArb, accounts, tokens, atBlocks)
+
+	require.Error(t, errArb, "GetBalancesAtByChain should return an error for Arbitrum Mainnet")
+	require.Contains(t, errArb.Error(), "no scan contract", "Incorrect error message for Arbitrum Mainnet")
+	require.Nil(t, balancesArb[w_common.ArbitrumMainnet])
 }
