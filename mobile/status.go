@@ -1066,7 +1066,7 @@ type FleetDescription struct {
 
 func Fleets() string {
 	fleets := FleetDescription{
-		DefaultFleet: api.DefaultFleet,
+		DefaultFleet: params.DefaultFleet,
 		Fleets:       params.GetSupportedFleets(),
 	}
 

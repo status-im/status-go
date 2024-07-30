@@ -724,8 +724,8 @@ func (b *GethStatusBackend) UpdateNodeConfigFleet(acc multiaccounts.Account, pas
 	if !params.IsFleetSupported(fleet) {
 		b.log.Warn("fleet is not supported, overriding with default value",
 			"fleet", fleet,
-			"defaultFleet", DefaultFleet)
-		fleet = DefaultFleet
+			"defaultFleet", params.DefaultFleet)
+		fleet = params.DefaultFleet
 	}
 
 	err = SetFleet(fleet, config)

@@ -801,7 +801,7 @@ func nodeConfigForLocalPairSync(installationID, keyUID, tmpDir string) (*params.
 
 	// need specify cluster config here, otherwise TestPairingThreeDevices will fail due to no messages(CR) received
 	// TODO(frank) need to figure out why above happen
-	clusterConfig, err := params.LoadClusterConfigFromFleet(params.FleetProd)
+	clusterConfig, err := params.LoadClusterConfigFromFleet(params.FleetStatusProd)
 	if err != nil {
 		return nil, err
 	}

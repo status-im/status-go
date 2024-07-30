@@ -41,8 +41,6 @@ const DefaultVerifyTransactionChainID = 1
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet, pathEncryption}
 
-var DefaultFleet = params.FleetStatusProd
-
 var overrideApiConfig = overrideApiConfigProd
 
 func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
@@ -127,7 +125,7 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 }
 
 func SetDefaultFleet(nodeConfig *params.NodeConfig) error {
-	return SetFleet(DefaultFleet, nodeConfig)
+	return SetFleet(params.DefaultFleet, nodeConfig)
 }
 
 func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
@@ -306,7 +304,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 
 	fleet := request.WakuV2Fleet
 	if fleet == "" {
-		fleet = DefaultFleet
+		fleet = params.DefaultFleet
 	}
 
 	err := SetFleet(fleet, nodeConfig)

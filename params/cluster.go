@@ -3,13 +3,13 @@ package params
 // Define available fleets.
 const (
 	FleetUndefined     = ""
-	FleetProd          = "eth.prod"
-	FleetStatusStaging = "status.staging"
 	FleetStatusProd    = "status.prod"
-	FleetStatusTest    = "status.test"
+	FleetStatusStaging = "status.staging"
 	FleetWakuSandbox   = "waku.sandbox"
 	FleetWakuTest      = "waku.test"
 )
+
+const DefaultFleet = FleetStatusProd
 
 // Cluster defines a list of Ethereum nodes.
 type Cluster struct {

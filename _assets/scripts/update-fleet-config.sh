@@ -5,12 +5,12 @@ DIR="$(cd $(dirname "$0")/../../config/cli; pwd)"
 echo "Downloading https://fleets.status.im/"
 json=$(curl --silent https://fleets.status.im/)
 fleets=(
-    'eth.prod'
+    'status.prod'
 )
 
 wakufleets=(
     'status.prod'
-    'status.test'
+    'status.staging'
     'waku.sandbox'
     'waku.test'
 )
