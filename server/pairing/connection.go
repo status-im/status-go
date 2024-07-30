@@ -4,12 +4,14 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"fmt"
+	"log"
 	"math/big"
 	"net"
 	"net/url"
 	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
+	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/server/pairing/versioning"
 )
@@ -19,20 +21,24 @@ const (
 )
 
 type ConnectionParams struct {
-	version   versioning.ConnectionParamVersion
-	netIPs    []net.IP
-	port      int
-	publicKey *ecdsa.PublicKey
-	aesKey    []byte
+	version        versioning.ConnectionParamVersion
+	netIPs         []net.IP
+	port           int
+	publicKey      *ecdsa.PublicKey
+	aesKey         []byte
+	installationID string
+	keyUID         string
 }
 
-func NewConnectionParams(netIPs []net.IP, port int, publicKey *ecdsa.PublicKey, aesKey []byte) *ConnectionParams {
+func NewConnectionParams(netIPs []net.IP, port int, publicKey *ecdsa.PublicKey, aesKey []byte, installationID, keyUID string) *ConnectionParams {
 	cp := new(ConnectionParams)
 	cp.version = versioning.LatestConnectionParamVer
 	cp.netIPs = netIPs
 	cp.port = port
 	cp.publicKey = publicKey
 	cp.aesKey = aesKey
+	cp.installationID = installationID
+	cp.keyUID = keyUID
 	return cp
 }
 
@@ -45,13 +51,21 @@ func NewConnectionParams(netIPs []net.IP, port int, publicKey *ecdsa.PublicKey, 
 //   - string type identifier
 //   - version
 //   - net.IP
-//   - version 1: a single net.IP
-//   - version 2: array of IPs in next form:
+//   - array of IPs in next form:
 //     | 1 byte | 4*N bytes | 1 byte | 16*N bytes |
 //     |   N    | N * IPv4  |    M   |  M * IPv6  |
 //   - port
 //   - ecdsa CompressedPublicKey
 //   - AES encryption key
+//   - string InstallationID of the sending device
+//   - string KeyUID of the sending device
+// NOTE:
+// - append(accrete) parameters instead of changing(breaking) existing parameters. Appending should **never** break, modifying existing parameters will break. Watch this before making changes: https://www.youtube.com/watch?v=oyLBGkS5ICk
+// - never strictly check version, unless you really want to break
+
+// This flag is used to keep compatibility with 2.29. It will output a 5 parameters connection string with version 3.
+var keep229Compatibility bool = true
+
 func (cp *ConnectionParams) ToString() string {
 	v := base58.Encode(new(big.Int).SetInt64(int64(cp.version)).Bytes())
 	ips := base58.Encode(SerializeNetIps(cp.netIPs))
@@ -59,7 +73,39 @@ func (cp *ConnectionParams) ToString() string {
 	k := base58.Encode(elliptic.MarshalCompressed(cp.publicKey.Curve, cp.publicKey.X, cp.publicKey.Y))
 	ek := base58.Encode(cp.aesKey)
 
-	return fmt.Sprintf("%s%s:%s:%s:%s:%s", connectionStringID, v, ips, p, k, ek)
+	if keep229Compatibility {
+		return fmt.Sprintf("%s%s:%s:%s:%s:%s", connectionStringID, v, ips, p, k, ek)
+	}
+
+	var i string
+	if cp.installationID != "" {
+
+		u, err := uuid.Parse(cp.installationID)
+		if err != nil {
+			log.Fatalf("Failed to parse UUID: %v", err)
+		} else {
+
+			// Convert UUID to byte slice
+			byteSlice := u[:]
+			i = base58.Encode(byteSlice)
+		}
+	}
+
+	var kuid string
+	if cp.keyUID != "" {
+		kuid = base58.Encode([]byte(cp.keyUID))
+
+	}
+
+	return fmt.Sprintf("%s%s:%s:%s:%s:%s:%s:%s", connectionStringID, v, ips, p, k, ek, i, kuid)
+}
+
+func (cp *ConnectionParams) InstallationID() string {
+	return cp.installationID
+}
+
+func (cp *ConnectionParams) KeyUID() string {
+	return cp.keyUID
 }
 
 func SerializeNetIps(ips []net.IP) []byte {
@@ -128,26 +174,17 @@ func (cp *ConnectionParams) FromString(s string) error {
 	requiredParams := 5
 
 	sData := strings.Split(s[2:], ":")
-	if len(sData) != requiredParams {
+	// NOTE: always allow extra parameters for forward compatibility, error on not enough required parameters or failing to parse
+	if len(sData) < requiredParams {
 		return fmt.Errorf("expected data '%s' to have length of '%d', received '%d'", s, requiredParams, len(sData))
 	}
 
-	cp.version = versioning.ConnectionParamVersion(new(big.Int).SetBytes(base58.Decode(sData[0])).Int64())
-
 	netIpsBytes := base58.Decode(sData[1])
-	switch cp.version {
-	case versioning.ConnectionParamsV1:
-		if len(netIpsBytes) != net.IPv4len {
-			return fmt.Errorf("invalid IP size: '%d' bytes, expected: '%d' bytes", len(netIpsBytes), net.IPv4len)
-		}
-		cp.netIPs = []net.IP{netIpsBytes}
-	case versioning.ConnectionParamsV2:
-		netIps, err := ParseNetIps(netIpsBytes)
-		if err != nil {
-			return err
-		}
-		cp.netIPs = netIps
+	netIps, err := ParseNetIps(netIpsBytes)
+	if err != nil {
+		return err
 	}
+	cp.netIPs = netIps
 
 	cp.port = int(new(big.Int).SetBytes(base58.Decode(sData[2])).Int64())
 	cp.publicKey = new(ecdsa.PublicKey)
@@ -155,16 +192,25 @@ func (cp *ConnectionParams) FromString(s string) error {
 	cp.publicKey.Curve = elliptic.P256()
 	cp.aesKey = base58.Decode(sData[4])
 
+	if len(sData) > 5 && len(sData[5]) != 0 {
+		installationIDBytes := base58.Decode(sData[5])
+		installationID, err := uuid.FromBytes(installationIDBytes)
+		if err != nil {
+			return err
+		}
+		cp.installationID = installationID.String()
+	}
+
+	if len(sData) > 6 && len(sData[6]) != 0 {
+		decodedBytes := base58.Decode(sData[6])
+		cp.keyUID = string(decodedBytes)
+	}
+
 	return cp.validate()
 }
 
 func (cp *ConnectionParams) validate() error {
-	err := cp.validateVersion()
-	if err != nil {
-		return err
-	}
-
-	err = cp.validateNetIP()
+	err := cp.validateNetIP()
 	if err != nil {
 		return err
 	}
@@ -180,13 +226,6 @@ func (cp *ConnectionParams) validate() error {
 	}
 
 	return cp.validateAESKey()
-}
-
-func (cp *ConnectionParams) validateVersion() error {
-	if cp.version <= versioning.LatestConnectionParamVer {
-		return nil
-	}
-	return fmt.Errorf("unsupported version '%d'", cp.version)
 }
 
 func (cp *ConnectionParams) validateNetIP() error {

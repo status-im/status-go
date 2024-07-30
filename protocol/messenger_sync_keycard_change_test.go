@@ -65,7 +65,7 @@ func (s *MessengerSyncKeycardChangeSuite) SetupTest() {
 	// Wait for the message to reach its destination
 	_, err = WaitOnMessengerResponse(
 		s.main,
-		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Installations()) > 0 },
 		"installation not received",
 	)
 	s.Require().NoError(err)

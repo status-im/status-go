@@ -1035,7 +1035,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	response, err = protocol.WaitOnMessengerResponse(
 		serverMessenger,
 		func(r *protocol.MessengerResponse) bool {
-			for _, i := range r.Installations {
+			for _, i := range r.Installations() {
 				if i.ID == settings.InstallationID {
 					return true
 				}
@@ -1048,7 +1048,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	s.Require().NoError(err)
 
 	found := false
-	for _, i := range response.Installations {
+	for _, i := range response.Installations() {
 		found = i.ID == settings.InstallationID &&
 			i.InstallationMetadata != nil &&
 			i.InstallationMetadata.Name == im1.Name &&
