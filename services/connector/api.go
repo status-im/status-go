@@ -1,8 +1,16 @@
 package connector
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+
 	"github.com/status-im/status-go/services/connector/commands"
 	persistence "github.com/status-im/status-go/services/connector/database"
+)
+
+var (
+	ErrInvalidResponseFromForwardedRpc = errors.New("invalid response from forwarded RPC")
 )
 
 type API struct {
@@ -47,7 +55,37 @@ func NewAPI(s *Service) *API {
 	}
 }
 
-func (api *API) CallRPC(inputJSON string) (string, error) {
+func (api *API) forwardRPC(URL string, inputJSON string) (interface{}, error) {
+	dApp, err := persistence.SelectDAppByUrl(api.s.db, URL)
+	if err != nil {
+		return "", err
+	}
+
+	if dApp == nil {
+		return "", commands.ErrDAppIsNotPermittedByUser
+	}
+
+	var response map[string]interface{}
+	rawResponse := api.s.rpc.CallRaw(inputJSON)
+	if err := json.Unmarshal([]byte(rawResponse), &response); err != nil {
+		return "", err
+	}
+
+	if errorField, ok := response["error"]; ok {
+		errorMap, _ := errorField.(map[string]interface{})
+		errorCode, _ := errorMap["code"].(float64)
+		errorMessage, _ := errorMap["message"].(string)
+		return nil, fmt.Errorf("error code %v: %s", errorCode, errorMessage)
+	}
+
+	if result, ok := response["result"]; ok {
+		return result, nil
+	}
+
+	return nil, ErrInvalidResponseFromForwardedRpc
+}
+
+func (api *API) CallRPC(inputJSON string) (interface{}, error) {
 	request, err := commands.RPCRequestFromJSON(inputJSON)
 	if err != nil {
 		return "", err
@@ -57,7 +95,7 @@ func (api *API) CallRPC(inputJSON string) (string, error) {
 		return command.Execute(request)
 	}
 
-	return api.s.rpc.CallRaw(inputJSON), nil
+	return api.forwardRPC(request.URL, inputJSON)
 }
 
 func (api *API) RecallDAppPermission(origin string) error {

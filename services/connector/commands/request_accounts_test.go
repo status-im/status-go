@@ -86,16 +86,11 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 		}
 	}))
 
+	expectedResponse := FormatAccountAddressToResponse(accountAddress)
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
-
-	// Unmarshal the response into a slice of addresses
-	var result []types.Address
-	err = json.Unmarshal([]byte(response), &result)
-
 	assert.NoError(t, err)
-	assert.Len(t, result, 1)
-	assert.Equal(t, accountAddress, result[0])
+	assert.Equal(t, expectedResponse, response)
 
 	// Check dApp in the database
 	dApp, err := persistence.SelectDAppByUrl(db, request.URL)
@@ -108,12 +103,7 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 	// This should not invoke UI side
 	response, err = cmd.Execute(request)
 	assert.NoError(t, err)
-
-	err = json.Unmarshal([]byte(response), &result)
-
-	assert.NoError(t, err)
-	assert.Len(t, result, 1)
-	assert.Equal(t, accountAddress, result[0])
+	assert.Equal(t, expectedResponse, response)
 }
 
 func TestRequestAccountsRejected(t *testing.T) {
@@ -150,5 +140,4 @@ func TestRequestAccountsRejected(t *testing.T) {
 
 	_, err = cmd.Execute(request)
 	assert.Equal(t, ErrRequestAccountsRejectedByUser, err)
-
 }

@@ -3,14 +3,15 @@ package connector
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/connector/chainutils"
 	"github.com/status-im/status-go/services/connector/commands"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -21,11 +22,11 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	nm := commands.NetworkManagerMock{}
 	nm.SetNetworks([]*params.Network{
 		{
-			ChainID: 0x1,
+			ChainID: walletCommon.EthereumMainnet,
 			Layer:   1,
 		},
 		{
-			ChainID: 0x5,
+			ChainID: walletCommon.OptimismMainnet,
 			Layer:   1,
 		},
 	})
@@ -77,36 +78,65 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 
 	// Request accounts, now for real
 	request = "{\"method\": \"eth_requestAccounts\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
-	expectedResponse := strings.ToLower(fmt.Sprintf(`["%s"]`, accountAddress.Hex()))
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
-	assert.Equal(t, expectedResponse, response)
+	assert.Equal(t, commands.FormatAccountAddressToResponse(accountAddress), response)
 
 	// Request to switch ethereum chain
-	expectedChainId := "0x5"
-	request = fmt.Sprintf("{\"method\": \"wallet_switchEthereumChain\", \"params\": [{\"chainId\": \"%s\"}], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }", expectedChainId)
-	expectedResponse = expectedChainId
+	expectedChainID, err := chainutils.GetHexChainID(walletCommon.ChainID(walletCommon.EthereumMainnet).String())
+	assert.NoError(t, err)
+	request = fmt.Sprintf("{\"method\": \"wallet_switchEthereumChain\", \"params\": [{\"chainId\": \"%s\"}], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }", expectedChainID)
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
-	assert.Equal(t, expectedResponse, response)
+	assert.Equal(t, expectedChainID, response)
 
 	// Check if the chain was switched
 	request = "{\"method\": \"eth_chainId\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
-	assert.Equal(t, expectedResponse, response)
+	assert.Equal(t, expectedChainID, response)
 
 	// Check the account after switching chain
 	request = "{\"method\": \"eth_accounts\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
-	expectedResponse = strings.ToLower(fmt.Sprintf(`["%s"]`, accountAddress.Hex()))
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
-	assert.Equal(t, expectedResponse, response)
+	assert.Equal(t, commands.FormatAccountAddressToResponse(accountAddress), response)
 
 	// Send transaction
 	request = fmt.Sprintf("{\"method\": \"eth_sendTransaction\", \"params\":[{\"from\":\"%s\",\"to\":\"0x0200000000000000000000000000000000000000\",\"value\":\"0x12345\",\"data\":\"0x307830\"}], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }", accountAddress.Hex())
-	expectedResponse = expectedHash.Hex()
 	response, err = api.CallRPC(request)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedHash.Hex(), response)
+}
+
+func TestForwardedRPCs(t *testing.T) {
+	db, close := createDB(t)
+	defer close()
+
+	rpc := commands.RPCClientMock{}
+	service := NewService(db, &rpc, nil)
+
+	api := NewAPI(service)
+
+	sharedAccount := types.BytesToAddress(types.FromHex("0x3d0ab2a774b74bb1d36f97700315adf962c69fct"))
+
+	testDAppData := signal.ConnectorDApp{
+		URL:     "https://app.test.org",
+		Name:    "testDAppName",
+		IconURL: "https://app.test.icon.org",
+	}
+
+	request := "{\"method\": \"eth_blockNumber\", \"params\":[],\"url\":\"https://app.test.org\",\"name\":\"testDAppName\",\"iconUrl\":\"http://testDAppIconUrl\"}"
+	_, err := api.CallRPC(request)
+	assert.Equal(t, commands.ErrDAppIsNotPermittedByUser, err)
+
+	err = commands.PersistDAppData(db, testDAppData, sharedAccount, 0x123)
+	assert.NoError(t, err)
+
+	expectedResponse := "0xaa37dc"
+	rpc.SetResponse(fmt.Sprintf(`{"jsonrpc":"2.0","id":37,"result":"%s"}`, expectedResponse))
+
+	response, err := api.CallRPC(request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 }

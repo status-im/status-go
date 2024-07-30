@@ -25,7 +25,7 @@ type RawAccountsResponse struct {
 	Result  []accounts.Account `json:"result"`
 }
 
-func (c *RequestAccountsCommand) Execute(request RPCRequest) (string, error) {
+func (c *RequestAccountsCommand) Execute(request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err
@@ -61,5 +61,5 @@ func (c *RequestAccountsCommand) Execute(request RPCRequest) (string, error) {
 		}
 	}
 
-	return c.dAppToAccountsResponse(dApp)
+	return FormatAccountAddressToResponse(dApp.SharedAccount), nil
 }
