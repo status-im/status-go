@@ -13,6 +13,11 @@ import (
 const requestTimeout = 5 * time.Second
 const maxNumOfRequestRetries = 5
 
+type BasicCreds struct {
+	User     string
+	Password string
+}
+
 type HTTPClient struct {
 	client *http.Client
 }
@@ -25,7 +30,7 @@ func NewHTTPClient() *HTTPClient {
 	}
 }
 
-func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl.Values) ([]byte, error) {
+func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl.Values, creds *BasicCreds) ([]byte, error) {
 	if len(params) > 0 {
 		url = url + "?" + params.Encode()
 	}
@@ -33,6 +38,10 @@ func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if creds != nil {
+		req.SetBasicAuth(creds.User, creds.Password)
 	}
 
 	var resp *http.Response
@@ -56,7 +65,7 @@ func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl
 	return body, nil
 }
 
-func (c *HTTPClient) DoPostRequest(ctx context.Context, url string, params map[string]interface{}) ([]byte, error) {
+func (c *HTTPClient) DoPostRequest(ctx context.Context, url string, params map[string]interface{}, creds *BasicCreds) ([]byte, error) {
 	jsonData, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -65,6 +74,10 @@ func (c *HTTPClient) DoPostRequest(ctx context.Context, url string, params map[s
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, err
+	}
+
+	if creds != nil {
+		req.SetBasicAuth(creds.User, creds.Password)
 	}
 
 	req.Header.Set("Content-Type", "application/json")

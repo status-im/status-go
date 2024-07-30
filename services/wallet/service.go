@@ -113,7 +113,11 @@ func NewService(
 	transferController.Start()
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
-	cryptoCompareProxy := cryptocompare.NewClientWithURL(cryptocompare.CryptoCompareStatusProxyURL)
+	cryptoCompareProxy := cryptocompare.NewClientWithParams(cryptocompare.Params{
+		URL:      cryptocompare.CryptoCompareStatusProxyURL,
+		User:     config.WalletConfig.StatusProxyMarketUser,
+		Password: config.WalletConfig.StatusProxyMarketPassword,
+	})
 	marketManager := market.NewManager([]thirdparty.MarketDataProvider{cryptoCompare, coingecko, cryptoCompareProxy}, feed)
 	reader := NewReader(tokenManager, marketManager, token.NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, accountFeed, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())

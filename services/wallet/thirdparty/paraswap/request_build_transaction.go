@@ -56,7 +56,7 @@ func (c *ClientV5) BuildTransaction(ctx context.Context, srcTokenAddress common.
 	}
 
 	url := fmt.Sprintf(transactionsURL, c.chainID)
-	response, err := c.httpClient.DoPostRequest(ctx, url, params)
+	response, err := c.httpClient.DoPostRequest(ctx, url, params, nil)
 	if err != nil {
 		return Transaction{}, err
 	}
