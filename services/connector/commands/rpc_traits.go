@@ -29,7 +29,7 @@ type RPCRequest struct {
 }
 
 type RPCCommand interface {
-	Execute(request RPCRequest) (string, error)
+	Execute(request RPCRequest) (interface{}, error)
 }
 
 type RequestAccountsAcceptedArgs struct {
