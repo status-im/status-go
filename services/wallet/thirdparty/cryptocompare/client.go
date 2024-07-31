@@ -7,13 +7,15 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/status-im/status-go/buildinfo"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
 )
 
-const baseURL = "https://min-api.cryptocompare.com"
-const CryptoCompareStatusProxyURL = "https://cryptocompare.test.api.status.im"
 const extraParamStatus = "Status.im"
+const baseURL = "https://min-api.cryptocompare.com"
+
+var CryptoCompareStatusProxyURL = fmt.Sprintf("https://%s.api.status.im/cryptocompare/", buildinfo.ApiProxyStageName)
 
 type HistoricalPricesContainer struct {
 	Aggregated     bool                         `json:"Aggregated"`

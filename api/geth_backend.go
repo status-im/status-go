@@ -601,7 +601,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		KeycardPairingDataFile: DefaultKeycardPairingDataFile,
 	}
 
-	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
+	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig, request.StatusProxyEnabled)
 
 	err = b.UpdateNodeConfigFleet(acc, request.Password, defaultCfg)
 	if err != nil {
