@@ -220,6 +220,14 @@ func (p *sqliteSyncState) MapWithPeerId(peerID PeerID, process func(State) State
 	return tx.Commit()
 }
 
+func (p *sqliteSyncState) Clear(count uint64) error {
+	_, err := p.db.Exec(
+		`DELETE FROM mvds_states WHERE send_count > ?`,
+		count,
+	)
+	return err
+}
+
 func updateInTx(tx *sql.Tx, state State) error {
 	_, err := tx.Exec(`
 		UPDATE mvds_states
