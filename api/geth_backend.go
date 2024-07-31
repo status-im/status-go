@@ -1508,8 +1508,6 @@ func (b *GethStatusBackend) prepareNodeAccount(request *requests.CreateAccount, 
 		return nil, errors.Wrap(err, "failed to prepare for keycard")
 	}
 
-	b.log.Info("<<< prepareNodeAccount", "settings", response.settings, "nodeConfig", response.nodeConfig)
-
 	return response, nil
 }
 

@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"path/filepath"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/account/generator"
@@ -85,8 +84,6 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.SendPushNotifications = true
 	s.InstallationID = GenerateInstallationID()
 	s.UseMailservers = true
-
-	log.Info("<<< default settings", "installationID", s.InstallationID)
 
 	s.PreviewPrivacy = true
 	s.PeerSyncingEnabled = false
