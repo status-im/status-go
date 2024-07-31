@@ -1,0 +1,1 @@
+DELETE from keycards WHERE keycard_uid IS NULL OR keycard_uid = "";
