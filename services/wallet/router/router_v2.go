@@ -1021,54 +1021,60 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 	return candidates, processorErrors, nil
 }
 
-func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*PathV2, input *RouteInputParams, balanceMap map[string]*big.Int) (err error) {
+func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*PathV2, input *RouteInputParams, balanceMap map[string]*big.Int) (hasPositiveBalance bool, err error) {
 	balanceMapCopy := copyMapGeneric(balanceMap, func(v interface{}) interface{} {
 		return new(big.Int).Set(v.(*big.Int))
 	}).(map[string]*big.Int)
 	if balanceMapCopy == nil {
-		return ErrCannotCheckBalance
+		return false, ErrCannotCheckBalance
 	}
 
 	// check the best route for the required balances
 	for _, path := range bestRoute {
+		tokenKey := makeBalanceKey(path.FromChain.ChainID, path.FromToken.Symbol)
+		if tokenBalance, ok := balanceMapCopy[tokenKey]; ok {
+			if tokenBalance.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+				hasPositiveBalance = true
+			}
+		}
+
 		if path.ProcessorName == pathprocessor.ProcessorBridgeHopName {
 			if path.TxBonderFees.ToInt().Cmp(path.AmountOut.ToInt()) > 0 {
-				return ErrLowAmountInForHopBridge
+				return hasPositiveBalance, ErrLowAmountInForHopBridge
 			}
 		}
 
 		if path.requiredTokenBalance != nil && path.requiredTokenBalance.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
-			key := makeBalanceKey(path.FromChain.ChainID, path.FromToken.Symbol)
-			if tokenBalance, ok := balanceMapCopy[key]; ok {
+			if tokenBalance, ok := balanceMapCopy[tokenKey]; ok {
 				if tokenBalance.Cmp(path.requiredTokenBalance) == -1 {
 					err := &errors.ErrorResponse{
 						Code:    ErrNotEnoughTokenBalance.Code,
 						Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, path.FromToken.Symbol, path.FromChain.ChainID),
 					}
-					return err
+					return hasPositiveBalance, err
 				}
-				balanceMapCopy[key].Sub(tokenBalance, path.requiredTokenBalance)
+				balanceMapCopy[tokenKey].Sub(tokenBalance, path.requiredTokenBalance)
 			} else {
-				return ErrTokenNotFound
+				return hasPositiveBalance, ErrTokenNotFound
 			}
 		}
 
-		key := makeBalanceKey(path.FromChain.ChainID, pathprocessor.EthSymbol)
-		if nativeBalance, ok := balanceMapCopy[key]; ok {
+		ethKey := makeBalanceKey(path.FromChain.ChainID, pathprocessor.EthSymbol)
+		if nativeBalance, ok := balanceMapCopy[ethKey]; ok {
 			if nativeBalance.Cmp(path.requiredNativeBalance) == -1 {
 				err := &errors.ErrorResponse{
 					Code:    ErrNotEnoughNativeBalance.Code,
 					Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, path.FromChain.ChainID),
 				}
-				return err
+				return hasPositiveBalance, err
 			}
-			balanceMapCopy[key].Sub(nativeBalance, path.requiredNativeBalance)
+			balanceMapCopy[ethKey].Sub(nativeBalance, path.requiredNativeBalance)
 		} else {
-			return ErrNativeTokenNotFound
+			return hasPositiveBalance, ErrNativeTokenNotFound
 		}
 	}
 
-	return nil
+	return hasPositiveBalance, nil
 }
 
 func removeBestRouteFromAllRouters(allRoutes [][]*PathV2, best []*PathV2) [][]*PathV2 {
@@ -1147,45 +1153,63 @@ func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, can
 		}
 	}()
 
-	for len(allRoutes) > 0 {
-		best := findBestV2(allRoutes, tokenPrice, nativeTokenPrice)
+	var (
+		bestRoute                        []*PathV2
+		lastBestRouteWithPositiveBalance []*PathV2
+		lastBestRouteErr                 error
+	)
 
-		err := r.checkBalancesForTheBestRoute(ctx, best, input, balanceMap)
+	for len(allRoutes) > 0 {
+		bestRoute = findBestV2(allRoutes, tokenPrice, nativeTokenPrice)
+		var hasPositiveBalance bool
+		hasPositiveBalance, err = r.checkBalancesForTheBestRoute(ctx, bestRoute, input, balanceMap)
+
 		if err != nil {
 			// If it's about transfer or bridge and there is more routes, but on the best (cheapest) one there is not enugh balance
 			// we shold check other routes even though there are not the cheapest ones
-			if (input.SendType == Transfer ||
-				input.SendType == Bridge) &&
-				len(allRoutes) > 1 {
+			if input.SendType == Transfer ||
+				input.SendType == Bridge {
+				if hasPositiveBalance {
+					lastBestRouteWithPositiveBalance = bestRoute
+					lastBestRouteErr = err
+				}
 
-				allRoutes = removeBestRouteFromAllRouters(allRoutes, best)
-				continue
-			} else {
-				suggestedRoutes.Best = best
-				return suggestedRoutes, errors.CreateErrorResponseFromError(err)
+				if len(allRoutes) > 1 {
+					allRoutes = removeBestRouteFromAllRouters(allRoutes, bestRoute)
+					continue
+				} else {
+					break
+				}
 			}
 		}
 
-		if len(best) > 0 {
-			// At this point we have to do the final check and update the amountIn (subtracting fees) if complete balance is going to be sent for native token (ETH)
-			for _, path := range best {
-				if path.subtractFees && path.FromToken.IsNative() {
-					path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxFee.ToInt())
-					if path.TxL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
-						path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxL1Fee.ToInt())
-					}
-					if path.ApprovalRequired {
-						path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.ApprovalFee.ToInt())
-						if path.ApprovalL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
-							path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.ApprovalL1Fee.ToInt())
-						}
+		break
+	}
+
+	// if none of the routes have positive balance, we should return the last best route with positive balance
+	if err != nil && lastBestRouteWithPositiveBalance != nil {
+		bestRoute = lastBestRouteWithPositiveBalance
+		err = lastBestRouteErr
+	}
+
+	if len(bestRoute) > 0 {
+		// At this point we have to do the final check and update the amountIn (subtracting fees) if complete balance is going to be sent for native token (ETH)
+		for _, path := range bestRoute {
+			if path.subtractFees && path.FromToken.IsNative() {
+				path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxFee.ToInt())
+				if path.TxL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+					path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxL1Fee.ToInt())
+				}
+				if path.ApprovalRequired {
+					path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.ApprovalFee.ToInt())
+					if path.ApprovalL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+						path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.ApprovalL1Fee.ToInt())
 					}
 				}
 			}
 		}
-		suggestedRoutes.Best = best
-		break
 	}
+	suggestedRoutes.Best = bestRoute
 
-	return suggestedRoutes, nil
+	return suggestedRoutes, err
 }
