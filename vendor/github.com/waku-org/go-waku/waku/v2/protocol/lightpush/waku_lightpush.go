@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -188,14 +189,17 @@ func (wakuLP *WakuLightPush) reply(stream network.Stream, responsePushRPC *pb.Pu
 }
 
 // request sends a message via lightPush protocol to either a specified peer or peer that is selected.
-func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, params *lightPushRequestParameters, peer peer.ID) (*pb.PushResponse, error) {
+func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, params *lightPushRequestParameters, peerID peer.ID) (*pb.PushResponse, error) {
 
-	logger := wakuLP.log.With(logging.HostID("peer", peer))
+	logger := wakuLP.log.With(logging.HostID("peer", peerID))
 
-	stream, err := wakuLP.h.NewStream(ctx, peer, LightPushID_v20beta1)
+	stream, err := wakuLP.h.NewStream(ctx, peerID, LightPushID_v20beta1)
 	if err != nil {
 		logger.Error("creating stream to peer", zap.Error(err))
 		wakuLP.metrics.RecordError(dialFailure)
+		if ps, ok := wakuLP.h.Peerstore().(peerstore.WakuPeerstore); ok {
+			ps.AddConnFailure(peer.AddrInfo{ID: peerID})
+		}
 		return nil, err
 	}
 	pushRequestRPC := &pb.PushRpc{RequestId: hex.EncodeToString(params.requestID), Request: req}
@@ -325,19 +329,21 @@ func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessa
 
 	logger.Debug("publishing message", zap.Stringers("peers", params.selectedPeers))
 	var wg sync.WaitGroup
-	var responses []*pb.PushResponse
-	for _, peerID := range params.selectedPeers {
+	responses := make([]*pb.PushResponse, params.selectedPeers.Len())
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	for i, peerID := range params.selectedPeers {
 		wg.Add(1)
-		go func(id peer.ID) {
+		go func(index int, id peer.ID) {
 			paramsValue := *params
 			paramsValue.requestID = protocol.GenerateRequestID()
 			defer wg.Done()
-			response, err := wakuLP.request(ctx, req, &paramsValue, id)
+			response, err := wakuLP.request(reqCtx, req, &paramsValue, id)
 			if err != nil {
 				logger.Error("could not publish message", zap.Error(err), zap.Stringer("peer", id))
 			}
-			responses = append(responses, response)
-		}(peerID)
+			responses[index] = response
+		}(i, peerID)
 	}
 	wg.Wait()
 	var successCount int
