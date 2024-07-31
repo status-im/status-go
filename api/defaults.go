@@ -6,13 +6,12 @@ import (
 	"math/big"
 	"path/filepath"
 
-	"github.com/google/uuid"
-
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -45,7 +44,7 @@ const (
 var (
 	paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet, pathEncryption}
 
-    DefaultFleet = params.FleetStatusProd
+	DefaultFleet = params.FleetStatusProd
 
 	overrideApiConfig = overrideApiConfigProd
 )
@@ -82,7 +81,7 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	s.SigningPhrase = signingPhrase
 
 	s.SendPushNotifications = true
-	s.InstallationID = GenerateInstallationID()
+	s.InstallationID = multidevice.GenerateInstallationID()
 	s.UseMailservers = true
 
 	s.PreviewPrivacy = true
@@ -432,10 +431,6 @@ func randomWalletEmoji() (string, error) {
 		return "", err
 	}
 	return animalsAndNatureEmojis[index.Int64()], nil
-}
-
-func GenerateInstallationID() string {
-	return uuid.New().String()
 }
 
 var animalsAndNatureEmojis = []string{
