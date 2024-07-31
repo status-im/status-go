@@ -2585,6 +2585,46 @@ func getNormalTestParamsList() []normalTestParams {
 				},
 			},
 		},
+		{
+			name: "Bridge - Specific Single FromChain - Specific Single ToChain - Sending Small Amount",
+			input: &RouteInputParams{
+				testnetMode:          false,
+				Uuid:                 uuid.NewString(),
+				SendType:             Bridge,
+				AddrFrom:             common.HexToAddress("0x1"),
+				AddrTo:               common.HexToAddress("0x2"),
+				AmountIn:             (*hexutil.Big)(big.NewInt(0.01 * testAmount1USDC)),
+				TokenID:              pathprocessor.UsdcSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.UsdcSymbol,
+						Decimals: 6,
+					},
+					tokenPrices:           testTokenPrices,
+					baseFee:               big.NewInt(testBaseFee),
+					suggestedFees:         testSuggestedFees,
+					balanceMap:            testBalanceMapPerChain,
+					estimationMap:         testEstimationMap,
+					bonderFeeMap:          testBbonderFeeMap,
+					approvalGasEstimation: testApprovalGasEstimation,
+					approvalL1Fee:         testApprovalL1Fee,
+				},
+			},
+			expectedError: ErrLowAmountInForHopBridge,
+			expectedCandidates: []*PathV2{
+				{
+					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					FromChain:        &arbitrum,
+					ToChain:          &mainnet,
+					ApprovalRequired: true,
+				},
+			},
+		},
 	}
 }
 
