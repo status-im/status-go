@@ -117,7 +117,8 @@
 // 1720466921_missing_message_verification.up.sql (167B)
 // 1720557751_rename_staging.up.sql (3.258kB)
 // 1720606449_enable_store_confirmation_for_messages_sent.up.sql (191B)
-// 1721215212_create_keycard_and_accounts.up.sql (604B)
+// 1721215212_create_keycard_and_accounts.up.sql (725B)
+// 1722415278_remove_incorrectly_added_keycards.up.sql (67B)
 // doc.go (94B)
 
 package migrations
@@ -2526,7 +2527,7 @@ func _1720606449_enable_store_confirmation_for_messages_sentUpSql() (*asset, err
 	return a, nil
 }
 
-var __1721215212_create_keycard_and_accountsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x84\x91\x4d\x4b\xc4\x30\x10\x86\xef\xf9\x15\xef\x71\x17\xa4\xe8\x79\xd9\xc3\xa2\x15\x2b\x35\x81\xb6\xe2\xb1\x84\x34\x48\x48\x4d\x4b\x93\x45\xfc\xf7\xb2\xf9\x30\xb5\xb8\x78\x4b\x66\x9e\xbe\xd3\x79\x52\xd1\xb6\x6c\x3a\x54\xb4\x63\xd0\xf2\x4b\xf0\x65\xb0\xd8\xc5\x53\x7f\x56\xc3\x4d\x2a\xf7\x86\x7f\xc8\x7c\x1b\x27\xa1\x65\xe8\x06\x6c\x9e\xac\x72\x6a\x32\x7b\xd2\x96\x75\x79\xdf\x11\x00\xb0\x45\xe2\x95\xb1\x8e\x1b\x21\x3d\x1c\x7b\x3e\xd1\x9f\x6f\x71\x6a\xb7\xd1\x39\x20\x7f\xe3\xb9\x34\x89\x3c\x36\xec\x05\x56\x3a\xa7\xcc\xbb\x85\x25\x6f\x4f\x65\x53\x5e\x99\x89\xaa\x05\x65\x1d\xe8\x6b\x5d\x13\xe0\x44\x1f\xae\x81\x17\xaa\xa2\xd8\x85\x35\xb0\x72\x01\x3f\x30\x69\xda\x1f\x08\xf9\x4b\x5f\xcf\x85\x98\xce\xc6\x6d\x3d\xc6\x72\xcf\x87\x61\x91\xd6\xfe\xf2\xa4\x8b\x35\x1a\x4a\x33\x2f\x22\x4a\xd2\xdc\x99\xab\x65\x95\xaf\x67\x4e\x9e\x59\x45\xf3\xcb\x69\x30\x1a\xc2\xfc\xff\x1e\x7d\x4a\xbc\x45\x3d\x97\xca\x27\x1f\x47\xe9\x70\xc4\x5d\x54\xb1\xc2\x36\xbb\xe7\xbd\x7f\x44\xc7\x9c\x7f\x24\xef\x0f\xdf\x01\x00\x00\xff\xff\x10\x4b\xf8\x55\x5c\x02\x00\x00")
+var __1721215212_create_keycard_and_accountsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x84\x91\x41\x6b\xb4\x30\x10\x86\xef\xf9\x15\x73\x5c\xe1\x43\xf6\x3b\x2f\x7b\x58\xda\x94\xa6\x6c\x23\x18\x4b\x7b\x93\x21\x86\x36\xd8\x46\x31\xd9\x43\xff\x7d\x31\x4e\xd4\x95\x2e\xf5\x94\x99\x3c\xbe\xe3\x3c\x0a\xa9\x78\x59\x81\x90\x55\x01\xad\xf9\xd6\x38\x34\x1e\x76\x74\xaa\x2f\xb6\xf9\x97\xda\xb5\xc3\x2f\xb3\x54\x9f\x9d\x6e\xcd\x74\x3b\x61\x7d\xe7\x6d\xb0\x9d\xcb\x98\xe2\x67\x7e\x57\x31\x00\x00\x9f\x27\xde\x3a\x1f\xd0\x69\x13\x61\xba\x8b\x89\xf1\xbc\x87\x93\xda\x46\x2f\x01\xcb\x3b\x91\x4b\x93\xd8\x43\x59\x3c\x83\x37\x21\x58\xf7\xee\xc1\xb3\xd7\x47\x5e\xf2\x1b\x33\x41\x28\x90\x45\x05\xf2\xe5\x7c\x66\x00\x27\x79\x7f\x0b\x1c\x29\x21\x61\x37\xad\x01\x2b\x17\x10\x07\x26\x4d\xd9\x81\xb1\xdf\xf4\xd5\xa8\x75\x77\x71\x61\xeb\x91\xda\x35\x36\xcd\x60\xbc\xbf\xf2\xd4\xe6\x6b\x74\x6a\xf5\x98\x13\xca\xd2\xdc\x1e\xed\xb0\xca\x6f\x7b\x64\x4f\x85\x90\xcb\x9f\x6b\xa1\x90\x53\x58\xfc\xde\x63\x4c\xa1\x8a\xf4\x8c\x1d\xfd\x81\x01\x8e\xb0\x27\x11\x2b\x68\xb3\xf9\xb2\xf5\xac\x99\x52\xfe\x50\x9c\x51\xf4\x58\xf3\x37\xa1\x2a\x05\xbb\xb8\xd6\xf8\x50\xfe\xff\xb9\x71\xe5\x75\xb5\x1f\xce\x04\x4d\xc5\x7c\x63\x91\x56\x4c\xa2\x46\x34\x3b\xfc\x04\x00\x00\xff\xff\xc9\x8f\xf4\xd0\xd5\x02\x00\x00")
 
 func _1721215212_create_keycard_and_accountsUpSqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -2541,8 +2542,28 @@ func _1721215212_create_keycard_and_accountsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1721215212_create_keycard_and_accounts.up.sql", size: 604, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf7, 0xde, 0x58, 0xfb, 0x43, 0x5a, 0xe8, 0xf1, 0xb5, 0x7a, 0x22, 0x50, 0xf7, 0xb, 0x1e, 0x2a, 0xa8, 0xd0, 0x5f, 0xe4, 0xdb, 0x76, 0x7, 0xf0, 0xe6, 0xe3, 0x6e, 0xc6, 0xae, 0xf6, 0x7, 0xe3}}
+	info := bindataFileInfo{name: "1721215212_create_keycard_and_accounts.up.sql", size: 725, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xce, 0x89, 0xe2, 0x42, 0x97, 0x54, 0xa3, 0x1a, 0x4c, 0xaa, 0x98, 0x76, 0x84, 0xbd, 0xf4, 0xf6, 0x39, 0xbe, 0xe, 0xb5, 0x4, 0x85, 0x3f, 0x56, 0x1c, 0xd6, 0x60, 0xb7, 0xdf, 0xdc, 0x65, 0x21}}
+	return a, nil
+}
+
+var __1722415278_remove_incorrectly_added_keycardsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x71\xf5\x71\x0d\x71\x55\x48\x2b\xca\xcf\x55\xc8\x4e\xad\x4c\x4e\x2c\x4a\x29\x56\x08\xf7\x70\x0d\x72\x85\x71\xe3\x4b\x33\x53\x14\x3c\x83\x15\xfc\x42\x7d\x7c\x14\xfc\x83\x50\x84\x6d\x15\x94\x94\xac\x01\x01\x00\x00\xff\xff\xc2\xec\x86\x2f\x43\x00\x00\x00")
+
+func _1722415278_remove_incorrectly_added_keycardsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1722415278_remove_incorrectly_added_keycardsUpSql,
+		"1722415278_remove_incorrectly_added_keycards.up.sql",
+	)
+}
+
+func _1722415278_remove_incorrectly_added_keycardsUpSql() (*asset, error) {
+	bytes, err := _1722415278_remove_incorrectly_added_keycardsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1722415278_remove_incorrectly_added_keycards.up.sql", size: 67, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2, 0xb3, 0xe1, 0x2e, 0x61, 0xcb, 0x5, 0xa3, 0x72, 0x86, 0xce, 0xba, 0x21, 0xd4, 0xaa, 0x58, 0x5a, 0xa0, 0xe5, 0x33, 0x61, 0xd5, 0xe, 0x3a, 0xdd, 0xcd, 0xc1, 0x78, 0xbd, 0x79, 0xa1, 0x6a}}
 	return a, nil
 }
 
@@ -2775,6 +2796,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1720557751_rename_staging.up.sql":                                         _1720557751_rename_stagingUpSql,
 	"1720606449_enable_store_confirmation_for_messages_sent.up.sql":            _1720606449_enable_store_confirmation_for_messages_sentUpSql,
 	"1721215212_create_keycard_and_accounts.up.sql":                            _1721215212_create_keycard_and_accountsUpSql,
+	"1722415278_remove_incorrectly_added_keycards.up.sql":                      _1722415278_remove_incorrectly_added_keycardsUpSql,
 	"doc.go": docGo,
 }
 
@@ -2942,6 +2964,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1720557751_rename_staging.up.sql":                                         {_1720557751_rename_stagingUpSql, map[string]*bintree{}},
 	"1720606449_enable_store_confirmation_for_messages_sent.up.sql":            {_1720606449_enable_store_confirmation_for_messages_sentUpSql, map[string]*bintree{}},
 	"1721215212_create_keycard_and_accounts.up.sql":                            {_1721215212_create_keycard_and_accountsUpSql, map[string]*bintree{}},
+	"1722415278_remove_incorrectly_added_keycards.up.sql":                      {_1722415278_remove_incorrectly_added_keycardsUpSql, map[string]*bintree{}},
 	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
