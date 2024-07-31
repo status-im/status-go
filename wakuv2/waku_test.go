@@ -135,7 +135,9 @@ func TestRestartDiscoveryV5(t *testing.T) {
 }
 
 func TestRelayPeers(t *testing.T) {
-	config := &Config{}
+	config := &Config{
+		EnableMissingMessageVerification: true,
+	}
 	setDefaultConfig(config, false)
 	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
@@ -458,13 +460,14 @@ func TestWakuV2Store(t *testing.T) {
 
 	// Configuration for the first Waku node
 	config1 := &Config{
-		Port:           0,
-		ClusterID:      16,
-		EnableDiscV5:   false,
-		DiscoveryLimit: 20,
-		EnableStore:    false,
-		StoreCapacity:  100,
-		StoreSeconds:   3600,
+		Port:                             0,
+		ClusterID:                        16,
+		EnableDiscV5:                     false,
+		DiscoveryLimit:                   20,
+		EnableStore:                      false,
+		StoreCapacity:                    100,
+		StoreSeconds:                     3600,
+		EnableMissingMessageVerification: true,
 	}
 	w1PeersCh := make(chan []string, 100) // buffered not to block on the send side
 

@@ -1024,6 +1024,7 @@ github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/tests
 github.com/waku-org/go-waku/waku/persistence
 github.com/waku-org/go-waku/waku/v2/api/filter
+github.com/waku-org/go-waku/waku/v2/api/missing
 github.com/waku-org/go-waku/waku/v2/api/publish
 github.com/waku-org/go-waku/waku/v2/discv5
 github.com/waku-org/go-waku/waku/v2/dnsdisc
