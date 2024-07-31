@@ -799,6 +799,11 @@ func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state
 
 func (p *Persistence) DeletePendingRequestToJoin(id []byte) error {
 	_, err := p.db.Exec(`DELETE FROM communities_requests_to_join WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	_, err = p.db.Exec(`DELETE FROM communities_requests_to_join_revealed_addresses WHERE request_id = ?`, id)
+
 	return err
 }
 
@@ -856,16 +861,6 @@ func (p *Persistence) GetRequestToJoinByPkAndCommunityID(pk string, communityID 
 	}
 
 	return request, nil
-}
-
-func (p *Persistence) GetRequestToJoinIDByPkAndCommunityID(pk string, communityID []byte) ([]byte, error) {
-	var id []byte
-	err := p.db.QueryRow(`SELECT id FROM communities_requests_to_join WHERE community_id = ? AND public_key = ?`, communityID, pk).Scan(&id)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	return id, nil
 }
 
 func (p *Persistence) GetRequestToJoinByPk(pk string, communityID []byte, state RequestToJoinState) (*RequestToJoin, error) {
