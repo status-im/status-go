@@ -5,17 +5,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestMessengerDeleteMessageForEveryoneSuite(t *testing.T) {
@@ -23,42 +17,31 @@ func TestMessengerDeleteMessageForEveryoneSuite(t *testing.T) {
 }
 
 type MessengerDeleteMessageForEveryoneSuite struct {
-	suite.Suite
+	CommunitiesMessengerTestSuiteBase
 	admin     *Messenger
 	moderator *Messenger
 	bob       *Messenger
-	shh       types.Waku
-	logger    *zap.Logger
 }
 
 func (s *MessengerDeleteMessageForEveryoneSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.CommunitiesMessengerTestSuiteBase.SetupTest()
+	s.admin = s.newMessenger("", []string{})
+	s.bob = s.newMessenger(bobPassword, []string{bobPassword})
+	s.moderator = s.newMessenger(aliceAccountAddress, []string{aliceAddress1})
 
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.admin = s.newMessenger()
-	s.bob = s.newMessenger()
-	s.moderator = s.newMessenger()
+	_, err := s.admin.Start()
+	s.Require().NoError(err)
+	_, err = s.bob.Start()
+	s.Require().NoError(err)
+	_, err = s.moderator.Start()
+	s.Require().NoError(err)
 }
 
 func (s *MessengerDeleteMessageForEveryoneSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.admin)
 	TearDownMessenger(&s.Suite, s.bob)
 	TearDownMessenger(&s.Suite, s.moderator)
-	_ = s.logger.Sync()
-}
-
-func (s *MessengerDeleteMessageForEveryoneSuite) newMessenger() *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
+	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
 func (s *MessengerDeleteMessageForEveryoneSuite) testSendAndDeleteMessage(messageToSend *common.Message, shouldError bool) {
@@ -99,13 +82,11 @@ func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() 
 	community := s.createCommunity()
 	communityChat := s.createCommunityChat(community)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-
 	advertiseCommunityTo(&s.Suite, community, s.admin, s.moderator)
-	joinCommunity(&s.Suite, community, s.admin, s.moderator, request, "")
+	joinCommunity(&s.Suite, community.ID(), s.admin, s.moderator, aliceAccountAddress, []string{aliceAddress1})
 
 	advertiseCommunityTo(&s.Suite, community, s.admin, s.bob)
-	joinCommunity(&s.Suite, community, s.admin, s.bob, request, "")
+	joinCommunity(&s.Suite, community.ID(), s.admin, s.bob, bobPassword, []string{bobAddress})
 
 	response, err := s.admin.AddRoleToMember(&requests.AddRoleToMember{
 		CommunityID: community.ID(),

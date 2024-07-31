@@ -304,8 +304,7 @@ func (s *MessengerStoreNodeCommunitySuite) TestSetStorenodeForCommunity_fetchMes
 
 	// 2. Bob joins the community
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
+	joinCommunity(&s.Suite, community.ID(), s.owner, s.bob, bobPassword, []string{bobAccountAddress})
 
 	// waits for onwer and bob to connect to the community store node
 	WaitForPeersConnected(&s.Suite, s.communityStoreNode, func() []string {

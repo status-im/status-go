@@ -48,7 +48,11 @@ func (m *AccountManagerMock) CanRecover(rpcParams account.RecoverParams, reveale
 }
 
 func (m *AccountManagerMock) Sign(rpcParams account.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
-	return types.HexBytes{}, nil
+	// mock signature
+	bytesArray := []byte(rpcParams.Address)
+	bytesArray = append(bytesArray, []byte(rpcParams.Password)...)
+	bytesArray = common.Shake256(bytesArray)
+	return append([]byte{0}, bytesArray...), nil
 }
 
 func (m *AccountManagerMock) DeleteAccount(address types.Address) error {
@@ -69,7 +73,6 @@ func (m *TokenManagerMock) GetAllChainIDs() ([]uint64, error) {
 
 func (m *TokenManagerMock) getBalanceBasedOnParams(accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big {
 	retBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
-	retBalances[testChainID1] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
 
 	for _, chainId := range chainIDs {
 		if _, exists := retBalances[chainId]; !exists {
@@ -275,8 +278,8 @@ type testCommunitiesMessengerConfig struct {
 	password            string
 	walletAddresses     []string
 	mockedBalances      *communities.BalancesByChain
-	mockedCollectibles  *communities.CollectiblesByChain
 	collectiblesService communities.CommunityTokensServiceInterface
+	collectiblesManager communities.CollectiblesManager
 }
 
 func (tcmc *testCommunitiesMessengerConfig) complete() error {
@@ -301,7 +304,6 @@ func defaultTestCommunitiesMessengerNodeConfig() *params.NodeConfig {
 		DataDir:   "test",
 	}
 }
-
 func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 	networks := json.RawMessage("{}")
 	return &settings.Settings{
@@ -341,14 +343,10 @@ func newTestCommunitiesMessenger(s *suite.Suite, waku types.Waku, config testCom
 		Balances: config.mockedBalances,
 	}
 
-	collectiblesManagerMock := &CollectiblesManagerMock{
-		Collectibles: config.mockedCollectibles,
-	}
-
 	options := []Option{
 		WithAccountManager(accountsManagerMock),
 		WithTokenManager(tokenManagerMock),
-		WithCollectiblesManager(collectiblesManagerMock),
+		WithCollectiblesManager(config.collectiblesManager),
 		WithCommunityTokensService(config.collectiblesService),
 		WithAppSettings(*config.appSettings, *config.nodeConfig),
 	}
@@ -478,9 +476,19 @@ func advertiseCommunityTo(s *suite.Suite, community *communities.Community, owne
 	s.Require().NoError(err)
 }
 
-func joinCommunity(s *suite.Suite, community *communities.Community, owner *Messenger, user *Messenger, request *requests.RequestToJoinCommunity, password string) {
+func createRequestToJoinCommunity(s *suite.Suite, communityID types.HexBytes, user *Messenger, password string, addresses []string) *requests.RequestToJoinCommunity {
+	airdropAddress := ""
+	if len(addresses) > 0 {
+		airdropAddress = addresses[0]
+	}
+
+	request := &requests.RequestToJoinCommunity{
+		CommunityID:       communityID,
+		AddressesToReveal: addresses,
+		AirdropAddress:    airdropAddress}
+
 	if password != "" {
-		signingParams, err := user.GenerateJoiningCommunityRequestsForSigning(common.PubkeyToHex(&user.identity.PublicKey), community.ID(), request.AddressesToReveal)
+		signingParams, err := user.GenerateJoiningCommunityRequestsForSigning(common.PubkeyToHex(&user.identity.PublicKey), communityID, request.AddressesToReveal)
 		s.Require().NoError(err)
 
 		for i := range signingParams {
@@ -502,7 +510,12 @@ func joinCommunity(s *suite.Suite, community *communities.Community, owner *Mess
 		}
 	}
 
-	response, err := user.RequestToJoinCommunity(request)
+	return request
+}
+
+func joinCommunity(s *suite.Suite, communityID types.HexBytes, controlNode *Messenger, user *Messenger, password string, addresses []string) {
+	requestToJoin := createRequestToJoinCommunity(s, communityID, user, password, addresses)
+	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
@@ -514,14 +527,16 @@ func joinCommunity(s *suite.Suite, community *communities.Community, owner *Mess
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
 
 	// Retrieve and accept join request
-	_, err = WaitOnMessengerResponse(owner, func(r *MessengerResponse) bool {
+	_, err = WaitOnMessengerResponse(controlNode, func(r *MessengerResponse) bool {
 		return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&user.identity.PublicKey)
-	}, "user not accepted")
+	}, "control node did accept user request to join")
 	s.Require().NoError(err)
 
 	// Retrieve join request response
 	_, err = WaitOnMessengerResponse(user, func(r *MessengerResponse) bool {
-		return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&user.identity.PublicKey)
+		return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&user.identity.PublicKey) &&
+			// Note: 'handleCommunityRequestToJoinResponse' does not return RequestToJoin with revealed addresses
+			checkRequestToJoinInResponse(r, user, communities.RequestToJoinStateAccepted, 0)
 	}, "user not accepted")
 	s.Require().NoError(err)
 }
@@ -538,16 +553,7 @@ func requestToJoinCommunity(s *suite.Suite, controlNode *Messenger, user *Messen
 	_, err = WaitOnMessengerResponse(
 		controlNode,
 		func(r *MessengerResponse) bool {
-			if len(r.RequestsToJoinCommunity()) == 0 {
-				return false
-			}
-
-			for _, resultRequest := range r.RequestsToJoinCommunity() {
-				if resultRequest.PublicKey == common.PubkeyToHex(&user.identity.PublicKey) {
-					return true
-				}
-			}
-			return false
+			return checkRequestToJoinInResponse(r, user, communities.RequestToJoinStatePending, 1)
 		},
 		"control node did not receive community request to join",
 	)
@@ -556,7 +562,11 @@ func requestToJoinCommunity(s *suite.Suite, controlNode *Messenger, user *Messen
 	return requestToJoin.ID
 }
 
-func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, controlNode *Messenger, user *Messenger, request *requests.RequestToJoinCommunity) {
+func joinOnRequestCommunity(s *suite.Suite, communityID types.HexBytes, controlNode *Messenger, user *Messenger, password string, addresses []string) {
+	s.Require().True(len(password) > 0)
+	s.Require().True(len(addresses) > 0)
+	s.Require().True(len(communityID) > 0)
+	request := createRequestToJoinCommunity(s, communityID, user, password, addresses)
 	// Request to join the community
 	requestToJoinID := requestToJoinCommunity(s, controlNode, user, request)
 
@@ -580,7 +590,7 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 	)
 	s.Require().NoError(err)
 
-	userCommunity, err := user.GetCommunityByID(community.ID())
+	userCommunity, err := user.GetCommunityByID(communityID)
 	s.Require().NoError(err)
 	s.Require().True(userCommunity.HasMember(&user.identity.PublicKey))
 
@@ -701,10 +711,19 @@ func makeAddressSatisfyTheCriteria(s *suite.Suite, mockedBalances communities.Ba
 
 	walletAddress := gethcommon.HexToAddress(address)
 	contractAddress := gethcommon.HexToAddress(criteria.ContractAddresses[chainID])
+
 	switch criteria.Type {
 	case protobuf.CommunityTokenType_ERC20:
 		balance, ok := new(big.Int).SetString(criteria.AmountInWei, 10)
 		s.Require().True(ok)
+
+		if _, exists := mockedBalances[chainID]; !exists {
+			mockedBalances[chainID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+		}
+
+		if _, exists := mockedBalances[chainID][walletAddress]; !exists {
+			mockedBalances[chainID][walletAddress] = make(map[gethcommon.Address]*hexutil.Big)
+		}
 
 		mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
 
@@ -724,9 +743,28 @@ func makeAddressSatisfyTheCriteria(s *suite.Suite, mockedBalances communities.Ba
 			})
 		}
 
+		if _, exists := mockedCollectibles[chainID]; !exists {
+			mockedCollectibles[chainID] = make(map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress)
+		}
+
+		if _, exists := mockedCollectibles[chainID][walletAddress]; !exists {
+			mockedCollectibles[chainID][walletAddress] = make(thirdparty.TokenBalancesPerContractAddress)
+		}
+
 		mockedCollectibles[chainID][walletAddress][contractAddress] = balances
 
 	case protobuf.CommunityTokenType_ENS:
 		// not implemented
 	}
+}
+
+func checkRequestToJoinInResponse(r *MessengerResponse, member *Messenger, state communities.RequestToJoinState, accountsCount int) bool {
+	for _, request := range r.RequestsToJoinCommunity() {
+		if request.PublicKey == member.IdentityPublicKeyString() &&
+			request.State == state &&
+			accountsCount == len(request.RevealedAccounts) {
+			return true
+		}
+	}
+	return false
 }

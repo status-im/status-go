@@ -6,15 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/protocol/protobuf"
-
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 
 	"github.com/stretchr/testify/suite"
-
-	"github.com/status-im/status-go/eth-node/types"
 )
 
 const (
@@ -22,29 +19,38 @@ const (
 	actionDecline = "Decline"
 )
 
-type MessengerSyncActivityCenterSuite struct {
-	MessengerBaseTestSuite
-	m2 *Messenger
-}
-
 func TestMessengerSyncActivityCenter(t *testing.T) {
 	suite.Run(t, new(MessengerSyncActivityCenterSuite))
 }
 
+type MessengerSyncActivityCenterSuite struct {
+	CommunitiesMessengerTestSuiteBase
+	m  *Messenger
+	m2 *Messenger
+}
+
 func (s *MessengerSyncActivityCenterSuite) SetupTest() {
-	s.MessengerBaseTestSuite.SetupTest()
+	s.CommunitiesMessengerTestSuiteBase.SetupTest()
 
-	m2, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
+	s.m = s.newMessenger(alicePassword, []string{aliceAccountAddress})
+
+	_, err := s.m.Start()
 	s.Require().NoError(err)
-	s.m2 = m2
 
-	PairDevices(&s.Suite, m2, s.m)
-	PairDevices(&s.Suite, s.m, m2)
+	s.m2 = s.newMessengerWithKey(s.m.identity, alicePassword, []string{aliceAccountAddress})
+	s.Require().NoError(err)
+
+	_, err = s.m2.Start()
+	s.Require().NoError(err)
+
+	PairDevices(&s.Suite, s.m2, s.m)
+	PairDevices(&s.Suite, s.m, s.m2)
 }
 
 func (s *MessengerSyncActivityCenterSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.m2)
-	s.MessengerBaseTestSuite.TearDownTest()
+	TearDownMessenger(&s.Suite, s.m)
+	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
 func (s *MessengerSyncActivityCenterSuite) createAndSaveNotification(m *Messenger, t ActivityCenterType, read bool) types.HexBytes {
@@ -116,16 +122,22 @@ func (s *MessengerSyncActivityCenterSuite) TestSyncCommunityRequestDecisionDecli
 }
 
 func (s *MessengerSyncActivityCenterSuite) testSyncCommunityRequestDecision(action string) {
-	userB := s.createUserB()
+
+	userB := s.newMessenger(accountPassword, []string{commonAccountAddress})
 	defer func() {
 		s.Require().NoError(userB.Shutdown())
 	}()
+
+	_, err := userB.Start()
+	s.Require().NoError(err)
 
 	communityID := s.createClosedCommunity()
 
 	s.addContactAndShareCommunity(userB, communityID)
 
-	s.requestToJoinCommunity(userB, communityID)
+	request := createRequestToJoinCommunity(&s.Suite, communityID, userB, accountPassword, []string{commonAccountAddress})
+	_, err = userB.RequestToJoinCommunity(request)
+	s.Require().NoError(err)
 
 	requestToJoinID := s.waitForRequestToJoin(s.m)
 
@@ -143,14 +155,6 @@ func (s *MessengerSyncActivityCenterSuite) testSyncCommunityRequestDecision(acti
 	}
 
 	s.waitForDecisionOnDevice2(requestToJoinID, action)
-}
-
-func (s *MessengerSyncActivityCenterSuite) createUserB() *Messenger {
-	key, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	userB, err := newMessengerWithKey(s.shh, key, s.logger, nil)
-	s.Require().NoError(err)
-	return userB
 }
 
 func (s *MessengerSyncActivityCenterSuite) createClosedCommunity() types.HexBytes {
@@ -218,11 +222,6 @@ func (s *MessengerSyncActivityCenterSuite) addContactAndShareCommunity(userB *Me
 	community, err := s.m.GetCommunityByID(communityID)
 	s.Require().NoError(err)
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.m, userB)
-}
-
-func (s *MessengerSyncActivityCenterSuite) requestToJoinCommunity(userB *Messenger, communityID types.HexBytes) {
-	_, err := userB.RequestToJoinCommunity(&requests.RequestToJoinCommunity{CommunityID: communityID})
-	s.Require().NoError(err)
 }
 
 func (s *MessengerSyncActivityCenterSuite) waitForRequestToJoin(messenger *Messenger) types.HexBytes {

@@ -24,7 +24,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -41,7 +40,6 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/server"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestMessengerCommunitiesSuite(t *testing.T) {
@@ -49,30 +47,20 @@ func TestMessengerCommunitiesSuite(t *testing.T) {
 }
 
 type MessengerCommunitiesSuite struct {
-	suite.Suite
+	CommunitiesMessengerTestSuiteBase
 	owner *Messenger
 	bob   *Messenger
 	alice *Messenger
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh    types.Waku
-	logger *zap.Logger
 }
 
 func (s *MessengerCommunitiesSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.CommunitiesMessengerTestSuiteBase.SetupTest()
 
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.owner = s.newMessenger()
+	s.owner = s.newMessenger("", []string{})
 	s.owner.account.CustomizationColor = multiaccountscommon.CustomizationColorOrange
-	s.bob = s.newMessenger()
+	s.bob = s.newMessenger(bobPassword, []string{bobAccountAddress})
 	s.bob.account.CustomizationColor = multiaccountscommon.CustomizationColorBlue
-	s.alice = s.newMessenger()
+	s.alice = s.newMessenger(alicePassword, []string{aliceAccountAddress})
 	s.alice.account.CustomizationColor = multiaccountscommon.CustomizationColorArmy
 
 	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
@@ -93,23 +81,7 @@ func (s *MessengerCommunitiesSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.owner)
 	TearDownMessenger(&s.Suite, s.bob)
 	TearDownMessenger(&s.Suite, s.alice)
-	_ = s.logger.Sync()
-}
-
-func (s *MessengerCommunitiesSuite) newMessengerWithKey(privateKey *ecdsa.PrivateKey) *Messenger {
-	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
-		testMessengerConfig: testMessengerConfig{
-			privateKey: privateKey,
-			logger:     s.logger,
-		},
-	})
-}
-
-func (s *MessengerCommunitiesSuite) newMessenger() *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	return s.newMessengerWithKey(privateKey)
+	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
 func (s *MessengerCommunitiesSuite) setMessengerDisplayName(m *Messenger, name string) {
@@ -258,8 +230,7 @@ func (s *MessengerCommunitiesSuite) TestJoiningOpenCommunityReturnsChatsResponse
 	s.Require().Len(response.Chats(), 1)
 
 	// Alice request to join community
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-
+	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -516,11 +487,6 @@ func (s *MessengerCommunitiesSuite) createCommunity() (*communities.Community, *
 
 func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.Community, owner *Messenger, user *Messenger) {
 	advertiseCommunityTo(&s.Suite, community, owner, user)
-}
-
-func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, owner, user, request, "")
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
@@ -861,7 +827,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 
 	s.Require().NoError(err)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	// We try to join the org
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
@@ -1067,7 +1033,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().NoError(err)
 
 	// Alice request to join community
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1174,7 +1140,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().True(notification.Deleted)
 
 	// Alice request to join community
-	request = &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request = s.createRequestToJoinCommunity(community.ID(), s.alice)
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1258,7 +1224,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().NoError(err)
 
 	// Alice request to join community
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1426,7 +1392,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().False(notificationState.HasSeen)
 
 	// Alice request to join community
-	request = &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request = s.createRequestToJoinCommunity(community.ID(), s.alice)
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1509,7 +1475,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 
 	s.Require().NoError(err)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	// We try to join the org
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
@@ -1658,7 +1624,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 
 	s.advertiseCommunityTo(community, s.bob, s.alice)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	// We try to join the org
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
@@ -1800,7 +1766,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().Len(requestsToJoin, 0)
 
 	// We request again
-	request2 := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request2 := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	// We try to join the org, it should error as we are already a member
 	response, err = s.alice.RequestToJoinCommunity(request2)
 	s.Require().Error(err)
@@ -1858,7 +1824,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().False(aliceCommunity.HasMember(&s.alice.identity.PublicKey))
 
 	// Alice can request access again
-	request3 := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request3 := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	response, err = s.alice.RequestToJoinCommunity(request3)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1950,7 +1916,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 	s.Require().NoError(err)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	// We try to join the org
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
@@ -2419,7 +2385,12 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 }
 
 func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger {
-	m2 := s.newMessengerWithKey(m1.identity)
+	userPk := m1.IdentityPublicKeyString()
+	addresses, exists := s.accountsTestData[userPk]
+	s.Require().True(exists)
+	password, exists := s.accountsPasswords[userPk]
+	s.Require().True(exists)
+	m2 := s.newMessengerWithKey(m1.identity, password, addresses)
 
 	tcs, err := m2.communitiesManager.All()
 	s.Require().NoError(err, "m2.communitiesManager.All")
@@ -2820,7 +2791,8 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	}
 
 	// Alice requests to join the new community
-	response, err = s.alice.RequestToJoinCommunity(&requests.RequestToJoinCommunity{CommunityID: community.ID()})
+	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
+	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
@@ -3495,7 +3467,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	// We try to join the org
 	rtj := s.alice.communitiesManager.CreateRequestToJoin(request, s.alice.account.GetCustomizationColor())
 
@@ -3509,7 +3481,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 		EnsName:          rtj.ENSName,
 		DisplayName:      displayName,
 		CommunityId:      community.ID(),
-		RevealedAccounts: make([]*protobuf.RevealedAccount, 0),
+		RevealedAccounts: rtj.RevealedAccounts,
 	}
 
 	s.Require().NoError(err)
@@ -3527,7 +3499,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityMaxNumberOfMembers() {
-	john := s.newMessenger()
+	john := s.newMessenger("johnPassword", []string{"0x0765400000000000000000000000000000000000"})
 	_, err := john.Start()
 	s.Require().NoError(err)
 
@@ -3550,7 +3522,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityMaxNumberOfMembers() {
 	s.joinCommunity(community, s.owner, s.alice)
 
 	// Bob also tries to join, but he will be put in the requests to join to approve and won't join
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := s.createRequestToJoinCommunity(community.ID(), s.bob)
 	response, err := s.bob.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -3580,7 +3552,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityMaxNumberOfMembers() {
 	s.Require().Equal(protobuf.CommunityPermissions_MANUAL_ACCEPT, updatedCommunity.Permissions().Access)
 
 	// John also tries to join, but he his request will be ignored as it exceeds the max number of pending requests
-	requestJohn := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	requestJohn := s.createRequestToJoinCommunity(community.ID(), john)
 	response, err = john.RequestToJoinCommunity(requestJohn)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -3686,7 +3658,7 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	s.Require().True(community.Encrypted())
 	s.Require().True(community.ChannelEncrypted(chat.CommunityChatID()))
 
-	s.owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
+	s.mockPermissionCheckerForAllMessenger()
 
 	s.advertiseCommunityTo(community, s.owner, s.bob)
 	s.advertiseCommunityTo(community, s.owner, s.alice)
@@ -3763,7 +3735,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	s.advertiseCommunityTo(c, s.owner, s.bob)
 	s.advertiseCommunityTo(c, s.owner, s.alice)
 
-	s.owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
+	s.mockPermissionCheckerForAllMessenger()
 
 	s.joinCommunity(c, s.owner, s.bob)
 	s.joinCommunity(c, s.owner, s.alice)
@@ -3866,7 +3838,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 	s.advertiseCommunityTo(c, s.owner, s.bob)
 	s.advertiseCommunityTo(c, s.owner, s.alice)
 
-	s.owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
+	s.mockPermissionCheckerForAllMessenger()
 
 	s.joinCommunity(c, s.owner, s.bob)
 	s.joinCommunity(c, s.owner, s.alice)
@@ -3973,7 +3945,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.owner, s.alice)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	// We try to join the org
 	response, err := s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
@@ -3998,10 +3970,11 @@ func (s *MessengerCommunitiesSuite) TestRequestAndCancelCommunityAdminOffline() 
 	statusMessage.TransportLayer.Dst = community.PublicKey()
 
 	requestToJoinProto := &protobuf.CommunityRequestToJoin{
-		Clock:       requestToJoin1.Clock,
-		EnsName:     requestToJoin1.ENSName,
-		DisplayName: "Alice",
-		CommunityId: community.ID(),
+		Clock:            requestToJoin1.Clock,
+		EnsName:          requestToJoin1.ENSName,
+		DisplayName:      "Alice",
+		CommunityId:      community.ID(),
+		RevealedAccounts: requestToJoin1.RevealedAccounts,
 	}
 
 	err = s.owner.HandleCommunityRequestToJoin(messageState, requestToJoinProto, &statusMessage)
@@ -4527,13 +4500,11 @@ func (s *MessengerCommunitiesSuite) TestMemberMessagesHasImageLink() {
 	addMediaServer(s.owner)
 	community, communityChat := s.createCommunity()
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
-	joinCommunity(&s.Suite, community, s.owner, s.alice, request, "")
+	s.joinCommunity(community, s.owner, s.alice)
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
-	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
+	s.joinCommunity(community, s.owner, s.bob)
 
 	// WHEN: alice sends an image message
 	sentMessage := s.sendImageToCommunity(s.alice, communityChat.ID)
@@ -4566,8 +4537,7 @@ func (s *MessengerCommunitiesSuite) TestOpenAndNotJoinedCommunityNewChannelIsNot
 
 	// Bob joins the community
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
+	s.joinCommunity(community, s.owner, s.bob)
 
 	// Alice just observes the community
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
@@ -4661,8 +4631,7 @@ func (s *MessengerCommunitiesSuite) TestAliceDoesNotReceiveMentionWhenSpectating
 
 	// Bob JOINS the community
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
+	s.joinCommunity(community, s.owner, s.bob)
 
 	// Check Alice gets the updated community
 	_, err = WaitOnMessengerResponse(
@@ -4689,8 +4658,7 @@ func (s *MessengerCommunitiesSuite) TestAliceDoesNotReceiveMentionWhenSpectating
 	s.Require().NoError(err)
 
 	// Alice joins community
-	request = &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, s.owner, s.alice, request, "")
+	s.joinCommunity(community, s.owner, s.alice)
 
 	// Bob sends a message with mention
 	sentMessage = s.sendMention(s.bob, communityChat.ID)
@@ -4714,8 +4682,7 @@ func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityReque
 	community, _ := s.createCommunity()
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, s.owner, s.alice, request, "")
+	s.joinCommunity(community, s.owner, s.alice)
 
 	response, err := s.alice.LeaveCommunity(community.ID())
 	s.Require().NoError(err)
@@ -4765,7 +4732,9 @@ func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityReque
 	s.Require().Error(err, ErrOutdatedCommunityRequestToJoin)
 
 	// alice receives new request to join when she's already joined
-	requestToJoinResponse.Clock = requestToJoinResponse.Clock + 1
+	// Note: requestToJoinResponse clock is stored as milliseconds, but requestToJoin in database stored
+	// as seconds
+	requestToJoinResponse.Clock = requestToJoinResponse.Clock + 1000
 	err = s.alice.HandleCommunityRequestToJoinResponse(state, requestToJoinResponse, nil)
 	s.Require().NoError(err)
 }
@@ -4831,4 +4800,10 @@ func (s *MessengerCommunitiesSuite) TestIgnoreOutdatedCommunityDescription() {
 		s.Require().Equal(description3.Clock, communityFromDB.Clock())
 		s.Require().Len(communityFromDB.Members(), 3)
 	}
+}
+
+func (s *MessengerCommunitiesSuite) mockPermissionCheckerForAllMessenger() {
+	s.owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
+	s.alice.communitiesManager.PermissionChecker = &testPermissionChecker{}
+	s.bob.communitiesManager.PermissionChecker = &testPermissionChecker{}
 }

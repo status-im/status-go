@@ -10,22 +10,14 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
-
 	utils "github.com/status-im/status-go/common"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestMessengerCommunitiesSignersSuite(t *testing.T) {
@@ -33,68 +25,32 @@ func TestMessengerCommunitiesSignersSuite(t *testing.T) {
 }
 
 type MessengerCommunitiesSignersSuite struct {
-	suite.Suite
+	CommunitiesMessengerTestSuiteBase
 	john  *Messenger
 	bob   *Messenger
 	alice *Messenger
-
-	shh    types.Waku
-	logger *zap.Logger
-
-	collectiblesServiceMock *CollectiblesServiceMock
-
-	accountsTestData map[string]string
-
-	mockedBalances     communities.BalancesByChain
-	mockedCollectibles communities.CollectiblesByChain
 }
 
 func (s *MessengerCommunitiesSignersSuite) SetupTest() {
-
+	s.CommunitiesMessengerTestSuiteBase.SetupTest()
 	communities.SetValidateInterval(300 * time.Millisecond)
 
-	s.logger = tt.MustCreateTestLogger()
-
-	s.collectiblesServiceMock = &CollectiblesServiceMock{}
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	accountPassword := "QWERTY"
-
-	s.mockedBalances = make(communities.BalancesByChain)
-	s.mockedBalances[testChainID1] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
-	s.mockedBalances[testChainID1][gethcommon.HexToAddress(aliceAddress1)] = make(map[gethcommon.Address]*hexutil.Big)
-	s.mockedBalances[testChainID1][gethcommon.HexToAddress(bobAddress)] = make(map[gethcommon.Address]*hexutil.Big)
-
-	s.mockedCollectibles = make(communities.CollectiblesByChain)
-	s.mockedCollectibles[testChainID1] = make(map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress)
-	s.mockedCollectibles[testChainID1][gethcommon.HexToAddress(aliceAddress1)] = make(thirdparty.TokenBalancesPerContractAddress)
-	s.mockedCollectibles[testChainID1][gethcommon.HexToAddress(bobAddress)] = make(thirdparty.TokenBalancesPerContractAddress)
-
-	s.john = s.newMessenger("", []string{})
-	s.bob = s.newMessenger(accountPassword, []string{aliceAddress1})
-	s.alice = s.newMessenger(accountPassword, []string{bobAddress})
+	s.john = s.newMessenger(accountPassword, []string{commonAccountAddress})
+	s.bob = s.newMessenger(accountPassword, []string{bobAddress})
+	s.alice = s.newMessenger(accountPassword, []string{aliceAddress1})
 	_, err := s.john.Start()
 	s.Require().NoError(err)
 	_, err = s.bob.Start()
 	s.Require().NoError(err)
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
-
-	s.accountsTestData = make(map[string]string)
-	s.accountsTestData[common.PubkeyToHex(&s.bob.identity.PublicKey)] = bobAddress
-	s.accountsTestData[common.PubkeyToHex(&s.alice.identity.PublicKey)] = aliceAddress1
 }
 
 func (s *MessengerCommunitiesSignersSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.john)
 	TearDownMessenger(&s.Suite, s.bob)
 	TearDownMessenger(&s.Suite, s.alice)
-	_ = s.logger.Sync()
+	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
 func (s *MessengerCommunitiesSignersSuite) newMessenger(password string, walletAddresses []string) *Messenger {
@@ -102,17 +58,10 @@ func (s *MessengerCommunitiesSignersSuite) newMessenger(password string, walletA
 		communities.WithAllowForcingCommunityMembersReevaluation(true),
 	}
 
-	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
-		testMessengerConfig: testMessengerConfig{
-			logger:       s.logger,
-			extraOptions: []Option{WithCommunityManagerOptions(communityManagerOptions)},
-		},
-		password:            password,
-		walletAddresses:     walletAddresses,
-		mockedBalances:      &s.mockedBalances,
-		mockedCollectibles:  &s.mockedCollectibles,
-		collectiblesService: s.collectiblesServiceMock,
-	})
+	return s.newMessengerWithConfig(testMessengerConfig{
+		logger:       s.logger,
+		extraOptions: []Option{WithCommunityManagerOptions(communityManagerOptions)},
+	}, password, walletAddresses)
 }
 
 func (s *MessengerCommunitiesSignersSuite) createCommunity(controlNode *Messenger) *communities.Community {
@@ -122,40 +71,6 @@ func (s *MessengerCommunitiesSignersSuite) createCommunity(controlNode *Messenge
 
 func (s *MessengerCommunitiesSignersSuite) advertiseCommunityTo(controlNode *Messenger, community *communities.Community, user *Messenger) {
 	advertiseCommunityTo(&s.Suite, community, controlNode, user)
-}
-
-func (s *MessengerCommunitiesSignersSuite) joinCommunity(controlNode *Messenger, community *communities.Community, user *Messenger) {
-	accTestData := s.accountsTestData[common.PubkeyToHex(&s.alice.identity.PublicKey)]
-	array64Bytes := common.HashPublicKey(&s.alice.identity.PublicKey)
-	signature := append([]byte{0}, array64Bytes...)
-
-	request := &requests.RequestToJoinCommunity{
-		CommunityID:       community.ID(),
-		AddressesToReveal: []string{accTestData},
-		AirdropAddress:    accTestData,
-		Signatures:        []types.HexBytes{signature},
-	}
-
-	joinCommunity(&s.Suite, community, controlNode, user, request, "")
-}
-
-func (s *MessengerCommunitiesSignersSuite) joinOnRequestCommunity(controlNode *Messenger, community *communities.Community, user *Messenger) {
-	accTestData := s.accountsTestData[common.PubkeyToHex(&user.identity.PublicKey)]
-	array64Bytes := common.HashPublicKey(&user.identity.PublicKey)
-	signature := append([]byte{0}, array64Bytes...)
-
-	request := &requests.RequestToJoinCommunity{
-		CommunityID:       community.ID(),
-		AddressesToReveal: []string{accTestData},
-		AirdropAddress:    accTestData,
-		Signatures:        []types.HexBytes{signature},
-	}
-
-	joinOnRequestCommunity(&s.Suite, community, controlNode, user, request)
-}
-
-func (s *MessengerCommunitiesSignersSuite) makeAddressSatisfyTheCriteria(chainID uint64, address string, criteria *protobuf.TokenCriteria) {
-	makeAddressSatisfyTheCriteria(&s.Suite, s.mockedBalances, s.mockedCollectibles, chainID, address, criteria)
 }
 
 // John crates a community
@@ -174,8 +89,8 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	s.advertiseCommunityTo(s.john, community, s.bob)
 	s.advertiseCommunityTo(s.john, community, s.alice)
 
-	s.joinCommunity(s.john, community, s.bob)
-	s.joinCommunity(s.john, community, s.alice)
+	s.joinCommunity(community, s.john, s.bob)
+	s.joinCommunity(community, s.john, s.alice)
 
 	// john mints owner token
 	var chainID uint64 = 1
@@ -311,7 +226,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	s.Require().False(community.IsOwner())
 
 	// John manually joins the community
-	s.joinCommunity(s.alice, community, s.john)
+	s.joinCommunity(community, s.alice, s.john)
 
 	// Alice change community name
 
@@ -370,8 +285,8 @@ func (s *MessengerCommunitiesSignersSuite) TestAutoAcceptOnOwnershipChangeReques
 	s.advertiseCommunityTo(s.john, community, s.bob)
 	s.advertiseCommunityTo(s.john, community, s.alice)
 
-	s.joinOnRequestCommunity(s.john, community, s.bob)
-	s.joinOnRequestCommunity(s.john, community, s.alice)
+	s.joinOnRequestCommunity(community, s.john, s.bob)
+	s.joinOnRequestCommunity(community, s.john, s.alice)
 
 	// john mints owner token
 	var chainID uint64 = 1
@@ -508,7 +423,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 
 	s.advertiseCommunityTo(s.john, community, s.alice)
 
-	s.joinCommunity(s.john, community, s.alice)
+	s.joinCommunity(community, s.john, s.alice)
 
 	// john mints owner token
 	var chainID uint64 = 1
@@ -595,7 +510,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 	s.Require().NoError(err)
 
 	// Bob joins the community
-	s.joinCommunity(s.alice, community, s.bob)
+	s.joinCommunity(community, s.alice, s.bob)
 
 }
 
@@ -632,7 +547,7 @@ func (s *MessengerCommunitiesSignersSuite) forceCommunityChange(community *commu
 func (s *MessengerCommunitiesSignersSuite) testSyncCommunity(mintOwnerToken bool) {
 	community := s.createCommunity(s.john)
 	s.advertiseCommunityTo(s.john, community, s.alice)
-	s.joinCommunity(s.john, community, s.alice)
+	s.joinCommunity(community, s.john, s.alice)
 
 	// FIXME: Remove this workaround when fixed:
 	// https://github.com/status-im/status-go/issues/4413
@@ -921,8 +836,8 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeDeviceChanged() {
 	err = <-waitOnBobCommunityValidation
 	s.Require().NoError(err)
 
-	s.joinOnRequestCommunity(s.john, community, s.alice)
-	s.joinOnRequestCommunity(s.john, community, s.bob)
+	s.joinOnRequestCommunity(community, s.john, s.alice)
+	s.joinOnRequestCommunity(community, s.john, s.bob)
 
 	community, err = s.john.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)

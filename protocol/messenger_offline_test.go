@@ -33,6 +33,12 @@ type MessengerOfflineSuite struct {
 	aliceWaku types.Waku
 
 	logger *zap.Logger
+
+	mockedBalances          communities.BalancesByChain
+	collectiblesManagerMock *CollectiblesManagerMock
+	collectiblesServiceMock *CollectiblesServiceMock
+	accountsTestData        map[string][]string
+	accountsPasswords       map[string]string
 }
 
 func TestMessengerOfflineSuite(t *testing.T) {
@@ -42,19 +48,24 @@ func TestMessengerOfflineSuite(t *testing.T) {
 func (s *MessengerOfflineSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
+	s.collectiblesServiceMock = &CollectiblesServiceMock{}
+	s.collectiblesManagerMock = &CollectiblesManagerMock{}
+	s.accountsTestData = make(map[string][]string)
+	s.accountsPasswords = make(map[string]string)
+
 	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
 
 	ownerLogger := s.logger.With(zap.String("name", "owner"))
 	s.ownerWaku = wakuNodes[0]
-	s.owner = s.newMessenger(s.ownerWaku, ownerLogger)
+	s.owner = s.newMessenger(s.ownerWaku, ownerLogger, "", []string{})
 
 	bobLogger := s.logger.With(zap.String("name", "bob"))
 	s.bobWaku = wakuNodes[1]
-	s.bob = s.newMessenger(s.bobWaku, bobLogger)
+	s.bob = s.newMessenger(s.bobWaku, bobLogger, bobPassword, []string{bobAccountAddress})
 
 	aliceLogger := s.logger.With(zap.String("name", "alice"))
 	s.aliceWaku = wakuNodes[2]
-	s.alice = s.newMessenger(s.aliceWaku, aliceLogger)
+	s.alice = s.newMessenger(s.aliceWaku, aliceLogger, alicePassword, []string{aliceAddress1})
 
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
@@ -89,7 +100,7 @@ func (s *MessengerOfflineSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerOfflineSuite) newMessenger(waku types.Waku, logger *zap.Logger) *Messenger {
+func (s *MessengerOfflineSuite) newMessenger(waku types.Waku, logger *zap.Logger, password string, accounts []string) *Messenger {
 	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			logger: s.logger,
@@ -97,16 +108,15 @@ func (s *MessengerOfflineSuite) newMessenger(waku types.Waku, logger *zap.Logger
 				WithResendParams(minimumResendDelay, 1),
 			},
 		},
+		walletAddresses:     accounts,
+		password:            password,
+		mockedBalances:      &s.mockedBalances,
+		collectiblesManager: s.collectiblesManagerMock,
 	})
 }
 
 func (s *MessengerOfflineSuite) advertiseCommunityTo(community *communities.Community, owner *Messenger, user *Messenger) {
 	advertiseCommunityTo(&s.Suite, community, owner, user)
-}
-
-func (s *MessengerOfflineSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, owner, user, request, "")
 }
 
 func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
@@ -121,7 +131,7 @@ func (s *MessengerOfflineSuite) TestCommunityOfflineEdit() {
 	ctx := context.Background()
 
 	s.advertiseCommunityTo(community, s.owner, s.alice)
-	s.joinCommunity(community, s.owner, s.alice)
+	joinCommunity(&s.Suite, community.ID(), s.owner, s.alice, aliceAccountAddress, []string{aliceAddress1})
 
 	_, err := s.alice.SendChatMessage(ctx, inputMessage)
 	s.Require().NoError(err)

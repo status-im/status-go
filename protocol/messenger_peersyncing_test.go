@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -33,8 +32,10 @@ type MessengerPeersyncingSuite struct {
 	alice *Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
-	shh    types.Waku
-	logger *zap.Logger
+	shh               types.Waku
+	logger            *zap.Logger
+	accountsTestData  map[string][]string
+	accountsPasswords map[string]string
 }
 
 func (s *MessengerPeersyncingSuite) SetupTest() {
@@ -56,6 +57,14 @@ func (s *MessengerPeersyncingSuite) SetupTest() {
 	s.owner.featureFlags.ResendRawMessagesDisabled = true
 
 	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
+
+	s.accountsTestData = make(map[string][]string)
+	s.accountsTestData[common.PubkeyToHex(&s.bob.identity.PublicKey)] = []string{bobAddress}
+	s.accountsTestData[common.PubkeyToHex(&s.alice.identity.PublicKey)] = []string{aliceAddress1}
+
+	s.accountsPasswords = make(map[string]string)
+	s.accountsPasswords[common.PubkeyToHex(&s.bob.identity.PublicKey)] = bobPassword
+	s.accountsPasswords[common.PubkeyToHex(&s.alice.identity.PublicKey)] = aliceAddress1
 
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
@@ -81,8 +90,11 @@ func (s *MessengerPeersyncingSuite) newMessenger() *Messenger {
 }
 
 func (s *MessengerPeersyncingSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, owner, user, request, "")
+	addresses, exists := s.accountsTestData[user.IdentityPublicKeyString()]
+	s.Require().True(exists)
+	password, exists := s.accountsPasswords[user.IdentityPublicKeyString()]
+	s.Require().True(exists)
+	joinCommunity(&s.Suite, community.ID(), s.owner, user, password, addresses)
 }
 
 func (s *MessengerPeersyncingSuite) thirdPartyTest(community *communities.Community, chat *Chat) {
