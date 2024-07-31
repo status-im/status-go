@@ -1031,6 +1031,12 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*
 
 	// check the best route for the required balances
 	for _, path := range bestRoute {
+		if path.ProcessorName == pathprocessor.ProcessorBridgeHopName {
+			if path.TxBonderFees.ToInt().Cmp(path.AmountOut.ToInt()) > 0 {
+				return ErrLowAmountInForHopBridge
+			}
+		}
+
 		if path.requiredTokenBalance != nil && path.requiredTokenBalance.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
 			key := makeBalanceKey(path.FromChain.ChainID, path.FromToken.Symbol)
 			if tokenBalance, ok := balanceMapCopy[key]; ok {
