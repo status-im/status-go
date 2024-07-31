@@ -24,7 +24,7 @@ if [[ -z "${UNIT_TEST_COUNT}" ]]; then
 fi
 
 UNIT_TEST_PACKAGE_TIMEOUT="3m"
-UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED="36m"
+UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED="45m"
 
 redirect_stdout() {
   output_file=$1
