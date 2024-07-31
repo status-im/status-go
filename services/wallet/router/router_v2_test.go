@@ -90,7 +90,7 @@ func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
 func setupRouter(t *testing.T) (*Router, func()) {
 	db, cleanTmpDb := setupTestNetworkDB(t)
 
-	client, _ := rpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, defaultNetworks, db)
+	client, _ := rpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, defaultNetworks, db, nil)
 
 	router := NewRouter(client, nil, nil, nil, nil, nil, nil, nil)
 
