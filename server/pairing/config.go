@@ -7,7 +7,6 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 )
 
@@ -27,32 +26,14 @@ type SenderConfig struct {
 type ReceiverConfig struct {
 	CreateAccount *requests.CreateAccount `json:"createAccount" validate:"required"`
 
-	// ReceiverConfig.KeystorePath must not end with keyUID (because keyUID is not known yet)
-	// Deprecated: use CreateAccount.RootDataDir instead
-	KeystorePath string `json:"keystorePath"`
-
 	// DeviceType SendPairInstallation need this information
 	// Deprecated: This field can be omitted, but is kept here until
 	// https://github.com/status-im/status-go/issues/3351 is fully implemented.
 	DeviceType string `json:"deviceType"`
 
-	// Deprecated: use CreateAccount.KdfIterations instead
-	KDFIterations int `json:"kdfIterations" validate:"gte=0"`
-
-	// SettingCurrentNetwork corresponding to field current_network from table settings, so that we can override current network from sender
-	// Deprecated: use CreateAccount.SettingCurrentNetwork instead
-	SettingCurrentNetwork string `json:"settingCurrentNetwork"`
-
-	// Deprecated: use CreateAccount.DeviceName instead
-	DeviceName string `json:"deviceName"`
-
 	// TODO: make those private
 	DB             *multiaccounts.Database `json:"-"`
 	LoggedInKeyUID string                  `json:"-"`
-
-	// nodeConfig will be generated
-	// Deprecated: use CreateAccount and build default node config instead
-	nodeConfig *params.NodeConfig
 }
 
 type KeystoreFilesConfig struct {
