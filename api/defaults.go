@@ -393,6 +393,12 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	return nodeConfig, nil
 }
 
+func DefaultKeystorePath(rootDataDir string, keyUID string) (string, string) {
+	relativePath := filepath.Join(keystoreRelativePath, keyUID)
+	absolutePath := filepath.Join(rootDataDir, relativePath)
+	return relativePath, absolutePath
+}
+
 func buildSigningPhrase() (string, error) {
 	length := big.NewInt(int64(len(dictionary)))
 	a, err := rand.Int(rand.Reader, length)

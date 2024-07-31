@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -126,9 +126,12 @@ func NewAccountPayloadStorer(p *AccountPayload, config *ReceiverConfig) (*Accoun
 		return ppr, nil
 	}
 
+	if config.CreateAccount != nil {
+		ppr.kdfIterations = config.CreateAccount.KdfIterations
+		ppr.keystorePath = config.AbsoluteKeystorePath()
+	}
+
 	ppr.multiaccountsDB = config.DB
-	ppr.kdfIterations = config.KDFIterations
-	ppr.keystorePath = config.KeystorePath
 	ppr.loggedInKeyUID = config.LoggedInKeyUID
 	return ppr, nil
 }
@@ -237,13 +240,8 @@ type RawMessageStorer struct {
 	payload               *RawMessagesPayload
 	syncRawMessageHandler *SyncRawMessageHandler
 	accountPayload        *AccountPayload
-	// Deprecated
-	nodeConfig *params.NodeConfig
-	// Deprecated
-	settingCurrentNetwork string
+	createAccount         *requests.CreateAccount
 	deviceType            string
-	// Deprecated
-	deviceName string
 }
 
 func NewRawMessageStorer(backend *api.GethStatusBackend, payload *RawMessagesPayload, accountPayload *AccountPayload, config *ReceiverConfig) *RawMessageStorer {
@@ -251,10 +249,8 @@ func NewRawMessageStorer(backend *api.GethStatusBackend, payload *RawMessagesPay
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
 		payload:               payload,
 		accountPayload:        accountPayload,
-		nodeConfig:            config.nodeConfig,
-		settingCurrentNetwork: config.SettingCurrentNetwork,
 		deviceType:            config.DeviceType,
-		deviceName:            config.DeviceName,
+		createAccount:         config.CreateAccount,
 	}
 }
 

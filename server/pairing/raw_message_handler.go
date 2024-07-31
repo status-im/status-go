@@ -142,7 +142,7 @@ func (s *SyncRawMessageHandler) login(accountPayload *AccountPayload, createAcco
 		return err
 	}
 
-	var chatKey *ecdsa.PrivateKey // TODO: Set this chatKey to LoginAccount request
+	var chatKey *ecdsa.PrivateKey
 	if accountPayload.chatKey != "" {
 		chatKeyHex := strings.Trim(accountPayload.chatKey, "0x")
 		chatKey, err = ethcrypto.HexToECDSA(chatKeyHex)

@@ -27,7 +27,6 @@ import (
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -79,75 +78,37 @@ func (s *SyncDeviceSuite) SetupTest() {
 
 func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *api.GethStatusBackend {
 	backend := s.prepareBackendWithoutAccount(tmpdir)
-	accountManager := backend.AccountManager()
-	accGenerator := accountManager.AccountsGenerator()
 
-	var (
-		generatedAccountInfo generator.GeneratedAndDerivedAccountInfo
-		err                  error
-	)
-	if len(mnemonic) > 0 {
-		generatedAccountInfo.GeneratedAccountInfo, err = accGenerator.ImportMnemonic(mnemonic, "")
-		require.NoError(s.T(), err)
-		generatedAccountInfo.Derived, err = accGenerator.DeriveAddresses(generatedAccountInfo.ID, paths)
-		require.NoError(s.T(), err)
-	} else {
-		generatedAccountInfos, err := accGenerator.GenerateAndDeriveAddresses(12, 1, "", paths)
-		require.NoError(s.T(), err)
-		generatedAccountInfo = generatedAccountInfos[0]
-	}
-	account := multiaccounts.Account{
-		KeyUID:        generatedAccountInfo.KeyUID,
-		KDFIterations: dbsetup.ReducedKDFIterationsNumber,
-	}
-	err = accountManager.InitKeystore(filepath.Join(tmpdir, keystoreDir, account.KeyUID))
-	require.NoError(s.T(), err)
-	err = backend.OpenAccounts()
-	require.NoError(s.T(), err)
-	derivedAddresses := generatedAccountInfo.Derived
-	_, err = accGenerator.StoreDerivedAccounts(generatedAccountInfo.ID, s.password, paths)
-	require.NoError(s.T(), err)
-
-	settings, err := defaultSettings(generatedAccountInfo.GeneratedAccountInfo, derivedAddresses, nil)
-	require.NoError(s.T(), err)
-
-	settings.Name, err = common.RandomAlphabeticalString(8)
+	displayName, err := common.RandomAlphabeticalString(8)
 	s.Require().NoError(err)
 
-	account.Name = settings.Name
+	deviceName, err := common.RandomAlphanumericString(8)
+	s.Require().NoError(err)
 
-	nodeConfig, err := nodeConfigForLocalPairSync(settings.InstallationID, account.KeyUID, tmpdir)
-	nodeConfig.RootDataDir = tmpdir
-	require.NoError(s.T(), err)
-	require.NoError(s.T(), setDefaultNodeConfig(nodeConfig))
-
-	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
-	walletAccount := &accounts.Account{
-		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
-		KeyUID:    generatedAccountInfo.KeyUID,
-		Address:   types.HexToAddress(walletDerivedAccount.Address),
-		ColorID:   "",
-		Wallet:    true,
-		Path:      pathDefaultWallet,
-		Name:      "Ethereum account",
+	createAccount := requests.CreateAccount{
+		RootDataDir:        tmpdir,
+		KdfIterations:      dbsetup.ReducedKDFIterationsNumber,
+		DisplayName:        displayName,
+		DeviceName:         deviceName,
+		Password:           s.password,
+		CustomizationColor: "primary",
 	}
 
-	chatDerivedAccount := derivedAddresses[pathDefaultChat]
-	chatAccount := &accounts.Account{
-		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
-		KeyUID:    generatedAccountInfo.KeyUID,
-		Address:   types.HexToAddress(chatDerivedAccount.Address),
-		Name:      settings.Name,
-		Chat:      true,
-		Path:      pathDefaultChat,
+	if mnemonic == "" {
+		_, err = backend.CreateAccountAndLogin(&createAccount)
+	} else {
+		_, err = backend.RestoreAccountAndLogin(&requests.RestoreAccount{
+			Mnemonic:      mnemonic,
+			FetchBackup:   false,
+			CreateAccount: createAccount,
+		})
 	}
 
-	accounts := []*accounts.Account{walletAccount, chatAccount}
-	err = backend.StartNodeWithAccountAndInitialConfig(account, s.password, *settings, nodeConfig, accounts, nil)
-	require.NoError(s.T(), err)
-	multiaccounts, err := backend.GetAccounts()
-	require.NoError(s.T(), err)
-	require.NotEmpty(s.T(), multiaccounts[0].ColorHash)
+	s.Require().NoError(err)
+
+	accs, err := backend.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().NotEmpty(accs[0].ColorHash)
 
 	return backend
 }
@@ -191,21 +152,15 @@ func (s *SyncDeviceSuite) pairAccounts(serverBackend *api.GethStatusBackend, ser
 	err = clientBackend.OpenAccounts()
 	require.NoError(s.T(), err)
 
-	clientNodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", clientDir)
-	require.NoError(s.T(), err)
-
-	clientKeystoreDir := filepath.Join(clientDir, keystoreDir)
 	clientPayloadSourceConfig := ReceiverClientConfig{
 		ReceiverConfig: &ReceiverConfig{
-			KeystorePath:          clientKeystoreDir,
-			DeviceType:            "desktop",
-			KDFIterations:         expectedKDFIterations,
-			nodeConfig:            clientNodeConfig,
-			SettingCurrentNetwork: currentNetwork,
+			CreateAccount: &requests.CreateAccount{
+				RootDataDir:   clientDir,
+				KdfIterations: expectedKDFIterations,
+			},
 		},
 		ClientConfig: new(ClientConfig),
 	}
-	clientNodeConfig.RootDataDir = clientDir
 
 	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
 	require.NoError(s.T(), err)
@@ -294,20 +249,17 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	err = serverBackend.OpenAccounts()
 	require.NoError(s.T(), err)
-	serverNodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", serverTmpDir)
-	require.NoError(s.T(), err)
-	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
+
 	serverPayloadSourceConfig := &ReceiverServerConfig{
 		ReceiverConfig: &ReceiverConfig{
-			nodeConfig:            serverNodeConfig,
-			KeystorePath:          serverKeystoreDir,
-			DeviceType:            "desktop",
-			KDFIterations:         expectedKDFIterations,
-			SettingCurrentNetwork: currentNetwork,
+			CreateAccount: &requests.CreateAccount{
+				RootDataDir:   serverTmpDir,
+				KdfIterations: expectedKDFIterations,
+			},
 		},
 		ServerConfig: new(ServerConfig),
 	}
-	serverNodeConfig.RootDataDir = serverTmpDir
+
 	serverConfigBytes, err := json.Marshal(serverPayloadSourceConfig)
 	require.NoError(s.T(), err)
 	cs, err := StartUpReceiverServer(serverBackend, string(serverConfigBytes))
@@ -377,6 +329,9 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	clientMessenger := clientBackend.Messenger()
 	require.True(s.T(), serverMessenger.HasPairedDevices())
 	require.True(s.T(), clientMessenger.HasPairedDevices())
+
+	serverNodeConfig, err := serverBackend.GetNodeConfig()
+	s.Require().NoError(err)
 
 	err = clientMessenger.DisableInstallation(serverNodeConfig.ShhextConfig.InstallationID)
 	require.NoError(s.T(), err)
@@ -469,20 +424,17 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	err = clientBackend.OpenAccounts()
 	require.NoError(s.T(), err)
-	clientNodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", clientTmpDir)
-	require.NoError(s.T(), err)
-	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
+
 	clientPayloadSourceConfig := ReceiverClientConfig{
 		ReceiverConfig: &ReceiverConfig{
-			KeystorePath:          clientKeystoreDir,
-			DeviceType:            "iphone",
-			KDFIterations:         expectedKDFIterations,
-			nodeConfig:            clientNodeConfig,
-			SettingCurrentNetwork: currentNetwork,
+			CreateAccount: &requests.CreateAccount{
+				RootDataDir:   clientTmpDir,
+				KdfIterations: expectedKDFIterations,
+				DeviceName:    "device-1",
+			},
 		},
 		ClientConfig: new(ClientConfig),
 	}
-	clientNodeConfig.RootDataDir = clientTmpDir
 	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
 	require.NoError(s.T(), err)
 	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
@@ -517,9 +469,13 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.True(s.T(), serverMessenger.HasPairedDevices())
 	require.True(s.T(), clientMessenger.HasPairedDevices())
 
+	clientNodeConfig, err := clientBackend.GetNodeConfig()
+	s.Require().NoError(err)
+
 	err = serverMessenger.DisableInstallation(clientNodeConfig.ShhextConfig.InstallationID)
 	require.NoError(s.T(), err)
 	require.False(s.T(), serverMessenger.HasPairedDevices())
+
 	serverNodeConfig, err := serverBackend.GetNodeConfig()
 	require.NoError(s.T(), err)
 	err = clientMessenger.DisableInstallation(serverNodeConfig.ShhextConfig.InstallationID)
@@ -790,6 +746,7 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	return syncSettings, nil
 }
 
+// Deprecated
 func nodeConfigForLocalPairSync(installationID, keyUID, tmpDir string) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
@@ -1324,20 +1281,16 @@ func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsReceiver
 	cs, err := StartUpSenderServer(serverBackend, string(configBytes))
 	s.NoError(err)
 
-	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
-	clientNodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", clientTmpDir)
-	s.NoError(err)
 	clientPayloadSourceConfig := ReceiverClientConfig{
 		ReceiverConfig: &ReceiverConfig{
-			KeystorePath:          clientKeystoreDir,
-			DeviceType:            "iphone",
-			KDFIterations:         expectedKDFIterations,
-			nodeConfig:            clientNodeConfig,
-			SettingCurrentNetwork: currentNetwork,
+			CreateAccount: &requests.CreateAccount{
+				RootDataDir:   clientTmpDir,
+				KdfIterations: expectedKDFIterations,
+				DeviceName:    "client-device",
+			},
 		},
 		ClientConfig: new(ClientConfig),
 	}
-	clientNodeConfig.RootDataDir = clientTmpDir
 	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
 	s.NoError(err)
 	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
@@ -1354,20 +1307,17 @@ func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsSender()
 		s.NoError(clientBackend.Logout())
 	}()
 
-	serverNodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", serverTmpDir)
-	s.NoError(err)
-	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
 	serverPayloadSourceConfig := &ReceiverServerConfig{
 		ReceiverConfig: &ReceiverConfig{
-			nodeConfig:            serverNodeConfig,
-			KeystorePath:          serverKeystoreDir,
-			DeviceType:            "desktop",
-			KDFIterations:         expectedKDFIterations,
-			SettingCurrentNetwork: currentNetwork,
+			CreateAccount: &requests.CreateAccount{
+				RootDataDir:   serverTmpDir,
+				KdfIterations: expectedKDFIterations,
+				DeviceName:    "server-device",
+			},
 		},
 		ServerConfig: new(ServerConfig),
 	}
-	serverNodeConfig.RootDataDir = serverTmpDir
+
 	serverConfigBytes, err := json.Marshal(serverPayloadSourceConfig)
 	s.NoError(err)
 	cs, err := StartUpReceiverServer(serverBackend, string(serverConfigBytes))

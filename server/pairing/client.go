@@ -529,6 +529,11 @@ func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string)
 	// Check DeviceType deprecation reason for more info.
 	conf.ReceiverConfig.DeviceType = runtime.GOOS
 
+	err = validateReceiverConfig(conf, conf.ReceiverConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	// ignore err because we allow no active account here
 	activeAccount, _ := backend.GetActiveAccount()
 	if activeAccount != nil {

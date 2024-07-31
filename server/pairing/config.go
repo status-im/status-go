@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
@@ -28,7 +29,7 @@ type ReceiverConfig struct {
 
 	// ReceiverConfig.KeystorePath must not end with keyUID (because keyUID is not known yet)
 	// Deprecated: use CreateAccount.RootDataDir instead
-	KeystorePath string `json:"keystorePath" validate:"required,not_end_keyuid"`
+	KeystorePath string `json:"keystorePath"`
 
 	// DeviceType SendPairInstallation need this information
 	// Deprecated: This field can be omitted, but is kept here until
@@ -40,7 +41,7 @@ type ReceiverConfig struct {
 
 	// SettingCurrentNetwork corresponding to field current_network from table settings, so that we can override current network from sender
 	// Deprecated: use CreateAccount.SettingCurrentNetwork instead
-	SettingCurrentNetwork string `json:"settingCurrentNetwork" validate:"required"`
+	SettingCurrentNetwork string `json:"settingCurrentNetwork"`
 
 	// Deprecated: use CreateAccount.DeviceName instead
 	DeviceName string `json:"deviceName"`
@@ -158,4 +159,11 @@ func NewReceiverServerConfig() *ReceiverServerConfig {
 		ReceiverConfig: new(ReceiverConfig),
 		ServerConfig:   new(ServerConfig),
 	}
+}
+
+func (c *ReceiverConfig) AbsoluteKeystorePath() string {
+	// Follow the same path as in InitKeyStoreDirWithAccount
+	// Keep keyUID empty as it's unknown yet
+	_, path := api.DefaultKeystorePath(c.CreateAccount.RootDataDir, "")
+	return path
 }

@@ -1513,10 +1513,9 @@ func (b *GethStatusBackend) prepareNodeAccount(request *requests.CreateAccount, 
 
 func (b *GethStatusBackend) InitKeyStoreDirWithAccount(rootDataDir, keyUID string) (string, error) {
 	b.UpdateRootDataDir(rootDataDir)
-	userKeyStoreRelativePath := filepath.Join(keystoreRelativePath, keyUID)
-	keystoreAbsolutePath := filepath.Join(b.rootDataDir, userKeyStoreRelativePath)
+	keyStoreRelativePath, keystoreAbsolutePath := DefaultKeystorePath(rootDataDir, keyUID)
 	// Initialize keystore dir with account
-	return userKeyStoreRelativePath, b.accountManager.InitKeystore(keystoreAbsolutePath)
+	return keyStoreRelativePath, b.accountManager.InitKeystore(keystoreAbsolutePath)
 }
 
 func (b *GethStatusBackend) generateAccountInfo(mnemonic string) (*generator.GeneratedAccountInfo, error) {

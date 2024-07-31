@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"net"
+	"runtime"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -296,11 +297,12 @@ func StartUpReceiverServer(backend *api.GethStatusBackend, configJSON string) (s
 	if err != nil {
 		return "", err
 	}
-	receiverConf := conf.ReceiverConfig
-	if err = setDefaultNodeConfig(receiverConf.nodeConfig); err != nil {
-		return "", err
-	}
-	err = validateAndVerifyNodeConfig(conf, receiverConf)
+
+	// This is a temporal solution to allow clients not to pass DeviceType.
+	// Check DeviceType deprecation reason for more info.
+	conf.ReceiverConfig.DeviceType = runtime.GOOS
+
+	err = validateReceiverConfig(conf, conf.ReceiverConfig)
 	if err != nil {
 		return "", err
 	}
