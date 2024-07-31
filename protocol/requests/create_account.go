@@ -86,6 +86,7 @@ type CreateAccount struct {
 
 	KeycardInstanceUID     string  `json:"keycardInstanceUID"`
 	KeycardPairingDataFile *string `json:"keycardPairingDataFile"`
+	StatusProxyEnabled     bool    `json:"statusProxyEnabled"`
 }
 
 type WalletSecretsConfig struct {
@@ -96,17 +97,19 @@ type WalletSecretsConfig struct {
 	RaribleMainnetAPIKey string `json:"raribleMainnetApiKey"`
 	RaribleTestnetAPIKey string `json:"raribleTestnetApiKey"`
 
-	AlchemyEthereumMainnetToken string `json:"alchemyEthereumMainnetToken"`
-	AlchemyEthereumGoerliToken  string `json:"alchemyEthereumGoerliToken"`
-	AlchemyEthereumSepoliaToken string `json:"alchemyEthereumSepoliaToken"`
-	AlchemyArbitrumMainnetToken string `json:"alchemyArbitrumMainnetToken"`
-	AlchemyArbitrumGoerliToken  string `json:"alchemyArbitrumGoerliToken"`
-	AlchemyArbitrumSepoliaToken string `json:"alchemyArbitrumSepoliaToken"`
-	AlchemyOptimismMainnetToken string `json:"alchemyOptimismMainnetToken"`
-	AlchemyOptimismGoerliToken  string `json:"alchemyOptimismGoerliToken"`
-	AlchemyOptimismSepoliaToken string `json:"alchemyOptimismSepoliaToken"`
-	StatusProxyMarketUser       string `json:"statusProxyMarketUser"`
-	StatusProxyMarketPassword   string `json:"statusProxyMarketPassword"`
+	AlchemyEthereumMainnetToken   string `json:"alchemyEthereumMainnetToken"`
+	AlchemyEthereumGoerliToken    string `json:"alchemyEthereumGoerliToken"`
+	AlchemyEthereumSepoliaToken   string `json:"alchemyEthereumSepoliaToken"`
+	AlchemyArbitrumMainnetToken   string `json:"alchemyArbitrumMainnetToken"`
+	AlchemyArbitrumGoerliToken    string `json:"alchemyArbitrumGoerliToken"`
+	AlchemyArbitrumSepoliaToken   string `json:"alchemyArbitrumSepoliaToken"`
+	AlchemyOptimismMainnetToken   string `json:"alchemyOptimismMainnetToken"`
+	AlchemyOptimismGoerliToken    string `json:"alchemyOptimismGoerliToken"`
+	AlchemyOptimismSepoliaToken   string `json:"alchemyOptimismSepoliaToken"`
+	StatusProxyMarketUser         string `json:"statusProxyMarketUser"`
+	StatusProxyMarketPassword     string `json:"statusProxyMarketPassword"`
+	StatusProxyBlockchainUser     string `json:"statusProxyBlockchainUser"`
+	StatusProxyBlockchainPassword string `json:"statusProxyBlockchainPassword"`
 
 	// Testing
 	GanacheURL string `json:"ganacheURL"`

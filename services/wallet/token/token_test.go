@@ -331,7 +331,7 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
 	client := gethrpc.DialInProc(server)
-	rpcClient, _ := rpc.NewClient(client, chainID, params.UpstreamRPCConfig{}, nil, appDB)
+	rpcClient, _ := rpc.NewClient(client, chainID, params.UpstreamRPCConfig{}, nil, appDB, nil)
 	rpcClient.UpstreamChainID = chainID
 	nm := network.NewManager(appDB)
 	mediaServer, err := mediaserver.NewMediaServer(appDB, nil, nil, walletDB)

@@ -36,7 +36,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	}
 
 	client := gethrpc.DialInProc(server)
-	rpcClient, err := statusRPC.NewClient(client, 1, upstreamConfig, nil, db)
+	rpcClient, err := statusRPC.NewClient(client, 1, upstreamConfig, nil, db, nil)
 	require.NoError(t, err)
 
 	service := NewService(db, rpcClient, nil)
