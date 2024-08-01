@@ -18,6 +18,7 @@ type NewMessage struct {
 	PowTarget   float64   `json:"powTarget"`
 	TargetPeer  string    `json:"targetPeer"`
 	Ephemeral   bool      `json:"ephemeral"`
+	Priority    *int      `json:"priority"`
 }
 
 // Message is the RPC representation of a whisper message.

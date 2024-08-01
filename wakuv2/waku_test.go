@@ -219,7 +219,7 @@ func TestBasicWakuV2(t *testing.T) {
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      proto.Uint32(0),
 		Timestamp:    &msgTimestamp,
-	})
+	}, nil)
 
 	require.NoError(t, err)
 
@@ -416,7 +416,7 @@ func TestWakuV2Filter(t *testing.T) {
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      proto.Uint32(0),
 		Timestamp:    &msgTimestamp,
-	})
+	}, nil)
 	require.NoError(t, err)
 	time.Sleep(5 * time.Second)
 
@@ -443,7 +443,7 @@ func TestWakuV2Filter(t *testing.T) {
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      proto.Uint32(0),
 		Timestamp:    &msgTimestamp,
-	})
+	}, nil)
 	require.NoError(t, err)
 	time.Sleep(10 * time.Second)
 
@@ -531,7 +531,7 @@ func TestWakuV2Store(t *testing.T) {
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      proto.Uint32(0),
 		Timestamp:    &msgTimestamp,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	waitForEnvelope(t, contentTopic.ContentTopic(), w2EnvelopeCh)
@@ -632,7 +632,7 @@ func TestConfirmMessageDelivered(t *testing.T) {
 		Version:      proto.Uint32(0),
 		Timestamp:    &msgTimestamp,
 		Ephemeral:    proto.Bool(false),
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	time.Sleep(1 * time.Second)
@@ -782,7 +782,7 @@ func TestLightpushRateLimit(t *testing.T) {
 			ContentTopic: maps.Keys(contentTopics)[0].ContentTopic(),
 			Version:      proto.Uint32(0),
 			Timestamp:    &msgTimestamp,
-		})
+		}, nil)
 
 		require.NoError(t, err)
 

@@ -31,6 +31,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
@@ -42,6 +43,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"golang.org/x/crypto/pbkdf2"
+	"golang.org/x/time/rate"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -55,6 +57,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
+	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
@@ -90,7 +93,9 @@ const messageExpiredPerid = 10 // in seconds
 const maxRelayPeers = 300
 const randomPeersKeepAliveInterval = 5 * time.Second
 const allPeersKeepAliveInterval = 5 * time.Minute
-const PeersToPublishForLightpush = 2
+const peersToPublishForLightpush = 2
+const publishingLimiterRate = rate.Limit(2)
+const publishingLimitBurst = 4
 
 type SentEnvelope struct {
 	Envelope      *protocol.Envelope
@@ -133,8 +138,11 @@ type Waku struct {
 	bandwidthCounter *metrics.BandwidthCounter
 
 	protectedTopicStore *persistence.ProtectedTopicsStore
-	sendQueue           chan *protocol.Envelope
-	msgQueue            chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
+
+	sendQueue *publish.MessageQueue
+	limiter   *publish.PublishRateLimiter
+
+	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
 	topicInterest   map[string]TopicInterest // Track message verification requests and when was the last time a pubsub topic was verified for missing messages
 	topicInterestMu sync.Mutex
@@ -227,7 +235,6 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		envelopeCache:                   newTTLCache(),
 		expirations:                     make(map[uint32]mapset.Set),
 		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
-		sendQueue:                       make(chan *protocol.Envelope, 1000),
 		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
 		connectionNotifChan:             make(chan node.PeerConnection, 20),
 		connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
@@ -247,6 +254,16 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
+		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
+	}
+
+	if !cfg.UseThrottledPublish || testing.Testing() {
+		// To avoid delaying the tests, or for when we dont want to rate limit, we set up an infinite rate limiter,
+		// basically disabling the rate limit functionality
+		waku.limiter = publish.NewPublishRateLimiter(rate.Inf, 1)
+
+	} else {
+		waku.limiter = publish.NewPublishRateLimiter(publishingLimiterRate, publishingLimitBurst)
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
@@ -979,76 +996,6 @@ func (w *Waku) SkipPublishToTopic(value bool) {
 	w.cfg.SkipPublishToTopic = value
 }
 
-type PublishMethod int
-
-const (
-	LightPush PublishMethod = iota
-	Relay
-)
-
-func (pm PublishMethod) String() string {
-	switch pm {
-	case LightPush:
-		return "LightPush"
-	case Relay:
-		return "Relay"
-	default:
-		return "Unknown"
-	}
-}
-
-func (w *Waku) broadcast() {
-	for {
-		select {
-		case envelope := <-w.sendQueue:
-			logger := w.logger.With(zap.Stringer("envelopeHash", envelope.Hash()), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().GetTimestamp()))
-			var fn publishFn
-			var publishMethod PublishMethod
-			if w.cfg.SkipPublishToTopic {
-				// For now only used in testing to simulate going offline
-				publishMethod = LightPush
-				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
-					return errors.New("test send failure")
-				}
-			} else if w.cfg.LightClient {
-				publishMethod = LightPush
-				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
-					logger.Info("publishing message via lightpush")
-					_, err := w.node.Lightpush().Publish(w.ctx, env.Message(), lightpush.WithPubSubTopic(env.PubsubTopic()), lightpush.WithMaxPeers(PeersToPublishForLightpush))
-					return err
-				}
-			} else {
-				publishMethod = Relay
-				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
-					peerCnt := len(w.node.Relay().PubSub().ListPeers(env.PubsubTopic()))
-					logger.Info("publishing message via relay", zap.Int("peerCnt", peerCnt))
-					_, err := w.node.Relay().Publish(w.ctx, env.Message(), relay.WithPubSubTopic(env.PubsubTopic()))
-					return err
-				}
-			}
-
-			// Wraps the publish function with a call to the telemetry client
-			if w.statusTelemetryClient != nil {
-				sendFn := fn
-				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
-					err := sendFn(env, logger)
-					if err == nil {
-						w.statusTelemetryClient.PushSentEnvelope(SentEnvelope{Envelope: env, PublishMethod: publishMethod})
-					} else {
-						w.statusTelemetryClient.PushErrorSendingEnvelope(ErrorSendingEnvelope{Error: err, SentEnvelope: SentEnvelope{Envelope: env, PublishMethod: publishMethod}})
-					}
-					return err
-				}
-			}
-
-			w.wg.Add(1)
-			go w.publishEnvelope(envelope, fn, logger)
-		case <-w.ctx.Done():
-			return
-		}
-	}
-}
-
 func (w *Waku) checkIfMessagesStored() {
 	if !w.cfg.EnableStoreConfirmationForMessagesSent {
 		return
@@ -1137,62 +1084,6 @@ func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
 
 func (w *Waku) SetStorePeerID(peerID peer.ID) {
 	w.storePeerID = peerID
-}
-
-type publishFn = func(envelope *protocol.Envelope, logger *zap.Logger) error
-
-func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publishFn, logger *zap.Logger) {
-	defer w.wg.Done()
-
-	if err := publishFn(envelope, logger); err != nil {
-		logger.Error("could not send message", zap.Error(err))
-		w.SendEnvelopeEvent(common.EnvelopeEvent{
-			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-			Event: common.EventEnvelopeExpired,
-		})
-		return
-	} else {
-		if !w.cfg.EnableStoreConfirmationForMessagesSent {
-			w.SendEnvelopeEvent(common.EnvelopeEvent{
-				Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-				Event: common.EventEnvelopeSent,
-			})
-		}
-	}
-}
-
-// Send injects a message into the waku send queue, to be distributed in the
-// network in the coming cycles.
-func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
-	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
-	if w.protectedTopicStore != nil {
-		privKey, err := w.protectedTopicStore.FetchPrivateKey(pubsubTopic)
-		if err != nil {
-			return nil, err
-		}
-
-		if privKey != nil {
-			err = relay.SignMessage(privKey, msg, pubsubTopic)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
-
-	w.sendQueue <- envelope
-
-	w.poolMu.Lock()
-	alreadyCached := w.envelopeCache.Has(gethcommon.BytesToHash(envelope.Hash().Bytes()))
-	w.poolMu.Unlock()
-	if !alreadyCached {
-		recvMessage := common.NewReceivedMessage(envelope, common.SendMessageType)
-		w.postEvent(recvMessage) // notify the local node about the new message
-		w.addEnvelope(recvMessage)
-	}
-
-	return envelope.Hash().Bytes(), nil
 }
 
 // ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options, processEnvelopes
@@ -1424,6 +1315,8 @@ func (w *Waku) Start() error {
 	}
 
 	go w.broadcast()
+
+	go w.sendQueue.Start(w.ctx)
 
 	go w.checkIfMessagesStored()
 

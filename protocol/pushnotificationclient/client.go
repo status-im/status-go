@@ -1738,6 +1738,7 @@ func (c *Client) queryPushNotificationInfo(publicKey *ecdsa.PublicKey) error {
 		// we don't want to wrap in an encryption layer message
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY,
+		Priority:            &common.LowPriority,
 	}
 
 	// this is the topic of message

@@ -370,8 +370,6 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
-	t.logger.Debug("SENDING message", zap.Binary("topic", filter.ContentTopic[:]))
-
 	return t.api.Post(ctx, *newMessage)
 }
 
