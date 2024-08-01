@@ -1076,7 +1076,7 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 
 		return nil
 	}
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
+	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 	tokenManager.SetTokens([]*token.Token{
@@ -1339,7 +1339,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		currentBlock:           100,
 	}
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
+	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
@@ -1463,7 +1463,7 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 			currentBlock:           100,
 		}
 
-		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
+		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
 		client.SetClient(tc.NetworkID(), tc)
 		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
@@ -1543,7 +1543,7 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
 	require.NoError(t, err)
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
+	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
@@ -1657,7 +1657,7 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 	}
 	//tc.printPreparedData = true
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
+	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
 	client.SetClient(tc.NetworkID(), tc)
 
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
@@ -1796,7 +1796,7 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
+	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
 	maker, _ := contracts.NewContractMaker(client)
 
 	wdb := NewDB(db)

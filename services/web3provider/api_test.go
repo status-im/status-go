@@ -45,7 +45,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
 	client := gethrpc.DialInProc(server)
 
-	rpcClient, err := statusRPC.NewClient(client, 1, upstreamConfig, nil, db)
+	rpcClient, err := statusRPC.NewClient(client, 1, upstreamConfig, nil, db, nil)
 	require.NoError(t, err)
 
 	// import account keys

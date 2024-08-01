@@ -61,6 +61,11 @@ GIT_AUTHOR := $(shell git config user.email || echo $$USER)
 ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
 
+ifdef RELEASE
+	BUILD_TAGS += release
+endif
+
+
 BUILD_FLAGS ?= -ldflags="-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/params.IpfsGatewayURL=$(IPFS_GATEWAY_URL) \

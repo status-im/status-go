@@ -161,7 +161,7 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	return nil
 }
 
-func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfig {
+func buildWalletConfig(request *requests.WalletSecretsConfig, statusProxyEnabled bool) params.WalletConfig {
 	walletConfig := params.WalletConfig{
 		Enabled:        true,
 		AlchemyAPIKeys: make(map[uint64]string),
@@ -214,6 +214,20 @@ func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfi
 	if request.AlchemyOptimismSepoliaToken != "" {
 		walletConfig.AlchemyAPIKeys[optimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
 	}
+	if request.StatusProxyMarketUser != "" {
+		walletConfig.StatusProxyMarketUser = request.StatusProxyMarketUser
+	}
+	if request.StatusProxyMarketPassword != "" {
+		walletConfig.StatusProxyMarketPassword = request.StatusProxyMarketPassword
+	}
+	if request.StatusProxyBlockchainUser != "" {
+		walletConfig.StatusProxyBlockchainUser = request.StatusProxyBlockchainUser
+	}
+	if request.StatusProxyBlockchainPassword != "" {
+		walletConfig.StatusProxyBlockchainPassword = request.StatusProxyBlockchainPassword
+	}
+
+	walletConfig.StatusProxyEnabled = statusProxyEnabled
 
 	return walletConfig
 }
@@ -281,7 +295,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	nodeConfig.MaxPeers = DefaultMaxPeers
 	nodeConfig.MaxPendingPeers = DefaultMaxPendingPeers
 
-	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
+	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig, request.StatusProxyEnabled)
 
 	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}

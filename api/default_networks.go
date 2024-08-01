@@ -1,9 +1,11 @@
 package api
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/buildinfo"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -27,6 +29,8 @@ var ganacheTokenAddress = common.HexToAddress("0x8571Ddc46b10d31EF963aF49b6C7799
 var mainnet = params.Network{
 	ChainID:                mainnetChainID,
 	ChainName:              "Mainnet",
+	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/grove/ethereum/mainnet/", buildinfo.ApiProxyStageName),
+	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/ethereum/mainnet/", buildinfo.ApiProxyStageName),
 	RPCURL:                 "https://eth-archival.rpc.grove.city/v1/",
 	FallbackURL:            "https://mainnet.infura.io/v3/",
 	BlockExplorerURL:       "https://etherscan.io/",
@@ -63,6 +67,8 @@ var goerli = params.Network{
 var sepolia = params.Network{
 	ChainID:                sepoliaChainID,
 	ChainName:              "Mainnet",
+	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/grove/ethereum/sepolia/", buildinfo.ApiProxyStageName),
+	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/ethereum/sepolia/", buildinfo.ApiProxyStageName),
 	RPCURL:                 "https://sepolia-archival.rpc.grove.city/v1/",
 	FallbackURL:            "https://sepolia.infura.io/v3/",
 	BlockExplorerURL:       "https://sepolia.etherscan.io/",
@@ -81,7 +87,9 @@ var sepolia = params.Network{
 var optimism = params.Network{
 	ChainID:                optimismChainID,
 	ChainName:              "Optimism",
-	RPCURL:                 "https://optimism-mainnet.rpc.grove.city/v1/",
+	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/grove/optimism/mainnet/", buildinfo.ApiProxyStageName),
+	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/optimism/mainnet/", buildinfo.ApiProxyStageName),
+	RPCURL:                 "https://optimism-archival.rpc.grove.city/v1/",
 	FallbackURL:            "https://optimism-mainnet.infura.io/v3/",
 	BlockExplorerURL:       "https://optimistic.etherscan.io",
 	IconURL:                "network/Network=Optimism",
@@ -117,6 +125,8 @@ var optimismGoerli = params.Network{
 var optimismSepolia = params.Network{
 	ChainID:                optimismSepoliaChainID,
 	ChainName:              "Optimism",
+	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/grove/optimism/sepolia/", buildinfo.ApiProxyStageName),
+	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/optimism/sepolia/", buildinfo.ApiProxyStageName),
 	RPCURL:                 "https://optimism-sepolia-archival.rpc.grove.city/v1/",
 	FallbackURL:            "https://optimism-sepolia.infura.io/v3/",
 	BlockExplorerURL:       "https://sepolia-optimism.etherscan.io/",
@@ -135,6 +145,8 @@ var optimismSepolia = params.Network{
 var arbitrum = params.Network{
 	ChainID:                arbitrumChainID,
 	ChainName:              "Arbitrum",
+	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/grove/arbitrum/mainnet/", buildinfo.ApiProxyStageName),
+	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/arbitrum/mainnet/", buildinfo.ApiProxyStageName),
 	RPCURL:                 "https://arbitrum-one.rpc.grove.city/v1/",
 	FallbackURL:            "https://arbitrum-mainnet.infura.io/v3/",
 	BlockExplorerURL:       "https://arbiscan.io/",
@@ -171,6 +183,8 @@ var arbitrumGoerli = params.Network{
 var arbitrumSepolia = params.Network{
 	ChainID:                arbitrumSepoliaChainID,
 	ChainName:              "Arbitrum",
+	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/grove/arbitrum/sepolia/", buildinfo.ApiProxyStageName),
+	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/arbitrum/sepolia/", buildinfo.ApiProxyStageName),
 	RPCURL:                 "https://arbitrum-sepolia-archival.rpc.grove.city/v1/",
 	FallbackURL:            "https://arbitrum-sepolia.infura.io/v3/",
 	BlockExplorerURL:       "https://sepolia-explorer.arbitrum.io/",

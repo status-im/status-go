@@ -310,6 +310,21 @@ type UpstreamRPCConfig struct {
 	URL string
 }
 
+type ProviderConfig struct {
+	// Enabled flag specifies whether feature is enabled
+	Enabled bool `validate:"required"`
+
+	// To identify provider
+	Name string `validate:"required"`
+
+	// URL sets the rpc upstream host address for communication with
+	// a non-local infura endpoint.
+	User         string `json:",omitempty"`
+	Password     string `json:",omitempty"`
+	APIKey       string `json:"APIKey,omitempty"`
+	APIKeySecret string `json:"APIKeySecret,omitempty"`
+}
+
 // ----------
 // NodeConfig
 // ----------
@@ -531,6 +546,8 @@ type TokenOverride struct {
 type Network struct {
 	ChainID                uint64          `json:"chainId"`
 	ChainName              string          `json:"chainName"`
+	DefaultRPCURL          string          `json:"defaultRpcUrl"`      // proxy rpc url
+	DefaultFallbackURL     string          `json:"defaultFallbackURL"` // proxy fallback url
 	RPCURL                 string          `json:"rpcUrl"`
 	OriginalRPCURL         string          `json:"originalRpcUrl"`
 	FallbackURL            string          `json:"fallbackURL"`
@@ -551,14 +568,19 @@ type Network struct {
 
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
-	Enabled              bool
-	OpenseaAPIKey        string            `json:"OpenseaAPIKey"`
-	RaribleMainnetAPIKey string            `json:"RaribleMainnetAPIKey"`
-	RaribleTestnetAPIKey string            `json:"RaribleTestnetAPIKey"`
-	AlchemyAPIKeys       map[uint64]string `json:"AlchemyAPIKeys"`
-	InfuraAPIKey         string            `json:"InfuraAPIKey"`
-	InfuraAPIKeySecret   string            `json:"InfuraAPIKeySecret"`
-	EnableCelerBridge    bool              `json:"EnableCelerBridge"`
+	Enabled                       bool
+	OpenseaAPIKey                 string            `json:"OpenseaAPIKey"`
+	RaribleMainnetAPIKey          string            `json:"RaribleMainnetAPIKey"`
+	RaribleTestnetAPIKey          string            `json:"RaribleTestnetAPIKey"`
+	AlchemyAPIKeys                map[uint64]string `json:"AlchemyAPIKeys"`
+	InfuraAPIKey                  string            `json:"InfuraAPIKey"`
+	InfuraAPIKeySecret            string            `json:"InfuraAPIKeySecret"`
+	StatusProxyMarketUser         string            `json:"StatusProxyMarketUser"`
+	StatusProxyMarketPassword     string            `json:"StatusProxyMarketPassword"`
+	StatusProxyBlockchainUser     string            `json:"StatusProxyBlockchainUser"`
+	StatusProxyBlockchainPassword string            `json:"StatusProxyBlockchainPassword"`
+	StatusProxyEnabled            bool              `json:"StatusProxyEnabled"`
+	EnableCelerBridge             bool              `json:"EnableCelerBridge"`
 }
 
 // LocalNotificationsConfig extra configuration for localnotifications.Service.
