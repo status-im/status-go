@@ -60,6 +60,13 @@ func WithTLSClientConfig(c *tls.Config) Option {
 	}
 }
 
+func WithHandshakeTimeout(d time.Duration) Option {
+	return func(t *transport) error {
+		t.handshakeTimeout = d
+		return nil
+	}
+}
+
 type transport struct {
 	privKey ic.PrivKey
 	pid     peer.ID
@@ -78,8 +85,9 @@ type transport struct {
 
 	noise *noise.Transport
 
-	connMx sync.Mutex
-	conns  map[quic.ConnectionTracingID]*conn // using quic-go's ConnectionTracingKey as map key
+	connMx           sync.Mutex
+	conns            map[quic.ConnectionTracingID]*conn // using quic-go's ConnectionTracingKey as map key
+	handshakeTimeout time.Duration
 }
 
 var _ tpt.Transport = &transport{}
@@ -99,13 +107,14 @@ func New(key ic.PrivKey, psk pnet.PSK, connManager *quicreuse.ConnManager, gater
 		return nil, err
 	}
 	t := &transport{
-		pid:         id,
-		privKey:     key,
-		rcmgr:       rcmgr,
-		gater:       gater,
-		clock:       clock.New(),
-		connManager: connManager,
-		conns:       map[quic.ConnectionTracingID]*conn{},
+		pid:              id,
+		privKey:          key,
+		rcmgr:            rcmgr,
+		gater:            gater,
+		clock:            clock.New(),
+		connManager:      connManager,
+		conns:            map[quic.ConnectionTracingID]*conn{},
+		handshakeTimeout: handshakeTimeout,
 	}
 	for _, opt := range opts {
 		if err := opt(t); err != nil {
@@ -159,7 +168,7 @@ func (t *transport) dialWithScope(ctx context.Context, raddr ma.Multiaddr, p pee
 	}
 
 	maddr, _ := ma.SplitFunc(raddr, func(c ma.Component) bool { return c.Protocol().Code == ma.P_WEBTRANSPORT })
-	sess, err := t.dial(ctx, maddr, url, sni, certHashes)
+	sess, qconn, err := t.dial(ctx, maddr, url, sni, certHashes)
 	if err != nil {
 		return nil, err
 	}
@@ -172,12 +181,12 @@ func (t *transport) dialWithScope(ctx context.Context, raddr ma.Multiaddr, p pee
 		sess.CloseWithError(errorCodeConnectionGating, "")
 		return nil, fmt.Errorf("secured connection gated")
 	}
-	conn := newConn(t, sess, sconn, scope)
+	conn := newConn(t, sess, sconn, scope, qconn)
 	t.addConn(sess, conn)
 	return conn, nil
 }
 
-func (t *transport) dial(ctx context.Context, addr ma.Multiaddr, url, sni string, certHashes []multihash.DecodedMultihash) (*webtransport.Session, error) {
+func (t *transport) dial(ctx context.Context, addr ma.Multiaddr, url, sni string, certHashes []multihash.DecodedMultihash) (*webtransport.Session, quic.Connection, error) {
 	var tlsConf *tls.Config
 	if t.tlsClientConf != nil {
 		tlsConf = t.tlsClientConf.Clone()
@@ -200,7 +209,7 @@ func (t *transport) dial(ctx context.Context, addr ma.Multiaddr, url, sni string
 	}
 	conn, err := t.connManager.DialQUIC(ctx, addr, tlsConf, t.allowWindowIncrease)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	dialer := webtransport.Dialer{
 		DialAddr: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (quic.EarlyConnection, error) {
@@ -210,12 +219,14 @@ func (t *transport) dial(ctx context.Context, addr ma.Multiaddr, url, sni string
 	}
 	rsp, sess, err := dialer.Dial(ctx, url, nil)
 	if err != nil {
-		return nil, err
+		conn.CloseWithError(1, "")
+		return nil, nil, err
 	}
 	if rsp.StatusCode < 200 || rsp.StatusCode > 299 {
-		return nil, fmt.Errorf("invalid response status code: %d", rsp.StatusCode)
+		conn.CloseWithError(1, "")
+		return nil, nil, fmt.Errorf("invalid response status code: %d", rsp.StatusCode)
 	}
-	return sess, err
+	return sess, conn, err
 }
 
 func (t *transport) upgrade(ctx context.Context, sess *webtransport.Session, p peer.ID, certHashes []multihash.DecodedMultihash) (*connSecurityMultiaddrs, error) {

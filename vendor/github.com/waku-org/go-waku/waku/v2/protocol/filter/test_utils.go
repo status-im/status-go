@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/suite"
 	"github.com/waku-org/go-waku/tests"
+	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
@@ -164,8 +165,8 @@ func (s *FilterTestSuite) GetWakuFilterLightNode() LightNodeData {
 	s.Require().NoError(err)
 	b := relay.NewBroadcaster(10)
 	s.Require().NoError(b.Start(context.Background()))
-	pm := peermanager.NewPeerManager(5, 5, nil, s.Log)
-	filterPush := NewWakuFilterLightNode(b, pm, timesource.NewDefaultClock(), prometheus.DefaultRegisterer, s.Log)
+	pm := peermanager.NewPeerManager(5, 5, nil, nil, true, s.Log)
+	filterPush := NewWakuFilterLightNode(b, pm, timesource.NewDefaultClock(), onlinechecker.NewDefaultOnlineChecker(true), prometheus.DefaultRegisterer, s.Log)
 	filterPush.SetHost(host)
 	pm.SetHost(host)
 	return LightNodeData{filterPush, host}

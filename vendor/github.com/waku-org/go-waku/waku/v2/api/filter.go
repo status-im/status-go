@@ -7,13 +7,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 	"go.uber.org/zap"
 )
 
-const FilterPingTimeout = 5 * time.Second
 const MultiplexChannelBuffer = 100
 
 type FilterConfig struct {
@@ -39,13 +39,13 @@ type Sub struct {
 	cancel                context.CancelFunc
 	log                   *zap.Logger
 	closing               chan string
-	isNodeOnline          bool //indicates if node has connectivity, this helps subscribe loop takes decision as to resubscribe or not.
+	onlineChecker         onlinechecker.OnlineChecker
 	resubscribeInProgress bool
 	id                    string
 }
 
 // Subscribe
-func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilter protocol.ContentFilter, config FilterConfig, log *zap.Logger, online bool) (*Sub, error) {
+func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilter protocol.ContentFilter, config FilterConfig, log *zap.Logger) (*Sub, error) {
 	sub := new(Sub)
 	sub.id = uuid.NewString()
 	sub.wf = wf
@@ -56,24 +56,26 @@ func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilte
 	sub.Config = config
 	sub.log = log.Named("filter-api").With(zap.String("apisub-id", sub.id), zap.Stringer("content-filter", sub.ContentFilter))
 	sub.log.Debug("filter subscribe params", zap.Int("max-peers", config.MaxPeers))
-	sub.isNodeOnline = online
 	sub.closing = make(chan string, config.MaxPeers)
-	if online {
+
+	sub.onlineChecker = wf.OnlineChecker()
+	if wf.OnlineChecker().IsOnline() {
 		subs, err := sub.subscribe(contentFilter, sub.Config.MaxPeers)
 		if err == nil {
 			sub.multiplex(subs)
 		}
 	}
+
 	go sub.subscriptionLoop()
 	return sub, nil
 }
 
-func (apiSub *Sub) Unsubscribe() {
-	apiSub.cancel()
-}
-
-func (apiSub *Sub) SetNodeState(online bool) {
-	apiSub.isNodeOnline = online
+func (apiSub *Sub) Unsubscribe(contentFilter protocol.ContentFilter) {
+	_, err := apiSub.wf.Unsubscribe(apiSub.ctx, contentFilter)
+	//Not reading result unless we want to do specific error handling?
+	if err != nil {
+		apiSub.log.Debug("failed to unsubscribe", zap.Error(err), zap.Stringer("content-filter", contentFilter))
+	}
 }
 
 func (apiSub *Sub) subscriptionLoop() {
@@ -82,7 +84,7 @@ func (apiSub *Sub) subscriptionLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			if apiSub.isNodeOnline && len(apiSub.subs) < apiSub.Config.MaxPeers &&
+			if apiSub.onlineChecker.IsOnline() && len(apiSub.subs) < apiSub.Config.MaxPeers &&
 				!apiSub.resubscribeInProgress && len(apiSub.closing) < apiSub.Config.MaxPeers {
 				apiSub.closing <- ""
 			}
@@ -109,7 +111,7 @@ func (apiSub *Sub) checkAndResubscribe(subId string) {
 		delete(apiSub.subs, subId)
 	}
 	apiSub.log.Debug("subscription status", zap.Int("sub-count", len(apiSub.subs)), zap.Stringer("content-filter", apiSub.ContentFilter))
-	if apiSub.isNodeOnline && len(apiSub.subs) < apiSub.Config.MaxPeers {
+	if apiSub.onlineChecker.IsOnline() && len(apiSub.subs) < apiSub.Config.MaxPeers {
 		apiSub.resubscribe(failedPeer)
 	}
 	apiSub.resubscribeInProgress = false

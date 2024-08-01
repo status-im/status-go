@@ -143,11 +143,9 @@ func NewDiscoveryV5(priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConn
 		localnode:              localnode,
 		metrics:                newMetrics(reg),
 		config: discover.Config{
-			PrivateKey: priv,
-			Bootnodes:  bootnodes,
-			V5Config: discover.V5Config{
-				ProtocolID: &protocolID,
-			},
+			PrivateKey:   priv,
+			Bootnodes:    bootnodes,
+			V5ProtocolID: &protocolID,
 		},
 		udpAddr: &net.UDPAddr{
 			IP:   net.IPv4zero,

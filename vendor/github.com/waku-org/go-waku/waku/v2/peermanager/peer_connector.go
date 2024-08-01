@@ -16,8 +16,8 @@ import (
 
 	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
-	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/service"
 
 	"go.uber.org/zap"
@@ -28,10 +28,11 @@ import (
 // PeerConnectionStrategy is a utility to connect to peers,
 // but only if we have not recently tried connecting to them already
 type PeerConnectionStrategy struct {
-	mux   sync.Mutex
-	cache *lru.TwoQueueCache
-	host  host.Host
-	pm    *PeerManager
+	mux           sync.Mutex
+	cache         *lru.TwoQueueCache
+	host          host.Host
+	pm            *PeerManager
+	onlineChecker onlinechecker.OnlineChecker
 
 	paused      atomic.Bool
 	dialTimeout time.Duration
@@ -60,8 +61,12 @@ func getBackOff() backoff.BackoffFactory {
 //
 // dialTimeout is how long we attempt to connect to a peer before giving up
 // minPeers is the minimum number of peers that the node should have
-func NewPeerConnectionStrategy(pm *PeerManager,
-	dialTimeout time.Duration, logger *zap.Logger) (*PeerConnectionStrategy, error) {
+func NewPeerConnectionStrategy(
+	pm *PeerManager,
+	onlineChecker onlinechecker.OnlineChecker,
+	dialTimeout time.Duration,
+	logger *zap.Logger,
+) (*PeerConnectionStrategy, error) {
 	// cacheSize is the size of a TwoQueueCache
 	cacheSize := 600
 	cache, err := lru.New2Q(cacheSize)
@@ -73,6 +78,7 @@ func NewPeerConnectionStrategy(pm *PeerManager,
 		cache:                  cache,
 		dialTimeout:            dialTimeout,
 		CommonDiscoveryService: service.NewCommonDiscoveryService(),
+		onlineChecker:          onlineChecker,
 		pm:                     pm,
 		backoff:                getBackOff(),
 		logger:                 logger.Named("discovery-connector"),
@@ -127,10 +133,9 @@ func (c *PeerConnectionStrategy) consumeSubscription(s subscription) {
 				triggerImmediateConnection := false
 				//Not connecting to peer as soon as it is discovered,
 				// rather expecting this to be pushed from PeerManager based on the need.
-				if len(c.host.Network().Peers()) < waku_proto.GossipSubDMin {
+				if len(c.host.Network().Peers()) < c.pm.OutPeersTarget {
 					triggerImmediateConnection = true
 				}
-				c.logger.Debug("adding discovered peer", logging.HostID("peerID", p.AddrInfo.ID))
 				c.pm.AddDiscoveredPeer(p, triggerImmediateConnection)
 
 			case <-time.After(1 * time.Second):
@@ -171,6 +176,10 @@ func (c *PeerConnectionStrategy) Stop() {
 
 func (c *PeerConnectionStrategy) isPaused() bool {
 	return c.paused.Load()
+}
+
+func (c *PeerConnectionStrategy) SetPaused(paused bool) {
+	c.paused.Store(paused)
 }
 
 // it might happen Subscribe is called before peerConnector has started so store these subscriptions in subscriptions array and custom after c.cancel is set.
@@ -227,7 +236,7 @@ func (c *PeerConnectionStrategy) addConnectionBackoff(peerID peer.ID) {
 func (c *PeerConnectionStrategy) dialPeers() {
 	defer c.WaitGroup().Done()
 
-	maxGoRoutines := c.pm.OutRelayPeersTarget
+	maxGoRoutines := c.pm.OutPeersTarget
 	if maxGoRoutines > maxActiveDials {
 		maxGoRoutines = maxActiveDials
 	}
@@ -236,10 +245,17 @@ func (c *PeerConnectionStrategy) dialPeers() {
 
 	for {
 		select {
+		case <-c.Context().Done():
+			return
 		case pd, ok := <-c.GetListeningChan():
 			if !ok {
 				return
 			}
+
+			if !c.onlineChecker.IsOnline() {
+				continue
+			}
+
 			addrInfo := pd.AddrInfo
 
 			if addrInfo.ID == c.host.ID() || addrInfo.ID == "" ||
@@ -252,8 +268,6 @@ func (c *PeerConnectionStrategy) dialPeers() {
 				c.WaitGroup().Add(1)
 				go c.dialPeer(addrInfo, sem)
 			}
-		case <-c.Context().Done():
-			return
 		}
 	}
 }

@@ -513,7 +513,7 @@ func (w *WakuRelay) unsubscribeFromPubsubTopic(topicData *pubsubTopicSubscriptio
 
 	err := topicData.topic.Close()
 	if err != nil {
-		w.log.Error("failed to close the pubsubTopic", zap.String("topic", pubSubTopic))
+		w.log.Error("failed to close the pubsubTopic", zap.String("topic", pubSubTopic), zap.Error(err))
 		return err
 	}
 
@@ -521,7 +521,7 @@ func (w *WakuRelay) unsubscribeFromPubsubTopic(topicData *pubsubTopicSubscriptio
 
 	err = w.pubsub.UnregisterTopicValidator(pubSubTopic)
 	if err != nil {
-		w.log.Error("failed to unregister topic validator", zap.String("topic", pubSubTopic))
+		w.log.Error("failed to unregister topic validator", zap.String("topic", pubSubTopic), zap.Error(err))
 		return err
 	}
 

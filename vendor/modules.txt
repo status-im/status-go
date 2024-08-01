@@ -2,8 +2,8 @@
 ## explicit; go 1.16
 github.com/BurntSushi/toml
 github.com/BurntSushi/toml/internal
-# github.com/DataDog/zstd v1.4.5
-## explicit
+# github.com/DataDog/zstd v1.5.2
+## explicit; go 1.14
 github.com/DataDog/zstd
 # github.com/Masterminds/squirrel v1.5.4
 ## explicit; go 1.14
@@ -334,7 +334,7 @@ github.com/elastic/gosigar/sys/windows
 # github.com/ethereum/c-kzg-4844 v1.0.0
 ## explicit; go 1.19
 github.com/ethereum/c-kzg-4844/bindings/go
-# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.12.1-0.20240730103428-3ccd70edb79c
+# github.com/ethereum/go-ethereum v1.11.6 => github.com/status-im/go-ethereum v1.12.1-0.20240731102018-216ea3288e4c
 ## explicit; go 1.20
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
@@ -528,8 +528,8 @@ github.com/gorilla/securecookie
 # github.com/gorilla/sessions v1.2.1
 ## explicit
 github.com/gorilla/sessions
-# github.com/gorilla/websocket v1.5.1
-## explicit; go 1.20
+# github.com/gorilla/websocket v1.5.3
+## explicit; go 1.12
 github.com/gorilla/websocket
 # github.com/hashicorp/errwrap v1.1.0
 ## explicit
@@ -651,7 +651,7 @@ github.com/libp2p/go-buffer-pool
 # github.com/libp2p/go-flow-metrics v0.1.0
 ## explicit; go 1.17
 github.com/libp2p/go-flow-metrics
-# github.com/libp2p/go-libp2p v0.35.0
+# github.com/libp2p/go-libp2p v0.35.2
 ## explicit; go 1.21
 github.com/libp2p/go-libp2p
 github.com/libp2p/go-libp2p/config
@@ -722,7 +722,7 @@ github.com/libp2p/go-libp2p/p2p/transport/webtransport
 # github.com/libp2p/go-libp2p-asn-util v0.4.1
 ## explicit; go 1.19
 github.com/libp2p/go-libp2p-asn-util
-# github.com/libp2p/go-libp2p-pubsub v0.11.0
+# github.com/libp2p/go-libp2p-pubsub v0.11.0 => github.com/waku-org/go-libp2p-pubsub v0.0.0-20240703191659-2cbb09eac9b5
 ## explicit; go 1.21
 github.com/libp2p/go-libp2p-pubsub
 github.com/libp2p/go-libp2p-pubsub/pb
@@ -924,7 +924,7 @@ github.com/pion/dtls/v2/pkg/protocol/alert
 github.com/pion/dtls/v2/pkg/protocol/extension
 github.com/pion/dtls/v2/pkg/protocol/handshake
 github.com/pion/dtls/v2/pkg/protocol/recordlayer
-# github.com/pion/ice/v2 v2.3.24
+# github.com/pion/ice/v2 v2.3.25
 ## explicit; go 1.13
 github.com/pion/ice/v2
 github.com/pion/ice/v2/internal/atomic
@@ -1186,8 +1186,8 @@ github.com/tyler-smith/go-bip39/wordlists
 # github.com/urfave/cli/v2 v2.27.2
 ## explicit; go 1.18
 github.com/urfave/cli/v2
-# github.com/waku-org/go-discover v0.0.0-20240506173252-4912704efdc5
-## explicit; go 1.15
+# github.com/waku-org/go-discover v0.0.0-20240731115217-a02c0dc93f46
+## explicit; go 1.19
 github.com/waku-org/go-discover/discover
 github.com/waku-org/go-discover/discover/v4wire
 github.com/waku-org/go-discover/discover/v5wire
@@ -1196,7 +1196,7 @@ github.com/waku-org/go-discover/discover/v5wire
 github.com/waku-org/go-libp2p-rendezvous
 github.com/waku-org/go-libp2p-rendezvous/db
 github.com/waku-org/go-libp2p-rendezvous/pb
-# github.com/waku-org/go-waku v0.8.1-0.20240612113959-d9dc91a162d9
+# github.com/waku-org/go-waku v0.8.1-0.20240801095000-3a9df41b4a5c
 ## explicit; go 1.21
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/tests
@@ -1206,6 +1206,7 @@ github.com/waku-org/go-waku/waku/v2/discv5
 github.com/waku-org/go-waku/waku/v2/dnsdisc
 github.com/waku-org/go-waku/waku/v2/hash
 github.com/waku-org/go-waku/waku/v2/node
+github.com/waku-org/go-waku/waku/v2/onlinechecker
 github.com/waku-org/go-waku/waku/v2/payload
 github.com/waku-org/go-waku/waku/v2/peermanager
 github.com/waku-org/go-waku/waku/v2/peerstore
@@ -1329,7 +1330,7 @@ go.uber.org/dig/internal/digerror
 go.uber.org/dig/internal/digreflect
 go.uber.org/dig/internal/dot
 go.uber.org/dig/internal/graph
-# go.uber.org/fx v1.21.1
+# go.uber.org/fx v1.22.1
 ## explicit; go 1.20
 go.uber.org/fx
 go.uber.org/fx/fxevent

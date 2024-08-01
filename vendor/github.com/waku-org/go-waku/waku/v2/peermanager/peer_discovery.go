@@ -55,7 +55,7 @@ func (pm *PeerManager) discoverOnDemand(cluster uint16,
 
 	wakuProtoInfo, ok := pm.wakuprotoToENRFieldMap[wakuProtocol]
 	if !ok {
-		pm.logger.Error("cannot do on demand discovery for non-waku protocol", zap.String("protocol", string(wakuProtocol)))
+		pm.logger.Warn("cannot do on demand discovery for non-waku protocol", zap.String("protocol", string(wakuProtocol)))
 		return nil, errors.New("cannot do on demand discovery for non-waku protocol")
 	}
 	iterator, err := pm.discoveryService.PeerIterator(
@@ -112,7 +112,7 @@ func (pm *PeerManager) discoverPeersByPubsubTopics(pubsubTopics []string, proto 
 		for _, shardInfo := range shardsInfo {
 			err = pm.DiscoverAndConnectToPeers(ctx, shardInfo.ClusterID, shardInfo.ShardIDs[0], proto, maxCount)
 			if err != nil {
-				pm.logger.Error("failed to discover and connect to peers", zap.Error(err))
+				pm.logger.Warn("failed to discover and connect to peers", zap.Error(err))
 			}
 		}
 	} else {

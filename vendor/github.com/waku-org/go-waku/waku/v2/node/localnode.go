@@ -9,7 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
@@ -20,7 +22,12 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 	var options []wenr.ENROption
 	options = append(options, wenr.WithUDPPort(udpPort))
 	options = append(options, wenr.WithWakuBitfield(wakuFlags))
-	options = append(options, wenr.WithMultiaddress(multiaddrs...))
+
+	// Reset ENR fields
+	wenr.DeleteField(localnode, wenr.MultiaddrENRField)
+	wenr.DeleteField(localnode, enr.TCP(0).ENRKey())
+	wenr.DeleteField(localnode, enr.IPv4{}.ENRKey())
+	wenr.DeleteField(localnode, enr.IPv6{}.ENRKey())
 
 	if advertiseAddr != nil {
 		// An advertised address disables libp2p address updates
@@ -36,32 +43,38 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 		// Using a static ip will disable endpoint prediction.
 		options = append(options, wenr.WithIP(ipAddr))
 	} else {
-		// We received a libp2p address update, but we should still
-		// allow discv5 to update the enr record. We set the localnode
-		// keys manually. It's possible that the ENR record might get
-		// updated automatically
-		ip4 := ipAddr.IP.To4()
-		ip6 := ipAddr.IP.To16()
-		if ip4 != nil && !ip4.IsUnspecified() {
-			localnode.SetFallbackIP(ip4)
-			localnode.Set(enr.IPv4(ip4))
-			localnode.Set(enr.TCP(uint16(ipAddr.Port)))
-		} else {
-			localnode.Delete(enr.IPv4{})
-			localnode.Delete(enr.TCP(0))
-			localnode.SetFallbackIP(net.IP{127, 0, 0, 1})
-		}
+		if ipAddr.Port != 0 {
+			// We received a libp2p address update, but we should still
+			// allow discv5 to update the enr record. We set the localnode
+			// keys manually. It's possible that the ENR record might get
+			// updated automatically
+			ip4 := ipAddr.IP.To4()
+			ip6 := ipAddr.IP.To16()
+			if ip4 != nil && !ip4.IsUnspecified() {
+				localnode.SetFallbackIP(ip4)
+				localnode.Set(enr.IPv4(ip4))
+				localnode.Set(enr.TCP(uint16(ipAddr.Port)))
+			} else {
+				localnode.Delete(enr.IPv4{})
+				localnode.Delete(enr.TCP(0))
+				localnode.SetFallbackIP(net.IP{127, 0, 0, 1})
+			}
 
-		if ip4 == nil && ip6 != nil && !ip6.IsUnspecified() {
-			localnode.Set(enr.IPv6(ip6))
-			localnode.Set(enr.TCP6(ipAddr.Port))
-		} else {
-			localnode.Delete(enr.IPv6{})
-			localnode.Delete(enr.TCP6(0))
+			if ip4 == nil && ip6 != nil && !ip6.IsUnspecified() {
+				localnode.Set(enr.IPv6(ip6))
+				localnode.Set(enr.TCP6(ipAddr.Port))
+			} else {
+				localnode.Delete(enr.IPv6{})
+				localnode.Delete(enr.TCP6(0))
+			}
 		}
 	}
 
-	return wenr.Update(localnode, options...)
+	// Writing the IP + Port has priority over writting the multiaddress which might fail or not
+	// depending on the enr having space
+	options = append(options, wenr.WithMultiaddress(multiaddrs...))
+
+	return wenr.Update(w.log, localnode, options...)
 }
 
 func isPrivate(addr *net.TCPAddr) bool {
@@ -177,7 +190,7 @@ func decapsulateP2P(addr ma.Multiaddr) (ma.Multiaddr, error) {
 	return addr, nil
 }
 
-func decapsulateCircuitRelayAddr(addr ma.Multiaddr) (ma.Multiaddr, error) {
+func decapsulateCircuitRelayAddr(ctx context.Context, addr ma.Multiaddr) (ma.Multiaddr, error) {
 	_, err := addr.ValueForProtocol(ma.P_CIRCUIT)
 	if err != nil {
 		return nil, errors.New("not a circuit relay address")
@@ -187,6 +200,16 @@ func decapsulateCircuitRelayAddr(addr ma.Multiaddr) (ma.Multiaddr, error) {
 	addr, _ = ma.SplitFunc(addr, func(c ma.Component) bool {
 		return c.Protocol().Code == ma.P_CIRCUIT
 	})
+
+	// If the multiaddress is a dns4 address, we resolve it
+	addrs, err := madns.DefaultResolver.Resolve(ctx, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(addrs) > 0 {
+		return addrs[0], nil
+	}
 
 	return addr, nil
 }
@@ -215,21 +238,49 @@ func selectWSListenAddresses(addresses []ma.Multiaddr) ([]ma.Multiaddr, error) {
 	return result, nil
 }
 
-func selectCircuitRelayListenAddresses(addresses []ma.Multiaddr) ([]ma.Multiaddr, error) {
+func selectCircuitRelayListenAddresses(ctx context.Context, addresses []ma.Multiaddr) ([]ma.Multiaddr, error) {
 	var result []ma.Multiaddr
+
 	for _, addr := range addresses {
-		addr, err := decapsulateCircuitRelayAddr(addr)
+		addr, err := decapsulateCircuitRelayAddr(ctx, addr)
 		if err != nil {
 			continue
 		}
+
+		_, noWS := addr.ValueForProtocol(ma.P_WSS)
+		_, noWSS := addr.ValueForProtocol(ma.P_WS)
+		if noWS == nil || noWSS == nil { // WS or WSS found
+			continue
+		}
+
 		result = append(result, addr)
 	}
 
 	return result, nil
 }
 
-func (w *WakuNode) getENRAddresses(addrs []ma.Multiaddr) (extAddr *net.TCPAddr, multiaddr []ma.Multiaddr, err error) {
+func filter0Port(addresses []ma.Multiaddr) ([]ma.Multiaddr, error) {
+	var result []ma.Multiaddr
+	for _, addr := range addresses {
+		portStr, err := addr.ValueForProtocol(ma.P_TCP)
+		if err != nil && !errors.Is(err, multiaddr.ErrProtocolNotFound) {
+			return nil, err
+		}
 
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			return nil, err
+		}
+
+		if port != 0 {
+			result = append(result, addr)
+		}
+	}
+
+	return result, nil
+}
+
+func (w *WakuNode) getENRAddresses(ctx context.Context, addrs []ma.Multiaddr) (extAddr *net.TCPAddr, multiaddr []ma.Multiaddr, err error) {
 	extAddr, err = selectMostExternalAddress(addrs)
 	if err != nil {
 		return nil, nil, err
@@ -240,7 +291,7 @@ func (w *WakuNode) getENRAddresses(addrs []ma.Multiaddr) (extAddr *net.TCPAddr, 
 		return nil, nil, err
 	}
 
-	circuitAddrs, err := selectCircuitRelayListenAddresses(addrs)
+	circuitAddrs, err := selectCircuitRelayListenAddresses(ctx, addrs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -253,11 +304,16 @@ func (w *WakuNode) getENRAddresses(addrs []ma.Multiaddr) (extAddr *net.TCPAddr, 
 		multiaddr = append(multiaddr, wssAddrs...)
 	}
 
+	multiaddr, err = filter0Port(multiaddr)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return
 }
 
 func (w *WakuNode) setupENR(ctx context.Context, addrs []ma.Multiaddr) error {
-	ipAddr, multiaddresses, err := w.getENRAddresses(addrs)
+	ipAddr, multiaddresses, err := w.getENRAddresses(ctx, addrs)
 	if err != nil {
 		w.log.Error("obtaining external address", zap.Error(err))
 		return err
@@ -280,6 +336,14 @@ func (w *WakuNode) setupENR(ctx context.Context, addrs []ma.Multiaddr) error {
 
 	return nil
 
+}
+
+func (w *WakuNode) SetRelayShards(rs protocol.RelayShards) error {
+	err := wenr.Update(w.log, w.localNode, wenr.WithWakuRelaySharding(rs))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (w *WakuNode) watchTopicShards(ctx context.Context) error {
@@ -323,7 +387,7 @@ func (w *WakuNode) watchTopicShards(ctx context.Context) error {
 						w.log.Warn("A mix of named and static shards found. ENR shard will contain only the following shards", zap.Any("shards", rs[0]))
 					}
 
-					err = wenr.Update(w.localNode, wenr.WithWakuRelaySharding(rs[0]))
+					err = wenr.Update(w.log, w.localNode, wenr.WithWakuRelaySharding(rs[0]))
 					if err != nil {
 						w.log.Warn("could not set ENR shard info", zap.Error(err))
 						continue

@@ -4,7 +4,9 @@ go 1.21
 
 toolchain go1.21.8
 
-replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.12.1-0.20240730103428-3ccd70edb79c
+replace github.com/ethereum/go-ethereum v1.11.6 => github.com/status-im/go-ethereum v1.12.1-0.20240731102018-216ea3288e4c
+
+replace github.com/libp2p/go-libp2p-pubsub v0.11.0 => github.com/waku-org/go-libp2p-pubsub v0.0.0-20240703191659-2cbb09eac9b5
 
 replace github.com/rjeczalik/notify => github.com/status-im/notify v1.0.2-status
 
@@ -23,7 +25,7 @@ require (
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
-	github.com/ethereum/go-ethereum v1.10.26
+	github.com/ethereum/go-ethereum v1.11.6
 	github.com/forPelevin/gomoji v1.1.2
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.3
@@ -35,7 +37,7 @@ require (
 	github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
 	github.com/kilic/bls12-381 v0.1.0
 	github.com/lib/pq v1.10.4
-	github.com/libp2p/go-libp2p v0.35.0
+	github.com/libp2p/go-libp2p v0.35.2
 	github.com/libp2p/go-libp2p-pubsub v0.11.0
 	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mat/besticon v0.0.0-20210314201728-1579f269edb7
@@ -93,7 +95,7 @@ require (
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 	github.com/urfave/cli/v2 v2.27.2
-	github.com/waku-org/go-waku v0.8.1-0.20240612113959-d9dc91a162d9
+	github.com/waku-org/go-waku v0.8.1-0.20240801095000-3a9df41b4a5c
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
@@ -107,7 +109,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.3.2 // indirect
-	github.com/DataDog/zstd v1.4.5 // indirect
+	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/PuerkitoBio/goquery v1.6.1 // indirect
 	github.com/RoaringBitmap/roaring v0.9.4 // indirect
@@ -184,7 +186,7 @@ require (
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20240207164012-fb44976bdcd5 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
-	github.com/gorilla/websocket v1.5.1 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-bexpr v0.1.10 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -238,7 +240,7 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pion/datachannel v1.5.6 // indirect
 	github.com/pion/dtls/v2 v2.2.11 // indirect
-	github.com/pion/ice/v2 v2.3.24 // indirect
+	github.com/pion/ice/v2 v2.3.25 // indirect
 	github.com/pion/interceptor v0.1.29 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/mdns v0.0.12 // indirect
@@ -278,7 +280,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
-	github.com/waku-org/go-discover v0.0.0-20240506173252-4912704efdc5 // indirect
+	github.com/waku-org/go-discover v0.0.0-20240731115217-a02c0dc93f46 // indirect
 	github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0 // indirect
 	github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 // indirect
 	github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b // indirect
@@ -293,7 +295,7 @@ require (
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/dig v1.17.1 // indirect
-	go.uber.org/fx v1.21.1 // indirect
+	go.uber.org/fx v1.22.1 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect

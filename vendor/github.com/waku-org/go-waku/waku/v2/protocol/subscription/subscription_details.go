@@ -37,6 +37,8 @@ type SubscriptionDetails struct {
 }
 
 func (s *SubscriptionDetails) Add(contentTopics ...string) {
+	s.mapRef.Lock()
+	defer s.mapRef.Unlock()
 	s.Lock()
 	defer s.Unlock()
 
@@ -44,14 +46,14 @@ func (s *SubscriptionDetails) Add(contentTopics ...string) {
 		if _, ok := s.ContentFilter.ContentTopics[ct]; !ok {
 			s.ContentFilter.ContentTopics[ct] = struct{}{}
 			// Increase the number of subscriptions for this (pubsubTopic, contentTopic) pair
-			s.mapRef.Lock()
 			s.mapRef.increaseSubFor(s.ContentFilter.PubsubTopic, ct)
-			s.mapRef.Unlock()
 		}
 	}
 }
 
 func (s *SubscriptionDetails) Remove(contentTopics ...string) {
+	s.mapRef.Lock()
+	defer s.mapRef.Unlock()
 	s.Lock()
 	defer s.Unlock()
 
@@ -59,15 +61,13 @@ func (s *SubscriptionDetails) Remove(contentTopics ...string) {
 		if _, ok := s.ContentFilter.ContentTopics[ct]; ok {
 			delete(s.ContentFilter.ContentTopics, ct)
 			// Decrease the number of subscriptions for this (pubsubTopic, contentTopic) pair
-			s.mapRef.Lock()
 			s.mapRef.decreaseSubFor(s.ContentFilter.PubsubTopic, ct)
-			s.mapRef.Unlock()
 		}
 	}
 
 	if len(s.ContentFilter.ContentTopics) == 0 {
 		// err doesn't matter
-		_ = s.mapRef.Delete(s)
+		_ = s.mapRef.DeleteNoLock(s)
 	}
 }
 
@@ -105,7 +105,9 @@ func (s *SubscriptionDetails) CloseC() {
 
 func (s *SubscriptionDetails) Close() error {
 	s.CloseC()
-	return s.mapRef.Delete(s)
+	s.mapRef.Lock()
+	defer s.mapRef.Unlock()
+	return s.mapRef.DeleteNoLock(s)
 }
 
 func (s *SubscriptionDetails) SetClosing() {

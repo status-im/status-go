@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
@@ -45,7 +46,8 @@ var (
 type WakuFilterLightNode struct {
 	*service.CommonService
 	h                host.Host
-	broadcaster      relay.Broadcaster //TODO: Move the broadcast functionality outside of relay client to a higher SDK layer.s
+	broadcaster      relay.Broadcaster //TODO: Move the broadcast functionality outside of relay client to a higher SDK layer.
+	onlineChecker    onlinechecker.OnlineChecker
 	timesource       timesource.Timesource
 	metrics          Metrics
 	log              *zap.Logger
@@ -79,12 +81,19 @@ func (arr *WakuFilterPushResult) Errors() []WakuFilterPushError {
 // Note that broadcaster is optional.
 // Takes an optional peermanager if WakuFilterLightnode is being created along with WakuNode.
 // If using libp2p host, then pass peermanager as nil
-func NewWakuFilterLightNode(broadcaster relay.Broadcaster, pm *peermanager.PeerManager,
-	timesource timesource.Timesource, reg prometheus.Registerer, log *zap.Logger) *WakuFilterLightNode {
+func NewWakuFilterLightNode(
+	broadcaster relay.Broadcaster,
+	pm *peermanager.PeerManager,
+	timesource timesource.Timesource,
+	onlineChecker onlinechecker.OnlineChecker,
+	reg prometheus.Registerer,
+	log *zap.Logger,
+) *WakuFilterLightNode {
 	wf := new(WakuFilterLightNode)
 	wf.log = log.Named("filterv2-lightnode")
 	wf.broadcaster = broadcaster
 	wf.timesource = timesource
+	wf.onlineChecker = onlineChecker
 	wf.pm = pm
 	wf.CommonService = service.NewCommonService()
 	wf.metrics = newMetrics(reg)
@@ -147,6 +156,7 @@ func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(network.Strea
 		if !wf.subscriptions.IsSubscribedTo(peerID) {
 			logger.Warn("received message push from unknown peer", logging.HostID("peerID", peerID))
 			wf.metrics.RecordError(unknownPeerMessagePush)
+			//Send a wildcard unsubscribe to this peer so that further requests are not forwarded to us
 			if err := stream.Reset(); err != nil {
 				wf.log.Error("resetting connection", zap.Error(err))
 			}
@@ -190,8 +200,8 @@ func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(network.Strea
 		}
 
 		logger = messagePush.WakuMessage.Logger(logger, pubSubTopic)
-
-		if !wf.subscriptions.Has(peerID, protocol.NewContentFilter(pubSubTopic, messagePush.WakuMessage.ContentTopic)) {
+		cf := protocol.NewContentFilter(pubSubTopic, messagePush.WakuMessage.ContentTopic)
+		if !wf.subscriptions.Has(peerID, cf) {
 			logger.Warn("received messagepush with invalid subscription parameters")
 			wf.metrics.RecordError(invalidSubscriptionMessage)
 			return
@@ -199,13 +209,13 @@ func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(network.Strea
 
 		wf.metrics.RecordMessage()
 
-		wf.notify(peerID, pubSubTopic, messagePush.WakuMessage)
+		wf.notify(ctx, peerID, pubSubTopic, messagePush.WakuMessage)
 
 		logger.Info("received message push")
 	}
 }
 
-func (wf *WakuFilterLightNode) notify(remotePeerID peer.ID, pubsubTopic string, msg *wpb.WakuMessage) {
+func (wf *WakuFilterLightNode) notify(ctx context.Context, remotePeerID peer.ID, pubsubTopic string, msg *wpb.WakuMessage) {
 	envelope := protocol.NewEnvelope(msg, wf.timesource.Now().UnixNano(), pubsubTopic)
 
 	if wf.broadcaster != nil {
@@ -213,11 +223,11 @@ func (wf *WakuFilterLightNode) notify(remotePeerID peer.ID, pubsubTopic string, 
 		wf.broadcaster.Submit(envelope)
 	}
 	// Notify filter subscribers
-	wf.subscriptions.Notify(remotePeerID, envelope)
+	wf.subscriptions.Notify(ctx, remotePeerID, envelope)
 }
 
 func (wf *WakuFilterLightNode) request(ctx context.Context, requestID []byte,
-	reqType pb.FilterSubscribeRequest_FilterSubscribeType, contentFilter protocol.ContentFilter, peer peer.ID) error {
+	reqType pb.FilterSubscribeRequest_FilterSubscribeType, contentFilter protocol.ContentFilter, peerID peer.ID) error {
 	request := &pb.FilterSubscribeRequest{
 		RequestId:           hex.EncodeToString(requestID),
 		FilterSubscribeType: reqType,
@@ -230,11 +240,14 @@ func (wf *WakuFilterLightNode) request(ctx context.Context, requestID []byte,
 		return err
 	}
 
-	logger := wf.log.With(logging.HostID("peerID", peer))
+	logger := wf.log.With(logging.HostID("peerID", peerID))
 
-	stream, err := wf.h.NewStream(ctx, peer, FilterSubscribeID_v20beta1)
+	stream, err := wf.h.NewStream(ctx, peerID, FilterSubscribeID_v20beta1)
 	if err != nil {
 		wf.metrics.RecordError(dialFailure)
+		if ps, ok := wf.h.Peerstore().(peerstore.WakuPeerstore); ok {
+			ps.AddConnFailure(peer.AddrInfo{ID: peerID})
+		}
 		return err
 	}
 
@@ -700,4 +713,12 @@ func (wf *WakuFilterLightNode) UnsubscribeAll(ctx context.Context, opts ...Filte
 	}
 
 	return wf.unsubscribeAll(ctx, opts...)
+}
+
+func (wf *WakuFilterLightNode) OnlineChecker() onlinechecker.OnlineChecker {
+	return wf.onlineChecker
+}
+
+func (wf *WakuFilterLightNode) SetOnlineChecker(onlineChecker onlinechecker.OnlineChecker) {
+	wf.onlineChecker = onlineChecker
 }

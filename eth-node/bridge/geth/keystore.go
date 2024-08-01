@@ -54,7 +54,8 @@ func (k *gethKeyStoreAdapter) Delete(a types.Account) error {
 		return err
 	}
 
-	return k.keystore.Delete(gethAccount)
+	// TODO provide passphrase!
+	return k.keystore.Delete(gethAccount, "")
 }
 
 // parseGethURL converts a user supplied URL into the accounts specific structure.

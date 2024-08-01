@@ -12,6 +12,8 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
+var ErrNoPortAvailable = errors.New("port not available")
+
 // WakuENRField is the name of the ENR field that contains information about which protocols are supported by the node
 const WakuENRField = "waku2"
 
@@ -59,6 +61,11 @@ func enodeToMultiAddr(node *enode.Node) (multiaddr.Multiaddr, error) {
 
 	ipType := "ip4"
 	portNumber := node.TCP()
+
+	if portNumber == 0 {
+		return nil, ErrNoPortAvailable
+	}
+
 	if utils.IsIPv6(node.IP().String()) {
 		ipType = "ip6"
 		var port enr.TCP6
@@ -83,9 +90,12 @@ func Multiaddress(node *enode.Node) (peer.ID, []multiaddr.Multiaddr, error) {
 
 	addr, err := enodeToMultiAddr(node)
 	if err != nil {
-		return "", nil, err
+		if !errors.Is(err, ErrNoPortAvailable) {
+			return "", nil, err
+		}
+	} else {
+		result = append(result, addr)
 	}
-	result = append(result, addr)
 
 	var multiaddrRaw []byte
 	if err := node.Record().Load(enr.WithEntry(MultiaddrENRField, &multiaddrRaw)); err != nil {
@@ -110,7 +120,8 @@ func Multiaddress(node *enode.Node) (peer.ID, []multiaddr.Multiaddr, error) {
 		maRaw := multiaddrRaw[offset+2 : offset+2+int(maSize)]
 		addr, err := multiaddr.NewMultiaddrBytes(maRaw)
 		if err != nil {
-			return "", nil, fmt.Errorf("invalid multiaddress field length")
+			// The value is not a multiaddress. Ignoring...
+			continue
 		}
 
 		hostInfoStr := fmt.Sprintf("/p2p/%s", peerID.String())

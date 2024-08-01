@@ -264,7 +264,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		node.WithPrivateKey(nodeKey),
 		node.WithHostAddress(hostAddr),
 		node.WithTopicHealthStatusChannel(waku.topicHealthStatusChan),
-		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
+		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval)*time.Second, time.Duration(cfg.KeepAliveInterval)*time.Second),
 		node.WithMaxPeerConnections(cfg.DiscoveryLimit),
 		node.WithLogger(logger),
 		node.WithLogLevel(logger.Level()),

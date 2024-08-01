@@ -80,7 +80,7 @@ func (mgr *FilterManager) subscribeAndRunLoop(f filterConfig) {
 	ctx, cancel := context.WithCancel(mgr.ctx)
 	config := api.FilterConfig{MaxPeers: mgr.cfg.MinPeersForFilter}
 
-	sub, err := api.Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger, mgr.peersAvailable)
+	sub, err := api.Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger)
 	mgr.Lock()
 	mgr.filters[f.ID] = SubDetails{cancel, sub}
 	mgr.Unlock()
@@ -110,9 +110,10 @@ func (mgr *FilterManager) onConnectionStatusChange(pubsubTopic string, newStatus
 		}
 	}
 	mgr.Lock()
-	for _, subDetails := range mgr.filters {
-		subDetails.sub.SetNodeState(newStatus)
-	}
+	// TODO SetNodeState not available any more
+	// for _, subDetails := range mgr.filters {
+	// 	subDetails.sub.SetNodeState(newStatus)
+	// }
 	mgr.Unlock()
 	mgr.peersAvailable = newStatus
 }

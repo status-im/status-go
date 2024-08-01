@@ -1,6 +1,7 @@
 package subscription
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -130,9 +131,9 @@ func (sub *SubscriptionsMap) Has(peerID peer.ID, cf protocol.ContentFilter) bool
 
 	return true
 }
-func (sub *SubscriptionsMap) Delete(subscription *SubscriptionDetails) error {
-	sub.Lock()
-	defer sub.Unlock()
+
+// Caller has to acquire lock before invoking this method.This is done to avoid possible deadlock
+func (sub *SubscriptionsMap) DeleteNoLock(subscription *SubscriptionDetails) error {
 
 	peerSubscription, ok := sub.items[subscription.PeerID]
 	if !ok {
@@ -178,17 +179,17 @@ func (sub *SubscriptionsMap) Clear() {
 	sub.clear()
 }
 
-func (sub *SubscriptionsMap) Notify(peerID peer.ID, envelope *protocol.Envelope) {
+func (sub *SubscriptionsMap) Notify(ctx context.Context, peerID peer.ID, envelope *protocol.Envelope) {
 	sub.RLock()
 	defer sub.RUnlock()
 
 	subscriptions, ok := sub.items[peerID].SubsPerPubsubTopic[envelope.PubsubTopic()]
 	if ok {
-		iterateSubscriptionSet(sub.logger, subscriptions, envelope)
+		iterateSubscriptionSet(ctx, sub.logger, subscriptions, envelope)
 	}
 }
 
-func iterateSubscriptionSet(logger *zap.Logger, subscriptions SubscriptionSet, envelope *protocol.Envelope) {
+func iterateSubscriptionSet(ctx context.Context, logger *zap.Logger, subscriptions SubscriptionSet, envelope *protocol.Envelope) {
 	for _, subscription := range subscriptions {
 		func(subscription *SubscriptionDetails) {
 			subscription.RLock()
@@ -201,6 +202,8 @@ func iterateSubscriptionSet(logger *zap.Logger, subscriptions SubscriptionSet, e
 
 			if !subscription.Closed {
 				select {
+				case <-ctx.Done():
+					return
 				case subscription.C <- envelope:
 				default:
 					logger.Warn("can't deliver message to subscription. subscriber too slow")

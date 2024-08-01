@@ -63,5 +63,5 @@ func TestZapLoggerTerminalFormat(t *testing.T) {
 	require.NoError(t, err)
 
 	zapLogger.Info("some message with error level")
-	require.Contains(t, buf.String(), `logutils/zap_adapter_test.go:65`)
+	require.Contains(t, buf.String(), `zap_adapter_test.go:65`)
 }
