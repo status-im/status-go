@@ -82,7 +82,7 @@ func (bf *DefaultBalanceFetcher) fetchBalancesForChain(parent context.Context, c
 		group.Add(func(parent context.Context) error {
 			balances, err := bf.FetchChainBalances(parent, accounts, ethScanContract, atBlock)
 			if err != nil {
-				return nil
+				return err
 			}
 
 			updateBalance(balances)
@@ -111,7 +111,7 @@ func (bf *DefaultBalanceFetcher) fetchBalancesForChain(parent context.Context, c
 				}
 
 				if err != nil {
-					return nil
+					return err
 				}
 
 				updateBalance(accTokenBalance)
@@ -298,7 +298,7 @@ func (bf *DefaultBalanceFetcher) GetBalancesAtByChain(parent context.Context, cl
 		group.Add(func(parent context.Context) error {
 			balances, err := bf.fetchBalancesForChain(parent, client, accounts, tokens, atBlocks[client.NetworkID()])
 			if err != nil {
-				return nil
+				return err
 			}
 
 			updateBalance(client.NetworkID(), balances)

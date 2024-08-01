@@ -264,7 +264,10 @@ func (r *Reader) invalidateBalanceCache() {
 func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
 	needFetch := !r.isBalanceCacheValid(addresses) || r.isBalanceUpdateNeededAnyway(clients, addresses)
 	if needFetch {
-		return r.FetchBalances(ctx, clients, addresses)
+		fetchedBalances, err := r.FetchBalances(ctx, clients, addresses)
+		if err == nil {
+			return fetchedBalances, nil
+		}
 	}
 
 	return r.GetCachedBalances(clients, addresses)
