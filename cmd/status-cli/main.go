@@ -75,10 +75,9 @@ var SimulateFlags = append([]cli.Flag{
 		Usage:   "How many messages to sent from each user",
 	},
 	&cli.BoolFlag{
-		Name:    MessageFailureFlag,
-		Aliases: []string{"f"},
-		Usage:   "Causes messages to fail about 25% of the time",
-		Value:   false,
+		Name:  MessageFailureFlag,
+		Usage: "Causes messages to fail about 25% of the time",
+		Value: false,
 	},
 }, CommonFlags...)
 

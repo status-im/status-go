@@ -194,4 +194,7 @@ type Waku interface {
 
 	// SetStorePeerID updates the peer id of store node
 	SetStorePeerID(peerID peer.ID)
+
+	// PeerID returns node's PeerID
+	PeerID() peer.ID
 }

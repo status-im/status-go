@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"go.uber.org/zap"
@@ -1595,6 +1597,10 @@ func (w *Waku) Clean() error {
 	}
 
 	return nil
+}
+
+func (w *Waku) PeerID() peer.ID {
+	panic("not implemented")
 }
 
 // validatePrivateKey checks the format of the given private key.

@@ -92,7 +92,7 @@ func createClient(t *testing.T, mockServerURL string) *Client {
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
 	}
-	return NewClient(logger, mockServerURL, "testUID", "testNode", "1.0", WithSendPeriod(100*time.Millisecond))
+	return NewClient(logger, mockServerURL, "testUID", "testNode", "1.0", WithSendPeriod(100*time.Millisecond), WithPeerID("16Uiu2HAkvWiyFsgRhuJEb9JfjYxEkoHLgnUQmr1N5mKWnYjxYRVm"))
 }
 
 type expectedCondition func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool)
@@ -385,4 +385,31 @@ func TestPeerCount(t *testing.T) {
 
 		require.NotEqual(t, 0, len(w.Peers()))
 	})
+}
+
+func TestPeerId(t *testing.T) {
+	expectedCondition := func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
+		var data map[string]interface{}
+
+		err := json.Unmarshal(*received[0].TelemetryData, &data)
+		if err != nil {
+			return false, true
+		}
+
+		_, ok := data["peerId"]
+		require.True(t, ok)
+		return ok, false
+	}
+	withMockServer(t, ReceivedEnvelopeMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+		client.Start(ctx)
+
+		client.PushReceivedEnvelope(v2protocol.NewEnvelope(&pb.WakuMessage{
+			Payload:      []byte{1, 2, 3, 4, 5},
+			ContentTopic: testContentTopic,
+			Version:      proto.Uint32(0),
+			Timestamp:    proto.Int64(time.Now().Unix()),
+		}, 0, ""))
+
+	})
+
 }

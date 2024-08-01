@@ -350,3 +350,7 @@ func (w *gethWakuV2Wrapper) ConfirmMessageDelivered(hashes []common.Hash) {
 func (w *gethWakuV2Wrapper) SetStorePeerID(peerID peer.ID) {
 	w.waku.SetStorePeerID(peerID)
 }
+
+func (w *gethWakuV2Wrapper) PeerID() peer.ID {
+	return w.waku.PeerID()
+}

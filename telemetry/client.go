@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -76,6 +77,7 @@ type Client struct {
 	logger              *zap.Logger
 	keyUID              string
 	nodeName            string
+	peerId              string
 	version             string
 	telemetryCh         chan TelemetryRequest
 	telemetryCacheLock  sync.Mutex
@@ -94,7 +96,14 @@ func WithSendPeriod(sendPeriod time.Duration) TelemetryClientOption {
 	}
 }
 
+func WithPeerID(peerId string) TelemetryClientOption {
+	return func(c *Client) {
+		c.peerId = peerId
+	}
+}
+
 func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName string, version string, opts ...TelemetryClientOption) *Client {
+	serverURL = strings.TrimRight(serverURL, "/")
 	client := &Client{
 		serverURL:           serverURL,
 		httpClient:          &http.Client{Timeout: time.Minute},
@@ -255,6 +264,7 @@ func (c *Client) ProcessReceivedMessages(receivedMessages ReceivedMessages) *jso
 			"topic":          receivedMessages.Filter.ContentTopic.String(),
 			"messageType":    message.ApplicationLayer.Type.String(),
 			"receiverKeyUID": c.keyUID,
+			"peerId":         c.peerId,
 			"nodeName":       c.nodeName,
 			"messageSize":    len(receivedMessages.SSHMessage.Payload),
 			"statusVersion":  c.version,
@@ -272,6 +282,7 @@ func (c *Client) ProcessReceivedEnvelope(envelope *v2protocol.Envelope) *json.Ra
 		"pubsubTopic":    envelope.PubsubTopic(),
 		"topic":          envelope.Message().ContentTopic,
 		"receiverKeyUID": c.keyUID,
+		"peerId":         c.peerId,
 		"nodeName":       c.nodeName,
 		"statusVersion":  c.version,
 	}
@@ -287,6 +298,7 @@ func (c *Client) ProcessSentEnvelope(sentEnvelope wakuv2.SentEnvelope) *json.Raw
 		"pubsubTopic":   sentEnvelope.Envelope.PubsubTopic(),
 		"topic":         sentEnvelope.Envelope.Message().ContentTopic,
 		"senderKeyUID":  c.keyUID,
+		"peerId":        c.peerId,
 		"nodeName":      c.nodeName,
 		"publishMethod": sentEnvelope.PublishMethod.String(),
 		"statusVersion": c.version,
@@ -303,6 +315,7 @@ func (c *Client) ProcessErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSe
 		"pubsubTopic":   errorSendingEnvelope.SentEnvelope.Envelope.PubsubTopic(),
 		"topic":         errorSendingEnvelope.SentEnvelope.Envelope.Message().ContentTopic,
 		"senderKeyUID":  c.keyUID,
+		"peerId":        c.peerId,
 		"nodeName":      c.nodeName,
 		"publishMethod": errorSendingEnvelope.SentEnvelope.PublishMethod.String(),
 		"statusVersion": c.version,
@@ -318,6 +331,7 @@ func (c *Client) ProcessPeerCount(peerCount PeerCount) *json.RawMessage {
 		"peerCount":     peerCount.PeerCount,
 		"nodeName":      c.nodeName,
 		"nodeKeyUID":    c.keyUID,
+		"peerId":        c.peerId,
 		"statusVersion": c.version,
 		"timestamp":     time.Now().Unix(),
 	}
@@ -339,6 +353,7 @@ func (c *Client) UpdateEnvelopeProcessingError(shhMessage *types.Message, proces
 		"pubsubTopic":     shhMessage.PubsubTopic,
 		"topic":           shhMessage.Topic,
 		"receiverKeyUID":  c.keyUID,
+		"peerId":          c.peerId,
 		"nodeName":        c.nodeName,
 		"processingError": errorString,
 	}
