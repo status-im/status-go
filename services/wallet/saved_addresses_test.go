@@ -394,3 +394,145 @@ func TestSavedAddressesAddSame(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
 }
+
+func TestSavedAddressesPerTestnetMode(t *testing.T) {
+	manager, stop := setupTestSavedAddressesDB(t)
+	defer stop()
+
+	addresses := []SavedAddress{
+		SavedAddress{
+			Address: common.Address{1},
+			Name:    "addr1",
+			IsTest:  true,
+		},
+		SavedAddress{
+			Address: common.Address{2},
+			Name:    "addr2",
+			IsTest:  false,
+		},
+		SavedAddress{
+			Address: common.Address{3},
+			Name:    "addr3",
+			IsTest:  true,
+		},
+		SavedAddress{
+			Address: common.Address{4},
+			Name:    "addr4",
+			IsTest:  false,
+		},
+		SavedAddress{
+			Address: common.Address{5},
+			Name:    "addr5",
+			IsTest:  true,
+			Removed: true,
+		},
+		SavedAddress{
+			Address: common.Address{6},
+			Name:    "addr6",
+			IsTest:  false,
+			Removed: true,
+		},
+		SavedAddress{
+			Address: common.Address{7},
+			Name:    "addr7",
+			IsTest:  true,
+		},
+	}
+
+	for _, sa := range addresses {
+		err := manager.upsertSavedAddress(sa, nil)
+		require.NoError(t, err)
+	}
+
+	res, err := manager.GetSavedAddresses()
+	require.NoError(t, err)
+	require.Equal(t, len(res), len(addresses)-2)
+
+	res, err = manager.GetSavedAddressesPerMode(true)
+	require.NoError(t, err)
+	require.Equal(t, len(res), 3)
+
+	res, err = manager.GetSavedAddressesPerMode(false)
+	require.NoError(t, err)
+	require.Equal(t, len(res), 2)
+}
+
+func TestSavedAddressesCapacity(t *testing.T) {
+	manager, stop := setupTestSavedAddressesDB(t)
+	defer stop()
+
+	addresses := []SavedAddress{
+		SavedAddress{
+			Address: common.Address{1},
+			Name:    "addr1",
+			IsTest:  true,
+		},
+		SavedAddress{
+			Address: common.Address{2},
+			Name:    "addr2",
+			IsTest:  false,
+		},
+		SavedAddress{
+			Address: common.Address{3},
+			Name:    "addr3",
+			IsTest:  true,
+		},
+		SavedAddress{
+			Address: common.Address{4},
+			Name:    "addr4",
+			IsTest:  false,
+		},
+		SavedAddress{
+			Address: common.Address{5},
+			Name:    "addr5",
+			IsTest:  true,
+			Removed: true,
+		},
+		SavedAddress{
+			Address: common.Address{6},
+			Name:    "addr6",
+			IsTest:  false,
+			Removed: true,
+		},
+		SavedAddress{
+			Address: common.Address{7},
+			Name:    "addr7",
+			IsTest:  true,
+		},
+	}
+
+	for _, sa := range addresses {
+		err := manager.upsertSavedAddress(sa, nil)
+		require.NoError(t, err)
+	}
+
+	capacity, err := manager.RemainingCapacityForSavedAddresses(true)
+	require.NoError(t, err)
+	require.Equal(t, 17, capacity)
+
+	capacity, err = manager.RemainingCapacityForSavedAddresses(false)
+	require.NoError(t, err)
+	require.Equal(t, 18, capacity)
+
+	// add 17 more for testnet and 18 more for mainnet mode
+	for i := 1; i < 36; i++ {
+		sa := SavedAddress{
+			Address: common.Address{byte(i + 8)},
+			Name:    "addr" + strconv.Itoa(i+8),
+			IsTest:  i%2 == 0,
+		}
+
+		err := manager.upsertSavedAddress(sa, nil)
+		require.NoError(t, err)
+	}
+
+	capacity, err = manager.RemainingCapacityForSavedAddresses(true)
+	require.Error(t, err)
+	require.Equal(t, "no more save addresses can be added", err.Error())
+	require.Equal(t, 0, capacity)
+
+	capacity, err = manager.RemainingCapacityForSavedAddresses(false)
+	require.Error(t, err)
+	require.Equal(t, "no more save addresses can be added", err.Error())
+	require.Equal(t, 0, capacity)
+}
