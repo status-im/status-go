@@ -3,10 +3,12 @@ package wallet
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/constants"
 	multiAccCommon "github.com/status-im/status-go/multiaccounts/common"
 )
 
@@ -115,9 +117,26 @@ func (sam *SavedAddressesManager) GetSavedAddresses() ([]*SavedAddress, error) {
 	return sam.getSavedAddresses("removed != 1")
 }
 
+func (sam *SavedAddressesManager) GetSavedAddressesPerMode(testnetMode bool) ([]*SavedAddress, error) {
+	return sam.getSavedAddresses(fmt.Sprintf("is_test = %t AND removed != 1", testnetMode))
+}
+
 // GetRawSavedAddresses provides access to the soft-delete and sync metadata
 func (sam *SavedAddressesManager) GetRawSavedAddresses() ([]*SavedAddress, error) {
 	return sam.getSavedAddresses("")
+}
+
+func (sam *SavedAddressesManager) RemainingCapacityForSavedAddresses(testnetMode bool) (int, error) {
+	savedAddress, err := sam.GetSavedAddressesPerMode(testnetMode)
+	if err != nil {
+		return 0, err
+	}
+	remainingCapacity := constants.MaxNumberOfSavedAddresses - len(savedAddress)
+	if remainingCapacity <= 0 {
+		return 0, errors.New("no more save addresses can be added")
+	}
+
+	return remainingCapacity, nil
 }
 
 func (sam *SavedAddressesManager) upsertSavedAddress(sa SavedAddress, tx *sql.Tx) (err error) {

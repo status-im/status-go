@@ -211,6 +211,21 @@ func (api *API) AddKeypair(ctx context.Context, password string, keypair *accoun
 	return nil
 }
 
+// RemainingAccountCapacity returns the number of accounts that can be added.
+func (api *API) RemainingAccountCapacity(ctx context.Context) (int, error) {
+	return (*api.messenger).RemainingAccountCapacity()
+}
+
+// RemainingKeypairCapacity returns the number of keypairs that can be added.
+func (api *API) RemainingKeypairCapacity(ctx context.Context) (int, error) {
+	return (*api.messenger).RemainingKeypairCapacity()
+}
+
+// RemainingWatchOnlyAccountCapacity returns the number of watch-only accounts that can be added.
+func (api *API) RemainingWatchOnlyAccountCapacity(ctx context.Context) (int, error) {
+	return (*api.messenger).RemainingWatchOnlyAccountCapacity()
+}
+
 func (api *API) checkAccountValidity(account *accounts.Account) error {
 	if len(account.Address) == 0 {
 		return errors.New("`Address` field of an account must be set")
