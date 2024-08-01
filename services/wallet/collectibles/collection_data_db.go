@@ -8,6 +8,14 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
+type CollectionDataStorage interface {
+	SetData(collections []thirdparty.CollectionData, allowUpdate bool) error
+	GetIDsNotInDB(ids []thirdparty.ContractID) ([]thirdparty.ContractID, error)
+	GetData(ids []thirdparty.ContractID) (map[string]thirdparty.CollectionData, error)
+	SetCollectionSocialsData(id thirdparty.ContractID, collectionSocials *thirdparty.CollectionSocials) error
+	GetSocialsForID(contractID thirdparty.ContractID) (*thirdparty.CollectionSocials, error)
+}
+
 type CollectionDataDB struct {
 	db *sql.DB
 }

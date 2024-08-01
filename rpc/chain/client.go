@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/circuitbreaker"
 	"github.com/status-im/status-go/services/rpcstats"
@@ -71,6 +72,15 @@ func DeepCopyTagger(t Tagger) Tagger {
 	return t.DeepCopyTag()
 }
 
+type HealthMonitor interface {
+	GetCircuitBreaker() *circuitbreaker.CircuitBreaker
+	SetCircuitBreaker(cb *circuitbreaker.CircuitBreaker)
+}
+
+type Copyable interface {
+	Copy() interface{}
+}
+
 // Shallow copy of the client with a deep copy of tag and group tag
 // To avoid passing tags as parameter to every chain call, it is sufficient for now
 // to set the tag and group tag once on the client
@@ -115,6 +125,20 @@ type ClientWithFallback struct {
 
 	tag      string // tag for the limiter
 	groupTag string // tag for the limiter group
+}
+
+func (c *ClientWithFallback) Copy() interface{} {
+	return &ClientWithFallback{
+		ChainID:        c.ChainID,
+		ethClients:     c.ethClients,
+		commonLimiter:  c.commonLimiter,
+		circuitbreaker: c.circuitbreaker,
+		WalletNotifier: c.WalletNotifier,
+		isConnected:    c.isConnected,
+		LastCheckedAt:  c.LastCheckedAt,
+		tag:            c.tag,
+		groupTag:       c.groupTag,
+	}
 }
 
 // Don't mark connection as failed if we get one of these errors
@@ -263,7 +287,7 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, ethClients []*EthClie
 					}
 				}
 
-				if isVMError(err) {
+				if isVMError(err) || errors.Is(err, context.Canceled) {
 					cmd.Cancel()
 				}
 
@@ -948,8 +972,10 @@ func (c *ClientWithFallback) SetWalletNotifier(notifier func(chainId uint64, mes
 func (c *ClientWithFallback) toggleConnectionState(err error) {
 	connected := true
 	if err != nil {
-		if !isVMError(err) && !errors.Is(err, ErrRequestsOverLimit) {
+		if !isVMError(err) && !errors.Is(err, ErrRequestsOverLimit) && !errors.Is(err, context.Canceled) {
 			connected = false
+		} else {
+			log.Warn("Error in chain call", "error", err)
 		}
 	}
 	c.SetIsConnected(connected)
@@ -982,4 +1008,12 @@ func (c *ClientWithFallback) GetLimiter() RequestLimiter {
 
 func (c *ClientWithFallback) SetLimiter(limiter RequestLimiter) {
 	c.commonLimiter = limiter
+}
+
+func (c *ClientWithFallback) GetCircuitBreaker() *circuitbreaker.CircuitBreaker {
+	return c.circuitbreaker
+}
+
+func (c *ClientWithFallback) SetCircuitBreaker(cb *circuitbreaker.CircuitBreaker) {
+	c.circuitbreaker = cb
 }
