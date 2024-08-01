@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
 )
@@ -18,10 +20,8 @@ var coinGeckoMapping = map[string]string{
 	"ETH":   "ethereum",
 	"AST":   "airswap",
 	"ABT":   "arcblock",
-	"ATM":   "",
 	"BNB":   "binancecoin",
 	"BLT":   "bloom",
-	"CDT":   "",
 	"COMP":  "compound-coin",
 	"EDG":   "edgeless",
 	"ENG":   "enigma",
@@ -47,7 +47,6 @@ var coinGeckoMapping = map[string]string{
 	"UNI":   "uniswap",
 	"USDC":  "usd-coin",
 	"USDP":  "paxos-standard",
-	"VRS":   "",
 	"USDT":  "tether",
 	"SHIB":  "shiba-inu",
 	"LINK":  "chainlink",
@@ -184,23 +183,21 @@ func (c *Client) getTokens() (map[string][]GeckoToken, error) {
 	}
 
 	mapTokensToSymbols(tokens, c.tokens)
-
 	return c.tokens, nil
 }
 
-func (c *Client) mapSymbolsToIds(symbols []string) ([]string, error) {
+func (c *Client) mapSymbolsToIds(symbols []string) (map[string]string, error) {
 	tokens, err := c.getTokens()
 	if err != nil {
 		return nil, err
 	}
-	ids := make([]string, 0)
-	for _, symbol := range utils.RenameSymbols(symbols) {
-		id, err := getIDFromSymbol(tokens, symbol)
+	ids := make(map[string]string, 0)
+	for _, symbol := range symbols {
+		id, err := getIDFromSymbol(tokens, utils.GetRealSymbol(symbol))
 		if err == nil {
-			ids = append(ids, id)
+			ids[symbol] = id
 		}
 	}
-	ids = utils.RemoveDuplicates(ids)
 
 	return ids, nil
 }
@@ -212,7 +209,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 	}
 
 	params := url.Values{}
-	params.Add("ids", strings.Join(ids, ","))
+	params.Add("ids", strings.Join(maps.Values(ids), ","))
 	params.Add("vs_currencies", strings.Join(currencies, ","))
 
 	url := fmt.Sprintf("%ssimple/price", baseURL)
@@ -227,17 +224,9 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 		return nil, fmt.Errorf("%s - %s", err, string(response))
 	}
 
-	tokens, err := c.getTokens()
-	if err != nil {
-		return nil, err
-	}
 	result := make(map[string]map[string]float64)
-	for _, symbol := range symbols {
+	for symbol, id := range ids {
 		result[symbol] = map[string]float64{}
-		id, err := getIDFromSymbol(tokens, utils.GetRealSymbol(symbol))
-		if err != nil {
-			return nil, err
-		}
 		for _, currency := range currencies {
 			result[symbol][currency] = prices[id][strings.ToLower(currency)]
 		}
@@ -272,7 +261,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 	}
 
 	params := url.Values{}
-	params.Add("ids", strings.Join(ids, ","))
+	params.Add("ids", strings.Join(maps.Values(ids), ","))
 	params.Add("vs_currency", currency)
 	params.Add("order", "market_cap_desc")
 	params.Add("per_page", "250")
@@ -292,17 +281,8 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		return nil, fmt.Errorf("%s - %s", err, string(response))
 	}
 
-	tokens, err := c.getTokens()
-	if err != nil {
-		return nil, err
-	}
-
 	result := make(map[string]thirdparty.TokenMarketValues)
-	for _, symbol := range symbols {
-		id, err := getIDFromSymbol(tokens, utils.GetRealSymbol(symbol))
-		if err != nil {
-			return nil, err
-		}
+	for symbol, id := range ids {
 		for _, marketValue := range marketValues {
 			if id != marketValue.ID {
 				continue
