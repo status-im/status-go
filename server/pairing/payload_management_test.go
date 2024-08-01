@@ -65,7 +65,7 @@ func setupTestDB(t *testing.T) (*multiaccounts.Database, func()) {
 
 func makeKeystore(t *testing.T) string {
 	keyStoreDir := t.TempDir()
-	keyStoreDir = filepath.Join(keyStoreDir, keystoreDir)
+	keyStoreDir = filepath.Join(keyStoreDir, api.DefaultKeystoreRelativePath)
 
 	err := os.MkdirAll(keyStoreDir, 0777)
 	require.NoError(t, err)

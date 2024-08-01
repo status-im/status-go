@@ -127,7 +127,7 @@ func (s *SyncDeviceSuite) pairAccounts(serverBackend *api.GethStatusBackend, ser
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 
-	serverKeystorePath := filepath.Join(serverDir, keystoreDir, serverActiveAccount.KeyUID)
+	serverKeystorePath := filepath.Join(serverDir, api.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
 	serverConfig := &SenderServerConfig{
 		SenderConfig: &SenderConfig{
 			KeystorePath: serverKeystorePath,
@@ -146,7 +146,7 @@ func (s *SyncDeviceSuite) pairAccounts(serverBackend *api.GethStatusBackend, ser
 
 	// Start receiving client
 
-	err = clientBackend.AccountManager().InitKeystore(filepath.Join(clientDir, keystoreDir))
+	err = clientBackend.AccountManager().InitKeystore(filepath.Join(clientDir, api.DefaultKeystoreRelativePath))
 	require.NoError(s.T(), err)
 
 	err = clientBackend.OpenAccounts()
@@ -245,7 +245,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	}()
 	ctx := context.TODO()
 
-	err := serverBackend.AccountManager().InitKeystore(filepath.Join(serverTmpDir, keystoreDir))
+	err := serverBackend.AccountManager().InitKeystore(filepath.Join(serverTmpDir, api.DefaultKeystoreRelativePath))
 	require.NoError(s.T(), err)
 	err = serverBackend.OpenAccounts()
 	require.NoError(s.T(), err)
@@ -285,7 +285,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	// startup sending client
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
-	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
+	clientKeystorePath := filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
 	clientPayloadSourceConfig := SenderClientConfig{
 		SenderConfig: &SenderConfig{
 			KeystorePath: clientKeystorePath,
@@ -373,7 +373,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
-	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
+	serverKeystorePath := filepath.Join(serverTmpDir, api.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
 	var config = &SenderServerConfig{
 		SenderConfig: &SenderConfig{
 			KeystorePath: serverKeystorePath,
@@ -420,7 +420,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	_, err = serverMessenger.DeleteMessageForMeAndSync(ctx, publicChatID, serverMessageID)
 	require.NoError(s.T(), err)
 
-	err = clientBackend.AccountManager().InitKeystore(filepath.Join(clientTmpDir, keystoreDir))
+	err = clientBackend.AccountManager().InitKeystore(filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath))
 	require.NoError(s.T(), err)
 	err = clientBackend.OpenAccounts()
 	require.NoError(s.T(), err)
@@ -753,7 +753,7 @@ func nodeConfigForLocalPairSync(installationID, keyUID, tmpDir string) (*params.
 	nodeConfig.LogEnabled = true
 	nodeConfig.LogLevel = "DEBUG"
 	nodeConfig.LogDir = tmpDir
-	nodeConfig.KeyStoreDir = filepath.Join(keystoreDir, keyUID)
+	nodeConfig.KeyStoreDir = filepath.Join(api.DefaultKeystoreRelativePath, keyUID)
 	nodeConfig.KeycardPairingDataFile = filepath.Join("keycard", "pairings.json")
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		InstallationID: installationID,
@@ -886,14 +886,14 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 	require.NoError(s.T(), err, "saving seed phrase keypair on client without keystore files")
 
 	// check server - server should contain keystore files for imported seed phrase
-	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
+	serverKeystorePath := filepath.Join(serverTmpDir, api.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
 	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverSeedPhraseKp.DerivedFrom[2:]))
 	for _, acc := range serverSeedPhraseKp.Accounts {
 		require.True(s.T(), containsKeystoreFile(serverKeystorePath, acc.Address.String()[2:]))
 	}
 
 	// check client - client should not contain keystore files for imported seed phrase
-	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
+	clientKeystorePath := filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
 	require.False(s.T(), containsKeystoreFile(clientKeystorePath, clientSeedPhraseKp.DerivedFrom[2:]))
 	for _, acc := range clientSeedPhraseKp.Accounts {
 		require.False(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
@@ -1082,14 +1082,14 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 		len(serverKp.Keycards) == len(clientKp.Keycards))
 
 	// Check server - server should contain keystore files for imported seed phrase
-	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
+	serverKeystorePath := filepath.Join(serverTmpDir, api.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
 	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverKp.DerivedFrom[2:]))
 	for _, acc := range serverKp.Accounts {
 		require.True(s.T(), containsKeystoreFile(serverKeystorePath, acc.Address.String()[2:]))
 	}
 
 	// Check client - client should not contain keystore files for imported seed phrase
-	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
+	clientKeystorePath := filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
 	require.False(s.T(), containsKeystoreFile(clientKeystorePath, clientKp.DerivedFrom[2:]))
 	for _, acc := range clientKp.Accounts {
 		require.False(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
@@ -1266,7 +1266,7 @@ func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsReceiver
 
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	s.NoError(err)
-	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
+	serverKeystorePath := filepath.Join(serverTmpDir, api.DefaultKeystoreRelativePath, serverActiveAccount.KeyUID)
 	var config = &SenderServerConfig{
 		SenderConfig: &SenderConfig{
 			KeystorePath: serverKeystorePath,
@@ -1325,7 +1325,7 @@ func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsSender()
 
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	s.NoError(err)
-	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
+	clientKeystorePath := filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
 	clientPayloadSourceConfig := SenderClientConfig{
 		SenderConfig: &SenderConfig{
 			KeystorePath: clientKeystorePath,

@@ -26,8 +26,8 @@ const (
 	defaultMnemonicLength    = 12
 	shardsTestClusterID      = 16
 	walletAccountDefaultName = "Account 1"
-	keystoreRelativePath     = "keystore"
 
+	DefaultKeystoreRelativePath       = "keystore"
 	DefaultKeycardPairingDataFile     = "/ethereum/mainnet_rpc/keycard/pairings.json"
 	DefaultDataDir                    = "/ethereum/mainnet_rpc"
 	DefaultNodeName                   = "StatusIM"
@@ -401,7 +401,7 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 }
 
 func DefaultKeystorePath(rootDataDir string, keyUID string) (string, string) {
-	relativePath := filepath.Join(keystoreRelativePath, keyUID)
+	relativePath := filepath.Join(DefaultKeystoreRelativePath, keyUID)
 	absolutePath := filepath.Join(rootDataDir, relativePath)
 	return relativePath, absolutePath
 }

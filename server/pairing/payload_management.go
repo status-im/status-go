@@ -14,9 +14,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-// FIXME: Reuse api.keystoreRelativePath.
-const keystoreDir = "keystore"
-
 var (
 	ErrKeyFileAlreadyExists    = errors.New("key file already exists")
 	ErrKeyUIDEmptyAsSender     = errors.New("keyUID must be provided as sender")

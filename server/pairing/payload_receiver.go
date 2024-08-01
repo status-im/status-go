@@ -176,7 +176,7 @@ func (aps *AccountPayloadStorer) storeKeys(keyStorePath string) error {
 
 	// If lastDir == keystoreDir we presume we need to create the rest of the keystore path
 	// else we presume the provided keystore is valid
-	if lastDir == keystoreDir {
+	if lastDir == api.DefaultKeystoreRelativePath {
 		if aps.multiaccount == nil || aps.multiaccount.KeyUID == "" {
 			return fmt.Errorf("no known Key UID")
 		}
@@ -442,7 +442,7 @@ func (kfps *KeystoreFilesPayloadStorer) storeKeys(keyStorePath string) error {
 
 	// If lastDir == keystoreDir we presume we need to create the rest of the keystore path
 	// else we presume the provided keystore is valid
-	if lastDir == keystoreDir {
+	if lastDir == api.DefaultKeystoreRelativePath {
 		keyStorePath = filepath.Join(keyStorePath, kfps.loggedInKeyUID)
 		_, err := os.Stat(keyStorePath)
 		if os.IsNotExist(err) {
