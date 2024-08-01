@@ -45,8 +45,11 @@ func NewAPI(s *Service) *API {
 		NetworkManager: s.nm,
 	})
 
-	// Request permissions
+	// Permissions
 	r.Register("wallet_requestPermissions", &commands.RequestPermissionsCommand{})
+	r.Register("wallet_revokePermissions", &commands.RevokePermissionsCommand{
+		Db: s.db,
+	})
 
 	return &API{
 		s: s,
@@ -100,6 +103,10 @@ func (api *API) CallRPC(inputJSON string) (interface{}, error) {
 
 func (api *API) RecallDAppPermission(origin string) error {
 	return persistence.DeleteDApp(api.s.db, origin)
+}
+
+func (api *API) GetPermittedDAppsList() ([]persistence.DApp, error) {
+	return persistence.SelectAllDApps(api.s.db)
 }
 
 func (api *API) RequestAccountsAccepted(args commands.RequestAccountsAcceptedArgs) error {

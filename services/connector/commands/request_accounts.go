@@ -38,11 +38,12 @@ func (c *RequestAccountsCommand) Execute(request RPCRequest) (interface{}, error
 
 	// FIXME: this may have a security issue in case some malicious software tries to fake the origin
 	if dApp == nil {
-		account, chainID, err := c.ClientHandler.RequestShareAccountForDApp(signal.ConnectorDApp{
+		connectorDApp := signal.ConnectorDApp{
 			URL:     request.URL,
 			Name:    request.Name,
 			IconURL: request.IconURL,
-		})
+		}
+		account, chainID, err := c.ClientHandler.RequestShareAccountForDApp(connectorDApp)
 		if err != nil {
 			return "", err
 		}
@@ -59,6 +60,7 @@ func (c *RequestAccountsCommand) Execute(request RPCRequest) (interface{}, error
 		if err != nil {
 			return "", err
 		}
+		signal.SendConnectorDAppPermissionGranted(connectorDApp)
 	}
 
 	return FormatAccountAddressToResponse(dApp.SharedAccount), nil

@@ -1,8 +1,10 @@
 package signal
 
 const (
-	EventConnectorSendRequestAccounts = "connector.sendRequestAccounts"
-	EventConnectorSendTransaction     = "connector.sendTransaction"
+	EventConnectorSendRequestAccounts   = "connector.sendRequestAccounts"
+	EventConnectorSendTransaction       = "connector.sendTransaction"
+	EventConnectorDAppPermissionGranted = "connector.dAppPermissionGranted"
+	EventConnectorDAppPermissionRevoked = "connector.dAppPermissionRevoked"
 )
 
 type ConnectorDApp struct {
@@ -39,4 +41,12 @@ func SendConnectorSendTransaction(dApp ConnectorDApp, chainID uint64, txArgs str
 		ChainID:       chainID,
 		TxArgs:        txArgs,
 	})
+}
+
+func SendConnectorDAppPermissionGranted(dApp ConnectorDApp) {
+	send(EventConnectorDAppPermissionGranted, dApp)
+}
+
+func SendConnectorDAppPermissionRevoked(dApp ConnectorDApp) {
+	send(EventConnectorDAppPermissionRevoked, dApp)
 }
