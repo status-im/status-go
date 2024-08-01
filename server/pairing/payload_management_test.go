@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
