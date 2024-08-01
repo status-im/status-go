@@ -14,7 +14,7 @@
 // along with the Waku library. If not, see <http://www.gnu.org/licenses/>.
 //
 // This software uses the go-ethereum library, which is licensed
-// under the GNU Lesser General Public Library, version 3 or any later.
+// under the GNU Lesser General Public License, version 3 or any later.
 
 package wakuv2
 
@@ -53,6 +53,7 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	libp2pEvent "github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
@@ -1439,6 +1440,30 @@ func (w *Waku) Start() error {
 	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set w.ctx to nil within `w.Stop()`
 	w.wg.Add(1)
 	go w.seedBootnodesForDiscV5()
+
+	subscription, err := w.node.Host().EventBus().Subscribe(libp2pEvent.WildcardSubscription)
+	if err != nil {
+		w.logger.Error("failed to subscribe to peer identification completed event", zap.Error(err))
+	}
+
+	go func() {
+		for {
+			select {
+			case e, ok := <-subscription.Out():
+				if !ok {
+					w.logger.Info("subscription closed")
+					return
+				}
+				// event := e.(libp2pEvent.EvtPeerIdentificationFailed)
+				w.logger.Info("AK: ", zap.Any("event", e))
+			case <-time.After(5 * time.Second):
+				w.logger.Info("tick")
+			case <-w.ctx.Done():
+				subscription.Close()
+				return
+			}
+		}
+	}()
 
 	return nil
 }
