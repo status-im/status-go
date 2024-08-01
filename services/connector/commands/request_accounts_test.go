@@ -65,6 +65,7 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 	assert.NoError(t, err)
 
 	accountAddress := types.Address{0x03}
+	dAppPermissionGranted := false
 
 	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
 		var evt EventType
@@ -83,6 +84,8 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 				ChainID:   walletCommon.EthereumMainnet,
 			})
 			assert.NoError(t, err)
+		case signal.EventConnectorDAppPermissionGranted:
+			dAppPermissionGranted = true
 		}
 	}))
 
@@ -104,6 +107,8 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 	response, err = cmd.Execute(request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
+
+	assert.True(t, dAppPermissionGranted)
 }
 
 func TestRequestAccountsRejected(t *testing.T) {

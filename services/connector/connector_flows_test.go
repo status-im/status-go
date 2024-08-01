@@ -107,6 +107,18 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedHash.Hex(), response)
+
+	// Revoke permissions
+	request = "{\"method\": \"wallet_revokePermissions\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
+	_, err = api.CallRPC(request)
+	assert.NoError(t, err)
+
+	// Check if the account was revoked
+	request = "{\"method\":\"eth_accounts\",\"params\":[],\"url\":\"http://testDAppURL123\",\"name\":\"testDAppName\",\"iconUrl\":\"http://testDAppIconUrl\"}"
+	response, err = api.CallRPC(request)
+	assert.Empty(t, response)
+	assert.Error(t, err)
+	assert.Equal(t, commands.ErrDAppIsNotPermittedByUser, err)
 }
 
 func TestForwardedRPCs(t *testing.T) {
