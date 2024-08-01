@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -78,10 +77,6 @@ func (s *ConfigTestSuite) TestValidationKeyUID() {
 }
 
 func (s *ConfigTestSuite) TestValidationNotEndKeyUID() {
-	nodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", "/dummy/path")
-	nodeConfig.RootDataDir = "/tmp"
-	s.Require().NoError(err, "nodeConfigForLocalPairSync should not return error")
-
 	keyUIDPattern := regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
 
 	r := &ReceiverConfig{

@@ -20,18 +20,13 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	accservice "github.com/status-im/status-go/services/accounts"
@@ -56,8 +51,6 @@ const (
 	path1                   = "m/44'/60'/0'/0/1"
 	expectedKDFIterations   = 1024
 )
-
-var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
 func TestSyncDeviceSuite(t *testing.T) {
 	suite.Run(t, new(SyncDeviceSuite))
@@ -696,78 +689,6 @@ func (s *SyncDeviceSuite) TestPairAcceptContactRequest() {
 		s.Require().False(r.Notifications[0].Dismissed)
 		s.Require().True(r.Notifications[0].Read)
 	})
-}
-
-func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
-	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
-
-	syncSettings := &settings.Settings{}
-	syncSettings.KeyUID = generatedAccountInfo.KeyUID
-	syncSettings.Address = types.HexToAddress(generatedAccountInfo.Address)
-	syncSettings.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
-
-	// Set chat key & name
-	name, err := alias.GenerateFromPublicKeyString(chatKeyString)
-	if err != nil {
-		return nil, err
-	}
-	syncSettings.Name = name
-	syncSettings.PublicKey = chatKeyString
-
-	syncSettings.DappsAddress = types.HexToAddress(derivedAddresses[pathDefaultWallet].Address)
-	syncSettings.EIP1581Address = types.HexToAddress(derivedAddresses[pathEIP1581].Address)
-	syncSettings.Mnemonic = mnemonic
-
-	syncSettings.SigningPhrase = "balabala"
-
-	syncSettings.SendPushNotifications = true
-	syncSettings.InstallationID = uuid.New().String()
-	syncSettings.UseMailservers = true
-
-	syncSettings.PreviewPrivacy = true
-	syncSettings.Currency = "usd"
-	syncSettings.ProfilePicturesVisibility = 1
-	syncSettings.LinkPreviewRequestEnabled = true
-
-	visibleTokens := make(map[string][]string)
-	visibleTokens["mainnet"] = []string{"SNT"}
-	visibleTokensJSON, err := json.Marshal(visibleTokens)
-	if err != nil {
-		return nil, err
-	}
-	visibleTokenJSONRaw := json.RawMessage(visibleTokensJSON)
-	syncSettings.WalletVisibleTokens = &visibleTokenJSONRaw
-
-	networks := `[{"id":"goerli_rpc","chain-explorer-link":"https://goerli.etherscan.io/address/","name":"Goerli with upstream RPC","config":{"NetworkId":5,"DataDir":"/ethereum/goerli_rpc","UpstreamConfig":{"Enabled":true,"URL":"https://goerli-archival.rpc.grove.city/v1/3ef2018191814b7e1009b8d9"}}},{"id":"mainnet_rpc","chain-explorer-link":"https://etherscan.io/address/","name":"Mainnet with upstream RPC","config":{"NetworkId":1,"DataDir":"/ethereum/mainnet_rpc","UpstreamConfig":{"Enabled":true,"URL":"https://eth-archival.rpc.grove.city/v1/3ef2018191814b7e1009b8d9"}}}]`
-	var networksRawMessage json.RawMessage = []byte(networks)
-	syncSettings.Networks = &networksRawMessage
-	syncSettings.CurrentNetwork = currentNetwork
-
-	return syncSettings, nil
-}
-
-// Deprecated
-func nodeConfigForLocalPairSync(installationID, keyUID, tmpDir string) (*params.NodeConfig, error) {
-	// Set mainnet
-	nodeConfig := &params.NodeConfig{}
-	nodeConfig.LogEnabled = true
-	nodeConfig.LogLevel = "DEBUG"
-	nodeConfig.LogDir = tmpDir
-	nodeConfig.KeyStoreDir = filepath.Join(api.DefaultKeystoreRelativePath, keyUID)
-	nodeConfig.KeycardPairingDataFile = filepath.Join("keycard", "pairings.json")
-	nodeConfig.ShhextConfig = params.ShhextConfig{
-		InstallationID: installationID,
-	}
-
-	// need specify cluster config here, otherwise TestPairingThreeDevices will fail due to no messages(CR) received
-	// TODO(frank) need to figure out why above happen
-	clusterConfig, err := params.LoadClusterConfigFromFleet(params.FleetProd)
-	if err != nil {
-		return nil, err
-	}
-	nodeConfig.ClusterConfig = *clusterConfig
-
-	return nodeConfig, nil
 }
 
 type testTimeSource struct{}
