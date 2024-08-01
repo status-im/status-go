@@ -313,8 +313,10 @@ func (pm *PeerManager) ensureMinRelayConnsPerTopic() {
 		// peers. This will ensure that the peers returned by this function
 		// match those peers that are currently connected
 
-		curPeerLen := pm.checkAndUpdateTopicHealth(topicInst)
-		if curPeerLen < pm.OutPeersTarget {
+		meshPeerLen := pm.checkAndUpdateTopicHealth(topicInst)
+		topicPeers := pm.host.Peerstore().(wps.WakuPeerstore).PeersByPubSubTopic(topicStr)
+		curPeerLen := topicPeers.Len()
+		if meshPeerLen < waku_proto.GossipSubDMin || curPeerLen < pm.OutPeersTarget {
 			pm.logger.Debug("subscribed topic has not reached target peers, initiating more connections to maintain healthy mesh",
 				zap.String("pubSubTopic", topicStr), zap.Int("connectedPeerCount", curPeerLen),
 				zap.Int("targetPeers", pm.OutPeersTarget))

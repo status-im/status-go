@@ -112,7 +112,7 @@ func (pm *PeerManager) discoverPeersByPubsubTopics(pubsubTopics []string, proto 
 		for _, shardInfo := range shardsInfo {
 			err = pm.DiscoverAndConnectToPeers(ctx, shardInfo.ClusterID, shardInfo.ShardIDs[0], proto, maxCount)
 			if err != nil {
-				pm.logger.Error("failed to discover and connect to peers", zap.Error(err))
+				pm.logger.Warn("failed to discover and connect to peers", zap.Error(err))
 			}
 		}
 	} else {

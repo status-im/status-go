@@ -657,6 +657,8 @@ func TestConfirmMessageDelivered(t *testing.T) {
 
 func TestOnlineChecker(t *testing.T) {
 	w, err := New(nil, "shards.staging", nil, nil, nil, nil, nil, nil)
+	require.NoError(t, w.Start())
+
 	require.NoError(t, err)
 	require.False(t, w.onlineChecker.IsOnline())
 
