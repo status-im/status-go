@@ -27,11 +27,10 @@ type ReceiverConfig struct {
 	CreateAccount *requests.CreateAccount `json:"createAccount" validate:"required"`
 
 	// DeviceType SendPairInstallation need this information
-	// Deprecated: This field can be omitted, but is kept here until
-	// https://github.com/status-im/status-go/issues/3351 is fully implemented.
-	DeviceType string `json:"deviceType"`
+	// Deprecated: This field will be automatically overridden with runtime.GOOS and can be omitted by client.
+	// The field will be removed in https://github.com/status-im/status-go/issues/3351 is fully implemented.
+	DeviceType string `json:"-"`
 
-	// TODO: make those private
 	DB             *multiaccounts.Database `json:"-"`
 	LoggedInKeyUID string                  `json:"-"`
 }

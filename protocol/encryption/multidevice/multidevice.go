@@ -5,7 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
-	
+
 	"github.com/status-im/status-go/eth-node/crypto"
 )
 

@@ -74,8 +74,6 @@ var (
 	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
 	// ErrDBNotAvailable is returned if a method is called before the DB is available for usage
 	ErrDBNotAvailable = errors.New("DB is unavailable")
-	// ErrConfigNotAvailable is returned if a method is called before the nodeconfig is set
-	ErrConfigNotAvailable = errors.New("nodeConfig is not available")
 )
 
 var _ StatusBackend = (*GethStatusBackend)(nil)
@@ -2028,7 +2026,7 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 
 	// Start WakuV1 if WakuV2 is not enabled
 	conf.WakuConfig.Enabled = !conf.WakuV2Config.Enabled
-	// nodeConfig.Version should be taken from params.Version
+	// NodeConfig.Version should be taken from params.Version
 	// which is set at the compile time.
 	// What's cached is usually outdated so we overwrite it here.
 	conf.Version = params.Version

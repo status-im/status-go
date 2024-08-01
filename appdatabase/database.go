@@ -54,7 +54,7 @@ func doMigration(db *sql.DB) error {
 			return err
 		}
 
-		// nodeConfig migration cannot be done with SQL
+		// NodeConfig migration cannot be done with SQL
 		err = nodecfg.MigrateNodeConfig(db)
 		if err != nil {
 			return err
