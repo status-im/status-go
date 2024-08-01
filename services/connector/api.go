@@ -29,11 +29,13 @@ func NewAPI(s *Service) *API {
 	})
 
 	// Accounts query and dapp permissions
-	r.Register("eth_accounts", &commands.AccountsCommand{Db: s.db})
-	r.Register("eth_requestAccounts", &commands.RequestAccountsCommand{
+	// NOTE: Some dApps expect same behavior for both eth_accounts and eth_requestAccounts
+	accountsCommand := &commands.RequestAccountsCommand{
 		ClientHandler:   c,
 		AccountsCommand: commands.AccountsCommand{Db: s.db},
-	})
+	}
+	r.Register("eth_accounts", accountsCommand)
+	r.Register("eth_requestAccounts", accountsCommand)
 
 	// Active chain per dapp management
 	r.Register("eth_chainId", &commands.ChainIDCommand{
