@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/status-im/status-go/eth-node/types"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/signal"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestFailToRevokePermissionsWithMissingDAppFields(t *testing.T) {
