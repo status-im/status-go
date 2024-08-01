@@ -563,9 +563,9 @@ func requestToJoinCommunity(s *suite.Suite, controlNode *Messenger, user *Messen
 }
 
 func joinOnRequestCommunity(s *suite.Suite, communityID types.HexBytes, controlNode *Messenger, user *Messenger, password string, addresses []string) {
-	s.Require().True(len(password) > 0)
-	s.Require().True(len(addresses) > 0)
-	s.Require().True(len(communityID) > 0)
+	s.Require().NotEmpty(password)
+	s.Require().NotEmpty(addresses)
+	s.Require().NotEmpty(communityID)
 	request := createRequestToJoinCommunity(s, communityID, user, password, addresses)
 	// Request to join the community
 	requestToJoinID := requestToJoinCommunity(s, controlNode, user, request)

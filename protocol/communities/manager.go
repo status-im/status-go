@@ -4846,6 +4846,8 @@ func (m *Manager) ShareRequestsToJoinWithPrivilegedMembers(community *Community,
 	var syncRequestsWithoutRevealedAccounts []*protobuf.SyncCommunityRequestsToJoin
 	var syncRequestsWithRevealedAccounts []*protobuf.SyncCommunityRequestsToJoin
 	for _, request := range requestsToJoin {
+		// if shared request to join is not approved by control node - do not send revealed accounts.
+		// revealed accounts will be sent as soon as control node accepts request to join
 		if request.State != RequestToJoinStateAccepted {
 			request.RevealedAccounts = []*protobuf.RevealedAccount{}
 		}

@@ -1671,8 +1671,8 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		m.logger.Error(ErrOutdatedCommunityRequestToJoin.Error(),
 			zap.String("communityId", community.IDString()),
 			zap.Bool("joined", community.Joined()),
-			zap.Uint64("requestToJoinResponseProto", requestToJoinResponseProto.Clock),
-			zap.Uint64("requestToJoin", requestToJoinResponseProto.Clock),
+			zap.Uint64("requestToJoinResponseProto.Clock", requestToJoinResponseProto.Clock),
+			zap.Uint64("requestToJoin.Clock", requestToJoin.Clock),
 			zap.Uint8("state", uint8(requestToJoin.State)))
 		return ErrOutdatedCommunityRequestToJoin
 	}
