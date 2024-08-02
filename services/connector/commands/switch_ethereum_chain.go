@@ -52,7 +52,7 @@ func (c *SwitchEthereumChainCommand) getSupportedChainIDs() ([]uint64, error) {
 	return chainutils.GetSupportedChainIDs(c.NetworkManager)
 }
 
-func (c *SwitchEthereumChainCommand) Execute(request RPCRequest) (string, error) {
+func (c *SwitchEthereumChainCommand) Execute(request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err

@@ -45,7 +45,7 @@ func (r *RPCRequest) getSendTransactionParams() (*transactions.SendTxArgs, error
 	return &sendTxArgs, nil
 }
 
-func (c *SendTransactionCommand) Execute(request RPCRequest) (string, error) {
+func (c *SendTransactionCommand) Execute(request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err

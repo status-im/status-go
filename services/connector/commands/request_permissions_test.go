@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -95,10 +94,11 @@ func TestRequestPermissionsResponse(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 
-				var permission Permission
-				err = json.Unmarshal([]byte(response), &permission)
-				assert.NoError(t, err)
-				assert.Equal(t, permission.ParentCapability, tc.expectedCapability)
+				if permission, ok := response.(Permission); ok {
+					assert.Equal(t, permission.ParentCapability, tc.expectedCapability)
+				} else {
+					assert.Fail(t, "Can't parse permission from the response")
+				}
 			}
 		})
 	}
