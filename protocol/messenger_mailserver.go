@@ -403,7 +403,7 @@ func (m *Messenger) checkForMissingMessagesLoop() {
 		case <-m.quit:
 			return
 
-		// Wait for mailserver available (triggered also on mailserver change
+		// Wait for mailserver available, also triggered on mailserver change
 		case <-mailserverAvailableSignal:
 
 		case <-t.C:

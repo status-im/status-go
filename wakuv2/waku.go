@@ -662,7 +662,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 				}
 				return
 			case env := <-sub[0].Ch:
-				err := w.OnNewEnvelopes(env, common.MissingMessageType, false)
+				err := w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 				if err != nil {
 					w.logger.Error("OnNewEnvelopes error", zap.Error(err))
 				}
@@ -1312,7 +1312,7 @@ func (w *Waku) Start() error {
 				case <-w.ctx.Done():
 					return
 				case envelope := <-w.missingMsgVerifier.C:
-					err = w.OnNewEnvelopes(envelope, common.StoreMessageType, false)
+					err = w.OnNewEnvelopes(envelope, common.MissingMessageType, false)
 					if err != nil {
 						w.logger.Error("OnNewEnvelopes error", zap.Error(err))
 					}
