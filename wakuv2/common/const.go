@@ -18,35 +18,11 @@
 
 package common
 
-import (
-	"time"
-)
-
 // Waku protocol parameters
 const (
-	SizeMask = byte(3) // mask used to extract the size of payload size field from the flags
+	TopicLength  = 4  // in bytes
+	AESKeyLength = 32 // in bytes
+	KeyIDSize    = 32 // in bytes
 
-	TopicLength      = 4  // in bytes
-	AESKeyLength     = 32 // in bytes
-	KeyIDSize        = 32 // in bytes
-	BloomFilterSize  = 64 // in bytes
-	MaxTopicInterest = 10000
-
-	EnvelopeHeaderLength = 20
-
-	MaxMessageSize        = uint32(10 * 1024 * 1024) // maximum accepted size of a message.
-	DefaultMaxMessageSize = uint32(1 << 20)          // DefaultMaximumMessageSize is 1mb.
-
-	ExpirationCycle   = time.Second
-	TransmissionCycle = 300 * time.Millisecond
-
-	DefaultTTL           = 50 // seconds
-	DefaultSyncAllowance = 10 // seconds
-
-	MaxLimitInSyncMailRequest = 1000
-
-	EnvelopeTimeNotSynced uint = iota + 1
-	EnvelopeOtherError
-
-	MaxLimitInMessagesRequest = 1000
+	DefaultMaxMessageSize = uint32(1 << 20) // DefaultMaximumMessageSize is 1mb.
 )

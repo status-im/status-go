@@ -48,26 +48,6 @@ var (
 		Help:    "Size of processed Waku envelopes in bytes.",
 		Buckets: prom.ExponentialBuckets(256, 4, 10),
 	})
-	RateLimitsProcessed = prom.NewCounter(prom.CounterOpts{
-		Name: "waku2_rate_limits_processed_total",
-		Help: "Number of packets Waku rate limiter processed.",
-	})
-	RateLimitsExceeded = prom.NewCounterVec(prom.CounterOpts{
-		Name: "waku2_rate_limits_exceeded_total",
-		Help: "Number of times the Waku rate limits were exceeded",
-	}, []string{"type"})
-	BridgeSent = prom.NewCounter(prom.CounterOpts{
-		Name: "waku2_bridge_sent_total",
-		Help: "Number of envelopes bridged from Waku",
-	})
-	BridgeReceivedSucceed = prom.NewCounter(prom.CounterOpts{
-		Name: "waku2_bridge_received_success_total",
-		Help: "Number of envelopes bridged to Waku and successfully added",
-	})
-	BridgeReceivedFailed = prom.NewCounter(prom.CounterOpts{
-		Name: "waku2_bridge_received_failure_total",
-		Help: "Number of envelopes bridged to Waku and failed to be added",
-	})
 )
 
 func init() {
@@ -76,9 +56,4 @@ func init() {
 	prom.MustRegister(EnvelopesCacheFailedCounter)
 	prom.MustRegister(EnvelopesCachedCounter)
 	prom.MustRegister(EnvelopesSizeMeter)
-	prom.MustRegister(RateLimitsProcessed)
-	prom.MustRegister(RateLimitsExceeded)
-	prom.MustRegister(BridgeSent)
-	prom.MustRegister(BridgeReceivedSucceed)
-	prom.MustRegister(BridgeReceivedFailed)
 }
