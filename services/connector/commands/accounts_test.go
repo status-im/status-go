@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -52,14 +51,8 @@ func TestGetAccountForPermittedDApp(t *testing.T) {
 	request, err := ConstructRPCRequest("eth_accounts", []interface{}{}, &testDAppData)
 	assert.NoError(t, err)
 
+	expectedResponse := FormatAccountAddressToResponse(sharedAccount)
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
-
-	// Unmarshal the response into a slice of addresses
-	var result []types.Address
-	err = json.Unmarshal([]byte(response), &result)
-
-	assert.NoError(t, err)
-	assert.Len(t, result, 1)
-	assert.Equal(t, sharedAccount, result[0])
+	assert.Equal(t, expectedResponse, response)
 }

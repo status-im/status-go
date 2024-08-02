@@ -14,7 +14,7 @@ type ChainIDCommand struct {
 	Db             *sql.DB
 }
 
-func (c *ChainIDCommand) Execute(request RPCRequest) (string, error) {
+func (c *ChainIDCommand) Execute(request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err
