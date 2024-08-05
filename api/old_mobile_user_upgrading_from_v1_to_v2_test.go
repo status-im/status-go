@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	d_common "github.com/status-im/status-go/common"
+
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/sqlite"
@@ -46,6 +48,8 @@ type OldMobileUserUpgradingFromV1ToV2Test struct {
 	tmpdir string
 }
 
+type PostLoginCheckCallback func(b *GethStatusBackend)
+
 func (s *OldMobileUserUpgradingFromV1ToV2Test) SetupTest() {
 	utils.Init()
 	s.tmpdir = s.T().TempDir()
@@ -56,72 +60,94 @@ func TestOldMobileUserUpgradingFromV1ToV2(t *testing.T) {
 	suite.Run(t, new(OldMobileUserUpgradingFromV1ToV2Test))
 }
 
-func (s *OldMobileUserUpgradingFromV1ToV2Test) loginMobileUser() {
+func (s *OldMobileUserUpgradingFromV1ToV2Test) loginMobileUser(check PostLoginCheckCallback) {
 	b := NewGethStatusBackend()
 	b.UpdateRootDataDir(s.tmpdir)
 	s.Require().NoError(b.OpenAccounts())
 	s.Require().NoError(b.Login(oldMobileUserKeyUID, oldMobileUserPasswd))
-	db, err := accounts.NewDB(b.appDB)
-	s.Require().NoError(err)
-	accs, err := db.GetAllAccounts()
-	s.Require().NoError(err)
-	s.Require().True(len(accs) == 6)
-	kps, err := db.GetAllKeypairs()
-	s.Require().NoError(err)
-	s.Require().True(len(kps) == 3)
 
-	// Create a map to categorize keypairs by their type
-	keypairMap := make(map[accounts.KeypairType][]*accounts.Keypair)
-	for _, kp := range kps {
-		keypairMap[kp.Type] = append(keypairMap[kp.Type], kp)
-	}
+	check(b)
 
-	// Check profile keypair
-	profileKps, ok := keypairMap[accounts.KeypairTypeProfile]
-	s.Require().True(ok, "Profile keypair not found")
-	s.Require().True(len(profileKps) == 1, "Unexpected number of profile keypairs")
-	s.Require().True(len(profileKps[0].Accounts) == 3)
-	for _, a := range profileKps[0].Accounts {
-		s.Require().Equal(a.KeyUID, oldMobileUserKeyUID)
-	}
-
-	generator := b.AccountManager().AccountsGenerator()
-	// Check seed keypair
-	seedKps, ok := keypairMap[accounts.KeypairTypeSeed]
-	s.Require().True(ok, "Seed keypair not found")
-	s.Require().True(len(seedKps) == 1, "Unexpected number of seed keypairs")
-	s.Require().True(len(seedKps[0].Accounts) == 1)
-	info, err := generator.LoadAccount(seedKps[0].Accounts[0].Address.Hex(), oldMobileUserPasswd)
-	s.Require().NoError(err)
-	s.Require().Equal(seedKps[0].KeyUID, info.KeyUID)
-	s.Require().Equal(seedKps[0].Accounts[0].KeyUID, info.KeyUID)
-	mnemonicNoExtraSpaces := strings.Join(strings.Fields("vocal blouse script census island armor seek catch wool narrow peasant attract"), " ")
-	importedSeedAccountInfo, err := generator.ImportMnemonic(mnemonicNoExtraSpaces, "")
-	s.Require().NoError(err)
-	derivedAddresses, err := generator.DeriveAddresses(importedSeedAccountInfo.ID, paths)
-	s.Require().NoError(err)
-	s.Require().Equal(derivedAddresses[pathDefaultWallet].PublicKey, "0x04fde3e58a7379161da2adf033fbee076e2ba11fca8b07c4d06610b399911a60017e4c108eae243487d19e273f99c2d6af13ff5e330783f4389212092b01cc616c")
-	//following line shows: we're unable to calculate the right KeyUID with the wrong public key from existing records for the imported seed account
-	s.Require().False(importedSeedAccountInfo.KeyUID == seedKps[0].KeyUID)
-
-	// Check key keypair
-	keyKps, ok := keypairMap[accounts.KeypairTypeKey]
-	s.Require().True(ok, "Key keypair not found")
-	s.Require().True(len(keyKps) == 1, "Unexpected number of key keypairs")
-	s.Require().True(len(keyKps[0].Accounts) == 1)
-	info, err = generator.LoadAccount(keyKps[0].Accounts[0].Address.Hex(), oldMobileUserPasswd)
-	s.Require().NoError(err)
-	s.Require().Equal(keyKps[0].KeyUID, info.KeyUID)
-	s.Require().Equal(keyKps[0].Accounts[0].KeyUID, info.KeyUID)
-	info, err = generator.ImportPrivateKey("c3ad0b50652318f845565c13761e5369ce75dcbc2a94616e15b829d4b07410fe")
-	s.Require().NoError(err)
-	s.Require().Equal(info.KeyUID, keyKps[0].KeyUID)
 	s.Require().NoError(b.Logout())
 }
 
+func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLightClientEnabledAfterUpgradingFromMobileV1() {
+	bkFunc := d_common.IsMobilePlatform
+	d_common.IsMobilePlatform = func() bool {
+		return true
+	}
+	defer func() {
+		d_common.IsMobilePlatform = bkFunc
+	}()
+
+	s.loginMobileUser(func(b *GethStatusBackend) {
+		nc, err := b.GetNodeConfig()
+		s.Require().NoError(err)
+		s.Require().True(nc.WakuV2Config.LightClient)
+	})
+}
+
 func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWithExistingMobileUser() {
-	s.loginMobileUser()
-	s.loginMobileUser() // Login twice to catch weird errors that only appear after logout
+	checkAfterLogin := func(b *GethStatusBackend) {
+		db, err := accounts.NewDB(b.appDB)
+		s.Require().NoError(err)
+		accs, err := db.GetAllAccounts()
+		s.Require().NoError(err)
+		s.Require().True(len(accs) == 6)
+		kps, err := db.GetAllKeypairs()
+		s.Require().NoError(err)
+		s.Require().True(len(kps) == 3)
+
+		// Create a map to categorize keypairs by their type
+		keypairMap := make(map[accounts.KeypairType][]*accounts.Keypair)
+		for _, kp := range kps {
+			keypairMap[kp.Type] = append(keypairMap[kp.Type], kp)
+		}
+
+		// Check profile keypair
+		profileKps, ok := keypairMap[accounts.KeypairTypeProfile]
+		s.Require().True(ok, "Profile keypair not found")
+		s.Require().True(len(profileKps) == 1, "Unexpected number of profile keypairs")
+		s.Require().True(len(profileKps[0].Accounts) == 3)
+		for _, a := range profileKps[0].Accounts {
+			s.Require().Equal(a.KeyUID, oldMobileUserKeyUID)
+		}
+
+		generator := b.AccountManager().AccountsGenerator()
+		// Check seed keypair
+		seedKps, ok := keypairMap[accounts.KeypairTypeSeed]
+		s.Require().True(ok, "Seed keypair not found")
+		s.Require().True(len(seedKps) == 1, "Unexpected number of seed keypairs")
+		s.Require().True(len(seedKps[0].Accounts) == 1)
+		info, err := generator.LoadAccount(seedKps[0].Accounts[0].Address.Hex(), oldMobileUserPasswd)
+		s.Require().NoError(err)
+		s.Require().Equal(seedKps[0].KeyUID, info.KeyUID)
+		s.Require().Equal(seedKps[0].Accounts[0].KeyUID, info.KeyUID)
+		mnemonicNoExtraSpaces := strings.Join(strings.Fields("vocal blouse script census island armor seek catch wool narrow peasant attract"), " ")
+		importedSeedAccountInfo, err := generator.ImportMnemonic(mnemonicNoExtraSpaces, "")
+		s.Require().NoError(err)
+		derivedAddresses, err := generator.DeriveAddresses(importedSeedAccountInfo.ID, paths)
+		s.Require().NoError(err)
+		s.Require().Equal(derivedAddresses[pathDefaultWallet].PublicKey, "0x04fde3e58a7379161da2adf033fbee076e2ba11fca8b07c4d06610b399911a60017e4c108eae243487d19e273f99c2d6af13ff5e330783f4389212092b01cc616c")
+		//following line shows: we're unable to calculate the right KeyUID with the wrong public key from existing records for the imported seed account
+		s.Require().False(importedSeedAccountInfo.KeyUID == seedKps[0].KeyUID)
+
+		// Check key keypair
+		keyKps, ok := keypairMap[accounts.KeypairTypeKey]
+		s.Require().True(ok, "Key keypair not found")
+		s.Require().True(len(keyKps) == 1, "Unexpected number of key keypairs")
+		s.Require().True(len(keyKps[0].Accounts) == 1)
+		info, err = generator.LoadAccount(keyKps[0].Accounts[0].Address.Hex(), oldMobileUserPasswd)
+		s.Require().NoError(err)
+		s.Require().Equal(keyKps[0].KeyUID, info.KeyUID)
+		s.Require().Equal(keyKps[0].Accounts[0].KeyUID, info.KeyUID)
+		info, err = generator.ImportPrivateKey("c3ad0b50652318f845565c13761e5369ce75dcbc2a94616e15b829d4b07410fe")
+		s.Require().NoError(err)
+		s.Require().Equal(info.KeyUID, keyKps[0].KeyUID)
+	}
+
+	s.loginMobileUser(checkAfterLogin)
+	s.loginMobileUser(checkAfterLogin) // Login twice to catch weird errors that only appear after logout
 }
 
 // TestAddWalletAccount we should be able to add a wallet account after upgrading from mobile v1
