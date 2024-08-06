@@ -25,12 +25,12 @@ type PathProcessor interface {
 	EstimateGas(params ProcessorInputParams) (uint64, error)
 	// CalculateAmountOut calculates the amount out
 	CalculateAmountOut(params ProcessorInputParams) (*big.Int, error)
-	// Send sends the tx
-	Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
+	// Send sends the tx, returns the hash and the used nonce (lastUsedNonce is -1 if it's the first tx)
+	Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types.Hash, uint64, error)
 	// GetContractAddress returns the contract address
 	GetContractAddress(params ProcessorInputParams) (common.Address, error)
-	// BuildTransaction builds the transaction based on MultipathProcessorTxArgs
-	BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error)
+	// BuildTransaction builds the transaction based on MultipathProcessorTxArgs, returns the transaction and the used nonce (lastUsedNonce is -1 if it's the first tx)
+	BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error)
 }
 
 type PathProcessorClearable interface {
