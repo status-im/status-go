@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/ierc20"
@@ -112,45 +111,6 @@ func (s *TransferProcessor) EstimateGas(params ProcessorInputParams) (uint64, er
 
 	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil
-}
-
-func (s *TransferProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(params.ToAddr)
-	if params.FromToken.IsNative() {
-		sendArgs := &MultipathProcessorTxArgs{
-			TransferTx: &transactions.SendTxArgs{
-				From:  types.Address(params.FromAddr),
-				To:    &toAddr,
-				Value: (*hexutil.Big)(params.AmountIn),
-				Data:  types.HexBytes("0x0"),
-			},
-			ChainID: params.FromChain.ChainID,
-		}
-
-		return s.BuildTransaction(sendArgs)
-	}
-	abi, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
-	if err != nil {
-		return nil, createTransferErrorResponse(err)
-	}
-	input, err := abi.Pack("transfer",
-		params.ToAddr,
-		params.AmountIn,
-	)
-	if err != nil {
-		return nil, createTransferErrorResponse(err)
-	}
-	sendArgs := &MultipathProcessorTxArgs{
-		TransferTx: &transactions.SendTxArgs{
-			From:  types.Address(params.FromAddr),
-			To:    &toAddr,
-			Value: (*hexutil.Big)(ZeroBigIntValue),
-			Data:  input,
-		},
-		ChainID: params.FromChain.ChainID,
-	}
-
-	return s.BuildTransaction(sendArgs)
 }
 
 func (s *TransferProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {

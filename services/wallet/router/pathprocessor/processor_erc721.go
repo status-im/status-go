@@ -106,32 +106,6 @@ func (s *ERC721Processor) EstimateGas(params ProcessorInputParams) (uint64, erro
 	return uint64(increasedEstimation), nil
 }
 
-func (s *ERC721Processor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
-	contractAddress := types.Address(params.FromToken.Address)
-
-	// We store ERC721 Token ID using big.Int.String() in token.Symbol
-	tokenID, success := new(big.Int).SetString(params.FromToken.Symbol, 10)
-	if !success {
-		return nil, createERC721ErrorResponse(fmt.Errorf("failed to convert ERC721's Symbol %s to big.Int", params.FromToken.Symbol))
-	}
-
-	sendArgs := &MultipathProcessorTxArgs{
-		ERC721TransferTx: &ERC721TxArgs{
-			SendTxArgs: transactions.SendTxArgs{
-				From:  types.Address(params.FromAddr),
-				To:    &contractAddress,
-				Value: (*hexutil.Big)(params.AmountIn),
-				Data:  types.HexBytes("0x0"),
-			},
-			TokenID:   (*hexutil.Big)(tokenID),
-			Recipient: params.ToAddr,
-		},
-		ChainID: params.FromChain.ChainID,
-	}
-
-	return s.BuildTransaction(sendArgs)
-}
-
 func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
 	ethClient, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {

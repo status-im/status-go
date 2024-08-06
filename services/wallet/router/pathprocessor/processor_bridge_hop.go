@@ -277,28 +277,6 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, e
 	return uint64(increasedEstimation), nil
 }
 
-func (h *HopBridgeProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(params.ToAddr)
-	sendArgs := &MultipathProcessorTxArgs{
-		HopTx: &HopBridgeTxArgs{
-			SendTxArgs: transactions.SendTxArgs{
-				From:  types.Address(params.FromAddr),
-				To:    &toAddr,
-				Value: (*hexutil.Big)(params.AmountIn),
-				Data:  types.HexBytes("0x0"),
-			},
-			Symbol:    params.FromToken.Symbol,
-			Recipient: params.ToAddr,
-			Amount:    (*hexutil.Big)(params.AmountIn),
-			BonderFee: (*hexutil.Big)(params.BonderFee),
-			ChainID:   params.ToChain.ChainID,
-		},
-		ChainID: params.FromChain.ChainID,
-	}
-
-	return h.BuildTransaction(sendArgs)
-}
-
 func (h *HopBridgeProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	address, _, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
 	return address, createBridgeHopErrorResponse(err)

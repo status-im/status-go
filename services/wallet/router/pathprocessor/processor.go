@@ -31,8 +31,6 @@ type PathProcessor interface {
 	GetContractAddress(params ProcessorInputParams) (common.Address, error)
 	// BuildTransaction builds the transaction based on MultipathProcessorTxArgs
 	BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error)
-	// BuildTx builds the transaction based on ProcessorInputParams
-	BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error)
 }
 
 type PathProcessorClearable interface {

@@ -209,27 +209,6 @@ func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) 
 	return
 }
 
-func (s *SwapParaswapProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(params.ToAddr)
-	sendArgs := &MultipathProcessorTxArgs{
-		SwapTx: &SwapParaswapTxArgs{
-			SendTxArgs: transactions.SendTxArgs{
-				From:   types.Address(params.FromAddr),
-				To:     &toAddr,
-				Value:  (*hexutil.Big)(params.AmountIn),
-				Data:   types.HexBytes("0x0"),
-				Symbol: params.FromToken.Symbol,
-			},
-			ChainID:     params.FromChain.ChainID,
-			ChainIDTo:   params.ToChain.ChainID,
-			TokenIDFrom: params.FromToken.Symbol,
-			TokenIDTo:   params.ToToken.Symbol,
-		},
-	}
-
-	return s.BuildTransaction(sendArgs)
-}
-
 func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {
 	slippageBP := uint(sendArgs.SwapTx.SlippagePercentage * 100) // convert to basis points
 

@@ -283,27 +283,6 @@ func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 	return uint64(increasedEstimation), nil
 }
 
-func (s *CelerBridgeProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(params.ToAddr)
-	sendArgs := &MultipathProcessorTxArgs{
-		CbridgeTx: &CelerBridgeTxArgs{
-			SendTxArgs: transactions.SendTxArgs{
-				From:  types.Address(params.FromAddr),
-				To:    &toAddr,
-				Value: (*hexutil.Big)(params.AmountIn),
-				Data:  types.HexBytes("0x0"),
-			},
-			ChainID:   params.ToChain.ChainID,
-			Symbol:    params.FromToken.Symbol,
-			Recipient: params.ToAddr,
-			Amount:    (*hexutil.Big)(params.AmountIn),
-		},
-		ChainID: params.FromChain.ChainID,
-	}
-
-	return s.BuildTransaction(sendArgs)
-}
-
 func (s *CelerBridgeProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	transferConfig, err := s.getTransferConfig(params.FromChain.IsTest)
 	if err != nil {
