@@ -21,6 +21,8 @@ package common
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var topicStringTests = []struct {
@@ -31,6 +33,13 @@ var topicStringTests = []struct {
 	{topic: TopicType{0x00, 0x7f, 0x80, 0xff}, str: "0x007f80ff"},
 	{topic: TopicType{0xff, 0x80, 0x7f, 0x00}, str: "0xff807f00"},
 	{topic: TopicType{0xf2, 0x6e, 0x77, 0x79}, str: "0xf26e7779"},
+}
+
+func TestTopicSet(t *testing.T) {
+
+	tSet := NewTopicSet([]TopicType{{0x00, 0x00, 0x00, 0x00}, {0x00, 0x7f, 0x80, 0xff}})
+	topics := tSet.ContentTopics()
+	require.Equal(t, len(topics), 2)
 }
 
 func TestTopicString(t *testing.T) {

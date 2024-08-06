@@ -57,6 +57,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
+	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
@@ -126,7 +127,7 @@ type Waku struct {
 
 	// Filter-related
 	filters       *common.Filters // Message filters installed with Subscribe function
-	filterManager *FilterManager
+	filterManager *filterapi.FilterManager
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
 	symKeys     map[string][]byte            // Symmetric key storage
@@ -956,7 +957,8 @@ func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 	}
 
 	if w.cfg.LightClient {
-		w.filterManager.addFilter(id, f)
+		cf := protocol.NewContentFilter(f.PubsubTopic, f.ContentTopics.ContentTopics()...)
+		w.filterManager.SubscribeFilter(id, cf)
 	}
 
 	return id, nil
@@ -970,7 +972,7 @@ func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 	}
 
 	if w.cfg.LightClient {
-		w.filterManager.removeFilter(id)
+		w.filterManager.UnsubscribeFilter(id)
 	}
 
 	return nil
@@ -1207,6 +1209,11 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, query store.FilterCrit
 	return result.Cursor(), envelopesCount, nil
 }
 
+// OnNewEnvelope is an interface from Waku FilterManager API that gets invoked when any new message is received by Filter.
+func (w *Waku) OnNewEnvelope(env *protocol.Envelope) error {
+	return w.OnNewEnvelopes(env, common.RelayedMessageType, false)
+}
+
 // Start implements node.Service, starting the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Start() error {
@@ -1302,8 +1309,8 @@ func (w *Waku) Start() error {
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
 		// for installed filters
-		w.filterManager = newFilterManager(w.ctx, w.logger, w.cfg,
-			func(env *protocol.Envelope) error { return w.OnNewEnvelopes(env, common.RelayedMessageType, false) },
+		w.filterManager = filterapi.NewFilterManager(w.ctx, w.logger, w.cfg.MinPeersForFilter,
+			w,
 			w.node.FilterLightnode())
 	}
 
@@ -1676,7 +1683,7 @@ func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
 		w.logger.Info("connection switched or offline detected via mobile, disconnecting all peers")
 		w.node.DisconnectAllPeers()
 		if w.cfg.LightClient {
-			w.filterManager.networkChange()
+			w.filterManager.NetworkChange()
 		}
 	}
 }
@@ -1685,8 +1692,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 	isOnline := !state.Offline
 	if w.cfg.LightClient {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
-		// trigger FilterManager to take care of any pending filter subscriptions
-		go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
+		go w.filterManager.OnConnectionStatusChange("", isOnline)
 		w.handleNetworkChangeFromApp(state)
 	} else {
 		// for lightClient state update and onlineChange is handled in filterManager.
