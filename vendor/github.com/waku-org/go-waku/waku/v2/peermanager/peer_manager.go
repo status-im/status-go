@@ -309,17 +309,15 @@ func (pm *PeerManager) ensureMinRelayConnsPerTopic() {
 	defer pm.topicMutex.RUnlock()
 	for topicStr, topicInst := range pm.subRelayTopics {
 
-		// @cammellos reported that ListPeers returned an invalid number of
-		// peers. This will ensure that the peers returned by this function
-		// match those peers that are currently connected
+		meshPeerLen := pm.checkAndUpdateTopicHealth(topicInst)
+		curConnectedPeerLen := pm.getPeersBasedOnconnectionStatus(topicStr, network.Connected).Len()
 
-		curPeerLen := pm.checkAndUpdateTopicHealth(topicInst)
-		if curPeerLen < pm.OutPeersTarget {
+		if meshPeerLen < waku_proto.GossipSubDMin || curConnectedPeerLen < pm.OutPeersTarget {
 			pm.logger.Debug("subscribed topic has not reached target peers, initiating more connections to maintain healthy mesh",
-				zap.String("pubSubTopic", topicStr), zap.Int("connectedPeerCount", curPeerLen),
+				zap.String("pubSubTopic", topicStr), zap.Int("connectedPeerCount", curConnectedPeerLen),
 				zap.Int("targetPeers", pm.OutPeersTarget))
 			//Find not connected peers.
-			notConnectedPeers := pm.getNotConnectedPers(topicStr)
+			notConnectedPeers := pm.getPeersBasedOnconnectionStatus(topicStr, network.NotConnected)
 			if notConnectedPeers.Len() == 0 {
 				pm.logger.Debug("could not find any peers in peerstore to connect to, discovering more", zap.String("pubSubTopic", topicStr))
 				go pm.discoverPeersByPubsubTopics([]string{topicStr}, relay.WakuRelayID_v200, pm.ctx, 2)
@@ -327,12 +325,13 @@ func (pm *PeerManager) ensureMinRelayConnsPerTopic() {
 			}
 			pm.logger.Debug("connecting to eligible peers in peerstore", zap.String("pubSubTopic", topicStr))
 			//Connect to eligible peers.
-			numPeersToConnect := pm.OutPeersTarget - curPeerLen
-
-			if numPeersToConnect > notConnectedPeers.Len() {
-				numPeersToConnect = notConnectedPeers.Len()
+			numPeersToConnect := pm.OutPeersTarget - curConnectedPeerLen
+			if numPeersToConnect > 0 {
+				if numPeersToConnect > notConnectedPeers.Len() {
+					numPeersToConnect = notConnectedPeers.Len()
+				}
+				pm.connectToSpecifiedPeers(notConnectedPeers[0:numPeersToConnect])
 			}
-			pm.connectToSpecifiedPeers(notConnectedPeers[0:numPeersToConnect])
 		}
 	}
 }
@@ -372,8 +371,8 @@ func (pm *PeerManager) connectToSpecifiedPeers(peers peer.IDSlice) {
 	}
 }
 
-// getNotConnectedPers returns peers for a pubSubTopic that are not connected.
-func (pm *PeerManager) getNotConnectedPers(pubsubTopic string) (notConnectedPeers peer.IDSlice) {
+// getPeersBasedOnconnectionStatus returns peers for a pubSubTopic that are either connected/not-connected based on status passed.
+func (pm *PeerManager) getPeersBasedOnconnectionStatus(pubsubTopic string, connected network.Connectedness) (filteredPeers peer.IDSlice) {
 	var peerList peer.IDSlice
 	if pubsubTopic == "" {
 		peerList = pm.host.Peerstore().Peers()
@@ -381,8 +380,8 @@ func (pm *PeerManager) getNotConnectedPers(pubsubTopic string) (notConnectedPeer
 		peerList = pm.host.Peerstore().(*wps.WakuPeerstoreImpl).PeersByPubSubTopic(pubsubTopic)
 	}
 	for _, peerID := range peerList {
-		if pm.host.Network().Connectedness(peerID) != network.Connected {
-			notConnectedPeers = append(notConnectedPeers, peerID)
+		if pm.host.Network().Connectedness(peerID) == connected {
+			filteredPeers = append(filteredPeers, peerID)
 		}
 	}
 	return
