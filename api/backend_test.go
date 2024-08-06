@@ -1783,6 +1783,10 @@ func TestCreateAccountPathsValidation(t *testing.T) {
 
 	err := request.Validate(validation)
 	require.NoError(t, err)
+
+	request.RootDataDir = ""
+	err = request.Validate(validation)
+	require.ErrorIs(t, err, requests.ErrCreateAccountInvalidRootDataDir)
 }
 
 func TestRestoreKeycardAccountAndLogin(t *testing.T) {
