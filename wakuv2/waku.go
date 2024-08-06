@@ -58,6 +58,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/metrics"
 
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
+	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
@@ -144,10 +145,9 @@ type Waku struct {
 	sendQueue *publish.MessageQueue
 	limiter   *publish.PublishRateLimiter
 
-	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
+	missingMsgVerifier *missing.MissingMessageVerifier
 
-	topicInterest   map[string]TopicInterest // Track message verification requests and when was the last time a pubsub topic was verified for missing messages
-	topicInterestMu sync.Mutex
+	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -240,7 +240,6 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
 		connectionNotifChan:             make(chan node.PeerConnection, 20),
 		connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
-		topicInterest:                   make(map[string]TopicInterest),
 		ctx:                             ctx,
 		cancel:                          cancel,
 		wg:                              sync.WaitGroup{},
@@ -1194,11 +1193,6 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, query store.FilterCrit
 		mkv.Message.RateLimitProof = nil
 
 		envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), query.PubsubTopic)
-		logger.Info("received waku2 store message",
-			zap.Stringer("envelopeHash", envelope.Hash()),
-			zap.String("pubsubTopic", query.PubsubTopic),
-			zap.Int64p("timestamp", envelope.Message().Timestamp),
-		)
 
 		err = w.OnNewEnvelopes(envelope, common.StoreMessageType, processEnvelopes)
 		if err != nil {
@@ -1303,7 +1297,28 @@ func (w *Waku) Start() error {
 
 	if w.cfg.EnableMissingMessageVerification {
 		w.wg.Add(1)
-		go w.checkForMissingMessages()
+
+		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
+			w.node.Store(),
+			w,
+			w.node.Timesource(),
+			w.logger)
+
+		w.missingMsgVerifier.Start(w.ctx)
+
+		go func() {
+			for {
+				select {
+				case <-w.ctx.Done():
+					return
+				case envelope := <-w.missingMsgVerifier.C:
+					err = w.OnNewEnvelopes(envelope, common.MissingMessageType, false)
+					if err != nil {
+						w.logger.Error("OnNewEnvelopes error", zap.Error(err))
+					}
+				}
+			}
+		}()
 	}
 
 	if w.cfg.LightClient {
@@ -1335,6 +1350,20 @@ func (w *Waku) Start() error {
 	go w.seedBootnodesForDiscV5()
 
 	return nil
+}
+
+func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
+	w.poolMu.Lock()
+	defer w.poolMu.Unlock()
+	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
+}
+
+func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic string, contentTopics []string) {
+	if !w.cfg.EnableMissingMessageVerification {
+		return
+	}
+
+	w.missingMsgVerifier.SetCriteriaInterest(peerID, protocol.NewContentFilter(pubsubTopic, contentTopics...))
 }
 
 func (w *Waku) setupRelaySubscriptions() error {
@@ -1405,10 +1434,11 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	}
 
 	logger := w.logger.With(
-		zap.Any("messageType", msgType),
+		zap.String("messageType", msgType),
 		zap.Stringer("envelopeHash", envelope.Hash()),
+		zap.String("pubsubTopic", envelope.PubsubTopic()),
 		zap.String("contentTopic", envelope.Message().ContentTopic),
-		zap.Int64("timestamp", envelope.Message().GetTimestamp()),
+		logutils.WakuMessageTimestamp("timestamp", envelope.Message().Timestamp),
 	)
 
 	logger.Debug("received new envelope")

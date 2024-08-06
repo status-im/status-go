@@ -396,27 +396,34 @@ func (m *Messenger) checkForMissingMessagesLoop() {
 	t := time.NewTicker(missingMessageCheckPeriod)
 	defer t.Stop()
 
+	mailserverAvailableSignal := m.SubscribeMailserverAvailable()
+
 	for {
 		select {
 		case <-m.quit:
 			return
 
-		case <-t.C:
-			filters := m.transport.Filters()
-			filtersByMs := m.SplitFiltersByStoreNode(filters)
-			for communityID, filtersForMs := range filtersByMs {
-				ms := m.getActiveMailserver(communityID)
-				if ms == nil {
-					continue
-				}
+		// Wait for mailserver available, also triggered on mailserver change
+		case <-mailserverAvailableSignal:
 
-				peerID, err := ms.PeerID()
-				if err != nil {
-					m.logger.Error("could not obtain the peerID")
-					return
-				}
-				m.transport.SetCriteriaForMissingMessageVerification(peerID, filtersForMs)
+		case <-t.C:
+
+		}
+
+		filters := m.transport.Filters()
+		filtersByMs := m.SplitFiltersByStoreNode(filters)
+		for communityID, filtersForMs := range filtersByMs {
+			ms := m.getActiveMailserver(communityID)
+			if ms == nil {
+				continue
 			}
+
+			peerID, err := ms.PeerID()
+			if err != nil {
+				m.logger.Error("could not obtain the peerID")
+				return
+			}
+			m.transport.SetCriteriaForMissingMessageVerification(peerID, filtersForMs)
 		}
 	}
 }

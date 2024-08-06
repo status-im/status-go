@@ -17,12 +17,13 @@ import (
 )
 
 // MessageType represents where this message comes from
-type MessageType int
+type MessageType = string
 
 const (
-	RelayedMessageType MessageType = iota
-	StoreMessageType
-	SendMessageType
+	RelayedMessageType MessageType = "relay"
+	StoreMessageType   MessageType = "store"
+	SendMessageType    MessageType = "send"
+	MissingMessageType MessageType = "missing"
 )
 
 // MessageParams specifies the exact way a message should be wrapped
