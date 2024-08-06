@@ -166,7 +166,7 @@ func TestSendTransactionsETHSuccess(t *testing.T) {
 	// Verify that the SendTransactionWithChainID method is called for each transaction with proper arguments
 	// Return values are not checked, because they must be checked in Transactor tests
 	for _, tx := range expectedData {
-		transactor.EXPECT().SendTransactionWithChainID(tx.ChainID, *(tx.TransferTx), account).Return(types.Hash{}, nil)
+		transactor.EXPECT().SendTransactionWithChainID(tx.ChainID, *(tx.TransferTx), int64(-1), account).Return(types.Hash{}, uint64(0), nil)
 	}
 
 	// Call the SendTransactions method
@@ -182,7 +182,7 @@ func TestSendTransactionsApproveSuccess(t *testing.T) {
 	// Verify that the SendTransactionWithChainID method is called for each transaction with proper arguments
 	// Return values are not checked, because they must be checked in Transactor tests
 	for _, tx := range expectedData {
-		transactor.EXPECT().SendTransactionWithChainID(tx.ChainID, *(tx.TransferTx), account).Return(types.Hash{}, nil)
+		transactor.EXPECT().SendTransactionWithChainID(tx.ChainID, *(tx.TransferTx), int64(-1), account).Return(types.Hash{}, uint64(0), nil)
 	}
 
 	// Call the SendTransactions method
@@ -205,7 +205,7 @@ func TestSendTransactionsETHFailOnBridge(t *testing.T) {
 
 	expectedErr := transactions.ErrInvalidTxSender // Any error to verify
 	// In case of bridge error, verify that the error is returned
-	transferBridge.EXPECT().Send(gomock.Any(), gomock.Any()).Return(types.Hash{}, transactions.ErrInvalidTxSender)
+	transferBridge.EXPECT().Send(gomock.Any(), int64(-1), gomock.Any()).Return(types.Hash{}, uint64(0), transactions.ErrInvalidTxSender)
 
 	// Call the SendTransactions method
 	_, err := tm.SendTransactions(context.Background(), multiTransaction, data, bridges, account)
@@ -220,8 +220,8 @@ func TestSendTransactionsETHFailOnTransactor(t *testing.T) {
 	// Verify that the SendTransactionWithChainID method is called for each transaction with proper arguments
 	// Return values are not checked, because they must be checked in Transactor tests. Only error propagation matters here
 	expectedErr := transactions.ErrInvalidTxSender // Any error to verify
-	transactor.EXPECT().SendTransactionWithChainID(expectedData[0].ChainID, *(expectedData[0].TransferTx), account).Return(types.Hash{}, nil)
-	transactor.EXPECT().SendTransactionWithChainID(expectedData[1].ChainID, *(expectedData[1].TransferTx), account).Return(types.Hash{}, expectedErr)
+	transactor.EXPECT().SendTransactionWithChainID(expectedData[0].ChainID, *(expectedData[0].TransferTx), int64(-1), account).Return(types.Hash{}, uint64(0), nil)
+	transactor.EXPECT().SendTransactionWithChainID(expectedData[1].ChainID, *(expectedData[1].TransferTx), int64(-1), account).Return(types.Hash{}, uint64(0), expectedErr)
 
 	// Call the SendTransactions method
 	_, err := tm.SendTransactions(context.Background(), multiTransaction, data, bridges, account)

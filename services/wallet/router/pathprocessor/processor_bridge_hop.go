@@ -282,7 +282,7 @@ func (h *HopBridgeProcessor) GetContractAddress(params ProcessorInputParams) (co
 	return address, createBridgeHopErrorResponse(err)
 }
 
-func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
+func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
 	fromChain := h.networkManager.Find(sendArgs.HopTx.ChainID)
 	if fromChain == nil {
 		return tx, fmt.Errorf("ChainID not supported %d", sendArgs.HopTx.ChainID)
@@ -290,9 +290,14 @@ func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, sig
 
 	token := h.tokenManager.FindToken(fromChain, sendArgs.HopTx.Symbol)
 
-	nonce, err := h.transactor.NextNonce(h.contractMaker.RPCClient, fromChain.ChainID, sendArgs.HopTx.From)
-	if err != nil {
-		return tx, createBridgeHopErrorResponse(err)
+	var nonce uint64
+	if lastUsedNonce < 0 {
+		nonce, err = h.transactor.NextNonce(h.contractMaker.RPCClient, fromChain.ChainID, sendArgs.HopTx.From)
+		if err != nil {
+			return tx, createBridgeHopErrorResponse(err)
+		}
+	} else {
+		nonce = uint64(lastUsedNonce) + 1
 	}
 
 	argNonce := hexutil.Uint64(nonce)
@@ -344,16 +349,17 @@ func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, sig
 	return tx, nil
 }
 
-func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	tx, err := h.sendOrBuild(sendArgs, getSigner(sendArgs.HopTx.ChainID, sendArgs.HopTx.From, verifiedAccount))
+func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, nonce uint64, err error) {
+	tx, err := h.sendOrBuild(sendArgs, getSigner(sendArgs.HopTx.ChainID, sendArgs.HopTx.From, verifiedAccount), lastUsedNonce)
 	if err != nil {
-		return types.Hash{}, createBridgeHopErrorResponse(err)
+		return types.Hash{}, 0, createBridgeHopErrorResponse(err)
 	}
-	return types.Hash(tx.Hash()), nil
+	return types.Hash(tx.Hash()), tx.Nonce(), nil
 }
 
-func (h *HopBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
-	return h.sendOrBuild(sendArgs, nil)
+func (h *HopBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	tx, err := h.sendOrBuild(sendArgs, nil, lastUsedNonce)
+	return tx, tx.Nonce(), createBridgeHopErrorResponse(err)
 }
 
 func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {

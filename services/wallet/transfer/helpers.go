@@ -158,12 +158,21 @@ func sendTransactions(data []*pathprocessor.MultipathProcessorTxArgs, pathProces
 	map[uint64][]types.Hash, error) {
 
 	hashes := make(map[uint64][]types.Hash)
+	usedNonces := make(map[uint64]int64)
 	for _, tx := range data {
-		hash, err := pathProcessors[tx.Name].Send(tx, account)
+
+		lastUsedNonce := int64(-1)
+		if nonce, ok := usedNonces[tx.ChainID]; ok {
+			lastUsedNonce = nonce
+		}
+
+		hash, usedNonce, err := pathProcessors[tx.Name].Send(tx, lastUsedNonce, account)
 		if err != nil {
 			return nil, err // TODO: One of transfers within transaction could have been sent. Need to notify user about it
 		}
+
 		hashes[tx.ChainID] = append(hashes[tx.ChainID], hash)
+		usedNonces[tx.ChainID] = int64(usedNonce)
 	}
 	return hashes, nil
 }

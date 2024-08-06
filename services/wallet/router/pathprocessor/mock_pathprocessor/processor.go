@@ -55,18 +55,19 @@ func (mr *MockPathProcessorMockRecorder) AvailableFor(params interface{}) *gomoc
 }
 
 // BuildTransaction mocks base method.
-func (m *MockPathProcessor) BuildTransaction(sendArgs *pathprocessor.MultipathProcessorTxArgs) (*types.Transaction, error) {
+func (m *MockPathProcessor) BuildTransaction(sendArgs *pathprocessor.MultipathProcessorTxArgs, lastUsedNonce int64) (*types.Transaction, uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BuildTransaction", sendArgs)
+	ret := m.ctrl.Call(m, "BuildTransaction", sendArgs, lastUsedNonce)
 	ret0, _ := ret[0].(*types.Transaction)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(uint64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // BuildTransaction indicates an expected call of BuildTransaction.
-func (mr *MockPathProcessorMockRecorder) BuildTransaction(sendArgs interface{}) *gomock.Call {
+func (mr *MockPathProcessorMockRecorder) BuildTransaction(sendArgs, lastUsedNonce interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildTransaction", reflect.TypeOf((*MockPathProcessor)(nil).BuildTransaction), sendArgs)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildTransaction", reflect.TypeOf((*MockPathProcessor)(nil).BuildTransaction), sendArgs, lastUsedNonce)
 }
 
 // CalculateAmountOut mocks base method.
@@ -160,18 +161,19 @@ func (mr *MockPathProcessorMockRecorder) PackTxInputData(params interface{}) *go
 }
 
 // Send mocks base method.
-func (m *MockPathProcessor) Send(sendArgs *pathprocessor.MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types0.Hash, error) {
+func (m *MockPathProcessor) Send(sendArgs *pathprocessor.MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types0.Hash, uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Send", sendArgs, verifiedAccount)
+	ret := m.ctrl.Call(m, "Send", sendArgs, lastUsedNonce, verifiedAccount)
 	ret0, _ := ret[0].(types0.Hash)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(uint64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // Send indicates an expected call of Send.
-func (mr *MockPathProcessorMockRecorder) Send(sendArgs, verifiedAccount interface{}) *gomock.Call {
+func (mr *MockPathProcessorMockRecorder) Send(sendArgs, lastUsedNonce, verifiedAccount interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockPathProcessor)(nil).Send), sendArgs, verifiedAccount)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockPathProcessor)(nil).Send), sendArgs, lastUsedNonce, verifiedAccount)
 }
 
 // MockPathProcessorClearable is a mock of PathProcessorClearable interface.
