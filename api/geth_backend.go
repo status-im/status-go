@@ -1643,13 +1643,18 @@ func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, input
 }
 
 func (b *GethStatusBackend) prepareSubAccounts(request *requests.CreateAccount, input *prepareAccountInput) ([]*accounts.Account, error) {
+	emoji, err := randomWalletEmoji()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate random emoji")
+	}
+
 	walletDerivedAccount := input.derivedAddresses[pathDefaultWallet]
 	walletAccount := &accounts.Account{
 		PublicKey:          types.Hex2Bytes(walletDerivedAccount.PublicKey),
 		KeyUID:             input.keyUID,
 		Address:            types.HexToAddress(walletDerivedAccount.Address),
 		ColorID:            multiacccommon.CustomizationColor(request.CustomizationColor),
-		Emoji:              request.Emoji,
+		Emoji:              emoji,
 		Wallet:             true,
 		Path:               pathDefaultWallet,
 		Name:               walletAccountDefaultName,

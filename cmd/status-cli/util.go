@@ -144,7 +144,6 @@ func createAccountAndLogin(b *api.GethStatusBackend, rootDataDir, password strin
 	req := &requests.CreateAccount{
 		DisplayName:        p.Name,
 		CustomizationColor: "#ffffff",
-		Emoji:              "some",
 		Password:           password,
 		RootDataDir:        rootDataDir,
 		LogFilePath:        "log",
