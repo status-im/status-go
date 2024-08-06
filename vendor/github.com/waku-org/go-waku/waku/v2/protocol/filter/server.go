@@ -14,6 +14,7 @@ import (
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
@@ -273,6 +274,9 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, logger *zap.Logge
 			wf.metrics.RecordError(pushTimeoutFailure)
 		} else {
 			wf.metrics.RecordError(dialFailure)
+			if ps, ok := wf.h.Peerstore().(peerstore.WakuPeerstore); ok {
+				ps.AddConnFailure(peer.AddrInfo{ID: peerID})
+			}
 		}
 		logger.Error("opening peer stream", zap.Error(err))
 		return err
