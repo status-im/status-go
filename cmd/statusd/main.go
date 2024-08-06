@@ -204,11 +204,11 @@ func main() {
 			Mnemonic:    *seedPhrase,
 			FetchBackup: false,
 			CreateAccount: requests.CreateAccount{
-				DisplayName:           "Account1",
-				DeviceName:            "StatusIM",
-				Password:              *password,
-				CustomizationColor:    "0x000000",
-				BackupDisabledDataDir: config.DataDir,
+				DisplayName:        "Account1",
+				DeviceName:         "StatusIM",
+				Password:           *password,
+				CustomizationColor: "0x000000",
+				RootDataDir:        config.DataDir,
 				APIConfig: &requests.APIConfig{
 					ConnectorEnabled: config.ClusterConfig.Enabled,
 					HTTPEnabled:      config.HTTPEnabled,

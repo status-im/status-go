@@ -1744,11 +1744,11 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 		Mnemonic:    "test test test test test test test test test test test test",
 		FetchBackup: false,
 		CreateAccount: requests.CreateAccount{
-			DisplayName:           "Account1",
-			DeviceName:            "StatusIM",
-			Password:              "password",
-			CustomizationColor:    "0x000000",
-			BackupDisabledDataDir: tmpdir,
+			DisplayName:        "Account1",
+			DeviceName:         "StatusIM",
+			Password:           "password",
+			CustomizationColor: "0x000000",
+			RootDataDir:        tmpdir,
 		},
 	}
 	account, err := backend.RestoreAccountAndLogin(restoreRequest)
@@ -1783,12 +1783,6 @@ func TestCreateAccountPathsValidation(t *testing.T) {
 
 	err := request.Validate(validation)
 	require.NoError(t, err)
-
-	request.RootDataDir = ""
-	request.BackupDisabledDataDir = tmpdir
-	err = request.Validate(validation)
-	require.NoError(t, err)
-	require.Equal(t, tmpdir, request.RootDataDir)
 }
 
 func TestRestoreKeycardAccountAndLogin(t *testing.T) {
