@@ -376,7 +376,6 @@ func TestWakuV2Filter(t *testing.T) {
 	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
-	w.filterManager.filterSubBatchDuration = 1 * time.Second
 
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 10 * time.Second
@@ -689,8 +688,8 @@ func TestOnlineChecker(t *testing.T) {
 	require.NoError(t, err)
 
 	require.False(t, lightNode.onlineChecker.IsOnline())
-
-	lightNode.filterManager.addFilter("test", &common.Filter{})
+	f := &common.Filter{}
+	lightNode.filterManager.SubscribeFilter("test", protocol.NewContentFilter(f.PubsubTopic, f.ContentTopics.ContentTopics()...))
 
 }
 
