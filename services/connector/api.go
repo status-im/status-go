@@ -29,11 +29,13 @@ func NewAPI(s *Service) *API {
 	})
 
 	// Accounts query and dapp permissions
-	r.Register("eth_accounts", &commands.AccountsCommand{Db: s.db})
-	r.Register("eth_requestAccounts", &commands.RequestAccountsCommand{
+	// NOTE: Some dApps expect same behavior for both eth_accounts and eth_requestAccounts
+	accountsCommand := &commands.RequestAccountsCommand{
 		ClientHandler:   c,
 		AccountsCommand: commands.AccountsCommand{Db: s.db},
-	})
+	}
+	r.Register("eth_accounts", accountsCommand)
+	r.Register("eth_requestAccounts", accountsCommand)
 
 	// Active chain per dapp management
 	r.Register("eth_chainId", &commands.ChainIDCommand{
@@ -45,8 +47,11 @@ func NewAPI(s *Service) *API {
 		NetworkManager: s.nm,
 	})
 
-	// Request permissions
+	// Permissions
 	r.Register("wallet_requestPermissions", &commands.RequestPermissionsCommand{})
+	r.Register("wallet_revokePermissions", &commands.RevokePermissionsCommand{
+		Db: s.db,
+	})
 
 	return &API{
 		s: s,
@@ -100,6 +105,10 @@ func (api *API) CallRPC(inputJSON string) (interface{}, error) {
 
 func (api *API) RecallDAppPermission(origin string) error {
 	return persistence.DeleteDApp(api.s.db, origin)
+}
+
+func (api *API) GetPermittedDAppsList() ([]persistence.DApp, error) {
+	return persistence.SelectAllDApps(api.s.db)
 }
 
 func (api *API) RequestAccountsAccepted(args commands.RequestAccountsAcceptedArgs) error {

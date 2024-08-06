@@ -80,3 +80,16 @@ func TestInsertAndRemoveDApp(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, dAppBack)
 }
+
+func TestSelectAllDApps(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+
+	err := UpsertDApp(db, &testDApp)
+	require.NoError(t, err)
+
+	dApps, err := SelectAllDApps(db)
+	require.NoError(t, err)
+	require.Len(t, dApps, 1)
+	require.Equal(t, testDApp, dApps[0])
+}
