@@ -10,6 +10,7 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/constants"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
@@ -780,4 +781,46 @@ func (m *Messenger) resolveAndSyncKeypairOrJustWalletAccount(keyUID string, addr
 	_, chat := m.getLastClockWithRelatedChat()
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
+}
+
+func (m *Messenger) RemainingAccountCapacity() (int, error) {
+	accounts, err := m.settings.GetActiveAccounts()
+	if err != nil {
+		return 0, err
+	}
+	numOfAccountsWithoutChatAccount := 0
+	if len(accounts) > 0 {
+		numOfAccountsWithoutChatAccount = len(accounts) - 1
+	}
+	remainingCapacity := constants.MaxNumberOfAccounts - numOfAccountsWithoutChatAccount
+	if remainingCapacity <= 0 {
+		return 0, errors.New("no more accounts can be added")
+	}
+
+	return remainingCapacity, nil
+}
+
+func (m *Messenger) RemainingKeypairCapacity() (int, error) {
+	keypairs, err := m.settings.GetActiveKeypairs()
+	if err != nil {
+		return 0, err
+	}
+	remainingCapacity := constants.MaxNumberOfKeypairs - len(keypairs)
+	if remainingCapacity <= 0 {
+		return 0, errors.New("no more keypairs can be added")
+	}
+
+	return remainingCapacity, nil
+}
+
+func (m *Messenger) RemainingWatchOnlyAccountCapacity() (int, error) {
+	accounts, err := m.settings.GetActiveWatchOnlyAccounts()
+	if err != nil {
+		return 0, err
+	}
+	remainingCapacity := constants.MaxNumberOfWatchOnlyAccounts - len(accounts)
+	if remainingCapacity <= 0 {
+		return 0, errors.New("no more watch-only accounts can be added")
+	}
+	return remainingCapacity, nil
 }

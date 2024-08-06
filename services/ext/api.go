@@ -1126,6 +1126,15 @@ func (api *PublicAPI) GetSavedAddresses(ctx context.Context) ([]*wallet.SavedAdd
 	return api.service.messenger.GetSavedAddresses(ctx)
 }
 
+func (api *PublicAPI) GetSavedAddressesPerMode(ctx context.Context, testnetMode bool) ([]*wallet.SavedAddress, error) {
+	return api.service.messenger.GetSavedAddressesPerMode(testnetMode)
+}
+
+// RemainingCapacityForSavedAddresses returns the number of saved addresses that can be added
+func (api *PublicAPI) RemainingCapacityForSavedAddresses(ctx context.Context, testnetMode bool) (int, error) {
+	return api.service.messenger.RemainingCapacityForSavedAddresses(testnetMode)
+}
+
 // PushNotifications server endpoints
 func (api *PublicAPI) StartPushNotificationsServer() error {
 	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, true)

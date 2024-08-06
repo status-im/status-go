@@ -36,6 +36,14 @@ func (m *Messenger) GetSavedAddresses(ctx context.Context) ([]*wallet.SavedAddre
 	return m.savedAddressesManager.GetSavedAddresses()
 }
 
+func (m *Messenger) GetSavedAddressesPerMode(isTest bool) ([]*wallet.SavedAddress, error) {
+	return m.savedAddressesManager.GetSavedAddressesPerMode(isTest)
+}
+
+func (m *Messenger) RemainingCapacityForSavedAddresses(testnetMode bool) (int, error) {
+	return m.savedAddressesManager.RemainingCapacityForSavedAddresses(testnetMode)
+}
+
 func (m *Messenger) garbageCollectRemovedSavedAddresses() error {
 	return m.savedAddressesManager.DeleteSoftRemovedSavedAddresses(uint64(time.Now().AddDate(0, 0, -30).Unix()))
 }
