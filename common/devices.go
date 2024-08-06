@@ -4,12 +4,12 @@ import "runtime"
 
 const (
 	AndroidPlatform = "android"
-	IosPlatform     = "ios"
+	IOSPlatform     = "ios"
 	WindowsPlatform = "windows"
 )
 
 var IsMobilePlatform = func() bool {
-	return OperatingSystemIs(AndroidPlatform) || OperatingSystemIs(IosPlatform)
+	return OperatingSystemIs(AndroidPlatform) || OperatingSystemIs(IOSPlatform)
 }
 
 func OperatingSystemIs(targetOS string) bool {
