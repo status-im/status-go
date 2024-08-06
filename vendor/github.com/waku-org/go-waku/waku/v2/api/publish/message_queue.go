@@ -103,12 +103,6 @@ func (m *MessageQueue) Start(ctx context.Context) {
 			m.envelopeAvailableOnPriorityQueueSignal <- struct{}{}
 
 		case <-ctx.Done():
-			if m.usePriorityQueue {
-				close(m.throttledPrioritySendQueue)
-				close(m.envelopeAvailableOnPriorityQueueSignal)
-			} else {
-				close(m.toSendChan)
-			}
 			return
 		}
 	}
@@ -116,27 +110,43 @@ func (m *MessageQueue) Start(ctx context.Context) {
 
 // Push an envelope into the message queue. The priority is optional, and will be ignored
 // if the message queue does not use a priority queue
-func (m *MessageQueue) Push(envelope *protocol.Envelope, priority ...MessagePriority) {
+func (m *MessageQueue) Push(ctx context.Context, envelope *protocol.Envelope, priority ...MessagePriority) error {
 	if m.usePriorityQueue {
 		msgPriority := NormalPriority
 		if len(priority) != 0 {
 			msgPriority = priority[0]
 		}
 
-		m.throttledPrioritySendQueue <- &envelopePriority{
+		pEnvelope := &envelopePriority{
 			envelope: envelope,
 			priority: msgPriority,
 		}
+
+		select {
+		case m.throttledPrioritySendQueue <- pEnvelope:
+			// Do nothing
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	} else {
-		m.toSendChan <- envelope
+		select {
+		case m.toSendChan <- envelope:
+			// Do nothing
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
+
+	return nil
 }
 
 // Pop will return a channel on which a message can be retrieved from the message queue
-func (m *MessageQueue) Pop() <-chan *protocol.Envelope {
+func (m *MessageQueue) Pop(ctx context.Context) <-chan *protocol.Envelope {
 	ch := make(chan *protocol.Envelope)
 
 	go func() {
+		defer close(ch)
+
 		select {
 		case _, ok := <-m.envelopeAvailableOnPriorityQueueSignal:
 			if ok {
@@ -147,9 +157,11 @@ func (m *MessageQueue) Pop() <-chan *protocol.Envelope {
 			if ok {
 				ch <- envelope
 			}
+
+		case <-ctx.Done():
+			return
 		}
 
-		close(ch)
 	}()
 
 	return ch
