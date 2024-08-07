@@ -109,6 +109,7 @@ type Client struct {
 	sendPeriod           time.Duration
 	lastPeerCount        int
 	lastPeerConnFailures map[string]int
+	deviceType           string
 }
 
 type TelemetryClientOption func(*Client)
@@ -122,6 +123,12 @@ func WithSendPeriod(sendPeriod time.Duration) TelemetryClientOption {
 func WithPeerID(peerId string) TelemetryClientOption {
 	return func(c *Client) {
 		c.peerId = peerId
+	}
+}
+
+func WithDeviceType(deviceType string) TelemetryClientOption {
+	return func(c *Client) {
+		c.deviceType = deviceType
 	}
 }
 
@@ -150,6 +157,10 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 	}
 
 	return client
+}
+
+func (c *Client) SetDeviceType(deviceType string) {
+	c.deviceType = deviceType
 }
 
 func (c *Client) Start(ctx context.Context) {
@@ -303,6 +314,7 @@ func (c *Client) ProcessReceivedMessages(receivedMessages ReceivedMessages) *jso
 			"nodeName":       c.nodeName,
 			"messageSize":    len(receivedMessages.SSHMessage.Payload),
 			"statusVersion":  c.version,
+			"deviceType":     c.deviceType,
 		})
 	}
 	body, _ := json.Marshal(postBody)
@@ -320,6 +332,7 @@ func (c *Client) ProcessReceivedEnvelope(envelope *v2protocol.Envelope) *json.Ra
 		"peerId":         c.peerId,
 		"nodeName":       c.nodeName,
 		"statusVersion":  c.version,
+		"deviceType":     c.deviceType,
 	}
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
@@ -337,6 +350,7 @@ func (c *Client) ProcessSentEnvelope(sentEnvelope wakuv2.SentEnvelope) *json.Raw
 		"nodeName":      c.nodeName,
 		"publishMethod": sentEnvelope.PublishMethod.String(),
 		"statusVersion": c.version,
+		"deviceType":    c.deviceType,
 	}
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
@@ -355,6 +369,7 @@ func (c *Client) ProcessErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSe
 		"publishMethod": errorSendingEnvelope.SentEnvelope.PublishMethod.String(),
 		"statusVersion": c.version,
 		"error":         errorSendingEnvelope.Error.Error(),
+		"deviceType":    c.deviceType,
 	}
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
@@ -369,6 +384,7 @@ func (c *Client) ProcessPeerCount(peerCount PeerCount) *json.RawMessage {
 		"peerId":        c.peerId,
 		"statusVersion": c.version,
 		"timestamp":     time.Now().Unix(),
+		"deviceType":    c.deviceType,
 	}
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
@@ -384,6 +400,7 @@ func (c *Client) ProcessPeerConnFailure(peerConnFailure PeerConnFailure) *json.R
 		"peerId":        c.peerId,
 		"statusVersion": c.version,
 		"timestamp":     time.Now().Unix(),
+		"deviceType":    c.deviceType,
 	}
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
@@ -406,6 +423,7 @@ func (c *Client) UpdateEnvelopeProcessingError(shhMessage *types.Message, proces
 		"peerId":          c.peerId,
 		"nodeName":        c.nodeName,
 		"processingError": errorString,
+		"deviceType":      c.deviceType,
 	}
 	body, _ := json.Marshal(postBody)
 	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
