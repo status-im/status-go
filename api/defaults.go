@@ -417,7 +417,7 @@ func randomWalletEmoji() (string, error) {
 	count := big.NewInt(int64(len(animalsAndNatureEmojis)))
 	index, err := rand.Int(rand.Reader, count)
 	if err != nil {
-		return "🐵", err
+		return "", err
 	}
 	return animalsAndNatureEmojis[index.Int64()], nil
 }
