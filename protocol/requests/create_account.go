@@ -33,10 +33,6 @@ type APIConfig struct {
 }
 
 type CreateAccount struct {
-	// Deprecated: BackupDisabledDataDir is the directory where backup is disabled
-	// Use `RootDataDir` instead. Effective BackupDisabledDataDir value will default to RootDataDir + "./".
-	BackupDisabledDataDir string `json:"backupDisabledDataDir"`
-
 	// RootDataDir is an absolute path to the root directory where all data will be stored.
 	RootDataDir   string `json:"rootDataDir"`
 	KdfIterations int    `json:"kdfIterations"`
@@ -134,13 +130,7 @@ func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
 	}
 
 	if len(c.RootDataDir) == 0 {
-		if c.BackupDisabledDataDir == "" {
-			return ErrCreateAccountInvalidRootDataDir
-		}
-		// NOTE: Fallback to old BackupDisabledDataDir field.
-		// Remove this when both desktop and mobile use the new `RootDataDir` field.
-		// Return error if `RootDataDir` is empty.
-		c.RootDataDir = c.BackupDisabledDataDir
+		return ErrCreateAccountInvalidRootDataDir
 	}
 
 	return nil
