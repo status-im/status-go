@@ -202,7 +202,7 @@ func main() {
 		select {
 		case <-ticker.C:
 			count++
-			timestamp := time.Now().Format(time.RFC3339)
+			timestamp := time.Now().UTC().Format(time.RFC3339)
 			logger.Info("Publishing", "id", id, "count", count, "time", timestamp)
 			inputMessage := common.NewMessage()
 
