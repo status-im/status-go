@@ -2283,84 +2283,6 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 
 	contact := state.CurrentMessageState.Contact
 
-	// If we receive some propagated state from someone who's not
-	// our paired device, we handle it
-	if receivedMessage.ContactRequestPropagatedState != nil && !isSyncMessage {
-		result := contact.ContactRequestPropagatedStateReceived(receivedMessage.ContactRequestPropagatedState)
-		if result.sendBackState {
-			_, err = m.sendContactUpdate(context.Background(), contact.ID, "", "", "", "", m.dispatchMessage)
-			if err != nil {
-				return err
-			}
-		}
-		if result.newContactRequestReceived {
-
-			if contact.hasAddedUs() && !contact.mutual() {
-				receivedMessage.ContactRequestState = common.ContactRequestStatePending
-			}
-
-			// Add mutual state update message for outgoing contact request
-			clock := receivedMessage.Clock - 1
-			updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, receivedMessage.Timestamp, false)
-			if err != nil {
-				return err
-			}
-
-			err = m.prepareMessage(updateMessage, m.httpServer)
-			if err != nil {
-				return err
-			}
-			err = m.persistence.SaveMessages([]*common.Message{updateMessage})
-			if err != nil {
-				return err
-			}
-			state.Response.AddMessage(updateMessage)
-
-			err = m.createIncomingContactRequestNotification(contact, state, receivedMessage, true)
-			if err != nil {
-				return err
-			}
-		}
-		state.ModifiedContacts.Store(contact.ID, true)
-		state.AllContacts.Store(contact.ID, contact)
-	}
-
-	if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST && chat.OneToOne() {
-		chatContact := contact
-		if isSyncMessage {
-			chatContact, err = m.BuildContact(&requests.BuildContact{PublicKey: chat.ID})
-			if err != nil {
-				return err
-			}
-		}
-
-		if receivedMessage.CustomizationColor != 0 {
-			chatContact.CustomizationColor = multiaccountscommon.IDToColorFallbackToBlue(receivedMessage.CustomizationColor)
-		}
-
-		if chatContact.mutual() || chatContact.dismissed() {
-			m.logger.Info("ignoring contact request message for a mutual or dismissed contact")
-			return nil
-		}
-
-		sendNotification, err := handleContactRequestChatMessage(receivedMessage, chatContact, isSyncMessage, m.logger)
-		if err != nil {
-			m.logger.Error("failed to handle contact request message", zap.Error(err))
-			return err
-		}
-		state.ModifiedContacts.Store(chatContact.ID, true)
-		state.AllContacts.Store(chatContact.ID, chatContact)
-
-		if sendNotification {
-			err = m.createIncomingContactRequestNotification(chatContact, state, receivedMessage, true)
-			if err != nil {
-				return err
-			}
-		}
-	} else if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
-		chat.Highlight = true
-	}
-
 	if receivedMessage.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE {
 		discordMessage := receivedMessage.GetDiscordMessage()
 		discordMessageAuthor := discordMessage.GetAuthor()
@@ -2447,6 +2369,84 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	err = m.addPeersyncingMessage(chat, state.CurrentMessageState.StatusMessage)
 	if err != nil {
 		m.logger.Warn("failed to add peersyncing message", zap.Error(err))
+	}
+
+	// If we receive some propagated state from someone who's not
+	// our paired device, we handle it
+	if receivedMessage.ContactRequestPropagatedState != nil && !isSyncMessage {
+		result := contact.ContactRequestPropagatedStateReceived(receivedMessage.ContactRequestPropagatedState)
+		if result.sendBackState {
+			_, err = m.sendContactUpdate(context.Background(), contact.ID, "", "", "", "", m.dispatchMessage)
+			if err != nil {
+				return err
+			}
+		}
+		if result.newContactRequestReceived {
+
+			if contact.hasAddedUs() && !contact.mutual() {
+				receivedMessage.ContactRequestState = common.ContactRequestStatePending
+			}
+
+			// Add mutual state update message for outgoing contact request
+			clock := receivedMessage.Clock - 1
+			updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, receivedMessage.Timestamp, false)
+			if err != nil {
+				return err
+			}
+
+			err = m.prepareMessage(updateMessage, m.httpServer)
+			if err != nil {
+				return err
+			}
+			err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+			if err != nil {
+				return err
+			}
+			state.Response.AddMessage(updateMessage)
+
+			err = m.createIncomingContactRequestNotification(contact, state, receivedMessage, true)
+			if err != nil {
+				return err
+			}
+		}
+		state.ModifiedContacts.Store(contact.ID, true)
+		state.AllContacts.Store(contact.ID, contact)
+	}
+
+	if receivedMessage.ContentType == protobuf.ChatMessage_CONTACT_REQUEST && chat.OneToOne() {
+		chatContact := contact
+		if isSyncMessage {
+			chatContact, err = m.BuildContact(&requests.BuildContact{PublicKey: chat.ID})
+			if err != nil {
+				return err
+			}
+		}
+
+		if receivedMessage.CustomizationColor != 0 {
+			chatContact.CustomizationColor = multiaccountscommon.IDToColorFallbackToBlue(receivedMessage.CustomizationColor)
+		}
+
+		if chatContact.mutual() || chatContact.dismissed() {
+			m.logger.Info("ignoring contact request message for a mutual or dismissed contact")
+			return nil
+		}
+
+		sendNotification, err := handleContactRequestChatMessage(receivedMessage, chatContact, isSyncMessage, m.logger)
+		if err != nil {
+			m.logger.Error("failed to handle contact request message", zap.Error(err))
+			return err
+		}
+		state.ModifiedContacts.Store(chatContact.ID, true)
+		state.AllContacts.Store(chatContact.ID, chatContact)
+
+		if sendNotification {
+			err = m.createIncomingContactRequestNotification(chatContact, state, receivedMessage, true)
+			if err != nil {
+				return err
+			}
+		}
+	} else if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
+		chat.Highlight = true
 	}
 
 	receivedMessage.New = true
