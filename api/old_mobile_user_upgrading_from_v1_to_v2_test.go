@@ -71,7 +71,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) loginMobileUser(check PostLoginCh
 	s.Require().NoError(b.Logout())
 }
 
-func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLightClientEnabledAfterUpgradingFromMobileV1() {
+func (s *OldMobileUserUpgradingFromV1ToV2Test) TestOptimizeMobileWakuV2SettingsForMobileV1() {
 	bkFunc := d_common.IsMobilePlatform
 	d_common.IsMobilePlatform = func() bool {
 		return true
@@ -84,6 +84,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLightClientEnabledAfterUpgrad
 		nc, err := b.GetNodeConfig()
 		s.Require().NoError(err)
 		s.Require().True(nc.WakuV2Config.LightClient)
+		s.Require().False(nc.WakuV2Config.EnableStoreConfirmationForMessagesSent)
 	})
 }
 

@@ -63,7 +63,7 @@ func doMigration(db *sql.DB) error {
 
 	postSteps := []*sqlite.PostStep{
 		{Version: 1662365868, CustomMigration: FixMissingKeyUIDForAccounts},
-		{Version: 1662365868, CustomMigration: EnableLightClientForMobileV1ByDefault},
+		{Version: 1720606449, CustomMigration: OptimizeMobileWakuV2SettingsForMobileV1},
 	}
 	postSteps = append(postSteps, customSteps...)
 	// Run all the new migrations
@@ -90,11 +90,11 @@ func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, erro
 	return db, nil
 }
 
-func EnableLightClientForMobileV1ByDefault(sqlTx *sql.Tx) error {
+func OptimizeMobileWakuV2SettingsForMobileV1(sqlTx *sql.Tx) error {
 	if d_common.IsMobilePlatform() {
-		_, err := sqlTx.Exec(`UPDATE wakuv2_config SET light_client = ?`, true)
+		_, err := sqlTx.Exec(`UPDATE wakuv2_config SET light_client = ?, enable_store_confirmation_for_messages_sent = ?`, true, false)
 		if err != nil {
-			log.Error("failed to enable light client for mobile v1", "err", err.Error())
+			log.Error("failed to enable light client and disable store confirmation for mobile v1", "err", err.Error())
 			return err
 		}
 	}
