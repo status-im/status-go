@@ -125,8 +125,8 @@ func (m *MessageSentCheck) SetStorePeerID(peerID peer.ID) {
 	m.storePeerID = peerID
 }
 
-// CheckIfMessagesStored checks if the tracked outgoing messages are stored periodically
-func (m *MessageSentCheck) CheckIfMessagesStored() {
+// Start checks if the tracked outgoing messages are stored periodically
+func (m *MessageSentCheck) Start() {
 	ticker := time.NewTicker(m.hashQueryInterval)
 	defer ticker.Stop()
 	for {
