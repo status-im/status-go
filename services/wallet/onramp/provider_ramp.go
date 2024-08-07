@@ -8,7 +8,7 @@ import (
 )
 
 const rampID = "ramp"
-const rampSiteURL = "https://ramp.network/buy?hostApiKey=zrtf9u2uqebeyzcs37fu5857tktr3eg9w5tffove&swapAsset=DAI,ETH,USDC,USDT"
+const rampSiteURL = "https://app.ramp.network/?hostApiKey=zrtf9u2uqebeyzcs37fu5857tktr3eg9w5tffove&hostAppName=Status&swapAsset=ETH_*,ARBITRUM_*,OPTIMISM_*"
 
 type RampProvider struct{}
 

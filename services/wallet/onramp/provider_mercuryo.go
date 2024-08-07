@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -22,6 +23,7 @@ const supportedAssetsUpdateInterval = 24 * time.Hour
 type MercuryoProvider struct {
 	supportedTokens          []*token.Token
 	supportedTokensTimestamp time.Time
+	supportedTokensLock      sync.RWMutex
 	httpClient               *mercuryo.Client
 	tokenManager             token.ManagerInterface
 }
@@ -63,6 +65,9 @@ func (p *MercuryoProvider) GetCryptoOnRamp(ctx context.Context) (CryptoOnRamp, e
 }
 
 func (p *MercuryoProvider) getSupportedCurrencies(ctx context.Context) ([]*token.Token, error) {
+	p.supportedTokensLock.Lock()
+	defer p.supportedTokensLock.Unlock()
+
 	if time.Since(p.supportedTokensTimestamp) < supportedAssetsUpdateInterval {
 		return p.supportedTokens, nil
 	}
