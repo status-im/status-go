@@ -53,9 +53,15 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]b
 	envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
 
 	if priority != nil {
-		w.sendQueue.Push(envelope, *priority)
+		err := w.sendQueue.Push(w.ctx, envelope, *priority)
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		w.sendQueue.Push(envelope)
+		err := w.sendQueue.Push(w.ctx, envelope)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	w.poolMu.Lock()
@@ -75,7 +81,7 @@ func (w *Waku) broadcast() {
 		var envelope *protocol.Envelope
 
 		select {
-		case envelope = <-w.sendQueue.Pop():
+		case envelope = <-w.sendQueue.Pop(w.ctx):
 
 		case <-w.ctx.Done():
 			return
