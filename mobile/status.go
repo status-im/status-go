@@ -1409,7 +1409,7 @@ func InitLogging(logSettingsJSON string) string {
 	if err = json.Unmarshal([]byte(logSettingsJSON), &logSettings); err != nil {
 		return makeJSONResponse(err)
 	}
-	
+
 	if err = logutils.OverrideRootLogWithConfig(logSettings, false); err == nil {
 		log.Info("logging initialised", "logSettings", logSettingsJSON)
 	}
