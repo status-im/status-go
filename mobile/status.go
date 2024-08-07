@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sync"
 	"unsafe"
 
 	validator "gopkg.in/go-playground/validator.v9"
@@ -1401,10 +1400,8 @@ func DeserializeAndCompressKey(DesktopKey string) string {
 	return CompressPublicKey(sanitisedKey)
 }
 
-var initLoggingOnce sync.Once
-
-// InitLogging The InitLogging function should be called only once during the application's lifetime,
-// specifically when the application starts. This ensures that we can capture logs before the user login.
+// InitLogging The InitLogging function should be called when the application starts.
+// This ensures that we can capture logs before the user login. Subsequent calls will update the logger settings.
 // Before this, we can only capture logs after user login since we will only configure the logging after the login process.
 func InitLogging(logSettingsJSON string) string {
 	var logSettings logutils.LogSettings
@@ -1412,12 +1409,10 @@ func InitLogging(logSettingsJSON string) string {
 	if err = json.Unmarshal([]byte(logSettingsJSON), &logSettings); err != nil {
 		return makeJSONResponse(err)
 	}
-
-	initLoggingOnce.Do(func() {
-		if err = logutils.OverrideRootLogWithConfig(logSettings, false); err == nil {
-			log.Info("logging initialised", "logSettings", logSettingsJSON)
-		}
-	})
+	
+	if err = logutils.OverrideRootLogWithConfig(logSettings, false); err == nil {
+		log.Info("logging initialised", "logSettings", logSettingsJSON)
+	}
 
 	return makeJSONResponse(err)
 }
