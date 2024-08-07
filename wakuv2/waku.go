@@ -41,7 +41,6 @@ import (
 
 	"go.uber.org/zap"
 
-	mapset "github.com/deckarep/golang-set"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/time/rate"
 
@@ -135,7 +134,6 @@ type Waku struct {
 	keyMu       sync.RWMutex                 // Mutex associated with key stores
 
 	envelopeCache *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] // Pool of envelopes currently tracked by this node
-	expirations   map[uint32]mapset.Set                                     // Message expiration pool
 	poolMu        sync.RWMutex                                              // Mutex to sync the message and expiration pools
 
 	bandwidthCounter *metrics.BandwidthCounter
@@ -235,7 +233,6 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
 		symKeys:                         make(map[string][]byte),
 		envelopeCache:                   newTTLCache(),
-		expirations:                     make(map[uint32]mapset.Set),
 		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
 		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
 		connectionNotifChan:             make(chan node.PeerConnection, 20),

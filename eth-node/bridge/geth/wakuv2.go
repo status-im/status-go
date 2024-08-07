@@ -132,7 +132,7 @@ func (w *gethWakuV2Wrapper) Subscribe(opts *types.SubscriptionOptions) (string, 
 		}
 	}
 
-	f, err := w.createFilterWrapper("", keyAsym, keySym, opts.PoW, opts.PubsubTopic, opts.Topics)
+	f, err := w.createFilterWrapper("", keyAsym, keySym, opts.PubsubTopic, opts.Topics)
 	if err != nil {
 		return "", err
 	}
@@ -162,7 +162,7 @@ func (w *gethWakuV2Wrapper) UnsubscribeMany(ids []string) error {
 	return w.waku.UnsubscribeMany(ids)
 }
 
-func (w *gethWakuV2Wrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, pubsubTopic string, topics [][]byte) (types.Filter, error) {
+func (w *gethWakuV2Wrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateKey, keySym []byte, pubsubTopic string, topics [][]byte) (types.Filter, error) {
 	return NewWakuV2FilterWrapper(&wakucommon.Filter{
 		KeyAsym:       keyAsym,
 		KeySym:        keySym,

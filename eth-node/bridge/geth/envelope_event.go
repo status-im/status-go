@@ -3,7 +3,6 @@ package gethbridge
 import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku"
-	"github.com/status-im/status-go/wakuv2"
 
 	wakucommon "github.com/status-im/status-go/waku/common"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
@@ -47,8 +46,6 @@ func NewWakuV2EnvelopeEventWrapper(envelopeEvent *wakuv2common.EnvelopeEvent) *t
 		for index := range data {
 			wrappedData[index] = *NewWakuV2EnvelopeErrorWrapper(&data[index])
 		}
-	case *wakuv2.MailServerResponse:
-		wrappedData = NewWakuV2MailServerResponseWrapper(data)
 	}
 	return &types.EnvelopeEvent{
 		Event: types.EventType(envelopeEvent.Event),
