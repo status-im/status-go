@@ -1593,8 +1593,8 @@ func (m *Messenger) watchChatsAndCommunitiesToUnmute() {
 			case <-time.After(1 * time.Minute):
 				response := &MessengerResponse{}
 				m.allChats.Range(func(chatID string, c *Chat) bool {
-					chatMuteTill, _ := time.Parse(time.RFC3339, c.MuteTill.Format(time.RFC3339))
-					currTime, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+					chatMuteTill := c.MuteTill.Truncate(time.Second)
+					currTime := time.Now().Truncate(time.Second)
 
 					if currTime.After(chatMuteTill) && !chatMuteTill.Equal(time.Time{}) && c.Muted {
 						err := m.persistence.UnmuteChat(c.ID)
