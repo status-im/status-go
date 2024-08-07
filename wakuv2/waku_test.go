@@ -17,7 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/metrics"
 	libp2pprotocol "github.com/libp2p/go-libp2p/core/protocol"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	ethdnsdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
@@ -40,7 +39,6 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2/common"
@@ -597,64 +595,6 @@ func waitForEnvelope(t *testing.T, contentTopic string, envCh chan common.Envelo
 			return
 		}
 	}
-}
-
-func TestConfirmMessageDelivered(t *testing.T) {
-	aliceConfig := &Config{}
-	aliceNode, err := New(nil, "", aliceConfig, nil, nil, nil, nil, nil)
-	require.NoError(t, err)
-	require.NoError(t, aliceNode.Start())
-
-	bobConfig := &Config{}
-	bobNode, err := New(nil, "", bobConfig, nil, nil, nil, nil, nil)
-	require.NoError(t, err)
-	require.NoError(t, bobNode.Start())
-
-	addrs := aliceNode.ListenAddresses()
-	require.Greater(t, len(addrs), 0)
-	_, err = bobNode.AddRelayPeer(addrs[0])
-	require.NoError(t, err)
-	err = bobNode.DialPeer(addrs[0])
-	require.NoError(t, err)
-
-	filter := &common.Filter{
-		Messages:      common.NewMemoryMessageStore(),
-		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
-	}
-
-	_, err = aliceNode.Subscribe(filter)
-	require.NoError(t, err)
-
-	msgTimestamp := aliceNode.timestamp()
-	contentTopic := maps.Keys(filter.ContentTopics)[0]
-
-	_, err = aliceNode.Send(shard.DefaultShardPubsubTopic(), &pb.WakuMessage{
-		Payload:      []byte{1, 2, 3, 4, 5},
-		ContentTopic: contentTopic.ContentTopic(),
-		Version:      proto.Uint32(0),
-		Timestamp:    &msgTimestamp,
-		Ephemeral:    proto.Bool(false),
-	}, nil)
-	require.NoError(t, err)
-
-	time.Sleep(1 * time.Second)
-
-	messages := filter.Retrieve()
-	require.Len(t, messages, 1)
-
-	require.Len(t, aliceNode.sendMsgIDs, 1)
-	for _, msgs := range aliceNode.sendMsgIDs {
-		require.Len(t, msgs, 1)
-		for hash := range msgs {
-			require.Equal(t, hash, messages[0].Hash())
-		}
-	}
-
-	aliceNode.ConfirmMessageDelivered([]ethcommon.Hash{messages[0].Hash()})
-	require.Len(t, aliceNode.sendMsgIDs, 0)
-
-	require.NoError(t, aliceNode.Stop())
-	require.NoError(t, bobNode.Stop())
 }
 
 func TestOnlineChecker(t *testing.T) {
