@@ -36,15 +36,11 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 
 	api := NewAPI(service)
 
-	// Try to request accounts without permission
-	request := "{\"method\":\"eth_accounts\",\"params\":[],\"url\":\"http://testDAppURL123\",\"name\":\"testDAppName\",\"iconUrl\":\"http://testDAppIconUrl\"}"
-	response, err := api.CallRPC(request)
-	assert.Empty(t, response)
-	assert.Error(t, err)
-	assert.Equal(t, commands.ErrDAppIsNotPermittedByUser, err)
-
 	accountAddress := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 	expectedHash := types.BytesToHash(types.FromHex("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"))
+
+	dAppPermissionRevoked := false
+	dAppPermissionGranted := false
 
 	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
 		var evt commands.EventType
@@ -52,6 +48,10 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 		assert.NoError(t, err)
 
 		switch evt.Type {
+		case signal.EventConnectorDAppPermissionRevoked:
+			dAppPermissionRevoked = true
+		case signal.EventConnectorDAppPermissionGranted:
+			dAppPermissionGranted = true
 		case signal.EventConnectorSendRequestAccounts:
 			var ev signal.ConnectorSendRequestAccountsSignal
 			err := json.Unmarshal(evt.Event, &ev)
@@ -77,10 +77,12 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	}))
 
 	// Request accounts, now for real
-	request = "{\"method\": \"eth_requestAccounts\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
-	response, err = api.CallRPC(request)
+	request := "{\"method\": \"eth_requestAccounts\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
+	response, err := api.CallRPC(request)
 	assert.NoError(t, err)
 	assert.Equal(t, commands.FormatAccountAddressToResponse(accountAddress), response)
+	assert.Equal(t, true, dAppPermissionGranted)
+	assert.Equal(t, false, dAppPermissionRevoked)
 
 	// Request to switch ethereum chain
 	expectedChainID, err := chainutils.GetHexChainID(walletCommon.ChainID(walletCommon.EthereumMainnet).String())
@@ -107,6 +109,19 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedHash.Hex(), response)
+
+	// Revoke permissions
+	request = "{\"method\": \"wallet_revokePermissions\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
+	_, err = api.CallRPC(request)
+	assert.NoError(t, err)
+
+	// Check if the account was revoked
+	request = fmt.Sprintf("{\"method\": \"eth_sendTransaction\", \"params\":[{\"from\":\"%s\",\"to\":\"0x0200000000000000000000000000000000000000\",\"value\":\"0x12345\",\"data\":\"0x307830\"}], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }", accountAddress.Hex())
+	response, err = api.CallRPC(request)
+	assert.Empty(t, response)
+	assert.Error(t, err)
+	assert.Equal(t, commands.ErrDAppIsNotPermittedByUser, err)
+	assert.Equal(t, true, dAppPermissionRevoked)
 }
 
 func TestForwardedRPCs(t *testing.T) {
