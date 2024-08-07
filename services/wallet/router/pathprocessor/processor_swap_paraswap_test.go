@@ -1,14 +1,19 @@
 package pathprocessor
 
 import (
+	"errors"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	gomock "github.com/golang/mock/gomock"
+
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
+	mock_paraswap "github.com/status-im/status-go/services/wallet/thirdparty/paraswap/mock"
 	"github.com/status-im/status-go/services/wallet/token"
 
 	"github.com/stretchr/testify/require"
@@ -67,5 +72,62 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 			require.NotNil(t, amountOut)
 			require.Equal(t, testPriceRoute.DestAmount.Uint64(), amountOut.Uint64())
 		}
+	}
+}
+
+func expectClientFetchPriceRoute(clientMock *mock_paraswap.MockClientInterface, route paraswap.Route, err error) {
+	clientMock.EXPECT().FetchPriceRoute(
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+	).Return(route, err)
+}
+
+func TestParaswapErrors(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := mock_paraswap.NewMockClientInterface(ctrl)
+
+	processor := NewSwapParaswapProcessor(nil, nil, nil)
+	processor.paraswapClient = client
+
+	fromToken := token.Token{
+		Symbol: EthSymbol,
+	}
+	toToken := token.Token{
+		Symbol: UsdcSymbol,
+	}
+	chainID := walletCommon.EthereumMainnet
+
+	testInputParams := ProcessorInputParams{
+		FromChain: &params.Network{ChainID: chainID},
+		ToChain:   &params.Network{ChainID: chainID},
+		FromToken: &fromToken,
+		ToToken:   &toToken,
+	}
+
+	// Test Errors
+	type testCase struct {
+		clientError    string
+		processorError error
+	}
+
+	testCases := []testCase{
+		{"Price Timeout", ErrPriceTimeout},
+		{"No routes found with enough liquidity", ErrNotEnoughLiquidity},
+		{"ESTIMATED_LOSS_GREATER_THAN_MAX_IMPACT", ErrPriceImpactTooHigh},
+	}
+
+	for _, tc := range testCases {
+		expectClientFetchPriceRoute(client, paraswap.Route{}, errors.New(tc.clientError))
+		_, err := processor.EstimateGas(testInputParams)
+		require.Equal(t, tc.processorError.Error(), err.Error())
 	}
 }
