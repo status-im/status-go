@@ -856,14 +856,8 @@ func (m *Messenger) CheckCommunitiesToUnmute() (*MessengerResponse, error) {
 		return nil, fmt.Errorf("couldn't get all communities: %v", err)
 	}
 	for _, community := range communities {
-		communityMuteTill, err := time.Parse(time.RFC3339, community.MuteTill().Format(time.RFC3339))
-		if err != nil {
-			return nil, err
-		}
-		currTime, err := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-		if err != nil {
-			return nil, err
-		}
+		communityMuteTill := community.MuteTill().Truncate(time.Second)
+		currTime := time.Now().Truncate(time.Second)
 
 		if currTime.After(communityMuteTill) && !communityMuteTill.Equal(time.Time{}) && community.Muted() {
 			err := m.communitiesManager.SetMuted(community.ID(), false)

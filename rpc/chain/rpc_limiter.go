@@ -201,7 +201,12 @@ func (rl *RPCRequestLimiter) Allow(tag string) (bool, error) {
 	// Check if a number of requests is over the limit within the interval
 	if time.Since(data.CreatedAt) < data.Period || data.Period.Milliseconds() == LimitInfinitely {
 		if data.NumReqs >= data.MaxReqs {
-			log.Info("Number of requests over limit", "tag", tag, "numReqs", data.NumReqs, "maxReqs", data.MaxReqs, "period", data.Period, "createdAt", data.CreatedAt)
+			log.Info("Number of requests over limit",
+				"tag", tag,
+				"numReqs", data.NumReqs,
+				"maxReqs", data.MaxReqs,
+				"period", data.Period,
+				"createdAt", data.CreatedAt.UTC())
 			return false, ErrRequestsOverLimit
 		}
 
