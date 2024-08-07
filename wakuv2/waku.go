@@ -1190,27 +1190,7 @@ func (w *Waku) Start() error {
 	go w.sendQueue.Start(w.ctx)
 
 	if w.cfg.EnableStoreConfirmationForMessagesSent {
-		w.messageSentCheck = publish.NewMessageSentCheck(w.ctx, w.node.Store(), w.node.Timesource(), w.logger)
-		go w.messageSentCheck.Start()
-
-		go func() {
-			for {
-				select {
-				case <-w.ctx.Done():
-					return
-				case hash := <-w.messageSentCheck.MessageStoredChan:
-					w.SendEnvelopeEvent(common.EnvelopeEvent{
-						Hash:  hash,
-						Event: common.EventEnvelopeSent,
-					})
-				case hash := <-w.messageSentCheck.MessageExpiredChan:
-					w.SendEnvelopeEvent(common.EnvelopeEvent{
-						Hash:  hash,
-						Event: common.EventEnvelopeExpired,
-					})
-				}
-			}
-		}()
+		w.confirmMessagesSent()
 	}
 
 	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set w.ctx to nil within `w.Stop()`
@@ -1218,6 +1198,30 @@ func (w *Waku) Start() error {
 	go w.seedBootnodesForDiscV5()
 
 	return nil
+}
+
+func (w *Waku) confirmMessagesSent() {
+	w.messageSentCheck = publish.NewMessageSentCheck(w.ctx, w.node.Store(), w.node.Timesource(), w.logger)
+	go w.messageSentCheck.Start()
+
+	go func() {
+		for {
+			select {
+			case <-w.ctx.Done():
+				return
+			case hash := <-w.messageSentCheck.MessageStoredChan:
+				w.SendEnvelopeEvent(common.EnvelopeEvent{
+					Hash:  hash,
+					Event: common.EventEnvelopeSent,
+				})
+			case hash := <-w.messageSentCheck.MessageExpiredChan:
+				w.SendEnvelopeEvent(common.EnvelopeEvent{
+					Hash:  hash,
+					Event: common.EventEnvelopeExpired,
+				})
+			}
+		}
+	}()
 }
 
 func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
