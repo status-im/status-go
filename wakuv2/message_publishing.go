@@ -5,13 +5,14 @@ import (
 
 	"go.uber.org/zap"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/wakuv2/common"
 )
 
 type PublishMethod int
