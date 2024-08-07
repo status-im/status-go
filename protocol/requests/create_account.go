@@ -47,7 +47,6 @@ type CreateAccount struct {
 	ImagePath          string              `json:"imagePath"`
 	ImageCropRectangle *ImageCropRectangle `json:"imageCropRectangle"`
 	CustomizationColor string              `json:"customizationColor"`
-	Emoji              string              `json:"emoji"`
 
 	WakuV2Nameserver                             *string `json:"wakuV2Nameserver"`
 	WakuV2LightClient                            bool    `json:"wakuV2LightClient"`

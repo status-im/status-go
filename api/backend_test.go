@@ -832,7 +832,6 @@ func TestLoginAccount(t *testing.T) {
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
-		Emoji:              "some",
 		Password:           password,
 		RootDataDir:        tmpdir,
 		LogFilePath:        tmpdir + "/log",
@@ -894,7 +893,6 @@ func TestEnableInstallationAndPair(t *testing.T) {
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        displayName,
 		CustomizationColor: "#ffffff",
-		Emoji:              "some",
 		Password:           password,
 		RootDataDir:        tmpdir,
 		LogFilePath:        tmpdir + "/log",
@@ -1498,7 +1496,6 @@ func TestCreateWallet(t *testing.T) {
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
-		Emoji:              "emoji",
 		Password:           password,
 		RootDataDir:        tmpdir,
 		LogFilePath:        tmpdir + "/log",
@@ -1562,7 +1559,6 @@ func TestSetFleet(t *testing.T) {
 		Password:           password,
 		RootDataDir:        tmpdir,
 		LogFilePath:        tmpdir + "/log",
-		Emoji:              "some",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1631,7 +1627,6 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 		Password:           password,
 		RootDataDir:        tmpdir,
 		LogFilePath:        tmpdir + "/log",
-		Emoji:              "some",
 	}
 	c := make(chan interface{}, 10)
 	signal.SetMobileSignalHandler(func(data []byte) {
@@ -1695,7 +1690,6 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 	createAccountRequest1 := &requests.CreateAccount{
 		DisplayName:         "User-1",
 		CustomizationColor:  "#ffffff",
-		Emoji:               "some",
 		Password:            "password123",
 		RootDataDir:         tmpdir,
 		LogFilePath:         tmpdir + "/log",
@@ -1716,7 +1710,6 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 	createAccountRequest2 := &requests.CreateAccount{
 		DisplayName:        "User-2",
 		CustomizationColor: "#ffffff",
-		Emoji:              "some",
 		Password:           "password",
 		RootDataDir:        tmpdir,
 		LogFilePath:        tmpdir + "/log",
