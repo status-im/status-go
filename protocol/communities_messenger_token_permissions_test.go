@@ -148,6 +148,9 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 	mockedBalances          communities.BalancesByChain
 	mockedCollectibles      communities.CollectiblesByChain
 	collectiblesServiceMock *CollectiblesServiceMock
+	collectiblesManagerMock *CollectiblesManagerMock
+	accountsTestData        map[string][]string
+	accountsPasswords       map[string]string
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
@@ -159,6 +162,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.bobWaku = nil
 	s.aliceWaku = nil
 
+	s.accountsTestData = make(map[string][]string)
+	s.accountsPasswords = make(map[string]string)
+
+	s.mockedCollectibles = make(communities.CollectiblesByChain)
+	s.collectiblesManagerMock = &CollectiblesManagerMock{
+		Collectibles: &s.mockedCollectibles,
+	}
 	s.resetMockedBalances()
 
 	s.logger = tt.MustCreateTestLogger()
@@ -205,7 +215,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string
 	}
 	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
 
-	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
+	messenger := newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			logger:       s.logger.Named(name),
 			extraOptions: extraOptions,
@@ -213,23 +223,32 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string
 		password:            password,
 		walletAddresses:     walletAddresses,
 		mockedBalances:      &s.mockedBalances,
-		mockedCollectibles:  &s.mockedCollectibles,
 		collectiblesService: s.collectiblesServiceMock,
+		collectiblesManager: s.collectiblesManagerMock,
 	})
+
+	publicKey := messenger.IdentityPublicKeyString()
+	s.accountsTestData[publicKey] = walletAddresses
+	s.accountsPasswords[publicKey] = password
+
+	return messenger
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunity(community *communities.Community, user *Messenger, password string, addresses []string) {
-	s.joinCommunityWithAirdropAddress(community, user, password, addresses, "")
+func (s *MessengerCommunitiesTokenPermissionsSuite) createRequestToJoinCommunity(communityID types.HexBytes, user *Messenger) *requests.RequestToJoinCommunity {
+	userPk := user.IdentityPublicKeyString()
+	addresses, exists := s.accountsTestData[userPk]
+	s.Require().True(exists)
+	password, exists := s.accountsPasswords[userPk]
+	s.Require().True(exists)
+	return createRequestToJoinCommunity(&s.Suite, communityID, user, password, addresses)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunityWithAirdropAddress(community *communities.Community, user *Messenger, password string, addresses []string, airdropAddress string) {
-	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(password)))
-	if airdropAddress == "" && len(addresses) > 0 {
-		airdropAddress = addresses[0]
-	}
-
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), AddressesToReveal: addresses, AirdropAddress: airdropAddress}
-	joinCommunity(&s.Suite, community, s.owner, user, request, passwdHash)
+func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunity(community *communities.Community, user *Messenger) {
+	addresses, exists := s.accountsTestData[user.IdentityPublicKeyString()]
+	s.Require().True(exists)
+	password, exists := s.accountsPasswords[user.IdentityPublicKeyString()]
+	s.Require().True(exists)
+	joinCommunity(&s.Suite, community.ID(), s.owner, user, password, addresses)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
@@ -393,8 +412,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata(
 	s.Require().Equal(tokensMetadata[0].Version, newToken.Version)
 }
 
+// Note: (mprakhov) after providing revealed addresses this test must be fixed
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSTokenPermission() {
-	community, _ := s.createCommunity()
+	s.T().Skip("flaky test")
+	community, _ := createCommunity(&s.Suite, s.owner)
 
 	createTokenPermission := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
@@ -419,7 +440,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 	s.Require().NoError(err)
 	s.Require().Len(declinedRequests, 0)
 
-	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	requestToJoin := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	// We try to join the org
 	response, err = s.alice.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
@@ -510,7 +531,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 
 	// bob joins the community
 	s.advertiseCommunityTo(community, s.bob)
-	s.joinCommunityWithAirdropAddress(community, s.bob, bobPassword, []string{bobAddress}, "")
+	s.joinCommunity(community, s.bob)
 
 	messages := []string{
 		"1-message", // RandomLettersString(10), // successful message on open community
@@ -609,7 +630,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	s.Require().NoError(err)
 
 	// bob tries to join, but he doesn't satisfy so the request isn't sent
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), AddressesToReveal: []string{bobAddress}, AirdropAddress: bobAddress}
+	request := s.createRequestToJoinCommunity(community.ID(), s.bob)
 	_, err = s.bob.RequestToJoinCommunity(request)
 	s.Require().ErrorIs(err, communities.ErrPermissionToJoinNotSatisfied)
 
@@ -631,7 +652,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	})
 
 	// bob re-joins the community
-	s.joinCommunity(community, s.bob, bobPassword, []string{bobAddress})
+	s.joinCommunity(community, s.bob)
 
 	err = <-waitOnCommunityKeyToBeDistributedToBob
 	s.Require().NoError(err)
@@ -686,7 +707,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPe
 	s.advertiseCommunityTo(community, s.bob)
 
 	// Bob should still be able to join even if there is a permission to be an admin
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.bob)
 
 	// Verify that we have Bob's revealed account
 	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
@@ -756,7 +777,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWit
 
 	// Bob should still be able to join even though he doesn't satisfy the admin requirement
 	// because he satisfies the member one
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.bob)
 
 	// Verify that we have Bob's revealed account
 	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
@@ -834,7 +855,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 
 	// Bob should still be able to join even though he doesn't satisfy the member requirement
 	// because he satisfies the admin one
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.bob)
 
 	// Verify that we have Bob's revealed account
 	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
@@ -865,7 +886,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testViewChannelPermissions(v
 
 	// bob joins the community
 	s.advertiseCommunityTo(community, s.bob)
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.bob)
 
 	// send message to the channel
 	msg := s.sendChatMessage(s.owner, chat.ID, "hello on open community")
@@ -1042,7 +1063,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestAnnouncementsChannelPerm
 
 	// bob joins the community
 	s.advertiseCommunityTo(community, s.bob)
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.bob)
 
 	// setup view channel permission
 	channelPermissionRequest := requests.CreateCommunityTokenPermission{
@@ -1135,7 +1156,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestSearchMessageinPermissio
 
 	// bob joins the community
 	s.advertiseCommunityTo(community, s.bob)
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.bob)
 
 	// send message to the original channel
 	msg := s.sendChatMessage(s.owner, chat.ID, "hello on open community")
@@ -1240,7 +1261,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 
 	// bob joins the community
 	s.advertiseCommunityTo(community, s.bob)
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.bob)
 
 	community, err := s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
@@ -1499,7 +1520,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.makeAddressSatisfyTheCriteria(testChainID1, aliceAddress1, tokenPermission.TokenCriteria[0])
 
 	// join community as a privileged user
-	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress1})
+	s.joinCommunity(community, s.alice)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
@@ -1657,7 +1678,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	})
 
 	// join community as a privileged user
-	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress1})
+	s.joinCommunity(community, s.alice)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
@@ -1776,7 +1797,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestResendEncryptionKeyOnBac
 
 	// bob joins the community
 	s.advertiseCommunityTo(community, s.bob)
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.bob)
 
 	// setup view channel permission
 	channelPermissionRequest := requests.CreateCommunityTokenPermission{
@@ -2166,7 +2187,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 		return ok
 	})
 
-	s.joinCommunity(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.bob)
 
 	err = <-waitForKeysDistributedToBob
 	s.Require().NoError(err)

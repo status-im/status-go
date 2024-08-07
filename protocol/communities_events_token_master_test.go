@@ -4,18 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
-
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestTokenMasterCommunityEventsSuite(t *testing.T) {
@@ -23,95 +15,7 @@ func TestTokenMasterCommunityEventsSuite(t *testing.T) {
 }
 
 type TokenMasterCommunityEventsSuite struct {
-	suite.Suite
-	controlNode *Messenger
-	tokenMaster *Messenger
-	alice       *Messenger
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh                     types.Waku
-	logger                  *zap.Logger
-	mockedBalances          map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
-	collectiblesServiceMock *CollectiblesServiceMock
-
-	additionalEventSenders []*Messenger
-}
-
-func (s *TokenMasterCommunityEventsSuite) GetControlNode() *Messenger {
-	return s.controlNode
-}
-
-func (s *TokenMasterCommunityEventsSuite) GetEventSender() *Messenger {
-	return s.tokenMaster
-}
-
-func (s *TokenMasterCommunityEventsSuite) GetMember() *Messenger {
-	return s.alice
-}
-
-func (s *TokenMasterCommunityEventsSuite) GetSuite() *suite.Suite {
-	return &s.Suite
-}
-
-func (s *TokenMasterCommunityEventsSuite) GetCollectiblesServiceMock() *CollectiblesServiceMock {
-	return s.collectiblesServiceMock
-}
-
-func (s *TokenMasterCommunityEventsSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-	s.collectiblesServiceMock = &CollectiblesServiceMock{}
-
-	s.mockedBalances = createMockedWalletBalance(&s.Suite)
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.controlNode = s.newMessenger("", []string{})
-	s.tokenMaster = s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
-	s.alice = s.newMessenger(accountPassword, []string{aliceAccountAddress})
-	_, err := s.controlNode.Start()
-	s.Require().NoError(err)
-	_, err = s.tokenMaster.Start()
-	s.Require().NoError(err)
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
-
-}
-
-func (s *TokenMasterCommunityEventsSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.controlNode)
-	TearDownMessenger(&s.Suite, s.tokenMaster)
-	TearDownMessenger(&s.Suite, s.alice)
-
-	for _, m := range s.additionalEventSenders {
-		TearDownMessenger(&s.Suite, m)
-	}
-	s.additionalEventSenders = nil
-
-	_ = s.logger.Sync()
-}
-
-func (s *TokenMasterCommunityEventsSuite) SetupAdditionalMessengers(messengers []*Messenger) {
-	for _, m := range messengers {
-		s.additionalEventSenders = append(s.additionalEventSenders, m)
-		_, err := m.Start()
-		s.Require().NoError(err)
-	}
-}
-
-func (s *TokenMasterCommunityEventsSuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
-		testMessengerConfig: testMessengerConfig{
-			logger: s.logger,
-		},
-		password:            password,
-		walletAddresses:     walletAddresses,
-		mockedBalances:      &s.mockedBalances,
-		collectiblesService: s.collectiblesServiceMock,
-	})
+	EventSenderCommunityEventsSuiteBase
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterEditCommunityDescription() {
@@ -166,7 +70,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterCannotDeleteBecomeToken
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptMemberRequestToJoin() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testAcceptMemberRequestToJoin(s, community, user)
@@ -177,7 +81,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptMemberRequestToJo
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalTokenMaster)
@@ -187,7 +91,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJo
 	additionalTokenMaster := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalTokenMaster)
@@ -196,7 +100,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJo
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJoin() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testRejectMemberRequestToJoin(s, community, user)
@@ -209,7 +113,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterControlNodeHandlesMulti
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(s, community, user, additionalTokenMaster)
 }
 
@@ -294,8 +198,8 @@ func (s *TokenMasterCommunityEventsSuite) TestMemberReceiveTokenMasterEventsWhen
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestJoinedTokenMasterReceiveRequestsToJoinWithRevealedAccounts() {
-	s.T().Skip("flaky test")
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
+	// event sender will receive privileged role during permission creation
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_NONE, []*Messenger{})
 
 	// set up additional user (bob) that will send request to join
 	bob := s.newMessenger(accountPassword, []string{bobAccountAddress})
@@ -304,12 +208,10 @@ func (s *TokenMasterCommunityEventsSuite) TestJoinedTokenMasterReceiveRequestsTo
 	newPrivilegedUser := s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
 
 	s.SetupAdditionalMessengers([]*Messenger{bob, newPrivilegedUser})
-
 	testJoinedPrivilegedMemberReceiveRequestsToJoin(s, community, bob, newPrivilegedUser, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestReceiveRequestsToJoinWithRevealedAccountsAfterGettingTokenMasterRole() {
-	s.T().Skip("flaky test")
 	// set up additional user (bob) that will send request to join
 	bob := s.newMessenger(accountPassword, []string{bobAccountAddress})
 	s.SetupAdditionalMessengers([]*Messenger{bob})
@@ -320,7 +222,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptsRequestToJoinAft
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	s.SetupAdditionalMessengers([]*Messenger{user})
 	testPrivilegedMemberAcceptsRequestToJoinAfterMemberLeave(s, community, user)
 }

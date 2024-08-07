@@ -18,7 +18,7 @@ func TestCommunityEventsEventualConsistencySuite(t *testing.T) {
 }
 
 type CommunityEventsEventualConsistencySuite struct {
-	AdminCommunityEventsSuiteBase
+	EventSenderCommunityEventsSuiteBase
 
 	messagesOrderController *MessagesOrderController
 }
@@ -26,7 +26,8 @@ type CommunityEventsEventualConsistencySuite struct {
 func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
-
+	s.accountsTestData = make(map[string][]string)
+	s.accountsPasswords = make(map[string]string)
 	s.mockedBalances = createMockedWalletBalance(&s.Suite)
 
 	config := waku.DefaultConfig
@@ -41,24 +42,19 @@ func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
 	s.messagesOrderController.Start(wakuWrapper.SubscribePostEvents())
 
 	s.owner = s.newMessenger("", []string{})
-	s.admin = s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
+	s.eventSender = s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
 	s.alice = s.newMessenger(accountPassword, []string{aliceAccountAddress})
 	_, err = s.owner.Start()
 	s.Require().NoError(err)
-	_, err = s.admin.Start()
+	_, err = s.eventSender.Start()
 	s.Require().NoError(err)
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
 
 }
 
-func (s *CommunityEventsEventualConsistencySuite) TearDownTest() {
-	s.AdminCommunityEventsSuiteBase.TearDownTest()
-	s.messagesOrderController.Stop()
-}
-
 func (s *CommunityEventsEventualConsistencySuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
+	messenger := newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
 		testMessengerConfig: testMessengerConfig{
 			logger:                  s.logger,
 			messagesOrderController: s.messagesOrderController,
@@ -68,6 +64,16 @@ func (s *CommunityEventsEventualConsistencySuite) newMessenger(password string, 
 		mockedBalances:      &s.mockedBalances,
 		collectiblesService: s.collectiblesServiceMock,
 	})
+
+	publicKey := messenger.IdentityPublicKeyString()
+	s.accountsTestData[publicKey] = walletAddresses
+	s.accountsPasswords[publicKey] = password
+	return messenger
+}
+
+func (s *CommunityEventsEventualConsistencySuite) TearDownTest() {
+	s.EventSenderCommunityEventsSuiteBase.TearDownTest()
+	s.messagesOrderController.Stop()
 }
 
 type requestToJoinActionType int
@@ -82,13 +88,18 @@ func (s *CommunityEventsEventualConsistencySuite) testRequestsToJoin(actions []r
 	s.Require().True(community.IsControlNode())
 
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, user)
 
 	// user sends request to join
-	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID(), ENSName: "testName"}
+	userPPk := user.IdentityPublicKeyString()
+	userPassword, exists := s.accountsPasswords[userPPk]
+	s.Require().True(exists)
+	userAccounts, exists := s.accountsTestData[userPPk]
+	s.Require().True(exists)
+	requestToJoin := createRequestToJoinCommunity(&s.Suite, community.ID(), user, userPassword, userAccounts)
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -107,7 +118,7 @@ func (s *CommunityEventsEventualConsistencySuite) testRequestsToJoin(actions []r
 
 	// admin receives request to join
 	response, err = WaitOnMessengerResponse(
-		s.admin,
+		s.eventSender,
 		checkRequestToJoin,
 		"event sender did not receive community request to join",
 	)
@@ -118,12 +129,12 @@ func (s *CommunityEventsEventualConsistencySuite) testRequestsToJoin(actions []r
 		switch action {
 		case requestToJoinAccept:
 			acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
-			_, err = s.admin.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+			_, err = s.eventSender.AcceptRequestToJoinCommunity(acceptRequestToJoin)
 			s.Require().NoError(err)
 
 		case requestToJoinReject:
 			rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: sentRequest.ID}
-			_, err = s.admin.DeclineRequestToJoinCommunity(rejectRequestToJoin)
+			_, err = s.eventSender.DeclineRequestToJoinCommunity(rejectRequestToJoin)
 			s.Require().NoError(err)
 		}
 	}

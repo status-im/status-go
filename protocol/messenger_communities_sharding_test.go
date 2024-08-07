@@ -34,10 +34,24 @@ type MessengerCommunitiesShardingSuite struct {
 	aliceUnhandledMessagesTracker *unhandledMessagesTracker
 
 	logger *zap.Logger
+
+	mockedBalances          communities.BalancesByChain
+	mockedCollectibles      communities.CollectiblesByChain
+	collectiblesServiceMock *CollectiblesServiceMock
+	collectiblesManagerMock *CollectiblesManagerMock
+	accountsTestData        map[string][]string
+	accountsPasswords       map[string]string
 }
 
 func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
+	s.collectiblesServiceMock = &CollectiblesServiceMock{}
+	s.mockedCollectibles = make(communities.CollectiblesByChain)
+	s.collectiblesManagerMock = &CollectiblesManagerMock{
+		Collectibles: &s.mockedCollectibles,
+	}
+	s.accountsTestData = make(map[string][]string)
+	s.accountsPasswords = make(map[string]string)
 
 	wakuNodes := CreateWakuV2Network(&s.Suite, s.logger, []string{"owner", "alice"})
 
@@ -49,7 +63,11 @@ func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 			name:   "owner",
 			logger: s.logger,
 		},
-		nodeConfig: nodeConfig,
+		walletAddresses:     []string{},
+		password:            "",
+		nodeConfig:          nodeConfig,
+		mockedBalances:      &s.mockedBalances,
+		collectiblesManager: s.collectiblesManagerMock,
 	})
 
 	s.aliceUnhandledMessagesTracker = &unhandledMessagesTracker{
@@ -62,7 +80,10 @@ func (s *MessengerCommunitiesShardingSuite) SetupTest() {
 			logger:                   s.logger,
 			unhandledMessagesTracker: s.aliceUnhandledMessagesTracker,
 		},
-		nodeConfig: nodeConfig,
+		walletAddresses: []string{aliceAddress1},
+		password:        alicePassword,
+		nodeConfig:      nodeConfig,
+		mockedBalances:  &s.mockedBalances,
 	})
 
 	_, err := s.owner.Start()
@@ -119,7 +140,7 @@ func (s *MessengerCommunitiesShardingSuite) TestPostToCommunityChat() {
 	community, chat := createCommunity(&s.Suite, s.owner)
 
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
-	joinCommunity(&s.Suite, community, s.owner, s.alice, &requests.RequestToJoinCommunity{CommunityID: community.ID()}, "")
+	joinCommunity(&s.Suite, community.ID(), s.owner, s.alice, alicePassword, []string{aliceAddress1})
 
 	// Members should be able to receive messages in a community with sharding enabled.
 	{
@@ -153,7 +174,7 @@ func (s *MessengerCommunitiesShardingSuite) TestIgnoreOutdatedShardKey() {
 	community, _ := createCommunity(&s.Suite, s.owner)
 
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
-	joinCommunity(&s.Suite, community, s.owner, s.alice, &requests.RequestToJoinCommunity{CommunityID: community.ID()}, "")
+	joinCommunity(&s.Suite, community.ID(), s.owner, s.alice, alicePassword, []string{aliceAddress1})
 
 	shard := &shard.Shard{
 		Cluster: shard.MainStatusShardCluster,

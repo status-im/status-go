@@ -4,18 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
-
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestOwnerWithoutCommunityKeyCommunityEventsSuite(t *testing.T) {
@@ -23,94 +15,7 @@ func TestOwnerWithoutCommunityKeyCommunityEventsSuite(t *testing.T) {
 }
 
 type OwnerWithoutCommunityKeyCommunityEventsSuite struct {
-	suite.Suite
-	controlNode              *Messenger
-	ownerWithoutCommunityKey *Messenger
-	alice                    *Messenger
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh                     types.Waku
-	logger                  *zap.Logger
-	mockedBalances          map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
-	collectiblesServiceMock *CollectiblesServiceMock
-
-	additionalEventSenders []*Messenger
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) GetControlNode() *Messenger {
-	return s.controlNode
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) GetEventSender() *Messenger {
-	return s.ownerWithoutCommunityKey
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) GetMember() *Messenger {
-	return s.alice
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) GetSuite() *suite.Suite {
-	return &s.Suite
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) GetCollectiblesServiceMock() *CollectiblesServiceMock {
-	return s.collectiblesServiceMock
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-	s.collectiblesServiceMock = &CollectiblesServiceMock{}
-
-	s.mockedBalances = createMockedWalletBalance(&s.Suite)
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.controlNode = s.newMessenger("", []string{})
-	s.ownerWithoutCommunityKey = s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
-	s.alice = s.newMessenger("", []string{})
-	_, err := s.controlNode.Start()
-	s.Require().NoError(err)
-	_, err = s.ownerWithoutCommunityKey.Start()
-	s.Require().NoError(err)
-	_, err = s.alice.Start()
-	s.Require().NoError(err)
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TearDownTest() {
-	TearDownMessenger(&s.Suite, s.controlNode)
-	TearDownMessenger(&s.Suite, s.ownerWithoutCommunityKey)
-	TearDownMessenger(&s.Suite, s.alice)
-
-	for _, m := range s.additionalEventSenders {
-		TearDownMessenger(&s.Suite, m)
-	}
-	s.additionalEventSenders = nil
-
-	_ = s.logger.Sync()
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) SetupAdditionalMessengers(messengers []*Messenger) {
-	for _, m := range messengers {
-		s.additionalEventSenders = append(s.additionalEventSenders, m)
-		_, err := m.Start()
-		s.Require().NoError(err)
-	}
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	return newTestCommunitiesMessenger(&s.Suite, s.shh, testCommunitiesMessengerConfig{
-		testMessengerConfig: testMessengerConfig{
-			logger: s.logger,
-		},
-		password:            password,
-		walletAddresses:     walletAddresses,
-		mockedBalances:      &s.mockedBalances,
-		collectiblesService: s.collectiblesServiceMock,
-	})
+	EventSenderCommunityEventsSuiteBase
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerEditCommunityDescription() {
@@ -140,11 +45,11 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCreateEditDelete
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders() {
-	additionalOwner := s.newMessenger("", []string{})
+	additionalOwner := s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
@@ -154,18 +59,18 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequ
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testAcceptMemberRequestToJoin(s, community, user)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequestToJoinResponseSharedWithOtherEventSenders() {
-	additionalOwner := s.newMessenger("", []string{})
+	additionalOwner := s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
@@ -175,20 +80,21 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequ
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	s.SetupAdditionalMessengers([]*Messenger{user})
 
 	testRejectMemberRequestToJoin(s, community, user)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
+	// TODO: test fixed, need to fix the code as it contains error
 	s.T().Skip("flaky test")
 
-	additionalOwner := s.newMessenger("", []string{})
+	additionalOwner := s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
+	user := s.newMessenger("somePassword", []string{"0x0123400000000000000000000000000000000000"})
 	testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(s, community, user, additionalOwner)
 }
 

@@ -2665,9 +2665,11 @@ func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
 		return err
 	}
 
-	err = m.saveAndPublish(community)
-	if err != nil {
-		return err
+	if community.IsControlNode() {
+		err = m.saveAndPublish(community)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -3644,10 +3646,6 @@ func (m *Manager) SpectateCommunity(id types.HexBytes) (*Community, error) {
 
 func (m *Manager) GetMagnetlinkMessageClock(communityID types.HexBytes) (uint64, error) {
 	return m.persistence.GetMagnetlinkMessageClock(communityID)
-}
-
-func (m *Manager) GetRequestToJoinIDByPkAndCommunityID(pk *ecdsa.PublicKey, communityID []byte) ([]byte, error) {
-	return m.persistence.GetRequestToJoinIDByPkAndCommunityID(common.PubkeyToHex(pk), communityID)
 }
 
 func (m *Manager) GetCommunityRequestToJoinClock(pk *ecdsa.PublicKey, communityID string) (uint64, error) {
@@ -4836,6 +4834,10 @@ func (m *Manager) handleCommunityEvents(community *Community) error {
 }
 
 func (m *Manager) ShareRequestsToJoinWithPrivilegedMembers(community *Community, privilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {
+	if len(privilegedMembers) == 0 {
+		return nil
+	}
+
 	requestsToJoin, err := m.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
 	if err != nil {
 		return err
@@ -4844,6 +4846,11 @@ func (m *Manager) ShareRequestsToJoinWithPrivilegedMembers(community *Community,
 	var syncRequestsWithoutRevealedAccounts []*protobuf.SyncCommunityRequestsToJoin
 	var syncRequestsWithRevealedAccounts []*protobuf.SyncCommunityRequestsToJoin
 	for _, request := range requestsToJoin {
+		// if shared request to join is not approved by control node - do not send revealed accounts.
+		// revealed accounts will be sent as soon as control node accepts request to join
+		if request.State != RequestToJoinStateAccepted {
+			request.RevealedAccounts = []*protobuf.RevealedAccount{}
+		}
 		syncRequestsWithRevealedAccounts = append(syncRequestsWithRevealedAccounts, request.ToSyncProtobuf())
 		requestProtoWithoutAccounts := request.ToSyncProtobuf()
 		requestProtoWithoutAccounts.RevealedAccounts = []*protobuf.RevealedAccount{}

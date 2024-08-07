@@ -339,28 +339,37 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 
 	signer := &key.PublicKey
 
+	revealedAccounts := []*protobuf.RevealedAccount{
+		&protobuf.RevealedAccount{
+			Address: "0x0100000000000000000000000000000000000000"},
+	}
+
 	request := &protobuf.CommunityRequestToJoin{
-		EnsName:     "donvanvliet.stateofus.eth",
-		CommunityId: s.communityID,
-		Clock:       uint64(time.Now().Unix()),
+		EnsName:          "donvanvliet.stateofus.eth",
+		CommunityId:      s.communityID,
+		Clock:            uint64(time.Now().Unix()),
+		RevealedAccounts: revealedAccounts,
 	}
 
 	requestWithChatID := &protobuf.CommunityRequestToJoin{
-		EnsName:     "donvanvliet.stateofus.eth",
-		CommunityId: s.communityID,
-		ChatId:      testChatID1,
-		Clock:       uint64(time.Now().Unix()),
+		EnsName:          "donvanvliet.stateofus.eth",
+		CommunityId:      s.communityID,
+		ChatId:           testChatID1,
+		Clock:            uint64(time.Now().Unix()),
+		RevealedAccounts: revealedAccounts,
 	}
 
 	requestWithoutENS := &protobuf.CommunityRequestToJoin{
-		CommunityId: s.communityID,
-		Clock:       uint64(time.Now().Unix()),
+		CommunityId:      s.communityID,
+		Clock:            uint64(time.Now().Unix()),
+		RevealedAccounts: revealedAccounts,
 	}
 
 	requestWithChatWithoutENS := &protobuf.CommunityRequestToJoin{
-		CommunityId: s.communityID,
-		ChatId:      testChatID1,
-		Clock:       uint64(time.Now().Unix()),
+		CommunityId:      s.communityID,
+		ChatId:           testChatID1,
+		Clock:            uint64(time.Now().Unix()),
+		RevealedAccounts: revealedAccounts,
 	}
 
 	// MATRIX

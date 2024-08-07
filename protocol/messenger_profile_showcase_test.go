@@ -2,18 +2,13 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"math/big"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/appdatabase"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -22,12 +17,11 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/waku"
+
+	"github.com/stretchr/testify/suite"
 )
 
 func TestMessengerProfileShowcaseSuite(t *testing.T) { // nolint: deadcode,unused
@@ -35,53 +29,20 @@ func TestMessengerProfileShowcaseSuite(t *testing.T) { // nolint: deadcode,unuse
 }
 
 type TestMessengerProfileShowcase struct {
-	suite.Suite
-	m          *Messenger        // main instance of Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-	// If one wants to send messages between different instances of Messenger,
-	// a single waku service should be shared.
-	shh              types.Waku
-	logger           *zap.Logger
-	collectiblesMock CollectiblesManagerMock
+	CommunitiesMessengerTestSuiteBase
+	m *Messenger // main instance of Messenger
 }
 
 func (s *TestMessengerProfileShowcase) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.m = s.newMessengerForProfileShowcase()
-	s.privateKey = s.m.identity
+	s.CommunitiesMessengerTestSuiteBase.SetupTest()
+	s.m = s.newMessenger("", []string{})
+	_, err := s.m.Start()
+	s.Require().NoError(err)
 }
 
 func (s *TestMessengerProfileShowcase) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.m)
-	_ = s.logger.Sync()
-}
-
-func (s *TestMessengerProfileShowcase) newMessengerForProfileShowcase() *Messenger {
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.NoError(err, "creating sqlite db instance")
-	err = sqlite.Migrate(db)
-	s.NoError(err, "protocol migrate")
-
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	s.collectiblesMock = CollectiblesManagerMock{}
-
-	options := []Option{
-		WithCollectiblesManager(&s.collectiblesMock),
-	}
-
-	m, err := newMessengerWithKey(s.shh, privateKey, s.logger, options)
-	s.Require().NoError(err)
-
-	return m
+	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
 func (s *TestMessengerProfileShowcase) mutualContact(theirMessenger *Messenger) {
@@ -187,7 +148,7 @@ func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences(
 			TxTimestamp: 0,
 		},
 	}
-	s.collectiblesMock.SetCollectibleOwnershipResponse(collectibleID, balances)
+	s.collectiblesManagerMock.SetCollectibleOwnershipResponse(collectibleID, balances)
 
 	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
@@ -258,7 +219,7 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 			TxTimestamp: 0,
 		},
 	}
-	s.collectiblesMock.SetCollectibleOwnershipResponse(collectibleID, balances)
+	s.collectiblesManagerMock.SetCollectibleOwnershipResponse(collectibleID, balances)
 
 	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().Equal(errorAccountVisibilityLowerThanCollectible, err)
@@ -266,7 +227,10 @@ func (s *TestMessengerProfileShowcase) TestFailToSaveProfileShowcasePreferencesW
 
 func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntries() {
 	// Add mutual contact
-	theirMessenger := s.newMessengerForProfileShowcase()
+	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
 	s.mutualContact(theirMessenger)
@@ -441,7 +405,7 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 			TxTimestamp: 32443424,
 		},
 	}
-	s.collectiblesMock.SetCollectibleOwnershipResponse(collectibleID, balances)
+	s.collectiblesManagerMock.SetCollectibleOwnershipResponse(collectibleID, balances)
 
 	err = s.m.SetProfileShowcasePreferences(request, false)
 	s.Require().NoError(err)
@@ -457,13 +421,17 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Len(profileShowcasePreferences.UnverifiedTokens, 2)
 
 	// Add mutual contact
-	mutualContact := s.newMessengerForProfileShowcase()
+	mutualContact := s.newMessenger(alicePassword, []string{aliceAccountAddress})
+	_, err = mutualContact.Start()
+	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, mutualContact)
 
 	s.mutualContact(mutualContact)
 
 	// Add identity verified contact
-	verifiedContact := s.newMessengerForProfileShowcase()
+	verifiedContact := s.newMessenger(bobPassword, []string{bobAccountAddress})
+	_, err = verifiedContact.Start()
+	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, verifiedContact)
 
 	s.mutualContact(verifiedContact)
@@ -587,7 +555,9 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnenc
 	s.Require().NoError(err)
 
 	// Add bob as a mutual contact
-	bob := s.newMessengerForProfileShowcase()
+	bob := s.newMessenger(bobPassword, []string{bobAccountAddress})
+	_, err = bob.Start()
+	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
 	s.mutualContact(bob)
@@ -652,7 +622,9 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 	s.Require().NoError(err)
 
 	// Add bob as a mutual contact
-	bob := s.newMessengerForProfileShowcase()
+	bob := s.newMessenger(bobPassword, []string{bobAccountAddress})
+	_, err = bob.Start()
+	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
 	s.mutualContact(bob)
@@ -735,7 +707,9 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesGrantExpires(
 	s.Require().True(community.Encrypted())
 
 	// 2) Bob add Alice become a mutual contacts
-	bob := s.newMessengerForProfileShowcase()
+	bob := s.newMessenger(bobPassword, []string{bobAccountAddress})
+	_, err = bob.Start()
+	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
 	s.mutualContact(bob)
@@ -800,7 +774,9 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 	s.Require().NoError(err)
 
 	// 1) Owner creates an encrypted community
-	owner := s.newMessengerForProfileShowcase()
+	owner := s.newMessenger("", []string{})
+	_, err = owner.Start()
+	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, owner)
 
 	owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
@@ -809,7 +785,9 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 	s.Require().True(community.Encrypted())
 
 	// 2) Bob add Alice become a mutual contacts
-	bob := s.newMessengerForProfileShowcase()
+	bob := s.newMessenger(bobPassword, []string{bobAccountAddress})
+	_, err = bob.Start()
+	s.Require().NoError(err)
 	defer TearDownMessenger(&s.Suite, bob)
 
 	s.mutualContact(bob)
@@ -817,8 +795,9 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 	// 3) Alice joins the community
 	advertiseCommunityTo(&s.Suite, community, owner, alice)
 	advertiseCommunityTo(&s.Suite, community, owner, bob)
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, owner, alice, request, "")
+
+	alice.communitiesManager.PermissionChecker = &testPermissionChecker{}
+	joinCommunity(&s.Suite, community.ID(), owner, alice, aliceAccountAddress, []string{aliceAddress1})
 
 	joinedCommunities, err := alice.communitiesManager.Joined()
 	s.Require().NoError(err)

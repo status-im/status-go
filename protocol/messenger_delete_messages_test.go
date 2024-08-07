@@ -5,17 +5,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestMessengerDeleteMessagesSuite(t *testing.T) {
@@ -23,42 +17,32 @@ func TestMessengerDeleteMessagesSuite(t *testing.T) {
 }
 
 type MessengerDeleteMessagesSuite struct {
-	suite.Suite
-	owner  *Messenger
-	admin  *Messenger
-	bob    *Messenger
-	shh    types.Waku
-	logger *zap.Logger
+	CommunitiesMessengerTestSuiteBase
+	owner *Messenger
+	admin *Messenger
+	bob   *Messenger
 }
 
 func (s *MessengerDeleteMessagesSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
+	s.CommunitiesMessengerTestSuiteBase.SetupTest()
 
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
+	s.owner = s.newMessenger("", []string{})
+	s.bob = s.newMessenger(bobPassword, []string{bobAddress})
+	s.admin = s.newMessenger(alicePassword, []string{aliceAddress1})
 
-	s.owner = s.newMessenger()
-	s.bob = s.newMessenger()
-	s.admin = s.newMessenger()
+	_, err := s.owner.Start()
+	s.Require().NoError(err)
+	_, err = s.bob.Start()
+	s.Require().NoError(err)
+	_, err = s.admin.Start()
+	s.Require().NoError(err)
 }
 
 func (s *MessengerDeleteMessagesSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.owner)
 	TearDownMessenger(&s.Suite, s.bob)
 	TearDownMessenger(&s.Suite, s.admin)
-	_ = s.logger.Sync()
-}
-
-func (s *MessengerDeleteMessagesSuite) newMessenger() *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
+	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
 func (s *MessengerDeleteMessagesSuite) sendMessageAndCheckDelivery(sender *Messenger, text string, chatID string) *common.Message {
@@ -120,13 +104,14 @@ func (s *MessengerDeleteMessagesSuite) checkAllMembersHasMemberMessages(memberPu
 func (s *MessengerDeleteMessagesSuite) TestDeleteMessageErrors() {
 	community, communityChat := createCommunity(&s.Suite, s.owner)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.admin)
-	joinCommunity(&s.Suite, community, s.owner, s.admin, request, "")
+	joinCommunity(&s.Suite, community.ID(), s.owner, s.admin, alicePassword, []string{aliceAddress1})
+
+	community, err := s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
-	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
+	joinCommunity(&s.Suite, community.ID(), s.owner, s.bob, bobPassword, []string{bobAddress})
 
 	grantPermission(&s.Suite, community, s.owner, s.admin, protobuf.CommunityMember_ROLE_ADMIN)
 
@@ -138,7 +123,7 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteMessageErrors() {
 
 	// empty request
 	deleteMessagesRequest := &requests.DeleteCommunityMemberMessages{}
-	_, err := s.owner.DeleteCommunityMemberMessages(deleteMessagesRequest)
+	_, err = s.owner.DeleteCommunityMemberMessages(deleteMessagesRequest)
 	s.Require().ErrorIs(err, requests.ErrDeleteCommunityMemberMessagesInvalidCommunityID)
 
 	// only community ID provided
@@ -190,13 +175,11 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteMessageErrors() {
 func (s *MessengerDeleteMessagesSuite) TestDeleteMessage() {
 	community, communityChat := createCommunity(&s.Suite, s.owner)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.admin)
-	joinCommunity(&s.Suite, community, s.owner, s.admin, request, "")
+	joinCommunity(&s.Suite, community.ID(), s.owner, s.admin, alicePassword, []string{aliceAddress1})
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
-	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
+	joinCommunity(&s.Suite, community.ID(), s.owner, s.bob, bobPassword, []string{bobAddress})
 
 	grantPermission(&s.Suite, community, s.owner, s.admin, protobuf.CommunityMember_ROLE_ADMIN)
 
@@ -308,13 +291,11 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteMessage() {
 func (s *MessengerDeleteMessagesSuite) TestDeleteAllMemberMessage() {
 	community, communityChat := createCommunity(&s.Suite, s.owner)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.admin)
-	joinCommunity(&s.Suite, community, s.owner, s.admin, request, "")
+	joinCommunity(&s.Suite, community.ID(), s.owner, s.admin, aliceAccountAddress, []string{aliceAddress1})
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
-	joinCommunity(&s.Suite, community, s.owner, s.bob, request, "")
+	joinCommunity(&s.Suite, community.ID(), s.owner, s.bob, bobPassword, []string{bobAddress})
 
 	grantPermission(&s.Suite, community, s.owner, s.admin, protobuf.CommunityMember_ROLE_ADMIN)
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -26,19 +27,34 @@ func (s *MessengerActivityCenterMessageSuite) advertiseCommunityTo(community *co
 }
 
 func (s *MessengerActivityCenterMessageSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, owner, user, request, "")
+	joinCommunity(&s.Suite, community.ID(), owner, user, accountPassword, []string{commonAccountAddress})
 }
 
 type MessengerActivityCenterMessageSuite struct {
-	MessengerBaseTestSuite
+	CommunitiesMessengerTestSuiteBase
+	m *Messenger // main instance of Messenger
+}
+
+func (s *MessengerActivityCenterMessageSuite) SetupTest() {
+	s.CommunitiesMessengerTestSuiteBase.SetupTest()
+
+	s.m = s.newMessenger(alicePassword, []string{aliceAccountAddress})
+	s.m.account.CustomizationColor = multiaccountscommon.CustomizationColorOrange
+
+	_, err := s.m.Start()
+	s.Require().NoError(err)
+}
+
+func (s *MessengerActivityCenterMessageSuite) TearDownTest() {
+	TearDownMessenger(&s.Suite, s.m)
+	s.CommunitiesMessengerTestSuiteBase.TearDownTest()
 }
 
 func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
-	theirMessenger := s.newMessenger()
+	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.transport)
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
@@ -89,7 +105,7 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 
 func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 	alice := s.m
-	bob := s.newMessenger()
+	bob := s.newMessenger(bobPassword, []string{bobAddress})
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
@@ -129,7 +145,7 @@ func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 
 func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 	alice := s.m
-	bob := s.newMessenger()
+	bob := s.newMessenger(bobPassword, []string{bobAddress})
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// create an http server
@@ -211,7 +227,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 
 func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNotifications() {
 	alice := s.m
-	bob := s.newMessenger()
+	bob := s.newMessenger(bobPassword, []string{bobAddress})
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
@@ -261,7 +277,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNot
 
 func (s *MessengerActivityCenterMessageSuite) TestReadCommunityOverviewNotifications() {
 	alice := s.m
-	bob := s.newMessenger()
+	bob := s.newMessenger(bobPassword, []string{bobAddress})
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
@@ -284,7 +300,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReadCommunityOverviewNotificat
 
 func (s *MessengerActivityCenterMessageSuite) prepareCommunityChannelWithMentionAndReply() (*Messenger, *Messenger, *common.Message, *common.Message, *communities.Community) {
 	alice := s.m
-	bob := s.newMessenger()
+	bob := s.newMessenger(bobPassword, []string{bobAddress})
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community
@@ -458,7 +474,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMarkAllActivityCenterNotificat
 
 func (s *MessengerActivityCenterMessageSuite) TestAliceDoesNotReceiveCommunityNotificationsBeforeJoined() {
 	alice := s.m
-	bob := s.newMessenger()
+	bob := s.newMessenger(bobPassword, []string{bobAddress})
 	defer TearDownMessenger(&s.Suite, bob)
 
 	// Create a community

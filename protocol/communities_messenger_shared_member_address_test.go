@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"math/big"
 	"testing"
 	"time"
 
@@ -39,6 +38,8 @@ type MessengerCommunitiesSharedMemberAddressSuite struct {
 
 	mockedBalances          map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
 	collectiblesServiceMock *CollectiblesServiceMock
+	mockedCollectibles      communities.CollectiblesByChain
+	collectiblesManagerMock CollectiblesManagerMock
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) SetupTest() {
@@ -52,6 +53,10 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) SetupTest() {
 
 	communities.SetValidateInterval(300 * time.Millisecond)
 	s.collectiblesServiceMock = &CollectiblesServiceMock{}
+	s.mockedCollectibles = communities.CollectiblesByChain{}
+	s.collectiblesManagerMock = CollectiblesManagerMock{
+		Collectibles: &s.mockedCollectibles,
+	}
 
 	s.resetMockedBalances()
 
@@ -108,21 +113,12 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) newMessenger(password str
 		walletAddresses:     walletAddresses,
 		mockedBalances:      &s.mockedBalances,
 		collectiblesService: s.collectiblesServiceMock,
+		collectiblesManager: &s.collectiblesManagerMock,
 	})
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) joinCommunity(community *communities.Community, user *Messenger, password string, addresses []string) {
-	s.joinCommunityWithAirdropAddress(community, user, password, addresses, "")
-}
-
-func (s *MessengerCommunitiesSharedMemberAddressSuite) joinCommunityWithAirdropAddress(community *communities.Community, user *Messenger, password string, addresses []string, airdropAddress string) {
-	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(password)))
-	if airdropAddress == "" && len(addresses) > 0 {
-		airdropAddress = addresses[0]
-	}
-
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), AddressesToReveal: addresses, AirdropAddress: airdropAddress}
-	joinCommunity(&s.Suite, community, s.owner, user, request, passwdHash)
+	joinCommunity(&s.Suite, community.ID(), s.owner, user, password, addresses)
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) checkRevealedAccounts(communityID types.HexBytes, user *Messenger, expectedAccounts []*protobuf.RevealedAccount) {
@@ -132,12 +128,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) checkRevealedAccounts(com
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) makeAddressSatisfyTheCriteria(chainID uint64, address string, criteria *protobuf.TokenCriteria) {
-	walletAddress := gethcommon.HexToAddress(address)
-	contractAddress := gethcommon.HexToAddress(criteria.ContractAddresses[chainID])
-	balance, ok := new(big.Int).SetString(criteria.AmountInWei, 10)
-	s.Require().True(ok)
-
-	s.mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
+	makeAddressSatisfyTheCriteria(&s.Suite, s.mockedBalances, s.mockedCollectibles, chainID, address, criteria)
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) resetMockedBalances() {
@@ -185,6 +176,59 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) createEditSharedAddresses
 	}
 
 	return request
+}
+
+func (s *MessengerCommunitiesSharedMemberAddressSuite) joinOnRequestCommunityAsTokenMaster(community *communities.Community) {
+	bobRequest := createRequestToJoinCommunity(&s.Suite, community.ID(), s.bob, bobPassword, []string{bobAddress})
+	requestToJoinID := requestToJoinCommunity(&s.Suite, s.owner, s.bob, bobRequest)
+	// accept join request
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: requestToJoinID}
+	response, err := s.owner.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	updatedCommunity := response.Communities()[0]
+	s.Require().NotNil(updatedCommunity)
+	s.Require().True(updatedCommunity.HasMember(&s.bob.identity.PublicKey))
+	s.Require().True(updatedCommunity.IsMemberTokenMaster(&s.bob.identity.PublicKey))
+
+	// receive request to join response
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 &&
+				r.Communities()[0].HasMember(&s.bob.identity.PublicKey) &&
+				r.Communities()[0].IsMemberTokenMaster(&s.bob.identity.PublicKey)
+		},
+		"user did not receive request to join response",
+	)
+	s.Require().NoError(err)
+
+	userCommunity, err := s.bob.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(userCommunity.HasMember(&s.bob.identity.PublicKey))
+	s.Require().True(userCommunity.IsTokenMaster())
+}
+
+func (s *MessengerCommunitiesSharedMemberAddressSuite) waitForRevealedAddresses(receiver *Messenger, communityID types.HexBytes, expectedAccounts []*protobuf.RevealedAccount) {
+	_, err := WaitOnMessengerResponse(receiver, func(r *MessengerResponse) bool {
+		revealedAccounts, err := receiver.communitiesManager.GetRevealedAddresses(communityID, s.alice.IdentityPublicKeyString())
+		if err != nil {
+			return false
+		}
+		if len(expectedAccounts) != len(revealedAccounts) {
+			return false
+		}
+
+		for index := range revealedAccounts {
+			if revealedAccounts[index].Address != expectedAccounts[index].Address {
+				return false
+			}
+		}
+
+		return true
+	}, "client did not receive alice shared address")
+	s.Require().NoError(err)
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TestJoinedCommunityMembersSharedAddress() {
@@ -265,7 +309,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestJoinedCommunityMember
 	community, _ := createCommunity(&s.Suite, s.owner)
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
 
-	s.joinCommunityWithAirdropAddress(community, s.alice, alicePassword, []string{aliceAddress1, aliceAddress2}, aliceAddress2)
+	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress1, aliceAddress2})
 
 	community, err := s.owner.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
@@ -280,7 +324,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestJoinedCommunityMember
 	s.Require().Len(revealedAccountsInAlicesDB, 2)
 	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress1)
 	s.Require().Equal(revealedAccountsInAlicesDB[1].Address, aliceAddress2)
-	s.Require().Equal(true, revealedAccountsInAlicesDB[1].IsAirdropAddress)
+	s.Require().Equal(true, revealedAccountsInAlicesDB[0].IsAirdropAddress)
 
 	// Check owner's DB for revealed accounts
 	s.checkRevealedAccounts(community.ID(), s.owner, revealedAccountsInAlicesDB)
@@ -318,16 +362,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestEditSharedAddresses()
 	s.Require().Equal(true, aliceExpectedRevealedAccounts[0].IsAirdropAddress)
 
 	// check that owner received revealed address
-	_, err = WaitOnMessengerResponse(s.owner, func(r *MessengerResponse) bool {
-		revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), s.alice.IdentityPublicKeyString())
-		s.Require().NoError(err)
-		s.Require().Len(revealedAccounts, 1)
-		return revealedAccounts[0].Address == aliceAddress2
-
-	}, "owned did not receive alice shared address")
-	s.Require().NoError(err)
-
-	s.checkRevealedAccounts(community.ID(), s.owner, aliceExpectedRevealedAccounts)
+	s.waitForRevealedAddresses(s.owner, community.ID(), aliceExpectedRevealedAccounts)
 
 	// check that we filter out outdated edit shared addresses events
 	community, err = s.owner.GetCommunityByID(community.ID())
@@ -383,42 +418,30 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterReceivesEd
 	s.Require().NoError(err)
 	checkRoleBasedOnThePermissionType(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, &s.bob.identity.PublicKey, community)
 
-	aliceRevealedAccounts, err := s.bob.GetRevealedAccounts(community.ID(), alicePubkey)
 	s.Require().NoError(err)
-	s.Require().Len(aliceRevealedAccounts, 1)
+
+	expectedAliceRevealedAccounts, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), s.alice.IdentityPublicKeyString())
+	s.Require().NoError(err)
+	s.Require().Len(expectedAliceRevealedAccounts, 1)
+
+	s.waitForRevealedAddresses(s.bob, community.ID(), expectedAliceRevealedAccounts)
 
 	request := s.createEditSharedAddressesRequest(community.ID())
 
 	response, err := s.alice.EditSharedAddressesForCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	expectedAliceRevealedAccounts, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	expectedAliceRevealedAccounts, err = s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
 	s.Require().NoError(err)
 	s.Require().Len(expectedAliceRevealedAccounts, 1)
 	s.Require().Equal(expectedAliceRevealedAccounts[0].Address, aliceAddress2)
 	s.Require().Equal(true, expectedAliceRevealedAccounts[0].IsAirdropAddress)
 
-	// check that owner received revealed address
-	_, err = WaitOnMessengerResponse(s.owner, func(r *MessengerResponse) bool {
-		revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), s.alice.IdentityPublicKeyString())
-		s.Require().NoError(err)
-		s.Require().Len(revealedAccounts, 1)
-		return revealedAccounts[0].Address == aliceAddress2
+	s.waitForRevealedAddresses(s.owner, community.ID(), expectedAliceRevealedAccounts)
 
-	}, "owned did not receive alice shared address")
 	s.Require().NoError(err)
 
-	s.checkRevealedAccounts(community.ID(), s.owner, expectedAliceRevealedAccounts)
-
-	// check that bob as a token master received revealed address
-	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
-		revealedAccounts, err := s.bob.communitiesManager.GetRevealedAddresses(community.ID(), s.alice.IdentityPublicKeyString())
-		s.Require().NoError(err)
-		s.Require().Len(revealedAccounts, 1)
-		return revealedAccounts[0].Address == aliceAddress2
-	}, "user not accepted")
-	s.Require().NoError(err)
-	s.checkRevealedAccounts(community.ID(), s.bob, expectedAliceRevealedAccounts)
+	s.waitForRevealedAddresses(s.bob, community.ID(), expectedAliceRevealedAccounts)
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TestSharedAddressesReturnsRevealedAccount() {
@@ -552,17 +575,21 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterReceivesMe
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
 	s.joinCommunity(community, s.bob, bobPassword, []string{bobAddress})
+	s.Require().NoError(err)
 
 	// check bob has TM role
 	community, err = s.bob.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
 	checkRoleBasedOnThePermissionType(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, &s.bob.identity.PublicKey, community)
 
-	s.checkRevealedAccounts(community.ID(), s.bob, expectedAliceRevealedAccounts)
+	s.waitForRevealedAddresses(s.bob, community.ID(), expectedAliceRevealedAccounts)
 
 	// remove alice revealed addresses
-	aliceRequestID := communities.CalculateRequestID(s.alice.IdentityPublicKeyString(), community.ID())
-	err = s.bob.communitiesManager.RemoveRequestToJoinRevealedAddresses(aliceRequestID)
+	requestToDelete, err := s.bob.communitiesManager.GetRequestToJoinByPkAndCommunityID(s.alice.IdentityPublicKey(), community.ID())
+	s.Require().NoError(err)
+	err = s.bob.communitiesManager.RemoveRequestToJoinRevealedAddresses(requestToDelete.ID)
+	s.Require().NoError(err)
+	err = s.bob.communitiesManager.DeletePendingRequestToJoin(requestToDelete)
 	s.Require().NoError(err)
 
 	emptySharedAddresses, err := s.bob.GetRevealedAccounts(community.ID(), s.alice.IdentityPublicKeyString())
@@ -589,23 +616,13 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterReceivesMe
 		s.bob,
 		func(r *MessengerResponse) bool {
 			_, _ = s.owner.RetrieveAll()
-			if len(r.requestsToJoinCommunity) == 0 {
-				return false
-			}
-
-			for _, requestToJoin := range r.requestsToJoinCommunity {
-				if requestToJoin.PublicKey == s.alice.IdentityPublicKeyString() {
-					return true
-				}
-			}
-
-			return false
+			aliceAccounts, err := s.bob.communitiesManager.GetRevealedAddresses(community.ID(), s.alice.IdentityPublicKeyString())
+			s.Require().NoError(err)
+			return len(aliceAccounts) > 0 && aliceAccounts[0].Address == aliceAddress1
 		},
 		"alice request to join with revealed addresses not received",
 	)
 	s.Require().NoError(err)
-
-	s.checkRevealedAccounts(community.ID(), s.bob, expectedAliceRevealedAccounts)
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterReceivedRevealedAddressesFromJoinedMember() {
@@ -641,17 +658,17 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterReceivedRe
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
 	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress1})
 
-	// check that bob received revealed address
-	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
-		return len(r.RequestsToJoinCommunity()) == 1 && r.RequestsToJoinCommunity()[0].PublicKey == s.alice.IdentityPublicKeyString()
-	}, "user not accepted")
-	s.Require().NoError(err)
-
 	expectedAliceRevealedAccounts, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), s.alice.IdentityPublicKeyString())
 	s.Require().NoError(err)
 	s.Require().Len(expectedAliceRevealedAccounts, 1)
 	s.Require().Equal(expectedAliceRevealedAccounts[0].Address, aliceAddress1)
 	s.Require().Equal(true, expectedAliceRevealedAccounts[0].IsAirdropAddress)
+
+	// check that bob received revealed address
+	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
+		return checkRequestToJoinInResponse(r, s.alice, communities.RequestToJoinStateAccepted, len(expectedAliceRevealedAccounts))
+	}, "user not accepted")
+	s.Require().NoError(err)
 
 	s.checkRevealedAccounts(community.ID(), s.bob, expectedAliceRevealedAccounts)
 }
@@ -682,6 +699,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterJoinedToCo
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, tokenCriteria)
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
+
 	s.joinCommunity(community, s.bob, bobPassword, []string{bobAddress})
 
 	community, err = s.bob.communitiesManager.GetByID(community.ID())
@@ -694,7 +712,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterJoinedToCo
 	s.Require().Equal(expectedAliceRevealedAccounts[0].Address, aliceAddress1)
 	s.Require().Equal(true, expectedAliceRevealedAccounts[0].IsAirdropAddress)
 
-	s.checkRevealedAccounts(community.ID(), s.bob, expectedAliceRevealedAccounts)
+	s.waitForRevealedAddresses(s.bob, community.ID(), expectedAliceRevealedAccounts)
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivedSharedAddressOnGettingTokenMasterRole() {
@@ -733,18 +751,18 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivedSharedA
 	err = <-waitOnOwnerSendSyncMessage
 	s.Require().NoError(err)
 
-	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
-		return len(r.Communities()) == 1 && r.Communities()[0].IsTokenMaster()
-	}, "bob didn't receive token master role")
-	s.Require().NoError(err)
-
 	expectedAliceRevealedAccounts, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), s.alice.IdentityPublicKeyString())
 	s.Require().NoError(err)
 	s.Require().Len(expectedAliceRevealedAccounts, 1)
 	s.Require().Equal(expectedAliceRevealedAccounts[0].Address, aliceAddress1)
 	s.Require().Equal(true, expectedAliceRevealedAccounts[0].IsAirdropAddress)
 
-	s.checkRevealedAccounts(community.ID(), s.bob, expectedAliceRevealedAccounts)
+	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
+		return len(r.Communities()) == 1 && r.Communities()[0].IsTokenMaster()
+	}, "bob didn't receive token master role")
+	s.Require().NoError(err)
+
+	s.waitForRevealedAddresses(s.bob, community.ID(), expectedAliceRevealedAccounts)
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterReceivesAccountsAfterPendingRequestToJoinApproval() {
@@ -769,27 +787,10 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterReceivesAc
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
 
-	aliceArray64Bytes := common.HashPublicKey(&s.alice.identity.PublicKey)
-	aliceSignature := append([]byte{0}, aliceArray64Bytes...)
-	aliceRequest := &requests.RequestToJoinCommunity{
-		CommunityID:       community.ID(),
-		AddressesToReveal: []string{aliceAddress1},
-		AirdropAddress:    aliceAddress1,
-		Signatures:        []types.HexBytes{aliceSignature},
-	}
-
+	aliceRequest := createRequestToJoinCommunity(&s.Suite, community.ID(), s.alice, alicePassword, []string{aliceAddress1})
 	aliceRequestToJoinID := requestToJoinCommunity(&s.Suite, s.owner, s.alice, aliceRequest)
 
-	bobArray64Bytes := common.HashPublicKey(&s.bob.identity.PublicKey)
-	bobSignature := append([]byte{0}, bobArray64Bytes...)
-	bobRequest := &requests.RequestToJoinCommunity{
-		CommunityID:       community.ID(),
-		AddressesToReveal: []string{bobAddress},
-		AirdropAddress:    bobAddress,
-		Signatures:        []types.HexBytes{bobSignature},
-	}
-
-	joinOnRequestCommunity(&s.Suite, community, s.owner, s.bob, bobRequest)
+	s.joinOnRequestCommunityAsTokenMaster(community)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
@@ -799,14 +800,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterReceivesAc
 	s.Require().NoError(err)
 
 	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
-		if r.RequestsToJoinCommunity() != nil {
-			for _, request := range r.RequestsToJoinCommunity() {
-				if request.PublicKey == s.alice.IdentityPublicKeyString() && request.State == communities.RequestToJoinStateAccepted {
-					return true
-				}
-			}
-		}
-		return false
+		return checkRequestToJoinInResponse(r, s.alice, communities.RequestToJoinStateAccepted, 1)
 	}, "bob didn't receive accepted Alice request to join")
 	s.Require().NoError(err)
 
@@ -820,56 +814,26 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestTokenMasterReceivesAc
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivesPendingRequestToJoinAfterAfterGettingTokenMasterRole() {
-	s.T().Skip("flaky test")
-
 	community, _ := createOnRequestCommunity(&s.Suite, s.owner)
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
 
-	aliceArray64Bytes := common.HashPublicKey(&s.alice.identity.PublicKey)
-	aliceSignature := append([]byte{0}, aliceArray64Bytes...)
-	aliceRequest := &requests.RequestToJoinCommunity{
-		CommunityID:       community.ID(),
-		AddressesToReveal: []string{aliceAddress1},
-		AirdropAddress:    aliceAddress1,
-		Signatures:        []types.HexBytes{aliceSignature},
-	}
-
+	aliceRequest := createRequestToJoinCommunity(&s.Suite, community.ID(), s.alice, alicePassword, []string{aliceAddress1})
 	aliceRequestToJoinID := requestToJoinCommunity(&s.Suite, s.owner, s.alice, aliceRequest)
 
-	bobArray64Bytes := common.HashPublicKey(&s.bob.identity.PublicKey)
-	bobSignature := append([]byte{0}, bobArray64Bytes...)
-	bobRequest := &requests.RequestToJoinCommunity{
-		CommunityID:       community.ID(),
-		AddressesToReveal: []string{bobAddress},
-		AirdropAddress:    bobAddress,
-		Signatures:        []types.HexBytes{bobSignature},
-	}
-
-	joinOnRequestCommunity(&s.Suite, community, s.owner, s.bob, bobRequest)
+	joinOnRequestCommunity(&s.Suite, community.ID(), s.owner, s.bob, bobPassword, []string{bobAddress})
 
 	tokenCriteria := createTokenMasterTokenCriteria()
 
 	// make bob satisfy the Token Master criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, tokenCriteria)
 
-	// wait for owner to send sync message for bob, who got a TM role
-	waitOnOwnerSendSyncMessage := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-		return sub.CommunityPrivilegedMemberSyncMessage != nil &&
-			sub.CommunityPrivilegedMemberSyncMessage.CommunityPrivilegedUserSyncMessage.Type == protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ALL_SYNC_REQUESTS_TO_JOIN &&
-			len(sub.CommunityPrivilegedMemberSyncMessage.Receivers) == 1 &&
-			sub.CommunityPrivilegedMemberSyncMessage.Receivers[0].Equal(&s.bob.identity.PublicKey)
-	})
-
 	_, err := s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
 		CommunityID:   community.ID(),
 		Type:          protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER,
 		TokenCriteria: []*protobuf.TokenCriteria{tokenCriteria},
 	})
-	s.Require().NoError(err)
-
-	err = <-waitOnOwnerSendSyncMessage
 	s.Require().NoError(err)
 
 	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
@@ -881,10 +845,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivesPending
 	s.Require().NoError(err)
 
 	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
-		return len(r.RequestsToJoinCommunity()) > 0 &&
-			r.RequestsToJoinCommunity()[0].PublicKey == s.alice.IdentityPublicKeyString() &&
-			r.RequestsToJoinCommunity()[0].State == communities.RequestToJoinStateAccepted
-
+		return checkRequestToJoinInResponse(r, s.alice, communities.RequestToJoinStateAccepted, 1)
 	}, "bob didn't receive accepted Alice request to join")
 	s.Require().NoError(err)
 
@@ -932,8 +893,8 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestHandlingOutdatedPrivi
 
 	// check that bob received revealed address
 	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
-		return len(r.RequestsToJoinCommunity()) == 1 && r.RequestsToJoinCommunity()[0].PublicKey == s.alice.IdentityPublicKeyString()
-	}, "user not accepted")
+		return checkRequestToJoinInResponse(r, s.alice, communities.RequestToJoinStateAccepted, 1)
+	}, "bob did not receive alice revealed addresses")
 	s.Require().NoError(err)
 
 	// handle outdated CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ALL_SYNC_REQUESTS_TO_JOIN msg
@@ -1009,16 +970,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivedEditedS
 	s.Require().Equal(true, expectedAliceRevealedAccounts[0].IsAirdropAddress)
 
 	// check that owner received edited shared adresses
-	_, err = WaitOnMessengerResponse(s.owner, func(r *MessengerResponse) bool {
-		revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
-		s.Require().NoError(err)
-		s.Require().Len(revealedAccounts, 1)
-		return revealedAccounts[0].Address == aliceAddress2
-
-	}, "owned did not receive alice shared address")
-	s.Require().NoError(err)
-
-	s.checkRevealedAccounts(community.ID(), s.owner, expectedAliceRevealedAccounts)
+	s.waitForRevealedAddresses(s.owner, community.ID(), expectedAliceRevealedAccounts)
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
 	s.joinCommunity(community, s.bob, bobPassword, []string{bobAddress})
@@ -1028,14 +980,6 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivedEditedS
 	// make bob satisfy the Token Master criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, tokenCriteria)
 
-	// wait for owner to send sync message for bob, who got a TM role
-	waitOnOwnerSendSyncMessage := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-		return sub.CommunityPrivilegedMemberSyncMessage != nil &&
-			sub.CommunityPrivilegedMemberSyncMessage.CommunityPrivilegedUserSyncMessage.Type == protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ALL_SYNC_REQUESTS_TO_JOIN &&
-			len(sub.CommunityPrivilegedMemberSyncMessage.Receivers) == 1 &&
-			sub.CommunityPrivilegedMemberSyncMessage.Receivers[0].Equal(&s.bob.identity.PublicKey)
-	})
-
 	_, err = s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
 		CommunityID:   community.ID(),
 		Type:          protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER,
@@ -1043,15 +987,12 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivedEditedS
 	})
 	s.Require().NoError(err)
 
-	err = <-waitOnOwnerSendSyncMessage
-	s.Require().NoError(err)
-
 	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
 		return len(r.Communities()) == 1 && r.Communities()[0].IsTokenMaster()
 	}, "bob didn't receive token master role")
 	s.Require().NoError(err)
 
-	s.checkRevealedAccounts(community.ID(), s.bob, expectedAliceRevealedAccounts)
+	s.waitForRevealedAddresses(s.bob, community.ID(), expectedAliceRevealedAccounts)
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivesAccountsOnRoleChangeFromAdminToTokenMaster() {
@@ -1112,9 +1053,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivesAccount
 
 	// check that bob received alice request to join without revealed accounts
 	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
-		return len(r.RequestsToJoinCommunity()) == 1 &&
-			r.RequestsToJoinCommunity()[0].PublicKey == s.alice.IdentityPublicKeyString() &&
-			len(r.RequestsToJoinCommunity()[0].RevealedAccounts) == 0
+		return checkRequestToJoinInResponse(r, s.alice, communities.RequestToJoinStateAccepted, 0)
 	}, "alice request to join was not delivered to admin bob")
 	s.Require().NoError(err)
 
@@ -1140,19 +1079,10 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestMemberReceivesAccount
 	s.Require().NoError(err)
 
 	// check that bob received alice request to join with revealed accounts
-	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
-		revealedAccounts, err := s.bob.communitiesManager.GetRevealedAddresses(community.ID(), alicePublicKey)
-		s.Require().NoError(err)
-		return len(revealedAccounts) > 0
-	}, "alice request to join was not delivered to token master bob")
-	s.Require().NoError(err)
-
-	s.checkRevealedAccounts(community.ID(), s.bob, expectedAliceRevealedAccounts)
+	s.waitForRevealedAddresses(s.bob, community.ID(), expectedAliceRevealedAccounts)
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) TestOwnerRejectAndAcceptAliceRequestToJoin() {
-	s.T().Skip("flaky test")
-
 	community, _ := createOnRequestCommunity(&s.Suite, s.owner)
 	s.Require().False(community.AutoAccept())
 
@@ -1173,26 +1103,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestOwnerRejectAndAcceptA
 	s.Require().Len(community.TokenPermissions(), 1)
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
-
-	aliceArray64Bytes := common.HashPublicKey(&s.alice.identity.PublicKey)
-	aliceSignature := append([]byte{0}, aliceArray64Bytes...)
-	aliceRequest := &requests.RequestToJoinCommunity{
-		CommunityID:       community.ID(),
-		AddressesToReveal: []string{aliceAddress1},
-		AirdropAddress:    aliceAddress1,
-		Signatures:        []types.HexBytes{aliceSignature},
-	}
-
-	bobArray64Bytes := common.HashPublicKey(&s.bob.identity.PublicKey)
-	bobSignature := append([]byte{0}, bobArray64Bytes...)
-	bobRequest := &requests.RequestToJoinCommunity{
-		CommunityID:       community.ID(),
-		AddressesToReveal: []string{bobAddress},
-		AirdropAddress:    bobAddress,
-		Signatures:        []types.HexBytes{bobSignature},
-	}
-
-	joinOnRequestCommunity(&s.Suite, community, s.owner, s.bob, bobRequest)
+	s.joinOnRequestCommunityAsTokenMaster(community)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
@@ -1200,13 +1111,12 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestOwnerRejectAndAcceptA
 
 	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
 
+	aliceRequest := createRequestToJoinCommunity(&s.Suite, community.ID(), s.alice, alicePassword, []string{aliceAddress1})
 	aliceRequestToJoinID := requestToJoinCommunity(&s.Suite, s.owner, s.alice, aliceRequest)
 
 	// check that bob received alice request to join without revealed accounts due to pending state
 	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
-		return len(r.RequestsToJoinCommunity()) == 1 &&
-			r.RequestsToJoinCommunity()[0].State == communities.RequestToJoinStatePending &&
-			r.RequestsToJoinCommunity()[0].PublicKey == s.alice.IdentityPublicKeyString()
+		return checkRequestToJoinInResponse(r, s.alice, communities.RequestToJoinStatePending, 0)
 	}, "alice pending request to join was not delivered to token master bob")
 	s.Require().NoError(err)
 
@@ -1220,9 +1130,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestOwnerRejectAndAcceptA
 
 	// check that bob received owner decline sync msg
 	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
-		return len(r.RequestsToJoinCommunity()) == 1 &&
-			r.RequestsToJoinCommunity()[0].State == communities.RequestToJoinStateDeclined &&
-			r.RequestsToJoinCommunity()[0].PublicKey == s.alice.IdentityPublicKeyString()
+		return checkRequestToJoinInResponse(r, s.alice, communities.RequestToJoinStateDeclined, 0)
 	}, "alice declined request to join was not delivered to token master bob")
 	s.Require().NoError(err)
 
@@ -1235,9 +1143,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TestOwnerRejectAndAcceptA
 	s.Require().NoError(err)
 
 	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
-		return len(r.RequestsToJoinCommunity()) == 1 &&
-			r.RequestsToJoinCommunity()[0].State == communities.RequestToJoinStateAccepted &&
-			r.RequestsToJoinCommunity()[0].PublicKey == s.alice.IdentityPublicKeyString()
+		return checkRequestToJoinInResponse(r, s.alice, communities.RequestToJoinStateAccepted, len(aliceRequest.AddressesToReveal))
 	}, "bob didn't receive accepted Alice request to join")
 	s.Require().NoError(err)
 

@@ -1435,7 +1435,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	logger := m.logger.Named("RequestToJoinCommunity")
 	logger.Debug("Addresses to reveal", zap.Any("Addresses:", request.AddressesToReveal))
 
-	if err := request.Validate(len(request.AddressesToReveal) > 0); err != nil {
+	if err := request.Validate(); err != nil {
 		logger.Debug("request failed to validate", zap.Error(err), zap.Any("request", request))
 		return nil, err
 	}

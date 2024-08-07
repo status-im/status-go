@@ -922,8 +922,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 		return nil
 	})
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-
+	request := createRequestToJoinCommunity(&s.Suite, community.ID(), alice, alicePassword, []string{aliceAddress1})
+	alice.communitiesManager.PermissionChecker = &testPermissionChecker{}
 	// We try to join the org
 	response, err = alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)

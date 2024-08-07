@@ -23,17 +23,9 @@ type RequestToJoinCommunity struct {
 	ShareFutureAddresses bool             `json:"shareFutureAddresses"`
 }
 
-func (j *RequestToJoinCommunity) Validate(full bool) error {
-	// TODO: A parital validation, in case `full` is set to `false` should check `AddressesToReveal` as well. But because of changes
-	//       that need to be done in tests we cannot do that now.
-	//       Also in the line 61, we should remove `len(signature) > 0` from the condition, but from the same reason we cannot do that now.
-
+func (j *RequestToJoinCommunity) Validate() error {
 	if len(j.CommunityID) == 0 {
 		return ErrRequestToJoinCommunityInvalidCommunityID
-	}
-
-	if !full {
-		return nil
 	}
 
 	if len(j.AddressesToReveal) == 0 {
@@ -57,7 +49,7 @@ func (j *RequestToJoinCommunity) Validate(full bool) error {
 	}
 
 	for _, signature := range j.Signatures {
-		if len(signature) > 0 && len(signature) != crypto.SignatureLength {
+		if len(signature) != crypto.SignatureLength {
 			return ErrRequestToJoinCommunityInvalidSignature
 		}
 	}
