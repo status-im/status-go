@@ -1906,8 +1906,9 @@ github.com/rogpeppe/go-internal v1.6.1/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTE
 github.com/rogpeppe/go-internal v1.8.0/go.mod h1:WmiCO8CzOY8rg0OYDC4/i/2WRWAB6poM+XZ2dLUbcbE=
 github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjRBZyWFQ=
 github.com/rogpeppe/go-internal v1.10.0/go.mod h1:UQnix2H7Ngw/k4C5ijL5+65zddjncjaFoBhdsK/akog=
-github.com/rs/cors v1.7.0 h1:+88SsELBHx5r+hZ8TCkggzSstaWNbDvThkVK8H6f9ik=
 github.com/rs/cors v1.7.0/go.mod h1:gFx+x8UowdsKA9AchylcLynDq+nNFfI8FkUZdN/jGCU=
+github.com/rs/cors v1.11.0 h1:0B9GE/r9Bc2UxRMMtymBkHTenPkHDv0CW4Y98GBY+po=
+github.com/rs/cors v1.11.0/go.mod h1:XyqrcTp5zjWr1wsJ8PIRZssZ8b/WMcMf71DJnit4EMU=
 github.com/rs/dnscache v0.0.0-20190621150935-06bb5526f76b/go.mod h1:qe5TWALJ8/a1Lqznoc5BDHpYX/8HU60Hm2AwRmqzxqA=
 github.com/rs/dnscache v0.0.0-20210201191234-295bba877686 h1:IJ6Df0uxPDtNoByV0KkzVKNseWvZFCNM/S9UoyOMCSI=
 github.com/rs/dnscache v0.0.0-20210201191234-295bba877686/go.mod h1:qe5TWALJ8/a1Lqznoc5BDHpYX/8HU60Hm2AwRmqzxqA=
@@ -2048,6 +2049,8 @@ github.com/status-im/status-go/extkeys v1.1.2 h1:FSjARgDathJ3rIapJt851LsIXP9Oyuu
 github.com/status-im/status-go/extkeys v1.1.2/go.mod h1:hCmFzb2jiiVF2voZKYbzuhOQiHHCmyLJsZJXrFFg7BY=
 github.com/status-im/tcp-shaker v1.1.1-status h1:TnVeeWlq2SKCWotHc4Vi6qZQfY8TTe3VLmu1xpEFYhg=
 github.com/status-im/tcp-shaker v1.1.1-status/go.mod h1:RYo/itke1oU5k/6sj9DNM3QAwtE5rZSgg5JnkOv83hk=
+github.com/status-im/telemetry v0.0.0-20240813130615-b4e1a202a77b h1:ELIoZLYXqcvcgZ3cB5i4EiI7oHIbT2Qcv36GiPwoS5o=
+github.com/status-im/telemetry v0.0.0-20240813130615-b4e1a202a77b/go.mod h1:fkDGhVFJeQxBlYrhsRhIsujZEN2nNPmTXqp1M5x7HeY=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857 h1:sPkzT7Z7uLmejOsBRlZ0kwDWpqjpHJsp834o5nbhqho=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857/go.mod h1:lq9I5ROto5tcua65GmCE6SIW7VE0ucdEBs1fn4z7uWU=
 github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980/go.mod h1:AO3tvPzVZ/ayst6UlUKUv6rcPQInYe3IknH3jYhAKu8=

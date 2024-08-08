@@ -881,9 +881,10 @@ github.com/rivo/uniseg
 # github.com/rjeczalik/notify v0.9.3 => github.com/status-im/notify v1.0.2-status
 ## explicit; go 1.11
 github.com/rjeczalik/notify
-# github.com/rs/cors v1.7.0
-## explicit
+# github.com/rs/cors v1.11.0
+## explicit; go 1.13
 github.com/rs/cors
+github.com/rs/cors/internal
 # github.com/rs/dnscache v0.0.0-20210201191234-295bba877686
 ## explicit; go 1.12
 github.com/rs/dnscache
@@ -958,6 +959,9 @@ github.com/status-im/status-go/extkeys
 # github.com/status-im/tcp-shaker v1.1.1-status
 ## explicit; go 1.13
 github.com/status-im/tcp-shaker
+# github.com/status-im/telemetry v0.0.0-20240813130615-b4e1a202a77b
+## explicit; go 1.20
+github.com/status-im/telemetry/pkg/types
 # github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
 ## explicit; go 1.14
 github.com/status-im/zxcvbn-go
