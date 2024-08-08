@@ -378,11 +378,6 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		return err
 	}
 
-	if w.opts.keepAliveRandomPeersInterval > time.Duration(0) || w.opts.keepAliveAllPeersInterval > time.Duration(0) {
-		w.wg.Add(1)
-		go w.startKeepAlive(ctx, w.opts.keepAliveRandomPeersInterval, w.opts.keepAliveAllPeersInterval)
-	}
-
 	w.metadata.SetHost(host)
 	err = w.metadata.Start(ctx)
 	if err != nil {
@@ -476,6 +471,11 @@ func (w *WakuNode) Start(ctx context.Context) error {
 				return err
 			}
 		}
+	}
+
+	if w.opts.keepAliveRandomPeersInterval > time.Duration(0) || w.opts.keepAliveAllPeersInterval > time.Duration(0) {
+		w.wg.Add(1)
+		go w.startKeepAlive(ctx, w.opts.keepAliveRandomPeersInterval, w.opts.keepAliveAllPeersInterval)
 	}
 
 	w.peerExchange.SetHost(host)
