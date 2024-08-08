@@ -583,6 +583,20 @@ type WalletConfig struct {
 	EnableCelerBridge             bool              `json:"EnableCelerBridge"`
 }
 
+// MarshalJSON custom marshalling to avoid exposing sensitive data in log,
+// there's a function called `startNode` will log NodeConfig which include WalletConfig
+func (wc WalletConfig) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Enabled            bool `json:"Enabled"`
+		StatusProxyEnabled bool `json:"StatusProxyEnabled"`
+		EnableCelerBridge  bool `json:"EnableCelerBridge"`
+	}{
+		Enabled:            wc.Enabled,
+		StatusProxyEnabled: wc.StatusProxyEnabled,
+		EnableCelerBridge:  wc.EnableCelerBridge,
+	})
+}
+
 // LocalNotificationsConfig extra configuration for localnotifications.Service.
 type LocalNotificationsConfig struct {
 	Enabled bool

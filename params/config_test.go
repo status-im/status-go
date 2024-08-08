@@ -1,6 +1,7 @@
 package params_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -337,4 +338,23 @@ func TestNodeConfigValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMarshalWalletConfigJSON(t *testing.T) {
+	walletConfig := params.WalletConfig{
+		OpenseaAPIKey:        "some-key",
+		RaribleMainnetAPIKey: "some-key2",
+	}
+	bytes, err := json.Marshal(walletConfig)
+	require.NoError(t, err)
+	// check if sensitive fields are not present
+	require.NotContains(t, string(bytes), "OpenseaAPIKey")
+	require.Contains(t, string(bytes), "StatusProxyEnabled")
+
+	// check if deserializing are still working with sensitive fields
+	walletConfig = params.WalletConfig{}
+	err = json.Unmarshal([]byte(`{"OpenseaAPIKey":"some-key", "StatusProxyEnabled":true}`), &walletConfig)
+	require.NoError(t, err)
+	require.Equal(t, "some-key", walletConfig.OpenseaAPIKey)
+	require.True(t, walletConfig.StatusProxyEnabled)
 }
