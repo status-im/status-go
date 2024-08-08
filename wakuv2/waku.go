@@ -1376,7 +1376,7 @@ func (w *Waku) Start() error {
 					//TODO: needs fixing, right now invoking everytime.
 					//Trigger FilterManager to take care of any pending filter subscriptions
 					//TODO: Pass pubsubTopic based on topicHealth notif received.
-					go w.filterManager.onConnectionStatusChange(w.cfg.DefaultShardPubsubTopic, isOnline)
+					go w.filterManager.onConnectionStatusChange("", isOnline)
 
 				}
 				w.connStatusMu.Lock()
