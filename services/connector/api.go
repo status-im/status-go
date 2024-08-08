@@ -23,7 +23,12 @@ func NewAPI(s *Service) *API {
 	r := NewCommandRegistry()
 	c := commands.NewClientSideHandler()
 
+	// Transactions and signing
 	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{
+		Db:            s.db,
+		ClientHandler: c,
+	})
+	r.Register("personal_sign", &commands.PersonalSignCommand{
 		Db:            s.db,
 		ClientHandler: c,
 	})
@@ -125,4 +130,12 @@ func (api *API) SendTransactionAccepted(args commands.SendTransactionAcceptedArg
 
 func (api *API) SendTransactionRejected(args commands.RejectedArgs) error {
 	return api.c.SendTransactionRejected(args)
+}
+
+func (api *API) PersonalSignAccepted(args commands.PersonalSignAcceptedArgs) error {
+	return api.c.PersonalSignAccepted(args)
+}
+
+func (api *API) PersonalSignRejected(args commands.RejectedArgs) error {
+	return api.c.PersonalSignRejected(args)
 }

@@ -3,6 +3,7 @@ package signal
 const (
 	EventConnectorSendRequestAccounts   = "connector.sendRequestAccounts"
 	EventConnectorSendTransaction       = "connector.sendTransaction"
+	EventConnectorPersonalSign          = "connector.personalSign"
 	EventConnectorDAppPermissionGranted = "connector.dAppPermissionGranted"
 	EventConnectorDAppPermissionRevoked = "connector.dAppPermissionRevoked"
 )
@@ -27,6 +28,13 @@ type ConnectorSendTransactionSignal struct {
 	TxArgs    string `json:"txArgs"`
 }
 
+type ConnectorPersonalSignSignal struct {
+	ConnectorDApp
+	RequestID string `json:"requestId"`
+	Challenge string `json:"challenge"`
+	Address   string `json:"address"`
+}
+
 func SendConnectorSendRequestAccounts(dApp ConnectorDApp, requestID string) {
 	send(EventConnectorSendRequestAccounts, ConnectorSendRequestAccountsSignal{
 		ConnectorDApp: dApp,
@@ -40,6 +48,15 @@ func SendConnectorSendTransaction(dApp ConnectorDApp, chainID uint64, txArgs str
 		RequestID:     requestID,
 		ChainID:       chainID,
 		TxArgs:        txArgs,
+	})
+}
+
+func SendConnectorPersonalSign(dApp ConnectorDApp, requestID, challenge, address string) {
+	send(EventConnectorPersonalSign, ConnectorPersonalSignSignal{
+		ConnectorDApp: dApp,
+		RequestID:     requestID,
+		Challenge:     challenge,
+		Address:       address,
 	})
 }
 
