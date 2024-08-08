@@ -56,8 +56,8 @@ func (w *WakuNode) startKeepAlive(ctx context.Context, randomPeersPingDuration t
 	}
 
 	allPeersTickerC := make(<-chan time.Time)
-	if randomPeersPingDuration != 0 {
-		allPeersTicker := time.NewTicker(randomPeersPingDuration)
+	if allPeersPingDuration != 0 {
+		allPeersTicker := time.NewTicker(allPeersPingDuration)
 		defer allPeersTicker.Stop()
 		randomPeersTickerC = allPeersTicker.C
 	}
