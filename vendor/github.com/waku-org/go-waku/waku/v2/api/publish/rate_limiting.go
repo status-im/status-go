@@ -26,12 +26,19 @@ func NewPublishRateLimiter(r rate.Limit, b int) *PublishRateLimiter {
 // ThrottlePublishFn is used to decorate a PublishFn so rate limiting is applied
 func (p *PublishRateLimiter) ThrottlePublishFn(ctx context.Context, publishFn PublishFn) PublishFn {
 	return func(envelope *protocol.Envelope, logger *zap.Logger) error {
-		if err := p.limiter.Wait(ctx); err != nil {
-			if !errors.Is(err, context.Canceled) {
-				logger.Error("could not send message (limiter)", zap.Error(err))
-			}
+		if err := p.Check(ctx, logger); err != nil {
 			return err
 		}
 		return publishFn(envelope, logger)
 	}
+}
+
+func (p *PublishRateLimiter) Check(ctx context.Context, logger *zap.Logger) error {
+	if err := p.limiter.Wait(ctx); err != nil {
+		if !errors.Is(err, context.Canceled) {
+			logger.Error("could not send message (limiter)", zap.Error(err))
+		}
+		return err
+	}
+	return nil
 }

@@ -90,13 +90,10 @@ const cacheTTL = 20 * time.Minute
 const maxRelayPeers = 300
 const randomPeersKeepAliveInterval = 5 * time.Second
 const allPeersKeepAliveInterval = 5 * time.Minute
-const peersToPublishForLightpush = 2
-const publishingLimiterRate = rate.Limit(2)
-const publishingLimitBurst = 4
 
 type SentEnvelope struct {
 	Envelope      *protocol.Envelope
-	PublishMethod PublishMethod
+	PublishMethod publish.PublishMethod
 }
 
 type ErrorSendingEnvelope struct {
@@ -137,7 +134,6 @@ type Waku struct {
 	protectedTopicStore *persistence.ProtectedTopicsStore
 
 	sendQueue *publish.MessageQueue
-	limiter   *publish.PublishRateLimiter
 
 	missingMsgVerifier *missing.MissingMessageVerifier
 
@@ -155,7 +151,7 @@ type Waku struct {
 	storeMsgIDs   map[gethcommon.Hash]bool // Map of the currently processing ids
 	storeMsgIDsMu sync.RWMutex
 
-	messageSentCheck *publish.MessageSentCheck
+	messageSender *publish.MessageSender
 
 	topicHealthStatusChan   chan peermanager.TopicHealthStatus
 	connectionNotifChan     chan node.PeerConnection
@@ -244,15 +240,6 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		onPeerStats:                     onPeerStats,
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
 		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
-	}
-
-	if !cfg.UseThrottledPublish || testing.Testing() {
-		// To avoid delaying the tests, or for when we dont want to rate limit, we set up an infinite rate limiter,
-		// basically disabling the rate limit functionality
-		waku.limiter = publish.NewPublishRateLimiter(rate.Inf, 1)
-
-	} else {
-		waku.limiter = publish.NewPublishRateLimiter(publishingLimiterRate, publishingLimitBurst)
 	}
 
 	waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
@@ -992,16 +979,11 @@ func (w *Waku) SkipPublishToTopic(value bool) {
 }
 
 func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
-	if !w.cfg.EnableStoreConfirmationForMessagesSent {
-		return
-	}
-	w.messageSentCheck.DeleteByMessageIDs(hashes)
+	w.messageSender.MessagesDelivered(hashes)
 }
 
 func (w *Waku) SetStorePeerID(peerID peer.ID) {
-	if w.messageSentCheck != nil {
-		w.messageSentCheck.SetStorePeerID(peerID)
-	}
+	w.messageSender.SetStorePeerID(peerID)
 }
 
 func (w *Waku) Query(ctx context.Context, peerID peer.ID, query store.FilterCriteria, cursor []byte, opts []store.RequestOption, processEnvelopes bool) ([]byte, int, error) {
@@ -1162,8 +1144,9 @@ func (w *Waku) Start() error {
 
 	go w.sendQueue.Start(w.ctx)
 
-	if w.cfg.EnableStoreConfirmationForMessagesSent {
-		w.confirmMessagesSent()
+	err = w.startMessageSender()
+	if err != nil {
+		return err
 	}
 
 	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set w.ctx to nil within `w.Stop()`
@@ -1210,28 +1193,55 @@ func (w *Waku) checkForConnectionChanges() {
 	})
 }
 
-func (w *Waku) confirmMessagesSent() {
-	w.messageSentCheck = publish.NewMessageSentCheck(w.ctx, w.node.Store(), w.node.Timesource(), w.logger)
-	go w.messageSentCheck.Start()
+func (w *Waku) startMessageSender() error {
+	publishMethod := publish.Relay
+	if w.cfg.LightClient {
+		publishMethod = publish.LightPush
+	}
 
-	go func() {
-		for {
-			select {
-			case <-w.ctx.Done():
-				return
-			case hash := <-w.messageSentCheck.MessageStoredChan:
-				w.SendEnvelopeEvent(common.EnvelopeEvent{
-					Hash:  hash,
-					Event: common.EventEnvelopeSent,
-				})
-			case hash := <-w.messageSentCheck.MessageExpiredChan:
-				w.SendEnvelopeEvent(common.EnvelopeEvent{
-					Hash:  hash,
-					Event: common.EventEnvelopeExpired,
-				})
+	sender, err := publish.NewMessageSender(publishMethod, w.node.Lightpush(), w.node.Relay(), w.logger)
+	if err != nil {
+		w.logger.Error("failed to create message sender", zap.Error(err))
+		return err
+	}
+
+	if w.cfg.EnableStoreConfirmationForMessagesSent {
+		msgStoredChan := make(chan gethcommon.Hash, 1000)
+		msgExpiredChan := make(chan gethcommon.Hash, 1000)
+		messageSentCheck := publish.NewMessageSentCheck(w.ctx, w.node.Store(), w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
+		sender.WithMessageSentCheck(messageSentCheck)
+
+		go func() {
+			for {
+				select {
+				case <-w.ctx.Done():
+					return
+				case hash := <-msgStoredChan:
+					w.SendEnvelopeEvent(common.EnvelopeEvent{
+						Hash:  hash,
+						Event: common.EventEnvelopeSent,
+					})
+				case hash := <-msgExpiredChan:
+					w.SendEnvelopeEvent(common.EnvelopeEvent{
+						Hash:  hash,
+						Event: common.EventEnvelopeExpired,
+					})
+				}
 			}
-		}
-	}()
+		}()
+	}
+
+	if !w.cfg.UseThrottledPublish || testing.Testing() {
+		// To avoid delaying the tests, or for when we dont want to rate limit, we set up an infinite rate limiter,
+		// basically disabling the rate limit functionality
+		limiter := publish.NewPublishRateLimiter(rate.Inf, 1)
+		sender.WithRateLimiting(limiter)
+	}
+
+	w.messageSender = sender
+	w.messageSender.Start()
+
+	return nil
 }
 
 func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
@@ -1419,11 +1429,6 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 		w.storeMsgIDsMu.Lock()
 		w.storeMsgIDs[e.Hash()] = true
 		w.storeMsgIDsMu.Unlock()
-	}
-
-	ephemeral := e.Envelope.Message().Ephemeral
-	if w.cfg.EnableStoreConfirmationForMessagesSent && e.MsgType == common.SendMessageType && (ephemeral == nil || !*ephemeral) {
-		w.messageSentCheck.Add(e.PubsubTopic, e.Hash(), e.Sent)
 	}
 
 	matched := w.filters.NotifyWatchers(e)

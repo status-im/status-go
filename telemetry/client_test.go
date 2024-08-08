@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/wakuv2"
+	"github.com/waku-org/go-waku/waku/v2/api/publish"
 )
 
 var (
@@ -170,7 +171,7 @@ func TestClient_ProcessSentEnvelope(t *testing.T) {
 				Version:      proto.Uint32(0),
 				Timestamp:    proto.Int64(time.Now().Unix()),
 			}, 0, ""),
-			PublishMethod: wakuv2.LightPush,
+			PublishMethod: publish.LightPush,
 		}
 
 		// Send the telemetry request
