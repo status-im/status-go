@@ -9,8 +9,6 @@ import (
 const (
 	// EthereumV5 is kademlia-based discovery from go-ethereum repository.
 	EthereumV5 = "ethv5"
-	// RendezvousV1 is req/rep based discovery that uses ENR for records.
-	RendezvousV1 = "ethvousv1"
 )
 
 // Discovery is an abstract interface for using different discovery providers.

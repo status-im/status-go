@@ -12,10 +12,9 @@ const (
 
 // Cluster defines a list of Ethereum nodes.
 type Cluster struct {
-	StaticNodes     []string `json:"staticnodes"`
-	BootNodes       []string `json:"bootnodes"`
-	MailServers     []string `json:"mailservers"` // list of trusted mail servers
-	RendezvousNodes []string `json:"rendezvousnodes"`
+	StaticNodes []string `json:"staticnodes"`
+	BootNodes   []string `json:"bootnodes"`
+	MailServers []string `json:"mailservers"` // list of trusted mail servers
 }
 
 type FleetName = string

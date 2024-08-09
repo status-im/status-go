@@ -17,8 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/status-im/rendezvous/server"
-
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
@@ -27,10 +25,9 @@ import (
 type PeerPoolSimulationSuite struct {
 	suite.Suite
 
-	bootnode         *p2p.Server
-	peers            []*p2p.Server
-	discovery        []discovery.Discovery
-	rendezvousServer *server.Server
+	bootnode  *p2p.Server
+	peers     []*p2p.Server
+	discovery []discovery.Discovery
 }
 
 func TestPeerPoolSimulationSuite(t *testing.T) {
@@ -90,9 +87,6 @@ func (s *PeerPoolSimulationSuite) TearDown() {
 	for i := range s.peers {
 		s.peers[i].Stop()
 		s.NoError(s.discovery[i].Stop())
-	}
-	if s.rendezvousServer != nil {
-		s.rendezvousServer.Stop()
 	}
 }
 

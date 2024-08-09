@@ -916,9 +916,6 @@ github.com/spaolacci/murmur3
 # github.com/status-im/doubleratchet v3.0.0+incompatible
 ## explicit
 github.com/status-im/doubleratchet
-# github.com/status-im/go-multiaddr-ethv4 v1.2.5
-## explicit; go 1.19
-github.com/status-im/go-multiaddr-ethv4
 # github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969
 ## explicit
 github.com/status-im/keycard-go/derivationpath
@@ -947,11 +944,6 @@ github.com/status-im/mvds/state/migrations
 github.com/status-im/mvds/store
 github.com/status-im/mvds/store/migrations
 github.com/status-im/mvds/transport
-# github.com/status-im/rendezvous v1.3.8-0.20240110194857-cc5be22bf83e
-## explicit; go 1.18
-github.com/status-im/rendezvous
-github.com/status-im/rendezvous/protocol
-github.com/status-im/rendezvous/server
 # github.com/status-im/status-go/extkeys v1.1.2
 ## explicit; go 1.13
 github.com/status-im/status-go/extkeys

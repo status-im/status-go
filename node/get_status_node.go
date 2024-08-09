@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"sync"
 
-	ma "github.com/multiformats/go-multiaddr"
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -336,7 +335,7 @@ func (n *StatusNode) setupRPCClient() (err error) {
 }
 
 func (n *StatusNode) discoveryEnabled() bool {
-	return n.config != nil && (!n.config.NoDiscovery || n.config.Rendezvous) && n.config.ClusterConfig.Enabled
+	return n.config != nil && (!n.config.NoDiscovery) && n.config.ClusterConfig.Enabled
 }
 
 func (n *StatusNode) discoverNode() (*enode.Node, error) {
@@ -359,29 +358,6 @@ func (n *StatusNode) discoverNode() (*enode.Node, error) {
 		return nil, err
 	}
 	return enode.New(enode.ValidSchemes[r.IdentityScheme()], r)
-}
-
-func (n *StatusNode) startRendezvous() (discovery.Discovery, error) {
-	if !n.config.Rendezvous {
-		return nil, errors.New("rendezvous is not enabled")
-	}
-	if len(n.config.ClusterConfig.RendezvousNodes) == 0 {
-		return nil, errors.New("rendezvous node must be provided if rendezvous discovery is enabled")
-	}
-	maddrs := make([]ma.Multiaddr, len(n.config.ClusterConfig.RendezvousNodes))
-	for i, addr := range n.config.ClusterConfig.RendezvousNodes {
-		var err error
-		maddrs[i], err = ma.NewMultiaddr(addr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse rendezvous node %s: %v", n.config.ClusterConfig.RendezvousNodes[0], err)
-		}
-	}
-	node, err := n.discoverNode()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get a discover node: %v", err)
-	}
-
-	return discovery.NewRendezvous(maddrs, n.gethNode.Server().PrivateKey, node)
 }
 
 // StartDiscovery starts the peers discovery protocols depending on the node config.
@@ -408,13 +384,7 @@ func (n *StatusNode) startDiscovery() error {
 			n.config.ListenAddr,
 			parseNodesV5(n.config.ClusterConfig.BootNodes)))
 	}
-	if n.config.Rendezvous {
-		d, err := n.startRendezvous()
-		if err != nil {
-			return err
-		}
-		discoveries = append(discoveries, d)
-	}
+
 	if len(discoveries) == 0 {
 		return errors.New("wasn't able to register any discovery")
 	} else if len(discoveries) > 1 {

@@ -46,7 +46,6 @@ type Config struct {
 	MinPeersForFilter                      int              `toml:",omitempty"` // Indicates the minimum number of peers required for using Filter Protocol
 	LightClient                            bool             `toml:",omitempty"` // Indicates if the node is a light client
 	WakuNodes                              []string         `toml:",omitempty"`
-	Rendezvous                             bool             `toml:",omitempty"`
 	DiscV5BootstrapNodes                   []string         `toml:",omitempty"`
 	Nameserver                             string           `toml:",omitempty"` // Optional nameserver to use for dns discovery
 	Resolver                               ethdisc.Resolver `toml:",omitempty"` // Optional resolver to use for dns discovery

@@ -34,7 +34,7 @@ type insertFn func(tx *sql.Tx, c *params.NodeConfig) error
 func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO node_config (
-		network_id, data_dir, keystore_dir, node_key, no_discovery, rendezvous,
+		network_id, data_dir, keystore_dir, node_key, no_discovery, 
 		listen_addr, advertise_addr, name, version, api_modules, tls_enabled,
 		max_peers, max_pending_peers, enable_status_service, enable_ntp_sync,
 		bridge_enabled, wallet_enabled, local_notifications_enabled,
@@ -44,9 +44,9 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	) VALUES (
 		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-		?, ?, ?, ?, ?, ?, 'id'
+		?, ?, ?, ?, ?, 'id'
 	)`,
-		c.NetworkID, c.DataDir, c.KeyStoreDir, c.NodeKey, c.NoDiscovery, c.Rendezvous,
+		c.NetworkID, c.DataDir, c.KeyStoreDir, c.NodeKey, c.NoDiscovery,
 		c.ListenAddr, c.AdvertiseAddr, c.Name, c.Version, c.APIModules,
 		c.TLSEnabled, c.MaxPeers, c.MaxPendingPeers,
 		c.EnableStatusService, true,
@@ -313,7 +313,6 @@ func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
 	nodeMap[BootNodes] = c.ClusterConfig.BootNodes
 	nodeMap[TrustedMailServers] = c.ClusterConfig.TrustedMailServers
 	nodeMap[PushNotificationsServers] = c.ClusterConfig.PushNotificationsServers
-	nodeMap[RendezvousNodes] = c.ClusterConfig.RendezvousNodes
 	nodeMap[DiscV5BootstrapNodes] = c.ClusterConfig.DiscV5BootstrapNodes
 	nodeMap[WakuNodes] = c.ClusterConfig.WakuNodes
 
@@ -441,14 +440,14 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 
 	err := tx.QueryRow(`
 	SELECT
-		network_id, data_dir, keystore_dir, node_key, no_discovery, rendezvous,
+		network_id, data_dir, keystore_dir, node_key, no_discovery,
 		listen_addr, advertise_addr, name, version, api_modules, tls_enabled, max_peers, max_pending_peers,
 		enable_status_service, bridge_enabled, wallet_enabled, local_notifications_enabled,
 		browser_enabled, permissions_enabled, mailservers_enabled, swarm_enabled,
 		mailserver_registry_address, web3provider_enabled, connector_enabled FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
-		&nodecfg.NetworkID, &nodecfg.DataDir, &nodecfg.KeyStoreDir, &nodecfg.NodeKey, &nodecfg.NoDiscovery, &nodecfg.Rendezvous,
+		&nodecfg.NetworkID, &nodecfg.DataDir, &nodecfg.KeyStoreDir, &nodecfg.NodeKey, &nodecfg.NoDiscovery,
 		&nodecfg.ListenAddr, &nodecfg.AdvertiseAddr, &nodecfg.Name, &nodecfg.Version, &nodecfg.APIModules, &nodecfg.TLSEnabled, &nodecfg.MaxPeers, &nodecfg.MaxPendingPeers,
 		&nodecfg.EnableStatusService, &nodecfg.BridgeConfig.Enabled, &nodecfg.WalletConfig.Enabled, &nodecfg.LocalNotificationsConfig.Enabled,
 		&nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled, &nodecfg.MailserversConfig.Enabled, &nodecfg.SwarmConfig.Enabled,
@@ -537,7 +536,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	nodeMap[BootNodes] = &nodecfg.ClusterConfig.BootNodes
 	nodeMap[TrustedMailServers] = &nodecfg.ClusterConfig.TrustedMailServers
 	nodeMap[PushNotificationsServers] = &nodecfg.ClusterConfig.PushNotificationsServers
-	nodeMap[RendezvousNodes] = &nodecfg.ClusterConfig.RendezvousNodes
 	nodeMap[WakuNodes] = &nodecfg.ClusterConfig.WakuNodes
 	nodeMap[DiscV5BootstrapNodes] = &nodecfg.ClusterConfig.DiscV5BootstrapNodes
 	rows, err = tx.Query(`SELECT node, type	FROM cluster_nodes WHERE synthetic_id = 'id' ORDER BY node ASC`)

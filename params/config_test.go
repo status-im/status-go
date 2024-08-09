@@ -220,18 +220,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Error: "NoDiscovery is false, but ClusterConfig.BootNodes is empty",
 		},
 		{
-			Name: "Validate that ClusterConfig.RendezvousNodes is verified to be empty if Rendezvous is disabled",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
-				"NoDiscovery": true,
-				"Rendezvous": true
-			}`,
-			Error: "Rendezvous is enabled, but ClusterConfig.RendezvousNodes is empty",
-		},
-		{
 			Name: "Validate that PFSEnabled & InstallationID are checked for validity",
 			Config: `{
 				"NetworkId": 1,
