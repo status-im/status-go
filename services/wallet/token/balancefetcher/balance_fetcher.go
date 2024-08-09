@@ -300,7 +300,6 @@ func (bf *DefaultBalanceFetcher) GetBalancesAtByChain(parent context.Context, cl
 			if err != nil {
 				return err
 			}
-
 			updateBalance(client.NetworkID(), balances)
 			return nil
 		})
@@ -310,5 +309,5 @@ func (bf *DefaultBalanceFetcher) GetBalancesAtByChain(parent context.Context, cl
 	case <-parent.Done():
 		return nil, parent.Err()
 	}
-	return response, group.Error()
+	return response, nil
 }
