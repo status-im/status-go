@@ -1091,51 +1091,18 @@ func (w *Waku) Start() error {
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
-
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-w.ctx.Done():
 				return
-
+			case <-ticker.C:
+				w.checkForConnectionChanges()
 			case <-w.topicHealthStatusChan:
 				// TODO: https://github.com/status-im/status-go/issues/4628
-
 			case <-w.connectionNotifChan:
-
-				isOnline := len(w.node.Host().Network().Peers()) > 0
-
-				w.connStatusMu.Lock()
-
-				latestConnStatus := types.ConnStatus{
-					IsOnline: isOnline,
-					Peers:    FormatPeerStats(w.node),
-				}
-
-				w.logger.Debug("peer stats",
-					zap.Int("peersCount", len(latestConnStatus.Peers)),
-					zap.Any("stats", latestConnStatus))
-				for k, subs := range w.connStatusSubscriptions {
-					if !subs.Send(latestConnStatus) {
-						delete(w.connStatusSubscriptions, k)
-					}
-				}
-
-				w.connStatusMu.Unlock()
-
-				if w.onPeerStats != nil {
-					w.onPeerStats(latestConnStatus)
-				}
-
-				if w.statusTelemetryClient != nil {
-					connFailures := FormatPeerConnFailures(w.node)
-					w.statusTelemetryClient.PushPeerCount(w.ctx, w.PeerCount())
-					w.statusTelemetryClient.PushPeerConnFailures(w.ctx, connFailures)
-				}
-
-				w.ConnectionChanged(connection.State{
-					Type:    w.state.Type, //setting state type as previous one since there won't be a change here
-					Offline: !latestConnStatus.IsOnline,
-				})
+				w.checkForConnectionChanges()
 			}
 		}
 	}()
@@ -1202,6 +1169,44 @@ func (w *Waku) Start() error {
 	go w.seedBootnodesForDiscV5()
 
 	return nil
+}
+
+func (w *Waku) checkForConnectionChanges() {
+
+	isOnline := len(w.node.Host().Network().Peers()) > 0
+
+	w.connStatusMu.Lock()
+
+	latestConnStatus := types.ConnStatus{
+		IsOnline: isOnline,
+		Peers:    FormatPeerStats(w.node),
+	}
+
+	w.logger.Debug("peer stats",
+		zap.Int("peersCount", len(latestConnStatus.Peers)),
+		zap.Any("stats", latestConnStatus))
+	for k, subs := range w.connStatusSubscriptions {
+		if !subs.Send(latestConnStatus) {
+			delete(w.connStatusSubscriptions, k)
+		}
+	}
+
+	w.connStatusMu.Unlock()
+
+	if w.onPeerStats != nil {
+		w.onPeerStats(latestConnStatus)
+	}
+
+	if w.statusTelemetryClient != nil {
+		connFailures := FormatPeerConnFailures(w.node)
+		w.statusTelemetryClient.PushPeerCount(w.ctx, w.PeerCount())
+		w.statusTelemetryClient.PushPeerConnFailures(w.ctx, connFailures)
+	}
+
+	w.ConnectionChanged(connection.State{
+		Type:    w.state.Type, //setting state type as previous one since there won't be a change here
+		Offline: !latestConnStatus.IsOnline,
+	})
 }
 
 func (w *Waku) confirmMessagesSent() {
