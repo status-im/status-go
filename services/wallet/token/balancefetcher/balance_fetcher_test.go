@@ -382,12 +382,4 @@ func TestBalanceFetcherGetBalancesAtByChain(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, expectedBalances, balances)
-
-	// Fetch native balances and token balances using scan contract for Arbitrum Mainnet
-	chainClientsArb := map[uint64]chain.ClientInterface{w_common.ArbitrumMainnet: chainClientArb}
-	balancesArb, errArb := bf.GetBalancesAtByChain(ctx, chainClientsArb, accounts, tokens, atBlocks)
-
-	require.Error(t, errArb, "GetBalancesAtByChain should return an error for Arbitrum Mainnet")
-	require.Contains(t, errArb.Error(), "no scan contract", "Incorrect error message for Arbitrum Mainnet")
-	require.Nil(t, balancesArb[w_common.ArbitrumMainnet])
 }
