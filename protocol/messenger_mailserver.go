@@ -396,15 +396,10 @@ func (m *Messenger) checkForMissingMessagesLoop() {
 	t := time.NewTicker(missingMessageCheckPeriod)
 	defer t.Stop()
 
-	mailserverAvailableSignal := m.SubscribeMailserverAvailable()
-
 	for {
 		select {
 		case <-m.quit:
 			return
-
-		// Wait for mailserver available, also triggered on mailserver change
-		case <-mailserverAvailableSignal:
 
 		case <-t.C:
 
