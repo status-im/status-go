@@ -1352,7 +1352,8 @@ func (w *Waku) Start() error {
 
 	go func() {
 		defer w.wg.Done()
-
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-w.ctx.Done():
@@ -1360,61 +1361,10 @@ func (w *Waku) Start() error {
 
 			case <-w.topicHealthStatusChan:
 				// TODO: https://github.com/status-im/status-go/issues/4628
-
 			case <-w.connectionNotifChan:
-
-				isOnline := len(w.node.Host().Network().Peers()) > 0
-
-				if w.cfg.LightClient {
-					// TODO: Temporary changes for lightNodes to have health check based on connected peers.
-					//This needs to be enhanced to be based on healthy Filter and lightPush peers available for each shard.
-					//This would get fixed as part of https://github.com/waku-org/go-waku/issues/1114
-
-					subs := w.node.FilterLightnode().Subscriptions()
-					w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
-
-					//TODO: needs fixing, right now invoking everytime.
-					//Trigger FilterManager to take care of any pending filter subscriptions
-					//TODO: Pass pubsubTopic based on topicHealth notif received.
-					go w.filterManager.onConnectionStatusChange("", isOnline)
-
-				}
-				w.connStatusMu.Lock()
-
-				latestConnStatus := types.ConnStatus{
-					IsOnline: isOnline,
-					Peers:    FormatPeerStats(w.node),
-				}
-
-				w.logger.Debug("peer stats",
-					zap.Int("peersCount", len(latestConnStatus.Peers)),
-					zap.Any("stats", latestConnStatus))
-				for k, subs := range w.connStatusSubscriptions {
-					if !subs.Send(latestConnStatus) {
-						delete(w.connStatusSubscriptions, k)
-					}
-				}
-
-				w.connStatusMu.Unlock()
-
-				if w.onPeerStats != nil {
-					w.onPeerStats(latestConnStatus)
-				}
-
-				if w.statusTelemetryClient != nil {
-					w.statusTelemetryClient.PushPeerCount(w.PeerCount())
-				}
-
-				//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
-				if !w.onlineChecker.IsOnline() && isOnline {
-					if err := w.discoverAndConnectPeers(); err != nil {
-						w.logger.Error("failed to add wakuv2 peers", zap.Error(err))
-					}
-				}
-
-				w.ConnectionChanged(connection.State{
-					Offline: !latestConnStatus.IsOnline,
-				})
+				w.checkForConnectionChanges()
+			case <-ticker.C:
+				w.checkForConnectionChanges()
 			}
 		}
 	}()
@@ -1456,6 +1406,62 @@ func (w *Waku) Start() error {
 	go w.seedBootnodesForDiscV5()
 
 	return nil
+}
+
+func (w *Waku) checkForConnectionChanges() {
+
+	isOnline := len(w.node.Host().Network().Peers()) > 0
+
+	if w.cfg.LightClient {
+		// TODO: Temporary changes for lightNodes to have health check based on connected peers.
+		//This needs to be enhanced to be based on healthy Filter and lightPush peers available for each shard.
+		//This would get fixed as part of https://github.com/waku-org/go-waku/issues/1114
+
+		subs := w.node.FilterLightnode().Subscriptions()
+		w.logger.Debug("filter subs count", zap.Int("count", len(subs)))
+
+		//TODO: needs fixing, right now invoking everytime.
+		//Trigger FilterManager to take care of any pending filter subscriptions
+		//TODO: Pass pubsubTopic based on topicHealth notif received.
+		go w.filterManager.onConnectionStatusChange("", isOnline)
+
+	}
+	w.connStatusMu.Lock()
+
+	latestConnStatus := types.ConnStatus{
+		IsOnline: isOnline,
+		Peers:    FormatPeerStats(w.node),
+	}
+
+	w.logger.Debug("peer stats",
+		zap.Int("peersCount", len(latestConnStatus.Peers)),
+		zap.Any("stats", latestConnStatus))
+	for k, subs := range w.connStatusSubscriptions {
+		if !subs.Send(latestConnStatus) {
+			delete(w.connStatusSubscriptions, k)
+		}
+	}
+
+	w.connStatusMu.Unlock()
+
+	if w.onPeerStats != nil {
+		w.onPeerStats(latestConnStatus)
+	}
+
+	if w.statusTelemetryClient != nil {
+		w.statusTelemetryClient.PushPeerCount(w.PeerCount())
+	}
+
+	//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
+	if !w.onlineChecker.IsOnline() && isOnline {
+		if err := w.discoverAndConnectPeers(); err != nil {
+			w.logger.Error("failed to add wakuv2 peers", zap.Error(err))
+		}
+	}
+
+	w.ConnectionChanged(connection.State{
+		Offline: !latestConnStatus.IsOnline,
+	})
 }
 
 func (w *Waku) setupRelaySubscriptions() error {
