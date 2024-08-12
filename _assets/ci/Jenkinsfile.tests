@@ -52,14 +52,15 @@ pipeline {
   }
 
   environment {
-    PLATFORM = 'tests'
-    DB_CONT  = "status-go-test-db-${env.EXECUTOR_NUMBER.toInteger() + 1}"
-    DB_PORT  = "${5432 + env.EXECUTOR_NUMBER.toInteger()}"
-    TMPDIR   = "${WORKSPACE_TMP}"
-    GOPATH   = "${WORKSPACE_TMP}/go"
-    GOCACHE  = "${WORKSPACE_TMP}/gocache"
-    PATH     = "${PATH}:${GOPATH}/bin"
-    REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
+    PLATFORM    = 'tests'
+    DB_CONT     = "status-go-test-db-${env.EXECUTOR_NUMBER.toInteger() + 1}"
+    DB_PORT     = "${5432 + env.EXECUTOR_NUMBER.toInteger()}"
+    TMPDIR      = "${WORKSPACE_TMP}"
+    GOPATH      = "${WORKSPACE_TMP}/go"
+    GOCACHE     = "${WORKSPACE_TMP}/gocache"
+    PATH        = "${PATH}:${GOPATH}/bin"
+    REPO_SRC    = "${GOPATH}/src/github.com/status-im/status-go"
+    BASE_BRANCH = "${env.CHANGE_TARGET}"
 
     /* Hack-fix for params not being set in env on first job run. */
     UNIT_TEST_FAILFAST =               "${params.UNIT_TEST_FAILFAST}"
@@ -94,6 +95,9 @@ pipeline {
     }
 
     stage('Commit') {
+      environment {
+        BASE_BRANCH = "${env.BASE_BRANCH}"
+      }
       when { // https://github.com/status-im/status-go/issues/4993#issuecomment-2022685544
         expression { !isTestNightlyJob() }
       }
