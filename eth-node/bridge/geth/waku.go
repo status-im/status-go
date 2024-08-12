@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku"
@@ -59,7 +61,7 @@ func (w *GethWakuWrapper) StopDiscV5() error {
 }
 
 // PeerCount function only added for compatibility with waku V2
-func (w *GethWakuWrapper) AddStorePeer(address string) (peer.ID, error) {
+func (w *GethWakuWrapper) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return "", errors.New("not available in WakuV1")
 }
 
@@ -90,22 +92,22 @@ func (w *GethWakuWrapper) RemovePubsubTopicKey(topic string) error {
 }
 
 // AddRelayPeer function only added for compatibility with waku V2
-func (w *GethWakuWrapper) AddRelayPeer(address string) (peer.ID, error) {
+func (w *GethWakuWrapper) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return "", errors.New("not available in WakuV1")
 }
 
 // DialPeer function only added for compatibility with waku V2
-func (w *GethWakuWrapper) DialPeer(address string) error {
+func (w *GethWakuWrapper) DialPeer(address multiaddr.Multiaddr) error {
 	return errors.New("not available in WakuV1")
 }
 
 // DialPeerByID function only added for compatibility with waku V2
-func (w *GethWakuWrapper) DialPeerByID(peerID string) error {
+func (w *GethWakuWrapper) DialPeerByID(peerID peer.ID) error {
 	return errors.New("not available in WakuV1")
 }
 
 // ListenAddresses function only added for compatibility with waku V2
-func (w *GethWakuWrapper) ListenAddresses() ([]string, error) {
+func (w *GethWakuWrapper) ListenAddresses() ([]multiaddr.Multiaddr, error) {
 	return nil, errors.New("not available in WakuV1")
 }
 
@@ -114,12 +116,12 @@ func (w *GethWakuWrapper) RelayPeersByTopic(topic string) (*types.PeerList, erro
 }
 
 // ENR function only added for compatibility with waku V2
-func (w *GethWakuWrapper) ENR() (string, error) {
-	return "", errors.New("not available in WakuV1")
+func (w *GethWakuWrapper) ENR() (*enode.Node, error) {
+	return nil, errors.New("not available in WakuV1")
 }
 
 // PeerCount function only added for compatibility with waku V2
-func (w *GethWakuWrapper) DropPeer(peerID string) error {
+func (w *GethWakuWrapper) DropPeer(peerID peer.ID) error {
 	return errors.New("not available in WakuV1")
 }
 
@@ -132,8 +134,8 @@ func (w *GethWakuWrapper) SetCriteriaForMissingMessageVerification(peerID peer.I
 }
 
 // Peers function only added for compatibility with waku V2
-func (w *GethWakuWrapper) Peers() map[string]types.WakuV2Peer {
-	p := make(map[string]types.WakuV2Peer)
+func (w *GethWakuWrapper) Peers() types.PeerStats {
+	p := make(types.PeerStats)
 	return p
 }
 

@@ -3,21 +3,47 @@ package storenodes
 import (
 	"testing"
 
+	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/services/mailservers"
 )
 
+func TestSerialization(t *testing.T) {
+	maddr, err := multiaddr.NewMultiaddr("/dns4/test.net/tcp/30303/p2p/16Uiu2HAmMELCo218hncCtTvC2Dwbej3rbyHQcR8erXNnKGei7WPZ")
+	require.NoError(t, err)
+	snodes := Storenodes{
+		{
+			CommunityID: communityID1,
+			StorenodeID: "storenode001",
+			Name:        "My Mailserver",
+			Address:     maddr,
+			Fleet:       "prod",
+			Version:     2,
+		},
+	}
+
+	snodesProtobuf := snodes.ToProtobuf()
+
+	snodes2 := FromProtobuf(snodesProtobuf, 0)
+
+	require.Equal(t, snodes[0].Address.String(), snodes2[0].Address.String())
+}
+
 func TestUpdateStorenodesInDB(t *testing.T) {
 	db, close := setupTestDB(t, communityID1, communityID2)
 	defer close()
+
+	maddr, err := multiaddr.NewMultiaddr("/dns4/test.net/tcp/30303/p2p/16Uiu2HAmMELCo218hncCtTvC2Dwbej3rbyHQcR8erXNnKGei7WPZ")
+	require.NoError(t, err)
+
 	csn := NewCommunityStorenodes(db, nil)
 	snodes1 := []Storenode{
 		{
 			CommunityID: communityID1,
 			StorenodeID: "storenode001",
 			Name:        "My Mailserver",
-			Address:     "enode://...",
+			Address:     maddr,
 			Fleet:       "prod",
 			Version:     2,
 		},
@@ -27,13 +53,13 @@ func TestUpdateStorenodesInDB(t *testing.T) {
 			CommunityID: communityID2,
 			StorenodeID: "storenode002",
 			Name:        "My Mailserver",
-			Address:     "enode://...",
+			Address:     maddr,
 			Fleet:       "prod",
 			Version:     2,
 		},
 	}
 	// populate db
-	err := csn.UpdateStorenodesInDB(communityID1, snodes1, 0)
+	err = csn.UpdateStorenodesInDB(communityID1, snodes1, 0)
 	require.NoError(t, err)
 	err = csn.UpdateStorenodesInDB(communityID2, snodes2, 0)
 	require.NoError(t, err)
@@ -51,7 +77,7 @@ func TestUpdateStorenodesInDB(t *testing.T) {
 func matchStoreNode(t *testing.T, sn Storenode, ms mailservers.Mailserver) {
 	require.Equal(t, sn.StorenodeID, ms.ID)
 	require.Equal(t, sn.Name, ms.Name)
-	require.Equal(t, sn.Address, ms.Address)
+	require.Equal(t, sn.Address.String(), ms.Address)
 	require.Equal(t, sn.Fleet, ms.Fleet)
 	require.Equal(t, sn.Version, ms.Version)
 }

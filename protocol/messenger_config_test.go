@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/appdatabase"
@@ -10,7 +11,7 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 )
 
-func WithTestStoreNode(s *suite.Suite, id string, address string, fleet string, collectiblesServiceMock *CollectiblesServiceMock) Option {
+func WithTestStoreNode(s *suite.Suite, id string, address multiaddr.Multiaddr, fleet string, collectiblesServiceMock *CollectiblesServiceMock) Option {
 	return func(c *config) error {
 		sqldb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 		s.Require().NoError(err)
@@ -19,7 +20,7 @@ func WithTestStoreNode(s *suite.Suite, id string, address string, fleet string, 
 		err = db.Add(mailservers.Mailserver{
 			ID:      id,
 			Name:    id,
-			Address: address,
+			Address: address.String(),
 			Fleet:   fleet,
 		})
 		s.Require().NoError(err)

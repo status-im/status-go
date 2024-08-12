@@ -496,7 +496,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
 
 	storeNodeAddress := storeNodeListenAddresses[0]
-	s.logger.Info("store node ready", zap.String("address", storeNodeAddress))
+	s.logger.Info("store node ready", zap.Stringer("address", storeNodeAddress))
 
 	// Create messengers
 

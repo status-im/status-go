@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -57,7 +59,7 @@ type MessengerStoreNodeRequestSuite struct {
 	bob   *Messenger
 
 	wakuStoreNode    *waku2.Waku
-	storeNodeAddress string
+	storeNodeAddress multiaddr.Multiaddr
 
 	ownerWaku types.Waku
 	bobWaku   types.Waku
@@ -163,7 +165,7 @@ func (s *MessengerStoreNodeRequestSuite) createStore() {
 
 	s.wakuStoreNode = NewTestWakuV2(&s.Suite, cfg)
 	s.storeNodeAddress = s.wakuListenAddress(s.wakuStoreNode)
-	s.logger.Info("store node ready", zap.String("address", s.storeNodeAddress))
+	s.logger.Info("store node ready", zap.Stringer("address", s.storeNodeAddress))
 }
 
 func (s *MessengerStoreNodeRequestSuite) tearDownOwner() {
@@ -183,13 +185,13 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 	s.ownerWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
 
 	messengerLogger := s.logger.Named("owner-messenger")
-	s.owner = s.newMessenger(s.ownerWaku, messengerLogger, s.storeNodeAddress)
+	s.owner = s.newMessenger(s.ownerWaku, messengerLogger, &s.storeNodeAddress)
 
 	// We force the owner to use the store node as relay peer
-	WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.ownerWaku), func() []string {
+	WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.ownerWaku), func() peer.IDSlice {
 		err := s.owner.DialPeer(s.storeNodeAddress)
 		s.Require().NoError(err)
-		return []string{s.wakuStoreNode.PeerID().String()}
+		return peer.IDSlice{s.wakuStoreNode.PeerID()}
 	})
 }
 
@@ -203,7 +205,7 @@ func (s *MessengerStoreNodeRequestSuite) createBob() {
 	s.bobWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
 
 	messengerLogger := s.logger.Named("bob-messenger")
-	s.bob = s.newMessenger(s.bobWaku, messengerLogger, s.storeNodeAddress)
+	s.bob = s.newMessenger(s.bobWaku, messengerLogger, &s.storeNodeAddress)
 }
 
 func (s *MessengerStoreNodeRequestSuite) tearDownBob() {
@@ -211,7 +213,7 @@ func (s *MessengerStoreNodeRequestSuite) tearDownBob() {
 	TearDownMessenger(&s.Suite, s.bob)
 }
 
-func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *zap.Logger, mailserverAddress string) *Messenger {
+func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *zap.Logger, mailserverAddress *multiaddr.Multiaddr) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -220,9 +222,9 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 		WithCuratedCommunitiesUpdateLoop(false),
 	}
 
-	if mailserverAddress != "" {
+	if mailserverAddress != nil {
 		options = append(options,
-			WithTestStoreNode(&s.Suite, localMailserverID, mailserverAddress, localFleet, s.collectiblesServiceMock),
+			WithTestStoreNode(&s.Suite, localMailserverID, *mailserverAddress, localFleet, s.collectiblesServiceMock),
 		)
 	}
 
@@ -363,7 +365,7 @@ func (s *MessengerStoreNodeRequestSuite) waitForEnvelopes(subscription <-chan st
 	}
 }
 
-func (s *MessengerStoreNodeRequestSuite) wakuListenAddress(waku *waku2.Waku) string {
+func (s *MessengerStoreNodeRequestSuite) wakuListenAddress(waku *waku2.Waku) multiaddr.Multiaddr {
 	addresses := waku.ListenAddresses()
 	s.Require().LessOrEqual(1, len(addresses))
 	return addresses[0]
@@ -1230,7 +1232,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingCommunityWithOwnerToken() {
 
 func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 	storeAddress := s.storeNodeAddress
-	storePeerID := s.wakuStoreNode.PeerID().String()
+	storePeerID := s.wakuStoreNode.PeerID()
 
 	// Create messengers
 	s.createOwner()
@@ -1242,10 +1244,10 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 
 	// Connect to store node to force "online" status
 	{
-		WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() []string {
+		WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() peer.IDSlice {
 			err := s.bob.DialPeer(storeAddress)
 			s.Require().NoError(err)
-			return []string{storePeerID}
+			return peer.IDSlice{storePeerID}
 		})
 		s.Require().True(s.bob.Online())
 
@@ -1299,10 +1301,10 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 		// We don't enable it earlier to control when we connect to the store node.
 		s.bob.config.codeControlFlags.AutoRequestHistoricMessages = true
 
-		WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() []string {
+		WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() peer.IDSlice {
 			err := s.bob.DialPeer(storeAddress)
 			s.Require().NoError(err)
-			return []string{storePeerID}
+			return peer.IDSlice{storePeerID}
 		})
 		s.Require().True(s.bob.Online())
 

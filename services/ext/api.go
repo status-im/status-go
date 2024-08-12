@@ -9,6 +9,9 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
@@ -16,6 +19,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -1480,29 +1484,47 @@ func (api *PublicAPI) StorePubsubTopicKey(topic string, privKey string) error {
 	return api.service.messenger.StorePubsubTopicKey(topic, p)
 }
 
-func (api *PublicAPI) AddStorePeer(address string) (string, error) {
-	peerID, err := api.service.messenger.AddStorePeer(address)
-	return string(peerID), err
+func (api *PublicAPI) AddStorePeer(address string) (peer.ID, error) {
+	maddr, err := multiaddr.NewMultiaddr(address)
+	if err != nil {
+		return "", err
+	}
+	return api.service.messenger.AddStorePeer(maddr)
 }
 
-func (api *PublicAPI) AddRelayPeer(address string) (string, error) {
-	peerID, err := api.service.messenger.AddRelayPeer(address)
-	return string(peerID), err
+func (api *PublicAPI) AddRelayPeer(address string) (peer.ID, error) {
+	maddr, err := multiaddr.NewMultiaddr(address)
+	if err != nil {
+		return "", err
+	}
+	return api.service.messenger.AddRelayPeer(maddr)
 }
 
 func (api *PublicAPI) DialPeer(address string) error {
-	return api.service.messenger.DialPeer(address)
+	maddr, err := multiaddr.NewMultiaddr(address)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.DialPeer(maddr)
 }
 
 func (api *PublicAPI) DialPeerByID(peerID string) error {
-	return api.service.messenger.DialPeerByID(peerID)
+	pID, err := peer.Decode(peerID)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.DialPeerByID(pID)
 }
 
 func (api *PublicAPI) DropPeer(peerID string) error {
-	return api.service.messenger.DropPeer(peerID)
+	pID, err := peer.Decode(peerID)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.DropPeer(pID)
 }
 
-func (api *PublicAPI) Peers() map[string]types.WakuV2Peer {
+func (api *PublicAPI) Peers() types.PeerStats {
 	return api.service.messenger.Peers()
 }
 
@@ -1510,11 +1532,11 @@ func (api *PublicAPI) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 	return api.service.messenger.RelayPeersByTopic(topic)
 }
 
-func (api *PublicAPI) ListenAddresses() ([]string, error) {
+func (api *PublicAPI) ListenAddresses() ([]multiaddr.Multiaddr, error) {
 	return api.service.messenger.ListenAddresses()
 }
 
-func (api *PublicAPI) Enr() (string, error) {
+func (api *PublicAPI) Enr() (*enode.Node, error) {
 	return api.service.messenger.ENR()
 }
 

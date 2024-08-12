@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
+
 	"github.com/status-im/status-go/protocol/storenodes"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
@@ -46,9 +49,9 @@ type MessengerStoreNodeCommunitySuite struct {
 	bobWaku types.Waku
 
 	storeNode                 *waku2.Waku
-	storeNodeAddress          string
+	storeNodeAddress          multiaddr.Multiaddr
 	communityStoreNode        *waku2.Waku
-	communityStoreNodeAddress string
+	communityStoreNodeAddress multiaddr.Multiaddr
 
 	collectiblesServiceMock *CollectiblesServiceMock
 
@@ -65,8 +68,8 @@ func (s *MessengerStoreNodeCommunitySuite) SetupTest() {
 	s.storeNode, s.storeNodeAddress = s.createStore("store-1")
 	s.communityStoreNode, s.communityStoreNodeAddress = s.createStore("store-community")
 
-	s.owner, s.ownerWaku = s.newMessenger("owner", s.storeNodeAddress)
-	s.bob, s.bobWaku = s.newMessenger("bob", s.storeNodeAddress)
+	s.owner, s.ownerWaku = s.newMessenger("owner", &s.storeNodeAddress)
+	s.bob, s.bobWaku = s.newMessenger("bob", &s.storeNodeAddress)
 }
 
 func (s *MessengerStoreNodeCommunitySuite) TearDown() {
@@ -85,7 +88,7 @@ func (s *MessengerStoreNodeCommunitySuite) TearDown() {
 	}
 }
 
-func (s *MessengerStoreNodeCommunitySuite) createStore(name string) (*waku2.Waku, string) {
+func (s *MessengerStoreNodeCommunitySuite) createStore(name string) (*waku2.Waku, multiaddr.Multiaddr) {
 	cfg := testWakuV2Config{
 		logger:      s.logger.Named(name),
 		enableStore: true,
@@ -98,7 +101,7 @@ func (s *MessengerStoreNodeCommunitySuite) createStore(name string) (*waku2.Waku
 	return storeNode, addresses[0]
 }
 
-func (s *MessengerStoreNodeCommunitySuite) newMessenger(name, storenodeAddress string) (*Messenger, types.Waku) {
+func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAddress *multiaddr.Multiaddr) (*Messenger, types.Waku) {
 	localMailserverID := "local-mailserver-007"
 	localFleet := "local-fleet-007"
 
@@ -119,11 +122,15 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name, storenodeAddress s
 	err = sqlite.Migrate(mailserversSQLDb) // migrate default
 	s.Require().NoError(err)
 
+	var sAddr string
+	if storenodeAddress != nil {
+		sAddr = (*storenodeAddress).String()
+	}
 	mailserversDatabase := mailserversDB.NewDB(mailserversSQLDb)
 	err = mailserversDatabase.Add(mailserversDB.Mailserver{
 		ID:      localMailserverID,
 		Name:    localMailserverID,
-		Address: storenodeAddress,
+		Address: sAddr,
 		Fleet:   localFleet,
 	})
 	s.Require().NoError(err)
@@ -133,9 +140,9 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name, storenodeAddress s
 		WithCuratedCommunitiesUpdateLoop(false),
 	}
 
-	if storenodeAddress != "" {
+	if storenodeAddress != nil {
 		options = append(options,
-			WithTestStoreNode(&s.Suite, localMailserverID, storenodeAddress, localFleet, s.collectiblesServiceMock),
+			WithTestStoreNode(&s.Suite, localMailserverID, *storenodeAddress, localFleet, s.collectiblesServiceMock),
 		)
 	}
 
@@ -291,15 +298,15 @@ func (s *MessengerStoreNodeCommunitySuite) TestSetStorenodeForCommunity_fetchMes
 	err = s.bob.DialPeer(s.storeNodeAddress)
 	s.Require().NoError(err)
 
-	ownerPeerID := gethbridge.GetGethWakuV2From(s.ownerWaku).PeerID().String()
-	bobPeerID := gethbridge.GetGethWakuV2From(s.bobWaku).PeerID().String()
+	ownerPeerID := gethbridge.GetGethWakuV2From(s.ownerWaku).PeerID()
+	bobPeerID := gethbridge.GetGethWakuV2From(s.bobWaku).PeerID()
 
 	// 1. Owner creates a community
 	community, chat := s.createCommunityWithChat(s.owner)
 
 	// waits for onwer and bob to connect to the store node
-	WaitForPeersConnected(&s.Suite, s.storeNode, func() []string {
-		return []string{ownerPeerID, bobPeerID}
+	WaitForPeersConnected(&s.Suite, s.storeNode, func() peer.IDSlice {
+		return peer.IDSlice{ownerPeerID, bobPeerID}
 	})
 
 	// 2. Bob joins the community
@@ -307,13 +314,13 @@ func (s *MessengerStoreNodeCommunitySuite) TestSetStorenodeForCommunity_fetchMes
 	joinCommunity(&s.Suite, community.ID(), s.owner, s.bob, bobPassword, []string{bobAccountAddress})
 
 	// waits for onwer and bob to connect to the community store node
-	WaitForPeersConnected(&s.Suite, s.communityStoreNode, func() []string {
+	WaitForPeersConnected(&s.Suite, s.communityStoreNode, func() peer.IDSlice {
 		err := s.bob.DialPeer(s.communityStoreNodeAddress)
 		s.Require().NoError(err)
 		err = s.owner.DialPeer(s.communityStoreNodeAddress)
 		s.Require().NoError(err)
 
-		return []string{ownerPeerID, bobPeerID}
+		return peer.IDSlice{ownerPeerID, bobPeerID}
 	})
 
 	// 3. Owner sets the storenode for the community
