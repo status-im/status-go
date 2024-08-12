@@ -1279,13 +1279,6 @@ func (w *Waku) Stop() error {
 
 	w.node.Stop()
 
-	time.Sleep(2 * time.Second)
-	w.logger.Info("<<< push to telemetry client")
-
-	if w.statusTelemetryClient != nil {
-		w.statusTelemetryClient.PushPeerCount(w.PeerCount())
-	}
-
 	if w.protectedTopicStore != nil {
 		err := w.protectedTopicStore.Close()
 		if err != nil {
@@ -1293,12 +1286,8 @@ func (w *Waku) Stop() error {
 		}
 	}
 
-	w.logger.Info("<<< wait for wait group")
-
 	close(w.goingOnline)
 	w.wg.Wait()
-
-	w.logger.Info("<<< wait finished")
 
 	w.ctx = nil
 	w.cancel = nil
