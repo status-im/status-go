@@ -432,6 +432,7 @@ func NewManager(
 
 	manager.persistence = &Persistence{
 		db:                      db,
+		logger:                  logger.Named("persistence"),
 		recordBundleToCommunity: manager.dbRecordBundleToCommunity,
 	}
 

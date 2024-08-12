@@ -2419,6 +2419,11 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 }
 
 func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string, c *protobuf.CommunityChat) (*MessengerResponse, error) {
+	m.logger.Debug("<<< EditCommunityChat",
+		zap.String("communityID", communityID.String()),
+		zap.String("chatID", chatID),
+	)
+
 	var response MessengerResponse
 	community, changes, err := m.communitiesManager.EditChat(communityID, chatID, c)
 	if err != nil {
