@@ -93,6 +93,7 @@ type PeerConnFailure struct {
 }
 
 type Client struct {
+	ctx                  context.Context
 	serverURL            string
 	httpClient           *http.Client
 	logger               *zap.Logger
@@ -153,15 +154,16 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 }
 
 func (c *Client) Start(ctx context.Context) {
-	go func() {
+	c.ctx = ctx
 
+	go func() {
 		for {
 			select {
 			case telemetryRequest := <-c.telemetryCh:
 				c.telemetryCacheLock.Lock()
 				c.telemetryCache = append(c.telemetryCache, telemetryRequest)
 				c.telemetryCacheLock.Unlock()
-			case <-ctx.Done():
+			case <-c.ctx.Done():
 				return
 			}
 		}
@@ -191,7 +193,7 @@ func (c *Client) Start(ctx context.Context) {
 					}
 				}
 				timer.Reset(sendPeriod)
-			case <-ctx.Done():
+			case <-c.ctx.Done():
 				return
 			}
 		}
@@ -243,7 +245,12 @@ func (c *Client) processAndPushTelemetry(data interface{}) {
 		return
 	}
 
-	c.telemetryCh <- telemetryRequest
+	select {
+	case <-c.ctx.Done():
+		return
+	case c.telemetryCh <- telemetryRequest:
+	}
+
 	c.nextIdLock.Lock()
 	c.nextId++
 	c.nextIdLock.Unlock()
