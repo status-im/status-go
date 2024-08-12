@@ -2,4 +2,4 @@
 
 package buildinfo
 
-var ApiProxyStageName = "prod"
+var ApiProxyStageName = "test"
