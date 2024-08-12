@@ -241,8 +241,7 @@ func (w *Waku) fetchMessagesBatch(missingHistoryRequest TopicInterest, batchFrom
 	// Split into batches
 	for i := 0; i < len(missingHashes); i += maxHashQueryLength {
 		j := i + maxHashQueryLength
-		if j > len(missingHashes) {
-			j = len(missingHashes)
+		j = math.Min(j, len(missingHashes))
 		}
 
 		wg.Add(1)
