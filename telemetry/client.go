@@ -42,30 +42,30 @@ type TelemetryRequest struct {
 	TelemetryData *json.RawMessage `json:"telemetry_data"`
 }
 
-func (c *Client) PushReceivedMessages(receivedMessages ReceivedMessages) {
-	c.processAndPushTelemetry(receivedMessages)
+func (c *Client) PushReceivedMessages(ctx context.Context, receivedMessages ReceivedMessages) {
+	c.processAndPushTelemetry(ctx, receivedMessages)
 }
 
-func (c *Client) PushSentEnvelope(sentEnvelope wakuv2.SentEnvelope) {
-	c.processAndPushTelemetry(sentEnvelope)
+func (c *Client) PushSentEnvelope(ctx context.Context, sentEnvelope wakuv2.SentEnvelope) {
+	c.processAndPushTelemetry(ctx, sentEnvelope)
 }
 
-func (c *Client) PushReceivedEnvelope(receivedEnvelope *v2protocol.Envelope) {
-	c.processAndPushTelemetry(receivedEnvelope)
+func (c *Client) PushReceivedEnvelope(ctx context.Context, receivedEnvelope *v2protocol.Envelope) {
+	c.processAndPushTelemetry(ctx, receivedEnvelope)
 }
 
-func (c *Client) PushErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSendingEnvelope) {
-	c.processAndPushTelemetry(errorSendingEnvelope)
+func (c *Client) PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvelope wakuv2.ErrorSendingEnvelope) {
+	c.processAndPushTelemetry(ctx, errorSendingEnvelope)
 }
 
-func (c *Client) PushPeerCount(peerCount int) {
+func (c *Client) PushPeerCount(ctx context.Context, peerCount int) {
 	if peerCount != c.lastPeerCount {
 		c.lastPeerCount = peerCount
-		c.processAndPushTelemetry(PeerCount{PeerCount: peerCount})
+		c.processAndPushTelemetry(ctx, PeerCount{PeerCount: peerCount})
 	}
 }
 
-func (c *Client) PushPeerConnFailures(peerConnFailures map[string]int) {
+func (c *Client) PushPeerConnFailures(ctx context.Context, peerConnFailures map[string]int) {
 	for peerID, failures := range peerConnFailures {
 		if lastFailures, exists := c.lastPeerConnFailures[peerID]; exists {
 			if failures == lastFailures {
@@ -73,7 +73,7 @@ func (c *Client) PushPeerConnFailures(peerConnFailures map[string]int) {
 			}
 		}
 		c.lastPeerConnFailures[peerID] = failures
-		c.processAndPushTelemetry(PeerConnFailure{FailedPeerId: peerID, FailureCount: failures})
+		c.processAndPushTelemetry(ctx, PeerConnFailure{FailedPeerId: peerID, FailureCount: failures})
 	}
 }
 
@@ -154,7 +154,6 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 
 func (c *Client) Start(ctx context.Context) {
 	go func() {
-
 		for {
 			select {
 			case telemetryRequest := <-c.telemetryCh:
@@ -199,7 +198,7 @@ func (c *Client) Start(ctx context.Context) {
 	}()
 }
 
-func (c *Client) processAndPushTelemetry(data interface{}) {
+func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) {
 	var telemetryRequest TelemetryRequest
 	switch v := data.(type) {
 	case ReceivedMessages:
@@ -243,7 +242,12 @@ func (c *Client) processAndPushTelemetry(data interface{}) {
 		return
 	}
 
-	c.telemetryCh <- telemetryRequest
+	select {
+	case <-ctx.Done():
+		return
+	case c.telemetryCh <- telemetryRequest:
+	}
+
 	c.nextIdLock.Lock()
 	c.nextId++
 	c.nextIdLock.Unlock()

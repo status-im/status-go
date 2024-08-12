@@ -721,6 +721,13 @@ func (b *StatusNode) Cleanup() error {
 		}
 	}
 
+	if b.pendingTracker != nil {
+		err := b.pendingTracker.Stop()
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
