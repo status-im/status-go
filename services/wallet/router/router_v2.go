@@ -499,7 +499,8 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 	}
 
 	balanceMap, err := r.getBalanceMapForTokenOnChains(ctx, input, selectedFromChains)
-	if err != nil {
+	// return only if there are no balances, otherwise try to resolve the candidates for chains we know the balances for
+	if len(balanceMap) == 0 && err != nil {
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
@@ -541,38 +542,57 @@ func (r *Router) getBalanceMapForTokenOnChains(ctx context.Context, input *Route
 
 	balanceMap = make(map[string]*big.Int)
 
+	chainError := func(chainId uint64, token string, intErr error) {
+		if err == nil {
+			err = fmt.Errorf("chain %d, token %s: %w", chainId, token, intErr)
+		} else {
+			err = fmt.Errorf("%s; chain %d, token %s: %w", err.Error(), chainId, token, intErr)
+		}
+	}
+
 	for _, chain := range selectedFromChains {
+		// check token existence
 		token := input.SendType.FindToken(r.tokenManager, r.collectiblesService, input.AddrFrom, chain, input.TokenID)
 		if token == nil {
+			chainError(chain.ChainID, token.Symbol, ErrTokenNotFound)
+			continue
+		}
+		// check native token existence
+		nativeToken := r.tokenManager.FindToken(chain, chain.NativeCurrencySymbol)
+		if nativeToken == nil {
+			chainError(chain.ChainID, chain.NativeCurrencySymbol, ErrNativeTokenNotFound)
 			continue
 		}
 
 		// add token balance for the chain
-		tokenBalance := big.NewInt(1)
-		if input.SendType == ERC1155Transfer {
+		var tokenBalance *big.Int
+		if input.SendType == ERC721Transfer {
+			tokenBalance = big.NewInt(1)
+		} else if input.SendType == ERC1155Transfer {
 			tokenBalance, err = r.getERC1155Balance(ctx, chain, token, input.AddrFrom)
 			if err != nil {
-				return nil, errors.CreateErrorResponseFromError(err)
+				chainError(chain.ChainID, token.Symbol, errors.CreateErrorResponseFromError(err))
 			}
-		} else if input.SendType != ERC721Transfer {
+		} else {
 			tokenBalance, err = r.getBalance(ctx, chain.ChainID, token, input.AddrFrom)
 			if err != nil {
-				return nil, errors.CreateErrorResponseFromError(err)
+				chainError(chain.ChainID, token.Symbol, errors.CreateErrorResponseFromError(err))
 			}
 		}
-		balanceMap[makeBalanceKey(chain.ChainID, token.Symbol)] = tokenBalance
+		// add only if balance is not nil
+		if tokenBalance != nil {
+			balanceMap[makeBalanceKey(chain.ChainID, token.Symbol)] = tokenBalance
+		}
 
 		// add native token balance for the chain
-		nativeToken := r.tokenManager.FindToken(chain, chain.NativeCurrencySymbol)
-		if nativeToken == nil {
-			return nil, ErrNativeTokenNotFound
-		}
-
 		nativeBalance, err := r.getBalance(ctx, chain.ChainID, nativeToken, input.AddrFrom)
 		if err != nil {
-			return nil, errors.CreateErrorResponseFromError(err)
+			chainError(chain.ChainID, token.Symbol, errors.CreateErrorResponseFromError(err))
 		}
-		balanceMap[makeBalanceKey(chain.ChainID, nativeToken.Symbol)] = nativeBalance
+		// add only if balance is not nil
+		if nativeBalance != nil {
+			balanceMap[makeBalanceKey(chain.ChainID, nativeToken.Symbol)] = nativeBalance
+		}
 	}
 
 	return
