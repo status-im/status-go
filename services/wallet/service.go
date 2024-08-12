@@ -62,10 +62,6 @@ func NewService(
 	feed *event.Feed,
 	mediaServer *server.MediaServer,
 ) *Service {
-	cryptoOnRampManager := onramp.NewManager(&onramp.Options{
-		DataSourceType: onramp.DataSourceStatic,
-	})
-
 	signals := &walletevent.SignalsTransmitter{
 		Publisher: feed,
 	}
@@ -105,6 +101,14 @@ func NewService(
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
 	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountFeed, accountsDB, token.NewPersistence(db))
 	tokenManager.Start()
+
+	cryptoOnRampProviders := []onramp.Provider{
+		onramp.NewMercuryoProvider(tokenManager),
+		onramp.NewRampProvider(),
+		onramp.NewMoonPayProvider(),
+	}
+	cryptoOnRampManager := onramp.NewManager(cryptoOnRampProviders)
+
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(transfer.NewMultiTransactionDB(db), gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	blockChainState := blockchainstate.NewBlockChainState()

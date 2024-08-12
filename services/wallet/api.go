@@ -343,7 +343,13 @@ func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, t
 }
 
 func (api *API) GetCryptoOnRamps(ctx context.Context) ([]onramp.CryptoOnRamp, error) {
-	return api.s.cryptoOnRampManager.Get()
+	log.Debug("call to GetCryptoOnRamps")
+	return api.s.cryptoOnRampManager.GetProviders(ctx)
+}
+
+func (api *API) GetCryptoOnRampURL(ctx context.Context, providerID string, parameters onramp.Parameters) (string, error) {
+	log.Debug("call to GetCryptoOnRampURL")
+	return api.s.cryptoOnRampManager.GetURL(ctx, providerID, parameters)
 }
 
 /*
