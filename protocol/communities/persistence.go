@@ -21,10 +21,12 @@ import (
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"go.uber.org/zap"
 )
 
 type Persistence struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *zap.Logger
 
 	recordBundleToCommunity func(*CommunityRecordBundle) (*Community, error)
 }
@@ -451,6 +453,12 @@ func (p *Persistence) SaveRequestToJoinRevealedAddresses(requestID types.HexByte
 }
 
 func (p *Persistence) SaveCheckChannelPermissionResponse(communityID string, chatID string, response *CheckChannelPermissionsResponse) error {
+	p.logger.Debug("<<< SaveCheckChannelPermissionResponse",
+		zap.String("communtiyID", communityID),
+		zap.String("chatID", chatID),
+		zap.Any("response", response),
+	)
+
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -465,28 +473,45 @@ func (p *Persistence) SaveCheckChannelPermissionResponse(communityID string, cha
 		_ = tx.Rollback()
 	}()
 
+	p.logger.Debug("<<< SaveCheckChannelPermissionResponse: 1")
+
 	viewOnlyPermissionIDs := make([]string, 0)
 	viewAndPostPermissionIDs := make([]string, 0)
 
 	for permissionID := range response.ViewOnlyPermissions.Permissions {
+		p.logger.Debug("<<< SaveCheckChannelPermissionResponse permissions loop 1", zap.String("permissionID", permissionID))
 		viewOnlyPermissionIDs = append(viewOnlyPermissionIDs, permissionID)
 	}
 	for permissionID := range response.ViewAndPostPermissions.Permissions {
+		p.logger.Debug("<<< SaveCheckChannelPermissionResponse permissions loop 2", zap.String("permissionID", permissionID))
 		viewAndPostPermissionIDs = append(viewAndPostPermissionIDs, permissionID)
 	}
+
+	p.logger.Debug("<<< SaveCheckChannelPermissionResponse 2")
 
 	_, err = tx.Exec(`INSERT INTO communities_check_channel_permission_responses (community_id,chat_id,view_only_permissions_satisfied,view_and_post_permissions_satisfied, view_only_permission_ids, view_and_post_permission_ids) VALUES (?, ?, ?, ?, ?, ?)`, communityID, chatID, response.ViewOnlyPermissions.Satisfied, response.ViewAndPostPermissions.Satisfied, strings.Join(viewOnlyPermissionIDs[:], ","), strings.Join(viewAndPostPermissionIDs[:], ","))
 	if err != nil {
 		return err
 	}
 
+	p.logger.Debug("<<< SaveCheckChannelPermissionResponse 3")
+
 	saveCriteriaResults := func(permissions map[string]*PermissionTokenCriteriaResult) error {
+
+		p.logger.Debug("<<< SaveCheckChannelPermissionResponse - saveCriteriaResults")
+
 		for permissionID, criteriaResult := range permissions {
+			p.logger.Debug("<<< SaveCheckChannelPermissionResponse - saveCriteriaResults loop 1",
+				zap.String("permissionID", permissionID),
+				zap.Any("criteriaResult", criteriaResult),
+			)
 
 			criteria := make([]string, 0)
 			for _, val := range criteriaResult.Criteria {
 				criteria = append(criteria, strconv.FormatBool(val))
 			}
+
+			p.logger.Debug("<<< SaveCheckChannelPermissionResponse - saveCriteriaResults loop 2")
 
 			_, err = tx.Exec(`INSERT INTO communities_permission_token_criteria_results (permission_id,community_id, chat_id, criteria) VALUES (?, ?, ?, ?)`, permissionID, communityID, chatID, strings.Join(criteria[:], ","))
 			if err != nil {
@@ -496,10 +521,14 @@ func (p *Persistence) SaveCheckChannelPermissionResponse(communityID string, cha
 		return nil
 	}
 
+	p.logger.Debug("<<< SaveCheckChannelPermissionResponse 4")
+
 	err = saveCriteriaResults(response.ViewOnlyPermissions.Permissions)
 	if err != nil {
 		return err
 	}
+
+	p.logger.Debug("<<< SaveCheckChannelPermissionResponse 5")
 	return saveCriteriaResults(response.ViewAndPostPermissions.Permissions)
 }
 
