@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 )
 
 type Persistence struct {
@@ -475,19 +476,13 @@ func (p *Persistence) SaveCheckChannelPermissionResponse(communityID string, cha
 
 	p.logger.Debug("<<< SaveCheckChannelPermissionResponse: 1")
 
-	viewOnlyPermissionIDs := make([]string, 0)
-	viewAndPostPermissionIDs := make([]string, 0)
+	viewOnlyPermissionIDs := maps.Keys(response.ViewOnlyPermissions.Permissions)
+	viewAndPostPermissionIDs := maps.Keys(response.ViewAndPostPermissions.Permissions)
 
-	for permissionID := range response.ViewOnlyPermissions.Permissions {
-		p.logger.Debug("<<< SaveCheckChannelPermissionResponse permissions loop 1", zap.String("permissionID", permissionID))
-		viewOnlyPermissionIDs = append(viewOnlyPermissionIDs, permissionID)
-	}
-	for permissionID := range response.ViewAndPostPermissions.Permissions {
-		p.logger.Debug("<<< SaveCheckChannelPermissionResponse permissions loop 2", zap.String("permissionID", permissionID))
-		viewAndPostPermissionIDs = append(viewAndPostPermissionIDs, permissionID)
-	}
-
-	p.logger.Debug("<<< SaveCheckChannelPermissionResponse 2")
+	p.logger.Debug("<<< SaveCheckChannelPermissionResponse 2",
+		zap.Any("viewOnlyPermissionIDs", viewOnlyPermissionIDs),
+		zap.Any("viewAndPostPermissionIDs", viewAndPostPermissionIDs),
+	)
 
 	_, err = tx.Exec(`INSERT INTO communities_check_channel_permission_responses (community_id,chat_id,view_only_permissions_satisfied,view_and_post_permissions_satisfied, view_only_permission_ids, view_and_post_permission_ids) VALUES (?, ?, ?, ?, ?, ?)`, communityID, chatID, response.ViewOnlyPermissions.Satisfied, response.ViewAndPostPermissions.Satisfied, strings.Join(viewOnlyPermissionIDs[:], ","), strings.Join(viewAndPostPermissionIDs[:], ","))
 	if err != nil {

@@ -2381,6 +2381,11 @@ func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(ctx context.Cont
 }
 
 func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.CommunityChat) (*MessengerResponse, error) {
+	m.logger.Debug("<<< CreateCommunityChat",
+		zap.String("communityID", communityID.String()),
+		zap.Any("chat", c),
+	)
+
 	var response MessengerResponse
 
 	c.Identity.FirstMessageTimestamp = FirstMessageTimestampNoMessage

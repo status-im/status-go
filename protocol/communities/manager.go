@@ -3286,6 +3286,11 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 }
 
 func (m *Manager) CheckChannelPermissions(communityID types.HexBytes, chatID string, addresses []gethcommon.Address) (*CheckChannelPermissionsResponse, error) {
+	m.logger.Debug("<<< CheckChannelPermissions",
+		zap.String("communityID", communityID.String()),
+		zap.String("chatID", chatID),
+	)
+
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
 
