@@ -510,6 +510,9 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 }
 
 func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
+	w.wg.Add(1)
+	defer w.wg.Done()
+
 	if telemetryServerURL == "" {
 		return
 	}
@@ -546,7 +549,9 @@ func (w *Waku) GetStats() types.StatsSummary {
 }
 
 func (w *Waku) runPeerExchangeLoop() {
+	w.wg.Add(1)
 	defer w.wg.Done()
+
 	if !w.cfg.EnablePeerExchangeClient {
 		// Currently peer exchange client is only used for light nodes
 		return
@@ -1083,8 +1088,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(2)
-
+	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
 
@@ -1142,7 +1146,6 @@ func (w *Waku) Start() error {
 	go w.runPeerExchangeLoop()
 
 	if w.cfg.EnableMissingMessageVerification {
-		w.wg.Add(1)
 
 		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
 			w.node.Store(),
@@ -1152,7 +1155,9 @@ func (w *Waku) Start() error {
 
 		w.missingMsgVerifier.Start(w.ctx)
 
+		w.wg.Add(1)
 		go func() {
+			w.wg.Done()
 			for {
 				select {
 				case <-w.ctx.Done():
@@ -1194,7 +1199,6 @@ func (w *Waku) Start() error {
 	}
 
 	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set w.ctx to nil within `w.Stop()`
-	w.wg.Add(1)
 	go w.seedBootnodesForDiscV5()
 
 	return nil
@@ -1275,6 +1279,13 @@ func (w *Waku) Stop() error {
 
 	w.node.Stop()
 
+	time.Sleep(2 * time.Second)
+	w.logger.Info("<<< push to telemetry client")
+
+	if w.statusTelemetryClient != nil {
+		w.statusTelemetryClient.PushPeerCount(w.PeerCount())
+	}
+
 	if w.protectedTopicStore != nil {
 		err := w.protectedTopicStore.Close()
 		if err != nil {
@@ -1282,8 +1293,12 @@ func (w *Waku) Stop() error {
 		}
 	}
 
+	w.logger.Info("<<< wait for wait group")
+
 	close(w.goingOnline)
 	w.wg.Wait()
+
+	w.logger.Info("<<< wait finished")
 
 	w.ctx = nil
 	w.cancel = nil
@@ -1612,8 +1627,10 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 // It backs off exponentially until maxRetries, at which point it restarts from 0
 // It also restarts if there's a connection change signalled from the client
 func (w *Waku) seedBootnodesForDiscV5() {
+	w.wg.Add(1)
+	defer w.wg.Done()
+
 	if !w.cfg.EnableDiscV5 || w.node.DiscV5() == nil {
-		w.wg.Done()
 		return
 	}
 
@@ -1674,7 +1691,6 @@ func (w *Waku) seedBootnodesForDiscV5() {
 			}
 
 		case <-w.ctx.Done():
-			w.wg.Done()
 			w.logger.Debug("bootnode seeding stopped")
 			return
 		}
