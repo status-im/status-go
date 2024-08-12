@@ -104,11 +104,11 @@ type ErrorSendingEnvelope struct {
 }
 
 type ITelemetryClient interface {
-	PushReceivedEnvelope(receivedEnvelope *protocol.Envelope)
-	PushSentEnvelope(sentEnvelope SentEnvelope)
-	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
-	PushPeerCount(peerCount int)
-	PushPeerConnFailures(peerConnFailures map[string]int)
+	PushReceivedEnvelope(ctx context.Context, receivedEnvelope *protocol.Envelope)
+	PushSentEnvelope(ctx context.Context, sentEnvelope SentEnvelope)
+	PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvelope ErrorSendingEnvelope)
+	PushPeerCount(ctx context.Context, peerCount int)
+	PushPeerConnFailures(ctx context.Context, peerConnFailures map[string]int)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -1128,8 +1128,8 @@ func (w *Waku) Start() error {
 
 				if w.statusTelemetryClient != nil {
 					connFailures := FormatPeerConnFailures(w.node)
-					w.statusTelemetryClient.PushPeerCount(w.PeerCount())
-					w.statusTelemetryClient.PushPeerConnFailures(connFailures)
+					w.statusTelemetryClient.PushPeerCount(w.ctx, w.PeerCount())
+					w.statusTelemetryClient.PushPeerConnFailures(w.ctx, connFailures)
 				}
 
 				w.ConnectionChanged(connection.State{
@@ -1306,7 +1306,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	}
 
 	if w.statusTelemetryClient != nil {
-		w.statusTelemetryClient.PushReceivedEnvelope(envelope)
+		w.statusTelemetryClient.PushReceivedEnvelope(w.ctx, envelope)
 	}
 
 	logger := w.logger.With(
