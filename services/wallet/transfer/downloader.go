@@ -534,6 +534,13 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, from, to *big.Int) ([]*DBHeader, error) {
 	start := time.Now()
 	log.Debug("get erc20 transfers in range start", "chainID", d.client.NetworkID(), "from", from, "to", to, "accounts", d.accounts)
+
+	// TODO #16062: Figure out real root cause of invalid range
+	if from != nil && to != nil && from.Cmp(to) > 0 {
+		log.Error("invalid range", "chainID", d.client.NetworkID(), "from", from, "to", to, "accounts", d.accounts)
+		return nil, errors.New("invalid range")
+	}
+
 	headers := []*DBHeader{}
 	ctx := context.Background()
 	var err error
