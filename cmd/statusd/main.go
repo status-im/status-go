@@ -74,7 +74,6 @@ var (
 				params.FleetProd,
 				params.FleetStatusStaging,
 				params.FleetStatusProd,
-				params.FleetStatusTest,
 				params.FleetWakuSandbox,
 				params.FleetWakuTest,
 			},

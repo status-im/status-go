@@ -6,7 +6,6 @@ const (
 	FleetProd          = "eth.prod"
 	FleetStatusStaging = "status.staging"
 	FleetStatusProd    = "status.prod"
-	FleetStatusTest    = "status.test"
 	FleetWakuSandbox   = "waku.sandbox"
 	FleetWakuTest      = "waku.test"
 )
