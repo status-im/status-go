@@ -3508,7 +3508,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			statusMessages := handleMessagesResponse.StatusMessages
 
 			if m.telemetryClient != nil {
-				m.telemetryClient.PushReceivedMessages(telemetry.ReceivedMessages{
+				m.telemetryClient.PushReceivedMessages(m.ctx, telemetry.ReceivedMessages{
 					Filter:     filter,
 					SSHMessage: shhMessage,
 					Messages:   statusMessages,

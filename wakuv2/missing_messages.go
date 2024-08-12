@@ -95,6 +95,7 @@ func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic s
 }
 
 func (w *Waku) checkForMissingMessages() {
+	w.wg.Add(1)
 	defer w.wg.Done()
 	defer w.logger.Debug("checkForMissingMessages - done")
 

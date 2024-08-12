@@ -10,8 +10,9 @@ import (
 	big "math/big"
 	reflect "reflect"
 
-	common "github.com/ethereum/go-ethereum/common"
 	gomock "github.com/golang/mock/gomock"
+
+	common "github.com/ethereum/go-ethereum/common"
 	paraswap "github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 )
 
