@@ -59,8 +59,10 @@ func (c *Client) PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvel
 }
 
 func (c *Client) PushPeerCount(ctx context.Context, peerCount int) {
-	if peerCount != c.lastPeerCount {
+	now := time.Now()
+	if peerCount != c.lastPeerCount && now.Sub(c.lastPeerCountTime) > 1*time.Second {
 		c.lastPeerCount = peerCount
+		c.lastPeerCountTime = now
 		c.processAndPushTelemetry(ctx, PeerCount{PeerCount: peerCount})
 	}
 }
@@ -108,6 +110,7 @@ type Client struct {
 	nextId               int
 	sendPeriod           time.Duration
 	lastPeerCount        int
+	lastPeerCountTime    time.Time
 	lastPeerConnFailures map[string]int
 	deviceType           string
 }
@@ -143,6 +146,7 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 		nextIdLock:           sync.Mutex{},
 		sendPeriod:           10 * time.Second, // default value
 		lastPeerCount:        0,
+		lastPeerCountTime:    time.Time{},
 		lastPeerConnFailures: make(map[string]int),
 	}
 
