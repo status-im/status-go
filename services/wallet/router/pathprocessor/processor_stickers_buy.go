@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts"
@@ -132,32 +131,12 @@ func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 	return uint64(increasedEstimation), nil
 }
 
-func (s *StickersBuyProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(params.ToAddr)
-	inputData, err := s.PackTxInputData(params)
-	if err != nil {
-		return nil, createStickersBuyErrorResponse(err)
-	}
-
-	sendArgs := &MultipathProcessorTxArgs{
-		TransferTx: &transactions.SendTxArgs{
-			From:  types.Address(params.FromAddr),
-			To:    &toAddr,
-			Value: (*hexutil.Big)(ZeroBigIntValue),
-			Data:  inputData,
-		},
-		ChainID: params.FromChain.ChainID,
-	}
-
-	return s.BuildTransaction(sendArgs)
+func (s *StickersBuyProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
+	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce, verifiedAccount)
 }
 
-func (s *StickersBuyProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, *sendArgs.TransferTx, verifiedAccount)
-}
-
-func (s *StickersBuyProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
-	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx)
+func (s *StickersBuyProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce)
 }
 
 func (s *StickersBuyProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {

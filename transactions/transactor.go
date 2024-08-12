@@ -48,9 +48,9 @@ func (e *ErrBadNonce) Error() string {
 type TransactorIface interface {
 	NextNonce(rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error)
 	EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error)
-	SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error)
-	SendTransactionWithChainID(chainID uint64, sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error)
-	ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs) (tx *gethtypes.Transaction, err error)
+	SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error)
+	SendTransactionWithChainID(chainID uint64, sendArgs SendTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, nonce uint64, err error)
+	ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs, lastUsedNonce int64) (tx *gethtypes.Transaction, nonce uint64, err error)
 	AddSignatureToTransaction(chainID uint64, tx *gethtypes.Transaction, sig []byte) (*gethtypes.Transaction, error)
 	SendRawTransaction(chainID uint64, rawTx string) error
 	BuildTransactionWithSignature(chainID uint64, args SendTxArgs, sig []byte) (*gethtypes.Transaction, error)
@@ -139,21 +139,21 @@ func (t *Transactor) EstimateGas(network *params.Network, from common.Address, t
 }
 
 // SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.
-func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	hash, err = t.validateAndPropagate(t.rpcWrapper, verifiedAccount, sendArgs)
+func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error) {
+	hash, nonce, err = t.validateAndPropagate(t.rpcWrapper, verifiedAccount, sendArgs, lastUsedNonce)
 	return
 }
 
-func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs SendTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, nonce uint64, err error) {
 	wrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
-	hash, err = t.validateAndPropagate(wrapper, verifiedAccount, sendArgs)
+	hash, nonce, err = t.validateAndPropagate(wrapper, verifiedAccount, sendArgs, lastUsedNonce)
 	return
 }
 
-func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs) (tx *gethtypes.Transaction, err error) {
+func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs, lastUsedNonce int64) (tx *gethtypes.Transaction, nonce uint64, err error) {
 	wrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
-	tx, err = t.validateAndBuildTransaction(wrapper, sendArgs)
-	return
+	tx, err = t.validateAndBuildTransaction(wrapper, sendArgs, lastUsedNonce)
+	return tx, tx.Nonce(), err
 }
 
 func (t *Transactor) AddSignatureToTransaction(chainID uint64, tx *gethtypes.Transaction, sig []byte) (*gethtypes.Transaction, error) {
@@ -361,7 +361,7 @@ func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.S
 	return nil
 }
 
-func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args SendTxArgs) (tx *gethtypes.Transaction, err error) {
+func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args SendTxArgs, lastUsedNonce int64) (tx *gethtypes.Transaction, err error) {
 	if !args.Valid() {
 		return tx, ErrInvalidSendTxArgs
 	}
@@ -370,9 +370,14 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 	if args.Nonce != nil {
 		nonce = uint64(*args.Nonce)
 	} else {
-		nonce, err = t.NextNonce(rpcWrapper.RPCClient, rpcWrapper.chainID, args.From)
-		if err != nil {
-			return tx, err
+		// some chains, like arbitrum doesn't count pending txs in the nonce, so we need to calculate it manually
+		if lastUsedNonce < 0 {
+			nonce, err = t.NextNonce(rpcWrapper.RPCClient, rpcWrapper.chainID, args.From)
+			if err != nil {
+				return tx, err
+			}
+		} else {
+			nonce = uint64(lastUsedNonce) + 1
 		}
 	}
 
@@ -433,23 +438,24 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 	return tx, nil
 }
 
-func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccount *account.SelectedExtKey, args SendTxArgs) (hash types.Hash, err error) {
+func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccount *account.SelectedExtKey, args SendTxArgs, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error) {
 	if err = t.validateAccount(args, selectedAccount); err != nil {
-		return hash, err
+		return hash, nonce, err
 	}
 
-	tx, err := t.validateAndBuildTransaction(rpcWrapper, args)
+	tx, err := t.validateAndBuildTransaction(rpcWrapper, args, lastUsedNonce)
 	if err != nil {
-		return hash, err
+		return hash, nonce, err
 	}
 
 	chainID := big.NewInt(int64(rpcWrapper.chainID))
 	signedTx, err := gethtypes.SignTx(tx, gethtypes.NewLondonSigner(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
-		return hash, err
+		return hash, nonce, err
 	}
 
-	return t.sendTransaction(rpcWrapper, common.Address(args.From), args.Symbol, args.MultiTransactionID, signedTx)
+	hash, err = t.sendTransaction(rpcWrapper, common.Address(args.From), args.Symbol, args.MultiTransactionID, signedTx)
+	return hash, tx.Nonce(), err
 }
 
 func (t *Transactor) buildTransaction(args SendTxArgs) *gethtypes.Transaction {
