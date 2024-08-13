@@ -8,6 +8,7 @@ from test_cases import RpcTestCase, TransactionTestCase
 
 @pytest.mark.wallet
 @pytest.mark.tx
+@pytest.mark.rpc
 class TestTransactionRpc(TransactionTestCase):
 
     @pytest.mark.parametrize(
@@ -48,6 +49,7 @@ class TestTransactionRpc(TransactionTestCase):
 
 
 @pytest.mark.wallet
+@pytest.mark.rpc
 class TestRpc(RpcTestCase):
 
     @pytest.mark.parametrize(

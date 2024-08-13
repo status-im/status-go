@@ -10,6 +10,13 @@ def pytest_addoption(parser):
         default="http://0.0.0.0:3333",
     )
     parser.addoption(
+        "--rpc_url_2",
+        action="store",
+        help="",
+        default="http://0.0.0.0:3334",
+    )
+
+    parser.addoption(
         "--password",
         action="store",
         help="",
