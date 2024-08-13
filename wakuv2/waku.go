@@ -1451,7 +1451,7 @@ func (w *Waku) checkForConnectionChanges() {
 	}
 
 	if w.statusTelemetryClient != nil {
-		w.statusTelemetryClient.PushPeerCount(w.PeerCount())
+		w.statusTelemetryClient.PushPeerCount(w.ctx, w.PeerCount())
 	}
 
 	//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
