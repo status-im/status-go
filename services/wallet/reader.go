@@ -264,9 +264,9 @@ func (r *Reader) invalidateBalanceCache() {
 func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
 	needFetch := !r.isBalanceCacheValid(addresses) || r.isBalanceUpdateNeededAnyway(clients, addresses)
 	if needFetch {
-		fetchedBalances, err := r.FetchBalances(ctx, clients, addresses)
-		if err == nil {
-			return fetchedBalances, nil
+		_, err := r.FetchBalances(ctx, clients, addresses)
+		if err != nil {
+			log.Error("FetchOrGetCachedWalletBalances error", "err", err)
 		}
 	}
 
@@ -436,6 +436,10 @@ func (r *Reader) createBalancePerChainPerSymbol(
 		hasError := false
 		if connected, ok := clientConnectionPerChain[tok.ChainID]; ok {
 			hasError = !connected
+		}
+
+		if _, ok := balances[tok.ChainID][address][tok.Address]; !ok {
+			hasError = true
 		}
 
 		// TODO: Avoid passing the entire balances map to toChainBalance. Iterate over the balances map once and pass the balance per address per token to toChainBalance
@@ -654,16 +658,16 @@ func (r *Reader) FetchBalances(ctx context.Context, clients map[uint64]chain.Cli
 		return nil, err
 	}
 
-	connectedPerChain := map[uint64]bool{}
-	for chainID, client := range clients {
-		connectedPerChain[chainID] = client.IsConnected()
-	}
-
 	tokenAddresses := getTokenAddresses(allTokens)
 	balances, err := r.fetchBalances(ctx, clients, addresses, tokenAddresses)
 	if err != nil {
 		log.Error("failed to update balances", "err", err)
 		return nil, err
+	}
+
+	connectedPerChain := map[uint64]bool{}
+	for chainID, client := range clients {
+		connectedPerChain[chainID] = client.IsConnected()
 	}
 
 	tokens := r.balancesToTokensByAddress(connectedPerChain, addresses, allTokens, balances, cachedTokens)
