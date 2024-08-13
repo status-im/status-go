@@ -1,4 +1,5 @@
 import json
+import jsonschema
 import requests
 from conftest import option, user_1, user_2
 
@@ -28,17 +29,22 @@ class RpcTestCase:
                 raise AssertionError(f"no id in response {response.json()}")
         return response
 
-    def rpc_request(self, method, params=[], _id=None):
+    def rpc_request(self, method, params=[], _id=None, client=None, url=None):
+        client = client if client else requests.Session()
+        url = url if url else option.rpc_url
 
         data = {"jsonrpc": "2.0", "method": method}
         if params:
             data["params"] = params
         data["id"] = _id if _id else 13
 
-        response = requests.post(option.rpc_url, json=data)
+        response = client.post(url, json=data)
 
         return response
 
+    def verify_json_schema(self, response, method):
+        with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
+            jsonschema.validate(instance=response.json(), schema=json.load(schema))
 
 class TransactionTestCase(RpcTestCase):
 
