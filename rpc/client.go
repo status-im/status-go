@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 
@@ -32,12 +33,30 @@ const (
 	providerGrove       = "grove"
 	providerInfura      = "infura"
 	ProviderStatusProxy = "status-proxy"
+
+	// rpcUserAgentFormat 'procurator': *an agent representing others*, aka a "proxy"
+	// allows for the rpc client to have a dedicated user agent, which is useful for the proxy server logs.
+	rpcUserAgentFormat = "procuratee-%s/1.0"
 )
 
 // List of RPC client errors.
 var (
-	ErrMethodNotFound = fmt.Errorf("The method does not exist/is not available")
+	ErrMethodNotFound = fmt.Errorf("the method does not exist/is not available")
 )
+
+var (
+	// rpcUserAgentName the user agent
+	rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS")
+)
+
+func init() {
+	switch runtime.GOOS {
+	case "android", "ios":
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, "mobile")
+	default:
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, "desktop")
+	}
+}
 
 // Handler defines handler for RPC methods.
 type Handler func(context.Context, uint64, ...interface{}) (interface{}, error)
@@ -245,7 +264,7 @@ func (c *Client) getEthClents(network *params.Network) []*chain.EthClient {
 				opts = append(opts,
 					gethrpc.WithHeaders(http.Header{
 						"Authorization": {"Basic " + authEncoded},
-						"User-Agent":    {"status-go-rpc-client/2.0"},
+						"User-Agent":    {rpcUserAgentName},
 					}),
 				)
 			}
