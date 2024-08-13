@@ -196,3 +196,8 @@ func TestGetClientsUsingCache(t *testing.T) {
 	assert.Nil(t, balance)
 	wg.Wait()
 }
+
+func TestUserAgent(t *testing.T) {
+	require.Equal(t, "procuratee-desktop/1.0", rpcUserAgentName)
+	require.Equal(t, "procuratee-desktop-upstream/1.0", rpcUserAgentUpstreamName)
+}

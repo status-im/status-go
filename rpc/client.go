@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 
@@ -31,12 +33,39 @@ const (
 	providerGrove       = "grove"
 	providerInfura      = "infura"
 	ProviderStatusProxy = "status-proxy"
+
+	// rpcUserAgentFormat 'procurator': *an agent representing others*, aka a "proxy"
+	// allows for the rpc client to have a dedicated user agent, which is useful for the proxy server logs.
+	rpcUserAgentFormat = "procuratee-%s/1.0"
+
+	// rpcUserAgentUpstreamFormat a separate user agent format for upstream, because we should not be using upstream
+	// if we see this user agent in the logs that means parts of the application are using a malconfigured http client
+	rpcUserAgentUpstreamFormat = "procuratee-%s-upstream/1.0"
 )
 
 // List of RPC client errors.
 var (
-	ErrMethodNotFound = fmt.Errorf("The method does not exist/is not available")
+	ErrMethodNotFound = fmt.Errorf("the method does not exist/is not available")
 )
+
+var (
+	// rpcUserAgentName the user agent
+	rpcUserAgentName         = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS")
+	rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, "no-GOOS")
+)
+
+func init() {
+	switch runtime.GOOS {
+	case "android", "ios":
+		mobile := "mobile"
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, mobile)
+		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, mobile)
+	default:
+		desktop := "desktop"
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, desktop)
+		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, desktop)
+	}
+}
 
 // Handler defines handler for RPC methods.
 type Handler func(context.Context, uint64, ...interface{}) (interface{}, error)
@@ -108,11 +137,18 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		providerConfigs:    providerConfigs,
 	}
 
+	var opts []gethrpc.ClientOption
+	opts = append(opts,
+		gethrpc.WithHeaders(http.Header{
+			"User-Agent": {rpcUserAgentUpstreamName},
+		}),
+	)
+
 	if upstream.Enabled {
 		c.UpstreamChainID = upstreamChainID
 		c.upstreamEnabled = upstream.Enabled
 		c.upstreamURL = upstream.URL
-		upstreamClient, err := gethrpc.Dial(c.upstreamURL)
+		upstreamClient, err := gethrpc.DialOptions(context.Background(), c.upstreamURL, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("dial upstream server: %s", err)
 		}
@@ -231,12 +267,17 @@ func (c *Client) getEthClents(network *params.Network) []*chain.EthClient {
 		url := urls[key]
 
 		if len(url) > 0 {
-			// For now we only support auth for status-proxy.
+			// For now, we only support auth for status-proxy.
 			authStr, ok := authMap[key]
 			var opts []gethrpc.ClientOption
 			if ok {
 				authEncoded := base64.StdEncoding.EncodeToString([]byte(authStr))
-				opts = append(opts, gethrpc.WithHeader("Authorization", "Basic "+authEncoded))
+				opts = append(opts,
+					gethrpc.WithHeaders(http.Header{
+						"Authorization": {"Basic " + authEncoded},
+						"User-Agent":    {rpcUserAgentName},
+					}),
+				)
 			}
 
 			rpcClient, err = gethrpc.DialOptions(context.Background(), url, opts...)
@@ -261,7 +302,7 @@ func (c *Client) getEthClents(network *params.Network) []*chain.EthClient {
 	return ethClients
 }
 
-// Ethclient returns ethclient.Client per chain
+// EthClient returns ethclient.Client per chain
 func (c *Client) EthClient(chainID uint64) (chain.ClientInterface, error) {
 	client, err := c.getClientUsingCache(chainID)
 	if err != nil {
