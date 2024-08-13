@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"reflect"
 	"sync"
@@ -107,6 +108,11 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		log:                log,
 		providerConfigs:    providerConfigs,
 	}
+
+	// TODO update user agent here
+	//  Something like "status-go-rpc-client-upstream"
+
+	gethrpc.DialOptions(context.Background(), c.upstreamURL)
 
 	if upstream.Enabled {
 		c.UpstreamChainID = upstreamChainID
@@ -231,12 +237,17 @@ func (c *Client) getEthClents(network *params.Network) []*chain.EthClient {
 		url := urls[key]
 
 		if len(url) > 0 {
-			// For now we only support auth for status-proxy.
+			// For now, we only support auth for status-proxy.
 			authStr, ok := authMap[key]
 			var opts []gethrpc.ClientOption
 			if ok {
 				authEncoded := base64.StdEncoding.EncodeToString([]byte(authStr))
-				opts = append(opts, gethrpc.WithHeader("Authorization", "Basic "+authEncoded))
+				opts = append(opts,
+					gethrpc.WithHeaders(http.Header{
+						"Authorization": {"Basic " + authEncoded},
+						"User-Agent":    {"status-go-rpc-client/2.0"},
+					}),
+				)
 			}
 
 			rpcClient, err = gethrpc.DialOptions(context.Background(), url, opts...)
@@ -261,7 +272,7 @@ func (c *Client) getEthClents(network *params.Network) []*chain.EthClient {
 	return ethClients
 }
 
-// Ethclient returns ethclient.Client per chain
+// EthClient returns ethclient.Client per chain
 func (c *Client) EthClient(chainID uint64) (chain.ClientInterface, error) {
 	client, err := c.getClientUsingCache(chainID)
 	if err != nil {
