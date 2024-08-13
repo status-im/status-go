@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -1378,10 +1377,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 			return nil
 		}
 
-		m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(img)))
-
 		ciis[images.SmallDimName] = m.adaptIdentityImageToProtobuf(img)
-		m.logger.Debug(fmt.Sprintf("%s protobuf.IdentityImage '%s'", context, spew.Sdump(ciis)))
 		ci.Images = ciis
 
 	case privateChat:
@@ -1392,12 +1388,9 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context ChatContext, ci *
 			return err
 		}
 
-		m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(imgs)))
-
 		for _, img := range imgs {
 			ciis[img.Name] = m.adaptIdentityImageToProtobuf(img)
 		}
-		m.logger.Debug(fmt.Sprintf("%s protobuf.IdentityImage '%s'", context, spew.Sdump(ciis)))
 		ci.Images = ciis
 
 	default:
