@@ -20,6 +20,7 @@ var (
 	ErrEmptyAccountsShared                    = fmt.Errorf("empty accounts were shared by wallet")
 	ErrRequestAccountsRejectedByUser          = fmt.Errorf("request accounts was rejected by user")
 	ErrSendTransactionRejectedByUser          = fmt.Errorf("send transaction was rejected by user")
+	ErrPersonalSignRejectedByUser             = fmt.Errorf("personal sign was rejected by user")
 	ErrEmptyRequestID                         = fmt.Errorf("empty requestID")
 	ErrAnotherConnectorOperationIsAwaitingFor = fmt.Errorf("another connector operation is awaiting for user input")
 )
@@ -29,6 +30,7 @@ type MessageType int
 const (
 	RequestAccountsAccepted MessageType = iota
 	SendTransactionAccepted
+	PersonalSignAccepted
 	Rejected
 )
 
@@ -95,6 +97,20 @@ func (c *ClientSideHandler) RequestShareAccountForDApp(dApp signal.ConnectorDApp
 	}
 }
 
+func (c *ClientSideHandler) RequestAccountsAccepted(args RequestAccountsAcceptedArgs) error {
+	c.responseChannel <- Message{Type: RequestAccountsAccepted, Data: args}
+	return nil
+}
+
+func (c *ClientSideHandler) RequestAccountsRejected(args RejectedArgs) error {
+	if args.RequestID == "" {
+		return ErrEmptyRequestID
+	}
+
+	c.responseChannel <- Message{Type: Rejected, Data: args}
+	return nil
+}
+
 func (c *ClientSideHandler) RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error) {
 	if !c.setRequestRunning() {
 		return types.Hash{}, ErrAnotherConnectorOperationIsAwaitingFor
@@ -132,20 +148,6 @@ func (c *ClientSideHandler) RequestSendTransaction(dApp signal.ConnectorDApp, ch
 	}
 }
 
-func (c *ClientSideHandler) RequestAccountsAccepted(args RequestAccountsAcceptedArgs) error {
-	c.responseChannel <- Message{Type: RequestAccountsAccepted, Data: args}
-	return nil
-}
-
-func (c *ClientSideHandler) RequestAccountsRejected(args RejectedArgs) error {
-	if args.RequestID == "" {
-		return ErrEmptyRequestID
-	}
-
-	c.responseChannel <- Message{Type: Rejected, Data: args}
-	return nil
-}
-
 func (c *ClientSideHandler) SendTransactionAccepted(args SendTransactionAcceptedArgs) error {
 	if args.RequestID == "" {
 		return ErrEmptyRequestID
@@ -156,6 +158,56 @@ func (c *ClientSideHandler) SendTransactionAccepted(args SendTransactionAccepted
 }
 
 func (c *ClientSideHandler) SendTransactionRejected(args RejectedArgs) error {
+	if args.RequestID == "" {
+		return ErrEmptyRequestID
+	}
+
+	c.responseChannel <- Message{Type: Rejected, Data: args}
+	return nil
+}
+
+func (c *ClientSideHandler) RequestPersonalSign(dApp signal.ConnectorDApp, challenge, address string) (string, error) {
+	if !c.setRequestRunning() {
+		return "", ErrAnotherConnectorOperationIsAwaitingFor
+	}
+	defer c.clearRequestRunning()
+
+	requestID := c.generateRequestID(dApp)
+	signal.SendConnectorPersonalSign(dApp, requestID, challenge, address)
+
+	timeout := time.After(WalletResponseMaxInterval)
+
+	for {
+		select {
+		case msg := <-c.responseChannel:
+			switch msg.Type {
+			case PersonalSignAccepted:
+				response := msg.Data.(PersonalSignAcceptedArgs)
+				if response.RequestID == requestID {
+					return response.Signature, nil
+				}
+			case Rejected:
+				response := msg.Data.(RejectedArgs)
+				if response.RequestID == requestID {
+					return "", ErrPersonalSignRejectedByUser
+				}
+			}
+		case <-timeout:
+			return "", ErrWalletResponseTimeout
+		}
+	}
+}
+
+func (c *ClientSideHandler) PersonalSignAccepted(args PersonalSignAcceptedArgs) error {
+	if args.RequestID == "" {
+		return ErrEmptyRequestID
+	}
+
+	c.responseChannel <- Message{Type: PersonalSignAccepted, Data: args}
+	return nil
+}
+
+func (c *ClientSideHandler) PersonalSignRejected(args RejectedArgs) error {
 	if args.RequestID == "" {
 		return ErrEmptyRequestID
 	}

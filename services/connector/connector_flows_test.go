@@ -38,6 +38,7 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 
 	accountAddress := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 	expectedHash := types.BytesToHash(types.FromHex("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"))
+	expectedSignature := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 
 	dAppPermissionRevoked := false
 	dAppPermissionGranted := false
@@ -71,6 +72,16 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 			err = api.SendTransactionAccepted(commands.SendTransactionAcceptedArgs{
 				RequestID: ev.RequestID,
 				Hash:      expectedHash,
+			})
+			assert.NoError(t, err)
+		case signal.EventConnectorPersonalSign:
+			var ev signal.ConnectorPersonalSignSignal
+			err := json.Unmarshal(evt.Event, &ev)
+			assert.NoError(t, err)
+
+			err = api.PersonalSignAccepted(commands.PersonalSignAcceptedArgs{
+				RequestID: ev.RequestID,
+				Signature: expectedSignature,
 			})
 			assert.NoError(t, err)
 		}
@@ -109,6 +120,12 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 	response, err = api.CallRPC(request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedHash.Hex(), response)
+
+	// Personal sign
+	request = "{\"method\": \"personal_sign\", \"params\":[{\"challenge\": \"0x506c65617365207369676e2074686973206d65737361676520746f20636f6e6669726d20796f7572206964656e746974792e\",\"address\":\"0x4B0897b0513FdBeEc7C469D9aF4fA6C0752aBea7\"}], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
+	response, err = api.CallRPC(request)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedSignature, response)
 
 	// Revoke permissions
 	request = "{\"method\": \"wallet_revokePermissions\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"

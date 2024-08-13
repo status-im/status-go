@@ -43,18 +43,27 @@ type SendTransactionAcceptedArgs struct {
 	Hash      types.Hash `json:"hash"`
 }
 
+type PersonalSignAcceptedArgs struct {
+	RequestID string `json:"requestId"`
+	Signature string `json:"signature"`
+}
+
 type RejectedArgs struct {
 	RequestID string `json:"requestId"`
 }
 
 type ClientSideHandlerInterface interface {
 	RequestShareAccountForDApp(dApp signal.ConnectorDApp) (types.Address, uint64, error)
-	RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error)
-
 	RequestAccountsAccepted(args RequestAccountsAcceptedArgs) error
 	RequestAccountsRejected(args RejectedArgs) error
+
+	RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error)
 	SendTransactionAccepted(args SendTransactionAcceptedArgs) error
 	SendTransactionRejected(args RejectedArgs) error
+
+	RequestPersonalSign(dApp signal.ConnectorDApp, challenge, address string) (string, error)
+	PersonalSignAccepted(args PersonalSignAcceptedArgs) error
+	PersonalSignRejected(args RejectedArgs) error
 }
 
 type NetworkManagerInterface interface {
