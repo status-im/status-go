@@ -118,11 +118,13 @@ func GetCommunityIDFromKey(communityKey string) string {
 }
 
 func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) error {
+	m.logger.Debug("<<< publishOrg", zap.Bool("org", org != nil), zap.Bool("shouldRekey", shouldRekey))
+
 	if org == nil {
 		return nil
 	}
 
-	m.logger.Debug("publishing community",
+	m.logger.Debug("<<< publishing community",
 		zap.Uint64("clock", org.Clock()),
 		zap.String("communityID", org.IDString()),
 		zap.Any("community", org),
@@ -155,7 +157,7 @@ func (m *Messenger) publishOrg(org *communities.Community, shouldRekey bool) err
 	}
 	messageID, err := m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
 	if err == nil {
-		m.logger.Debug("published community",
+		m.logger.Debug("<<< published community",
 			zap.String("pubsubTopic", org.PubsubTopic()),
 			zap.String("communityID", org.IDString()),
 			zap.String("messageID", hexutil.Encode(messageID)),
@@ -299,6 +301,8 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	// We check every 5 minutes if we need to publish
 	ticker := time.NewTicker(5 * time.Minute)
 
+	m.logger.Debug("<<< handleCommunitiesSubscription")
+
 	recentlyPublishedOrgs := func() map[string]*communities.Community {
 		result := make(map[string]*communities.Community)
 
@@ -318,7 +322,15 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	publishOrgAndDistributeEncryptionKeys := func(community *communities.Community) {
 		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
 
+		m.logger.Debug("<<< publishOrgAndDistributeEncryptionKeys",
+			zap.String("communityID", community.IDString()),
+		)
+
 		if recentlyPublishedOrg != nil && community.Clock() <= recentlyPublishedOrg.Clock() {
+			m.logger.Debug("<<< skip as recently published",
+				zap.Uint64("communityClock", community.Clock()),
+				zap.Uint64("recentlyPublishedOrgClock", recentlyPublishedOrg.Clock()),
+			)
 			return
 		}
 
@@ -331,6 +343,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 
 		shouldRekey := encryptionKeyActions.CommunityKeyAction.ActionType == communities.EncryptionKeyRekey
 		if community.Encrypted() {
+			m.logger.Debug("<<< community is encrypted", zap.String("communityID", community.IDString()))
 			clock := community.Clock()
 			clock++
 			userKicked := &protobuf.CommunityUserKicked{
@@ -397,6 +410,11 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 		for {
 			select {
 			case sub, more := <-c:
+				m.logger.Debug("<<< sub",
+					zap.Any("sub", sub),
+					zap.Bool("more", more),
+				)
+
 				if !more {
 					return
 				}
@@ -476,12 +494,21 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 
 			case <-ticker.C:
 				// If we are not online, we don't even try
+				m.logger.Debug("<<< tick")
+
 				if !m.Online() {
+					m.logger.Debug("<<< skip as not online")
 					continue
 				}
 
 				// If not enough time has passed since last advertisement, we skip this
-				if time.Now().Unix()-lastPublished < communityAdvertiseIntervalSecond {
+				now := time.Now().Unix()
+				if now-lastPublished < communityAdvertiseIntervalSecond {
+					m.logger.Debug("<<< skip as not time",
+						zap.Int64("lastPublished", lastPublished),
+						zap.Int64("now", now),
+						zap.Int64("communityAdvertiseIntervalSecond", communityAdvertiseIntervalSecond),
+					)
 					continue
 				}
 

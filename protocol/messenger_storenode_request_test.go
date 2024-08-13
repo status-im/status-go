@@ -40,7 +40,7 @@ const (
 	localFleet              = "local-test-fleet-1"
 	localMailserverID       = "local-test-mailserver"
 	storeNodeConnectTimeout = 500 * time.Millisecond
-	runLocalTests           = false
+	runLocalTests           = true
 )
 
 func TestMessengerStoreNodeRequestSuite(t *testing.T) {
@@ -1024,7 +1024,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 		return
 	}
 
-	exampleToRun := testFetchRealCommunityExample[3]
+	exampleToRun := testFetchRealCommunityExample[0]
 
 	// Test configuration
 	communityID := exampleToRun.CommunityID
