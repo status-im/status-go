@@ -11,8 +11,15 @@ import (
 func (tm *TransactionManager) buildTransactions(pathProcessors map[string]pathprocessor.PathProcessor) ([]string, error) {
 	tm.transactionsForKeycardSigning = make(map[common.Hash]*TransactionDescription)
 	var hashes []string
+	usedNonces := make(map[uint64]int64)
 	for _, bridgeTx := range tm.multipathTransactionsData {
-		builtTx, err := pathProcessors[bridgeTx.Name].BuildTransaction(bridgeTx)
+
+		lastUsedNonce := int64(-1)
+		if nonce, ok := usedNonces[bridgeTx.ChainID]; ok {
+			lastUsedNonce = nonce
+		}
+
+		builtTx, usedNonce, err := pathProcessors[bridgeTx.Name].BuildTransaction(bridgeTx, lastUsedNonce)
 		if err != nil {
 			return hashes, err
 		}
@@ -25,6 +32,8 @@ func (tm *TransactionManager) buildTransactions(pathProcessors map[string]pathpr
 			chainID: bridgeTx.ChainID,
 			builtTx: builtTx,
 		}
+
+		usedNonces[bridgeTx.ChainID] = int64(usedNonce)
 
 		hashes = append(hashes, txHash.String())
 	}

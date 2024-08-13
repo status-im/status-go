@@ -283,27 +283,6 @@ func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 	return uint64(increasedEstimation), nil
 }
 
-func (s *CelerBridgeProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
-	toAddr := types.Address(params.ToAddr)
-	sendArgs := &MultipathProcessorTxArgs{
-		CbridgeTx: &CelerBridgeTxArgs{
-			SendTxArgs: transactions.SendTxArgs{
-				From:  types.Address(params.FromAddr),
-				To:    &toAddr,
-				Value: (*hexutil.Big)(params.AmountIn),
-				Data:  types.HexBytes("0x0"),
-			},
-			ChainID:   params.ToChain.ChainID,
-			Symbol:    params.FromToken.Symbol,
-			Recipient: params.ToAddr,
-			Amount:    (*hexutil.Big)(params.AmountIn),
-		},
-		ChainID: params.FromChain.ChainID,
-	}
-
-	return s.BuildTransaction(sendArgs)
-}
-
 func (s *CelerBridgeProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	transferConfig, err := s.getTransferConfig(params.FromChain.IsTest)
 	if err != nil {
@@ -322,7 +301,7 @@ func (s *CelerBridgeProcessor) GetContractAddress(params ProcessorInputParams) (
 	return common.Address{}, ErrContractNotFound
 }
 
-func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (*ethTypes.Transaction, error) {
+func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (*ethTypes.Transaction, error) {
 	fromChain := s.rpcClient.NetworkManager.Find(sendArgs.ChainID)
 	if fromChain == nil {
 		return nil, ErrNetworkNotFound
@@ -345,6 +324,11 @@ func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, s
 	contract, err := celer.NewCeler(addrs, backend)
 	if err != nil {
 		return nil, createBridgeCellerErrorResponse(err)
+	}
+
+	if lastUsedNonce >= 0 {
+		lastUsedNonceHexUtil := hexutil.Uint64(uint64(lastUsedNonce) + 1)
+		sendArgs.CbridgeTx.Nonce = &lastUsedNonceHexUtil
 	}
 
 	var tx *ethTypes.Transaction
@@ -379,17 +363,18 @@ func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, s
 	return tx, nil
 }
 
-func (s *CelerBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
-	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.CbridgeTx.From, verifiedAccount))
+func (s *CelerBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types.Hash, uint64, error) {
+	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.CbridgeTx.From, verifiedAccount), lastUsedNonce)
 	if err != nil {
-		return types.HexToHash(""), createBridgeCellerErrorResponse(err)
+		return types.HexToHash(""), 0, createBridgeCellerErrorResponse(err)
 	}
 
-	return types.Hash(tx.Hash()), nil
+	return types.Hash(tx.Hash()), tx.Nonce(), nil
 }
 
-func (s *CelerBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
-	return s.sendOrBuild(sendArgs, nil)
+func (s *CelerBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	tx, err := s.sendOrBuild(sendArgs, nil, lastUsedNonce)
+	return tx, tx.Nonce(), err
 }
 
 func (s *CelerBridgeProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {

@@ -2223,7 +2223,8 @@ func (b *GethStatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, pa
 		return hash, err
 	}
 
-	return b.transactor.SendTransaction(sendArgs, verifiedAccount)
+	hash, _, err = b.transactor.SendTransaction(sendArgs, verifiedAccount, -1)
+	return hash, err
 }
 
 func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs transactions.SendTxArgs, password string) (hash types.Hash, err error) {
@@ -2232,7 +2233,8 @@ func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs 
 		return hash, err
 	}
 
-	return b.transactor.SendTransactionWithChainID(chainID, sendArgs, verifiedAccount)
+	hash, _, err = b.transactor.SendTransactionWithChainID(chainID, sendArgs, -1, verifiedAccount)
+	return hash, err
 }
 
 func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs transactions.SendTxArgs, sig []byte) (hash types.Hash, err error) {

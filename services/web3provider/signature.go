@@ -79,7 +79,7 @@ func (api *API) sendTransaction(chainID uint64, sendArgs transactions.SendTxArgs
 		return hash, err
 	}
 
-	hash, err = api.s.transactor.SendTransactionWithChainID(chainID, sendArgs, verifiedAccount)
+	hash, _, err = api.s.transactor.SendTransactionWithChainID(chainID, sendArgs, -1, verifiedAccount)
 	if err != nil {
 		return
 	}
