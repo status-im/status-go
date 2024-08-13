@@ -13,8 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	onramp "github.com/status-im/status-go/services/wallet/onramp"
 	gomock "go.uber.org/mock/gomock"
+
+	onramp "github.com/status-im/status-go/services/wallet/onramp"
 )
 
 // MockProvider is a mock of Provider interface.

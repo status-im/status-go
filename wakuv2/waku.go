@@ -104,10 +104,10 @@ type ErrorSendingEnvelope struct {
 }
 
 type ITelemetryClient interface {
-	PushReceivedEnvelope(receivedEnvelope *protocol.Envelope)
-	PushSentEnvelope(sentEnvelope SentEnvelope)
-	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
-	PushPeerCount(peerCount int)
+	PushReceivedEnvelope(ctx context.Context, receivedEnvelope *protocol.Envelope)
+	PushSentEnvelope(ctx context.Context, sentEnvelope SentEnvelope)
+	PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvelope ErrorSendingEnvelope)
+	PushPeerCount(ctx context.Context, peerCount int)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -507,6 +507,9 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 }
 
 func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
+	w.wg.Add(1)
+	defer w.wg.Done()
+
 	if telemetryServerURL == "" {
 		return
 	}
@@ -543,7 +546,9 @@ func (w *Waku) GetStats() types.StatsSummary {
 }
 
 func (w *Waku) runPeerExchangeLoop() {
+	w.wg.Add(1)
 	defer w.wg.Done()
+
 	if !w.cfg.EnablePeerExchangeClient {
 		// Currently peer exchange client is only used for light nodes
 		return
@@ -1035,9 +1040,9 @@ func (w *Waku) broadcast() {
 				fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 					err := sendFn(env, logger)
 					if err == nil {
-						w.statusTelemetryClient.PushSentEnvelope(SentEnvelope{Envelope: env, PublishMethod: publishMethod})
+						w.statusTelemetryClient.PushSentEnvelope(w.ctx, SentEnvelope{Envelope: env, PublishMethod: publishMethod})
 					} else {
-						w.statusTelemetryClient.PushErrorSendingEnvelope(ErrorSendingEnvelope{Error: err, SentEnvelope: SentEnvelope{Envelope: env, PublishMethod: publishMethod}})
+						w.statusTelemetryClient.PushErrorSendingEnvelope(w.ctx, ErrorSendingEnvelope{Error: err, SentEnvelope: SentEnvelope{Envelope: env, PublishMethod: publishMethod}})
 					}
 					return err
 				}
@@ -1348,8 +1353,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(2)
-
+	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
 		ticker := time.NewTicker(5 * time.Second)
@@ -1375,7 +1379,6 @@ func (w *Waku) Start() error {
 	go w.runPeerExchangeLoop()
 
 	if w.cfg.EnableMissingMessageVerification {
-		w.wg.Add(1)
 		go w.checkForMissingMessages()
 	}
 
@@ -1402,7 +1405,6 @@ func (w *Waku) Start() error {
 	go w.checkIfMessagesStored()
 
 	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set w.ctx to nil within `w.Stop()`
-	w.wg.Add(1)
 	go w.seedBootnodesForDiscV5()
 
 	return nil
@@ -1449,7 +1451,7 @@ func (w *Waku) checkForConnectionChanges() {
 	}
 
 	if w.statusTelemetryClient != nil {
-		w.statusTelemetryClient.PushPeerCount(w.PeerCount())
+		w.statusTelemetryClient.PushPeerCount(w.ctx, w.PeerCount())
 	}
 
 	//TODO: analyze if we need to discover and connect to peers with peerExchange loop enabled.
@@ -1528,7 +1530,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	}
 
 	if w.statusTelemetryClient != nil {
-		w.statusTelemetryClient.PushReceivedEnvelope(envelope)
+		w.statusTelemetryClient.PushReceivedEnvelope(w.ctx, envelope)
 	}
 
 	logger := w.logger.With(
@@ -1820,8 +1822,10 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 // It backs off exponentially until maxRetries, at which point it restarts from 0
 // It also restarts if there's a connection change signalled from the client
 func (w *Waku) seedBootnodesForDiscV5() {
+	w.wg.Add(1)
+	defer w.wg.Done()
+
 	if !w.cfg.EnableDiscV5 || w.node.DiscV5() == nil {
-		w.wg.Done()
 		return
 	}
 
@@ -1882,7 +1886,6 @@ func (w *Waku) seedBootnodesForDiscV5() {
 			}
 
 		case <-w.ctx.Done():
-			w.wg.Done()
 			w.logger.Debug("bootnode seeding stopped")
 			return
 		}

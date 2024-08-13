@@ -140,7 +140,7 @@ func TestClient_ProcessReceivedMessages(t *testing.T) {
 
 		// Send the telemetry request
 		client.Start(ctx)
-		client.PushReceivedMessages(data)
+		client.PushReceivedMessages(ctx, data)
 	})
 }
 
@@ -156,7 +156,7 @@ func TestClient_ProcessReceivedEnvelope(t *testing.T) {
 
 		// Send the telemetry request
 		client.Start(ctx)
-		client.PushReceivedEnvelope(envelope)
+		client.PushReceivedEnvelope(ctx, envelope)
 	})
 }
 
@@ -175,7 +175,7 @@ func TestClient_ProcessSentEnvelope(t *testing.T) {
 
 		// Send the telemetry request
 		client.Start(ctx)
-		client.PushSentEnvelope(sentEnvelope)
+		client.PushSentEnvelope(ctx, sentEnvelope)
 	})
 }
 
@@ -276,11 +276,13 @@ func TestRetryCache(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
+	ctx := context.Background()
+
 	client := createClient(t, mockServer.URL)
-	client.Start(context.Background())
+	client.Start(ctx)
 
 	for i := 0; i < 3; i++ {
-		client.PushReceivedEnvelope(v2protocol.NewEnvelope(&pb.WakuMessage{
+		client.PushReceivedEnvelope(ctx, v2protocol.NewEnvelope(&pb.WakuMessage{
 			Payload:      []byte{1, 2, 3, 4, 5},
 			ContentTopic: testContentTopic,
 			Version:      proto.Uint32(0),
@@ -292,7 +294,7 @@ func TestRetryCache(t *testing.T) {
 
 	require.Equal(t, 3, len(client.telemetryRetryCache))
 
-	client.PushReceivedEnvelope(v2protocol.NewEnvelope(&pb.WakuMessage{
+	client.PushReceivedEnvelope(ctx, v2protocol.NewEnvelope(&pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: testContentTopic,
 		Version:      proto.Uint32(0),
@@ -307,11 +309,13 @@ func TestRetryCache(t *testing.T) {
 }
 
 func TestRetryCacheCleanup(t *testing.T) {
+	ctx := context.Background()
+
 	client := createClient(t, "")
-	client.Start(context.Background())
+	client.Start(ctx)
 
 	for i := 0; i < 6000; i++ {
-		client.PushReceivedEnvelope(v2protocol.NewEnvelope(&pb.WakuMessage{
+		client.PushReceivedEnvelope(ctx, v2protocol.NewEnvelope(&pb.WakuMessage{
 			Payload:      []byte{1, 2, 3, 4, 5},
 			ContentTopic: testContentTopic,
 			Version:      proto.Uint32(0),
@@ -323,7 +327,7 @@ func TestRetryCacheCleanup(t *testing.T) {
 
 	require.Equal(t, 6000, len(client.telemetryRetryCache))
 
-	client.PushReceivedEnvelope(v2protocol.NewEnvelope(&pb.WakuMessage{
+	client.PushReceivedEnvelope(ctx, v2protocol.NewEnvelope(&pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: testContentTopic,
 		Version:      proto.Uint32(0),
