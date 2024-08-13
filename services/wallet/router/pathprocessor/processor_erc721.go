@@ -14,9 +14,16 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
+	"github.com/status-im/status-go/contracts/erc721"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
+)
+
+const (
+	functionNameSafeTransferFrom = "safeTransferFrom"
+	functionNameTransferFrom     = "transferFrom"
 )
 
 type ERC721TxArgs struct {
@@ -50,8 +57,8 @@ func (s *ERC721Processor) CalculateFees(params ProcessorInputParams) (*big.Int, 
 	return ZeroBigIntValue, ZeroBigIntValue, nil
 }
 
-func (s *ERC721Processor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	abi, err := abi.JSON(strings.NewReader(collectibles.CollectiblesMetaData.ABI))
+func (s *ERC721Processor) packTxInputDataInternally(params ProcessorInputParams, functionName string) ([]byte, error) {
+	abi, err := abi.JSON(strings.NewReader(erc721.Erc721MetaData.ABI))
 	if err != nil {
 		return []byte{}, createERC721ErrorResponse(err)
 	}
@@ -61,11 +68,43 @@ func (s *ERC721Processor) PackTxInputData(params ProcessorInputParams) ([]byte, 
 		return []byte{}, createERC721ErrorResponse(fmt.Errorf("failed to convert %s to big.Int", params.FromToken.Symbol))
 	}
 
-	return abi.Pack("safeTransferFrom",
+	return abi.Pack(functionName,
 		params.FromAddr,
 		params.ToAddr,
 		id,
 	)
+}
+
+func (s *ERC721Processor) checkIfFunctionExists(params ProcessorInputParams, functionName string) error {
+	data, err := s.packTxInputDataInternally(params, functionName)
+	if err != nil {
+		return createERC721ErrorResponse(err)
+	}
+
+	ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
+	if err != nil {
+		return createERC721ErrorResponse(err)
+	}
+
+	value := new(big.Int)
+	msg := ethereum.CallMsg{
+		From:  params.FromAddr,
+		To:    &params.FromToken.Address,
+		Value: value,
+		Data:  data,
+	}
+
+	_, err = ethClient.CallContract(context.Background(), msg, nil)
+	return err
+}
+
+func (s *ERC721Processor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+	err := s.checkIfFunctionExists(params, functionNameSafeTransferFrom)
+	if err == nil {
+		return s.packTxInputDataInternally(params, functionNameSafeTransferFrom)
+	}
+
+	return s.packTxInputDataInternally(params, functionNameTransferFrom)
 }
 
 func (s *ERC721Processor) EstimateGas(params ProcessorInputParams) (uint64, error) {
@@ -107,6 +146,21 @@ func (s *ERC721Processor) EstimateGas(params ProcessorInputParams) (uint64, erro
 }
 
 func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
+	from := common.Address(sendArgs.ERC721TransferTx.From)
+
+	useSafeTransferFrom := true
+	inputParams := ProcessorInputParams{
+		FromAddr: from,
+		ToAddr:   sendArgs.ERC721TransferTx.Recipient,
+		FromToken: &token.Token{
+			Symbol: sendArgs.ERC721TransferTx.TokenID.String(),
+		},
+	}
+	err = s.checkIfFunctionExists(inputParams, functionNameSafeTransferFrom)
+	if err != nil {
+		useSafeTransferFrom = false
+	}
+
 	ethClient, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
 		return tx, createERC721ErrorResponse(err)
@@ -130,10 +184,15 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 	argNonce := hexutil.Uint64(nonce)
 	sendArgs.ERC721TransferTx.Nonce = &argNonce
 	txOpts := sendArgs.ERC721TransferTx.ToTransactOpts(signerFn)
-	from := common.Address(sendArgs.ERC721TransferTx.From)
-	tx, err = contract.SafeTransferFrom(txOpts, from,
-		sendArgs.ERC721TransferTx.Recipient,
-		sendArgs.ERC721TransferTx.TokenID.ToInt())
+	if useSafeTransferFrom {
+		tx, err = contract.SafeTransferFrom(txOpts, from,
+			sendArgs.ERC721TransferTx.Recipient,
+			sendArgs.ERC721TransferTx.TokenID.ToInt())
+	} else {
+		tx, err = contract.TransferFrom(txOpts, from,
+			sendArgs.ERC721TransferTx.Recipient,
+			sendArgs.ERC721TransferTx.TokenID.ToInt())
+	}
 	if err != nil {
 		return tx, createERC721ErrorResponse(err)
 	}
