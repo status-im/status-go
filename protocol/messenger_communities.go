@@ -304,7 +304,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	publishOrgAndDistributeEncryptionKeys := func(community *communities.Community) {
 		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
 
-		if recentlyPublishedOrg != nil && community.Clock() <= recentlyPublishedOrg.Clock() {
+		if recentlyPublishedOrg != nil && community.Clock() < recentlyPublishedOrg.Clock() {
 			return
 		}
 
