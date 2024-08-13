@@ -3,7 +3,7 @@
 set -euo pipefail
 
 parse_commits() {
-    start_commit=${1:-origin/develop}
+    start_commit=${1:-origin/${BASE_BRANCH}}
     end_commit=${2:-HEAD}
     is_breaking_change=false
 
@@ -27,4 +27,4 @@ parse_commits() {
     echo "$is_breaking_change"
 }
 
-parse_commits
+parse_commits "$@"
