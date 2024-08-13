@@ -37,6 +37,10 @@ const (
 	// rpcUserAgentFormat 'procurator': *an agent representing others*, aka a "proxy"
 	// allows for the rpc client to have a dedicated user agent, which is useful for the proxy server logs.
 	rpcUserAgentFormat = "procuratee-%s/1.0"
+
+	// rpcUserAgentUpstreamFormat a separate user agent format for upstream, because we should not be using upstream
+	// if we see this user agent in the logs that means parts of the application are using a malconfigured http client
+	rpcUserAgentUpstreamFormat = "procuratee-%s-upstream/1.0"
 )
 
 // List of RPC client errors.
@@ -46,15 +50,20 @@ var (
 
 var (
 	// rpcUserAgentName the user agent
-	rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS")
+	rpcUserAgentName         = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS")
+	rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, "no-GOOS")
 )
 
 func init() {
 	switch runtime.GOOS {
 	case "android", "ios":
-		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, "mobile")
+		mobile := "mobile"
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, mobile)
+		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, mobile)
 	default:
-		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, "desktop")
+		desktop := "desktop"
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, desktop)
+		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, desktop)
 	}
 }
 
@@ -128,16 +137,18 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		providerConfigs:    providerConfigs,
 	}
 
-	// TODO update user agent here
-	//  Something like "status-go-rpc-client-upstream"
-
-	gethrpc.DialOptions(context.Background(), c.upstreamURL)
+	var opts []gethrpc.ClientOption
+	opts = append(opts,
+		gethrpc.WithHeaders(http.Header{
+			"User-Agent": {rpcUserAgentUpstreamName},
+		}),
+	)
 
 	if upstream.Enabled {
 		c.UpstreamChainID = upstreamChainID
 		c.upstreamEnabled = upstream.Enabled
 		c.upstreamURL = upstream.URL
-		upstreamClient, err := gethrpc.Dial(c.upstreamURL)
+		upstreamClient, err := gethrpc.DialOptions(context.Background(), c.upstreamURL, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("dial upstream server: %s", err)
 		}
