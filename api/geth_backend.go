@@ -547,7 +547,7 @@ func (b *GethStatusBackend) updateAccountColorHashAndColorID(keyUID string, acco
 }
 
 func (b *GethStatusBackend) overrideNetworks(conf *params.NodeConfig, request *requests.Login) {
-	conf.Networks = setRPCs(defaultNetworks, &request.WalletSecretsConfig)
+	conf.Networks = setRPCs(defaultNetworks(request.WalletSecretsConfig.StatusProxyStageName), &request.WalletSecretsConfig)
 }
 
 func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
