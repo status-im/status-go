@@ -1058,6 +1058,6 @@ func TestFetchOrGetCachedWalletBalances(t *testing.T) {
 	clients := map[uint64]chain.ClientInterface{}
 	addresses := []common.Address{}
 
-	_, err := reader.FetchOrGetCachedWalletBalances(context.TODO(), clients, addresses)
+	_, err := reader.FetchOrGetCachedWalletBalances(context.TODO(), clients, addresses, false)
 	require.Error(t, err)
 }

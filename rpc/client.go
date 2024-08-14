@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -156,11 +157,15 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		if err != nil {
 			return nil, fmt.Errorf("get RPC limiter: %s", err)
 		}
-		hostPortUpstream, err := extractHostAndPortFromURL(c.upstreamURL)
+		hostPortUpstream, err := extractHostFromURL(c.upstreamURL)
 		if err != nil {
 			hostPortUpstream = "upstream"
 		}
-		c.upstream = chain.NewSimpleClient(*chain.NewEthClient(ethclient.NewClient(upstreamClient), limiter, upstreamClient, hostPortUpstream), upstreamChainID)
+
+		// Include the chain-id in the rpc client
+		rpcName := fmt.Sprintf("%s-chain-id-%d", hostPortUpstream, upstreamChainID)
+
+		c.upstream = chain.NewSimpleClient(*chain.NewEthClient(ethclient.NewClient(upstreamClient), limiter, upstreamClient, rpcName), upstreamChainID)
 	}
 
 	c.router = newRouter(c.upstreamEnabled)
@@ -176,7 +181,7 @@ func (c *Client) SetWalletNotifier(notifier func(chainID uint64, message string)
 	c.walletNotifier = notifier
 }
 
-func extractHostAndPortFromURL(inputURL string) (string, error) {
+func extractHostFromURL(inputURL string) (string, error) {
 	parsedURL, err := url.Parse(inputURL)
 	if err != nil {
 		return "", err
@@ -223,7 +228,7 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 		return nil, fmt.Errorf("could not find network: %d", chainID)
 	}
 
-	ethClients := c.getEthClents(network)
+	ethClients := c.getEthClients(network)
 	if len(ethClients) == 0 {
 		return nil, fmt.Errorf("could not find any RPC URL for chain: %d", chainID)
 	}
@@ -234,7 +239,7 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 	return client, nil
 }
 
-func (c *Client) getEthClents(network *params.Network) []*chain.EthClient {
+func (c *Client) getEthClients(network *params.Network) []*chain.EthClient {
 	urls := make(map[string]string)
 	keys := make([]string, 0)
 	authMap := make(map[string]string)
@@ -259,7 +264,7 @@ func (c *Client) getEthClents(network *params.Network) []*chain.EthClient {
 	urls["fallback"] = network.FallbackURL
 
 	ethClients := make([]*chain.EthClient, 0)
-	for _, key := range keys {
+	for index, key := range keys {
 		var rpcClient *gethrpc.Client
 		var rpcLimiter *chain.RPCRpsLimiter
 		var err error
@@ -285,17 +290,22 @@ func (c *Client) getEthClents(network *params.Network) []*chain.EthClient {
 				c.log.Error("dial server "+key, "error", err)
 			}
 
-			hostPort, err = extractHostAndPortFromURL(url)
-			if err != nil {
-				hostPort = key
+			// If using the status-proxy, consider each endpoint as a separate provider
+			circuitKey := fmt.Sprintf("%s-%d", key, index)
+			// Otherwise host is good enough
+			if !strings.Contains(url, "status.im") {
+				hostPort, err = extractHostFromURL(url)
+				if err == nil {
+					circuitKey = hostPort
+				}
 			}
 
-			rpcLimiter, err = c.getRPCRpsLimiter(hostPort)
+			rpcLimiter, err = c.getRPCRpsLimiter(circuitKey)
 			if err != nil {
 				c.log.Error("get RPC limiter "+key, "error", err)
 			}
 
-			ethClients = append(ethClients, chain.NewEthClient(ethclient.NewClient(rpcClient), rpcLimiter, rpcClient, hostPort))
+			ethClients = append(ethClients, chain.NewEthClient(ethclient.NewClient(rpcClient), rpcLimiter, rpcClient, circuitKey))
 		}
 	}
 
@@ -357,7 +367,7 @@ func (c *Client) UpdateUpstreamURL(url string) error {
 		return err
 	}
 	c.Lock()
-	hostPortUpstream, err := extractHostAndPortFromURL(url)
+	hostPortUpstream, err := extractHostFromURL(url)
 	if err != nil {
 		hostPortUpstream = "upstream"
 	}

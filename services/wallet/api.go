@@ -152,7 +152,7 @@ func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []
 		return nil, err
 	}
 
-	return api.reader.FetchOrGetCachedWalletBalances(ctx, clients, addresses)
+	return api.reader.FetchOrGetCachedWalletBalances(ctx, clients, addresses, false)
 }
 
 type DerivedAddress struct {
