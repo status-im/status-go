@@ -154,10 +154,35 @@ func TestRelayPeers(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestBasicWakuV2(t *testing.T) {
-	t.Skip("flaky test")
+func parseNodes(rec []string) []*enode.Node {
+	var ns []*enode.Node
+	for _, r := range rec {
+		var n enode.Node
+		if err := n.UnmarshalText([]byte(r)); err != nil {
+			panic(err)
+		}
+		ns = append(ns, &n)
+	}
+	return ns
+}
 
-	enrTreeAddress := testStoreENRBootstrap
+// In order to run these tests, you must run an nwaku node
+//
+// Using Docker:
+//
+//	IP_ADDRESS=$(hostname -I | awk '{print $1}');
+//	docker run \
+//	 -p 60000:60000/tcp -p 9000:9000/udp -p 8645:8645/tcp harbor.status.im/wakuorg/nwaku:v0.31.0 \
+//	 --tcp-port=60000 --discv5-discovery=true --cluster-id=16 --pubsub-topic=/waku/2/rs/16/32 --pubsub-topic=/waku/2/rs/16/64 \
+//	 --nat=extip:${IP_ADDRESS} --discv5-discovery --discv5-udp-port=9000 --rest-address=0.0.0.0 --store
+
+func TestBasicWakuV2(t *testing.T) {
+	nwakuInfo, err := GetNwakuInfo(nil, nil)
+	require.NoError(t, err)
+
+	// Creating a fake DNS Discovery ENRTree
+	tree, url := makeTestTree("n", parseNodes([]string{nwakuInfo.EnrUri}), nil)
+	enrTreeAddress := url
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
 	if envEnrTreeAddress != "" {
 		enrTreeAddress = envEnrTreeAddress
@@ -166,6 +191,7 @@ func TestBasicWakuV2(t *testing.T) {
 	config := &Config{}
 	setDefaultConfig(config, false)
 	config.Port = 0
+	config.Resolver = mapResolver(tree.ToTXT("n"))
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
 	config.WakuNodes = []string{enrTreeAddress}
@@ -177,7 +203,7 @@ func TestBasicWakuV2(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
-	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress)
+	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress, dnsdisc.WithResolver(config.Resolver))
 	require.NoError(t, err)
 
 	// Peer used for retrieving history
@@ -192,7 +218,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		if len(w.Peers()) < 2 {
+		if len(w.Peers()) < 1 {
 			return errors.New("no peers discovered")
 		}
 		return nil
