@@ -10,9 +10,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/google/uuid"
-
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 
 	"gopkg.in/go-playground/validator.v9"
@@ -43,12 +40,6 @@ func newValidate() (*validator.Validate, error) {
 		return nil, err
 	}
 
-	if err := validate.RegisterValidation("not_end_keyuid", func(fl validator.FieldLevel) bool {
-		keystorePath := fl.Field().String()
-		return len(keystorePath) <= 66 || !keyUIDPattern.MatchString(keystorePath[len(keystorePath)-66:])
-	}); err != nil {
-		return nil, err
-	}
 	return validate, nil
 }
 
@@ -120,21 +111,17 @@ func validateAndVerifyPassword(s interface{}, senderConfig *SenderConfig) error 
 	return validateKeys(keys, senderConfig.Password)
 }
 
-func validateAndVerifyNodeConfig(s interface{}, receiverConfig *ReceiverConfig) error {
+func validateReceiverConfig(s interface{}, receiverConfig *ReceiverConfig) error {
 	err := validate(s)
 	if err != nil {
 		return err
 	}
 
-	if receiverConfig.NodeConfig == nil {
-		return fmt.Errorf("node config is required for receiver config")
-	}
-
-	if receiverConfig.NodeConfig.RootDataDir == "" {
-		return fmt.Errorf("root data dir is required for node config")
-	}
-
-	return receiverConfig.NodeConfig.Validate()
+	return receiverConfig.CreateAccount.Validate(&requests.CreateAccountValidation{
+		AllowEmptyDisplayName:        true,
+		AllowEmptyCustomizationColor: true,
+		AllowEmptyPassword:           true,
+	})
 }
 
 func emptyDir(dir string) error {
@@ -243,112 +230,6 @@ func validateKeystoreFilesConfig(backend *api.GethStatusBackend, conf interface{
 
 	if keystorePath == "" {
 		return fmt.Errorf("keyStorePath can not be empty")
-	}
-
-	return nil
-}
-
-// setDefaultNodeConfig sets default values for the node configuration.
-// Config Values still needed from the mobile include
-// VerifyTransactionURL/VerifyENSURL/VerifyENSContractAddress/VerifyTransactionChainID
-// LogEnabled/LogDir/RootDataDir/LightClient/Nameserver
-func setDefaultNodeConfig(c *params.NodeConfig) error {
-	if c == nil {
-		return nil
-	}
-
-	err := c.UpdateWithDefaults()
-	if err != nil {
-		return err
-	}
-
-	// following specifiedXXX variables are used to check if frontend has specified the value
-	// if not, the default value is set. NOTE: we also check 2 extra fields: WakuV2Config(LightClient|Nameserver)
-	// see api.SetFleet for more details
-	specifiedVerifyTransactionURL := c.ShhextConfig.VerifyTransactionURL
-	specifiedVerifyENSURL := c.ShhextConfig.VerifyENSURL
-	specifiedVerifyENSContractAddress := c.ShhextConfig.VerifyENSContractAddress
-	specifiedVerifyTransactionChainID := c.ShhextConfig.VerifyTransactionChainID
-	specifiedNetworkID := c.NetworkID
-	specifiedNetworks := c.Networks
-	specifiedUpstreamConfigURL := c.UpstreamConfig.URL
-	specifiedLogEnabled := c.LogEnabled
-	specifiedLogLevel := c.LogLevel
-	specifiedFleet := c.ClusterConfig.Fleet
-	specifiedInstallationID := c.ShhextConfig.InstallationID
-	specifiedTorrentConfigEnabled := c.TorrentConfig.Enabled
-	specifiedTorrentConfigPort := c.TorrentConfig.Port
-
-	if len(specifiedNetworks) == 0 {
-		c.Networks = api.BuildDefaultNetworks(&requests.WalletSecretsConfig{})
-	}
-
-	if specifiedNetworkID == 0 {
-		c.NetworkID = c.Networks[0].ChainID
-	}
-
-	c.UpstreamConfig.Enabled = true
-	if specifiedUpstreamConfigURL == "" {
-		c.UpstreamConfig.URL = c.Networks[0].RPCURL
-	}
-
-	if specifiedLogEnabled && specifiedLogLevel == "" {
-		c.LogLevel = api.DefaultLogLevel
-	}
-	c.LogFile = api.DefaultLogFile
-
-	c.Name = api.DefaultNodeName
-	c.DataDir = api.DefaultDataDir
-	c.KeycardPairingDataFile = api.DefaultKeycardPairingDataFile
-	c.Rendezvous = false
-	c.NoDiscovery = true
-	c.MaxPeers = api.DefaultMaxPeers
-	c.MaxPendingPeers = api.DefaultMaxPendingPeers
-
-	c.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
-	c.BrowsersConfig = params.BrowsersConfig{Enabled: true}
-	c.PermissionsConfig = params.PermissionsConfig{Enabled: true}
-	c.MailserversConfig = params.MailserversConfig{Enabled: true}
-
-	c.ListenAddr = api.DefaultListenAddr
-
-	if specifiedFleet == "" {
-		err = api.SetDefaultFleet(c)
-		if err != nil {
-			return err
-		}
-	}
-
-	if specifiedInstallationID == "" {
-		specifiedInstallationID = uuid.New().String()
-	}
-
-	c.ShhextConfig = params.ShhextConfig{
-		InstallationID:             specifiedInstallationID,
-		MaxMessageDeliveryAttempts: api.DefaultMaxMessageDeliveryAttempts,
-		MailServerConfirmations:    true,
-		DataSyncEnabled:            true,
-		PFSEnabled:                 true,
-		VerifyTransactionURL:       specifiedVerifyTransactionURL,
-		VerifyENSURL:               specifiedVerifyENSURL,
-		VerifyENSContractAddress:   specifiedVerifyENSContractAddress,
-	}
-	if specifiedVerifyTransactionChainID == 0 {
-		c.ShhextConfig.VerifyTransactionChainID = int64(c.Networks[0].ChainID)
-	}
-
-	if specifiedVerifyTransactionURL == "" {
-		c.ShhextConfig.VerifyTransactionURL = c.Networks[0].FallbackURL
-	}
-	if specifiedVerifyENSURL == "" {
-		c.ShhextConfig.VerifyENSURL = c.Networks[0].FallbackURL
-	}
-
-	c.TorrentConfig = params.TorrentConfig{
-		Enabled:    specifiedTorrentConfigEnabled,
-		Port:       specifiedTorrentConfigPort,
-		DataDir:    filepath.Join(c.RootDataDir, params.ArchivesRelativePath),
-		TorrentDir: filepath.Join(c.RootDataDir, params.TorrentTorrentsRelativePath),
 	}
 
 	return nil

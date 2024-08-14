@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -126,9 +126,12 @@ func NewAccountPayloadStorer(p *AccountPayload, config *ReceiverConfig) (*Accoun
 		return ppr, nil
 	}
 
+	if config.CreateAccount != nil {
+		ppr.kdfIterations = config.CreateAccount.KdfIterations
+		ppr.keystorePath = config.AbsoluteKeystorePath()
+	}
+
 	ppr.multiaccountsDB = config.DB
-	ppr.kdfIterations = config.KDFIterations
-	ppr.keystorePath = config.KeystorePath
 	ppr.loggedInKeyUID = config.LoggedInKeyUID
 	return ppr, nil
 }
@@ -173,7 +176,7 @@ func (aps *AccountPayloadStorer) storeKeys(keyStorePath string) error {
 
 	// If lastDir == keystoreDir we presume we need to create the rest of the keystore path
 	// else we presume the provided keystore is valid
-	if lastDir == keystoreDir {
+	if lastDir == api.DefaultKeystoreRelativePath {
 		if aps.multiaccount == nil || aps.multiaccount.KeyUID == "" {
 			return fmt.Errorf("no known Key UID")
 		}
@@ -237,10 +240,8 @@ type RawMessageStorer struct {
 	payload               *RawMessagesPayload
 	syncRawMessageHandler *SyncRawMessageHandler
 	accountPayload        *AccountPayload
-	nodeConfig            *params.NodeConfig
-	settingCurrentNetwork string
+	createAccount         *requests.CreateAccount
 	deviceType            string
-	deviceName            string
 }
 
 func NewRawMessageStorer(backend *api.GethStatusBackend, payload *RawMessagesPayload, accountPayload *AccountPayload, config *ReceiverConfig) *RawMessageStorer {
@@ -248,10 +249,8 @@ func NewRawMessageStorer(backend *api.GethStatusBackend, payload *RawMessagesPay
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
 		payload:               payload,
 		accountPayload:        accountPayload,
-		nodeConfig:            config.NodeConfig,
-		settingCurrentNetwork: config.SettingCurrentNetwork,
 		deviceType:            config.DeviceType,
-		deviceName:            config.DeviceName,
+		createAccount:         config.CreateAccount,
 	}
 }
 
@@ -259,7 +258,7 @@ func (r *RawMessageStorer) Store() error {
 	if r.accountPayload == nil || r.accountPayload.multiaccount == nil {
 		return fmt.Errorf("no known multiaccount when storing raw messages")
 	}
-	return r.syncRawMessageHandler.HandleRawMessage(r.accountPayload, r.nodeConfig, r.settingCurrentNetwork, r.deviceType, r.deviceName, r.payload)
+	return r.syncRawMessageHandler.HandleRawMessage(r.accountPayload, r.createAccount, r.deviceType, r.payload)
 }
 
 /*
@@ -443,7 +442,7 @@ func (kfps *KeystoreFilesPayloadStorer) storeKeys(keyStorePath string) error {
 
 	// If lastDir == keystoreDir we presume we need to create the rest of the keystore path
 	// else we presume the provided keystore is valid
-	if lastDir == keystoreDir {
+	if lastDir == api.DefaultKeystoreRelativePath {
 		keyStorePath = filepath.Join(keyStorePath, kfps.loggedInKeyUID)
 		_, err := os.Stat(keyStorePath)
 		if os.IsNotExist(err) {

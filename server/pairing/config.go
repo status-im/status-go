@@ -5,8 +5,9 @@ import (
 	"crypto/tls"
 	"net"
 
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/requests"
 )
 
 type SenderConfig struct {
@@ -23,20 +24,13 @@ type SenderConfig struct {
 }
 
 type ReceiverConfig struct {
-	// nodeConfig is required, but we'll validate it separately
-	NodeConfig *params.NodeConfig `json:"nodeConfig"`
-
-	// ReceiverConfig.KeystorePath must not end with keyUID (because keyUID is not known yet)
-	KeystorePath string `json:"keystorePath" validate:"required,not_end_keyuid"`
+	CreateAccount *requests.CreateAccount `json:"createAccount" validate:"required"`
 
 	// DeviceType SendPairInstallation need this information
-	DeviceType    string `json:"deviceType" validate:"required"`
-	KDFIterations int    `json:"kdfIterations" validate:"gte=0"`
+	// Deprecated: This field will be automatically overridden with runtime.GOOS and can be omitted by client.
+	// The field will be removed in https://github.com/status-im/status-go/issues/3351 is fully implemented.
+	DeviceType string `json:"-"`
 
-	// SettingCurrentNetwork corresponding to field current_network from table settings, so that we can override current network from sender
-	SettingCurrentNetwork string `json:"settingCurrentNetwork" validate:"required"`
-
-	DeviceName     string                  `json:"deviceName"`
 	DB             *multiaccounts.Database `json:"-"`
 	LoggedInKeyUID string                  `json:"-"`
 }
@@ -145,4 +139,11 @@ func NewReceiverServerConfig() *ReceiverServerConfig {
 		ReceiverConfig: new(ReceiverConfig),
 		ServerConfig:   new(ServerConfig),
 	}
+}
+
+func (c *ReceiverConfig) AbsoluteKeystorePath() string {
+	// Follow the same path as in InitKeyStoreDirWithAccount
+	// Keep keyUID empty as it's unknown yet
+	_, path := api.DefaultKeystorePath(c.CreateAccount.RootDataDir, "")
+	return path
 }

@@ -13,9 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server/servertest"
 	"github.com/status-im/status-go/t/utils"
 )
@@ -62,21 +64,14 @@ func setupTestDB(t *testing.T) (*multiaccounts.Database, func()) {
 	}
 }
 
-func makeKeystores(t *testing.T) (string, string) {
+func makeKeystore(t *testing.T) string {
 	keyStoreDir := t.TempDir()
-	emptyKeyStoreDir := t.TempDir()
-
-	keyStoreDir = filepath.Join(keyStoreDir, keystoreDir, keyUID)
-	// TODO test case where the keystore dir does not yet exist because the device is new
-	emptyKeyStoreDir = filepath.Join(emptyKeyStoreDir, keystoreDir)
+	keyStoreDir = filepath.Join(keyStoreDir, api.DefaultKeystoreRelativePath)
 
 	err := os.MkdirAll(keyStoreDir, 0777)
 	require.NoError(t, err)
 
-	err = os.MkdirAll(emptyKeyStoreDir, 0777)
-	require.NoError(t, err)
-
-	return keyStoreDir, emptyKeyStoreDir
+	return keyStoreDir
 }
 
 func initKeys(t *testing.T, keyStoreDir string) {
@@ -116,7 +111,7 @@ func (pms *PayloadMarshallerSuite) SetupTest() {
 
 	db1, db1td := setupTestDB(pms.T())
 	db2, db2td := setupTestDB(pms.T())
-	keystore1, keystore2 := makeKeystores(pms.T())
+	keystore1 := filepath.Join(makeKeystore(pms.T()), keyUID)
 	pms.teardown = func() {
 		db1td()
 		db2td()
@@ -134,8 +129,10 @@ func (pms *PayloadMarshallerSuite) SetupTest() {
 	}
 
 	pms.config2 = &ReceiverConfig{
-		DB:           db2,
-		KeystorePath: keystore2,
+		DB: db2,
+		CreateAccount: &requests.CreateAccount{
+			RootDataDir: pms.T().TempDir(),
+		},
 	}
 }
 
@@ -293,7 +290,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pms.Require().NoError(err)
 
 	// TEST PairingPayloadRepository 2 Store()
-	keys := getFiles(pms.T(), filepath.Join(pms.config2.KeystorePath, keyUID))
+	keys := getFiles(pms.T(), filepath.Join(pms.config2.AbsoluteKeystorePath(), keyUID))
 
 	pms.Require().Len(keys, 2)
 	pms.Require().Len(keys[utils.GetAccount1PKFile()], 489)

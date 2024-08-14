@@ -14,13 +14,9 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-const keystoreDir = "keystore"
-
 var (
-	ErrKeyFileAlreadyExists    = errors.New("key file already exists")
-	ErrKeyUIDEmptyAsSender     = errors.New("keyUID must be provided as sender")
-	ErrNodeConfigNilAsReceiver = errors.New("node config must be provided as receiver")
-	ErrLoggedInKeyUIDConflict  = errors.New("logged in keyUID not same as keyUID in payload")
+	ErrKeyFileAlreadyExists   = errors.New("key file already exists")
+	ErrLoggedInKeyUIDConflict = errors.New("logged in keyUID not same as keyUID in payload")
 )
 
 // AccountPayload represents the payload structure a Server handles

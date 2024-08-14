@@ -1,14 +1,16 @@
 package pairing
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/protocol/requests"
 )
 
 func TestConfigTestSuite(t *testing.T) {
@@ -75,30 +77,17 @@ func (s *ConfigTestSuite) TestValidationKeyUID() {
 }
 
 func (s *ConfigTestSuite) TestValidationNotEndKeyUID() {
-	nodeConfig, err := nodeConfigForLocalPairSync(uuid.New().String(), "", "/dummy/path")
-	nodeConfig.RootDataDir = "/tmp"
-	require.NoError(s.T(), err, "nodeConfigForLocalPairSync should not return error")
-	s.T().Run("Valid keystore path without keyUID", func(t *testing.T) {
-		r := &ReceiverConfig{
-			NodeConfig:            nodeConfig,
-			KeystorePath:          "some/path/",
-			DeviceType:            "phone",
-			KDFIterations:         1,
-			SettingCurrentNetwork: "mainnet",
-		}
-		assert.NoError(t, setDefaultNodeConfig(r.NodeConfig))
-		assert.NoError(t, validateAndVerifyNodeConfig(r, r), "ReceiverConfig validation should pass")
-	})
+	keyUIDPattern := regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
 
-	s.T().Run("Invalid keystore path with keyUID", func(t *testing.T) {
-		r := &ReceiverConfig{
-			NodeConfig:            nodeConfig,
-			KeystorePath:          "some/path/0x130cc0ebdaecd220c1d6dea0ef01d575ef5364506785745049eb98ddf49cb54e",
-			DeviceType:            "phone",
-			KDFIterations:         1,
-			SettingCurrentNetwork: "mainnet",
-		}
-		assert.NoError(t, setDefaultNodeConfig(r.NodeConfig))
-		assert.Error(t, validateAndVerifyNodeConfig(r, r), "ReceiverConfig validation should fail")
-	})
+	r := &ReceiverConfig{
+		CreateAccount: &requests.CreateAccount{
+			RootDataDir:   "/tmp",
+			KdfIterations: 1,
+			DeviceName:    "device-1",
+		},
+	}
+	keystorePath := r.AbsoluteKeystorePath()
+	s.Require().True(len(keystorePath) <= 66 || !keyUIDPattern.MatchString(keystorePath[len(keystorePath)-66:]))
+
+	s.Require().NoError(validateReceiverConfig(r, r), "ReceiverConfig validation should pass")
 }

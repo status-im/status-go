@@ -123,11 +123,11 @@ func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
 		return errors.Wrap(ErrCreateAccountInvalidDisplayName, err.Error())
 	}
 
-	if len(c.Password) == 0 {
+	if len(c.Password) == 0 && !validation.AllowEmptyPassword {
 		return ErrCreateAccountInvalidPassword
 	}
 
-	if len(c.CustomizationColor) == 0 {
+	if len(c.CustomizationColor) == 0 && !validation.AllowEmptyCustomizationColor {
 		return ErrCreateAccountInvalidCustomizationColor
 	}
 
@@ -140,5 +140,7 @@ func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
 
 // NOTE: Reasoning for this struct here: https://github.com/status-im/status-go/pull/4980#discussion_r1539219099
 type CreateAccountValidation struct {
-	AllowEmptyDisplayName bool
+	AllowEmptyDisplayName        bool
+	AllowEmptyPassword           bool
+	AllowEmptyCustomizationColor bool
 }
