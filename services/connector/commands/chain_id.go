@@ -2,7 +2,6 @@ package commands
 
 import (
 	"database/sql"
-	"strconv"
 
 	"github.com/status-im/status-go/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/services/connector/database"
@@ -25,24 +24,20 @@ func (c *ChainIDCommand) Execute(request RPCRequest) (interface{}, error) {
 		return "", err
 	}
 
+	var chainId uint64
 	if dApp == nil {
-		defaultChainID, err := chainutils.GetDefaultChainID(c.NetworkManager)
+		chainId, err = chainutils.GetDefaultChainID(c.NetworkManager)
 		if err != nil {
 			return "", err
 		}
-
-		chainId, err := chainutils.GetHexChainID(strconv.FormatUint(defaultChainID, 16))
-		if err != nil {
-			return "", err
-		}
-
-		return chainId, nil
+	} else {
+		chainId = dApp.ChainID
 	}
 
-	chainId, err := chainutils.GetHexChainID(walletCommon.ChainID(dApp.ChainID).String())
+	chainIdHex, err := chainutils.GetHexChainID(walletCommon.ChainID(chainId).String())
 	if err != nil {
 		return "", err
 	}
 
-	return chainId, nil
+	return chainIdHex, nil
 }

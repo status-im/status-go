@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/signal"
 )
 
 // errors
@@ -92,6 +93,11 @@ func (c *SwitchEthereumChainCommand) Execute(request RPCRequest) (interface{}, e
 	if err != nil {
 		return "", err
 	}
+
+	signal.SendConnectorDAppChainIdSwitched(signal.ConnectorDAppChainIdSwitchedSignal{
+		URL:     request.URL,
+		ChainId: chainId,
+	})
 
 	return chainId, nil
 }

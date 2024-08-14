@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"database/sql"
 	"errors"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -16,7 +17,7 @@ var (
 
 type RequestAccountsCommand struct {
 	ClientHandler ClientSideHandlerInterface
-	AccountsCommand
+	Db            *sql.DB
 }
 
 type RawAccountsResponse struct {

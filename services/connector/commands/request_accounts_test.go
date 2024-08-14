@@ -17,7 +17,7 @@ func TestFailToRequestAccountsWithMissingDAppFields(t *testing.T) {
 	db, close := SetupTestDB(t)
 	defer close()
 
-	cmd := &RequestAccountsCommand{AccountsCommand: AccountsCommand{Db: db}}
+	cmd := &RequestAccountsCommand{Db: db}
 
 	// Missing DApp fields
 	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, nil)
@@ -35,8 +35,8 @@ func TestRequestAccountsWithSignalTimeout(t *testing.T) {
 	clientHandler := NewClientSideHandler()
 
 	cmd := &RequestAccountsCommand{
-		ClientHandler:   clientHandler,
-		AccountsCommand: AccountsCommand{Db: db},
+		ClientHandler: clientHandler,
+		Db:            db,
 	}
 
 	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x01})
@@ -57,8 +57,8 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 	clientHandler := NewClientSideHandler()
 
 	cmd := &RequestAccountsCommand{
-		ClientHandler:   clientHandler,
-		AccountsCommand: AccountsCommand{Db: db},
+		ClientHandler: clientHandler,
+		Db:            db,
 	}
 
 	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
@@ -118,8 +118,8 @@ func TestRequestAccountsRejected(t *testing.T) {
 	clientHandler := NewClientSideHandler()
 
 	cmd := &RequestAccountsCommand{
-		ClientHandler:   clientHandler,
-		AccountsCommand: AccountsCommand{Db: db},
+		ClientHandler: clientHandler,
+		Db:            db,
 	}
 
 	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
