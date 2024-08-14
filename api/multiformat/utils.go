@@ -150,7 +150,7 @@ func compressBls12p381g1PublicKey(key []byte) ([]byte, error) {
 	return cpk, nil
 }
 
-// compressBls12p381g1PublicKey is a dedicated key compression function for bls12 381 g2 pks
+// compressBls12p381g2PublicKey is a dedicated key compression function for bls12 381 g2 pks
 func compressBls12p381g2PublicKey(key []byte) ([]byte, error) {
 	g2 := bls12381.NewG2()
 

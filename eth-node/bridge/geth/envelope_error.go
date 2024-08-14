@@ -19,7 +19,7 @@ func NewWakuEnvelopeErrorWrapper(envelopeError *waku.EnvelopeError) *types.Envel
 	}
 }
 
-// NewWakuEnvelopeErrorWrapper returns a types.EnvelopeError object that mimics Geth's EnvelopeError
+// NewWakuV2EnvelopeErrorWrapper returns a types.EnvelopeError object that mimics Geth's EnvelopeError
 func NewWakuV2EnvelopeErrorWrapper(envelopeError *wakuv2.EnvelopeError) *types.EnvelopeError {
 	if envelopeError == nil {
 		panic("envelopeError should not be nil")
