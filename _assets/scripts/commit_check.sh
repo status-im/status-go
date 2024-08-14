@@ -3,6 +3,9 @@
 set -euo pipefail
 
 parse_commits() {
+
+    BASE_BRANCH=${BASE_BRANCH:-develop}
+
     start_commit=${1:-origin/${BASE_BRANCH}}
     end_commit=${2:-HEAD}
     is_breaking_change=false
