@@ -92,35 +92,44 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 		ctx = context.Background()
 	}
 
-	for _, f := range cmd.functors {
+	for i, f := range cmd.functors {
 		if cmd.cancel {
 			break
 		}
 
-		circuitName := f.circuitName
-		if cb.circuitNameHandler != nil {
-			circuitName = cb.circuitNameHandler(circuitName)
-		}
-
-		if hystrix.GetCircuitSettings()[circuitName] == nil {
-			hystrix.ConfigureCommand(circuitName, hystrix.CommandConfig{
-				Timeout:                cb.config.Timeout,
-				MaxConcurrentRequests:  cb.config.MaxConcurrentRequests,
-				RequestVolumeThreshold: cb.config.RequestVolumeThreshold,
-				SleepWindow:            cb.config.SleepWindow,
-				ErrorPercentThreshold:  cb.config.ErrorPercentThreshold,
-			})
-		}
-
-		err := hystrix.DoC(ctx, circuitName, func(ctx context.Context) error {
-			res, err := f.exec()
-			// Write to result only if success
+		var err error
+		// if last command, execute without circuit
+		if i == len(cmd.functors)-1 {
+			res, execErr := f.exec()
+			err = execErr
 			if err == nil {
 				result = CommandResult{res: res}
 			}
-			return err
-		}, nil)
+		} else {
+			circuitName := f.circuitName
+			if cb.circuitNameHandler != nil {
+				circuitName = cb.circuitNameHandler(circuitName)
+			}
 
+			if hystrix.GetCircuitSettings()[circuitName] == nil {
+				hystrix.ConfigureCommand(circuitName, hystrix.CommandConfig{
+					Timeout:                cb.config.Timeout,
+					MaxConcurrentRequests:  cb.config.MaxConcurrentRequests,
+					RequestVolumeThreshold: cb.config.RequestVolumeThreshold,
+					SleepWindow:            cb.config.SleepWindow,
+					ErrorPercentThreshold:  cb.config.ErrorPercentThreshold,
+				})
+			}
+
+			err = hystrix.DoC(ctx, circuitName, func(ctx context.Context) error {
+				res, err := f.exec()
+				// Write to result only if success
+				if err == nil {
+					result = CommandResult{res: res}
+				}
+				return err
+			}, nil)
+		}
 		if err == nil {
 			break
 		}
@@ -134,7 +143,6 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 		// Lets abuse every provider with the same amount of MaxConcurrentRequests,
 		// keep iterating even in case of ErrMaxConcurrency error
 	}
-
 	return result
 }
 
