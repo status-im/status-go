@@ -580,6 +580,7 @@ type WalletConfig struct {
 	StatusProxyBlockchainUser     string            `json:"StatusProxyBlockchainUser"`
 	StatusProxyBlockchainPassword string            `json:"StatusProxyBlockchainPassword"`
 	StatusProxyEnabled            bool              `json:"StatusProxyEnabled"`
+	StatusProxyStageName          string            `json:"StatusProxyStageName"`
 	EnableCelerBridge             bool              `json:"EnableCelerBridge"`
 }
 

@@ -167,6 +167,10 @@ func buildWalletConfig(request *requests.WalletSecretsConfig, statusProxyEnabled
 		AlchemyAPIKeys: make(map[uint64]string),
 	}
 
+	if request.StatusProxyStageName != "" {
+		walletConfig.StatusProxyStageName = request.StatusProxyStageName
+	}
+
 	if request.OpenseaAPIKey != "" {
 		walletConfig.OpenseaAPIKey = request.OpenseaAPIKey
 	}
@@ -285,7 +289,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 			URL:     request.UpstreamConfig,
 		}
 	} else {
-		nodeConfig.UpstreamConfig.URL = defaultNetworks[0].RPCURL
+		nodeConfig.UpstreamConfig.URL = mainnet(request.WalletSecretsConfig.StatusProxyStageName).RPCURL
 		nodeConfig.UpstreamConfig.Enabled = true
 	}
 
@@ -346,13 +350,13 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	if request.VerifyTransactionURL != nil {
 		nodeConfig.ShhextConfig.VerifyTransactionURL = *request.VerifyTransactionURL
 	} else {
-		nodeConfig.ShhextConfig.VerifyTransactionURL = defaultNetworks[0].FallbackURL
+		nodeConfig.ShhextConfig.VerifyTransactionURL = mainnet(request.WalletSecretsConfig.StatusProxyStageName).FallbackURL
 	}
 
 	if request.VerifyENSURL != nil {
 		nodeConfig.ShhextConfig.VerifyENSURL = *request.VerifyENSURL
 	} else {
-		nodeConfig.ShhextConfig.VerifyENSURL = defaultNetworks[0].FallbackURL
+		nodeConfig.ShhextConfig.VerifyENSURL = mainnet(request.WalletSecretsConfig.StatusProxyStageName).FallbackURL
 	}
 
 	if request.VerifyTransactionChainID != nil {
