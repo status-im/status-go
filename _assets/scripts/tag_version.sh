@@ -18,6 +18,7 @@ bump_version() {
     # Bump the version based on the type of change
     if [[ "$is_breaking_change" = true ]]; then
         ((minor++))
+        ((patch=0))
     else
         ((patch++))
     fi
