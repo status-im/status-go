@@ -400,7 +400,7 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 
 	nodeConfig.Name = "StatusIM"
 	nodeConfig.Rendezvous = false
-	clusterConfig, err := params.LoadClusterConfigFromFleet("eth.prod")
+	clusterConfig, err := params.LoadClusterConfigFromFleet("status.prod")
 	if err != nil {
 		return nil, err
 	}

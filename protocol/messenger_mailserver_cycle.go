@@ -186,7 +186,7 @@ func (m *Messenger) getFleet() (string, error) {
 	} else if m.config.clusterConfig.Fleet != "" {
 		fleet = m.config.clusterConfig.Fleet
 	} else {
-		fleet = params.FleetProd
+		fleet = params.DefaultFleet
 	}
 	return fleet, nil
 }

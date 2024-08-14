@@ -17,7 +17,7 @@ Running Waku node is a matter of a correct configuration. To enable Waku and JSO
 }
 ```
 
-This command will start a Waku node using the `eth.prod` fleet:
+This command will start a Waku node using the `status.prod` fleet:
 ```shell script
 $ ./build/bin/statusd -c ./_examples/waku.json
 ```

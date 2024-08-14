@@ -402,7 +402,7 @@ test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
 canary-test: node-canary
 	# TODO: uncomment that!
-	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
+	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-status.prod.json
 
 lint:
 	golangci-lint run ./...

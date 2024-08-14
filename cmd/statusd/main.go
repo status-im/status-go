@@ -67,18 +67,16 @@ var (
 	)
 	fleet = flag.String(
 		"fleet",
-		params.FleetProd,
+		params.DefaultFleet,
 		fmt.Sprintf(
 			"Select fleet: %s (default %s)",
 			[]string{
-				params.FleetProd,
-				params.FleetStatusStaging,
 				params.FleetStatusProd,
-				params.FleetStatusTest,
+				params.FleetStatusStaging,
 				params.FleetWakuSandbox,
 				params.FleetWakuTest,
 			},
-			params.FleetProd,
+			params.DefaultFleet,
 		),
 	)
 	listenAddr = flag.String("addr", "", "address to bind listener to")

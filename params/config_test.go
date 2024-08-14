@@ -21,7 +21,7 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	c, err := params.NewNodeConfigWithDefaults(
 		"/some/data/path",
 		params.GoerliNetworkID,
-		params.WithFleet(params.FleetProd),
+		params.WithFleet(params.FleetStatusProd),
 		params.WithLES(),
 		params.WithMailserver(),
 	)
@@ -34,10 +34,10 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	// assert MailServer
 	assert.Equal(t, false, c.WakuConfig.EnableMailServer)
 	// assert cluster
-	assert.Equal(t, false, c.NoDiscovery)
-	assert.Equal(t, params.FleetProd, c.ClusterConfig.Fleet)
-	assert.NotEmpty(t, c.ClusterConfig.BootNodes)
-	assert.NotEmpty(t, c.ClusterConfig.StaticNodes)
+	assert.Equal(t, true, c.NoDiscovery)
+	assert.Equal(t, params.FleetStatusProd, c.ClusterConfig.Fleet)
+	assert.Empty(t, c.ClusterConfig.BootNodes)
+	assert.Empty(t, c.ClusterConfig.StaticNodes)
 	assert.NotEmpty(t, c.ClusterConfig.PushNotificationsServers)
 	// assert LES
 	assert.Equal(t, true, c.LightEthConfig.Enabled)

@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 
@@ -37,6 +38,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	accservice "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 const (
@@ -69,12 +71,32 @@ type SyncDeviceSuite struct {
 	logger   *zap.Logger
 	password string
 	tmpdir   string
+
+	// add exchangeBootNode to ensure alice and bob can find each other.
+	// If relying on in the fleet, the test will likely be flaky
+	exchangeBootNode *wakuv2.Waku
 }
 
 func (s *SyncDeviceSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 	s.password = "password"
 	s.tmpdir = s.T().TempDir()
+	var err error
+	exchangeNodeConfig := &wakuv2.Config{
+		Port:                                   0,
+		EnableDiscV5:                           true,
+		EnablePeerExchangeServer:               true,
+		ClusterID:                              16,
+		DefaultShardPubsubTopic:                shard.DefaultShardPubsubTopic(),
+		EnableStoreConfirmationForMessagesSent: false,
+	}
+	s.exchangeBootNode, err = wakuv2.New(nil, "", exchangeNodeConfig, s.logger.Named("pxServerNode"), nil, nil, nil, nil)
+	s.Require().NoError(err)
+	s.Require().NoError(s.exchangeBootNode.Start())
+}
+
+func (s *SyncDeviceSuite) TearDownTest() {
+	s.Require().NoError(s.exchangeBootNode.Stop())
 }
 
 func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *api.GethStatusBackend {
@@ -115,6 +137,10 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *ap
 
 	nodeConfig, err := nodeConfigForLocalPairSync(settings.InstallationID, account.KeyUID, tmpdir)
 	nodeConfig.RootDataDir = tmpdir
+	pxServerNodeENR, err := s.exchangeBootNode.GetNodeENRString()
+	err = params.WithDiscV5BootstrapNodes([]string{pxServerNodeENR})(nodeConfig)
+	require.NoError(s.T(), err)
+	err = params.WithWakuNodes([]string{})(nodeConfig)
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), setDefaultNodeConfig(nodeConfig))
 
@@ -801,7 +827,7 @@ func nodeConfigForLocalPairSync(installationID, keyUID, tmpDir string) (*params.
 
 	// need specify cluster config here, otherwise TestPairingThreeDevices will fail due to no messages(CR) received
 	// TODO(frank) need to figure out why above happen
-	clusterConfig, err := params.LoadClusterConfigFromFleet(params.FleetProd)
+	clusterConfig, err := params.LoadClusterConfigFromFleet(params.FleetStatusProd)
 	if err != nil {
 		return nil, err
 	}
