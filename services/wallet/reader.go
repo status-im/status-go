@@ -261,8 +261,9 @@ func (r *Reader) invalidateBalanceCache() {
 	r.refreshBalanceCache = true
 }
 
-func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
-	needFetch := !r.isBalanceCacheValid(addresses) || r.isBalanceUpdateNeededAnyway(clients, addresses)
+func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address, forceRefresh bool) (map[common.Address][]token.StorageToken, error) {
+	needFetch := forceRefresh || !r.isBalanceCacheValid(addresses) || r.isBalanceUpdateNeededAnyway(clients, addresses)
+
 	if needFetch {
 		_, err := r.FetchBalances(ctx, clients, addresses)
 		if err != nil {
@@ -420,7 +421,6 @@ func (r *Reader) balancesToTokensByAddress(connectedPerChain map[uint64]bool, ad
 	return result
 }
 
-// For tokens with single symbol, create a chain balance for each chain
 func (r *Reader) createBalancePerChainPerSymbol(
 	address common.Address,
 	balances map[uint64]map[common.Address]map[common.Address]*hexutil.Big,
@@ -461,84 +461,19 @@ func (r *Reader) createBalancePerChainPerSymbol(
 }
 
 func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address, currency string) (map[common.Address][]token.StorageToken, error) {
-	cachedTokens, err := r.getCachedWalletTokensWithoutMarketData()
-	if err != nil {
-		return nil, err
-	}
-
-	chainIDs := maps.Keys(clients)
-
 	currencies := make([]string, 0)
 	currencies = append(currencies, currency)
 	currencies = append(currencies, getFixedCurrencies()...)
-	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs)
+
+	result, err := r.FetchOrGetCachedWalletBalances(ctx, clients, addresses, true)
 	if err != nil {
 		return nil, err
 	}
 
-	tokenAddresses := getTokenAddresses(allTokens)
-
-	balances, err := r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
-	if err != nil {
-		log.Info("tokenManager.GetBalancesByChain error", "err", err)
-		return nil, err
-	}
-
-	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
 	tokenSymbols := make([]string, 0)
-	result := make(map[common.Address][]token.StorageToken)
-
-	for _, address := range addresses {
-		for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
-			for symbol, tokens := range getTokenBySymbols(tokenList) {
-				balancesPerChain := make(map[uint64]token.ChainBalance)
-				decimals := tokens[0].Decimals
-				isVisible := false
-				for _, tok := range tokens {
-					hexBalance := balances[tok.ChainID][address][tok.Address]
-					balance := big.NewFloat(0.0)
-					if hexBalance != nil {
-						balance = new(big.Float).Quo(
-							new(big.Float).SetInt(hexBalance.ToInt()),
-							big.NewFloat(math.Pow(10, float64(decimals))),
-						)
-					}
-					hasError := false
-					if client, ok := clients[tok.ChainID]; ok {
-						hasError = err != nil || !client.IsConnected()
-					}
-					if !isVisible {
-						isVisible = balance.Cmp(big.NewFloat(0.0)) > 0 || isCachedToken(cachedTokens, address, tok.Symbol, tok.ChainID)
-					}
-					balancesPerChain[tok.ChainID] = token.ChainBalance{
-						RawBalance: hexBalance.ToInt().String(),
-						Balance:    balance,
-						Address:    tok.Address,
-						ChainID:    tok.ChainID,
-						HasError:   hasError,
-					}
-				}
-
-				if !isVisible && !belongsToMandatoryTokens(symbol) {
-					continue
-				}
-
-				walletToken := token.StorageToken{
-					Token: token.Token{
-						Name:          tokens[0].Name,
-						Symbol:        symbol,
-						Decimals:      decimals,
-						PegSymbol:     token.GetTokenPegSymbol(symbol),
-						Verified:      tokens[0].Verified,
-						CommunityData: tokens[0].CommunityData,
-						Image:         tokens[0].Image,
-					},
-					BalancesPerChain: balancesPerChain,
-				}
-
-				tokenSymbols = append(tokenSymbols, symbol)
-				result[address] = append(result[address], walletToken)
-			}
+	for _, storageTokens := range result {
+		for _, t := range storageTokens {
+			tokenSymbols = append(tokenSymbols, t.Token.Symbol)
 		}
 	}
 
