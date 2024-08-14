@@ -97,15 +97,17 @@ type WalletSecretsConfig struct {
 	RaribleMainnetAPIKey string `json:"raribleMainnetApiKey"`
 	RaribleTestnetAPIKey string `json:"raribleTestnetApiKey"`
 
-	AlchemyEthereumMainnetToken   string `json:"alchemyEthereumMainnetToken"`
-	AlchemyEthereumGoerliToken    string `json:"alchemyEthereumGoerliToken"`
-	AlchemyEthereumSepoliaToken   string `json:"alchemyEthereumSepoliaToken"`
-	AlchemyArbitrumMainnetToken   string `json:"alchemyArbitrumMainnetToken"`
-	AlchemyArbitrumGoerliToken    string `json:"alchemyArbitrumGoerliToken"`
-	AlchemyArbitrumSepoliaToken   string `json:"alchemyArbitrumSepoliaToken"`
-	AlchemyOptimismMainnetToken   string `json:"alchemyOptimismMainnetToken"`
-	AlchemyOptimismGoerliToken    string `json:"alchemyOptimismGoerliToken"`
-	AlchemyOptimismSepoliaToken   string `json:"alchemyOptimismSepoliaToken"`
+	AlchemyEthereumMainnetToken string `json:"alchemyEthereumMainnetToken"`
+	AlchemyEthereumGoerliToken  string `json:"alchemyEthereumGoerliToken"`
+	AlchemyEthereumSepoliaToken string `json:"alchemyEthereumSepoliaToken"`
+	AlchemyArbitrumMainnetToken string `json:"alchemyArbitrumMainnetToken"`
+	AlchemyArbitrumGoerliToken  string `json:"alchemyArbitrumGoerliToken"`
+	AlchemyArbitrumSepoliaToken string `json:"alchemyArbitrumSepoliaToken"`
+	AlchemyOptimismMainnetToken string `json:"alchemyOptimismMainnetToken"`
+	AlchemyOptimismGoerliToken  string `json:"alchemyOptimismGoerliToken"`
+	AlchemyOptimismSepoliaToken string `json:"alchemyOptimismSepoliaToken"`
+
+	StatusProxyStageName          string `json:"statusProxyStageName"`
 	StatusProxyMarketUser         string `json:"statusProxyMarketUser"`
 	StatusProxyMarketPassword     string `json:"statusProxyMarketPassword"`
 	StatusProxyBlockchainUser     string `json:"statusProxyBlockchainUser"`
