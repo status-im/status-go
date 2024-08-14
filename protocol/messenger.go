@@ -89,7 +89,7 @@ var (
 	ErrChatNotFoundError = errors.New("Chat not found")
 )
 
-var communityAdvertiseIntervalSecond int64 = 60 * 60
+const communityAdvertiseIntervalSecond int64 = 24 * 60 * 60
 
 // messageCacheIntervalMs is how long we should keep processed messages in the cache, in ms
 var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
