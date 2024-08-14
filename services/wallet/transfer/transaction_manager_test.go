@@ -280,7 +280,7 @@ func TestBuildTransaction(t *testing.T) {
 	}
 
 	expectedTx := gethtypes.NewTransaction(nonce, common.Address(*sendArgs.To), sendArgs.Value.ToInt(), gas, sendArgs.GasPrice.ToInt(), nil)
-	transactor.EXPECT().ValidateAndBuildTransaction(chainID, sendArgs, int64(-1)).Return(expectedTx, uint64(0), nil)
+	transactor.EXPECT().ValidateAndBuildTransaction(chainID, sendArgs).Return(expectedTx, nil)
 
 	response, err := manager.BuildTransaction(chainID, sendArgs)
 	require.NoError(t, err)
@@ -334,7 +334,7 @@ func TestBuildTransaction_InvalidSendTxArgs(t *testing.T) {
 	}
 
 	expectedErr := fmt.Errorf("invalid SendTxArgs")
-	transactor.EXPECT().ValidateAndBuildTransaction(chainID, sendArgs, int64(-1)).Return(nil, uint64(0), expectedErr)
+	transactor.EXPECT().ValidateAndBuildTransaction(chainID, sendArgs).Return(nil, expectedErr)
 	tx, err := manager.BuildTransaction(chainID, sendArgs)
 	require.Equal(t, expectedErr, err)
 	require.Nil(t, tx)

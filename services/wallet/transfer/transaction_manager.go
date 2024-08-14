@@ -182,7 +182,7 @@ func (tm *TransactionManager) BuildTransaction(chainID uint64, sendArgs transact
 		return nil, err
 	}
 
-	txBeingSigned, _, err := tm.transactor.ValidateAndBuildTransaction(chainID, sendArgs, -1)
+	txBeingSigned, err := tm.transactor.ValidateAndBuildTransaction(chainID, sendArgs)
 	if err != nil {
 		return nil, err
 	}

@@ -207,7 +207,7 @@ func (s *TransactorSuite) TestGasValues() {
 			}
 			s.setupTransactionPoolAPI(args, testNonce, testNonce, selectedAccount, nil)
 
-			hash, _, err := s.manager.SendTransaction(args, selectedAccount, -1)
+			hash, err := s.manager.SendTransaction(args, selectedAccount)
 			s.NoError(err)
 			s.False(reflect.DeepEqual(hash, common.Hash{}))
 		})
@@ -256,7 +256,7 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 		}
 		s.setupBuildTransactionMocks(args, selectedAccount)
 
-		tx, _, err := s.manager.ValidateAndBuildTransaction(chainID, args, -1)
+		tx, err := s.manager.ValidateAndBuildTransaction(chainID, args)
 		s.NoError(err)
 		s.Equal(tx.Gas(), uint64(gas), "The gas shouldn't be estimated, but should use the gas from the Tx")
 		s.Equal(tx.GasFeeCap(), expectedGasPrice, "The maxFeePerGas should be the same as in the original Tx")
@@ -275,7 +275,7 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 		}
 		s.setupBuildTransactionMocks(args, selectedAccount)
 
-		tx, _, err := s.manager.ValidateAndBuildTransaction(chainID, args, -1)
+		tx, err := s.manager.ValidateAndBuildTransaction(chainID, args)
 		s.NoError(err)
 		s.Equal(tx.Gas(), expectedGas, "The gas should be estimated if not present in the original Tx")
 		s.Equal(tx.Nonce(), expectedNonce, "The nonce should be added if not present in the original Tx")
@@ -298,7 +298,7 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 		}
 		s.setupBuildTransactionMocks(args, selectedAccount)
 
-		tx, _, err := s.manager.ValidateAndBuildTransaction(chainID, args, -1)
+		tx, err := s.manager.ValidateAndBuildTransaction(chainID, args)
 		s.NoError(err)
 		s.Equal(tx.Gas(), uint64(gas), "The gas shouldn't be estimated, but should use the gas from the Tx")
 		s.Equal(tx.GasPrice(), expectedGasPrice, "The gasPrice should be the same as in the original Tx")
@@ -314,7 +314,7 @@ func (s *TransactorSuite) TestBuildAndValidateTransaction() {
 		}
 		s.setupBuildTransactionMocks(args, selectedAccount)
 
-		tx, _, err := s.manager.ValidateAndBuildTransaction(chainID, args, -1)
+		tx, err := s.manager.ValidateAndBuildTransaction(chainID, args)
 		s.NoError(err)
 		s.Equal(tx.Gas(), expectedGas, "The gas should be estimated if not present in the original Tx")
 		s.Equal(tx.GasPrice(), expectedGasPrice, "The gasPrice should be estimated if not present in the original Tx")
@@ -333,7 +333,7 @@ func (s *TransactorSuite) TestArgsValidation() {
 	selectedAccount := &account.SelectedExtKey{
 		Address: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
 	}
-	_, _, err := s.manager.SendTransaction(args, selectedAccount, -1)
+	_, err := s.manager.SendTransaction(args, selectedAccount)
 	s.EqualError(err, ErrInvalidSendTxArgs.Error())
 }
 
@@ -346,14 +346,14 @@ func (s *TransactorSuite) TestAccountMismatch() {
 	var err error
 
 	// missing account
-	_, _, err = s.manager.SendTransaction(args, nil, -1)
+	_, err = s.manager.SendTransaction(args, nil)
 	s.EqualError(err, account.ErrNoAccountSelected.Error())
 
 	// mismatched accounts
 	selectedAccount := &account.SelectedExtKey{
 		Address: account.FromAddress(utils.TestConfig.Account2.WalletAddress),
 	}
-	_, _, err = s.manager.SendTransaction(args, selectedAccount, -1)
+	_, err = s.manager.SendTransaction(args, selectedAccount)
 	s.EqualError(err, ErrInvalidTxSender.Error())
 }
 

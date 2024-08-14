@@ -8,9 +8,10 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "github.com/golang/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
-	gomock "github.com/golang/mock/gomock"
 	account "github.com/status-im/status-go/account"
 	types0 "github.com/status-im/status-go/eth-node/types"
 	pathprocessor "github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -55,19 +56,33 @@ func (mr *MockPathProcessorMockRecorder) AvailableFor(params interface{}) *gomoc
 }
 
 // BuildTransaction mocks base method.
-func (m *MockPathProcessor) BuildTransaction(sendArgs *pathprocessor.MultipathProcessorTxArgs, lastUsedNonce int64) (*types.Transaction, uint64, error) {
+func (m *MockPathProcessor) BuildTransaction(sendArgs *pathprocessor.MultipathProcessorTxArgs) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BuildTransaction", sendArgs, lastUsedNonce)
+	ret := m.ctrl.Call(m, "BuildTransaction", sendArgs)
 	ret0, _ := ret[0].(*types.Transaction)
-	ret1, _ := ret[1].(uint64)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // BuildTransaction indicates an expected call of BuildTransaction.
-func (mr *MockPathProcessorMockRecorder) BuildTransaction(sendArgs, lastUsedNonce interface{}) *gomock.Call {
+func (mr *MockPathProcessorMockRecorder) BuildTransaction(sendArgs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildTransaction", reflect.TypeOf((*MockPathProcessor)(nil).BuildTransaction), sendArgs, lastUsedNonce)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildTransaction", reflect.TypeOf((*MockPathProcessor)(nil).BuildTransaction), sendArgs)
+}
+
+// BuildTx mocks base method.
+func (m *MockPathProcessor) BuildTx(params pathprocessor.ProcessorInputParams) (*types.Transaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BuildTx", params)
+	ret0, _ := ret[0].(*types.Transaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BuildTx indicates an expected call of BuildTx.
+func (mr *MockPathProcessorMockRecorder) BuildTx(params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildTx", reflect.TypeOf((*MockPathProcessor)(nil).BuildTx), params)
 }
 
 // CalculateAmountOut mocks base method.
@@ -99,6 +114,18 @@ func (m *MockPathProcessor) CalculateFees(params pathprocessor.ProcessorInputPar
 func (mr *MockPathProcessorMockRecorder) CalculateFees(params interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateFees", reflect.TypeOf((*MockPathProcessor)(nil).CalculateFees), params)
+}
+
+// Clear mocks base method.
+func (m *MockPathProcessor) Clear() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Clear")
+}
+
+// Clear indicates an expected call of Clear.
+func (mr *MockPathProcessorMockRecorder) Clear() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clear", reflect.TypeOf((*MockPathProcessor)(nil).Clear))
 }
 
 // EstimateGas mocks base method.
@@ -161,52 +188,16 @@ func (mr *MockPathProcessorMockRecorder) PackTxInputData(params interface{}) *go
 }
 
 // Send mocks base method.
-func (m *MockPathProcessor) Send(sendArgs *pathprocessor.MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types0.Hash, uint64, error) {
+func (m *MockPathProcessor) Send(sendArgs *pathprocessor.MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types0.Hash, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Send", sendArgs, lastUsedNonce, verifiedAccount)
+	ret := m.ctrl.Call(m, "Send", sendArgs, verifiedAccount)
 	ret0, _ := ret[0].(types0.Hash)
-	ret1, _ := ret[1].(uint64)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Send indicates an expected call of Send.
-func (mr *MockPathProcessorMockRecorder) Send(sendArgs, lastUsedNonce, verifiedAccount interface{}) *gomock.Call {
+func (mr *MockPathProcessorMockRecorder) Send(sendArgs, verifiedAccount interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockPathProcessor)(nil).Send), sendArgs, lastUsedNonce, verifiedAccount)
-}
-
-// MockPathProcessorClearable is a mock of PathProcessorClearable interface.
-type MockPathProcessorClearable struct {
-	ctrl     *gomock.Controller
-	recorder *MockPathProcessorClearableMockRecorder
-}
-
-// MockPathProcessorClearableMockRecorder is the mock recorder for MockPathProcessorClearable.
-type MockPathProcessorClearableMockRecorder struct {
-	mock *MockPathProcessorClearable
-}
-
-// NewMockPathProcessorClearable creates a new mock instance.
-func NewMockPathProcessorClearable(ctrl *gomock.Controller) *MockPathProcessorClearable {
-	mock := &MockPathProcessorClearable{ctrl: ctrl}
-	mock.recorder = &MockPathProcessorClearableMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockPathProcessorClearable) EXPECT() *MockPathProcessorClearableMockRecorder {
-	return m.recorder
-}
-
-// Clear mocks base method.
-func (m *MockPathProcessorClearable) Clear() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Clear")
-}
-
-// Clear indicates an expected call of Clear.
-func (mr *MockPathProcessorClearableMockRecorder) Clear() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clear", reflect.TypeOf((*MockPathProcessorClearable)(nil).Clear))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockPathProcessor)(nil).Send), sendArgs, verifiedAccount)
 }

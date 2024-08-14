@@ -209,6 +209,27 @@ func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) 
 	return
 }
 
+func (s *SwapParaswapProcessor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
+	toAddr := types.Address(params.ToAddr)
+	sendArgs := &MultipathProcessorTxArgs{
+		SwapTx: &SwapParaswapTxArgs{
+			SendTxArgs: transactions.SendTxArgs{
+				From:   types.Address(params.FromAddr),
+				To:     &toAddr,
+				Value:  (*hexutil.Big)(params.AmountIn),
+				Data:   types.HexBytes("0x0"),
+				Symbol: params.FromToken.Symbol,
+			},
+			ChainID:     params.FromChain.ChainID,
+			ChainIDTo:   params.ToChain.ChainID,
+			TokenIDFrom: params.FromToken.Symbol,
+			TokenIDTo:   params.ToToken.Symbol,
+		},
+	}
+
+	return s.BuildTransaction(sendArgs)
+}
+
 func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {
 	slippageBP := uint(sendArgs.SwapTx.SlippagePercentage * 100) // convert to basis points
 
@@ -255,21 +276,21 @@ func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorT
 	return nil
 }
 
-func (s *SwapParaswapProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+func (s *SwapParaswapProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
 	err := s.prepareTransaction(sendArgs)
 	if err != nil {
-		return nil, 0, createSwapParaswapErrorResponse(err)
+		return nil, createSwapParaswapErrorResponse(err)
 	}
-	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs, lastUsedNonce)
+	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs)
 }
 
-func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types.Hash, uint64, error) {
+func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
 	err := s.prepareTransaction(sendArgs)
 	if err != nil {
-		return types.Hash{}, 0, createSwapParaswapErrorResponse(err)
+		return types.Hash{}, createSwapParaswapErrorResponse(err)
 	}
 
-	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs, lastUsedNonce, verifiedAccount)
+	return s.transactor.SendTransactionWithChainID(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs, verifiedAccount)
 }
 
 func (s *SwapParaswapProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {

@@ -145,7 +145,33 @@ func (s *ERC721Processor) EstimateGas(params ProcessorInputParams) (uint64, erro
 	return uint64(increasedEstimation), nil
 }
 
-func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
+func (s *ERC721Processor) BuildTx(params ProcessorInputParams) (*ethTypes.Transaction, error) {
+	contractAddress := types.Address(params.FromToken.Address)
+
+	// We store ERC721 Token ID using big.Int.String() in token.Symbol
+	tokenID, success := new(big.Int).SetString(params.FromToken.Symbol, 10)
+	if !success {
+		return nil, createERC721ErrorResponse(fmt.Errorf("failed to convert ERC721's Symbol %s to big.Int", params.FromToken.Symbol))
+	}
+
+	sendArgs := &MultipathProcessorTxArgs{
+		ERC721TransferTx: &ERC721TxArgs{
+			SendTxArgs: transactions.SendTxArgs{
+				From:  types.Address(params.FromAddr),
+				To:    &contractAddress,
+				Value: (*hexutil.Big)(params.AmountIn),
+				Data:  types.HexBytes("0x0"),
+			},
+			TokenID:   (*hexutil.Big)(tokenID),
+			Recipient: params.ToAddr,
+		},
+		ChainID: params.FromChain.ChainID,
+	}
+
+	return s.BuildTransaction(sendArgs)
+}
+
+func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
 	from := common.Address(sendArgs.ERC721TransferTx.From)
 
 	useSafeTransferFrom := true
@@ -171,14 +197,9 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 		return tx, createERC721ErrorResponse(err)
 	}
 
-	var nonce uint64
-	if lastUsedNonce < 0 {
-		nonce, err = s.transactor.NextNonce(s.rpcClient, sendArgs.ChainID, sendArgs.ERC721TransferTx.From)
-		if err != nil {
-			return tx, createERC721ErrorResponse(err)
-		}
-	} else {
-		nonce = uint64(lastUsedNonce) + 1
+	nonce, err := s.transactor.NextNonce(s.rpcClient, sendArgs.ChainID, sendArgs.ERC721TransferTx.From)
+	if err != nil {
+		return tx, createERC721ErrorResponse(err)
 	}
 
 	argNonce := hexutil.Uint64(nonce)
@@ -203,17 +224,16 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 	return tx, nil
 }
 
-func (s *ERC721Processor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
-	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount), lastUsedNonce)
+func (s *ERC721Processor) Send(sendArgs *MultipathProcessorTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount))
 	if err != nil {
-		return hash, 0, createERC721ErrorResponse(err)
+		return hash, createERC721ErrorResponse(err)
 	}
-	return types.Hash(tx.Hash()), tx.Nonce(), nil
+	return types.Hash(tx.Hash()), nil
 }
 
-func (s *ERC721Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
-	tx, err := s.sendOrBuild(sendArgs, nil, lastUsedNonce)
-	return tx, tx.Nonce(), err
+func (s *ERC721Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs) (*ethTypes.Transaction, error) {
+	return s.sendOrBuild(sendArgs, nil)
 }
 
 func (s *ERC721Processor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {

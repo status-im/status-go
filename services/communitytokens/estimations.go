@@ -388,7 +388,7 @@ func (s *Service) suggestedFeesToSendTxArgs(from common.Address, to *common.Addr
 }
 
 func (s *Service) estimateL1Fee(ctx context.Context, chainID uint64, sendArgs transactions.SendTxArgs) (uint64, error) {
-	transaction, _, err := s.transactor.ValidateAndBuildTransaction(chainID, sendArgs, -1)
+	transaction, err := s.transactor.ValidateAndBuildTransaction(chainID, sendArgs)
 	if err != nil {
 		return 0, err
 	}

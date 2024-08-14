@@ -8,9 +8,10 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "github.com/golang/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
-	gomock "github.com/golang/mock/gomock"
 	account "github.com/status-im/status-go/account"
 	types0 "github.com/status-im/status-go/eth-node/types"
 	params "github.com/status-im/status-go/params"
@@ -117,35 +118,33 @@ func (mr *MockTransactorIfaceMockRecorder) SendRawTransaction(chainID, rawTx int
 }
 
 // SendTransaction mocks base method.
-func (m *MockTransactorIface) SendTransaction(sendArgs transactions.SendTxArgs, verifiedAccount *account.SelectedExtKey, lastUsedNonce int64) (types0.Hash, uint64, error) {
+func (m *MockTransactorIface) SendTransaction(sendArgs transactions.SendTxArgs, verifiedAccount *account.SelectedExtKey) (types0.Hash, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendTransaction", sendArgs, verifiedAccount, lastUsedNonce)
+	ret := m.ctrl.Call(m, "SendTransaction", sendArgs, verifiedAccount)
 	ret0, _ := ret[0].(types0.Hash)
-	ret1, _ := ret[1].(uint64)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SendTransaction indicates an expected call of SendTransaction.
-func (mr *MockTransactorIfaceMockRecorder) SendTransaction(sendArgs, verifiedAccount, lastUsedNonce interface{}) *gomock.Call {
+func (mr *MockTransactorIfaceMockRecorder) SendTransaction(sendArgs, verifiedAccount interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendTransaction", reflect.TypeOf((*MockTransactorIface)(nil).SendTransaction), sendArgs, verifiedAccount, lastUsedNonce)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendTransaction", reflect.TypeOf((*MockTransactorIface)(nil).SendTransaction), sendArgs, verifiedAccount)
 }
 
 // SendTransactionWithChainID mocks base method.
-func (m *MockTransactorIface) SendTransactionWithChainID(chainID uint64, sendArgs transactions.SendTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types0.Hash, uint64, error) {
+func (m *MockTransactorIface) SendTransactionWithChainID(chainID uint64, sendArgs transactions.SendTxArgs, verifiedAccount *account.SelectedExtKey) (types0.Hash, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendTransactionWithChainID", chainID, sendArgs, lastUsedNonce, verifiedAccount)
+	ret := m.ctrl.Call(m, "SendTransactionWithChainID", chainID, sendArgs, verifiedAccount)
 	ret0, _ := ret[0].(types0.Hash)
-	ret1, _ := ret[1].(uint64)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SendTransactionWithChainID indicates an expected call of SendTransactionWithChainID.
-func (mr *MockTransactorIfaceMockRecorder) SendTransactionWithChainID(chainID, sendArgs, lastUsedNonce, verifiedAccount interface{}) *gomock.Call {
+func (mr *MockTransactorIfaceMockRecorder) SendTransactionWithChainID(chainID, sendArgs, verifiedAccount interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendTransactionWithChainID", reflect.TypeOf((*MockTransactorIface)(nil).SendTransactionWithChainID), chainID, sendArgs, lastUsedNonce, verifiedAccount)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendTransactionWithChainID", reflect.TypeOf((*MockTransactorIface)(nil).SendTransactionWithChainID), chainID, sendArgs, verifiedAccount)
 }
 
 // SendTransactionWithSignature mocks base method.
@@ -178,17 +177,16 @@ func (mr *MockTransactorIfaceMockRecorder) StoreAndTrackPendingTx(from, symbol, 
 }
 
 // ValidateAndBuildTransaction mocks base method.
-func (m *MockTransactorIface) ValidateAndBuildTransaction(chainID uint64, sendArgs transactions.SendTxArgs, lastUsedNonce int64) (*types.Transaction, uint64, error) {
+func (m *MockTransactorIface) ValidateAndBuildTransaction(chainID uint64, sendArgs transactions.SendTxArgs) (*types.Transaction, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ValidateAndBuildTransaction", chainID, sendArgs, lastUsedNonce)
+	ret := m.ctrl.Call(m, "ValidateAndBuildTransaction", chainID, sendArgs)
 	ret0, _ := ret[0].(*types.Transaction)
-	ret1, _ := ret[1].(uint64)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // ValidateAndBuildTransaction indicates an expected call of ValidateAndBuildTransaction.
-func (mr *MockTransactorIfaceMockRecorder) ValidateAndBuildTransaction(chainID, sendArgs, lastUsedNonce interface{}) *gomock.Call {
+func (mr *MockTransactorIfaceMockRecorder) ValidateAndBuildTransaction(chainID, sendArgs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateAndBuildTransaction", reflect.TypeOf((*MockTransactorIface)(nil).ValidateAndBuildTransaction), chainID, sendArgs, lastUsedNonce)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateAndBuildTransaction", reflect.TypeOf((*MockTransactorIface)(nil).ValidateAndBuildTransaction), chainID, sendArgs)
 }
