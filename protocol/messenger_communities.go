@@ -301,26 +301,12 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	// We check every 5 minutes if we need to publish
 	ticker := time.NewTicker(5 * time.Minute)
 
-	recentlyPublishedOrgs := func() map[string]*communities.Community {
-		result := make(map[string]*communities.Community)
-
-		controlledCommunities, err := m.communitiesManager.Controlled()
-		if err != nil {
-			m.logger.Warn("failed to retrieve orgs", zap.Error(err))
-			return result
-		}
-
-		for _, org := range controlledCommunities {
-			result[org.IDString()] = org
-		}
-
-		return result
-	}()
+	recentlyPublishedOrgs := make(map[string]*communities.Community, 0)
 
 	publishOrgAndDistributeEncryptionKeys := func(community *communities.Community) {
 		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
 
-		if recentlyPublishedOrg != nil && community.Clock() <= recentlyPublishedOrg.Clock() {
+		if recentlyPublishedOrg != nil && community.Clock() < recentlyPublishedOrg.Clock() {
 			return
 		}
 
