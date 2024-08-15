@@ -973,9 +973,10 @@ func (c *ClientWithFallback) toggleConnectionState(err error) {
 	connected := true
 	if err != nil {
 		if !isVMError(err) && !errors.Is(err, ErrRequestsOverLimit) && !errors.Is(err, context.Canceled) {
+			log.Warn("error not in chain call", "error", err, "chain-id", c.ChainID)
 			connected = false
 		} else {
-			log.Warn("Error in chain call", "error", err)
+			log.Warn("Error in chain call", "error", err, "chain-id", c.ChainID)
 		}
 	}
 	c.SetIsConnected(connected)
