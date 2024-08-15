@@ -838,12 +838,12 @@ func (m *Messenger) CheckCommunitiesToUnmute() (*MessengerResponse, error) {
 	m.logger.Debug("watching communities to unmute")
 	response := &MessengerResponse{}
 	communities, err := m.communitiesManager.All()
+	currTime := time.Now()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get all communities: %v", err)
 	}
 	for _, community := range communities {
-		communityMuteTill := community.MuteTill().Truncate(time.Second)
-		currTime := time.Now().Truncate(time.Second)
+		communityMuteTill := community.MuteTill()
 
 		if currTime.After(communityMuteTill) && !communityMuteTill.Equal(time.Time{}) && community.Muted() {
 			err := m.communitiesManager.SetMuted(community.ID(), false)
