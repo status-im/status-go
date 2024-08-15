@@ -62,6 +62,11 @@ pipeline {
     REPO_SRC    = "${GOPATH}/src/github.com/status-im/status-go"
     BASE_BRANCH = "${env.CHANGE_TARGET}"
 
+    NWAKU_CONT  = "status-go-test-nwaku-${env.EXECUTOR_NUMBER.toInteger() + 1}"
+    NWAKU_TCP_PORT  = "${60000 + env.EXECUTOR_NUMBER.toInteger()}"
+    NWAKU_UDP_PORT  = "${9000 + env.EXECUTOR_NUMBER.toInteger()}"
+    NWAKU_REST_PORT = "${9645 + env.EXECUTOR_NUMBER.toInteger()}"
+
     /* Hack-fix for params not being set in env on first job run. */
     UNIT_TEST_FAILFAST =               "${params.UNIT_TEST_FAILFAST}"
     UNIT_TEST_RERUN_FAILS =            "${params.UNIT_TEST_RERUN_FAILS}"
@@ -121,28 +126,51 @@ pipeline {
     stage('Unit Tests') {
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"
+        NWAKU_REST_PORT = "${env.NWAKU_REST_PORT}"
       }
       steps { script {
+        def ipAddress = sh(script: "hostname -I | awk '{print \$1}'", returnStdout: true).trim()
         db = docker.image('postgres:9.6-alpine').withRun([
           "--name=${DB_CONT}",
           "--env=POSTGRES_HOST_AUTH_METHOD=trust",
           "--publish=${DB_PORT}:${DB_PORT}",
         ].join(' '), "-p ${DB_PORT}") { c ->
-          nix.shell('make generate-handlers', pure: true)
-          withCredentials([
-            string(
-              credentialsId: 'codeclimate-test-reporter-id',
-              variable: 'CC_TEST_REPORTER_ID'
-            ),
-          ]) {
-            nix.shell('make test-unit V=1', pure: false)
+          nwaku = docker.image('harbor.status.im/wakuorg/nwaku:latest').withRun([
+            "--name=${NWAKU_CONT}",
+            "--publish=${NWAKU_TCP_PORT}:${NWAKU_TCP_PORT}/tcp",
+            "--publish=${NWAKU_UDP_PORT}:${NWAKU_UDP_PORT}/udp",
+            "--publish=${NWAKU_REST_PORT}:8645/tcp"
+          ].join(' '), [
+            "--tcp-port=${NWAKU_TCP_PORT}",
+            "--discv5-discovery=true",
+            "--cluster-id=16",
+            "--pubsub-topic=/waku/2/rs/16/32",
+            "--pubsub-topic=/waku/2/rs/16/64",
+            "--nat=extip:${ipAddress}",
+            "--discv5-discovery",
+            "--discv5-udp-port=${NWAKU_UDP_PORT}",
+            "--rest-address=0.0.0.0",
+            "--store",
+            "--filter",
+            "--lightpush"
+          ].join(' ')) { c2 ->
+            nix.shell('make generate-handlers', pure: true)
+            withCredentials([
+              string(
+                credentialsId: 'codeclimate-test-reporter-id',
+                variable: 'CC_TEST_REPORTER_ID'
+              ),
+            ]) {
+              nix.shell('make test-unit V=1', pure: false)
+            }
+            sh "mv c.out test-coverage.out"
+            archiveArtifacts('test-coverage.out, coverage/codeclimate.json, test-coverage.html')
           }
-          sh "mv c.out test-coverage.out"
-          archiveArtifacts('test-coverage.out, coverage/codeclimate.json, test-coverage.html')
         }
       } }
       post { cleanup { /* Leftover DB containers. */
         sh "docker rm ${DB_CONT} || true"
+        sh "docker rm ${NWAKU_CONT} || true"
       } }
     }
   } // stages
