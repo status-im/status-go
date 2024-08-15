@@ -98,6 +98,10 @@ func (c *ClientSideHandler) RequestShareAccountForDApp(dApp signal.ConnectorDApp
 }
 
 func (c *ClientSideHandler) RequestAccountsAccepted(args RequestAccountsAcceptedArgs) error {
+	if args.RequestID == "" {
+		return ErrEmptyRequestID
+	}
+
 	c.responseChannel <- Message{Type: RequestAccountsAccepted, Data: args}
 	return nil
 }

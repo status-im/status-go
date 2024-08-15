@@ -36,8 +36,8 @@ func NewAPI(s *Service) *API {
 	// Accounts query and dapp permissions
 	// NOTE: Some dApps expect same behavior for both eth_accounts and eth_requestAccounts
 	accountsCommand := &commands.RequestAccountsCommand{
-		ClientHandler:   c,
-		AccountsCommand: commands.AccountsCommand{Db: s.db},
+		ClientHandler: c,
+		Db:            s.db,
 	}
 	r.Register("eth_accounts", accountsCommand)
 	r.Register("eth_requestAccounts", accountsCommand)
@@ -109,6 +109,7 @@ func (api *API) CallRPC(inputJSON string) (interface{}, error) {
 }
 
 func (api *API) RecallDAppPermission(origin string) error {
+	// TODO: close the websocket connection
 	return persistence.DeleteDApp(api.s.db, origin)
 }
 

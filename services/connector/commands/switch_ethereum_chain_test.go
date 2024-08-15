@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/signal"
 )
 
 func TestFailToSwitchEthereumChainWithMissingDAppFields(t *testing.T) {
@@ -67,7 +69,7 @@ func TestFailToSwitchEthereumChainWithUnsupportedChainId(t *testing.T) {
 	assert.Equal(t, ErrUnsupportedNetwork, err)
 }
 
-func TestSwitchEthereumChain(t *testing.T) {
+func TestSwitchEthereumChainSuccess(t *testing.T) {
 	db, close := SetupTestDB(t)
 	defer close()
 
@@ -80,6 +82,26 @@ func TestSwitchEthereumChain(t *testing.T) {
 			ChainID: walletCommon.EthereumGoerli,
 		},
 	})
+
+	chainId := fmt.Sprintf(`0x%s`, walletCommon.ChainID(walletCommon.EthereumMainnet).String())
+	chainIdSwitched := false
+
+	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+		var evt EventType
+		err := json.Unmarshal(s, &evt)
+		assert.NoError(t, err)
+
+		switch evt.Type {
+		case signal.EventConnectorDAppChainIdSwitched:
+			var ev signal.ConnectorDAppChainIdSwitchedSignal
+			err := json.Unmarshal(evt.Event, &ev)
+			assert.NoError(t, err)
+
+			assert.Equal(t, chainId, ev.ChainId)
+			assert.Equal(t, testDAppData.URL, ev.URL)
+			chainIdSwitched = true
+		}
+	}))
 
 	cmd := &SwitchEthereumChainCommand{
 		Db:             db,
@@ -99,6 +121,6 @@ func TestSwitchEthereumChain(t *testing.T) {
 
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
-	chainId := fmt.Sprintf(`0x%s`, walletCommon.ChainID(walletCommon.EthereumMainnet).String())
 	assert.Equal(t, chainId, response)
+	assert.True(t, chainIdSwitched)
 }

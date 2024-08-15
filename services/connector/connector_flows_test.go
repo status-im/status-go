@@ -172,3 +172,72 @@ func TestForwardedRPCs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 }
+
+func TestRequestAccountsAfterPermisasionsRevokeTest(t *testing.T) {
+	db, close := createDB(t)
+	defer close()
+
+	nm := commands.NetworkManagerMock{}
+	nm.SetNetworks([]*params.Network{
+		{
+			ChainID: walletCommon.EthereumMainnet,
+			Layer:   1,
+		},
+		{
+			ChainID: walletCommon.OptimismMainnet,
+			Layer:   1,
+		},
+	})
+	rpc := commands.RPCClientMock{}
+
+	service := NewService(db, &rpc, &nm)
+
+	api := NewAPI(service)
+
+	accountAddress := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
+	dAppPermissionRevoked := false
+	dAppPermissionGranted := false
+
+	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
+		var evt commands.EventType
+		err := json.Unmarshal(s, &evt)
+		assert.NoError(t, err)
+
+		switch evt.Type {
+		case signal.EventConnectorDAppPermissionRevoked:
+			dAppPermissionRevoked = true
+		case signal.EventConnectorDAppPermissionGranted:
+			dAppPermissionGranted = true
+		case signal.EventConnectorSendRequestAccounts:
+			var ev signal.ConnectorSendRequestAccountsSignal
+			err := json.Unmarshal(evt.Event, &ev)
+			assert.NoError(t, err)
+
+			err = api.RequestAccountsAccepted(commands.RequestAccountsAcceptedArgs{
+				RequestID: ev.RequestID,
+				Account:   accountAddress,
+				ChainID:   0x1,
+			})
+			assert.NoError(t, err)
+		}
+	}))
+
+	for range [10]int{} {
+		dAppPermissionRevoked = false
+		dAppPermissionGranted = false
+
+		// Request accounts
+		request := "{\"method\": \"eth_requestAccounts\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
+		response, err := api.CallRPC(request)
+		assert.NoError(t, err)
+		assert.Equal(t, commands.FormatAccountAddressToResponse(accountAddress), response)
+		assert.Equal(t, true, dAppPermissionGranted)
+		assert.Equal(t, false, dAppPermissionRevoked)
+
+		// Revoke permissions
+		request = "{\"method\": \"wallet_revokePermissions\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
+		_, err = api.CallRPC(request)
+		assert.NoError(t, err)
+		assert.Equal(t, true, dAppPermissionRevoked)
+	}
+}

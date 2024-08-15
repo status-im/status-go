@@ -6,6 +6,7 @@ const (
 	EventConnectorPersonalSign          = "connector.personalSign"
 	EventConnectorDAppPermissionGranted = "connector.dAppPermissionGranted"
 	EventConnectorDAppPermissionRevoked = "connector.dAppPermissionRevoked"
+	EventConnectorDAppChainIdSwitched   = "connector.dAppChainIdSwitched"
 )
 
 type ConnectorDApp struct {
@@ -33,6 +34,11 @@ type ConnectorPersonalSignSignal struct {
 	RequestID string `json:"requestId"`
 	Challenge string `json:"challenge"`
 	Address   string `json:"address"`
+}
+
+type ConnectorDAppChainIdSwitchedSignal struct {
+	URL     string `json:"url"`
+	ChainId string `json:"chainId"`
 }
 
 func SendConnectorSendRequestAccounts(dApp ConnectorDApp, requestID string) {
@@ -66,4 +72,8 @@ func SendConnectorDAppPermissionGranted(dApp ConnectorDApp) {
 
 func SendConnectorDAppPermissionRevoked(dApp ConnectorDApp) {
 	send(EventConnectorDAppPermissionRevoked, dApp)
+}
+
+func SendConnectorDAppChainIdSwitched(payload ConnectorDAppChainIdSwitchedSignal) {
+	send(EventConnectorDAppChainIdSwitched, payload)
 }
