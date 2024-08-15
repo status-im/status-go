@@ -193,9 +193,9 @@ func (s *Scheduler) Stop() {
 	for pair := s.queue.Oldest(); pair != nil; pair = pair.Next() {
 		// Notify the queued one that they are canceled
 		if pair.Value.policy == ReplacementPolicyCancelOld {
-			go func() {
-				pair.Value.resFn(nil, pair.Value.taskType, context.Canceled)
-			}()
+			go func(val *taskContext) {
+				val.resFn(nil, val.taskType, context.Canceled)
+			}(pair.Value)
 		}
 		s.queue.Delete(pair.Value.taskType)
 	}
