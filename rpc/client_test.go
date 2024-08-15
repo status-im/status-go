@@ -198,6 +198,6 @@ func TestGetClientsUsingCache(t *testing.T) {
 }
 
 func TestUserAgent(t *testing.T) {
-	require.Equal(t, "procuratee-desktop/1.0", rpcUserAgentName)
-	require.Equal(t, "procuratee-desktop-upstream/1.0", rpcUserAgentUpstreamName)
+	require.Equal(t, "procuratee-desktop/", rpcUserAgentName)
+	require.Equal(t, "procuratee-desktop-upstream/", rpcUserAgentUpstreamName)
 }

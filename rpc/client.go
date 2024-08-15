@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
+	appCommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
@@ -35,13 +35,16 @@ const (
 	providerInfura      = "infura"
 	ProviderStatusProxy = "status-proxy"
 
+	mobile  = "mobile"
+	desktop = "desktop"
+
 	// rpcUserAgentFormat 'procurator': *an agent representing others*, aka a "proxy"
 	// allows for the rpc client to have a dedicated user agent, which is useful for the proxy server logs.
-	rpcUserAgentFormat = "procuratee-%s/1.0"
+	rpcUserAgentFormat = "procuratee-%s/%s"
 
 	// rpcUserAgentUpstreamFormat a separate user agent format for upstream, because we should not be using upstream
 	// if we see this user agent in the logs that means parts of the application are using a malconfigured http client
-	rpcUserAgentUpstreamFormat = "procuratee-%s-upstream/1.0"
+	rpcUserAgentUpstreamFormat = "procuratee-%s-upstream/%s"
 )
 
 // List of RPC client errors.
@@ -51,20 +54,17 @@ var (
 
 var (
 	// rpcUserAgentName the user agent
-	rpcUserAgentName         = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS")
-	rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, "no-GOOS")
+	rpcUserAgentName         = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS", params.Version)
+	rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, "no-GOOS", params.Version)
 )
 
 func init() {
-	switch runtime.GOOS {
-	case "android", "ios":
-		mobile := "mobile"
-		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, mobile)
-		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, mobile)
-	default:
-		desktop := "desktop"
-		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, desktop)
-		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, desktop)
+	if appCommon.IsMobilePlatform() {
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, mobile, params.Version)
+		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, mobile, params.Version)
+	} else {
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, desktop, params.Version)
+		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, desktop, params.Version)
 	}
 }
 
