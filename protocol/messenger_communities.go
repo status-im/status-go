@@ -1486,7 +1486,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	rawMessage := &common.RawMessage{
 		Payload:             payload,
 		CommunityID:         community.ID(),
-		ResendType:          common.ResendTypeRawMessage,
+		ResendType:          common.ResendTypeDataSync,
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
@@ -1498,8 +1498,10 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
-	if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
-		return nil, err
+	if rawMessage.ResendType == common.ResendTypeRawMessage {
+		if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
+			return nil, err
+		}
 	}
 
 	if !community.AutoAccept() {
@@ -1529,12 +1531,6 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		for _, member := range rawMessage.Recipients {
 			_, err := m.sender.SendPrivate(context.Background(), member, rawMessage)
 			if err != nil {
-				return nil, err
-			}
-		}
-
-		if len(rawMessage.Recipients) > 0 {
-			if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
 				return nil, err
 			}
 		}
@@ -3690,7 +3686,7 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
-		ResendType:          common.ResendTypeRawMessage,
+		ResendType:          common.ResendTypeDataSync,
 		ResendMethod:        common.ResendMethodSendPrivate,
 		Recipients:          []*ecdsa.PublicKey{receiver},
 	}
@@ -3703,8 +3699,6 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 	if err != nil {
 		return nil, err
 	}
-
-	_, err = m.AddRawMessageToWatch(&rawMessage)
 
 	return requestToJoin, err
 }
@@ -4874,6 +4868,7 @@ func (m *Messenger) SendMessageToControlNode(community *communities.Community, r
 		return m.sender.SendPrivate(context.Background(), community.ControlNode(), rawMessage)
 	}
 	rawMessage.ResendMethod = common.ResendMethodSendCommunityMessage
+	rawMessage.ResendType = common.ResendTypeRawMessage
 	// Note: There are multiple instances where SendMessageToControlNode is invoked throughout the codebase.
 	// Additionally, some callers may invoke SendPrivate before SendMessageToControlNode. This could potentially
 	// lead to a situation where the same raw message is sent using different methods, which, from a code perspective,
