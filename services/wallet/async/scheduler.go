@@ -116,8 +116,9 @@ func (s *Scheduler) Enqueue(taskType TaskType, taskFn taskFunction, resFn result
 				// if other task type is running
 				// notify the queued one that it is overwritten or ignored
 				if existingTask.policy == ReplacementPolicyCancelOld {
+					oldResFn := existingTask.resFn
 					go func() {
-						existingTask.resFn(nil, existingTask.taskType, ErrTaskOverwritten)
+						oldResFn(nil, existingTask.taskType, ErrTaskOverwritten)
 					}()
 					// Overwrite the queued one of the same type
 					existingTask.taskFn = taskFn
