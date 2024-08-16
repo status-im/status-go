@@ -15,6 +15,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/afex/hystrix-go/hystrix"
 	"github.com/pkg/errors"
 
 	"github.com/imdario/mergo"
@@ -2433,6 +2434,12 @@ func (b *GethStatusBackend) ConnectionChange(typ string, expensive bool) {
 	}
 
 	b.log.Info("Network state change", "old", b.connectionState, "new", state)
+
+	if b.connectionState.Offline && !state.Offline {
+		//  flush hystrix if we are going again online, since it doesn't behave
+		// well when offline
+		hystrix.Flush()
+	}
 
 	b.connectionState = state
 	b.statusNode.ConnectionChanged(state)
