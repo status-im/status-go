@@ -287,6 +287,7 @@ func TestScheduler_Enqueue_ValidateOrder(t *testing.T) {
 
 			if p.taskType.Policy == ReplacementPolicyCancelOld && ctx.Err() != nil && errors.Is(ctx.Err(), context.Canceled) {
 				taskCanceledChan <- p
+				t.Logf("task canceled, task seq: %d, task type: %+v", currentIndex, p.taskType)
 				return nil, ctx.Err()
 			}
 
@@ -295,13 +296,16 @@ func TestScheduler_Enqueue_ValidateOrder(t *testing.T) {
 				return nil, errors.New("test error")
 			}
 			taskSuccessChan <- p
+			t.Logf("task executed successfully, task seq: %d, task type: %+v", currentIndex, p.taskType)
 			return 10 * (currentIndex + 1), nil
 		}, func(res interface{}, taskType TaskType, err error) {
 			require.Equal(t, p.taskType, taskType)
 			resChan <- p
+			t.Logf("response invoked, task seq: %d, task type: %+v, result: %+v", currentIndex, taskType, res)
 		})
 
 		if ignored {
+			t.Logf("task ignored, task seq: %d, task type: %+v", currentIndex, p.taskType)
 			ignoredCount++
 		}
 
@@ -355,7 +359,7 @@ func TestScheduler_Enqueue_ValidateOrder(t *testing.T) {
 	require.Equal(t, 1, taskFailedCount[testTask3], "expected one task call for type: %d had %d", 3, taskSuccessCount[testTask3])
 
 	require.Equal(t, 2, resChanCount[testTask1], "expected two task call for type: %d had %d", 1, taskSuccessCount[testTask1])
-	require.Equal(t, 2, resChanCount[testTask2], "expected tow task call for type: %d had %d", 2, taskSuccessCount[testTask2])
+	require.Equal(t, 2, resChanCount[testTask2], "expected two task call for type: %d had %d", 2, taskSuccessCount[testTask2])
 	require.Equal(t, 1, resChanCount[testTask3], "expected one task call for type: %d had %d", 3, taskSuccessCount[testTask3])
 }
 
@@ -391,4 +395,35 @@ func TestScheduler_Enqueue_InResult(t *testing.T) {
 			require.Fail(t, "test not completed in time")
 		}
 	}
+}
+
+func TestScheduler_Enqueue_Quick_Stop(t *testing.T) {
+	scheduler := NewScheduler()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	longRunningTask := func(ctx context.Context) (interface{}, error) {
+		defer wg.Done()
+		select {
+		case <-ctx.Done():
+			// we should reach here rather than other condition branch as Stop() canceled the context quickly
+			return nil, ctx.Err()
+		case <-time.After(10 * time.Second):
+			return "task completed", nil
+		}
+	}
+
+	resFn := func(res interface{}, taskType TaskType, err error) {
+		require.Error(t, err)
+		require.ErrorIs(t, err, context.Canceled)
+		wg.Done()
+	}
+
+	scheduler.Enqueue(TaskType{ID: 1, Policy: ReplacementPolicyCancelOld}, longRunningTask, resFn)
+
+	require.NotPanics(t, func() {
+		scheduler.Stop()
+		wg.Wait()
+	})
 }
