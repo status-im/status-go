@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/afex/hystrix-go/hystrix"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 type FallbackFunc func() ([]any, error)
@@ -117,6 +118,8 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 			// Write to result only if success
 			if err == nil {
 				result = CommandResult{res: res}
+			} else {
+				log.Error("histrix-breaker error", "error", err)
 			}
 			return err
 		}, nil)
