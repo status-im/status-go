@@ -79,6 +79,8 @@ import (
 
 	node "github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+
+	telemetry "github.com/status-im/status-go/telemetry/common"
 )
 
 const messageQueueLimit = 1024
@@ -92,24 +94,6 @@ const allPeersKeepAliveInterval = 5 * time.Minute
 const peersToPublishForLightpush = 2
 const publishingLimiterRate = rate.Limit(2)
 const publishingLimitBurst = 4
-
-type SentEnvelope struct {
-	Envelope      *protocol.Envelope
-	PublishMethod PublishMethod
-}
-
-type ErrorSendingEnvelope struct {
-	Error        error
-	SentEnvelope SentEnvelope
-}
-
-type ITelemetryClient interface {
-	PushReceivedEnvelope(ctx context.Context, receivedEnvelope *protocol.Envelope)
-	PushSentEnvelope(ctx context.Context, sentEnvelope SentEnvelope)
-	PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvelope ErrorSendingEnvelope)
-	PushPeerCount(ctx context.Context, peerCount int)
-	PushPeerConnFailures(ctx context.Context, peerConnFailures map[string]int)
-}
 
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
@@ -181,12 +165,12 @@ type Waku struct {
 	onHistoricMessagesRequestFailed func([]byte, peer.ID, error)
 	onPeerStats                     func(types.ConnStatus)
 
-	statusTelemetryClient ITelemetryClient
+	statusTelemetryClient telemetry.ITelemetryClient
 
 	defaultShardInfo protocol.RelayShards
 }
 
-func (w *Waku) SetStatusTelemetryClient(client ITelemetryClient) {
+func (w *Waku) SetStatusTelemetryClient(client telemetry.ITelemetryClient) {
 	w.statusTelemetryClient = client
 }
 
@@ -509,16 +493,7 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
-func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
-	w.wg.Add(1)
-	defer w.wg.Done()
-
-	if telemetryServerURL == "" {
-		return
-	}
-
-	telemetry := NewBandwidthTelemetryClient(w.logger, telemetryServerURL)
-
+func (w *Waku) telemetryBandwidthStats() {
 	ticker := time.NewTicker(time.Second * 20)
 	defer ticker.Stop()
 
@@ -535,7 +510,7 @@ func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
 				w.bandwidthCounter.Reset()
 			}
 
-			go telemetry.PushProtocolStats(w.bandwidthCounter.GetBandwidthByProtocol())
+			w.statusTelemetryClient.PushProtocolStats(w.ctx, w.bandwidthCounter.GetBandwidthByProtocol())
 		}
 	}
 }
@@ -1107,7 +1082,10 @@ func (w *Waku) Start() error {
 		}
 	}()
 
-	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
+	if w.statusTelemetryClient != nil {
+		go w.telemetryBandwidthStats()
+	}
+
 	//TODO: commenting for now so that only fleet nodes are used.
 	//Need to uncomment once filter peer scoring etc is implemented.
 	go w.runPeerExchangeLoop()

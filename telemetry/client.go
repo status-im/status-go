@@ -12,41 +12,34 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/libp2p/go-libp2p/core/protocol"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
-	"github.com/status-im/status-go/wakuv2"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-)
 
-type TelemetryType string
+	telemetrytypes "github.com/status-im/telemetry/pkg/types"
+
+	telemetry "github.com/status-im/status-go/telemetry/common"
+)
 
 const (
-	ProtocolStatsMetric        TelemetryType = "ProtocolStats"
-	ReceivedEnvelopeMetric     TelemetryType = "ReceivedEnvelope"
-	SentEnvelopeMetric         TelemetryType = "SentEnvelope"
-	UpdateEnvelopeMetric       TelemetryType = "UpdateEnvelope"
-	ReceivedMessagesMetric     TelemetryType = "ReceivedMessages"
-	ErrorSendingEnvelopeMetric TelemetryType = "ErrorSendingEnvelope"
-	PeerCountMetric            TelemetryType = "PeerCount"
-	PeerConnFailuresMetric     TelemetryType = "PeerConnFailure"
-
 	MaxRetryCache = 5000
 )
-
-type TelemetryRequest struct {
-	Id            int              `json:"id"`
-	TelemetryType TelemetryType    `json:"telemetry_type"`
-	TelemetryData *json.RawMessage `json:"telemetry_data"`
-}
 
 func (c *Client) PushReceivedMessages(ctx context.Context, receivedMessages ReceivedMessages) {
 	c.processAndPushTelemetry(ctx, receivedMessages)
 }
 
-func (c *Client) PushSentEnvelope(ctx context.Context, sentEnvelope wakuv2.SentEnvelope) {
+func (c *Client) PushSentEnvelope(ctx context.Context, sentEnvelope telemetry.SentEnvelope) {
 	c.processAndPushTelemetry(ctx, sentEnvelope)
 }
 
@@ -54,8 +47,12 @@ func (c *Client) PushReceivedEnvelope(ctx context.Context, receivedEnvelope *v2p
 	c.processAndPushTelemetry(ctx, receivedEnvelope)
 }
 
-func (c *Client) PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvelope wakuv2.ErrorSendingEnvelope) {
+func (c *Client) PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvelope telemetry.ErrorSendingEnvelope) {
 	c.processAndPushTelemetry(ctx, errorSendingEnvelope)
+}
+
+func (c *Client) PushProtocolStats(ctx context.Context, stats telemetry.ProtocolStatsMap) {
+	c.processAndPushTelemetry(ctx, stats)
 }
 
 func (c *Client) PushPeerCount(ctx context.Context, peerCount int) {
@@ -93,6 +90,7 @@ type PeerConnFailure struct {
 }
 
 type Client struct {
+	telemetry.ITelemetryClient
 	serverURL            string
 	httpClient           *http.Client
 	logger               *zap.Logger
@@ -100,10 +98,10 @@ type Client struct {
 	nodeName             string
 	peerId               string
 	version              string
-	telemetryCh          chan TelemetryRequest
+	telemetryCh          chan telemetrytypes.TelemetryRequest
 	telemetryCacheLock   sync.Mutex
-	telemetryCache       []TelemetryRequest
-	telemetryRetryCache  []TelemetryRequest
+	telemetryCache       []telemetrytypes.TelemetryRequest
+	telemetryRetryCache  []telemetrytypes.TelemetryRequest
 	nextIdLock           sync.Mutex
 	nextId               int
 	sendPeriod           time.Duration
@@ -134,10 +132,10 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 		keyUID:               keyUID,
 		nodeName:             nodeName,
 		version:              version,
-		telemetryCh:          make(chan TelemetryRequest),
+		telemetryCh:          make(chan telemetrytypes.TelemetryRequest),
 		telemetryCacheLock:   sync.Mutex{},
-		telemetryCache:       make([]TelemetryRequest, 0),
-		telemetryRetryCache:  make([]TelemetryRequest, 0),
+		telemetryCache:       make([]telemetrytypes.TelemetryRequest, 0),
+		telemetryRetryCache:  make([]telemetrytypes.TelemetryRequest, 0),
 		nextId:               0,
 		nextIdLock:           sync.Mutex{},
 		sendPeriod:           10 * time.Second, // default value
@@ -174,7 +172,7 @@ func (c *Client) Start(ctx context.Context) {
 			select {
 			case <-timer.C:
 				c.telemetryCacheLock.Lock()
-				telemetryRequests := make([]TelemetryRequest, len(c.telemetryCache))
+				telemetryRequests := make([]telemetrytypes.TelemetryRequest, len(c.telemetryCache))
 				copy(telemetryRequests, c.telemetryCache)
 				c.telemetryCache = nil
 				c.telemetryCacheLock.Unlock()
@@ -199,43 +197,49 @@ func (c *Client) Start(ctx context.Context) {
 }
 
 func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) {
-	var telemetryRequest TelemetryRequest
+	var telemetryRequest telemetrytypes.TelemetryRequest
 	switch v := data.(type) {
 	case ReceivedMessages:
-		telemetryRequest = TelemetryRequest{
+		telemetryRequest = telemetrytypes.TelemetryRequest{
 			Id:            c.nextId,
-			TelemetryType: ReceivedMessagesMetric,
+			TelemetryType: telemetrytypes.ReceivedMessagesMetric,
 			TelemetryData: c.ProcessReceivedMessages(v),
 		}
 	case *v2protocol.Envelope:
-		telemetryRequest = TelemetryRequest{
+		telemetryRequest = telemetrytypes.TelemetryRequest{
 			Id:            c.nextId,
-			TelemetryType: ReceivedEnvelopeMetric,
+			TelemetryType: telemetrytypes.ReceivedEnvelopeMetric,
 			TelemetryData: c.ProcessReceivedEnvelope(v),
 		}
-	case wakuv2.SentEnvelope:
-		telemetryRequest = TelemetryRequest{
+	case telemetry.SentEnvelope:
+		telemetryRequest = telemetrytypes.TelemetryRequest{
 			Id:            c.nextId,
-			TelemetryType: SentEnvelopeMetric,
+			TelemetryType: telemetrytypes.SentEnvelopeMetric,
 			TelemetryData: c.ProcessSentEnvelope(v),
 		}
-	case wakuv2.ErrorSendingEnvelope:
-		telemetryRequest = TelemetryRequest{
+	case telemetry.ErrorSendingEnvelope:
+		telemetryRequest = telemetrytypes.TelemetryRequest{
 			Id:            c.nextId,
-			TelemetryType: ErrorSendingEnvelopeMetric,
+			TelemetryType: telemetrytypes.ErrorSendingEnvelopeMetric,
 			TelemetryData: c.ProcessErrorSendingEnvelope(v),
 		}
 	case PeerCount:
-		telemetryRequest = TelemetryRequest{
+		telemetryRequest = telemetrytypes.TelemetryRequest{
 			Id:            c.nextId,
-			TelemetryType: PeerCountMetric,
+			TelemetryType: telemetrytypes.PeerCountMetric,
 			TelemetryData: c.ProcessPeerCount(v),
 		}
 	case PeerConnFailure:
-		telemetryRequest = TelemetryRequest{
+		telemetryRequest = telemetrytypes.TelemetryRequest{
 			Id:            c.nextId,
-			TelemetryType: PeerConnFailuresMetric,
+			TelemetryType: telemetrytypes.PeerConnFailureMetric,
 			TelemetryData: c.ProcessPeerConnFailure(v),
+		}
+	case telemetry.ProtocolStatsMap:
+		telemetryRequest = telemetrytypes.TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: telemetrytypes.ProtocolStatsMetric,
+			TelemetryData: c.ProcessProtocolStats(v),
 		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
@@ -254,7 +258,7 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 }
 
 // This is assuming to not run concurrently as we are not locking the `telemetryRetryCache`
-func (c *Client) pushTelemetryRequest(request []TelemetryRequest) error {
+func (c *Client) pushTelemetryRequest(request []telemetrytypes.TelemetryRequest) error {
 	if len(c.telemetryRetryCache) > MaxRetryCache { //Limit the size of the cache to not grow the slice indefinitely in case the Telemetry server is gone for longer time
 		removeNum := len(c.telemetryRetryCache) - MaxRetryCache
 		c.telemetryRetryCache = c.telemetryRetryCache[removeNum:]
@@ -288,21 +292,21 @@ func (c *Client) pushTelemetryRequest(request []TelemetryRequest) error {
 }
 
 func (c *Client) ProcessReceivedMessages(receivedMessages ReceivedMessages) *json.RawMessage {
-	var postBody []map[string]interface{}
+	var postBody []telemetrytypes.ReceivedMessage
 	for _, message := range receivedMessages.Messages {
-		postBody = append(postBody, map[string]interface{}{
-			"chatId":         receivedMessages.Filter.ChatID,
-			"messageHash":    types.EncodeHex(receivedMessages.SSHMessage.Hash),
-			"messageId":      message.ApplicationLayer.ID,
-			"sentAt":         receivedMessages.SSHMessage.Timestamp,
-			"pubsubTopic":    receivedMessages.Filter.PubsubTopic,
-			"topic":          receivedMessages.Filter.ContentTopic.String(),
-			"messageType":    message.ApplicationLayer.Type.String(),
-			"receiverKeyUID": c.keyUID,
-			"peerId":         c.peerId,
-			"nodeName":       c.nodeName,
-			"messageSize":    len(receivedMessages.SSHMessage.Payload),
-			"statusVersion":  c.version,
+		postBody = append(postBody, telemetrytypes.ReceivedMessage{
+			ChatID:         receivedMessages.Filter.ChatID,
+			MessageHash:    types.EncodeHex(receivedMessages.SSHMessage.Hash),
+			MessageID:      message.ApplicationLayer.ID.String(),
+			SentAt:         int64(receivedMessages.SSHMessage.Timestamp),
+			PubsubTopic:    receivedMessages.Filter.PubsubTopic,
+			Topic:          receivedMessages.Filter.ContentTopic.String(),
+			MessageType:    message.ApplicationLayer.Type.String(),
+			ReceiverKeyUID: c.keyUID,
+			PeerID:         c.peerId,
+			NodeName:       c.nodeName,
+			MessageSize:    len(receivedMessages.SSHMessage.Payload),
+			StatusVersion:  c.version,
 		})
 	}
 	body, _ := json.Marshal(postBody)
@@ -311,79 +315,83 @@ func (c *Client) ProcessReceivedMessages(receivedMessages ReceivedMessages) *jso
 }
 
 func (c *Client) ProcessReceivedEnvelope(envelope *v2protocol.Envelope) *json.RawMessage {
-	postBody := map[string]interface{}{
-		"messageHash":    envelope.Hash().String(),
-		"sentAt":         uint32(envelope.Message().GetTimestamp() / int64(time.Second)),
-		"pubsubTopic":    envelope.PubsubTopic(),
-		"topic":          envelope.Message().ContentTopic,
-		"receiverKeyUID": c.keyUID,
-		"peerId":         c.peerId,
-		"nodeName":       c.nodeName,
-		"statusVersion":  c.version,
+	postBody := telemetrytypes.ReceivedEnvelope{
+		MessageHash:    envelope.Hash().String(),
+		SentAt:         envelope.Message().GetTimestamp() / int64(time.Second),
+		PubsubTopic:    envelope.PubsubTopic(),
+		Topic:          envelope.Message().ContentTopic,
+		ReceiverKeyUID: c.keyUID,
+		PeerID:         c.peerId,
+		NodeName:       c.nodeName,
+		StatusVersion:  c.version,
 	}
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage
 }
 
-func (c *Client) ProcessSentEnvelope(sentEnvelope wakuv2.SentEnvelope) *json.RawMessage {
-	postBody := map[string]interface{}{
-		"messageHash":   sentEnvelope.Envelope.Hash().String(),
-		"sentAt":        uint32(sentEnvelope.Envelope.Message().GetTimestamp() / int64(time.Second)),
-		"pubsubTopic":   sentEnvelope.Envelope.PubsubTopic(),
-		"topic":         sentEnvelope.Envelope.Message().ContentTopic,
-		"senderKeyUID":  c.keyUID,
-		"peerId":        c.peerId,
-		"nodeName":      c.nodeName,
-		"publishMethod": sentEnvelope.PublishMethod.String(),
-		"statusVersion": c.version,
+func (c *Client) ProcessSentEnvelope(sentEnvelope telemetry.SentEnvelope) *json.RawMessage {
+	postBody := telemetrytypes.SentEnvelope{
+		MessageHash:   sentEnvelope.Envelope.Hash().String(),
+		SentAt:        sentEnvelope.Envelope.Message().GetTimestamp() / int64(time.Second),
+		PubsubTopic:   sentEnvelope.Envelope.PubsubTopic(),
+		Topic:         sentEnvelope.Envelope.Message().ContentTopic,
+		SenderKeyUID:  c.keyUID,
+		PeerID:        c.peerId,
+		NodeName:      c.nodeName,
+		PublishMethod: sentEnvelope.PublishMethod.String(),
+		StatusVersion: c.version,
 	}
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage
 }
 
-func (c *Client) ProcessErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSendingEnvelope) *json.RawMessage {
-	postBody := map[string]interface{}{
-		"messageHash":   errorSendingEnvelope.SentEnvelope.Envelope.Hash().String(),
-		"sentAt":        uint32(errorSendingEnvelope.SentEnvelope.Envelope.Message().GetTimestamp() / int64(time.Second)),
-		"pubsubTopic":   errorSendingEnvelope.SentEnvelope.Envelope.PubsubTopic(),
-		"topic":         errorSendingEnvelope.SentEnvelope.Envelope.Message().ContentTopic,
-		"senderKeyUID":  c.keyUID,
-		"peerId":        c.peerId,
-		"nodeName":      c.nodeName,
-		"publishMethod": errorSendingEnvelope.SentEnvelope.PublishMethod.String(),
-		"statusVersion": c.version,
-		"error":         errorSendingEnvelope.Error.Error(),
+func (c *Client) ProcessErrorSendingEnvelope(errorSendingEnvelope telemetry.ErrorSendingEnvelope) *json.RawMessage {
+	postBody := telemetrytypes.ErrorSendingEnvelope{
+		SentEnvelope: telemetrytypes.SentEnvelope{
+			MessageHash:   errorSendingEnvelope.SentEnvelope.Envelope.Hash().String(),
+			SentAt:        errorSendingEnvelope.SentEnvelope.Envelope.Message().GetTimestamp() / int64(time.Second),
+			PubsubTopic:   errorSendingEnvelope.SentEnvelope.Envelope.PubsubTopic(),
+			Topic:         errorSendingEnvelope.SentEnvelope.Envelope.Message().ContentTopic,
+			SenderKeyUID:  c.keyUID,
+			PeerID:        c.peerId,
+			NodeName:      c.nodeName,
+			PublishMethod: errorSendingEnvelope.SentEnvelope.PublishMethod.String(),
+			StatusVersion: c.version,
+		},
+		Error: errorSendingEnvelope.Error.Error(),
 	}
+
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage
 }
 
 func (c *Client) ProcessPeerCount(peerCount PeerCount) *json.RawMessage {
-	postBody := map[string]interface{}{
-		"peerCount":     peerCount.PeerCount,
-		"nodeName":      c.nodeName,
-		"nodeKeyUID":    c.keyUID,
-		"peerId":        c.peerId,
-		"statusVersion": c.version,
-		"timestamp":     time.Now().Unix(),
+	postBody := telemetrytypes.PeerCount{
+		PeerCount:     peerCount.PeerCount,
+		NodeName:      c.nodeName,
+		NodeKeyUid:    c.keyUID,
+		PeerID:        c.peerId,
+		StatusVersion: c.version,
+		Timestamp:     time.Now().Unix(),
 	}
+
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage
 }
 
 func (c *Client) ProcessPeerConnFailure(peerConnFailure PeerConnFailure) *json.RawMessage {
-	postBody := map[string]interface{}{
-		"failedPeerId":  peerConnFailure.FailedPeerId,
-		"failureCount":  peerConnFailure.FailureCount,
-		"nodeName":      c.nodeName,
-		"nodeKeyUID":    c.keyUID,
-		"peerId":        c.peerId,
-		"statusVersion": c.version,
-		"timestamp":     time.Now().Unix(),
+	postBody := telemetrytypes.PeerConnFailure{
+		FailedPeerId:  peerConnFailure.FailedPeerId,
+		FailureCount:  peerConnFailure.FailureCount,
+		NodeName:      c.nodeName,
+		NodeKeyUid:    c.keyUID,
+		PeerId:        c.peerId,
+		StatusVersion: c.version,
+		Timestamp:     time.Now().Unix(),
 	}
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
@@ -397,19 +405,42 @@ func (c *Client) UpdateEnvelopeProcessingError(shhMessage *types.Message, proces
 	if processingError != nil {
 		errorString = processingError.Error()
 	}
-	postBody := map[string]interface{}{
-		"messageHash":     types.EncodeHex(shhMessage.Hash),
-		"sentAt":          shhMessage.Timestamp,
-		"pubsubTopic":     shhMessage.PubsubTopic,
-		"topic":           shhMessage.Topic,
-		"receiverKeyUID":  c.keyUID,
-		"peerId":          c.peerId,
-		"nodeName":        c.nodeName,
-		"processingError": errorString,
+	postBody := telemetrytypes.ReceivedEnvelope{
+		MessageHash:     types.EncodeHex(shhMessage.Hash),
+		SentAt:          int64(shhMessage.Timestamp),
+		PubsubTopic:     shhMessage.PubsubTopic,
+		Topic:           shhMessage.Topic.String(),
+		ReceiverKeyUID:  c.keyUID,
+		PeerID:          c.peerId,
+		NodeName:        c.nodeName,
+		ProcessingError: errorString,
 	}
 	body, _ := json.Marshal(postBody)
 	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		c.logger.Error("Error sending envelope update to telemetry server", zap.Error(err))
 	}
+}
+
+func (c *Client) ProcessProtocolStats(stats telemetry.ProtocolStatsMap) *json.RawMessage {
+	getStatsPerProtocol := func(protocolID protocol.ID, stats telemetry.ProtocolStatsMap) telemetrytypes.Metric {
+		return telemetrytypes.Metric{
+			RateIn:   stats[protocolID].RateIn,
+			RateOut:  stats[protocolID].RateOut,
+			TotalIn:  stats[protocolID].TotalIn,
+			TotalOut: stats[protocolID].TotalOut,
+		}
+	}
+
+	postBody := telemetrytypes.ProtocolStats{
+		PeerID:          c.peerId,
+		Relay:           getStatsPerProtocol(relay.WakuRelayID_v200, stats),
+		Store:           getStatsPerProtocol(legacy_store.StoreID_v20beta4, stats),
+		FilterPush:      getStatsPerProtocol(filter.FilterPushID_v20beta1, stats),
+		FilterSubscribe: getStatsPerProtocol(filter.FilterSubscribeID_v20beta1, stats),
+		Lightpush:       getStatsPerProtocol(lightpush.LightPushID_v20beta1, stats),
+	}
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
 }

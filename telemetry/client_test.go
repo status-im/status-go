@@ -15,23 +15,33 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/libp2p/go-libp2p/core/metrics"
+
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/stretchr/testify/require"
+
+	telemetrytypes "github.com/status-im/telemetry/pkg/types"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	telemetry "github.com/status-im/status-go/telemetry/common"
 	"github.com/status-im/status-go/wakuv2"
+	"github.com/status-im/status-go/wakuv2/common"
 )
 
 var (
 	testContentTopic = "/waku/1/0x12345679/rfc26"
 )
 
-func createMockServer(t *testing.T, wg *sync.WaitGroup, expectedType TelemetryType, expectedCondition func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool)) *httptest.Server {
+func createMockServer(t *testing.T, wg *sync.WaitGroup, expectedType telemetrytypes.TelemetryType, expectedCondition func(received []telemetrytypes.TelemetryRequest) (shouldSucceed bool, shouldFail bool)) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			t.Errorf("Expected 'POST' request, got '%s'", r.Method)
@@ -41,7 +51,7 @@ func createMockServer(t *testing.T, wg *sync.WaitGroup, expectedType TelemetryTy
 		}
 
 		// Check the request body is as expected
-		var received []TelemetryRequest
+		var received []telemetrytypes.TelemetryRequest
 		err := json.NewDecoder(r.Body).Decode(&received)
 		if err != nil {
 			t.Fatal(err)
@@ -95,9 +105,9 @@ func createClient(t *testing.T, mockServerURL string) *Client {
 	return NewClient(logger, mockServerURL, "testUID", "testNode", "1.0", WithSendPeriod(100*time.Millisecond), WithPeerID("16Uiu2HAkvWiyFsgRhuJEb9JfjYxEkoHLgnUQmr1N5mKWnYjxYRVm"))
 }
 
-type expectedCondition func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool)
+type expectedCondition func(received []telemetrytypes.TelemetryRequest) (shouldSucceed bool, shouldFail bool)
 
-func withMockServer(t *testing.T, expectedType TelemetryType, expectedCondition expectedCondition, testFunc func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup)) {
+func withMockServer(t *testing.T, expectedType telemetrytypes.TelemetryType, expectedCondition expectedCondition, testFunc func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup)) {
 	var wg sync.WaitGroup
 	wg.Add(1) // Expecting one request
 
@@ -116,7 +126,7 @@ func withMockServer(t *testing.T, expectedType TelemetryType, expectedCondition 
 }
 
 func TestClient_ProcessReceivedMessages(t *testing.T) {
-	withMockServer(t, ReceivedMessagesMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, telemetrytypes.ReceivedMessagesMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		// Create a telemetry request to send
 		data := ReceivedMessages{
 			Filter: transport.Filter{
@@ -145,7 +155,7 @@ func TestClient_ProcessReceivedMessages(t *testing.T) {
 }
 
 func TestClient_ProcessReceivedEnvelope(t *testing.T) {
-	withMockServer(t, ReceivedEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, telemetrytypes.ReceivedEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		// Create a telemetry request to send
 		envelope := v2protocol.NewEnvelope(&pb.WakuMessage{
 			Payload:      []byte{1, 2, 3, 4, 5},
@@ -161,16 +171,16 @@ func TestClient_ProcessReceivedEnvelope(t *testing.T) {
 }
 
 func TestClient_ProcessSentEnvelope(t *testing.T) {
-	withMockServer(t, SentEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, telemetrytypes.SentEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		// Create a telemetry request to send
-		sentEnvelope := wakuv2.SentEnvelope{
+		sentEnvelope := telemetry.SentEnvelope{
 			Envelope: v2protocol.NewEnvelope(&pb.WakuMessage{
 				Payload:      []byte{1, 2, 3, 4, 5},
 				ContentTopic: testContentTopic,
 				Version:      proto.Uint32(0),
 				Timestamp:    proto.Int64(time.Now().Unix()),
 			}, 0, ""),
-			PublishMethod: wakuv2.LightPush,
+			PublishMethod: common.LightPush,
 		}
 
 		// Send the telemetry request
@@ -184,7 +194,7 @@ var (
 )
 
 func TestTelemetryUponPublishError(t *testing.T) {
-	withMockServer(t, ErrorSendingEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, telemetrytypes.ErrorSendingEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		enrTreeAddress := testENRBootstrap
 		envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
 		if envEnrTreeAddress != "" {
@@ -241,7 +251,7 @@ func TestRetryCache(t *testing.T) {
 		}
 
 		// Check the request body is as expected
-		var received []TelemetryRequest
+		var received []telemetrytypes.TelemetryRequest
 		err := json.NewDecoder(r.Body).Decode(&received)
 		if err != nil {
 			t.Fatal(err)
@@ -358,14 +368,14 @@ var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU
 func TestPeerCount(t *testing.T) {
 	t.Skip("flaky test")
 
-	expectedCondition := func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
-		found := slices.ContainsFunc(received, func(req TelemetryRequest) bool {
+	expectedCondition := func(received []telemetrytypes.TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
+		found := slices.ContainsFunc(received, func(req telemetrytypes.TelemetryRequest) bool {
 			t.Log(req)
-			return req.TelemetryType == PeerCountMetric
+			return req.TelemetryType == telemetrytypes.PeerCountMetric
 		})
 		return found, false
 	}
-	withMockServer(t, PeerCountMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, telemetrytypes.PeerCountMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		config := &wakuv2.Config{}
 		setDefaultConfig(config, false)
 		config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
@@ -392,7 +402,7 @@ func TestPeerCount(t *testing.T) {
 }
 
 func TestPeerId(t *testing.T) {
-	expectedCondition := func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
+	expectedCondition := func(received []telemetrytypes.TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
 		var data map[string]interface{}
 
 		err := json.Unmarshal(*received[0].TelemetryData, &data)
@@ -404,7 +414,7 @@ func TestPeerId(t *testing.T) {
 		require.True(t, ok)
 		return ok, false
 	}
-	withMockServer(t, ReceivedEnvelopeMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, telemetrytypes.ReceivedEnvelopeMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		client.Start(ctx)
 
 		client.PushReceivedEnvelope(ctx, v2protocol.NewEnvelope(&pb.WakuMessage{
@@ -414,6 +424,42 @@ func TestPeerId(t *testing.T) {
 			Timestamp:    proto.Int64(time.Now().Unix()),
 		}, 0, ""))
 
+	})
+
+}
+
+func TestProtocolStats(t *testing.T) {
+	expectedCondition := func(received []telemetrytypes.TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
+		var data telemetrytypes.ProtocolStats
+
+		err := json.Unmarshal(*received[0].TelemetryData, &data)
+		if err != nil {
+			return false, true
+		}
+
+		ok := data.FilterPush.RateIn == 30 && data.Lightpush.TotalOut == 20
+		require.True(t, ok)
+		return ok, false
+	}
+
+	withMockServer(t, telemetrytypes.ReceivedEnvelopeMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+		client.Start(ctx)
+
+		s := metrics.Stats{
+			TotalIn:  10,
+			TotalOut: 20,
+			RateIn:   30,
+			RateOut:  40,
+		}
+
+		m := make(telemetry.ProtocolStatsMap)
+		m[relay.WakuRelayID_v200] = s
+		m[filter.FilterPushID_v20beta1] = s
+		m[filter.FilterSubscribeID_v20beta1] = s
+		m[legacy_store.StoreID_v20beta4] = s
+		m[lightpush.LightPushID_v20beta1] = s
+
+		client.PushProtocolStats(ctx, m)
 	})
 
 }
