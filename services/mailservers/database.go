@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
+
+	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
@@ -33,11 +36,12 @@ func (m Mailserver) Enode() (*enode.Node, error) {
 
 func (m Mailserver) IDBytes() ([]byte, error) {
 	if m.Version == 2 {
-		id, err := peer.Decode(m.UniqueID())
+		p, err := m.PeerID()
 		if err != nil {
 			return nil, err
 		}
-		return []byte(id.String()), err
+
+		return p.Marshal()
 	}
 
 	node, err := enode.ParseV4(m.Address)
@@ -52,18 +56,18 @@ func (m Mailserver) PeerID() (peer.ID, error) {
 		return "", errors.New("not available")
 	}
 
-	pID, err := peer.Decode(m.UniqueID())
+	addr, err := multiaddr.NewMultiaddr(m.Address)
 	if err != nil {
 		return "", err
 	}
 
-	return pID, nil
+	return utils.GetPeerID(addr)
 }
 
 func (m Mailserver) UniqueID() string {
 	if m.Version == 2 {
-		s := strings.Split(m.Address, "/")
-		return s[len(s)-1]
+		p, _ := m.PeerID()
+		return p.String()
 	}
 	return m.Address
 }

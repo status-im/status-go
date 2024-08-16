@@ -12,12 +12,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -457,7 +459,7 @@ func (t *Transport) PeerCount() int {
 	return t.waku.PeerCount()
 }
 
-func (t *Transport) Peers() map[string]types.WakuV2Peer {
+func (t *Transport) Peers() types.PeerStats {
 	return t.waku.Peers()
 }
 
@@ -647,7 +649,7 @@ func (t *Transport) StopDiscV5() error {
 	return t.waku.StopDiscV5()
 }
 
-func (t *Transport) ListenAddresses() ([]string, error) {
+func (t *Transport) ListenAddresses() ([]multiaddr.Multiaddr, error) {
 	return t.waku.ListenAddresses()
 }
 
@@ -655,27 +657,27 @@ func (t *Transport) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 	return t.waku.RelayPeersByTopic(topic)
 }
 
-func (t *Transport) ENR() (string, error) {
+func (t *Transport) ENR() (*enode.Node, error) {
 	return t.waku.ENR()
 }
 
-func (t *Transport) AddStorePeer(address string) (peer.ID, error) {
+func (t *Transport) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return t.waku.AddStorePeer(address)
 }
 
-func (t *Transport) AddRelayPeer(address string) (peer.ID, error) {
+func (t *Transport) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return t.waku.AddRelayPeer(address)
 }
 
-func (t *Transport) DialPeer(address string) error {
+func (t *Transport) DialPeer(address multiaddr.Multiaddr) error {
 	return t.waku.DialPeer(address)
 }
 
-func (t *Transport) DialPeerByID(peerID string) error {
+func (t *Transport) DialPeerByID(peerID peer.ID) error {
 	return t.waku.DialPeerByID(peerID)
 }
 
-func (t *Transport) DropPeer(peerID string) error {
+func (t *Transport) DropPeer(peerID peer.ID) error {
 	return t.waku.DropPeer(peerID)
 }
 

@@ -7,12 +7,14 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/wakuv2"
@@ -177,10 +179,11 @@ func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesR
 	return errors.New("DEPRECATED")
 }
 
-func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest, processEnvelopes bool) (types.StoreRequestCursor, int, error) {
+func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerIDBytes []byte, r types.MessagesRequest, processEnvelopes bool) (types.StoreRequestCursor, int, error) {
 	var options []store.RequestOption
 
-	peer, err := peer.Decode(string(peerID))
+	var peerID peer.ID
+	err := peerID.Unmarshal(peerIDBytes)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -205,7 +208,7 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []b
 		ContentFilter: protocol.NewContentFilter(w.waku.GetPubsubTopic(r.PubsubTopic), contentTopics...),
 	}
 
-	pbCursor, envelopesCount, err := w.waku.Query(ctx, peer, query, cursor, options, processEnvelopes)
+	pbCursor, envelopesCount, err := w.waku.Query(ctx, peerID, query, cursor, options, processEnvelopes)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -251,27 +254,27 @@ func (w *gethWakuV2Wrapper) RemovePubsubTopicKey(topic string) error {
 	return w.waku.RemovePubsubTopicKey(topic)
 }
 
-func (w *gethWakuV2Wrapper) AddStorePeer(address string) (peer.ID, error) {
+func (w *gethWakuV2Wrapper) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return w.waku.AddStorePeer(address)
 }
 
-func (w *gethWakuV2Wrapper) AddRelayPeer(address string) (peer.ID, error) {
+func (w *gethWakuV2Wrapper) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return w.waku.AddRelayPeer(address)
 }
 
-func (w *gethWakuV2Wrapper) Peers() map[string]types.WakuV2Peer {
+func (w *gethWakuV2Wrapper) Peers() types.PeerStats {
 	return w.waku.Peers()
 }
 
-func (w *gethWakuV2Wrapper) DialPeer(address string) error {
+func (w *gethWakuV2Wrapper) DialPeer(address multiaddr.Multiaddr) error {
 	return w.waku.DialPeer(address)
 }
 
-func (w *gethWakuV2Wrapper) DialPeerByID(peerID string) error {
+func (w *gethWakuV2Wrapper) DialPeerByID(peerID peer.ID) error {
 	return w.waku.DialPeerByID(peerID)
 }
 
-func (w *gethWakuV2Wrapper) ListenAddresses() ([]string, error) {
+func (w *gethWakuV2Wrapper) ListenAddresses() ([]multiaddr.Multiaddr, error) {
 	return w.waku.ListenAddresses(), nil
 }
 
@@ -279,11 +282,11 @@ func (w *gethWakuV2Wrapper) RelayPeersByTopic(topic string) (*types.PeerList, er
 	return w.waku.RelayPeersByTopic(topic)
 }
 
-func (w *gethWakuV2Wrapper) ENR() (string, error) {
+func (w *gethWakuV2Wrapper) ENR() (*enode.Node, error) {
 	return w.waku.ENR()
 }
 
-func (w *gethWakuV2Wrapper) DropPeer(peerID string) error {
+func (w *gethWakuV2Wrapper) DropPeer(peerID peer.ID) error {
 	return w.waku.DropPeer(peerID)
 }
 

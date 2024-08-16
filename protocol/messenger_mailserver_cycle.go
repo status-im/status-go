@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -78,7 +79,12 @@ func (m *Messenger) StartMailserverCycle(mailservers []mailservers.Mailserver) e
 			return nil
 		}
 		for _, storenode := range mailservers {
-			_, err := m.transport.AddStorePeer(storenode.Address)
+			maddr, err := multiaddr.NewMultiaddr(storenode.Address)
+			if err != nil {
+				return err
+			}
+
+			_, err = m.AddStorePeer(maddr)
 			if err != nil {
 				return err
 			}

@@ -3,30 +3,43 @@ package types
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/pborman/uuid"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/connection"
 )
 
 type ConnStatus struct {
-	IsOnline bool                  `json:"isOnline"`
-	Peers    map[string]WakuV2Peer `json:"peers"`
+	IsOnline bool      `json:"isOnline"`
+	Peers    PeerStats `json:"peers"`
+}
+
+type PeerStats map[peer.ID]WakuV2Peer
+
+func (m PeerStats) MarshalJSON() ([]byte, error) {
+	tmpMap := make(map[string]WakuV2Peer)
+	for k, v := range m {
+		tmpMap[k.String()] = v
+	}
+	return json.Marshal(tmpMap)
 }
 
 type WakuV2Peer struct {
-	Protocols []protocol.ID `json:"protocols"`
-	Addresses []string      `json:"addresses"`
+	Protocols []protocol.ID         `json:"protocols"`
+	Addresses []multiaddr.Multiaddr `json:"addresses"`
 }
 
 type PeerList struct {
-	FullMeshPeers []peer.ID `json:"fullMesh"`
-	AllPeers      []peer.ID `json:"all"`
+	FullMeshPeers peer.IDSlice `json:"fullMesh"`
+	AllPeers      peer.IDSlice `json:"all"`
 }
 
 type ConnStatusSubscription struct {
@@ -94,13 +107,13 @@ type Waku interface {
 	// PeerCount
 	PeerCount() int
 
-	ListenAddresses() ([]string, error)
+	ListenAddresses() ([]multiaddr.Multiaddr, error)
 
 	RelayPeersByTopic(topic string) (*PeerList, error)
 
-	ENR() (string, error)
+	ENR() (*enode.Node, error)
 
-	Peers() map[string]WakuV2Peer
+	Peers() PeerStats
 
 	StartDiscV5() error
 
@@ -116,15 +129,15 @@ type Waku interface {
 
 	RemovePubsubTopicKey(topic string) error
 
-	AddStorePeer(address string) (peer.ID, error)
+	AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error)
 
-	AddRelayPeer(address string) (peer.ID, error)
+	AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error)
 
-	DialPeer(address string) error
+	DialPeer(address multiaddr.Multiaddr) error
 
-	DialPeerByID(peerID string) error
+	DialPeerByID(peerID peer.ID) error
 
-	DropPeer(peerID string) error
+	DropPeer(peerID peer.ID) error
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 

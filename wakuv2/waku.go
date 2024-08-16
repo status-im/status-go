@@ -69,6 +69,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
@@ -572,7 +573,7 @@ func (w *Waku) runPeerExchangeLoop() {
 			// We assume that those peers are running peer exchange according to infra config,
 			// If not, the peer selection process in go-waku will filter them out anyway
 			w.dnsAddressCacheLock.RLock()
-			var peers []peer.ID
+			var peers peer.IDSlice
 			for _, record := range w.dnsAddressCache {
 				for _, discoveredNode := range record {
 					if len(discoveredNode.PeerInfo.Addrs) == 0 {
@@ -1479,7 +1480,7 @@ func (w *Waku) PeerCount() int {
 	return w.node.PeerCount()
 }
 
-func (w *Waku) Peers() map[string]types.WakuV2Peer {
+func (w *Waku) Peers() types.PeerStats {
 	return FormatPeerStats(w.node)
 }
 
@@ -1494,22 +1495,17 @@ func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 	}, nil
 }
 
-func (w *Waku) ListenAddresses() []string {
-	addrs := w.node.ListenAddresses()
-	var result []string
-	for _, addr := range addrs {
-		result = append(result, addr.String())
-	}
-	return result
+func (w *Waku) ListenAddresses() []multiaddr.Multiaddr {
+	return w.node.ListenAddresses()
 }
 
-func (w *Waku) ENR() (string, error) {
+func (w *Waku) ENR() (*enode.Node, error) {
 	enr := w.node.ENR()
 	if enr == nil {
-		return "", errors.New("enr not available")
+		return nil, errors.New("enr not available")
 	}
 
-	return enr.String(), nil
+	return enr, nil
 }
 
 func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) error {
@@ -1729,13 +1725,8 @@ func (w *Waku) restartDiscV5() error {
 	return w.node.SetDiscV5Bootnodes(bootnodes)
 }
 
-func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
-	addr, err := multiaddr.NewMultiaddr(address)
-	if err != nil {
-		return "", err
-	}
-
-	peerID, err := w.node.AddPeer(addr, wps.Static, w.cfg.DefaultShardedPubsubTopics, store.StoreQueryID_v300)
+func (w *Waku) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
+	peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, store.StoreQueryID_v300)
 	if err != nil {
 		return "", err
 	}
@@ -1746,41 +1737,28 @@ func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
 }
 
-func (w *Waku) AddRelayPeer(address string) (peer.ID, error) {
-	addr, err := multiaddr.NewMultiaddr(address)
-	if err != nil {
-		return "", err
-	}
-
-	peerID, err := w.node.AddPeer(addr, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
+func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
+	peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}
 	return peerID, nil
 }
 
-func (w *Waku) DialPeer(address string) error {
+func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
 	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
 	defer cancel()
-	return w.node.DialPeer(ctx, address)
+	return w.node.DialPeerWithMultiAddress(ctx, address)
 }
 
-func (w *Waku) DialPeerByID(peerID string) error {
+func (w *Waku) DialPeerByID(peerID peer.ID) error {
 	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
 	defer cancel()
-	pid, err := peer.Decode(peerID)
-	if err != nil {
-		return err
-	}
-	return w.node.DialPeerByID(ctx, pid)
+	return w.node.DialPeerByID(ctx, peerID)
 }
 
-func (w *Waku) DropPeer(peerID string) error {
-	pid, err := peer.Decode(peerID)
-	if err != nil {
-		return err
-	}
-	return w.node.ClosePeerById(pid)
+func (w *Waku) DropPeer(peerID peer.ID) error {
+	return w.node.ClosePeerById(peerID)
 }
 
 func (w *Waku) ProcessingP2PMessages() bool {
@@ -1848,17 +1826,13 @@ func toDeterministicID(id string, expectedLen int) (string, error) {
 	return id, nil
 }
 
-func FormatPeerStats(wakuNode *node.WakuNode) map[string]types.WakuV2Peer {
-	p := make(map[string]types.WakuV2Peer)
+func FormatPeerStats(wakuNode *node.WakuNode) types.PeerStats {
+	p := make(types.PeerStats)
 	for k, v := range wakuNode.PeerStats() {
-		peerInfo := wakuNode.Host().Peerstore().PeerInfo(k)
-		wakuV2Peer := types.WakuV2Peer{}
-		wakuV2Peer.Protocols = v
-		hostInfo, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", k.String()))
-		for _, addr := range peerInfo.Addrs {
-			wakuV2Peer.Addresses = append(wakuV2Peer.Addresses, addr.Encapsulate(hostInfo).String())
+		p[k] = types.WakuV2Peer{
+			Addresses: utils.EncapsulatePeerID(k, wakuNode.Host().Peerstore().PeerInfo(k).Addrs...),
+			Protocols: v,
 		}
-		p[k.String()] = wakuV2Peer
 	}
 	return p
 }

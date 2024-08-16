@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/status-im/status-go/protocol/wakusync"
 
 	"github.com/status-im/status-go/protocol/identity"
@@ -226,7 +228,7 @@ func WaitForConnectionStatus(s *suite.Suite, waku *waku2.Waku, action func() boo
 	}
 }
 
-func hasAllPeers(m map[string]types.WakuV2Peer, checkSlice []string) bool {
+func hasAllPeers(m map[peer.ID]types.WakuV2Peer, checkSlice peer.IDSlice) bool {
 	for _, check := range checkSlice {
 		if _, ok := m[check]; !ok {
 			return false
@@ -235,7 +237,7 @@ func hasAllPeers(m map[string]types.WakuV2Peer, checkSlice []string) bool {
 	return true
 }
 
-func WaitForPeersConnected(s *suite.Suite, waku *waku2.Waku, action func() []string) {
+func WaitForPeersConnected(s *suite.Suite, waku *waku2.Waku, action func() peer.IDSlice) {
 	subscription := waku.SubscribeToConnStatusChanges()
 	defer subscription.Unsubscribe()
 
