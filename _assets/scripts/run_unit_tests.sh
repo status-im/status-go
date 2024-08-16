@@ -43,9 +43,31 @@ is_parallelizable() {
   return 0
 }
 
+filter_parallelizable_packages() {
+  local packages=$1
+  local non_parallelizable_packages=$2
+  local filtered_packages=""
+
+  for package in ${packages}; do
+    local is_parallelizable=true
+    for non_parallel_package in ${non_parallelizable_packages}; do
+      if [[ "${package}" == "${non_parallel_package}" ]]; then
+        is_parallelizable=false
+        break
+      fi
+    done
+    if [[ "${is_parallelizable}" == true ]]; then
+      filtered_packages="${filtered_packages} ${package}"
+    fi
+  done
+
+  echo "${filtered_packages}"
+}
+
 run_test_for_packages() {
   local packages=$1
   local iteration=$2
+  local parallel=$3
 
   local output_file="test_${iteration}.log"
   local coverage_file="test_${iteration}.coverage.out"
@@ -70,6 +92,7 @@ run_test_for_packages() {
     -v ${GOTEST_EXTRAFLAGS} \
     -timeout 45m \
     -count 1 \
+    -p ${parallel} \
     -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
 
@@ -99,8 +122,13 @@ echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
 rm -rf ./**/*.coverage.out
 
+parallelism=$(nproc)
+packages_sequential="${UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE}"
+packages_parallel=$(filter_parallelizable_packages "${UNIT_TEST_PACKAGES}" "${UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE}")
+
 for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-  run_test_for_packages "${UNIT_TEST_PACKAGES}" "${i}"
+  run_test_for_packages "${packages_parallel}" "parallel-${i}" "${parallelism}"
+  run_test_for_packages "${packages_sequential}" "sequential-${i}" "1"
 done
 
 # Gather test coverage results
