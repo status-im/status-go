@@ -16,7 +16,7 @@ func FailIfNoFile(t *testing.T, filename string) {
 		return
 	}
 
-	err = os.WriteFile(filename, []byte("test"), 0644)
+	err = os.WriteFile(filename, []byte("test"), 0600)
 	require.NoError(t, err)
 
 	t.Fatal("file created: ", filename)
