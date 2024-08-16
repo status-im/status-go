@@ -106,24 +106,6 @@ func DefaultMailservers() []Mailserver {
 			Version: 2,
 		},
 		Mailserver{
-			ID:      "node-01.ac-cn-hongkong-c.status.test",
-			Address: "/dns4/node-01.ac-cn-hongkong-c.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAm2BjXxCp1sYFJQKpLLbPbwd5juxbsYofu3TsS3auvT9Yi",
-			Fleet:   params.FleetStatusTest,
-			Version: 2,
-		},
-		Mailserver{
-			ID:      "node-01.do-ams3.status.test",
-			Address: "/dns4/node-01.do-ams3.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAkukebeXjTQ9QDBeNDWuGfbaSg79wkkhK4vPocLgR6QFDf",
-			Fleet:   params.FleetStatusTest,
-			Version: 2,
-		},
-		Mailserver{
-			ID:      "node-01.gc-us-central1-a.status.test",
-			Address: "/dns4/node-01.gc-us-central1-a.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAmGDX3iAFox93PupVYaHa88kULGqMpJ7AEHGwj3jbMtt76",
-			Fleet:   params.FleetStatusTest,
-			Version: 2,
-		},
-		Mailserver{
 			ID:      "store-01.do-ams3.status.prod",
 			Address: "/dns4/store-01.do-ams3.status.prod.status.im/tcp/30303/p2p/16Uiu2HAmAUdrQ3uwzuE4Gy4D56hX6uLKEeerJAnhKEHZ3DxF1EfT",
 			Fleet:   params.FleetStatusProd,

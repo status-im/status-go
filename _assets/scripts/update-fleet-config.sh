@@ -10,7 +10,7 @@ fleets=(
 
 wakufleets=(
     'status.prod'
-    'status.test'
+    'status.staging'
     'waku.sandbox'
     'waku.test'
 )
