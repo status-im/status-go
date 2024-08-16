@@ -23,9 +23,6 @@ if [[ -z "${UNIT_TEST_COUNT}" ]]; then
   UNIT_TEST_COUNT=1
 fi
 
-UNIT_TEST_PACKAGE_TIMEOUT="3m"
-UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED="45m"
-
 redirect_stdout() {
   output_file=$1
 
@@ -36,16 +33,6 @@ redirect_stdout() {
   fi
 }
 
-has_extended_timeout() {
-  local package
-  for package in ${UNIT_TEST_PACKAGES_WITH_EXTENDED_TIMEOUT}; do
-    if [[ "$1" == "${package}" ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
 is_parallelizable() {
   local package
   for package in ${UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE}; do
@@ -54,59 +41,6 @@ is_parallelizable() {
     fi
   done
   return 0
-}
-
-run_test_for_package() {
-  local package=$1
-  local iteration=$2
-  echo -e "${GRN}Testing:${RST} ${package} Iteration:${iteration}"
-  package_dir=$(go list -f "{{.Dir}}" "${package}")
-  output_file="${package_dir}/test_${iteration}.log"
-  coverage_file="${package_dir}/test_${iteration}.coverage.out"
-
-  if has_extended_timeout "${package}"; then
-    package_timeout="${UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED}"
-  else
-    package_timeout="${UNIT_TEST_PACKAGE_TIMEOUT}"
-  fi
-
-  local report_file="${package_dir}/report_${iteration}.xml"
-  local rerun_report_file="${package_dir}/report_rerun_fails_${iteration}.txt"
-  local exit_code_file="${package_dir}/exit_code_${iteration}.txt"
-
-  gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"
-  if [[ "${CI}" == 'true' ]]; then
-    gotestsum_flags="${gotestsum_flags} --junitfile=${report_file} --rerun-fails-report=${rerun_report_file}"
-  fi
-
-  # Cleanup previous coverage reports
-  rm -f ${package_dir}/coverage.out.rerun.*
-
-  PACKAGE_DIR=${package_dir} gotestsum --packages="${package}" ${gotestsum_flags} --raw-command -- \
-    ./_assets/scripts/test-with-coverage-old.sh \
-    ${package} \
-    -v ${GOTEST_EXTRAFLAGS} \
-    -timeout "${package_timeout}" \
-    -count 1 \
-    -tags "${BUILD_TAGS}" | \
-    redirect_stdout "${output_file}"
-
-  local go_test_exit=$?
-
-  # Merge package coverage results
-  go run ./cmd/test-coverage-utils/gocovmerge.go ${package_dir}/coverage.out.rerun.* > ${coverage_file}
-
-  # Cleanup coverage reports
-  rm -f ${package_dir}/coverage.out.rerun.*
-
-  echo "${go_test_exit}" > "${exit_code_file}"
-  if [[ "${go_test_exit}" -ne 0 ]]; then
-    if [[ "${CI}" == 'true' ]]; then
-      echo -e "${YLW}Failed, see the log:${RST} ${BLD}${output_file}${RST}"
-    fi
-  fi
-
-  return ${go_test_exit}
 }
 
 run_test_for_packages() {
@@ -161,7 +95,6 @@ if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
 	cc-test-reporter before-build
 fi
 
-echo -e "${GRN}UNIT_TEST_RUN_PARALLEL: ${RST}${UNIT_TEST_RUN_PARALLEL}"
 echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
 rm -rf ./**/*.coverage.out

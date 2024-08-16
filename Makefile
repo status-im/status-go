@@ -382,13 +382,10 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/fla
 #	github.com/status-im/status-go/multiaccounts/settings \
 #	github.com/status-im/status-go/node \
 #	github.com/status-im/status-go/services/wakuext
-test-unit: export UNIT_TEST_PACKAGES_WITH_EXTENDED_TIMEOUT ?= \
-	github.com/status-im/status-go/protocol
 test-unit: export UNIT_TEST_RUN_PARALLEL=true
 test-unit: ##@tests Run unit and integration tests
 	@find . -name "test-1.txt" -exec rm -f {} \;
 	@find . -name "test-2.txt" -exec rm -f {} \;
-	@rm -f args.txt
 	@time ./_assets/scripts/run_unit_tests.sh
 
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
