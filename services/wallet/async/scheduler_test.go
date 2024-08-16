@@ -392,3 +392,35 @@ func TestScheduler_Enqueue_InResult(t *testing.T) {
 		}
 	}
 }
+
+func TestScheduler_Enqueue_Quick_Stop(t *testing.T) {
+	scheduler := NewScheduler()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	longRunningTask := func(ctx context.Context) (interface{}, error) {
+		select {
+		case <-ctx.Done():
+			// we should reach here rather than other condition branch as Stop() canceled the context quickly
+			wg.Done()
+			return nil, ctx.Err()
+		case <-time.After(10 * time.Second):
+			wg.Done()
+			return "task completed", nil
+		}
+	}
+
+	resFn := func(res interface{}, taskType TaskType, err error) {
+		require.Error(t, err)
+		require.ErrorIs(t, err, context.Canceled)
+		wg.Done()
+	}
+
+	scheduler.Enqueue(TaskType{ID: 1, Policy: ReplacementPolicyCancelOld}, longRunningTask, resFn)
+
+	require.NotPanics(t, func() {
+		scheduler.Stop()
+		wg.Wait()
+	})
+}
