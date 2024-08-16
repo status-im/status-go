@@ -1,10 +1,12 @@
 package package_2
 
 import (
-	"github.com/status-im/status-go/flaky-packages/utils"
-	"testing"
 	"os"
+	"testing"
+
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/flaky-packages/utils"
 )
 
 func FailIfNoFile(t *testing.T, filename string) {
