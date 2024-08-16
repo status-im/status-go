@@ -99,30 +99,9 @@ echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
 rm -rf ./**/*.coverage.out
 
-if [[ $UNIT_TEST_RUN_PARALLEL == 'true' ]]; then
-  echo -e "${GRN}Running tests in parallel${RST}"
-  for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-    run_test_for_packages "${UNIT_TEST_PACKAGES}" "${i}"
-  done
-else
-  echo -e "${GRN}Running tests sequentially${RST}"
-  for package in ${UNIT_TEST_PACKAGES}; do
-    for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-      if ! is_parallelizable "${package}" || [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
-        run_test_for_package "${package}" "${i}"
-        go_test_exit=$?
-        if [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
-          if [[ "${go_test_exit}" -ne 0 ]]; then
-            exit "${go_test_exit}"
-          fi
-        fi
-      else
-        run_test_for_package "${package}" "${i}" &
-      fi
-    done
-    wait # Wait for all background jobs to finish
-  done
-fi
+for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
+  run_test_for_packages "${UNIT_TEST_PACKAGES}" "${i}"
+done
 
 # Gather test coverage results
 rm -f c.out c-full.out
