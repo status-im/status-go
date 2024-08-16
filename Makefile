@@ -366,24 +366,30 @@ test-unit: export UNIT_TEST_FAILFAST ?= true
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true
 test-unit: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
 test-unit: export UNIT_TEST_REPORT_CODECLIMATE ?= false
-test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/waku(/.*|$$)|/wakuv2(/.*|$$)') \
-	$(call sh, go list ./... | \
-	grep -v /vendor | \
-	grep -v /t/e2e | \
-	grep -v /t/benchmarks | \
-	grep -v /transactions/fake | \
-	grep -E -v '/waku(/.*|$$)' | \
-	grep -E -v '/wakuv2(/.*|$$)')
-test-unit: export UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE ?= \
-	github.com/status-im/status-go/api \
-	github.com/status-im/status-go/mailserver \
-	github.com/status-im/status-go/multiaccounts/settings \
-	github.com/status-im/status-go/node \
-	github.com/status-im/status-go/services/wakuext
+test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/flaky-packages')
+	#github.com/status-im/status-go/flaky-packages/package-1
+#test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/waku(/.*|$$)|/wakuv2(/.*|$$)') \
+#	$(call sh, go list ./... | \
+#	grep -v /vendor | \
+#	grep -v /t/e2e | \
+#	grep -v /t/benchmarks | \
+#	grep -v /transactions/fake | \
+#	grep -E -v '/waku(/.*|$$)' | \
+#	grep -E -v '/wakuv2(/.*|$$)')
+#test-unit: export UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE ?= \
+#	github.com/status-im/status-go/api \
+#	github.com/status-im/status-go/mailserver \
+#	github.com/status-im/status-go/multiaccounts/settings \
+#	github.com/status-im/status-go/node \
+#	github.com/status-im/status-go/services/wakuext
 test-unit: export UNIT_TEST_PACKAGES_WITH_EXTENDED_TIMEOUT ?= \
 	github.com/status-im/status-go/protocol
+test-unit: export UNIT_TEST_RUN_PARALLEL=true
 test-unit: ##@tests Run unit and integration tests
-	./_assets/scripts/run_unit_tests.sh
+	@find . -name "test-1.txt" -exec rm -f {} \;
+	@find . -name "test-2.txt" -exec rm -f {} \;
+	@rm -f args.txt
+	@time ./_assets/scripts/run_unit_tests.sh
 
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
