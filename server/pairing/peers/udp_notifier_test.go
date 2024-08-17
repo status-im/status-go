@@ -1,12 +1,14 @@
 package peers
 
 import (
+	"net"
 	"runtime"
 	"sync"
 	"testing"
 	"time"
 
 	udpp2p "github.com/schollz/peerdiscovery"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/server/servertest"
@@ -89,7 +91,9 @@ func (s *UDPPeerDiscoverySuite) TestUDPNotifier() {
 
 	wg.Wait()
 
-	s.Require().Len(tsl.log, 2)
+	niCount := ipv4AddressesCount(s.T())
+	s.Require().Len(tsl.log, niCount)
+
 	for _, address := range tsl.log {
 		s.Require().Len(address, 2)
 
@@ -99,4 +103,18 @@ func (s *UDPPeerDiscoverySuite) TestUDPNotifier() {
 			}
 		}
 	}
+}
+
+func ipv4AddressesCount(t *testing.T) int {
+	count := 0
+	addrs, _ := net.InterfaceAddrs()
+	for _, addr := range addrs {
+		ip, _, err := net.ParseCIDR(addr.String())
+		require.NoError(t, err)
+		require.NotNil(t, ip)
+		if ip != nil && ip.To4() != nil {
+			count++
+		}
+	}
+	return count
 }
