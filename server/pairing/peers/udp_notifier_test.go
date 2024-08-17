@@ -137,6 +137,7 @@ func ipv4AddressesCount(t *testing.T) int {
 				continue
 			}
 			supported = true
+			t.Logf("addr: %s", address)
 			break
 		}
 
