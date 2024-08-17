@@ -374,19 +374,7 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/wak
 	grep -v /transactions/fake | \
 	grep -E -v '/waku(/.*|$$)' | \
 	grep -E -v '/wakuv2(/.*|$$)')
-test-unit: export UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE ?= \
-	github.com/status-im/status-go/api \
-	github.com/status-im/status-go/mailserver \
-	github.com/status-im/status-go/multiaccounts/settings \
-	github.com/status-im/status-go/node \
-	github.com/status-im/status-go/services/wakuext \
-#test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/flaky-packages')
-#	#github.com/status-im/status-go/flaky-packages/package-1
-#test-unit: export UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE ?= \
-#	github.com/status-im/status-go/flaky-packages/package-1
 test-unit: ##@tests Run unit and integration tests
-	@find . -name "test-1.txt" -exec rm -f {} \;
-	@find . -name "test-2.txt" -exec rm -f {} \;
 	@time ./_assets/scripts/run_unit_tests.sh
 
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
