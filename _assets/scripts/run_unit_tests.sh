@@ -25,12 +25,7 @@ fi
 
 redirect_stdout() {
   output_file=$1
-
-  if [[ "${CI}" == 'true' ]]; then
-    cat > "${output_file}";
-  else
-    tee "${output_file}";
-  fi
+  tee "${output_file}";
 }
 
 is_parallelizable() {
@@ -71,12 +66,11 @@ run_test_for_packages() {
 
   local output_file="test_${iteration}.log"
   local coverage_file="test_${iteration}.coverage.out"
-
   local report_file="report_${iteration}.xml"
   local rerun_report_file="report_rerun_fails_${iteration}.txt"
   local exit_code_file="exit_code_${iteration}.txt"
 
-  echo -e "${GRN}Testing:${RST} ${packages} Iteration:${iteration}"
+  echo -e "${GRN}Testing:${RST} Iteration:${iteration}"
 
   gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"
   if [[ "${CI}" == 'true' ]]; then
@@ -123,12 +117,13 @@ echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 rm -rf ./**/*.coverage.out
 
 parallelism=$(nproc)
-packages_sequential="${UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE}"
-packages_parallel=$(filter_parallelizable_packages "${UNIT_TEST_PACKAGES}" "${UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE}")
+#packages_sequential="${UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE}"
+#packages_parallel=$(filter_parallelizable_packages "${UNIT_TEST_PACKAGES}" "${UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE}")
+packages_parallel="${UNIT_TEST_PACKAGES}"
 
 for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-  run_test_for_packages "${packages_parallel}" "parallel-${i}" "${parallelism}"
-  run_test_for_packages "${packages_sequential}" "sequential-${i}" "1"
+  run_test_for_packages "${packages_parallel}" "${i}" "${parallelism}"
+#  run_test_for_packages "${packages_sequential}" "sequential-${i}" "${parallelism}"
 done
 
 # Gather test coverage results
