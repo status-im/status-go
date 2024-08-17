@@ -108,7 +108,8 @@ func (s *UDPPeerDiscoverySuite) TestUDPNotifier() {
 func ipv4AddressesCount(t *testing.T) int {
 	count := 0
 	addrs, _ := net.InterfaceAddrs()
-	for _, addr := range addrs {
+	for i, addr := range addrs {
+		t.Logf("%d: addr: %s", i, addr.String())
 		ip, _, err := net.ParseCIDR(addr.String())
 		require.NoError(t, err)
 		require.NotNil(t, ip)
