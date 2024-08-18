@@ -375,7 +375,7 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/wak
 	grep -E -v '/waku(/.*|$$)' | \
 	grep -E -v '/wakuv2(/.*|$$)')
 test-unit: ##@tests Run unit and integration tests
-	@time ./_assets/scripts/run_unit_tests.sh
+	./_assets/scripts/run_unit_tests.sh
 
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
