@@ -56,7 +56,7 @@ var coinGeckoMapping = map[string]string{
 	"OP":    "optimism",
 }
 
-const baseURL = "https://api.coingecko.com/api/v3/"
+const baseURL = "https://api.coingecko.com/api/v3"
 
 type HistoricalPriceContainer struct {
 	Prices [][]float64 `json:"prices"`
@@ -83,7 +83,7 @@ type GeckoToken struct {
 type Client struct {
 	httpClient       *thirdparty.HTTPClient
 	tokens           map[string][]GeckoToken
-	tokensURL        string
+	baseURL          string
 	fetchTokensMutex sync.Mutex
 }
 
@@ -91,7 +91,7 @@ func NewClient() *Client {
 	return &Client{
 		httpClient: thirdparty.NewHTTPClient(),
 		tokens:     make(map[string][]GeckoToken),
-		tokensURL:  fmt.Sprintf("%scoins/list", baseURL),
+		baseURL:    baseURL,
 	}
 }
 
@@ -170,7 +170,7 @@ func (c *Client) getTokens() (map[string][]GeckoToken, error) {
 	params := url.Values{}
 	params.Add("include_platform", "true")
 
-	url := c.tokensURL
+	url := fmt.Sprintf("%s/coins/list", c.baseURL)
 	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
 	if err != nil {
 		return nil, err
@@ -212,7 +212,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 	params.Add("ids", strings.Join(maps.Values(ids), ","))
 	params.Add("vs_currencies", strings.Join(currencies, ","))
 
-	url := fmt.Sprintf("%ssimple/price", baseURL)
+	url := fmt.Sprintf("%s/simple/price", c.baseURL)
 	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
 	if err != nil {
 		return nil, err
@@ -269,7 +269,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 	params.Add("sparkline", "false")
 	params.Add("price_change_percentage", "1h,24h")
 
-	url := fmt.Sprintf("%scoins/markets", baseURL)
+	url := fmt.Sprintf("%s/coins/markets", c.baseURL)
 	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
 	if err != nil {
 		return nil, err
@@ -322,7 +322,7 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 	params.Add("vs_currency", currency)
 	params.Add("days", "30")
 
-	url := fmt.Sprintf("%scoins/%s/market_chart", baseURL, id)
+	url := fmt.Sprintf("%s/coins/%s/market_chart", c.baseURL, id)
 	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
 	if err != nil {
 		return nil, err
