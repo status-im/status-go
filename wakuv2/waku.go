@@ -318,7 +318,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 			pubsub.WithMaxMessageSize(int(waku.cfg.MaxMessageSize)),
 		}
 
-		if waku.logger.Level() == zap.DebugLevel {
+		if testing.Testing() {
 			relayOpts = append(relayOpts, pubsub.WithEventTracer(waku))
 		}
 
