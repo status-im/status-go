@@ -86,12 +86,8 @@ func (s *MessengerProfilePictureHandlerSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerProfilePictureHandlerSuite) generateKeyUID(publicKey *ecdsa.PublicKey) string {
-	return types.EncodeHex(crypto.FromECDSAPub(publicKey))
-}
-
 func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
-	keyUID := s.generateKeyUID(&m.identity.PublicKey)
+	keyUID := m.IdentityPublicKeyString()
 	m.account = &multiaccounts.Account{KeyUID: keyUID}
 
 	err := m.multiAccounts.SaveAccount(multiaccounts.Account{Name: "string", KeyUID: keyUID})
@@ -99,7 +95,7 @@ func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
 }
 
 func (s *MessengerProfilePictureHandlerSuite) generateAndStoreIdentityImages(m *Messenger) []images.IdentityImage {
-	keyUID := s.generateKeyUID(&m.identity.PublicKey)
+	keyUID := m.IdentityPublicKeyString()
 	iis := images.SampleIdentityImages()
 	s.Require().NoError(m.multiAccounts.StoreIdentityImages(keyUID, iis, false))
 
@@ -199,7 +195,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided()
 	err = s.alice.settings.SaveSettingField(settings.ProfilePicturesVisibility, settings.ProfilePicturesShowToEveryone)
 	s.Require().NoError(err)
 
-	bChat := CreateOneToOneChat(s.generateKeyUID(&s.aliceKey.PublicKey), &s.aliceKey.PublicKey, s.alice.transport)
+	bChat := CreateOneToOneChat(s.alice.IdentityPublicKeyString(), &s.aliceKey.PublicKey, s.alice.transport)
 	err = s.bob.SaveChat(bChat)
 	s.Require().NoError(err)
 
@@ -309,7 +305,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	s.logger.Debug("bob add contact before")
 	if args.bc {
 		s.logger.Debug("bob has contact to add")
-		_, err = s.bob.AddContact(context.Background(), &requests.AddContact{ID: s.generateKeyUID(&s.alice.identity.PublicKey)})
+		_, err = s.bob.AddContact(context.Background(), &requests.AddContact{ID: s.alice.IdentityPublicKeyString()})
 		s.Require().NoError(err)
 		s.logger.Debug("bob add contact after")
 	}
@@ -331,7 +327,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		s.logger.Debug("making privateChats for bob")
 
 		s.logger.Debug("Bob making one to one chat with alice")
-		bChat := CreateOneToOneChat(s.generateKeyUID(&s.aliceKey.PublicKey), &s.aliceKey.PublicKey, s.alice.transport)
+		bChat := CreateOneToOneChat(s.alice.IdentityPublicKeyString(), &s.aliceKey.PublicKey, s.alice.transport)
 		s.logger.Debug("Bob saving one to one chat with alice")
 		err = s.bob.SaveChat(bChat)
 		s.Require().NoError(err)
@@ -356,7 +352,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	s.logger.Debug("alice add contact before")
 	if args.ac {
 		s.logger.Debug("alice has contact to add")
-		_, err = s.alice.AddContact(context.Background(), &requests.AddContact{ID: s.generateKeyUID(&s.bob.identity.PublicKey)})
+		_, err = s.alice.AddContact(context.Background(), &requests.AddContact{ID: s.bob.IdentityPublicKeyString()})
 		s.Require().NoError(err)
 		s.logger.Debug("alice add contact after")
 	}
@@ -382,7 +378,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		s.logger.Debug("making privateChats for alice")
 
 		s.logger.Debug("Alice making one to one chat with bob")
-		aChat = CreateOneToOneChat(s.generateKeyUID(&s.bobKey.PublicKey), &s.bobKey.PublicKey, s.bob.transport)
+		aChat = CreateOneToOneChat(s.bob.IdentityPublicKeyString(), &s.bobKey.PublicKey, s.bob.transport)
 		s.logger.Debug("Alice saving one to one chat with bob")
 		err = s.alice.SaveChat(aChat)
 		s.Require().NoError(err)
@@ -454,7 +450,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	// Check if alice's contact data with profile picture is there
 	var contact *Contact
 	for _, c := range contacts {
-		if c.ID == s.generateKeyUID(&s.alice.identity.PublicKey) {
+		if c.ID == s.alice.IdentityPublicKeyString() {
 			contact = c
 		}
 	}
