@@ -158,7 +158,6 @@ var propagateErrors = []error{
 	vm.ErrNonceUintOverflow,
 
 	// Used by balance history to check state
-	ethereum.NotFound,
 	bind.ErrNoCode,
 }
 
@@ -205,6 +204,13 @@ func (c *ClientWithFallback) Close() {
 	for _, client := range c.ethClients {
 		client.ethClient.Close()
 	}
+}
+
+// Not found should not be cancelling the requests, as that's returned
+// when we are hitting a non archival node for example, it should continue the
+// chain as the next provider might have archival support.
+func isNotFoundError(err error) bool {
+	return strings.Contains(err.Error(), ethereum.NotFound.Error())
 }
 
 func isVMError(err error) bool {
@@ -972,7 +978,7 @@ func (c *ClientWithFallback) SetWalletNotifier(notifier func(chainId uint64, mes
 func (c *ClientWithFallback) toggleConnectionState(err error) {
 	connected := true
 	if err != nil {
-		if !isVMError(err) && !errors.Is(err, ErrRequestsOverLimit) && !errors.Is(err, context.Canceled) {
+		if !isNotFoundError(err) && !isVMError(err) && !errors.Is(err, ErrRequestsOverLimit) && !errors.Is(err, context.Canceled) {
 			log.Warn("Error not in chain call", "error", err, "chain", c.ChainID)
 			connected = false
 		} else {
