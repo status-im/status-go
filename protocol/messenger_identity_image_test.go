@@ -97,7 +97,9 @@ func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
 func (s *MessengerProfilePictureHandlerSuite) generateAndStoreIdentityImages(m *Messenger) []images.IdentityImage {
 	keyUID := m.IdentityPublicKeyString()
 	iis := images.SampleIdentityImages()
-	s.Require().NoError(m.multiAccounts.StoreIdentityImages(keyUID, iis, false))
+
+	err := m.multiAccounts.StoreIdentityImages(keyUID, iis, false)
+	s.Require().NoError(err)
 
 	return iis
 }
@@ -344,6 +346,12 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		err = s.alice.SaveChat(aChat)
 		s.Require().NoError(err)
 
+		// Alice sends a message to the public chat
+		message := buildTestMessage(*aChat)
+		response, err := s.alice.SendChatMessage(context.Background(), message)
+		s.Require().NoError(err)
+		s.Require().NotNil(response)
+
 	case privateChat:
 		aChat = CreateOneToOneChat(s.bob.IdentityPublicKeyString(), &s.bobKey.PublicKey, s.bob.transport)
 		err = s.alice.SaveChat(aChat)
@@ -358,12 +366,6 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		s.Failf("unexpected chat context type", "%s", string(args.cc))
 	}
 
-	// Alice sends a message to the public chat
-	message := buildTestMessage(*aChat)
-	response, err := s.alice.SendChatMessage(context.Background(), message)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
 	// Poll bob to see if he got the chatIdentity
 	// Retrieve ChatIdentity
 	var contacts []*Contact
@@ -372,7 +374,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		b.MaxElapsedTime = 2 * time.Second
 	}
 	err = tt.RetryWithBackOff(func() error {
-		response, err = s.bob.RetrieveAll()
+		response, err := s.bob.RetrieveAll()
 		if err != nil {
 			return err
 		}
