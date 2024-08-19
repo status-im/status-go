@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/afex/hystrix-go/hystrix"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 type FallbackFunc func() ([]any, error)
@@ -78,6 +80,16 @@ func NewFunctor(exec FallbackFunc, circuitName string) *Functor {
 	}
 }
 
+func accumulateCommandError(result CommandResult, circuitName string, err error) CommandResult {
+	// Accumulate errors
+	if result.err != nil {
+		result.err = fmt.Errorf("%w, %s.error: %w", result.err, circuitName, err)
+	} else {
+		result.err = fmt.Errorf("%s.error: %w", circuitName, err)
+	}
+	return result
+}
+
 // Executes the command in its circuit if set.
 // If the command's circuit is not configured, the circuit of the CircuitBreaker is used.
 // This is a blocking function.
@@ -127,6 +139,16 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 				if err == nil {
 					result = CommandResult{res: res}
 				}
+
+				// If the command has been cancelled, we don't count
+				// the error towars breaking the circuit, and then we break
+				if cmd.cancel {
+					result = accumulateCommandError(result, f.circuitName, err)
+					return nil
+				}
+				if err != nil {
+					log.Warn("hystrix error", "error", err, "provider", circuitName)
+				}
 				return err
 			}, nil)
 		}
@@ -134,12 +156,8 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 			break
 		}
 
-		// Accumulate errors
-		if result.err != nil {
-			result.err = fmt.Errorf("%w, %s.error: %w", result.err, f.circuitName, err)
-		} else {
-			result.err = fmt.Errorf("%s.error: %w", f.circuitName, err)
-		}
+		result = accumulateCommandError(result, f.circuitName, err)
+
 		// Lets abuse every provider with the same amount of MaxConcurrentRequests,
 		// keep iterating even in case of ErrMaxConcurrency error
 	}

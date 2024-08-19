@@ -493,7 +493,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
-	selectedFromChains, selectedTohains, err := r.getSelectedChains(input)
+	selectedFromChains, selectedToChains, err := r.getSelectedChains(input)
 	if err != nil {
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
@@ -504,7 +504,7 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
-	candidates, processorErrors, err := r.resolveCandidates(ctx, input, selectedFromChains, selectedTohains, balanceMap)
+	candidates, processorErrors, err := r.resolveCandidates(ctx, input, selectedFromChains, selectedToChains, balanceMap)
 	if err != nil {
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
@@ -744,7 +744,7 @@ func (r *Router) findOptionsForSendingAmount(input *RouteInputParams, selectedFr
 	return crossChainAmountOptions, nil
 }
 
-func (r *Router) getSelectedChains(input *RouteInputParams) (selectedFromChains []*params.Network, selectedTohains []*params.Network, err error) {
+func (r *Router) getSelectedChains(input *RouteInputParams) (selectedFromChains []*params.Network, selectedToChains []*params.Network, err error) {
 	var networks []*params.Network
 	networks, err = r.rpcClient.NetworkManager.Get(false)
 	if err != nil {
@@ -761,15 +761,15 @@ func (r *Router) getSelectedChains(input *RouteInputParams) (selectedFromChains 
 		}
 
 		if !containsNetworkChainID(network.ChainID, input.DisabledToChainIDs) {
-			selectedTohains = append(selectedTohains, network)
+			selectedToChains = append(selectedToChains, network)
 		}
 	}
 
-	return selectedFromChains, selectedTohains, nil
+	return selectedFromChains, selectedToChains, nil
 }
 
 func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams, selectedFromChains []*params.Network,
-	selectedTohains []*params.Network, balanceMap map[string]*big.Int) (candidates []*PathV2, processorErrors []*ProcessorError, err error) {
+	selectedToChains []*params.Network, balanceMap map[string]*big.Int) (candidates []*PathV2, processorErrors []*ProcessorError, err error) {
 	var (
 		testsMode = input.testsMode && input.testParams != nil
 		group     = async.NewAtomicGroup(ctx)
@@ -859,7 +859,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 						continue
 					}
 
-					for _, dest := range selectedTohains {
+					for _, dest := range selectedToChains {
 
 						if !input.SendType.isAvailableFor(network) {
 							continue

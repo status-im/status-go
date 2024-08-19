@@ -61,9 +61,11 @@ func TestManager_FetchAllAssetsByOwner(t *testing.T) {
 	rpcClient := mock_rpcclient.NewMockClientInterface(mockCtrl)
 	rpcClient.EXPECT().EthClient(gomock.Any()).Return(chainClient, nil).AnyTimes()
 	mockProvider1 := mock_thirdparty.NewMockCollectibleAccountOwnershipProvider(mockCtrl)
+	// We use 2 providers as the last one is not using hystrix
+	mockProvider2 := mock_thirdparty.NewMockCollectibleAccountOwnershipProvider(mockCtrl)
 
 	mockProviders := thirdparty.CollectibleProviders{
-		AccountOwnershipProviders: []thirdparty.CollectibleAccountOwnershipProvider{mockProvider1},
+		AccountOwnershipProviders: []thirdparty.CollectibleAccountOwnershipProvider{mockProvider1, mockProvider2},
 	}
 
 	// Generate many collectibles, but none support toeknURI method, but circuit must not be tripped
@@ -90,6 +92,10 @@ func TestManager_FetchAllAssetsByOwner(t *testing.T) {
 	mockProvider1.EXPECT().IsConnected().Return(true).AnyTimes()
 	mockProvider1.EXPECT().ID().Return(providerID).AnyTimes()
 	mockProvider1.EXPECT().FetchAllAssetsByOwner(gomock.Any(), chainID, owner, cursor, limit).Return(mockAssetContainer, nil)
+
+	mockProvider2.EXPECT().IsChainSupported(chainID).Return(true).AnyTimes()
+	mockProvider2.EXPECT().IsConnected().Return(true).AnyTimes()
+	mockProvider2.EXPECT().ID().Return(providerID).AnyTimes()
 
 	manager := NewManager(nil, rpcClient, nil, mockProviders, nil, nil)
 	manager.statuses = &sync.Map{}
