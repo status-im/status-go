@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/contracts/erc721"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
@@ -150,6 +151,9 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 
 	useSafeTransferFrom := true
 	inputParams := ProcessorInputParams{
+		FromChain: &params.Network{
+			ChainID: sendArgs.ChainID,
+		},
 		FromAddr: from,
 		ToAddr:   sendArgs.ERC721TransferTx.Recipient,
 		FromToken: &token.Token{
