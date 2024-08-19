@@ -50,11 +50,11 @@ run_test_for_packages() {
 
   # Run tests
   PACKAGES=${packages} \
+  UNIT_TEST_COUNT=${UNIT_TEST_COUNT} \
   gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
     ./_assets/scripts/test-with-coverage.sh \
     -v ${GOTEST_EXTRAFLAGS} \
     -timeout 45m \
-    -count 1 \
     -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
 
@@ -84,9 +84,9 @@ echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
 rm -rf ./**/*.coverage.out
 
-for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-  run_test_for_packages "${UNIT_TEST_PACKAGES}" "${i}"
-done
+#for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
+run_test_for_packages "${UNIT_TEST_PACKAGES}" "1"
+#done
 
 # Gather test coverage results
 rm -f c.out c-full.out
