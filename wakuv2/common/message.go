@@ -185,7 +185,8 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	result.Padding = raw.Padding
 	result.Signature = raw.Signature
 	result.Src = raw.PubKey
-
+	result.SymKeyHash = msg.SymKeyHash
+	result.Dst = msg.Dst
 	result.Sent = uint32(msg.Envelope.Message().GetTimestamp() / int64(time.Second))
 
 	ct, err := ExtractTopicFromContentTopic(msg.Envelope.Message().ContentTopic)

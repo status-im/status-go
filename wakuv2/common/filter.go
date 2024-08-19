@@ -235,23 +235,24 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 	}
 
 	for _, watcher := range candidates {
-		matched = true
+		// Messages are decrypted successfully only once
 		if decodedMsg == nil {
 			decodedMsg = recvMessage.Open(watcher)
 			if decodedMsg == nil {
 				log.Debug("processing message: failed to open", "message", recvMessage.Hash().Hex(), "filter", watcher.id)
+				continue
 			}
-		} else {
-			matched = watcher.MatchMessage(decodedMsg)
 		}
 
-		if matched && decodedMsg != nil {
+		if watcher.MatchMessage(decodedMsg) {
+			matched = true
 			log.Debug("processing message: decrypted", "envelopeHash", recvMessage.Hash().Hex())
 			if watcher.Src == nil || IsPubKeyEqual(decodedMsg.Src, watcher.Src) {
 				watcher.Trigger(decodedMsg)
 			}
 		}
 	}
+
 	return matched
 }
 
@@ -292,6 +293,8 @@ func (f *Filter) MatchMessage(msg *ReceivedMessage) bool {
 		return IsPubKeyEqual(&f.KeyAsym.PublicKey, msg.Dst)
 	} else if f.expectsSymmetricEncryption() && msg.isSymmetricEncryption() {
 		return f.SymKeyHash == msg.SymKeyHash
+	} else if !f.expectsAsymmetricEncryption() && !f.expectsSymmetricEncryption() && !msg.isAsymmetricEncryption() && !msg.isSymmetricEncryption() {
+		return true
 	}
 	return false
 }
