@@ -94,14 +94,23 @@ func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
 	s.NoError(err)
 }
 
-func (s *MessengerProfilePictureHandlerSuite) generateAndStoreIdentityImages(m *Messenger) []images.IdentityImage {
+func (s *MessengerProfilePictureHandlerSuite) generateAndStoreIdentityImages(m *Messenger) map[string]images.IdentityImage {
 	keyUID := m.IdentityPublicKeyString()
 	iis := images.SampleIdentityImages()
 
 	err := m.multiAccounts.StoreIdentityImages(keyUID, iis, false)
 	s.Require().NoError(err)
 
-	return iis
+	out := make(map[string]images.IdentityImage)
+
+	for _, ii := range iis {
+		out[ii.Name] = ii
+	}
+
+	s.Require().Contains(out, images.SmallDimName)
+	s.Require().Contains(out, images.LargeDimName)
+
+	return out
 }
 
 func (s *MessengerProfilePictureHandlerSuite) TestChatIdentity() {
@@ -362,6 +371,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 
 		err = s.alice.publishContactCode()
 		s.Require().NoError(err)
+
 	default:
 		s.Failf("unexpected chat context type", "%s", string(args.cc))
 	}
@@ -381,7 +391,6 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 
 		contacts = response.Contacts
 		if len(contacts) > 0 && len(contacts[0].Images) > 0 {
-			s.logger.Debug("", zap.Any("contacts", contacts))
 			return nil
 		}
 
@@ -410,35 +419,15 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	case publicChat:
 		// In public chat context we only need the images.SmallDimName, but also may have the large
 		s.Require().GreaterOrEqual(len(contact.Images), 1)
+		s.Require().Contains(contact.Images, images.SmallDimName)
+		s.Require().Equal(iis[images.SmallDimName].Payload, contact.Images[images.SmallDimName].Payload)
 
-		// Check if the result matches expectation
-		smImg, ok := contact.Images[images.SmallDimName]
-		s.Require().True(ok, "contact images must contain the images.SmallDimName")
-
-		for _, ii := range iis {
-			if ii.Name == images.SmallDimName {
-				s.Require().Equal(ii.Payload, smImg.Payload)
-			}
-		}
 	case privateChat:
 		s.Require().Equal(len(contact.Images), 2)
-		s.logger.Info("private chat chat images", zap.Any("iis", iis))
-
-		// Check if the result matches expectation
-		smImg, ok := contact.Images[images.SmallDimName]
-		s.Require().True(ok, "contact images must contain the images.SmallDimName")
-
-		lgImg, ok := contact.Images[images.LargeDimName]
-		s.Require().True(ok, "contact images must contain the images.LargeDimName")
-
-		for _, ii := range iis {
-			switch ii.Name {
-			case images.SmallDimName:
-				s.Require().Equal(ii.Payload, smImg.Payload)
-			case images.LargeDimName:
-				s.Require().Equal(ii.Payload, lgImg.Payload)
-			}
-		}
+		s.Require().Contains(contact.Images, images.SmallDimName)
+		s.Require().Contains(contact.Images, images.LargeDimName)
+		s.Require().Equal(iis[images.SmallDimName].Payload, contact.Images[images.SmallDimName].Payload)
+		s.Require().Equal(iis[images.LargeDimName].Payload, contact.Images[images.LargeDimName].Payload)
 	}
 }
 
