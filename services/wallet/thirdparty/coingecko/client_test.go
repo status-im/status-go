@@ -72,7 +72,7 @@ func TestGetTokensSuccess(t *testing.T) {
 	geckoClient := &Client{
 		httpClient: thirdparty.NewHTTPClient(),
 		tokens:     make(map[string][]GeckoToken),
-		tokensURL:  srv.URL,
+		baseURL:    srv.URL,
 	}
 
 	tokenMap, err := geckoClient.getTokens()
@@ -154,7 +154,7 @@ func TestGetTokensEthPlatform(t *testing.T) {
 	geckoClient := &Client{
 		httpClient: thirdparty.NewHTTPClient(),
 		tokens:     make(map[string][]GeckoToken),
-		tokensURL:  srv.URL,
+		baseURL:    srv.URL,
 	}
 
 	tokenMap, err := geckoClient.getTokens()
@@ -170,7 +170,7 @@ func TestGetTokensFailure(t *testing.T) {
 	geckoClient := &Client{
 		httpClient: thirdparty.NewHTTPClient(),
 		tokens:     make(map[string][]GeckoToken),
-		tokensURL:  srv.URL,
+		baseURL:    srv.URL,
 	}
 
 	_, err := geckoClient.getTokens()
@@ -200,7 +200,7 @@ func TestFetchPrices(t *testing.T) {
 	geckoClient := &Client{
 		httpClient: thirdparty.NewHTTPClient(),
 		tokens:     make(map[string][]GeckoToken),
-		tokensURL:  srv.URL + "/coins/list",
+		baseURL:    srv.URL,
 	}
 
 	symbols := []string{"ETH", "SNT", "UNSUPPORTED", "TOKENS"}
@@ -232,7 +232,7 @@ func TestFetchMarketValues(t *testing.T) {
 	geckoClient := &Client{
 		httpClient: thirdparty.NewHTTPClient(),
 		tokens:     make(map[string][]GeckoToken),
-		tokensURL:  srv.URL + "/coins/list",
+		baseURL:    srv.URL,
 	}
 
 	symbols := []string{"ETH", "SNT", "UNSUPPORTED", "TOKENS"}
