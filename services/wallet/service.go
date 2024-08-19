@@ -120,6 +120,7 @@ func NewService(
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
 	cryptoCompareProxy := cryptocompare.NewClientWithParams(cryptocompare.Params{
+		ID:       fmt.Sprintf("%s-proxy", cryptoCompare.ID()),
 		URL:      fmt.Sprintf("https://%s.api.status.im/cryptocompare/", statusProxyStageName),
 		User:     config.WalletConfig.StatusProxyMarketUser,
 		Password: config.WalletConfig.StatusProxyMarketPassword,
