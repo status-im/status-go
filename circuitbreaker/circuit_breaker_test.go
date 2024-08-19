@@ -241,10 +241,63 @@ func TestCircuitBreaker_CircuitExistsAndClosed(t *testing.T) {
 	cb := NewCircuitBreaker(Config{})
 	cmd := NewCommand(context.TODO(), nil)
 	existCircuit := fmt.Sprintf("existing_%d", timestamp) // unique name to avoid conflicts with go tests `-count` option
+	// We add it twice as otherwise it's only used for the fallback
+	cmd.Add(NewFunctor(func() ([]interface{}, error) {
+		return nil, nil
+	}, existCircuit))
+
 	cmd.Add(NewFunctor(func() ([]interface{}, error) {
 		return nil, nil
 	}, existCircuit))
 	_ = cb.Execute(cmd)
 	require.True(t, CircuitExists(existCircuit))
 	require.False(t, IsCircuitOpen(existCircuit))
+}
+
+func TestCircuitBreaker_Fallback(t *testing.T) {
+	cb := NewCircuitBreaker(Config{
+		RequestVolumeThreshold: 1, // 1 failed request is enough to trip the circuit
+		SleepWindow:            50000,
+		ErrorPercentThreshold:  1, // Trip on first error
+	})
+
+	circuitName := fmt.Sprintf("Fallback_%d", time.Now().Nanosecond()) // unique name to avoid conflicts with go tests `-count` option
+
+	prov1Called := 0
+
+	var ctx context.Context
+	expectedErr := errors.New("provider 1 failed")
+
+	// we start with 2, and we open the first
+	for {
+		cmd := NewCommand(ctx, nil)
+		cmd.Add(NewFunctor(func() ([]interface{}, error) {
+			return nil, expectedErr
+		}, circuitName+"1"))
+		cmd.Add(NewFunctor(func() ([]interface{}, error) {
+			return nil, errors.New("provider 2 failed")
+		}, circuitName+"2"))
+
+		result := cb.Execute(cmd)
+		require.NotNil(t, result.Error())
+		if IsCircuitOpen(circuitName + "1") {
+			break
+		}
+	}
+
+	// Make sure circuit is open
+	require.True(t, CircuitExists(circuitName+"1"))
+	require.True(t, IsCircuitOpen(circuitName+"1"))
+
+	// we send a single request, it should hit the provider, at that's a fallback
+	cmd := NewCommand(ctx, nil)
+	cmd.Add(NewFunctor(func() ([]interface{}, error) {
+		prov1Called++
+		return nil, expectedErr
+	}, circuitName+"1"))
+
+	result := cb.Execute(cmd)
+	require.True(t, errors.Is(result.Error(), expectedErr))
+
+	assert.Equal(t, 1, prov1Called)
 }
