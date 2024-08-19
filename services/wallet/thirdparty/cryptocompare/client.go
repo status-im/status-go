@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
 )
 
+const baseID = "cryptocompare"
 const extraParamStatus = "Status.im"
 const baseURL = "https://min-api.cryptocompare.com"
 
@@ -34,22 +35,24 @@ type MarketValuesContainer struct {
 }
 
 type Params struct {
+	ID       string
 	URL      string
 	User     string
 	Password string
 }
 
 type Client struct {
+	id         string
 	httpClient *thirdparty.HTTPClient
 	baseURL    string
 	creds      *thirdparty.BasicCreds
 }
 
 func NewClient() *Client {
-	return &Client{
-		httpClient: thirdparty.NewHTTPClient(),
-		baseURL:    baseURL,
-	}
+	return NewClientWithParams(Params{
+		ID:  baseID,
+		URL: baseURL,
+	})
 }
 
 func NewClientWithParams(params Params) *Client {
@@ -62,6 +65,7 @@ func NewClientWithParams(params Params) *Client {
 	}
 
 	return &Client{
+		id:         params.ID,
 		httpClient: thirdparty.NewHTTPClient(),
 		baseURL:    params.URL,
 		creds:      creds,
@@ -215,5 +219,5 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 }
 
 func (c *Client) ID() string {
-	return "cryptocompare"
+	return c.id
 }
