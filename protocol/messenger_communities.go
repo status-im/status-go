@@ -1531,6 +1531,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		rawMessage.Payload = payload
 
 		for _, member := range rawMessage.Recipients {
+			rawMessage.Sender = nil
 			_, err := m.sender.SendPrivate(context.Background(), member, rawMessage)
 			if err != nil {
 				return nil, err
