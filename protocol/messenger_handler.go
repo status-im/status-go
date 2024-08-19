@@ -9,6 +9,9 @@ import (
 	"sync"
 	"time"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+
+	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/signal"
 
@@ -3376,6 +3379,18 @@ func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount, fr
 		return nil, err
 	}
 
+	if m.config.accountsFeed != nil {
+		var eventType accountsevent.EventType
+		if acc.Removed {
+			eventType = accountsevent.EventTypeRemoved
+		} else {
+			eventType = accountsevent.EventTypeAdded
+		}
+		m.config.accountsFeed.Send(accountsevent.Event{
+			Type:     eventType,
+			Accounts: []gethcommon.Address{gethcommon.Address(acc.Address)},
+		})
+	}
 	return acc, nil
 }
 
@@ -3676,6 +3691,40 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 	if err != nil {
 		return nil, err
 	}
+
+	if m.config.accountsFeed != nil {
+		addedAddresses := []gethcommon.Address{}
+		removedAddresses := []gethcommon.Address{}
+		if dbKeypair.Removed {
+			for _, acc := range dbKeypair.Accounts {
+				removedAddresses = append(removedAddresses, gethcommon.Address(acc.Address))
+			}
+			m.config.accountsFeed.Send(accountsevent.Event{
+				Type:     accountsevent.EventTypeRemoved,
+				Accounts: removedAddresses,
+			})
+		} else {
+			for _, acc := range dbKeypair.Accounts {
+				if acc.Chat {
+					continue
+				}
+				if acc.Removed {
+					removedAddresses = append(removedAddresses, gethcommon.Address(acc.Address))
+				} else {
+					addedAddresses = append(addedAddresses, gethcommon.Address(acc.Address))
+				}
+			}
+			m.config.accountsFeed.Send(accountsevent.Event{
+				Type:     accountsevent.EventTypeAdded,
+				Accounts: addedAddresses,
+			})
+			m.config.accountsFeed.Send(accountsevent.Event{
+				Type:     accountsevent.EventTypeRemoved,
+				Accounts: removedAddresses,
+			})
+		}
+	}
+
 	return dbKeypair, nil
 }
 

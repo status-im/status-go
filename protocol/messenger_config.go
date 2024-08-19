@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/ethereum/go-ethereum/event"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
@@ -120,6 +122,8 @@ type config struct {
 	messageResendMaxCount int
 
 	communityManagerOptions []communities.ManagerOption
+
+	accountsFeed *event.Feed
 }
 
 func messengerDefaultConfig() config {
@@ -411,6 +415,13 @@ func WithCollectiblesManager(collectiblesManager communities.CollectiblesManager
 func WithAccountManager(accountManager account.Manager) Option {
 	return func(c *config) error {
 		c.accountsManager = accountManager
+		return nil
+	}
+}
+
+func WithAccountsFeed(feed *event.Feed) Option {
+	return func(c *config) error {
+		c.accountsFeed = feed
 		return nil
 	}
 }

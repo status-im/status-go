@@ -17,6 +17,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/appdatabase"
@@ -136,7 +137,9 @@ func TestInitProtocol(t *testing.T) {
 	defer func() { require.NoError(t, cleanupWalletDB()) }()
 	require.NoError(t, err)
 
-	err = service.InitProtocol("Test", privateKey, appDB, walletDB, nil, multiAccounts, acc, nil, nil, nil, nil, nil, zap.NewNop())
+	accountsFeed := &event.Feed{}
+
+	err = service.InitProtocol("Test", privateKey, appDB, walletDB, nil, multiAccounts, acc, nil, nil, nil, nil, nil, zap.NewNop(), accountsFeed)
 	require.NoError(t, err)
 }
 
@@ -207,7 +210,9 @@ func (s *ShhExtSuite) createAndAddNode() {
 	walletDB, err := helpers.SetupTestMemorySQLDB(&walletdatabase.DbInitializer{})
 	s.Require().NoError(err)
 
-	err = service.InitProtocol("Test", privateKey, appDB, walletDB, nil, multiAccounts, acc, nil, nil, nil, nil, nil, zap.NewNop())
+	accountsFeed := &event.Feed{}
+
+	err = service.InitProtocol("Test", privateKey, appDB, walletDB, nil, multiAccounts, acc, nil, nil, nil, nil, nil, zap.NewNop(), accountsFeed)
 	s.NoError(err)
 
 	stack.RegisterLifecycle(service)

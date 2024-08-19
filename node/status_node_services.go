@@ -74,7 +74,6 @@ var (
 )
 
 func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server.MediaServer) error {
-	accountsFeed := &event.Feed{}
 	settingsFeed := &event.Feed{}
 	accDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
@@ -97,7 +96,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.CommunityTokensService())
 	services = append(services, b.stickersService(accDB))
 	services = append(services, b.updatesService())
-	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed, accDB, mediaServer))
+	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(&b.accountsFeed, accDB, mediaServer))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
@@ -109,7 +108,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
 	// Keep this initialization before the other two
 	if config.WalletConfig.Enabled {
-		walletService := b.walletService(accDB, b.appDB, accountsFeed, settingsFeed, &b.walletFeed, config.WalletConfig.StatusProxyStageName)
+		walletService := b.walletService(accDB, b.appDB, &b.accountsFeed, settingsFeed, &b.walletFeed, config.WalletConfig.StatusProxyStageName)
 		services = append(services, walletService)
 	}
 
@@ -573,6 +572,10 @@ func (b *StatusNode) appgeneralService() *appgeneral.Service {
 
 func (b *StatusNode) WalletService() *wallet.Service {
 	return b.walletSrvc
+}
+
+func (b *StatusNode) AccountsFeed() *event.Feed {
+	return &b.accountsFeed
 }
 
 func (b *StatusNode) SetWalletCommunityInfoProvider(provider thirdparty.CommunityInfoProvider) {
