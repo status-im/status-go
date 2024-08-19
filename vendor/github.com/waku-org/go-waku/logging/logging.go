@@ -157,3 +157,7 @@ func Uint64(key string, value uint64) zap.Field {
 	valueStr := fmt.Sprintf("%v", value)
 	return zap.String(key, valueStr)
 }
+
+func UTCTime(key string, t time.Time) zap.Field {
+	return zap.Time(key, t.UTC())
+}

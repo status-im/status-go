@@ -207,11 +207,11 @@ func (c *PeerConnectionStrategy) canDialPeer(pi peer.AddrInfo) bool {
 		now := time.Now()
 		if now.Before(tv.nextTry) {
 			c.logger.Debug("Skipping connecting to peer due to backoff strategy",
-				zap.Time("currentTime", now), zap.Time("until", tv.nextTry))
+				logging.UTCTime("currentTime", now), logging.UTCTime("until", tv.nextTry))
 			return false
 		}
 		c.logger.Debug("Proceeding with connecting to peer",
-			zap.Time("currentTime", now), zap.Time("nextTry", tv.nextTry))
+			logging.UTCTime("currentTime", now), logging.UTCTime("nextTry", tv.nextTry))
 	}
 	return true
 }
@@ -228,7 +228,7 @@ func (c *PeerConnectionStrategy) addConnectionBackoff(peerID peer.ID) {
 		cachedPeer = &connCacheData{strat: c.backoff()}
 		cachedPeer.nextTry = time.Now().Add(cachedPeer.strat.Delay())
 		c.logger.Debug("Initializing connectionCache for peer ",
-			logging.HostID("peerID", peerID), zap.Time("until", cachedPeer.nextTry))
+			logging.HostID("peerID", peerID), logging.UTCTime("until", cachedPeer.nextTry))
 		c.cache.Add(peerID, cachedPeer)
 	}
 }

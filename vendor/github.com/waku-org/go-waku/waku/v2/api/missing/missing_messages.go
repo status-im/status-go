@@ -20,6 +20,7 @@ import (
 )
 
 const maxContentTopicsPerRequest = 10
+const maxMsgHashesPerRequest = 50
 
 // MessageTracker should keep track of messages it has seen before and
 // provide a way to determine whether a message exists or not. This
@@ -247,38 +248,55 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 		return nil
 	}
 
-	result, err = m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (*store.Result, error) {
-		return m.store.QueryByHash(ctx, missingHashes, store.WithPeer(interest.peerID), store.WithPaging(false, 100))
-	}, logger, "retrieving missing messages")
-	if err != nil {
-		if !errors.Is(err, context.Canceled) {
-			logger.Error("storenode not available", zap.Error(err))
-		}
-		return err
-	}
-
-	for !result.IsComplete() {
-		for _, mkv := range result.Messages() {
-			select {
-			case c <- protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic()):
-			default:
-				m.logger.Warn("subscriber is too slow!")
-			}
+	wg := sync.WaitGroup{}
+	// Split into batches
+	for i := 0; i < len(missingHashes); i += maxMsgHashesPerRequest {
+		j := i + maxMsgHashesPerRequest
+		if j > len(missingHashes) {
+			j = len(missingHashes)
 		}
 
-		result, err = m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (*store.Result, error) {
-			if err = result.Next(ctx); err != nil {
-				return nil, err
+		wg.Add(1)
+		go func(messageHashes []pb.MessageHash) {
+			defer wg.Wait()
+
+			result, err := m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (*store.Result, error) {
+				return m.store.QueryByHash(ctx, messageHashes, store.WithPeer(interest.peerID), store.WithPaging(false, maxMsgHashesPerRequest))
+			}, logger, "retrieving missing messages")
+			if err != nil {
+				if !errors.Is(err, context.Canceled) {
+					logger.Error("storenode not available", zap.Error(err))
+				}
+				return
 			}
-			return result, nil
-		}, logger.With(zap.String("cursor", hex.EncodeToString(result.Cursor()))), "retrieving next page")
-		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				logger.Error("storenode not available", zap.Error(err))
+
+			for !result.IsComplete() {
+				for _, mkv := range result.Messages() {
+					select {
+					case c <- protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic()):
+					default:
+						m.logger.Warn("subscriber is too slow!")
+					}
+				}
+
+				result, err = m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (*store.Result, error) {
+					if err = result.Next(ctx); err != nil {
+						return nil, err
+					}
+					return result, nil
+				}, logger.With(zap.String("cursor", hex.EncodeToString(result.Cursor()))), "retrieving next page")
+				if err != nil {
+					if !errors.Is(err, context.Canceled) {
+						logger.Error("storenode not available", zap.Error(err))
+					}
+					return
+				}
 			}
-			return err
-		}
+
+		}(missingHashes[i:j])
 	}
+
+	wg.Wait()
 
 	return nil
 }
