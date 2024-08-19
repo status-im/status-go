@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const DefaultMaxHashQueryLength = 100
+const DefaultMaxHashQueryLength = 50
 const DefaultHashQueryInterval = 3 * time.Second
 const DefaultMessageSentPeriod = 3    // in seconds
 const DefaultMessageExpiredPerid = 10 // in seconds
@@ -216,7 +216,7 @@ func (m *MessageSentCheck) messageHashBasedQuery(ctx context.Context, hashes []c
 		messageHashes[i] = pb.ToMessageHash(hash.Bytes())
 	}
 
-	m.logger.Debug("store.queryByHash request", zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", selectedPeer), zap.Any("messageHashes", messageHashes))
+	m.logger.Debug("store.queryByHash request", zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", selectedPeer), zap.Stringers("messageHashes", messageHashes))
 
 	result, err := m.store.QueryByHash(ctx, messageHashes, opts...)
 	if err != nil {
@@ -248,8 +248,8 @@ func (m *MessageSentCheck) messageHashBasedQuery(ctx context.Context, hashes []c
 		}
 	}
 
-	m.logger.Debug("ack message hashes", zap.Any("ackHashes", ackHashes))
-	m.logger.Debug("missed message hashes", zap.Any("missedHashes", missedHashes))
+	m.logger.Debug("ack message hashes", zap.Stringers("ackHashes", ackHashes))
+	m.logger.Debug("missed message hashes", zap.Stringers("missedHashes", missedHashes))
 
 	return append(ackHashes, missedHashes...)
 }

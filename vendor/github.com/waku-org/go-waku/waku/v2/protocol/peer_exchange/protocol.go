@@ -7,6 +7,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
@@ -17,6 +18,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/enr"
+	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange/pb"
 	"github.com/waku-org/go-waku/waku/v2/service"
 	"go.uber.org/zap"
@@ -155,8 +157,38 @@ func (wakuPX *WakuPeerExchange) Stop() {
 	})
 }
 
+func (wakuPX *WakuPeerExchange) DefaultPredicate() discv5.Predicate {
+	return discv5.FilterPredicate(func(n *enode.Node) bool {
+		localRS, err := wenr.RelaySharding(wakuPX.disc.Node().Record())
+		if err != nil {
+			return false
+		}
+
+		if localRS == nil { // No shard registered, so no need to check for shards
+			return true
+		}
+
+		nodeRS, err := wenr.RelaySharding(n.Record())
+		if err != nil {
+			wakuPX.log.Debug("failed to get relay shards from node record", logging.ENode("node", n), zap.Error(err))
+			return false
+		}
+
+		if nodeRS == nil {
+			// Node has no shards registered.
+			return false
+		}
+
+		if nodeRS.ClusterID != localRS.ClusterID {
+			return false
+		}
+
+		return true
+	})
+}
+
 func (wakuPX *WakuPeerExchange) iterate(ctx context.Context) error {
-	iterator, err := wakuPX.disc.PeerIterator()
+	iterator, err := wakuPX.disc.PeerIterator(wakuPX.DefaultPredicate())
 	if err != nil {
 		return fmt.Errorf("obtaining iterator: %w", err)
 	}
