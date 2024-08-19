@@ -554,7 +554,7 @@ func (r *Router) getBalanceMapForTokenOnChains(ctx context.Context, input *Route
 		// check token existence
 		token := input.SendType.FindToken(r.tokenManager, r.collectiblesService, input.AddrFrom, chain, input.TokenID)
 		if token == nil {
-			chainError(chain.ChainID, token.Symbol, ErrTokenNotFound)
+			chainError(chain.ChainID, input.TokenID, ErrTokenNotFound)
 			continue
 		}
 		// check native token existence
