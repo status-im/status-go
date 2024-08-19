@@ -38,7 +38,7 @@ pipeline {
     GOCACHE   = "${WORKSPACE_TMP}/gocache"
     PATH      = "${PATH}:${GOPATH}/bin"
     REPO_SRC  = "${GOPATH}/src/github.com/status-im/status-go"
-    ARTIFACT  = utils.pkgFilename(name: "status-go", type: "android", ext: "aar", version: null)
+    ARTIFACT  = utils.pkgFilename(name: "status-go", type: "android", ext: "aar", version: sh(script: "./_assets/scripts/version.sh", returnStdout: true))
   }
 
   stages {

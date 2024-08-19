@@ -29,7 +29,7 @@ help: SHELL := /bin/sh
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
-RELEASE_TAG := v$(file < VERSION)
+RELEASE_TAG:=$(shell ./_assets/scripts/version.sh)
 RELEASE_DIR := /tmp/release-$(RELEASE_TAG)
 GOLANGCI_BINARY=golangci-lint
 IPFS_GATEWAY_URL ?= https://ipfs.status.im/
