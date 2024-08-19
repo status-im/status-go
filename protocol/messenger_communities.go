@@ -1486,7 +1486,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	rawMessage := &common.RawMessage{
 		Payload:             payload,
 		CommunityID:         community.ID(),
-		ResendType:          common.ResendTypeDataSync,
+		ResendType:          common.ResendTypeRawMessage,
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 		PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
@@ -1516,6 +1516,8 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		privMembersArray = append(privMembersArray, privilegedMembersSorted[protobuf.CommunityMember_ROLE_ADMIN]...)
 
 		rawMessage.ResendMethod = common.ResendMethodSendPrivate
+		rawMessage.ResendType = common.ResendTypeDataSync
+		rawMessage.SkipEncryptionLayer = false
 		rawMessage.ID = ""
 		rawMessage.Recipients = privMembersArray
 
@@ -3683,7 +3685,7 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 	rawMessage := common.RawMessage{
 		Payload:             payload,
 		CommunityID:         community.ID(),
-		SkipEncryptionLayer: true,
+		SkipEncryptionLayer: false,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 		ResendType:          common.ResendTypeDataSync,
@@ -4862,13 +4864,16 @@ func (m *Messenger) CreateResponseWithACNotification(communityID string, acType 
 // SendMessageToControlNode sends a message to the control node of the community.
 // use pointer to rawMessage to get the message ID and other updated properties.
 func (m *Messenger) SendMessageToControlNode(community *communities.Community, rawMessage *common.RawMessage) ([]byte, error) {
+	m.logger.Debug("send message to control node", zap.Any("rawMessage:", rawMessage), zap.Any("community:", community))
 	if !community.PublicKey().Equal(community.ControlNode()) {
+		m.logger.Debug("control node is different with community pubkey", zap.Any("control:", community.ControlNode()), zap.Any("communityPubkey:", community.PublicKey()))
 		rawMessage.ResendMethod = common.ResendMethodSendPrivate
+		rawMessage.ResendType = common.ResendTypeDataSync
+		rawMessage.SkipEncryptionLayer = false
 		rawMessage.Recipients = append(rawMessage.Recipients, community.ControlNode())
 		return m.sender.SendPrivate(context.Background(), community.ControlNode(), rawMessage)
 	}
 	rawMessage.ResendMethod = common.ResendMethodSendCommunityMessage
-	rawMessage.ResendType = common.ResendTypeRawMessage
 	// Note: There are multiple instances where SendMessageToControlNode is invoked throughout the codebase.
 	// Additionally, some callers may invoke SendPrivate before SendMessageToControlNode. This could potentially
 	// lead to a situation where the same raw message is sent using different methods, which, from a code perspective,
