@@ -235,16 +235,16 @@ func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided()
 }
 
 func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePicture() {
-	profilePicShowSettings := map[string]settings.ProfilePicturesShowToType{
-		"ShowToContactsOnly": settings.ProfilePicturesShowToContactsOnly,
-		"ShowToEveryone":     settings.ProfilePicturesShowToEveryone,
-		"ShowToNone":         settings.ProfilePicturesShowToNone,
+	profilePicShowSettings := []settings.ProfilePicturesShowToType{
+		settings.ProfilePicturesShowToContactsOnly,
+		settings.ProfilePicturesShowToEveryone,
+		settings.ProfilePicturesShowToNone,
 	}
 
-	profilePicViewSettings := map[string]settings.ProfilePicturesVisibilityType{
-		"ViewFromContactsOnly": settings.ProfilePicturesVisibilityContactsOnly,
-		"ViewFromEveryone":     settings.ProfilePicturesVisibilityEveryone,
-		"ViewFromNone":         settings.ProfilePicturesVisibilityNone,
+	profilePicViewSettings := []settings.ProfilePicturesVisibilityType{
+		settings.ProfilePicturesVisibilityContactsOnly,
+		settings.ProfilePicturesVisibilityEveryone,
+		settings.ProfilePicturesVisibilityNone,
 	}
 
 	isContactFor := map[string][]bool{
@@ -259,15 +259,13 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 
 	// TODO see if possible to push each test scenario into a go routine
 	for _, cc := range chatContexts {
-		for sn, ss := range profilePicShowSettings {
-			for vn, vs := range profilePicViewSettings {
+		for _, ss := range profilePicShowSettings {
+			for _, vs := range profilePicViewSettings {
 				for _, ac := range isContactFor["alice"] {
 					for _, bc := range isContactFor["bob"] {
 						args := &e2eArgs{
 							cc: cc,
-							sn: sn,
 							ss: ss,
-							vn: vn,
 							vs: vs,
 							ac: ac,
 							bc: bc,
@@ -351,6 +349,8 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		response, err := s.alice.SendChatMessage(context.Background(), message)
 		s.Require().NoError(err)
 		s.Require().NotNil(response)
+
+		s.Require().Len(response.messages, 1)
 
 	case privateChat:
 		aChat = CreateOneToOneChat(s.bob.IdentityPublicKeyString(), &s.bobKey.PublicKey, s.bob.transport)
@@ -444,21 +444,17 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 
 type e2eArgs struct {
 	cc ChatContext
-	sn string
 	ss settings.ProfilePicturesShowToType
-	vn string
 	vs settings.ProfilePicturesVisibilityType
 	ac bool
 	bc bool
 }
 
 func (args *e2eArgs) String() string {
-	return fmt.Sprintf("ChatContext: %s, ShowTo: %s, ShowSettings: %d, ViewTo: %s, ViewSettings: %d, AliceContact: %t, BobContact: %t",
+	return fmt.Sprintf("ChatContext: %s, ShowTo: %s, Visibility: %s, AliceContact: %t, BobContact: %t",
 		string(args.cc),
-		args.sn,
-		int(args.ss),
-		args.vn,
-		int(args.vs),
+		profilePicShowSettingsMap[args.ss],
+		profilePicViewSettingsMap[args.vs],
 		args.ac,
 		args.bc,
 	)
@@ -492,4 +488,16 @@ func (args *e2eArgs) resultExpectedVS() (bool, error) {
 	default:
 		return false, errors.New("unknown ProfilePicturesVisibilityType")
 	}
+}
+
+var profilePicShowSettingsMap = map[settings.ProfilePicturesShowToType]string{
+	settings.ProfilePicturesShowToContactsOnly: "ShowToContactsOnly",
+	settings.ProfilePicturesShowToEveryone:     "ShowToEveryone",
+	settings.ProfilePicturesShowToNone:         "ShowToNone",
+}
+
+var profilePicViewSettingsMap = map[settings.ProfilePicturesVisibilityType]string{
+	settings.ProfilePicturesVisibilityContactsOnly: "ViewFromContactsOnly",
+	settings.ProfilePicturesVisibilityEveryone:     "ViewFromEveryone",
+	settings.ProfilePicturesVisibilityNone:         "ViewFromNone",
 }
