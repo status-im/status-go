@@ -67,18 +67,14 @@ func (s *MessengerProfilePictureHandlerSuite) SetupTest() {
 	aliceLogger := s.logger.Named("Alice messenger")
 	s.alice, err = newMessengerWithKey(s.shh, s.aliceKey, aliceLogger, []Option{})
 	s.Require().NoError(err)
-	s.logger.Debug("alice messenger created")
 
 	// Generate Bob Messenger
 	bobLogger := s.logger.Named("Bob messenger")
 	s.bob, err = newMessengerWithKey(s.shh, s.bobKey, bobLogger, []Option{})
 	s.Require().NoError(err)
-	s.logger.Debug("bob messenger created")
 
 	// Setup MultiAccount for Alice Messenger
-	s.logger.Debug("alice setupMultiAccount before")
 	s.setupMultiAccount(s.alice)
-	s.logger.Debug("alice setupMultiAccount after")
 }
 
 func (s *MessengerProfilePictureHandlerSuite) TearDownTest() {
@@ -430,7 +426,6 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		}
 
 		contacts = response.Contacts
-		s.logger.Debug("RetryWithBackOff contact data", zap.Any("contacts", contacts))
 
 		if len(contacts) > 0 && len(contacts[0].Images) > 0 {
 			s.logger.Debug("", zap.Any("contacts", contacts))
