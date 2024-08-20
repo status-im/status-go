@@ -45,9 +45,9 @@ pipeline {
     disableConcurrentBuilds()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
-      numToKeepStr: '5',
+      numToKeepStr: isTestNightlyJob() ? '14' : '5',
       daysToKeepStr: '30',
-      artifactNumToKeepStr: '1',
+      artifactNumToKeepStr: isTestNightlyJob() ? '14' : '1',
     ))
   }
 
