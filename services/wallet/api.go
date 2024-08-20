@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/onramp"
+	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -589,7 +591,66 @@ func (api *API) AddressExists(ctx context.Context, address types.Address) (bool,
 	return api.s.accountsDB.AddressExists(address)
 }
 
-// Returns details for the passed address (response doesn't include derivation path)
+// AddressDetails returns details for passed params (passed address, chains to check, timeout for the call to complete)
+// if chainIDs is empty, it will use all active chains
+// if timeout is zero, it will wait until the call completes
+// response doesn't include derivation path
+func (api *API) AddressDetails(ctx context.Context, params *requests.AddressDetails) (*DerivedAddress, error) {
+	if err := params.Validate(); err != nil {
+		return nil, err
+	}
+
+	result := &DerivedAddress{
+		Address: common.HexToAddress(params.Address),
+	}
+	addressExists, err := api.s.accountsDB.AddressExists(types.Address(result.Address))
+	if err != nil {
+		return result, err
+	}
+
+	result.AlreadyCreated = addressExists
+
+	chainIDs := params.ChainIDs
+	if len(chainIDs) == 0 {
+		activeNetworks, err := api.s.rpcClient.NetworkManager.GetActiveNetworks()
+		if err != nil {
+			return nil, err
+		}
+
+		chainIDs = wcommon.NetworksToChainIDs(activeNetworks)
+	}
+
+	clients, err := api.s.rpcClient.EthClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	if params.TimeoutInMilliseconds > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(params.TimeoutInMilliseconds)*time.Millisecond)
+		defer cancel()
+	}
+
+	for _, client := range clients {
+		balance, err := api.s.tokenManager.GetChainBalance(ctx, client, result.Address)
+		if err != nil {
+			if err != nil && errors.Is(err, context.DeadlineExceeded) {
+				return result, nil
+			}
+			return result, err
+		}
+
+		result.HasActivity = balance.Cmp(big.NewInt(0)) != 0
+		if result.HasActivity {
+			break
+		}
+	}
+
+	return result, nil
+}
+
+// @deprecated replaced by AddressDetails
+// GetAddressDetails returns details for the passed address (response doesn't include derivation path)
 func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address string) (*DerivedAddress, error) {
 	result := &DerivedAddress{
 		Address: common.HexToAddress(address),
