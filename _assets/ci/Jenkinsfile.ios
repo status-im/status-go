@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.1'
+library 'status-jenkins-lib@v1.9.6'
 
 pipeline {
   agent { label 'macos && aarch64 && xcode-15.1 && nix-2.19' }
@@ -38,7 +38,13 @@ pipeline {
     GOCACHE  = "${WORKSPACE_TMP}/gocache"
     PATH     = "${PATH}:${GOPATH}/bin"
     REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
-    ARTIFACT = utils.pkgFilename(name: "status-go", type: "ios", ext: "zip", version: sh(script: "./_assets/scripts/version.sh", returnStdout: true))
+    VERSION  = sh(script: "./_assets/scripts/version.sh", returnStdout: true)
+    ARTIFACT = utils.pkgFilename(
+      name:    'status-go',
+      type:    env.PLATFORM,
+      version: env.VERSION,
+      ext:     'zip',
+    )
     /* fix for gomobile complaining about missing packages */
     CGO_ENABLED = "1"
   }
@@ -60,8 +66,7 @@ pipeline {
     stage('Archive') {
       steps {
         dir('build/bin') {
-          sh 'zip -r status-go-ios.zip Statusgo.xcframework'
-          sh "mv status-go-ios.zip ${WORKSPACE}/${ARTIFACT}"
+          sh "zip -r ${WORKSPACE}/${ARTIFACT} Statusgo.xcframework"
         }
         archiveArtifacts(ARTIFACT)
       }
