@@ -1180,10 +1180,21 @@ func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 
 	// user sends request to join
 	requestID := testSendRequestToJoin(base, user, community.ID())
+	checkRequestToJoin := func(r *MessengerResponse) bool {
+		if len(r.RequestsToJoinCommunity()) == 0 {
+			return false
+		}
+		for _, request := range r.RequestsToJoinCommunity() {
+			if request.PublicKey == user.IdentityPublicKeyString() {
+				return true
+			}
+		}
+		return false
+	}
 	// event sender receives request to join
 	_, err := WaitOnMessengerResponse(
 		base.GetEventSender(),
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
+		checkRequestToJoin,
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
@@ -1191,7 +1202,7 @@ func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base Commu
 	// event sender 2 receives request to join
 	_, err = WaitOnMessengerResponse(
 		additionalEventSender,
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity()) > 0 },
+		checkRequestToJoin,
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)

@@ -4865,7 +4865,6 @@ func (m *Messenger) CreateResponseWithACNotification(communityID string, acType 
 // SendMessageToControlNode sends a message to the control node of the community.
 // use pointer to rawMessage to get the message ID and other updated properties.
 func (m *Messenger) SendMessageToControlNode(community *communities.Community, rawMessage *common.RawMessage) ([]byte, error) {
-	m.logger.Debug("send message to control node", zap.Any("rawMessage:", rawMessage), zap.Any("community:", community))
 	if !community.PublicKey().Equal(community.ControlNode()) {
 		m.logger.Debug("control node is different with community pubkey", zap.Any("control:", community.ControlNode()), zap.Any("communityPubkey:", community.PublicKey()))
 		rawMessage.ResendMethod = common.ResendMethodSendPrivate
