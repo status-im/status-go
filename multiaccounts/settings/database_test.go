@@ -89,6 +89,11 @@ func TestClosingsqlDB(t *testing.T) {
 	d, err := MakeNewDB(db)
 	require.NoError(t, err)
 
+	// Cleanup dbInstances to enable running test with -count more than 1.
+	dbFileName, err := dbsetup.GetDBFilename(db)
+	require.NoError(t, err)
+	defer delete(dbInstances, dbFileName)
+
 	// Add settings data to the db
 	err = d.CreateSettings(settings, config)
 	require.NoError(t, err)
