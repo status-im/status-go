@@ -139,7 +139,7 @@ type Messenger struct {
 	allInstallations           *installationMap
 	modifiedInstallations      *stringBoolMap
 	installationID             string
-	mailserverCycle            mailserverCycle
+	storenodeCycle             storenodeCycle
 	communityStorenodes        *storenodes.CommunityStorenodes
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
@@ -211,12 +211,12 @@ type peerStatus struct {
 	status                connStatus
 	canConnectAfter       time.Time
 	lastConnectionAttempt time.Time
-	mailserver            mailserversDB.Mailserver
+	storenode             mailserversDB.Mailserver
 }
-type mailserverCycle struct {
+type storenodeCycle struct {
 	sync.RWMutex
-	allMailservers            []mailserversDB.Mailserver
-	activeMailserver          *mailserversDB.Mailserver
+	allStorenodes             []mailserversDB.Mailserver
+	activeStorenode           *mailserversDB.Mailserver
 	peers                     map[string]peerStatus
 	events                    chan *p2p.PeerEvent
 	subscription              event.Subscription
@@ -604,7 +604,7 @@ func NewMessenger(
 		peerStore:               peerStore,
 		mvdsStatusChangeEvent:   make(chan datasyncnode.PeerStatusChangeEvent, 5),
 		verificationDatabase:    verification.NewPersistence(database),
-		mailserverCycle: mailserverCycle{
+		storenodeCycle: storenodeCycle{
 			peers:                     make(map[string]peerStatus),
 			availabilitySubscriptions: make([]chan struct{}, 0),
 		},
@@ -863,13 +863,13 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	response := &MessengerResponse{}
 
-	mailservers, err := m.allMailservers()
+	storenodes, err := m.allStorenodes()
 	if err != nil {
 		return nil, err
 	}
 
-	response.Mailservers = mailservers
-	err = m.StartMailserverCycle(mailservers)
+	response.Mailservers = storenodes
+	err = m.StartStorenodeCycle(storenodes)
 	if err != nil {
 		return nil, err
 	}

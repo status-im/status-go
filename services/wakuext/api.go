@@ -1,9 +1,7 @@
 package wakuext
 
 import (
-	"context"
 	"crypto/ecdsa"
-	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -70,59 +68,4 @@ func makeEnvelop(
 		return nil, err
 	}
 	return gethbridge.NewWakuEnvelope(envelope), nil
-}
-
-// RequestMessages sends a request for historic messages to a MailServer.
-func (api *PublicAPI) RequestMessages(_ context.Context, r ext.MessagesRequest) (types.HexBytes, error) {
-	api.log.Info("RequestMessages", "request", r)
-
-	now := api.service.w.GetCurrentTime()
-	r.SetDefaults(now)
-
-	if r.From > r.To {
-		return nil, fmt.Errorf("Query range is invalid: from > to (%d > %d)", r.From, r.To)
-	}
-
-	mailServerNode, err := api.service.GetPeer(r.MailServerPeer)
-	if err != nil {
-		return nil, fmt.Errorf("%v: %v", ext.ErrInvalidMailServerPeer, err)
-	}
-
-	var (
-		symKey    []byte
-		publicKey *ecdsa.PublicKey
-	)
-
-	if r.SymKeyID != "" {
-		symKey, err = api.service.w.GetSymKey(r.SymKeyID)
-		if err != nil {
-			return nil, fmt.Errorf("%v: %v", ext.ErrInvalidSymKeyID, err)
-		}
-	} else {
-		publicKey = mailServerNode.Pubkey()
-	}
-
-	payload, err := ext.MakeMessagesRequestPayload(r)
-	if err != nil {
-		return nil, err
-	}
-
-	envelope, err := makeEnvelop(
-		payload,
-		symKey,
-		publicKey,
-		api.service.NodeID(),
-		api.service.w.MinPow(),
-		now,
-	)
-	if err != nil {
-		return nil, err
-	}
-	hash := envelope.Hash()
-
-	if err := api.service.w.RequestHistoricMessagesWithTimeout(mailServerNode.ID().Bytes(), envelope, r.Timeout*time.Second); err != nil {
-		return nil, err
-	}
-
-	return hash[:], nil
 }

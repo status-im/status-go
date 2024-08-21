@@ -264,27 +264,6 @@ func (w *GethWakuWrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateK
 	}, id), nil
 }
 
-func (w *GethWakuWrapper) SendMessagesRequest(peerID []byte, r types.MessagesRequest) error {
-	return w.waku.SendMessagesRequest(peerID, wakucommon.MessagesRequest{
-		ID:     r.ID,
-		From:   r.From,
-		To:     r.To,
-		Limit:  r.Limit,
-		Cursor: r.Cursor,
-		Bloom:  r.Bloom,
-		Topics: r.ContentTopics,
-	})
-}
-
-// RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
-// which is known to implement MailServer interface, and is supposed to process this
-// request and respond with a number of peer-to-peer messages (possibly expired),
-// which are not supposed to be forwarded any further.
-// The whisper protocol is agnostic of the format and contents of envelope.
-func (w *GethWakuWrapper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope types.Envelope, timeout time.Duration) error {
-	return w.waku.RequestHistoricMessagesWithTimeout(peerID, envelope.Unwrap().(*wakucommon.Envelope), timeout)
-}
-
 func (w *GethWakuWrapper) ProcessingP2PMessages() bool {
 	return w.waku.ProcessingP2PMessages()
 }
@@ -293,7 +272,7 @@ func (w *GethWakuWrapper) MarkP2PMessageAsProcessed(hash common.Hash) {
 	w.waku.MarkP2PMessageAsProcessed(hash)
 }
 
-func (w *GethWakuWrapper) RequestStoreMessages(ctx context.Context, peerID []byte, r types.MessagesRequest, processEnvelopes bool) (types.StoreRequestCursor, int, error) {
+func (w *GethWakuWrapper) RequestStoreMessages(ctx context.Context, peerID peer.ID, r types.MessagesRequest, processEnvelopes bool) (types.StoreRequestCursor, int, error) {
 	return nil, 0, errors.New("not implemented")
 }
 

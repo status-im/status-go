@@ -8,7 +8,6 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
-
 	"github.com/status-im/status-go/protocol/storenodes"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
@@ -122,16 +121,12 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAd
 	err = sqlite.Migrate(mailserversSQLDb) // migrate default
 	s.Require().NoError(err)
 
-	var sAddr string
-	if storenodeAddress != nil {
-		sAddr = (*storenodeAddress).String()
-	}
 	mailserversDatabase := mailserversDB.NewDB(mailserversSQLDb)
 	err = mailserversDatabase.Add(mailserversDB.Mailserver{
-		ID:      localMailserverID,
-		Name:    localMailserverID,
-		Address: sAddr,
-		Fleet:   localFleet,
+		ID:    localMailserverID,
+		Name:  localMailserverID,
+		Addr:  storenodeAddress,
+		Fleet: localFleet,
 	})
 	s.Require().NoError(err)
 
@@ -355,10 +350,10 @@ func (s *MessengerStoreNodeCommunitySuite) TestToggleUseMailservers() {
 	// Enable use of mailservers
 	err := s.owner.ToggleUseMailservers(true)
 	s.Require().NoError(err)
-	s.Require().NotNil(s.owner.mailserverCycle.activeMailserver)
+	s.Require().NotNil(s.owner.storenodeCycle.activeStorenode)
 
 	// Disable use of mailservers
 	err = s.owner.ToggleUseMailservers(false)
 	s.Require().NoError(err)
-	s.Require().Nil(s.owner.mailserverCycle.activeMailserver)
+	s.Require().Nil(s.owner.storenodeCycle.activeStorenode)
 }

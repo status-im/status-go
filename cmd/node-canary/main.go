@@ -2,7 +2,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -20,13 +19,10 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/api"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/ext"
-	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -53,7 +49,7 @@ var (
 
 func main() {
 	var err error
-	var staticParsedNode, mailserverParsedNode *enode.Node
+	var staticParsedNode *enode.Node
 	if *staticEnodeAddr != "" {
 		staticParsedNode, err = enode.ParseV4(*staticEnodeAddr)
 		if err != nil {
@@ -62,23 +58,9 @@ func main() {
 		}
 	}
 
-	if *mailserverEnodeAddr != "" {
-		mailserverParsedNode, err = enode.ParseV4(*mailserverEnodeAddr)
-		if err != nil {
-			logger.Crit("Invalid mailserver address specified", "mailserverEnodeAddr", *mailserverEnodeAddr, "error", err)
-			os.Exit(1)
-		}
-	}
-
 	if staticParsedNode != nil {
 		verifyStaticNodeBehavior(staticParsedNode)
 		logger.Info("Connected to static node correctly", "address", *staticEnodeAddr)
-		os.Exit(0)
-	}
-
-	if mailserverParsedNode != nil {
-		verifyMailserverBehavior(mailserverParsedNode)
-		logger.Info("Mailserver responded correctly", "address", *mailserverEnodeAddr)
 		os.Exit(0)
 	}
 
@@ -96,119 +78,6 @@ func init() {
 
 	if err := logutils.OverrideRootLog(*logLevel != "", *logLevel, logutils.FileOptions{Filename: *logFile}, colors); err != nil {
 		stdlog.Fatalf("Error initializing logger: %s", err)
-	}
-}
-
-func verifyMailserverBehavior(mailserverNode *enode.Node) {
-	clientBackend, err := startClientNode()
-	if err != nil {
-		logger.Error("Node start failed", "error", err)
-		os.Exit(1)
-	}
-	defer func() { _ = clientBackend.StopNode() }()
-
-	clientNode := clientBackend.StatusNode()
-	clientGethWakuService := clientNode.WakuService()
-	if clientGethWakuService == nil {
-		logger.Error("Could not retrieve waku service")
-		os.Exit(1)
-	}
-	clientWakuService := gethbridge.NewGethWakuWrapper(clientGethWakuService)
-	clientWakuExtService := clientNode.WakuExtService()
-	if clientWakuExtService == nil {
-		logger.Error("Could not retrieve wakuext service")
-		os.Exit(1)
-	}
-
-	// add mailserver peer to client
-	clientErrCh := helpers.WaitForPeerAsync(clientNode.Server(), *mailserverEnodeAddr, p2p.PeerEventTypeAdd, time.Duration(*timeout)*time.Second)
-
-	err = clientNode.AddPeer(*mailserverEnodeAddr)
-	if err != nil {
-		logger.Error("Failed to add mailserver peer to client", "error", err)
-		os.Exit(1)
-	}
-
-	err = <-clientErrCh
-	if err != nil {
-		logger.Error("Error detected while waiting for mailserver peer to be added", "error", err)
-		os.Exit(1)
-	}
-
-	// add mailserver sym key
-	mailServerKeyID, err := clientWakuService.AddSymKeyFromPassword(mailboxPassword)
-	if err != nil {
-		logger.Error("Error adding mailserver sym key to client peer", "error", err)
-		os.Exit(1)
-	}
-
-	mailboxPeer := mailserverNode.ID().Bytes()
-	err = clientGethWakuService.AllowP2PMessagesFromPeer(mailboxPeer)
-	if err != nil {
-		logger.Error("Failed to allow P2P messages from mailserver peer", "error", err, mailserverNode.String())
-		os.Exit(1)
-	}
-
-	clientRPCClient := clientNode.RPCClient()
-
-	_, topic, _, err := joinPublicChat(clientWakuService, clientRPCClient, *publicChannel)
-	if err != nil {
-		logger.Error("Failed to join public chat", "error", err)
-		os.Exit(1)
-	}
-
-	// watch for envelopes to be available in filters in the client
-	envelopeAvailableWatcher := make(chan types.EnvelopeEvent, 1024)
-	sub := clientWakuService.SubscribeEnvelopeEvents(envelopeAvailableWatcher)
-	defer sub.Unsubscribe()
-
-	// watch for mailserver responses in the client
-	mailServerResponseWatcher := make(chan types.EnvelopeEvent, 1024)
-	sub = clientWakuService.SubscribeEnvelopeEvents(mailServerResponseWatcher)
-	defer sub.Unsubscribe()
-
-	// request messages from mailbox
-	wakuextAPI := wakuext.NewPublicAPI(clientWakuExtService)
-	requestIDBytes, err := wakuextAPI.RequestMessages(context.TODO(),
-		ext.MessagesRequest{
-			MailServerPeer: mailserverNode.String(),
-			From:           uint32(clientWakuService.GetCurrentTime().Add(-time.Duration(*period) * time.Second).Unix()),
-			Limit:          1,
-			Topic:          topic,
-			SymKeyID:       mailServerKeyID,
-			Timeout:        time.Duration(*timeout),
-		})
-	if err != nil {
-		logger.Error("Error requesting historic messages from mailserver", "error", err)
-		os.Exit(2)
-	}
-	requestID := types.BytesToHash(requestIDBytes)
-
-	// wait for mailserver request sent event
-	err = waitForMailServerRequestSent(mailServerResponseWatcher, requestID, time.Duration(*timeout)*time.Second)
-	if err != nil {
-		logger.Error("Error waiting for mailserver request sent event", "error", err)
-		os.Exit(3)
-	}
-
-	// wait for mailserver response
-	resp, err := waitForMailServerResponse(mailServerResponseWatcher, requestID, time.Duration(*timeout)*time.Second)
-	if err != nil {
-		logger.Error("Error waiting for mailserver response", "error", err)
-		os.Exit(3)
-	}
-
-	// if last envelope is empty there are no messages to receive
-	if isEmptyEnvelope(resp.LastEnvelopeHash) {
-		logger.Warn("No messages available from mailserver")
-		return
-	}
-
-	// wait for last envelope sent by the mailserver to be available for filters
-	err = waitForEnvelopeEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, types.EventEnvelopeAvailable)
-	if err != nil {
-		logger.Error("Error waiting for envelopes to be available to client filter", "error", err)
-		os.Exit(4)
 	}
 }
 

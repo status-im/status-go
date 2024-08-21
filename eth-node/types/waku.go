@@ -176,19 +176,8 @@ type Waku interface {
 	Unsubscribe(ctx context.Context, id string) error
 	UnsubscribeMany(ids []string) error
 
-	// RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
-	// which is known to implement MailServer interface, and is supposed to process this
-	// request and respond with a number of peer-to-peer messages (possibly expired),
-	// which are not supposed to be forwarded any further.
-	// The whisper protocol is agnostic of the format and contents of envelope.
-	// A timeout of 0 never expires.
-	RequestHistoricMessagesWithTimeout(peerID []byte, envelope Envelope, timeout time.Duration) error
-	// SendMessagesRequest sends a MessagesRequest. This is an equivalent to RequestHistoricMessages
-	// in terms of the functionality.
-	SendMessagesRequest(peerID []byte, request MessagesRequest) error
-
 	// RequestStoreMessages uses the WAKU2-STORE protocol to request historic messages
-	RequestStoreMessages(ctx context.Context, peerID []byte, request MessagesRequest, processEnvelopes bool) (StoreRequestCursor, int, error)
+	RequestStoreMessages(ctx context.Context, peerID peer.ID, request MessagesRequest, processEnvelopes bool) (StoreRequestCursor, int, error)
 
 	// ProcessingP2PMessages indicates whether there are in-flight p2p messages
 	ProcessingP2PMessages() bool

@@ -16,7 +16,6 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -461,9 +460,9 @@ func (t *Transport) Peers() types.PeerStats {
 	return t.waku.Peers()
 }
 
-func (t *Transport) createMessagesRequestV2(
+func (t *Transport) createMessagesRequest(
 	ctx context.Context,
-	peerID []byte,
+	peerID peer.ID,
 	from, to uint32,
 	previousStoreCursor types.StoreRequestCursor,
 	pubsubTopic string,
@@ -510,18 +509,16 @@ func (t *Transport) createMessagesRequestV2(
 
 func (t *Transport) SendMessagesRequestForTopics(
 	ctx context.Context,
-	peerID []byte,
+	peerID peer.ID,
 	from, to uint32,
-	previousCursor []byte,
 	previousStoreCursor types.StoreRequestCursor,
 	pubsubTopic string,
 	contentTopics []types.TopicType,
 	limit uint32,
 	waitForResponse bool,
 	processEnvelopes bool,
-) (cursor []byte, storeCursor types.StoreRequestCursor, envelopesCount int, err error) {
-	storeCursor, envelopesCount, err = t.createMessagesRequestV2(ctx, peerID, from, to, previousStoreCursor, pubsubTopic, contentTopics, limit, waitForResponse, processEnvelopes)
-	return
+) (storeCursor types.StoreRequestCursor, envelopesCount int, err error) {
+	return t.createMessagesRequest(ctx, peerID, from, to, previousStoreCursor, pubsubTopic, contentTopics, limit, waitForResponse, processEnvelopes)
 }
 
 func createMessagesRequest(from, to uint32, cursor []byte, storeCursor types.StoreRequestCursor, pubsubTopic string, topics []types.TopicType, limit uint32) types.MessagesRequest {
