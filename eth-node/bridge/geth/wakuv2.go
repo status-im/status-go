@@ -3,7 +3,6 @@ package gethbridge
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -174,21 +173,8 @@ func (w *gethWakuV2Wrapper) createFilterWrapper(id string, keyAsym *ecdsa.Privat
 	}, id), nil
 }
 
-// DEPRECATED: Not used in waku V2
-func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesRequest) error {
-	return errors.New("DEPRECATED")
-}
-
-func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerIDBytes []byte, r types.MessagesRequest, processEnvelopes bool) (types.StoreRequestCursor, int, error) {
-	var options []store.RequestOption
-
-	var peerID peer.ID
-	err := peerID.Unmarshal(peerIDBytes)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	options = []store.RequestOption{
+func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID peer.ID, r types.MessagesRequest, processEnvelopes bool) (types.StoreRequestCursor, int, error) {
+	options := []store.RequestOption{
 		store.WithPaging(false, uint64(r.Limit)),
 	}
 
@@ -218,11 +204,6 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerIDByte
 	}
 
 	return nil, envelopesCount, nil
-}
-
-// DEPRECATED: Not used in waku V2
-func (w *gethWakuV2Wrapper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope types.Envelope, timeout time.Duration) error {
-	return errors.New("DEPRECATED")
 }
 
 func (w *gethWakuV2Wrapper) StartDiscV5() error {

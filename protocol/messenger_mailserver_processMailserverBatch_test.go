@@ -39,22 +39,21 @@ func (t *mockTransport) SendMessagesRequestForTopics(
 	ctx context.Context,
 	peerID []byte,
 	from, to uint32,
-	previousCursor []byte,
 	previousStoreCursor types.StoreRequestCursor,
 	pubsubTopic string,
 	contentTopics []types.TopicType,
 	limit uint32,
 	waitForResponse bool,
 	processEnvelopes bool,
-) (cursor []byte, storeCursor types.StoreRequestCursor, envelopesCount int, err error) {
+) (storeCursor types.StoreRequestCursor, envelopesCount int, err error) {
 	var response queryResponse
-	if previousCursor == nil {
+	if previousStoreCursor == nil {
 		initialResponse := getInitialResponseKey(contentTopics)
 		response = t.queryResponses[initialResponse]
 	} else {
-		response = t.queryResponses[hex.EncodeToString(previousCursor)]
+		response = t.queryResponses[hex.EncodeToString(previousStoreCursor)]
 	}
-	return response.cursor, nil, 0, response.err
+	return response.cursor, 0, response.err
 }
 
 func (t *mockTransport) Populate(topics []types.TopicType, responses int, includeRandomError bool) error {
@@ -118,6 +117,7 @@ func (t *mockTransport) Populate(topics []types.TopicType, responses int, includ
 func TestProcessMailserverBatchHappyPath(t *testing.T) {
 	logger := tt.MustCreateTestLogger()
 
+	peerID := peer.
 	mailserverID := []byte{1, 2, 3, 4, 5}
 	topics := []types.TopicType{}
 	for i := 0; i < 22; i++ {

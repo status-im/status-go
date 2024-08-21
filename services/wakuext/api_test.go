@@ -1,14 +1,11 @@
 package wakuext
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"math"
-	"os"
 	"strconv"
 	"testing"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -30,76 +27,6 @@ import (
 	"github.com/status-im/status-go/waku"
 	"github.com/status-im/status-go/walletdatabase"
 )
-
-func TestRequestMessagesErrors(t *testing.T) {
-	var err error
-
-	waku := gethbridge.NewGethWakuWrapper(waku.New(nil, nil))
-	aNode, err := node.New(&node.Config{
-		P2P: p2p.Config{
-			MaxPeers:    math.MaxInt32,
-			NoDiscovery: true,
-		},
-		NoUSB: true,
-	}) // in-memory node as no data dir
-	require.NoError(t, err)
-	w := gethbridge.GetGethWakuFrom(waku)
-	aNode.RegisterLifecycle(w)
-	aNode.RegisterAPIs(w.APIs())
-	aNode.RegisterProtocols(w.Protocols())
-	require.NoError(t, err)
-
-	err = aNode.Start()
-	require.NoError(t, err)
-	defer func() { require.NoError(t, aNode.Close()) }()
-
-	handler := ext.NewHandlerMock(1)
-	config := params.NodeConfig{
-		RootDataDir: os.TempDir(),
-		ShhextConfig: params.ShhextConfig{
-			InstallationID: "1",
-			PFSEnabled:     true,
-		},
-	}
-	nodeWrapper := ext.NewTestNodeWrapper(nil, waku)
-	service := New(config, nodeWrapper, nil, handler, nil)
-	api := NewPublicAPI(service)
-
-	const mailServerPeer = "enode://b7e65e1bedc2499ee6cbd806945af5e7df0e59e4070c96821570bd581473eade24a489f5ec95d060c0db118c879403ab88d827d3766978f28708989d35474f87@[::]:51920"
-
-	var hash []byte
-
-	// invalid MailServer enode address
-	hash, err = api.RequestMessages(context.TODO(), ext.MessagesRequest{MailServerPeer: "invalid-address"})
-	require.Nil(t, hash)
-	require.EqualError(t, err, "invalid mailServerPeer value: invalid URL scheme, want \"enode\"")
-
-	// non-existent symmetric key
-	hash, err = api.RequestMessages(context.TODO(), ext.MessagesRequest{
-		MailServerPeer: mailServerPeer,
-		SymKeyID:       "invalid-sym-key-id",
-	})
-	require.Nil(t, hash)
-	require.EqualError(t, err, "invalid symKeyID value: non-existent key ID")
-
-	// with a symmetric key
-	symKeyID, symKeyErr := waku.AddSymKeyFromPassword("some-pass")
-	require.NoError(t, symKeyErr)
-	hash, err = api.RequestMessages(context.TODO(), ext.MessagesRequest{
-		MailServerPeer: mailServerPeer,
-		SymKeyID:       symKeyID,
-	})
-	require.Nil(t, hash)
-	require.Contains(t, err.Error(), "could not find peer with ID")
-
-	// from is greater than to
-	hash, err = api.RequestMessages(context.TODO(), ext.MessagesRequest{
-		From: 10,
-		To:   5,
-	})
-	require.Nil(t, hash)
-	require.Contains(t, err.Error(), "Query range is invalid: from > to (10 > 5)")
-}
 
 func TestInitProtocol(t *testing.T) {
 	config := params.NodeConfig{
@@ -237,57 +164,4 @@ func (s *ShhExtSuite) TearDownTest() {
 	s.nodes = nil
 	s.wakus = nil
 	s.services = nil
-}
-
-func (s *ShhExtSuite) TestRequestMessagesSuccess() {
-	// two nodes needed: client and mailserver
-	s.createAndAddNode()
-	s.createAndAddNode()
-
-	waitErr := helpers.WaitForPeerAsync(s.nodes[0].Server(), s.nodes[1].Server().Self().URLv4(), p2p.PeerEventTypeAdd, time.Second)
-	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
-	s.Require().NoError(<-waitErr)
-
-	api := NewPublicAPI(s.services[0])
-
-	_, err := api.RequestMessages(context.Background(), ext.MessagesRequest{
-		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
-		Topics:         []types.TopicType{{1}},
-	})
-	s.NoError(err)
-}
-
-func (s *ShhExtSuite) TestMultipleRequestMessagesWithoutForce() {
-	// two nodes needed: client and mailserver
-	s.createAndAddNode()
-	s.createAndAddNode()
-
-	waitErr := helpers.WaitForPeerAsync(s.nodes[0].Server(), s.nodes[1].Server().Self().URLv4(), p2p.PeerEventTypeAdd, time.Second)
-	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
-	s.Require().NoError(<-waitErr)
-
-	api := NewPublicAPI(s.services[0])
-
-	_, err := api.RequestMessages(context.Background(), ext.MessagesRequest{
-		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
-		Topics:         []types.TopicType{{1}},
-	})
-	s.NoError(err)
-	_, err = api.RequestMessages(context.Background(), ext.MessagesRequest{
-		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
-		Topics:         []types.TopicType{{2}},
-	})
-	s.NoError(err)
-}
-
-func (s *ShhExtSuite) TestFailedRequestWithUnknownMailServerPeer() {
-	s.createAndAddNode()
-
-	api := NewPublicAPI(s.services[0])
-
-	_, err := api.RequestMessages(context.Background(), ext.MessagesRequest{
-		MailServerPeer: "enode://19872f94b1e776da3a13e25afa71b47dfa99e658afd6427ea8d6e03c22a99f13590205a8826443e95a37eee1d815fc433af7a8ca9a8d0df7943d1f55684045b7@0.0.0.0:30305",
-		Topics:         []types.TopicType{{1}},
-	})
-	s.EqualError(err, "could not find peer with ID: 10841e6db5c02fc331bf36a8d2a9137a1696d9d3b6b1f872f780e02aa8ec5bba")
 }

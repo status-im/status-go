@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-
 	"github.com/status-im/status-go/protocol/wakusync"
 
 	"github.com/status-im/status-go/protocol/identity"

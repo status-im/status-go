@@ -44,16 +44,6 @@ type Whisper interface {
 	Unsubscribe(id string) error
 	UnsubscribeMany(ids []string) error
 
-	// RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
-	// which is known to implement MailServer interface, and is supposed to process this
-	// request and respond with a number of peer-to-peer messages (possibly expired),
-	// which are not supposed to be forwarded any further.
-	// The whisper protocol is agnostic of the format and contents of envelope.
-	// A timeout of 0 never expires.
-	RequestHistoricMessagesWithTimeout(peerID []byte, envelope Envelope, timeout time.Duration) error
-	// SendMessagesRequest sends a MessagesRequest. This is an equivalent to RequestHistoricMessages
-	// in terms of the functionality.
-	SendMessagesRequest(peerID []byte, request MessagesRequest) error
 	// SyncMessages can be sent between two Mail Servers and syncs envelopes between them.
 	SyncMessages(peerID []byte, req SyncMailRequest) error
 }

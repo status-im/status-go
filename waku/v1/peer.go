@@ -133,14 +133,6 @@ func (p *Peer) RequestHistoricMessages(envelope *common.Envelope) (err error) {
 	return
 }
 
-func (p *Peer) SendMessagesRequest(request common.MessagesRequest) (err error) {
-	err = p2p.Send(p.rw, p2pRequestCode, request)
-	if err != nil {
-		p.stats.AddUpload(request)
-	}
-	return
-}
-
 func (p *Peer) SendHistoricMessageResponse(payload []byte) (err error) {
 	size, r, err := rlp.EncodeToReader(payload)
 	if err != nil {
