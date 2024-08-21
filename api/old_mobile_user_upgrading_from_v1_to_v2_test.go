@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"database/sql"
-	"github.com/status-im/status-go/account"
 	"strings"
 	"testing"
 
@@ -41,6 +40,7 @@ const (
 	//    Wallet: 0, Chat: 0, Type: 'seed', Path: m/44'/60'/0'/0/0, Name: 'seed', Derived_from: '', Pubkey: 0x04FDE3E5...
 	// seed phrase for 0xB7A1233D1309CE665A3A4DB088E4A046EB333545: vocal blouse script census island armor seek catch wool narrow peasant attract
 	// private key for 0x516312D69737C5E6EF16F22E0097FF5D9F0C4196: c3ad0b50652318f845565c13761e5369ce75dcbc2a94616e15b829d4b07410fe
+	// status account seed phrase: coin globe kit hamster notable proof orphan always mistake usual morning usage
 	srcFolder = "../static/test-mobile-release-1.20.x-aa6e4b2-account/"
 )
 
@@ -186,6 +186,8 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 	s.Require().NoError(err)
 	s.Require().Len(infoMap, 1)
 	deriveAccountInfo := infoMap[suggestedPath]
+	expectedDerivedAddress := "0xf44F8Ebc5b088e0eA8a0f7309A4a0c525AD783DA"
+	s.Require().Equal(expectedDerivedAddress, deriveAccountInfo.Address)
 	derivedAddress := types.HexToAddress(deriveAccountInfo.Address)
 	accountsAPI := b.StatusNode().AccountService().AccountsAPI()
 	err = accountsAPI.AddAccount(context.Background(), oldMobileUserPasswd, &accounts.Account{
@@ -207,64 +209,6 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 	})
 	s.Require().NoError(err)
 	s.Require().NoError(b.Logout())
-}
-
-func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountFromRecover() {
-	const oldMobileUserKeyUID = "0x855ab0a932e5325daab7a550b9fcd78d2a17de5e2b7a52241f82505ea9d87629"
-	const oldMobileUserPasswd = "0x20756cad9b728c8225fd8cedb6badaf8731e174506950219ea657cd54f35f46c"
-
-	seedPhrase := "vocal blouse script census island armor seek catch wool narrow peasant attract"
-	tmpdir := s.T().TempDir()
-	s.T().Logf("tmpdir: %s", tmpdir)
-	manager := account.NewGethManager()
-	_, absKeyDir := DefaultKeystorePath(tmpdir, oldMobileUserKeyUID)
-	err := manager.InitKeystore(absKeyDir)
-	s.Require().NoError(err)
-	generator := manager.AccountsGenerator()
-	generatedAccountInfo, err := generator.ImportMnemonic(seedPhrase, "")
-	s.Require().NoError(err)
-	masterAccAddressExpected := "0x795E8857f0420A68853F5174872c6D9249C53973"
-	masterAcc, err := generator.StoreAccount(generatedAccountInfo.ID, oldMobileUserPasswd)
-	s.Require().NoError(err)
-	s.Require().Equal(masterAccAddressExpected, masterAcc.Address)
-
-	const pathWalletRoot = "m/44'/60'/0'/0"
-	const pathEIP1581 = "m/43'/60'/1581'"
-	const pathDefaultChat = pathEIP1581 + "/0'/0"
-	const pathDefaultWallet = pathWalletRoot + "/0"
-	var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
-	derivedAddresses, err := generator.DeriveAddresses(generatedAccountInfo.ID, paths)
-	s.Require().NoError(err)
-	s.Require().Len(derivedAddresses, 4)
-	_, err = generator.StoreDerivedAccounts(generatedAccountInfo.ID, oldMobileUserPasswd, paths)
-	s.Require().NoError(err)
-
-	//following addresses are correct!
-	//0xb7A1233d1309Ce665a3A4DB088E4a046eb333545 default wallet address
-	//0x986F7F9C7Bdf8eD833d60011B002A9caaE7B7ca5 generated wallet account1
-	//0x2Bbb07D4936955f6cB17A6b23831b93eF0c4A0fD generated wallet account2
-	accInfo, err := generator.LoadAccount(masterAccAddressExpected, oldMobileUserPasswd)
-	s.Require().NoError(err)
-	derivedAccInfos, err := generator.DeriveAddresses(accInfo.ID, []string{pathWalletRoot + "/1"})
-	s.Require().NoError(err)
-	s.Require().Len(derivedAccInfos, 1)
-	derivedAddress := derivedAccInfos[pathWalletRoot+"/1"].Address
-	s.T().Logf("derivedAddress: %s", derivedAddress)
-	s.Require().Equal("0x986F7F9C7Bdf8eD833d60011B002A9caaE7B7ca5", derivedAddress)
-
-	// following commented code are how we derive the address when generating wallet account, but it didn't work
-	// there was a PR(https://github.com/status-im/status-go/pull/5279/files#diff-e62600839ff3a2748953a173d3627e2c48a252b0a962a25a873b778313f81494)
-	// that update walletRootAddress as derived_from, the way seems incorrect. It should be update to #masterAccAddressExpected
-	// maybe we need to know how we store masterAccAddressExpected in V1 first?
-	//walletRootAddress := derivedAddresses[pathWalletRoot].Address
-	//accInfo, err := generator.LoadAccount(walletRootAddress, oldMobileUserPasswd)
-	//s.Require().NoError(err)
-	//derivedAccInfos, err := generator.DeriveAddresses(accInfo.ID, []string{pathWalletRoot + "/1"})
-	//s.Require().NoError(err)
-	//s.Require().Len(derivedAccInfos, 1)
-	//derivedAddress := derivedAccInfos[pathWalletRoot+"/1"].Address
-	//s.T().Logf("derivedAddress: %s", derivedAddress)
-	//s.Require().Equal("0x986F7F9C7Bdf8eD833d60011B002A9caaE7B7ca5", derivedAddress)
 }
 
 func (s *OldMobileUserUpgradingFromV1ToV2Test) TestFixMissingKeyUIDForAccounts() {
