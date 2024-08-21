@@ -318,3 +318,7 @@ func (w *GethWakuWrapper) SetStorePeerID(peerID peer.ID) {
 func (w *GethWakuWrapper) PeerID() peer.ID {
 	panic("not implemented")
 }
+
+func (w *GethWakuWrapper) PingPeer(context.Context, peer.ID) (time.Duration, error) {
+	return 0, errors.New("not available in WakuV1")
+}

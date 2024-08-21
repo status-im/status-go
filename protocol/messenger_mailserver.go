@@ -43,7 +43,7 @@ var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
 
 func (m *Messenger) shouldSync() (bool, error) {
 	// TODO (pablo) support community store node as well
-	if m.storenodeCycle.activeStorenode == nil || !m.Online() {
+	if m.mailserverCycle.activeMailserver == nil || !m.Online() {
 		return false, nil
 	}
 
@@ -91,18 +91,18 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 
 func (m *Messenger) connectToNewMailserverAndWait() error {
 	// Handle pinned mailservers
-	m.logger.Info("disconnecting storenode")
+	m.logger.Info("disconnecting mailserver")
 	pinnedMailserver, err := m.getPinnedMailserver()
 	if err != nil {
-		m.logger.Error("could not obtain the pinned storenode", zap.Error(err))
+		m.logger.Error("could not obtain the pinned mailserver", zap.Error(err))
 		return err
 	}
 	// If pinned mailserver is not nil, no need to disconnect and wait for it to be available
 	if pinnedMailserver == nil {
-		m.disconnectActiveStorenode(graylistBackoff)
+		m.disconnectActiveMailserver(graylistBackoff)
 	}
 
-	return m.findNewStorenode()
+	return m.findNewMailserver()
 }
 
 func (m *Messenger) performMailserverRequest(ms *mailservers.Mailserver, fn func(mailServer mailservers.Mailserver) (*MessengerResponse, error)) (*MessengerResponse, error) {
@@ -110,27 +110,27 @@ func (m *Messenger) performMailserverRequest(ms *mailservers.Mailserver, fn func
 		return nil, errors.New("mailserver not available")
 	}
 
-	m.storenodeCycle.RLock()
-	defer m.storenodeCycle.RUnlock()
+	m.mailserverCycle.RLock()
+	defer m.mailserverCycle.RUnlock()
 	var tries uint = 0
 	for tries < mailserverMaxTries {
 		if !m.communityStorenodes.IsCommunityStoreNode(ms.ID) && !m.isMailserverAvailable(ms.ID) {
 			return nil, errors.New("storenode not available")
 		}
-		m.logger.Info("trying performing store requests", zap.Uint("try", tries), zap.String("storenodeID", ms.ID))
+		m.logger.Info("trying performing mailserver requests", zap.Uint("try", tries), zap.String("mailserverID", ms.ID))
 
 		// Peform request
 		response, err := fn(*ms) // pass by value because we don't want the fn to modify the mailserver
 		if err == nil {
 			// Reset failed requests
-			m.logger.Debug("storenode request performed successfully",
-				zap.String("storenodeID", ms.ID))
+			m.logger.Debug("mailserver request performed successfully",
+				zap.String("mailserverID", ms.ID))
 			ms.FailedRequests = 0
 			return response, nil
 		}
 
-		m.logger.Error("failed to perform store request",
-			zap.String("storenodeID", ms.ID),
+		m.logger.Error("failed to perform mailserver request",
+			zap.String("mailserverID", ms.ID),
 			zap.Uint("tries", tries),
 			zap.Error(err),
 		)
@@ -347,6 +347,10 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 	backupFetched, err := m.settings.BackupFetched()
 	if err != nil {
 		return nil, err
+	}
+
+	if m.mailserversDatabase == nil {
+		return nil, nil
 	}
 
 	if forceFetchingBackup || !backupFetched {
@@ -715,7 +719,7 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 type work struct {
 	pubsubTopic   string
 	contentTopics []types.TopicType
-	storeCursor   types.StoreRequestCursor
+	cursor        types.StoreRequestCursor
 	limit         uint32
 }
 
@@ -730,7 +734,7 @@ type messageRequester interface {
 		limit uint32,
 		waitForResponse bool,
 		processEnvelopes bool,
-	) (storeCursor types.StoreRequestCursor, envelopesCount int, err error)
+	) (cursor types.StoreRequestCursor, envelopesCount int, err error)
 }
 
 func processMailserverBatch(
@@ -833,8 +837,7 @@ loop:
 				}()
 
 				queryCtx, queryCancel := context.WithTimeout(ctx, mailserverRequestTimeout)
-				storeCursor, envelopesCount, err := messageRequester.SendMessagesRequestForTopics(queryCtx, storenodeID, batch.From, batch.To, w.storeCursor, w.pubsubTopic, w.contentTopics, w.limit, true, processEnvelopes)
-
+				cursor, envelopesCount, err := messageRequester.SendMessagesRequestForTopics(queryCtx, storenodeID, batch.From, batch.To, w.cursor, w.pubsubTopic, w.contentTopics, w.limit, true, processEnvelopes)
 				queryCancel()
 
 				if err != nil {
@@ -856,7 +859,7 @@ loop:
 
 				// Check the cursor after calling `shouldProcessNextPage`.
 				// The app might use process the fetched envelopes in the callback for own needs.
-				if len(cursor) == 0 && storeCursor == nil {
+				if cursor == nil {
 					return
 				}
 
@@ -866,7 +869,7 @@ loop:
 				workCh <- work{
 					pubsubTopic:   w.pubsubTopic,
 					contentTopics: w.contentTopics,
-					storeCursor:   storeCursor,
+					cursor:        cursor,
 					limit:         nextPageLimit,
 				}
 			}(w)
@@ -915,12 +918,12 @@ func (m *Messenger) processMailserverBatch(ms mailservers.Mailserver, batch Mail
 		return nil
 	}
 
-	storenodeID, err := ms.PeerID()
+	mailserverID, err := ms.PeerID()
 	if err != nil {
 		return err
 	}
-	logger := m.logger.With(zap.String("storenode", ms.ID))
-	return processMailserverBatch(m.ctx, m.transport, batch, storenodeID, logger, defaultStoreNodeRequestPageSize, nil, false)
+	logger := m.logger.With(zap.String("mailserverID", ms.ID))
+	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, logger, defaultStoreNodeRequestPageSize, nil, false)
 }
 
 func (m *Messenger) processMailserverBatchWithOptions(ms mailservers.Mailserver, batch MailserverBatch, pageLimit uint32, shouldProcessNextPage func(int) (bool, uint32), processEnvelopes bool) error {
@@ -932,12 +935,12 @@ func (m *Messenger) processMailserverBatchWithOptions(ms mailservers.Mailserver,
 		return nil
 	}
 
-	storenodeID, err := ms.PeerID()
+	mailserverID, err := ms.PeerID()
 	if err != nil {
 		return err
 	}
-	logger := m.logger.With(zap.String("storenodeID", ms.ID))
-	return processMailserverBatch(m.ctx, m.transport, batch, storenodeID, logger, pageLimit, shouldProcessNextPage, processEnvelopes)
+	logger := m.logger.With(zap.String("mailserverID", ms.ID))
+	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, logger, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 type MailserverBatch struct {
@@ -1089,15 +1092,15 @@ func (m *Messenger) LoadFilters(filters []*transport.Filter) ([]*transport.Filte
 }
 
 func (m *Messenger) ToggleUseMailservers(value bool) error {
-	m.storenodeCycle.Lock()
-	defer m.storenodeCycle.Unlock()
+	m.mailserverCycle.Lock()
+	defer m.mailserverCycle.Unlock()
 
 	err := m.settings.SetUseMailservers(value)
 	if err != nil {
 		return err
 	}
 
-	m.disconnectActiveStorenode(backoffByUserAction)
+	m.disconnectActiveMailserver(backoffByUserAction)
 	if value {
 		m.cycleMailservers()
 		return nil
@@ -1111,7 +1114,7 @@ func (m *Messenger) SetPinnedMailservers(mailservers map[string]string) error {
 		return err
 	}
 
-	m.disconnectActiveStorenode(backoffByUserAction)
+	m.disconnectActiveMailserver(backoffByUserAction)
 	m.cycleMailservers()
 	return nil
 }

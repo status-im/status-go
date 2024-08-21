@@ -65,11 +65,11 @@ func TestUpdateStorenodesInDB(t *testing.T) {
 	require.NoError(t, err)
 
 	// check if storenodes are loaded
-	ms1, err := csn.GetStorenodeByCommunnityID(communityID1.String())
+	ms1, err := csn.GetStorenodeByCommunityID(communityID1.String())
 	require.NoError(t, err)
 	matchStoreNode(t, snodes1[0], ms1)
 
-	ms2, err := csn.GetStorenodeByCommunnityID(communityID2.String())
+	ms2, err := csn.GetStorenodeByCommunityID(communityID2.String())
 	require.NoError(t, err)
 	matchStoreNode(t, snodes2[0], ms2)
 }

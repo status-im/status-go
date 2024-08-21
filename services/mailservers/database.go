@@ -11,7 +11,9 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+
 	"github.com/waku-org/go-waku/waku/v2/protocol/enr"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
@@ -55,6 +57,7 @@ func (m Mailserver) PeerInfo() (*peer.AddrInfo, error) {
 		if err != nil {
 			return nil, err
 		}
+		addrInfo.Addrs = utils.EncapsulatePeerID(addrInfo.ID, addrInfo.Addrs...)
 		maddrs = append(maddrs, addrInfo.Addrs...)
 	}
 

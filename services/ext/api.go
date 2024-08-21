@@ -1412,7 +1412,7 @@ func (api *PublicAPI) RequestAllHistoricMessagesWithRetries(forceFetchingBackup 
 }
 
 func (api *PublicAPI) DisconnectActiveMailserver() {
-	api.service.messenger.DisconnectActiveStorenode()
+	api.service.messenger.DisconnectActiveMailserver()
 }
 
 // Echo is a method for testing purposes.

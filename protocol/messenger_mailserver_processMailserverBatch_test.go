@@ -7,8 +7,10 @@ import (
 	"errors"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -37,21 +39,21 @@ func getInitialResponseKey(topics []types.TopicType) string {
 
 func (t *mockTransport) SendMessagesRequestForTopics(
 	ctx context.Context,
-	peerID []byte,
+	peerID peer.ID,
 	from, to uint32,
-	previousStoreCursor types.StoreRequestCursor,
+	prevCursor types.StoreRequestCursor,
 	pubsubTopic string,
 	contentTopics []types.TopicType,
 	limit uint32,
 	waitForResponse bool,
 	processEnvelopes bool,
-) (storeCursor types.StoreRequestCursor, envelopesCount int, err error) {
+) (cursor types.StoreRequestCursor, envelopesCount int, err error) {
 	var response queryResponse
-	if previousStoreCursor == nil {
+	if prevCursor == nil {
 		initialResponse := getInitialResponseKey(contentTopics)
 		response = t.queryResponses[initialResponse]
 	} else {
-		response = t.queryResponses[hex.EncodeToString(previousStoreCursor)]
+		response = t.queryResponses[hex.EncodeToString(prevCursor)]
 	}
 	return response.cursor, 0, response.err
 }
@@ -115,44 +117,51 @@ func (t *mockTransport) Populate(topics []types.TopicType, responses int, includ
 }
 
 func TestProcessMailserverBatchHappyPath(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
+
 	logger := tt.MustCreateTestLogger()
 
-	peerID := peer.
-	mailserverID := []byte{1, 2, 3, 4, 5}
+	mailserverID, err := peer.Decode("16Uiu2HAkw3x97MbbZSWHbdF5bob45vcZvPPK4s4Mjyv2mxyB9GS3")
+	require.NoError(t, err)
 	topics := []types.TopicType{}
 	for i := 0; i < 22; i++ {
 		topics = append(topics, types.BytesToTopic([]byte{0, 0, 0, byte(i)}))
 	}
 
 	testTransport := newMockTransport()
-	err := testTransport.Populate(topics, 10, false)
+	err = testTransport.Populate(topics, 10, false)
 	require.NoError(t, err)
 
 	testBatch := MailserverBatch{
 		Topics: topics,
 	}
 
-	err = processMailserverBatch(context.TODO(), testTransport, testBatch, mailserverID, logger, defaultStoreNodeRequestPageSize, nil, false)
+	err = processMailserverBatch(ctx, testTransport, testBatch, mailserverID, logger, defaultStoreNodeRequestPageSize, nil, false)
 	require.NoError(t, err)
 }
 
 func TestProcessMailserverBatchFailure(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
+
 	logger := tt.MustCreateTestLogger()
 
-	mailserverID := []byte{1, 2, 3, 4, 5}
+	mailserverID, err := peer.Decode("16Uiu2HAkw3x97MbbZSWHbdF5bob45vcZvPPK4s4Mjyv2mxyB9GS3")
+	require.NoError(t, err)
 	topics := []types.TopicType{}
 	for i := 0; i < 5; i++ {
 		topics = append(topics, types.BytesToTopic([]byte{0, 0, 0, byte(i)}))
 	}
 
 	testTransport := newMockTransport()
-	err := testTransport.Populate(topics, 4, true)
+	err = testTransport.Populate(topics, 4, true)
 	require.NoError(t, err)
 
 	testBatch := MailserverBatch{
 		Topics: topics,
 	}
 
-	err = processMailserverBatch(context.TODO(), testTransport, testBatch, mailserverID, logger, defaultStoreNodeRequestPageSize, nil, false)
+	err = processMailserverBatch(ctx, testTransport, testBatch, mailserverID, logger, defaultStoreNodeRequestPageSize, nil, false)
 	require.Error(t, err)
 }
