@@ -1,10 +1,10 @@
 package profiling
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
-	"errors"
 )
 
 // CPUFilename is a filename in which the CPU profiling is stored.
