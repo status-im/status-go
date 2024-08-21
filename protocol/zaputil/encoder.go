@@ -2,10 +2,10 @@ package zaputil
 
 import (
 	"encoding/hex"
+	"sync"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"sync"
 )
 
 type jsonHexEncoder struct {
