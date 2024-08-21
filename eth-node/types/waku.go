@@ -141,7 +141,7 @@ type Waku interface {
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
-	SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []string) error
+	SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []TopicType) error
 
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64

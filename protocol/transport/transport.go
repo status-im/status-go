@@ -752,7 +752,7 @@ func (t *Transport) SetCriteriaForMissingMessageVerification(peerID peer.ID, fil
 		return
 	}
 
-	topicMap := make(map[string]map[string]struct{})
+	topicMap := make(map[string]map[types.TopicType]struct{})
 	for _, f := range filters {
 		if !f.Listen || f.Ephemeral {
 			continue
@@ -760,10 +760,10 @@ func (t *Transport) SetCriteriaForMissingMessageVerification(peerID peer.ID, fil
 
 		_, ok := topicMap[f.PubsubTopic]
 		if !ok {
-			topicMap[f.PubsubTopic] = make(map[string]struct{})
+			topicMap[f.PubsubTopic] = make(map[types.TopicType]struct{})
 		}
 
-		topicMap[f.PubsubTopic][f.ContentTopic.String()] = struct{}{}
+		topicMap[f.PubsubTopic][f.ContentTopic] = struct{}{}
 	}
 
 	for pubsubTopic, contentTopics := range topicMap {
@@ -774,7 +774,7 @@ func (t *Transport) SetCriteriaForMissingMessageVerification(peerID peer.ID, fil
 				zap.Error(err),
 				zap.Stringer("peerID", peerID),
 				zap.String("pubsubTopic", pubsubTopic),
-				zap.Strings("contentTopics", ctList))
+				zap.Stringers("contentTopics", ctList))
 			return
 		}
 	}
