@@ -21,8 +21,12 @@ func WriteHeapFile(dataDir string) error {
 		if err != nil {
 			return err
 		}
-		defer memFile.Close() //nolint: errcheck
+		defer func() {
+			memFile.Close() //nolint: errcheck
+			memFile = nil
+		}()
 	}
+
 	runtime.GC()
 	err = pprof.WriteHeapProfile(memFile)
 
