@@ -80,13 +80,15 @@ if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
 	cc-test-reporter before-build
 fi
 
-echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
-
 rm -rf ./**/*.coverage.out
 
-#for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-run_test_for_packages "${UNIT_TEST_PACKAGES}" "1"
-#done
+echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
+
+for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
+  run_test_for_packages "${UNIT_TEST_PACKAGES}" "${i}" &
+done
+
+wait
 
 # Gather test coverage results
 rm -f c.out c-full.out
