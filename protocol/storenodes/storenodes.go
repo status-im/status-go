@@ -39,8 +39,8 @@ type storenodesData struct {
 	storenodes []Storenode
 }
 
-// GetStorenodeByCommunnityID returns the active storenode for a community
-func (m *CommunityStorenodes) GetStorenodeByCommunnityID(communityID string) (mailservers.Mailserver, error) {
+// GetStorenodeByCommunityID returns the active storenode for a community
+func (m *CommunityStorenodes) GetStorenodeByCommunityID(communityID string) (mailservers.Mailserver, error) {
 	m.storenodesByCommunityIDMutex.RLock()
 	defer m.storenodesByCommunityIDMutex.RUnlock()
 

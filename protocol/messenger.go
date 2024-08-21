@@ -25,7 +25,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
 
 	"github.com/status-im/status-go/account"
@@ -139,7 +138,7 @@ type Messenger struct {
 	allInstallations           *installationMap
 	modifiedInstallations      *stringBoolMap
 	installationID             string
-	storenodeCycle             storenodeCycle
+	mailserverCycle            mailserverCycle
 	communityStorenodes        *storenodes.CommunityStorenodes
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
@@ -203,7 +202,6 @@ type connStatus int
 
 const (
 	disconnected connStatus = iota + 1
-	connecting
 	connected
 )
 
@@ -211,15 +209,13 @@ type peerStatus struct {
 	status                connStatus
 	canConnectAfter       time.Time
 	lastConnectionAttempt time.Time
-	storenode             mailserversDB.Mailserver
+	mailserver            mailserversDB.Mailserver
 }
-type storenodeCycle struct {
+type mailserverCycle struct {
 	sync.RWMutex
-	allStorenodes             []mailserversDB.Mailserver
-	activeStorenode           *mailserversDB.Mailserver
+	allMailservers            []mailserversDB.Mailserver
+	activeMailserver          *mailserversDB.Mailserver
 	peers                     map[string]peerStatus
-	events                    chan *p2p.PeerEvent
-	subscription              event.Subscription
 	availabilitySubscriptions []chan struct{}
 }
 
@@ -601,7 +597,7 @@ func NewMessenger(
 		peerStore:               peerStore,
 		mvdsStatusChangeEvent:   make(chan datasyncnode.PeerStatusChangeEvent, 5),
 		verificationDatabase:    verification.NewPersistence(database),
-		storenodeCycle: storenodeCycle{
+		mailserverCycle: mailserverCycle{
 			peers:                     make(map[string]peerStatus),
 			availabilitySubscriptions: make([]chan struct{}, 0),
 		},
@@ -860,13 +856,13 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	response := &MessengerResponse{}
 
-	storenodes, err := m.allStorenodes()
+	mailservers, err := m.allMailservers()
 	if err != nil {
 		return nil, err
 	}
 
-	response.Mailservers = storenodes
-	err = m.StartStorenodeCycle(storenodes)
+	response.Mailservers = mailservers
+	err = m.StartMailserverCycle(mailservers)
 	if err != nil {
 		return nil, err
 	}

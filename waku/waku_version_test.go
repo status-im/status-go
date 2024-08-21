@@ -278,20 +278,6 @@ func (s *WakuTestSuite) TestEventsWithoutConfirmation() {
 	timer.Stop()
 }
 
-func discardPipe() *p2p.MsgPipeRW {
-	rw1, rw2 := p2p.MsgPipe()
-	go func() {
-		for {
-			msg, err := rw1.ReadMsg()
-			if err != nil {
-				return
-			}
-			msg.Discard() // nolint: errcheck
-		}
-	}()
-	return rw2
-}
-
 func (s *WakuTestSuite) TestWakuTimeDesyncEnvelopeIgnored() {
 	c := &Config{
 		MaxMessageSize:     common.DefaultMaxMessageSize,

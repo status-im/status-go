@@ -2,9 +2,9 @@ package mailservers
 
 import "github.com/status-im/status-go/params"
 
-func DefaultStorenodesByFleet(fleet string) []Mailserver {
+func DefaultMailserversByFleet(fleet string) []Mailserver {
 	var items []Mailserver
-	for _, ms := range DefaultStorenodes() {
+	for _, ms := range DefaultMailservers() {
 		if ms.Fleet == fleet {
 			items = append(items, ms)
 		}
@@ -12,7 +12,7 @@ func DefaultStorenodesByFleet(fleet string) []Mailserver {
 	return items
 }
 
-func DefaultStorenodes() []Mailserver {
+func DefaultMailservers() []Mailserver {
 
 	return []Mailserver{
 		{
@@ -53,13 +53,13 @@ func DefaultStorenodes() []Mailserver {
 		},
 		{
 			ID:    "store-01.do-ams3.status.prod",
-			ENR:   MustDecodeENR("enr:-QEeuEA08-NJJDuKh6V8739MPl2G7ykaC0EWyUg21KtjQ1UtKxuE2qNy5uES2_bobr7sC5C4sS_-GhDVYMpOrM2IFc8KAYJpZIJ2NIJpcIQiqsAnim11bHRpYWRkcnO4bgA0Ni9zdG9yZS0wMS5nYy11cy1jZW50cmFsMS1hLnN0YXR1cy5wcm9kLnN0YXR1cy5pbQZ2XwA2Ni9zdG9yZS0wMS5nYy11cy1jZW50cmFsMS1hLnN0YXR1cy5wcm9kLnN0YXR1cy5pbQYBu94DgnJzjQAQBQABACAAQACAAQCJc2VjcDI1NmsxoQN_aBxNsOBrceDLyC75vBFRuzv_tWfaHG50Jc9DQztwkIN0Y3CCdl-DdWRwgiMohXdha3UyAw"),
+			ENR:   MustDecodeENR("enr:-QEMuEAs8JmmyUI3b9v_ADqYtELHUYAsAMS21lA2BMtrzF86tVmyy9cCrhmzfHGHx_g3nybn7jIRybzXTGNj3C2KzrriAYJpZIJ2NIJpcISf3_Jeim11bHRpYWRkcnO4XAArNiZzdG9yZS0wMS5kby1hbXMzLnN0YXR1cy5wcm9kLnN0YXR1cy5pbQZ2XwAtNiZzdG9yZS0wMS5kby1hbXMzLnN0YXR1cy5wcm9kLnN0YXR1cy5pbQYBu94DgnJzjQAQBQABACAAQACAAQCJc2VjcDI1NmsxoQLfoaQH3oSYW59yxEBfeAZbltmUnC4BzYkHqer2VQMTyoN0Y3CCdl-DdWRwgiMohXdha3UyAw"),
 			Addr:  MustDecodeMultiaddress("/dns4/store-01.do-ams3.status.prod.status.im/tcp/30303/p2p/16Uiu2HAmAUdrQ3uwzuE4Gy4D56hX6uLKEeerJAnhKEHZ3DxF1EfT"),
 			Fleet: params.FleetStatusProd,
 		},
 		{
 			ID:    "store-02.do-ams3.status.prod",
-			ENR:   MustDecodeENR("enr:-QEeuECQiv4VvUk04UnU3wxKXgWvErYcGMgYU8aDuc8VvEt1km2GvcEBq-R9XT-loNL5PZjxGKzB1rDtCOQaFVYQtgPnAYJpZIJ2NIJpcIQiqpoCim11bHRpYWRkcnO4bgA0Ni9zdG9yZS0wMi5nYy11cy1jZW50cmFsMS1hLnN0YXR1cy5wcm9kLnN0YXR1cy5pbQZ2XwA2Ni9zdG9yZS0wMi5nYy11cy1jZW50cmFsMS1hLnN0YXR1cy5wcm9kLnN0YXR1cy5pbQYBu94DgnJzjQAQBQABACAAQACAAQCJc2VjcDI1NmsxoQNbEg1bkMJCBiD5Tje3Z_11R-kd9munZF0v4iiYZa1jgoN0Y3CCdl-DdWRwgiMohXdha3UyAw"),
+			ENR:   MustDecodeENR("enr:-QEMuEDuTfD47Hz_NXDwf7LJMf0qhjp3CQhZ9Fy0Ulp4XehtEzewBzmJCoe77hjno3khH8kX2B9B1DgbJuc2n32fMZvOAYJpZIJ2NIJpcISf3_Kaim11bHRpYWRkcnO4XAArNiZzdG9yZS0wMi5kby1hbXMzLnN0YXR1cy5wcm9kLnN0YXR1cy5pbQZ2XwAtNiZzdG9yZS0wMi5kby1hbXMzLnN0YXR1cy5wcm9kLnN0YXR1cy5pbQYBu94DgnJzjQAQBQABACAAQACAAQCJc2VjcDI1NmsxoQLSM62HmqGpZ382YM4CyI-MCIlkxMP7ZbOwqwRPvk9wsIN0Y3CCdl-DdWRwgiMohXdha3UyAw"),
 			Addr:  MustDecodeMultiaddress("/dns4/store-02.do-ams3.status.prod.status.im/tcp/30303/p2p/16Uiu2HAm9aDJPkhGxc2SFcEACTFdZ91Q5TJjp76qZEhq9iF59x7R"),
 			Fleet: params.FleetStatusProd,
 		},

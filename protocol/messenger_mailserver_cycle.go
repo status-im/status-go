@@ -8,12 +8,13 @@ import (
 	"net"
 	"runtime"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+
+	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/storenodes"
@@ -25,15 +26,11 @@ const defaultBackoff = 10 * time.Second
 const graylistBackoff = 3 * time.Minute
 const backoffByUserAction = 0
 const isAndroidEmulator = runtime.GOOS == "android" && runtime.GOARCH == "amd64"
-const findNearestStorenode = !isAndroidEmulator
+const findNearestMailServer = !isAndroidEmulator
 const overrideDNS = runtime.GOOS == "android" || runtime.GOOS == "ios"
 const bootstrapDNS = "8.8.8.8:53"
 
-func (m *Messenger) storenodesByFleet(fleet string) []mailservers.Mailserver {
-	return mailservers.DefaultStorenodesByFleet(fleet)
-}
-
-type byRTTMsAndCanConnectBefore []SortedStorenodes
+type byRTTMsAndCanConnectBefore []SortedMailserver
 
 func (s byRTTMsAndCanConnectBefore) Len() int {
 	return len(s)
@@ -47,26 +44,32 @@ func (s byRTTMsAndCanConnectBefore) Less(i, j int) bool {
 	// Slightly inaccurate as time sensitive sorting, but it does not matter so much
 	now := time.Now()
 	if s[i].CanConnectAfter.Before(now) && s[j].CanConnectAfter.Before(now) {
-		return s[i].RTTMs < s[j].RTTMs
+		return s[i].RTT < s[j].RTT
 	}
 	return s[i].CanConnectAfter.Before(s[j].CanConnectAfter)
 }
 
-func (m *Messenger) StartStorenodeCycle(storenodes []mailservers.Mailserver) error {
-	m.storenodeCycle.allStorenodes = storenodes
-
-	if len(storenodes) == 0 {
-		m.logger.Warn("not starting storenode cycle: empty storenode list")
+func (m *Messenger) StartMailserverCycle(mailservers []mailservers.Mailserver) error {
+	if m.transport.WakuVersion() != 2 {
+		m.logger.Warn("not starting mailserver cycle: requires wakuv2")
 		return nil
 	}
-	for _, storenode := range storenodes {
+
+	m.mailserverCycle.allMailservers = mailservers
+
+	if len(mailservers) == 0 {
+		m.logger.Warn("not starting mailserver cycle: empty mailservers list")
+		return nil
+	}
+
+	for _, storenode := range mailservers {
 
 		peerInfo, err := storenode.PeerInfo()
 		if err != nil {
 			return err
 		}
 
-		for _, addr := range peerInfo.Addrs {
+		for _, addr := range utils.EncapsulatePeerID(peerInfo.ID, peerInfo.Addrs...) {
 			_, err := m.transport.AddStorePeer(addr)
 			if err != nil {
 				return err
@@ -75,59 +78,59 @@ func (m *Messenger) StartStorenodeCycle(storenodes []mailservers.Mailserver) err
 	}
 	go m.verifyStorenodeStatus()
 
-	m.logger.Debug("starting storenode cycle",
+	m.logger.Debug("starting mailserver cycle",
 		zap.Uint("WakuVersion", m.transport.WakuVersion()),
-		zap.Any("storenode", storenodes),
+		zap.Any("mailservers", mailservers),
 	)
 
 	return nil
 }
 
-func (m *Messenger) DisconnectActiveStorenode() {
-	m.storenodeCycle.Lock()
-	defer m.storenodeCycle.Unlock()
-	m.disconnectActiveStorenode(graylistBackoff)
+func (m *Messenger) DisconnectActiveMailserver() {
+	m.mailserverCycle.Lock()
+	defer m.mailserverCycle.Unlock()
+	m.disconnectActiveMailserver(graylistBackoff)
 }
 
-func (m *Messenger) disconnecStorenode(backoffDuration time.Duration) error {
-	if m.storenodeCycle.activeStorenode == nil {
-		m.logger.Info("no active storenode")
+func (m *Messenger) disconnectMailserver(backoffDuration time.Duration) error {
+	if m.mailserverCycle.activeMailserver == nil {
+		m.logger.Info("no active mailserver")
 		return nil
 	}
-	m.logger.Info("disconnecting active storenode", zap.String("nodeID", m.storenodeCycle.activeStorenode.ID))
+	m.logger.Info("disconnecting active mailserver", zap.String("nodeID", m.mailserverCycle.activeMailserver.ID))
 	m.mailPeersMutex.Lock()
-	pInfo, ok := m.storenodeCycle.peers[m.storenodeCycle.activeStorenode.ID]
+	pInfo, ok := m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID]
 	if ok {
 		pInfo.status = disconnected
 
 		pInfo.canConnectAfter = time.Now().Add(backoffDuration)
-		m.storenodeCycle.peers[m.storenodeCycle.activeStorenode.ID] = pInfo
+		m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID] = pInfo
 	} else {
-		m.storenodeCycle.peers[m.storenodeCycle.activeStorenode.ID] = peerStatus{
+		m.mailserverCycle.peers[m.mailserverCycle.activeMailserver.ID] = peerStatus{
 			status:          disconnected,
-			storenode:       *m.storenodeCycle.activeStorenode,
+			mailserver:      *m.mailserverCycle.activeMailserver,
 			canConnectAfter: time.Now().Add(backoffDuration),
 		}
 	}
 	m.mailPeersMutex.Unlock()
 
-	m.storenodeCycle.activeStorenode = nil
+	m.mailserverCycle.activeMailserver = nil
 	return nil
 }
 
-func (m *Messenger) disconnectActiveStorenode(backoffDuration time.Duration) {
-	err := m.disconnecStorenode(backoffDuration)
+func (m *Messenger) disconnectActiveMailserver(backoffDuration time.Duration) {
+	err := m.disconnectMailserver(backoffDuration)
 	if err != nil {
-		m.logger.Error("failed to disconnect storenode", zap.Error(err))
+		m.logger.Error("failed to disconnect mailserver", zap.Error(err))
 	}
 	signal.SendMailserverChanged(nil)
 }
 
 func (m *Messenger) cycleMailservers() {
-	m.logger.Info("Automatically switching storenode")
+	m.logger.Info("Automatically switching mailserver")
 
-	if m.storenodeCycle.activeStorenode != nil {
-		m.disconnectActiveStorenode(graylistBackoff)
+	if m.mailserverCycle.activeMailserver != nil {
+		m.disconnectActiveMailserver(graylistBackoff)
 	}
 
 	useMailserver, err := m.settings.CanUseMailservers()
@@ -137,13 +140,13 @@ func (m *Messenger) cycleMailservers() {
 	}
 
 	if !useMailserver {
-		m.logger.Info("Skipping storenode search due to useMailserver being false")
+		m.logger.Info("Skipping mailserver search due to useMailserver being false")
 		return
 	}
 
-	err = m.findNewStorenode()
+	err = m.findNewMailserver()
 	if err != nil {
-		m.logger.Error("Error getting new storenode", zap.Error(err))
+		m.logger.Error("Error getting new mailserver", zap.Error(err))
 	}
 }
 
@@ -162,22 +165,22 @@ func (m *Messenger) getFleet() (string, error) {
 	} else if m.config.clusterConfig.Fleet != "" {
 		fleet = m.config.clusterConfig.Fleet
 	} else {
-		fleet = params.FleetProd
+		fleet = params.FleetStatusProd
 	}
 	return fleet, nil
 }
 
-func (m *Messenger) allStorenodes() ([]mailservers.Mailserver, error) {
+func (m *Messenger) allMailservers() ([]mailservers.Mailserver, error) {
 	// Get configured fleet
 	fleet, err := m.getFleet()
 	if err != nil {
 		return nil, err
 	}
 
-	// Get default storenode for given fleet
-	allStorenodes := m.storenodesByFleet(fleet)
+	// Get default mailservers for given fleet
+	allMailservers := mailservers.DefaultMailserversByFleet(fleet)
 
-	// Add custom configured storenode
+	// Add custom configured mailservers
 	if m.mailserversDatabase != nil {
 		customMailservers, err := m.mailserversDatabase.Mailservers()
 		if err != nil {
@@ -186,22 +189,85 @@ func (m *Messenger) allStorenodes() ([]mailservers.Mailserver, error) {
 
 		for _, c := range customMailservers {
 			if c.Fleet == fleet {
-				allStorenodes = append(allStorenodes, c)
+				allMailservers = append(allMailservers, c)
 			}
 		}
 	}
 
-	return allStorenodes, nil
+	return allMailservers, nil
 }
 
-type SortedStorenodes struct {
+type SortedMailserver struct {
 	Mailserver      mailservers.Mailserver
-	RTTMs           int
+	RTT             time.Duration
 	CanConnectAfter time.Time
 }
 
-func (m *Messenger) findNewStorenode() error {
+func (m *Messenger) getAvailableMailserversSortedByRTT(allMailservers []mailservers.Mailserver) []mailservers.Mailserver {
+	// TODO: this can be replaced by peer selector once code is moved to go-waku api
+	availableMailservers := make(map[string]time.Duration)
+	availableMailserversMutex := sync.Mutex{}
+	availableMailserversWg := sync.WaitGroup{}
+	for _, mailserver := range allMailservers {
+		availableMailserversWg.Add(1)
+		go func(mailserver mailservers.Mailserver) {
+			defer availableMailserversWg.Done()
 
+			peerID, err := mailserver.PeerID()
+			if err != nil {
+				return
+			}
+
+			ctx, cancel := context.WithTimeout(m.ctx, 4*time.Second)
+			defer cancel()
+
+			rtt, err := m.transport.PingPeer(ctx, peerID)
+			if err == nil { // pinging mailservers might fail, but we don't care
+				availableMailserversMutex.Lock()
+				availableMailservers[mailserver.ID] = rtt
+				availableMailserversMutex.Unlock()
+			}
+		}(mailserver)
+	}
+	availableMailserversWg.Wait()
+
+	if len(availableMailservers) == 0 {
+		m.logger.Warn("No mailservers available") // Do nothing...
+		return nil
+	}
+
+	mailserversByID := make(map[string]mailservers.Mailserver)
+	for idx := range allMailservers {
+		mailserversByID[allMailservers[idx].ID] = allMailservers[idx]
+	}
+	var sortedMailservers []SortedMailserver
+	for mailserverID, rtt := range availableMailservers {
+		ms := mailserversByID[mailserverID]
+		sortedMailserver := SortedMailserver{
+			Mailserver: ms,
+			RTT:        rtt,
+		}
+		m.mailPeersMutex.Lock()
+		pInfo, ok := m.mailserverCycle.peers[ms.ID]
+		m.mailPeersMutex.Unlock()
+		if ok {
+			if time.Now().Before(pInfo.canConnectAfter) {
+				continue // We can't connect to this node yet
+			}
+		}
+		sortedMailservers = append(sortedMailservers, sortedMailserver)
+	}
+	sort.Sort(byRTTMsAndCanConnectBefore(sortedMailservers))
+
+	result := make([]mailservers.Mailserver, len(sortedMailservers))
+	for i, s := range sortedMailservers {
+		result[i] = s.Mailserver
+	}
+
+	return result
+}
+
+func (m *Messenger) findNewMailserver() error {
 	// we have to override DNS manually because of https://github.com/status-im/status-mobile/issues/19581
 	if overrideDNS {
 		var dialer net.Dialer
@@ -226,95 +292,22 @@ func (m *Messenger) findNewStorenode() error {
 		return m.connectToMailserver(*pinnedMailserver)
 	}
 
-	allStorenodes := m.storenodeCycle.allStorenodes
+	m.logger.Info("Finding a new mailserver...")
+
+	allMailservers := m.mailserverCycle.allMailservers
 
 	//	TODO: remove this check once sockets are stable on x86_64 emulators
-	if findNearestStorenode {
-		m.logger.Info("Finding a new storenode...")
-
-		if len(allStorenodes) == 0 {
-			m.logger.Warn("no storenodes available") // Do nothing...
-			return nil
-
-		}
-
-		pingResult, err := m.transport.PingPeer(m.ctx, allStorenodes, 500)
-		if err != nil {
-			// pinging storenodes might fail, but we don't care
-			m.logger.Warn("ping failed with", zap.Error(err))
-		}
-
-		var availableStorenodes []*mailservers.PingResult
-		for _, result := range pingResult {
-			if result.Err != nil {
-				m.logger.Info("connecting error", zap.String("err", *result.Err))
-				continue // The results with error are ignored
-			}
-			availableStorenodes = append(availableStorenodes, result)
-		}
-
-		if len(availableStorenodes) == 0 {
-			m.logger.Warn("No storenodes available") // Do nothing...
-			return nil
-		}
-
-		mailserversByID := make(map[string]mailservers.Mailserver)
-		for idx := range allStorenodes {
-			mailserversByID[allStorenodes[idx].ID] = allStorenodes[idx]
-		}
-		var sortedMailservers []SortedStorenodes
-		for _, ping := range availableStorenodes {
-			ms := mailserversByID[ping.ID]
-			sortedMailserver := SortedStorenodes{
-				Mailserver: ms,
-				RTTMs:      *ping.RTTMs,
-			}
-			m.mailPeersMutex.Lock()
-			pInfo, ok := m.storenodeCycle.peers[ms.ID]
-			m.mailPeersMutex.Unlock()
-			if ok {
-				if time.Now().Before(pInfo.canConnectAfter) {
-					continue // We can't connect to this node yet
-				}
-			}
-
-			sortedMailservers = append(sortedMailservers, sortedMailserver)
-
-		}
-		sort.Sort(byRTTMsAndCanConnectBefore(sortedMailservers))
-
-		// Picks a random mailserver amongs the ones with the lowest latency
-		// The pool size is 1/4 of the mailservers were pinged successfully
-		pSize := poolSize(len(sortedMailservers) - 1)
-		if pSize <= 0 {
-			pSize = len(sortedMailservers)
-			if pSize <= 0 {
-				m.logger.Warn("No mailservers available") // Do nothing...
-				return nil
-			}
-		}
-
-		r, err := rand.Int(rand.Reader, big.NewInt(int64(pSize)))
-		if err != nil {
-			return err
-		}
-
-		msPing := sortedMailservers[r.Int64()]
-		ms := mailserversByID[msPing.Mailserver.ID]
-		m.logger.Info("connecting to mailserver", zap.String("address", ms.ID))
-		return m.connectToMailserver(ms)
+	if findNearestMailServer {
+		allMailservers = m.getAvailableMailserversSortedByRTT(allMailservers)
 	}
 
-	mailserversByID := make(map[string]mailservers.Mailserver)
-	for idx := range allStorenodes {
-		mailserversByID[allStorenodes[idx].ID] = allStorenodes[idx]
-	}
-
-	pSize := poolSize(len(allStorenodes) - 1)
+	// Picks a random mailserver amongs the ones with the lowest latency
+	// The pool size is 1/4 of the mailservers were pinged successfully
+	pSize := poolSize(len(allMailservers) - 1)
 	if pSize <= 0 {
-		pSize = len(allStorenodes)
+		pSize = len(allMailservers)
 		if pSize <= 0 {
-			m.logger.Warn("No mailservers available") // Do nothing...
+			m.logger.Warn("No storenodes available") // Do nothing...
 			return nil
 		}
 	}
@@ -324,17 +317,14 @@ func (m *Messenger) findNewStorenode() error {
 		return err
 	}
 
-	msPing := allStorenodes[r.Int64()]
-	ms := mailserversByID[msPing.ID]
-	m.logger.Info("connecting to mailserver", zap.String("address", ms.ID))
-
+	ms := allMailservers[r.Int64()]
 	return m.connectToMailserver(ms)
 }
 
 func (m *Messenger) mailserverStatus(mailserverID string) connStatus {
 	m.mailPeersMutex.RLock()
 	defer m.mailPeersMutex.RUnlock()
-	peer, ok := m.storenodeCycle.peers[mailserverID]
+	peer, ok := m.mailserverCycle.peers[mailserverID]
 	if !ok {
 		return disconnected
 	}
@@ -343,32 +333,32 @@ func (m *Messenger) mailserverStatus(mailserverID string) connStatus {
 
 func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 
-	m.logger.Info("connecting to mailserver", zap.Any("peer", ms.ID))
+	m.logger.Info("connecting to mailserver", zap.String("mailserverID", ms.ID))
 
-	m.storenodeCycle.activeStorenode = &ms
-	signal.SendMailserverChanged(m.storenodeCycle.activeStorenode)
+	m.mailserverCycle.activeMailserver = &ms
+	signal.SendMailserverChanged(m.mailserverCycle.activeMailserver)
 
-	activeMailserverStatus := m.mailserverStatus(ms.ID)
-	if activeMailserverStatus != connected {
+	mailserverStatus := m.mailserverStatus(ms.ID)
+	if mailserverStatus != connected {
 		m.mailPeersMutex.Lock()
-		m.storenodeCycle.peers[ms.ID] = peerStatus{
+		m.mailserverCycle.peers[ms.ID] = peerStatus{
 			status:                connected,
 			lastConnectionAttempt: time.Now(),
 			canConnectAfter:       time.Now().Add(defaultBackoff),
-			storenode:             ms,
+			mailserver:            ms,
 		}
 		m.mailPeersMutex.Unlock()
 
-		m.storenodeCycle.activeStorenode.FailedRequests = 0
-		peerID, err := m.storenodeCycle.activeStorenode.PeerID()
+		m.mailserverCycle.activeMailserver.FailedRequests = 0
+		peerID, err := m.mailserverCycle.activeMailserver.PeerID()
 		if err != nil {
-			m.logger.Error("could not decode the peer id of storenode", zap.Error(err))
+			m.logger.Error("could not decode the peer id of mailserver", zap.Error(err))
 			return err
 		}
 
-		m.logger.Info("storenode available", zap.String("storenodeID", m.storenodeCycle.activeStorenode.ID))
+		m.logger.Info("mailserver available", zap.String("mailserverID", m.mailserverCycle.activeMailserver.ID))
 		m.EmitMailserverAvailable()
-		signal.SendMailserverAvailable(m.storenodeCycle.activeStorenode)
+		signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver)
 
 		m.transport.SetStorePeerID(peerID)
 
@@ -382,15 +372,15 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 // for that community if it has a mailserver setup otherwise it'll return the global mailserver
 func (m *Messenger) getActiveMailserver(communityID ...string) *mailservers.Mailserver {
 	if len(communityID) == 0 || communityID[0] == "" {
-		return m.storenodeCycle.activeStorenode
+		return m.mailserverCycle.activeMailserver
 	}
-	ms, err := m.communityStorenodes.GetStorenodeByCommunnityID(communityID[0])
+	ms, err := m.communityStorenodes.GetStorenodeByCommunityID(communityID[0])
 	if err != nil {
 		if !errors.Is(err, storenodes.ErrNotFound) {
 			m.logger.Error("getting storenode for community, using global", zap.String("communityID", communityID[0]), zap.Error(err))
 		}
 		// if we don't find a specific mailserver for the community, we just use the regular mailserverCycle's one
-		return m.storenodeCycle.activeStorenode
+		return m.mailserverCycle.activeMailserver
 	}
 	return &ms
 }
@@ -407,43 +397,16 @@ func (m *Messenger) isMailserverAvailable(mailserverID string) bool {
 	return m.mailserverStatus(mailserverID) == connected
 }
 
-func mailserverAddressToID(uniqueID string, allStorenodes []mailservers.Mailserver) (string, error) {
-	for _, ms := range allStorenodes {
-		if uniqueID == ms.ID {
-			return ms.ID, nil
-		}
-
-	}
-
-	return "", nil
-}
-
-type ConnectedPeer struct {
-	UniqueID string
-}
-
-func (m *Messenger) mailserverPeersInfo() []ConnectedPeer {
-	var connectedPeers []ConnectedPeer
-	for _, connectedPeer := range m.server.PeersInfo() {
-		connectedPeers = append(connectedPeers, ConnectedPeer{
-			// This is a bit fragile, but should work
-			UniqueID: strings.TrimSuffix(connectedPeer.Enode, "?discport=0"),
-		})
-	}
-
-	return connectedPeers
-}
-
 func (m *Messenger) penalizeMailserver(id string) {
 	m.mailPeersMutex.Lock()
 	defer m.mailPeersMutex.Unlock()
-	pInfo, ok := m.storenodeCycle.peers[id]
+	pInfo, ok := m.mailserverCycle.peers[id]
 	if !ok {
 		pInfo.status = disconnected
 	}
 
 	pInfo.canConnectAfter = time.Now().Add(graylistBackoff)
-	m.storenodeCycle.peers[id] = pInfo
+	m.mailserverCycle.peers[id] = pInfo
 }
 
 func (m *Messenger) asyncRequestAllHistoricMessages() {
@@ -496,7 +459,7 @@ func (m *Messenger) getPinnedMailserver() (*mailservers.Mailserver, error) {
 		return nil, nil
 	}
 
-	fleetMailservers := mailservers.DefaultStorenodes()
+	fleetMailservers := mailservers.DefaultMailservers()
 
 	for _, c := range fleetMailservers {
 		if c.Fleet == fleet && c.ID == pinnedMailserver {
@@ -521,35 +484,35 @@ func (m *Messenger) getPinnedMailserver() (*mailservers.Mailserver, error) {
 }
 
 func (m *Messenger) EmitMailserverAvailable() {
-	for _, s := range m.storenodeCycle.availabilitySubscriptions {
+	for _, s := range m.mailserverCycle.availabilitySubscriptions {
 		s <- struct{}{}
 		close(s)
-		l := len(m.storenodeCycle.availabilitySubscriptions)
-		m.storenodeCycle.availabilitySubscriptions = m.storenodeCycle.availabilitySubscriptions[:l-1]
+		l := len(m.mailserverCycle.availabilitySubscriptions)
+		m.mailserverCycle.availabilitySubscriptions = m.mailserverCycle.availabilitySubscriptions[:l-1]
 	}
 }
 
 func (m *Messenger) SubscribeMailserverAvailable() chan struct{} {
 	c := make(chan struct{})
-	m.storenodeCycle.availabilitySubscriptions = append(m.storenodeCycle.availabilitySubscriptions, c)
+	m.mailserverCycle.availabilitySubscriptions = append(m.mailserverCycle.availabilitySubscriptions, c)
 	return c
 }
 
 func (m *Messenger) disconnectStorenodeIfRequired() error {
 	m.logger.Debug("wakuV2 storenode status verification")
 
-	if m.storenodeCycle.activeStorenode == nil {
+	if m.mailserverCycle.activeMailserver == nil {
 		// No active storenode, find a new one
 		m.cycleMailservers()
 		return nil
 	}
 
 	// Check whether we want to disconnect the active storenode
-	if m.storenodeCycle.activeStorenode.FailedRequests >= mailserverMaxFailedRequests {
-		m.penalizeMailserver(m.storenodeCycle.activeStorenode.ID)
+	if m.mailserverCycle.activeMailserver.FailedRequests >= mailserverMaxFailedRequests {
+		m.penalizeMailserver(m.mailserverCycle.activeMailserver.ID)
 		signal.SendMailserverNotWorking()
-		m.logger.Info("too many failed requests", zap.String("storenode", m.storenodeCycle.activeStorenode.ID))
-		m.storenodeCycle.activeStorenode.FailedRequests = 0
+		m.logger.Info("too many failed requests", zap.String("storenode", m.mailserverCycle.activeMailserver.ID))
+		m.mailserverCycle.activeMailserver.FailedRequests = 0
 		return m.connectToNewMailserverAndWait()
 	}
 
@@ -557,7 +520,7 @@ func (m *Messenger) disconnectStorenodeIfRequired() error {
 }
 
 func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
-	// Add 1 second to timeout, because the storenode cycle has 1 second ticker, which doesn't tick on start.
+	// Add 1 second to timeout, because the mailserver cycle has 1 second ticker, which doesn't tick on start.
 	// This can be improved after merging https://github.com/status-im/status-go/pull/4380.
 	// NOTE: https://stackoverflow.com/questions/32705582/how-to-get-time-tick-to-tick-immediately
 	timeout += time.Second

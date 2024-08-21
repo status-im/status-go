@@ -2,16 +2,13 @@
 package main
 
 import (
-	"errors"
 	"flag"
-	"fmt"
 	stdlog "log"
 	"os"
 	"path"
 	"path/filepath"
 	"time"
 
-	"golang.org/x/crypto/sha3"
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -19,32 +16,22 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/helpers"
-)
-
-const (
-	mailboxPassword = "status-offline-inbox"
 )
 
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/cmd/node-canary")
 
 var (
-	staticEnodeAddr     = flag.String("staticnode", "", "checks if static node talks waku protocol (e.g. enode://abc123@1.2.3.4:30303)")
-	mailserverEnodeAddr = flag.String("mailserver", "", "queries mail server for historic messages (e.g. enode://123abc@4.3.2.1:30504)")
-	publicChannel       = flag.String("channel", "status", "The public channel name to retrieve historic messages from (used with 'mailserver' flag)")
-	timeout             = flag.Int("timeout", 10, "Timeout when connecting to node or fetching messages from mailserver, in seconds")
-	period              = flag.Int("period", 24*60*60, "How far in the past to request messages from mailserver, in seconds")
-	minPow              = flag.Float64("waku.pow", params.WakuMinimumPoW, "PoW for messages to be added to queue, in float format")
-	ttl                 = flag.Int("waku.ttl", params.WakuTTL, "Time to live for messages, in seconds")
-	homePath            = flag.String("home-dir", ".", "Home directory where state is stored")
-	logLevel            = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
-	logFile             = flag.String("logfile", "", "Path to the log file")
-	logWithoutColors    = flag.Bool("log-without-color", false, "Disables log colors")
+	staticEnodeAddr  = flag.String("staticnode", "", "checks if static node talks waku protocol (e.g. enode://abc123@1.2.3.4:30303)")
+	minPow           = flag.Float64("waku.pow", params.WakuMinimumPoW, "PoW for messages to be added to queue, in float format")
+	ttl              = flag.Int("waku.ttl", params.WakuTTL, "Time to live for messages, in seconds")
+	homePath         = flag.String("home-dir", ".", "Home directory where state is stored")
+	logLevel         = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+	logFile          = flag.String("logfile", "", "Path to the log file")
+	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
 )
 
 func main() {
@@ -179,108 +166,4 @@ func startClientNode() (*api.GethStatusBackend, error) {
 		return nil, err
 	}
 	return clientBackend, err
-}
-
-func joinPublicChat(w types.Waku, rpcClient *rpc.Client, name string) (string, types.TopicType, string, error) {
-	keyID, err := w.AddSymKeyFromPassword(name)
-	if err != nil {
-		return "", types.TopicType{}, "", err
-	}
-
-	h := sha3.NewLegacyKeccak256()
-	_, err = h.Write([]byte(name))
-	if err != nil {
-		return "", types.TopicType{}, "", err
-	}
-	fullTopic := h.Sum(nil)
-	topic := types.BytesToTopic(fullTopic)
-
-	wakuAPI := w.PublicWakuAPI()
-	filterID, err := wakuAPI.NewMessageFilter(types.Criteria{SymKeyID: keyID, Topics: []types.TopicType{topic}})
-
-	return keyID, topic, filterID, err
-}
-
-func waitForMailServerRequestSent(events chan types.EnvelopeEvent, requestID types.Hash, timeout time.Duration) error {
-	timeoutTimer := time.NewTimer(timeout)
-	for {
-		select {
-		case event := <-events:
-			if event.Hash == requestID && event.Event == types.EventMailServerRequestSent {
-				timeoutTimer.Stop()
-				return nil
-			}
-		case <-timeoutTimer.C:
-			return errors.New("timed out waiting for mailserver request sent")
-		}
-	}
-}
-
-func waitForMailServerResponse(events chan types.EnvelopeEvent, requestID types.Hash, timeout time.Duration) (*types.MailServerResponse, error) {
-	timeoutTimer := time.NewTimer(timeout)
-	for {
-		select {
-		case event := <-events:
-			if event.Hash == requestID {
-				resp, err := decodeMailServerResponse(event)
-				if resp != nil || err != nil {
-					timeoutTimer.Stop()
-					return resp, err
-				}
-			}
-		case <-timeoutTimer.C:
-			return nil, errors.New("timed out waiting for mailserver response")
-		}
-	}
-}
-
-func decodeMailServerResponse(event types.EnvelopeEvent) (*types.MailServerResponse, error) {
-	switch event.Event {
-	case types.EventMailServerRequestSent:
-		return nil, nil
-	case types.EventMailServerRequestCompleted:
-		resp, ok := event.Data.(*types.MailServerResponse)
-		if !ok {
-			return nil, errors.New("failed to convert event to a *MailServerResponse")
-		}
-
-		return resp, nil
-	case types.EventMailServerRequestExpired:
-		return nil, errors.New("no messages available from mailserver")
-	default:
-		return nil, fmt.Errorf("unexpected event type: %v", event.Event)
-	}
-}
-
-func waitForEnvelopeEvents(events chan types.EnvelopeEvent, hashes []string, event types.EventType) error {
-	check := make(map[string]struct{})
-	for _, hash := range hashes {
-		check[hash] = struct{}{}
-	}
-
-	timeout := time.NewTimer(time.Second * 5)
-	for {
-		select {
-		case e := <-events:
-			if e.Event == event {
-				delete(check, e.Hash.String())
-				if len(check) == 0 {
-					timeout.Stop()
-					return nil
-				}
-			}
-		case <-timeout.C:
-			return fmt.Errorf("timed out while waiting for event on envelopes. event: %s", event)
-		}
-	}
-}
-
-// helper for checking LastEnvelopeHash
-func isEmptyEnvelope(hash types.Hash) bool {
-	for _, b := range hash {
-		if b != 0 {
-			return false
-		}
-	}
-	return true
 }

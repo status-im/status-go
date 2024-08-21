@@ -8,6 +8,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+
 	"github.com/status-im/status-go/protocol/storenodes"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
@@ -350,10 +351,10 @@ func (s *MessengerStoreNodeCommunitySuite) TestToggleUseMailservers() {
 	// Enable use of mailservers
 	err := s.owner.ToggleUseMailservers(true)
 	s.Require().NoError(err)
-	s.Require().NotNil(s.owner.storenodeCycle.activeStorenode)
+	s.Require().NotNil(s.owner.mailserverCycle.activeMailserver)
 
 	// Disable use of mailservers
 	err = s.owner.ToggleUseMailservers(false)
 	s.Require().NoError(err)
-	s.Require().Nil(s.owner.storenodeCycle.activeStorenode)
+	s.Require().Nil(s.owner.mailserverCycle.activeMailserver)
 }

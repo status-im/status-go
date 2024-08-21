@@ -2,6 +2,7 @@ package storenodes
 
 import (
 	"github.com/multiformats/go-multiaddr"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/mailservers"

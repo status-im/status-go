@@ -1046,7 +1046,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 	}
 
 	// Prepare things depending on the configuration
-	nodesList := mailserversDB.DefaultStorenodesByFleet(fleet)
+	nodesList := mailserversDB.DefaultMailserversByFleet(fleet)
 	descriptionContentTopic := wakuV2common.BytesToTopic(transport.ToTopic(communityID))
 	shardContentTopic := wakuV2common.BytesToTopic(transport.ToTopic(transport.CommunityShardInfoTopic(communityID)))
 
