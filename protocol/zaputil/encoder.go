@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"sync"
 )
 
 type jsonHexEncoder struct {
@@ -31,13 +32,22 @@ func (enc *jsonHexEncoder) Clone() zapcore.Encoder {
 	return &jsonHexEncoder{Encoder: encoderClone}
 }
 
+var (
+	registerJSONHexEncoderOnce   sync.Once
+	registerConsoleHexEncodeOnce sync.Once
+)
+
 // RegisterJSONHexEncoder registers a jsonHexEncoder under "json-hex" name.
 // Later, this name can be used as a value for zap.Config.Encoding to enable
 // jsonHexEncoder.
 func RegisterJSONHexEncoder() error {
-	return zap.RegisterEncoder("json-hex", func(cfg zapcore.EncoderConfig) (zapcore.Encoder, error) {
-		return NewJSONHexEncoder(cfg), nil
+	var err error
+	registerJSONHexEncoderOnce.Do(func() {
+		err = zap.RegisterEncoder("json-hex", func(cfg zapcore.EncoderConfig) (zapcore.Encoder, error) {
+			return NewJSONHexEncoder(cfg), nil
+		})
 	})
+	return err
 }
 
 type consoleHexEncoder struct {
@@ -61,7 +71,11 @@ func (enc *consoleHexEncoder) Clone() zapcore.Encoder {
 }
 
 func RegisterConsoleHexEncoder() error {
-	return zap.RegisterEncoder("console-hex", func(cfg zapcore.EncoderConfig) (zapcore.Encoder, error) {
-		return NewConsoleHexEncoder(cfg), nil
+	var err error
+	registerConsoleHexEncodeOnce.Do(func() {
+		err = zap.RegisterEncoder("console-hex", func(cfg zapcore.EncoderConfig) (zapcore.Encoder, error) {
+			return NewConsoleHexEncoder(cfg), nil
+		})
 	})
+	return err
 }
