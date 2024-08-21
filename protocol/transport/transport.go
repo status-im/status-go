@@ -511,14 +511,14 @@ func (t *Transport) SendMessagesRequestForTopics(
 	ctx context.Context,
 	peerID peer.ID,
 	from, to uint32,
-	previousStoreCursor types.StoreRequestCursor,
+	prevCursor types.StoreRequestCursor,
 	pubsubTopic string,
 	contentTopics []types.TopicType,
 	limit uint32,
 	waitForResponse bool,
 	processEnvelopes bool,
-) (storeCursor types.StoreRequestCursor, envelopesCount int, err error) {
-	return t.createMessagesRequest(ctx, peerID, from, to, previousStoreCursor, pubsubTopic, contentTopics, limit, waitForResponse, processEnvelopes)
+) (cursor types.StoreRequestCursor, envelopesCount int, err error) {
+	return t.createMessagesRequest(ctx, peerID, from, to, prevCursor, pubsubTopic, contentTopics, limit, waitForResponse, processEnvelopes)
 }
 
 func createMessagesRequest(from, to uint32, cursor []byte, storeCursor types.StoreRequestCursor, pubsubTopic string, topics []types.TopicType, limit uint32) types.MessagesRequest {
@@ -629,6 +629,10 @@ func (t *Transport) SubscribeToConnStatusChanges() (*types.ConnStatusSubscriptio
 
 func (t *Transport) ConnectionChanged(state connection.State) {
 	t.waku.ConnectionChanged(state)
+}
+
+func (t *Transport) PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error) {
+	return t.waku.PingPeer(ctx, peerID)
 }
 
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected

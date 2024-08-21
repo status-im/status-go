@@ -36,6 +36,7 @@ import (
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/multiformats/go-multiaddr"
 
 	"go.uber.org/zap"
@@ -1790,6 +1791,19 @@ func (w *Waku) Clean() error {
 
 func (w *Waku) PeerID() peer.ID {
 	return w.node.Host().ID()
+}
+
+func (w *Waku) PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error) {
+	pingResultCh := ping.Ping(ctx, w.node.Host(), peerID)
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case r := <-pingResultCh:
+		if r.Error != nil {
+			return 0, r.Error
+		}
+		return r.RTT, nil
+	}
 }
 
 func (w *Waku) Peerstore() peerstore.Peerstore {

@@ -342,3 +342,7 @@ func (w *gethWakuV2Wrapper) SetStorePeerID(peerID peer.ID) {
 func (w *gethWakuV2Wrapper) PeerID() peer.ID {
 	return w.waku.PeerID()
 }
+
+func (w *gethWakuV2Wrapper) PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error) {
+	return w.waku.PingPeer(ctx, peerID)
+}

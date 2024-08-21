@@ -199,4 +199,7 @@ type Waku interface {
 
 	// PeerID returns node's PeerID
 	PeerID() peer.ID
+
+	// PingPeer returns the reply time
+	PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error)
 }

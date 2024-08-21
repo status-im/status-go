@@ -238,5 +238,5 @@ func SendMailserverChanged(ms *mailservers.Mailserver) {
 }
 
 func SendMailserverNotWorking() {
-	send(EventMailserverNotWorking, MailserverSignal{})
+	sendMailserverSignal(nil, EventMailserverNotWorking)
 }
