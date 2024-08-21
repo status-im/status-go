@@ -40,6 +40,7 @@ const (
 	//    Wallet: 0, Chat: 0, Type: 'seed', Path: m/44'/60'/0'/0/0, Name: 'seed', Derived_from: '', Pubkey: 0x04FDE3E5...
 	// seed phrase for 0xB7A1233D1309CE665A3A4DB088E4A046EB333545: vocal blouse script census island armor seek catch wool narrow peasant attract
 	// private key for 0x516312D69737C5E6EF16F22E0097FF5D9F0C4196: c3ad0b50652318f845565c13761e5369ce75dcbc2a94616e15b829d4b07410fe
+	// status account seed phrase: coin globe kit hamster notable proof orphan always mistake usual morning usage
 	srcFolder = "../static/test-mobile-release-1.20.x-aa6e4b2-account/"
 )
 
@@ -173,6 +174,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 	profileKp := profileKps[0]
 	s.Require().True(profileKp.DerivedFrom == walletRootAddress.Hex())
 	s.Require().False(masterAddress.Hex() == walletRootAddress.Hex())
+	s.T().Logf("masterAddress: %s, walletRootAddress: %s", masterAddress.Hex(), walletRootAddress.Hex())
 
 	// simulate mobile frontend adding a wallet account
 	suggestedPath, err := db.ResolveSuggestedPathForKeypair(oldMobileUserKeyUID)
@@ -184,6 +186,8 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradin
 	s.Require().NoError(err)
 	s.Require().Len(infoMap, 1)
 	deriveAccountInfo := infoMap[suggestedPath]
+	expectedDerivedAddress := "0xf44F8Ebc5b088e0eA8a0f7309A4a0c525AD783DA"
+	s.Require().Equal(expectedDerivedAddress, deriveAccountInfo.Address)
 	derivedAddress := types.HexToAddress(deriveAccountInfo.Address)
 	accountsAPI := b.StatusNode().AccountService().AccountsAPI()
 	err = accountsAPI.AddAccount(context.Background(), oldMobileUserPasswd, &accounts.Account{

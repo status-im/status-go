@@ -1740,17 +1740,27 @@ func (db *Database) ResolveSuggestedPathForKeypair(keyUID string) (suggestedPath
 
 	nextIndex := kp.LastUsedDerivationIndex + 1
 	for i := nextIndex; i < numOfAddressesToGenerater; i++ {
-		suggestedPath := fmt.Sprintf("%s%d", statusWalletRootPath, i)
-
+		suggestedPath = fmt.Sprintf("%s%d", statusWalletRootPath, i)
+		relativePath := fmt.Sprintf("m/%d", i)
 		found := false
 		for _, acc := range kp.Accounts {
-			if acc.Path != suggestedPath {
+			if acc.Path != suggestedPath && acc.Path != relativePath {
 				continue
 			}
 			found = true
 			break
 		}
 		if !found {
+			// relate custom migration https://github.com/status-im/status-go/pull/5279/files#diff-e62600839ff3a2748953a173d3627e2c48a252b0a962a25a873b778313f81494
+			if kp.Type == KeypairTypeProfile {
+				walletRootAddress, err := db.GetWalletRootAddress()
+				if err != nil {
+					return relativePath, err
+				}
+				if kp.DerivedFrom == walletRootAddress.Hex() { // derive from wallet root
+					return relativePath, nil
+				}
+			}
 			return suggestedPath, nil
 		}
 	}
