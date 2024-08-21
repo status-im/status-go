@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+	"errors"
 )
 
 // CPUFilename is a filename in which the CPU profiling is stored.
@@ -14,6 +15,9 @@ var cpuFile *os.File
 // StartCPUProfile enables CPU profiling for the current process. While profiling,
 // the profile will be buffered and written to the file in folder dataDir.
 func StartCPUProfile(dataDir string) error {
+	if cpuFile != nil {
+		return errors.New("cpu profiling is already started")
+	}
 	if cpuFile == nil {
 		var err error
 		cpuFile, err = os.Create(filepath.Join(dataDir, CPUFilename))
@@ -31,5 +35,7 @@ func StopCPUProfile() error {
 		return nil
 	}
 	pprof.StopCPUProfile()
-	return cpuFile.Close()
+	err := cpuFile.Close()
+	cpuFile = nil
+	return err
 }
