@@ -30,7 +30,7 @@ func BytesToTopic(b []byte) (t TopicType) {
 }
 
 // String converts a topic byte array to a string representation.
-func (t *TopicType) String() string {
+func (t TopicType) String() string {
 	return EncodeHex(t[:])
 }
 

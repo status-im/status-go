@@ -129,7 +129,7 @@ func (w *GethWakuWrapper) SubscribeToConnStatusChanges() (*types.ConnStatusSubsc
 	return nil, errors.New("not available in WakuV1")
 }
 
-func (w *GethWakuWrapper) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []string) error {
+func (w *GethWakuWrapper) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []types.TopicType) error {
 	return errors.New("not available in WakuV1")
 }
 
