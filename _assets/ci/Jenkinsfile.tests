@@ -181,18 +181,16 @@ pipeline {
         env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
         if (isTestNightlyJob()) {
-          archiveArtifacts('**/report_*.xml, **/test_*.log')
-          def totalSize = sh(script: "find . -name 'report_*.xml' | xargs wc -c | tail -n1 | awk '{print \$1}'", returnStdout: true).trim()
-          println("Total size of all report_*.xml files: ${totalSize} bytes.")
+          archiveArtifacts('report.xml, test.log')
         }
         if (params.UNIT_TEST_RERUN_FAILS) {
-          def rerunReports = findFiles(glob: '**/report_rerun_fails_*.txt')
+          def rerunReports = findFiles(glob: 'report_rerun_fails.txt')
           if (rerunReports.length > 0) {
-            archiveArtifacts('**/report_rerun_fails_*.txt')
+            archiveArtifacts('report_rerun_fails.txt')
           }
         }
         junit(
-          testResults: '**/report_*.xml',
+          testResults: 'report.xml',
           skipOldReports: true,
           skipPublishingChecks: true,
           skipMarkingBuildUnstable: true
@@ -212,7 +210,7 @@ pipeline {
     failure { 
       script { 
         github.notifyPR(false) 
-        archiveArtifacts('**/test_*.log')
+        archiveArtifacts('test.log')
       }
     }
     cleanup {
