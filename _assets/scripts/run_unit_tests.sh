@@ -30,15 +30,14 @@ redirect_stdout() {
 
 run_test_for_packages() {
   local packages=$1
-  local iteration=$2
 
-  local output_file="test_${iteration}.log"
-  local coverage_file="test_${iteration}.coverage.out"
-  local report_file="report_${iteration}.xml"
-  local rerun_report_file="report_rerun_fails_${iteration}.txt"
-  local exit_code_file="exit_code_${iteration}.txt"
+  local output_file="test.log"
+  local coverage_file="test.coverage.out"
+  local report_file="report.xml"
+  local rerun_report_file="report_rerun_fails.txt"
+  local exit_code_file="exit_code.txt"
 
-  echo -e "${GRN}Testing:${RST} Iteration:${iteration}"
+  echo -e "${GRN}Testing:${RST} All packages. Single iteration. -test.count=${UNIT_TEST_COUNT}"
 
   gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"
   if [[ "${CI}" == 'true' ]]; then
@@ -83,12 +82,7 @@ fi
 rm -rf ./**/*.coverage.out
 
 echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
-
-for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-  run_test_for_packages "${UNIT_TEST_PACKAGES}" "${i}" &
-done
-
-wait
+run_test_for_packages "${UNIT_TEST_PACKAGES}"
 
 # Gather test coverage results
 rm -f c.out c-full.out
@@ -109,7 +103,7 @@ fi
 
 shopt -s globstar nullglob # Enable recursive globbing
 if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
-  for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do
+  for exit_code_file in "${GIT_ROOT}"/**/exit_code.txt; do
     read exit_code < "${exit_code_file}"
     if [[ "${exit_code}" -ne 0 ]]; then
       mkdir -p "${GIT_ROOT}/reports"

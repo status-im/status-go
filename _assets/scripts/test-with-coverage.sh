@@ -10,7 +10,7 @@ count=1
 # https://github.com/gotestyourself/gotestsum/blob/03568ab6d48faabdb632013632ac42687b5f17d1/cmd/main.go#L331-L336
 if [[ "$*" != *"-test.run"* ]]; then
   packages="${PACKAGES}"
-#  count=${UNIT_TEST_COUNT}
+  count=${UNIT_TEST_COUNT}
 fi
 
 go test -json \
