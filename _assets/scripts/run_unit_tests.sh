@@ -25,7 +25,12 @@ fi
 
 redirect_stdout() {
   output_file=$1
-  tee "${output_file}";
+
+  if [[ "${CI}" == 'true' ]]; then
+    cat > "${output_file}";
+  else
+    tee "${output_file}";
+  fi
 }
 
 run_test_for_packages() {
