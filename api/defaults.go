@@ -299,7 +299,6 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	}
 
 	nodeConfig.Name = DefaultNodeName
-	nodeConfig.Rendezvous = false
 	nodeConfig.NoDiscovery = true
 	nodeConfig.MaxPeers = DefaultMaxPeers
 	nodeConfig.MaxPendingPeers = DefaultMaxPendingPeers

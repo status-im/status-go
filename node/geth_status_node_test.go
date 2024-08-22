@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
@@ -146,77 +145,6 @@ func TestStatusNodeAddPeer(t *testing.T) {
 	require.NoError(t, n.AddPeer(peerURL))
 	require.NoError(t, <-errCh)
 	require.Equal(t, 1, n.PeerCount())
-}
-
-func TestStatusNodeRendezvousDiscovery(t *testing.T) {
-	config := params.NodeConfig{
-		Rendezvous:  true,
-		NoDiscovery: true,
-		ClusterConfig: params.ClusterConfig{
-			Enabled: true,
-			// not necessarily with id, just valid multiaddr
-			RendezvousNodes: []string{"/ip4/127.0.0.1/tcp/34012", "/ip4/127.0.0.1/tcp/34011"},
-		},
-		// use custom address to test the all possibilities
-		AdvertiseAddr: "127.0.0.1",
-	}
-
-	n, stop1, stop2, err := createStatusNode()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			n.log.Error("stopping db", err)
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			n.log.Error("stopping multiaccount db", err)
-		}
-	}()
-	require.NoError(t, err)
-
-	require.NoError(t, n.Start(&config, nil))
-	require.NotNil(t, n.discovery)
-	require.True(t, n.discovery.Running())
-	require.IsType(t, &discovery.Rendezvous{}, n.discovery)
-}
-
-func TestStatusNodeStartDiscoveryManual(t *testing.T) {
-	config := params.NodeConfig{
-		Rendezvous:  true,
-		NoDiscovery: true,
-		ClusterConfig: params.ClusterConfig{
-			Enabled: true,
-			// not necessarily with id, just valid multiaddr
-			RendezvousNodes: []string{"/ip4/127.0.0.1/tcp/34012", "/ip4/127.0.0.1/tcp/34011"},
-		},
-		// use custom address to test the all possibilities
-		AdvertiseAddr: "127.0.0.1",
-	}
-
-	n, stop1, stop2, err := createStatusNode()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			n.log.Error("stopping db", err)
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			n.log.Error("stopping multiaccount db", err)
-		}
-	}()
-	require.NoError(t, err)
-
-	require.NoError(t, n.StartWithOptions(&config, StartOptions{}))
-	require.Nil(t, n.discovery)
-	// start discovery manually
-	require.NoError(t, n.StartDiscovery())
-	require.NotNil(t, n.discovery)
-	require.True(t, n.discovery.Running())
-	require.IsType(t, &discovery.Rendezvous{}, n.discovery)
 }
 
 func TestStatusNodeDiscoverNode(t *testing.T) {

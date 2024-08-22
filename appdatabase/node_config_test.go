@@ -129,7 +129,6 @@ func randomNodeConfig() *params.NodeConfig {
 		KeyStoreDir:               randomString(),
 		NodeKey:                   randomString(),
 		NoDiscovery:               randomBool(),
-		Rendezvous:                randomBool(),
 		ListenAddr:                randomString(),
 		AdvertiseAddr:             randomString(),
 		Name:                      randomString(),

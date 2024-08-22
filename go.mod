@@ -56,7 +56,6 @@ require (
 	github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4
 	github.com/status-im/migrate/v4 v4.6.2-status.3
 	github.com/status-im/mvds v0.0.27-0.20240729032523-f6fba962c2b1
-	github.com/status-im/rendezvous v1.3.8-0.20240110194857-cc5be22bf83e
 	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v1.1.1-status
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
@@ -257,7 +256,6 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/status-im/go-multiaddr-ethv4 v1.2.5 // indirect
 	github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tklauser/go-sysconf v0.3.6 // indirect

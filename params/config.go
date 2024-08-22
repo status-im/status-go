@@ -264,9 +264,6 @@ type ClusterConfig struct {
 	// PushNotificationsServers is a list of default push notification servers.
 	PushNotificationsServers []string
 
-	// RendezvousNodes is a list rendezvous discovery nodes.
-	RendezvousNodes []string
-
 	// WakuNodes is a list of waku2 multiaddresses
 	WakuNodes []string
 
@@ -356,10 +353,6 @@ type NodeConfig struct {
 	// NoDiscovery set to true will disable discovery protocol.
 	// Deprecated: won't be used at all in wakuv2
 	NoDiscovery bool
-
-	// Rendezvous enables discovery protocol.
-	// Deprecated: won't be used at all in wakuv2
-	Rendezvous bool
 
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).
 	ListenAddr string
@@ -917,7 +910,7 @@ func NewNodeConfigWithDefaultsAndFiles(
 
 // updatePeerLimits will set default peer limits expectations based on enabled services.
 func (c *NodeConfig) updatePeerLimits() {
-	if c.NoDiscovery && !c.Rendezvous {
+	if c.NoDiscovery {
 		return
 	}
 	if c.LightEthConfig.Enabled {
@@ -1095,10 +1088,6 @@ func (c *NodeConfig) Validate() error {
 
 	if c.ShhextConfig.PFSEnabled && len(c.ShhextConfig.InstallationID) == 0 {
 		return fmt.Errorf("PFSEnabled is true, but InstallationID is empty")
-	}
-
-	if len(c.ClusterConfig.RendezvousNodes) == 0 && c.Rendezvous {
-		return fmt.Errorf("Rendezvous is enabled, but ClusterConfig.RendezvousNodes is empty")
 	}
 
 	return nil
