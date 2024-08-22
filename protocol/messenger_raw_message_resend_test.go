@@ -101,22 +101,20 @@ func (s *MessengerRawMessageResendTest) waitForMessageSent(messageID string) {
 func (s *MessengerRawMessageResendTest) TestMessageSent() {
 	ids, err := s.bobMessenger.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN)
 	s.Require().NoError(err)
-	// one request to join to control node and another to privileged member
-	s.Require().Len(ids, 2)
+	// one request to join to control node
+	s.Require().Len(ids, 1)
 
 	s.waitForMessageSent(ids[0])
-	s.waitForMessageSent(ids[1])
 }
 
 // TestMessageResend tests if ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN is resent
 func (s *MessengerRawMessageResendTest) TestMessageResend() {
 	ids, err := s.bobMessenger.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN)
 	s.Require().NoError(err)
-	s.Require().Len(ids, 2)
+	s.Require().Len(ids, 1)
 	// wait for Sent status for already sent message to make sure that sent message was delivered
 	// before testing resend
 	s.waitForMessageSent(ids[0])
-	s.waitForMessageSent(ids[1])
 
 	rawMessage := s.GetRequestToJoinToControlNodeRawMessage(ids)
 	s.Require().NotNil(rawMessage)
@@ -145,10 +143,9 @@ func (s *MessengerRawMessageResendTest) TestMessageResend() {
 func (s *MessengerRawMessageResendTest) TestInvalidRawMessageToWatchDoesNotProduceResendLoop() {
 	ids, err := s.bobMessenger.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN)
 	s.Require().NoError(err)
-	s.Require().Len(ids, 2)
+	s.Require().Len(ids, 1)
 
 	s.waitForMessageSent(ids[0])
-	s.waitForMessageSent(ids[1])
 
 	rawMessage := s.GetRequestToJoinToControlNodeRawMessage(ids)
 	s.Require().NotNil(rawMessage)
