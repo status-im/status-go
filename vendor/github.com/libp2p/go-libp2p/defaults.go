@@ -10,10 +10,12 @@ import (
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	libp2pwebrtc "github.com/libp2p/go-libp2p/p2p/transport/webrtc"
 	ws "github.com/libp2p/go-libp2p/p2p/transport/websocket"
 	webtransport "github.com/libp2p/go-libp2p/p2p/transport/webtransport"
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,6 +48,7 @@ var DefaultTransports = ChainOptions(
 	Transport(quic.NewTransport),
 	Transport(ws.New),
 	Transport(webtransport.New),
+	Transport(libp2pwebrtc.New),
 )
 
 // DefaultPrivateTransports are the default libp2p transports when a PSK is supplied.
@@ -81,9 +84,11 @@ var DefaultListenAddrs = func(cfg *Config) error {
 		"/ip4/0.0.0.0/tcp/0",
 		"/ip4/0.0.0.0/udp/0/quic-v1",
 		"/ip4/0.0.0.0/udp/0/quic-v1/webtransport",
+		"/ip4/0.0.0.0/udp/0/webrtc-direct",
 		"/ip6/::/tcp/0",
 		"/ip6/::/udp/0/quic-v1",
 		"/ip6/::/udp/0/quic-v1/webtransport",
+		"/ip6/::/udp/0/webrtc-direct",
 	}
 	listenAddrs := make([]multiaddr.Multiaddr, 0, len(addrs))
 	for _, s := range addrs {
@@ -131,6 +136,18 @@ var DefaultMultiaddrResolver = func(cfg *Config) error {
 // DefaultPrometheusRegisterer configures libp2p to use the default registerer
 var DefaultPrometheusRegisterer = func(cfg *Config) error {
 	return cfg.Apply(PrometheusRegisterer(prometheus.DefaultRegisterer))
+}
+
+var defaultUDPBlackHoleDetector = func(cfg *Config) error {
+	// A black hole is a binary property. On a network if UDP dials are blocked, all dials will
+	// fail. So a low success rate of 5 out 100 dials is good enough.
+	return cfg.Apply(UDPBlackHoleSuccessCounter(&swarm.BlackHoleSuccessCounter{N: 100, MinSuccesses: 5, Name: "UDP"}))
+}
+
+var defaultIPv6BlackHoleDetector = func(cfg *Config) error {
+	// A black hole is a binary property. On a network if there is no IPv6 connectivity, all
+	// dials will fail. So a low success rate of 5 out 100 dials is good enough.
+	return cfg.Apply(IPv6BlackHoleSuccessCounter(&swarm.BlackHoleSuccessCounter{N: 100, MinSuccesses: 5, Name: "IPv6"}))
 }
 
 // Complete list of default options and when to fallback on them.
@@ -188,6 +205,18 @@ var defaults = []struct {
 	{
 		fallback: func(cfg *Config) bool { return !cfg.DisableMetrics && cfg.PrometheusRegisterer == nil },
 		opt:      DefaultPrometheusRegisterer,
+	},
+	{
+		fallback: func(cfg *Config) bool {
+			return !cfg.CustomUDPBlackHoleSuccessCounter && cfg.UDPBlackHoleSuccessCounter == nil
+		},
+		opt: defaultUDPBlackHoleDetector,
+	},
+	{
+		fallback: func(cfg *Config) bool {
+			return !cfg.CustomIPv6BlackHoleSuccessCounter && cfg.IPv6BlackHoleSuccessCounter == nil
+		},
+		opt: defaultIPv6BlackHoleDetector,
 	},
 }
 

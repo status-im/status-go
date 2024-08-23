@@ -8,14 +8,15 @@ import "github.com/pion/rtp"
 // cipher represents a implementation of one
 // of the SRTP Specific ciphers
 type srtpCipher interface {
-	// authTagLen returns auth key length of the cipher.
+	// AuthTagRTPLen/AuthTagRTCPLen return auth key length of the cipher.
 	// See the note below.
-	rtpAuthTagLen() (int, error)
-	rtcpAuthTagLen() (int, error)
-	// aeadAuthTagLen returns AEAD auth key length of the cipher.
+	AuthTagRTPLen() (int, error)
+	AuthTagRTCPLen() (int, error)
+	// AEADAuthTagLen returns AEAD auth key length of the cipher.
 	// See the note below.
-	aeadAuthTagLen() (int, error)
+	AEADAuthTagLen() (int, error)
 	getRTCPIndex([]byte) uint32
+	getMKI([]byte, bool) []byte
 
 	encryptRTP([]byte, *rtp.Header, []byte, uint32) ([]byte, error)
 	encryptRTCP([]byte, []byte, uint32, uint32) ([]byte, error)

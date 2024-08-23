@@ -150,7 +150,7 @@ type PubSub struct {
 	blacklist     Blacklist
 	blacklistPeer chan peer.ID
 
-	peers map[peer.ID]chan *RPC
+	peers map[peer.ID]*rpcQueue
 
 	inboundStreamsMx sync.Mutex
 	inboundStreams   map[peer.ID]network.Stream
@@ -199,11 +199,14 @@ type PubSubRouter interface {
 	// EnoughPeers returns whether the router needs more peers before it's ready to publish new records.
 	// Suggested (if greater than 0) is a suggested number of peers that the router should need.
 	EnoughPeers(topic string, suggested int) bool
-	// AcceptFrom is invoked on any incoming message before pushing it to the validation pipeline
+	// AcceptFrom is invoked on any RPC envelope before pushing it to the validation pipeline
 	// or processing control information.
 	// Allows routers with internal scoring to vet peers before committing any processing resources
 	// to the message and implement an effective graylist and react to validation queue overload.
 	AcceptFrom(peer.ID) AcceptStatus
+	// PreValidation is invoked on messages in the RPC envelope right before pushing it to
+	// the validation pipeline
+	PreValidation([]*Message)
 	// HandleRPC is invoked to process control messages in the RPC envelope.
 	// It is invoked after subscriptions and payload messages have been processed.
 	HandleRPC(*RPC)
@@ -289,7 +292,7 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		mySubs:                make(map[string]map[*Subscription]struct{}),
 		myRelays:              make(map[string]int),
 		topics:                make(map[string]map[peer.ID]struct{}),
-		peers:                 make(map[peer.ID]chan *RPC),
+		peers:                 make(map[peer.ID]*rpcQueue),
 		inboundStreams:        make(map[peer.ID]network.Stream),
 		blacklist:             NewMapBlacklist(),
 		blacklistPeer:         make(chan peer.ID),
@@ -331,13 +334,11 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 			h.SetStreamHandler(id, ps.handleNewStream)
 		}
 	}
-	h.Network().Notify((*PubSubNotif)(ps))
+	go ps.watchForNewPeers(ctx)
 
 	ps.val.Start(ps)
 
 	go ps.processLoop(ctx)
-
-	(*PubSubNotif)(ps).Initialize()
 
 	return ps, nil
 }
@@ -565,8 +566,8 @@ func WithAppSpecificRpcInspector(inspector func(peer.ID, *RPC) error) Option {
 func (p *PubSub) processLoop(ctx context.Context) {
 	defer func() {
 		// Clean up go routines.
-		for _, ch := range p.peers {
-			close(ch)
+		for _, queue := range p.peers {
+			queue.Close()
 		}
 		p.peers = nil
 		p.topics = nil
@@ -581,7 +582,7 @@ func (p *PubSub) processLoop(ctx context.Context) {
 		case s := <-p.newPeerStream:
 			pid := s.Conn().RemotePeer()
 
-			ch, ok := p.peers[pid]
+			q, ok := p.peers[pid]
 			if !ok {
 				log.Warn("new stream for unknown peer: ", pid)
 				s.Reset()
@@ -590,7 +591,7 @@ func (p *PubSub) processLoop(ctx context.Context) {
 
 			if p.blacklist.Contains(pid) {
 				log.Warn("closing stream for blacklisted peer: ", pid)
-				close(ch)
+				q.Close()
 				delete(p.peers, pid)
 				s.Reset()
 				continue
@@ -665,9 +666,9 @@ func (p *PubSub) processLoop(ctx context.Context) {
 			log.Infof("Blacklisting peer %s", pid)
 			p.blacklist.Add(pid)
 
-			ch, ok := p.peers[pid]
+			q, ok := p.peers[pid]
 			if ok {
-				close(ch)
+				q.Close()
 				delete(p.peers, pid)
 				for t, tmap := range p.topics {
 					if _, ok := tmap[pid]; ok {
@@ -698,6 +699,8 @@ func (p *PubSub) handlePendingPeers() {
 	p.newPeersPrioLk.Unlock()
 
 	for pid := range newPeers {
+		// Make sure we have a non-limited connection. We do this late because we may have
+		// disconnected in the meantime.
 		if p.host.Network().Connectedness(pid) != network.Connected {
 			continue
 		}
@@ -712,10 +715,10 @@ func (p *PubSub) handlePendingPeers() {
 			continue
 		}
 
-		messages := make(chan *RPC, p.peerOutboundQueueSize)
-		messages <- p.getHelloPacket()
-		go p.handleNewPeer(p.ctx, pid, messages)
-		p.peers[pid] = messages
+		rpcQueue := newRpcQueue(p.peerOutboundQueueSize)
+		rpcQueue.Push(p.getHelloPacket(), true)
+		go p.handleNewPeer(p.ctx, pid, rpcQueue)
+		p.peers[pid] = rpcQueue
 	}
 }
 
@@ -732,12 +735,12 @@ func (p *PubSub) handleDeadPeers() {
 	p.peerDeadPrioLk.Unlock()
 
 	for pid := range deadPeers {
-		ch, ok := p.peers[pid]
+		q, ok := p.peers[pid]
 		if !ok {
 			continue
 		}
 
-		close(ch)
+		q.Close()
 		delete(p.peers, pid)
 
 		for t, tmap := range p.topics {
@@ -759,10 +762,10 @@ func (p *PubSub) handleDeadPeers() {
 			// still connected, must be a duplicate connection being closed.
 			// we respawn the writer as we need to ensure there is a stream active
 			log.Debugf("peer declared dead but still connected; respawning writer: %s", pid)
-			messages := make(chan *RPC, p.peerOutboundQueueSize)
-			messages <- p.getHelloPacket()
-			p.peers[pid] = messages
-			go p.handleNewPeerWithBackoff(p.ctx, pid, backoffDelay, messages)
+			rpcQueue := newRpcQueue(p.peerOutboundQueueSize)
+			rpcQueue.Push(p.getHelloPacket(), true)
+			p.peers[pid] = rpcQueue
+			go p.handleNewPeerWithBackoff(p.ctx, pid, backoffDelay, rpcQueue)
 		}
 	}
 }
@@ -926,14 +929,14 @@ func (p *PubSub) announce(topic string, sub bool) {
 
 	out := rpcWithSubs(subopt)
 	for pid, peer := range p.peers {
-		select {
-		case peer <- out:
-			p.tracer.SendRPC(out, pid)
-		default:
+		err := peer.Push(out, false)
+		if err != nil {
 			log.Infof("Can't send announce message to peer %s: queue full; scheduling retry", pid)
 			p.tracer.DropRPC(out, pid)
 			go p.announceRetry(pid, topic, sub)
+			continue
 		}
+		p.tracer.SendRPC(out, pid)
 	}
 }
 
@@ -969,14 +972,14 @@ func (p *PubSub) doAnnounceRetry(pid peer.ID, topic string, sub bool) {
 	}
 
 	out := rpcWithSubs(subopt)
-	select {
-	case peer <- out:
-		p.tracer.SendRPC(out, pid)
-	default:
+	err := peer.Push(out, false)
+	if err != nil {
 		log.Infof("Can't send announce message to peer %s: queue full; scheduling retry", pid)
 		p.tracer.DropRPC(out, pid)
 		go p.announceRetry(pid, topic, sub)
+		return
 	}
+	p.tracer.SendRPC(out, pid)
 }
 
 // notifySubs sends a given message to all corresponding subscribers.
@@ -1102,13 +1105,21 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 		p.tracer.ThrottlePeer(rpc.from)
 
 	case AcceptAll:
+		var toPush []*Message
 		for _, pmsg := range rpc.GetPublish() {
 			if !(p.subscribedToMsg(pmsg) || p.canRelayMsg(pmsg)) {
 				log.Debug("received message in topic we didn't subscribe to; ignoring message")
 				continue
 			}
 
-			p.pushMsg(&Message{pmsg, "", rpc.from, nil, false})
+			msg := &Message{pmsg, "", rpc.from, nil, false}
+			if p.shouldPush(msg) {
+				toPush = append(toPush, msg)
+			}
+		}
+		p.rt.PreValidation(toPush)
+		for _, msg := range toPush {
+			p.pushMsg(msg)
 		}
 	}
 
@@ -1125,27 +1136,28 @@ func DefaultPeerFilter(pid peer.ID, topic string) bool {
 	return true
 }
 
-// pushMsg pushes a message performing validation as necessary
-func (p *PubSub) pushMsg(msg *Message) {
+// shouldPush filters a message before validating and pushing it
+// It returns true if the message can be further validated and pushed
+func (p *PubSub) shouldPush(msg *Message) bool {
 	src := msg.ReceivedFrom
 	// reject messages from blacklisted peers
 	if p.blacklist.Contains(src) {
 		log.Debugf("dropping message from blacklisted peer %s", src)
 		p.tracer.RejectMessage(msg, RejectBlacklstedPeer)
-		return
+		return false
 	}
 
 	// even if they are forwarded by good peers
 	if p.blacklist.Contains(msg.GetFrom()) {
 		log.Debugf("dropping message from blacklisted source %s", src)
 		p.tracer.RejectMessage(msg, RejectBlacklistedSource)
-		return
+		return false
 	}
 
 	err := p.checkSigningPolicy(msg)
 	if err != nil {
 		log.Debugf("dropping message from %s: %s", src, err)
-		return
+		return false
 	}
 
 	// reject messages claiming to be from ourselves but not locally published
@@ -1153,15 +1165,23 @@ func (p *PubSub) pushMsg(msg *Message) {
 	if peer.ID(msg.GetFrom()) == self && src != self {
 		log.Debugf("dropping message claiming to be from self but forwarded from %s", src)
 		p.tracer.RejectMessage(msg, RejectSelfOrigin)
-		return
+		return false
 	}
 
 	// have we already seen and validated this message?
 	id := p.idGen.ID(msg)
 	if p.seenMessage(id) {
 		p.tracer.DuplicateMessage(msg)
-		return
+		return false
 	}
+
+	return true
+}
+
+// pushMsg pushes a message performing validation as necessary
+func (p *PubSub) pushMsg(msg *Message) {
+	src := msg.ReceivedFrom
+	id := p.idGen.ID(msg)
 
 	if !p.val.Push(src, msg) {
 		return

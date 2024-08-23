@@ -246,7 +246,7 @@ func (wf *WakuFilterLightNode) request(ctx context.Context, requestID []byte,
 	if err != nil {
 		wf.metrics.RecordError(dialFailure)
 		if ps, ok := wf.h.Peerstore().(peerstore.WakuPeerstore); ok {
-			ps.AddConnFailure(peer.AddrInfo{ID: peerID})
+			ps.AddConnFailure(peerID)
 		}
 		return err
 	}

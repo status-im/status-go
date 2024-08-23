@@ -275,7 +275,7 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, logger *zap.Logge
 		} else {
 			wf.metrics.RecordError(dialFailure)
 			if ps, ok := wf.h.Peerstore().(peerstore.WakuPeerstore); ok {
-				ps.AddConnFailure(peer.AddrInfo{ID: peerID})
+				ps.AddConnFailure(peerID)
 			}
 		}
 		logger.Error("opening peer stream", zap.Error(err))
