@@ -1125,9 +1125,13 @@ func (w *Waku) Start() error {
 	if w.cfg.LightClient {
 		// Create FilterManager that will main peer connectivity
 		// for installed filters
-		w.filterManager = filterapi.NewFilterManager(w.ctx, w.logger, w.cfg.MinPeersForFilter,
+		w.filterManager = filterapi.NewFilterManager(
+			w.ctx,
+			w.logger,
+			w.cfg.MinPeersForFilter,
 			w,
-			w.node.FilterLightnode())
+			w.node.FilterLightnode(),
+			filterapi.WithBatchInterval(300*time.Millisecond))
 	}
 
 	err = w.setupRelaySubscriptions()
