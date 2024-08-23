@@ -177,6 +177,7 @@ func TestNTPTimeSource(t *testing.T) {
 				servers:         tc.servers,
 				allowedFailures: tc.allowedFailures,
 				timeQuery:       tc.query,
+				now:             time.Now,
 			}
 			assert.WithinDuration(t, time.Now(), source.Now(), clockCompareDelta)
 			err := source.updateOffset()
@@ -206,6 +207,7 @@ func TestRunningPeriodically(t *testing.T) {
 			timeQuery:         tc.query,
 			fastNTPSyncPeriod: time.Duration(fastHits*10) * time.Millisecond,
 			slowNTPSyncPeriod: time.Duration(slowHits*10) * time.Millisecond,
+			now:               time.Now,
 		}
 		lastCall := time.Now()
 		// we're simulating a calls to updateOffset, testing ntp calls happens
@@ -259,54 +261,47 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 		tc.responses[i] = queryResponse{Offset: responseOffset}
 	}
 
-	ntpTimeSourceCreator = func() *NTPTimeSource {
-		return &NTPTimeSource{
-			servers:           tc.servers,
-			allowedFailures:   tc.allowedFailures,
-			timeQuery:         tc.query,
-			slowNTPSyncPeriod: SlowNTPSyncPeriod,
-		}
-	}
-	now = func() time.Time {
-		return time.Unix(1, 0)
+	ts := NTPTimeSource{
+		servers:           tc.servers,
+		allowedFailures:   tc.allowedFailures,
+		timeQuery:         tc.query,
+		slowNTPSyncPeriod: SlowNTPSyncPeriod,
+		now: func() time.Time {
+			return time.Unix(1, 0)
+		},
 	}
 
 	expectedTime := uint64(11000)
-	n := GetCurrentTimeInMillis()
+	n := ts.GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
 	// test repeat invoke GetCurrentTimeInMillis
-	n = GetCurrentTimeInMillis()
+	n = ts.GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
-	e := Default().Stop()
+	e := ts.Stop()
 	require.NoError(t, e)
 
 	// test invoke after stop
-	n = GetCurrentTimeInMillis()
+	n = ts.GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
-	e = Default().Stop()
+	e = ts.Stop()
 	require.NoError(t, e)
 }
 
 func TestGetCurrentTimeOffline(t *testing.T) {
 	// covers https://github.com/status-im/status-desktop/issues/12691
-	ntpTimeSourceCreator = func() *NTPTimeSource {
-		if ntpTimeSource != nil {
-			return ntpTimeSource
-		}
-		ntpTimeSource = &NTPTimeSource{
-			servers:           defaultServers,
-			allowedFailures:   DefaultMaxAllowedFailures,
-			fastNTPSyncPeriod: 1 * time.Millisecond,
-			slowNTPSyncPeriod: 1 * time.Second,
-			timeQuery: func(string, ntp.QueryOptions) (*ntp.Response, error) {
-				return nil, errors.New("offline")
-			},
-		}
-		return ntpTimeSource
+	ts := &NTPTimeSource{
+		servers:           defaultServers,
+		allowedFailures:   DefaultMaxAllowedFailures,
+		fastNTPSyncPeriod: 1 * time.Millisecond,
+		slowNTPSyncPeriod: 1 * time.Second,
+		timeQuery: func(string, ntp.QueryOptions) (*ntp.Response, error) {
+			return nil, errors.New("offline")
+		},
+		now: time.Now,
 	}
 
 	// ensure there is no "panic: sync: negative WaitGroup counter"
 	// when GetCurrentTime() is invoked more than once when offline
-	_ = GetCurrentTime()
-	_ = GetCurrentTime()
+	_ = ts.GetCurrentTime()
+	_ = ts.GetCurrentTime()
 }

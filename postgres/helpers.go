@@ -29,6 +29,21 @@ func ResetDefaultTestPostgresDB() error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	// Drop current and prevent any future connections. Used in tests. Details here:
+	// https://stackoverflow.com/questions/17449420/postgresql-unable-to-drop-database-because-of-some-auto-connections-to-db
+	_, err = db.Exec("REVOKE CONNECT ON DATABASE postgres FROM public;")
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("SELECT pid, pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'postgres' AND pid <> pg_backend_pid();")
+	if err != nil {
+		return err
+	}
 
 	_, err = db.Exec("DROP DATABASE IF EXISTS postgres;")
 	if err != nil {
@@ -36,5 +51,14 @@ func ResetDefaultTestPostgresDB() error {
 	}
 
 	_, err = db.Exec("CREATE DATABASE postgres;")
-	return err
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("GRANT CONNECT ON DATABASE postgres TO public;")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

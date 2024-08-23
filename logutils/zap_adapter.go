@@ -3,7 +3,6 @@ package logutils
 import (
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -123,15 +122,11 @@ func NewZapAdapter(logger log.Logger, enab zapcore.LevelEnabler) zapcore.Core {
 	}
 }
 
-var registerOnce sync.Once
-
 // NewZapLoggerWithAdapter returns a logger forwarding all logs with level info and above.
 func NewZapLoggerWithAdapter(logger log.Logger) (*zap.Logger, error) {
-	registerOnce.Do(func() {
-		if err := zaputil.RegisterJSONHexEncoder(); err != nil {
-			panic(err)
-		}
-	})
+	if err := zaputil.RegisterJSONHexEncoder(); err != nil {
+		panic(err)
+	}
 
 	cfg := zap.Config{
 		Level:            zap.NewAtomicLevelAt(zapcore.DebugLevel),

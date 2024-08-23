@@ -42,10 +42,6 @@ var defaultServers = []string{
 }
 var errUpdateOffset = errors.New("failed to compute offset")
 
-var ntpTimeSource *NTPTimeSource
-var ntpTimeSourceCreator func() *NTPTimeSource
-var now func() time.Time
-
 type ntpQuery func(string, ntp.QueryOptions) (*ntp.Response, error)
 
 type queryResponse struct {
@@ -68,23 +64,6 @@ func (e multiRPCError) Error() string {
 	}
 	b.WriteString(".")
 	return b.String()
-}
-
-func init() {
-	ntpTimeSourceCreator = func() *NTPTimeSource {
-		if ntpTimeSource != nil {
-			return ntpTimeSource
-		}
-		ntpTimeSource = &NTPTimeSource{
-			servers:           defaultServers,
-			allowedFailures:   DefaultMaxAllowedFailures,
-			fastNTPSyncPeriod: FastNTPSyncPeriod,
-			slowNTPSyncPeriod: SlowNTPSyncPeriod,
-			timeQuery:         ntp.QueryWithOptions,
-		}
-		return ntpTimeSource
-	}
-	now = time.Now
 }
 
 func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (time.Duration, error) {
@@ -138,9 +117,18 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 	return offsets[mid], nil
 }
 
+var defaultTimeSource = &NTPTimeSource{
+	servers:           defaultServers,
+	allowedFailures:   DefaultMaxAllowedFailures,
+	fastNTPSyncPeriod: FastNTPSyncPeriod,
+	slowNTPSyncPeriod: SlowNTPSyncPeriod,
+	timeQuery:         ntp.QueryWithOptions,
+	now:               time.Now,
+}
+
 // Default initializes time source with default config values.
 func Default() *NTPTimeSource {
-	return ntpTimeSourceCreator()
+	return defaultTimeSource
 }
 
 // NTPTimeSource provides source of time that tries to be resistant to time skews.
@@ -151,6 +139,7 @@ type NTPTimeSource struct {
 	fastNTPSyncPeriod time.Duration
 	slowNTPSyncPeriod time.Duration
 	timeQuery         ntpQuery // for ease of testing
+	now               func() time.Time
 
 	quit    chan struct{}
 	started bool
@@ -163,7 +152,8 @@ type NTPTimeSource struct {
 func (s *NTPTimeSource) Now() time.Time {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return now().Add(s.latestOffset)
+	n := s.now()
+	return n.Add(s.latestOffset)
 }
 
 func (s *NTPTimeSource) updateOffset() error {
@@ -238,13 +228,25 @@ func (s *NTPTimeSource) Stop() error {
 	return nil
 }
 
+func (s *NTPTimeSource) GetCurrentTime() time.Time {
+	s.Start()
+	return s.Now()
+}
+
+func (s *NTPTimeSource) GetCurrentTimeInMillis() uint64 {
+	return convertToMillis(s.GetCurrentTime())
+}
+
 func GetCurrentTime() time.Time {
 	ts := Default()
 	ts.Start()
-
 	return ts.Now()
 }
 
 func GetCurrentTimeInMillis() uint64 {
-	return uint64(GetCurrentTime().UnixNano() / int64(time.Millisecond))
+	return convertToMillis(GetCurrentTime())
+}
+
+func convertToMillis(t time.Time) uint64 {
+	return uint64(t.UnixNano() / int64(time.Millisecond))
 }

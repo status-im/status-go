@@ -1,6 +1,7 @@
 package profiling
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -14,12 +15,14 @@ var cpuFile *os.File
 // StartCPUProfile enables CPU profiling for the current process. While profiling,
 // the profile will be buffered and written to the file in folder dataDir.
 func StartCPUProfile(dataDir string) error {
-	if cpuFile == nil {
-		var err error
-		cpuFile, err = os.Create(filepath.Join(dataDir, CPUFilename))
-		if err != nil {
-			return err
-		}
+	if cpuFile != nil {
+		return errors.New("cpu profiling is already started")
+	}
+
+	var err error
+	cpuFile, err = os.Create(filepath.Join(dataDir, CPUFilename))
+	if err != nil {
+		return err
 	}
 
 	return pprof.StartCPUProfile(cpuFile)
@@ -31,5 +34,7 @@ func StopCPUProfile() error {
 		return nil
 	}
 	pprof.StopCPUProfile()
-	return cpuFile.Close()
+	err := cpuFile.Close()
+	cpuFile = nil
+	return err
 }
