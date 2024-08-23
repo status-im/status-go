@@ -14,12 +14,12 @@ type KeyingMaterialExporter interface {
 // extracting them from DTLS. This behavior is defined in RFC5764:
 // https://tools.ietf.org/html/rfc5764
 func (c *Config) ExtractSessionKeysFromDTLS(exporter KeyingMaterialExporter, isClient bool) error {
-	keyLen, err := c.Profile.keyLen()
+	keyLen, err := c.Profile.KeyLen()
 	if err != nil {
 		return err
 	}
 
-	saltLen, err := c.Profile.saltLen()
+	saltLen, err := c.Profile.SaltLen()
 	if err != nil {
 		return err
 	}

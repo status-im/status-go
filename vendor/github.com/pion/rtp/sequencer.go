@@ -4,7 +4,6 @@
 package rtp
 
 import (
-	"math"
 	"sync"
 )
 
@@ -14,11 +13,18 @@ type Sequencer interface {
 	RollOverCount() uint64
 }
 
+// maxInitialRandomSequenceNumber is the maximum value used for the initial sequence
+// number when using NewRandomSequencer().
+// This uses only half the potential sequence number space to avoid issues decrypting
+// SRTP when the sequence number starts near the rollover and there is packet loss.
+// See https://webrtc-review.googlesource.com/c/src/+/358360
+const maxInitialRandomSequenceNumber = 1<<15 - 1
+
 // NewRandomSequencer returns a new sequencer starting from a random sequence
 // number
 func NewRandomSequencer() Sequencer {
 	return &sequencer{
-		sequenceNumber: uint16(globalMathRandomGenerator.Intn(math.MaxUint16)),
+		sequenceNumber: uint16(globalMathRandomGenerator.Intn(maxInitialRandomSequenceNumber)),
 	}
 }
 

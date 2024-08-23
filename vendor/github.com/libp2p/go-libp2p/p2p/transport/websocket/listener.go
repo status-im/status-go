@@ -2,10 +2,11 @@ package websocket
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
+	"sync"
 
 	"github.com/libp2p/go-libp2p/core/transport"
 
@@ -22,8 +23,11 @@ type listener struct {
 
 	laddr ma.Multiaddr
 
-	closed   chan struct{}
 	incoming chan *Conn
+
+	closeOnce sync.Once
+	closeErr  error
+	closed    chan struct{}
 }
 
 func (pwma *parsedWebsocketMultiaddr) toMultiaddr() ma.Multiaddr {
@@ -122,7 +126,6 @@ func (l *listener) Accept() (manet.Conn, error) {
 			c.Close()
 			return nil, err
 		}
-
 		return mnc, nil
 	case <-l.closed:
 		return nil, transport.ErrListenerClosed
@@ -134,13 +137,13 @@ func (l *listener) Addr() net.Addr {
 }
 
 func (l *listener) Close() error {
-	l.server.Close()
-	err := l.nl.Close()
-	<-l.closed
-	if strings.Contains(err.Error(), "use of closed network connection") {
-		return transport.ErrListenerClosed
-	}
-	return err
+	l.closeOnce.Do(func() {
+		err1 := l.nl.Close()
+		err2 := l.server.Close()
+		<-l.closed
+		l.closeErr = errors.Join(err1, err2)
+	})
+	return l.closeErr
 }
 
 func (l *listener) Multiaddr() ma.Multiaddr {

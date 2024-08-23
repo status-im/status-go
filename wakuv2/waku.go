@@ -1149,7 +1149,7 @@ func (w *Waku) Start() error {
 		return err
 	}
 
-	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set w.ctx to nil within `w.Stop()`
+	// we should wait `seedBootnodesForDiscV5` shutdown smoothly before set `w.ctx` to `nil`` within `w.Stop()`
 	go w.seedBootnodesForDiscV5()
 
 	return nil
@@ -1849,8 +1849,7 @@ func (w *Waku) StoreNode() *store.WakuStore {
 func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 	p := make(map[string]int)
 	for _, peerID := range wakuNode.Host().Network().Peers() {
-		peerInfo := wakuNode.Host().Peerstore().PeerInfo(peerID)
-		connFailures := wakuNode.Host().Peerstore().(wps.WakuPeerstore).ConnFailures(peerInfo)
+		connFailures := wakuNode.Host().Peerstore().(wps.WakuPeerstore).ConnFailures(peerID)
 		if connFailures > 0 {
 			p[peerID.String()] = connFailures
 		}

@@ -402,11 +402,23 @@ func (t *pubsubTracer) traceRPCMeta(rpc *RPC) *pb.TraceEvent_RPCMeta {
 			})
 		}
 
+		var idontwant []*pb.TraceEvent_ControlIDontWantMeta
+		for _, ctl := range rpc.Control.Idontwant {
+			var mids [][]byte
+			for _, mid := range ctl.MessageIDs {
+				mids = append(mids, []byte(mid))
+			}
+			idontwant = append(idontwant, &pb.TraceEvent_ControlIDontWantMeta{
+				MessageIDs: mids,
+			})
+		}
+
 		rpcMeta.Control = &pb.TraceEvent_ControlMeta{
-			Ihave: ihave,
-			Iwant: iwant,
-			Graft: graft,
-			Prune: prune,
+			Ihave:     ihave,
+			Iwant:     iwant,
+			Graft:     graft,
+			Prune:     prune,
+			Idontwant: idontwant,
 		}
 	}
 

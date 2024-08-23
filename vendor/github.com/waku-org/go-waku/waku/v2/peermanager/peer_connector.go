@@ -279,8 +279,9 @@ func (c *PeerConnectionStrategy) dialPeer(pi peer.AddrInfo, sem chan struct{}) {
 	err := c.host.Connect(ctx, pi)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		c.addConnectionBackoff(pi.ID)
-		c.host.Peerstore().(wps.WakuPeerstore).AddConnFailure(pi)
+		c.host.Peerstore().(wps.WakuPeerstore).AddConnFailure(pi.ID)
 		c.logger.Warn("connecting to peer", logging.HostID("peerID", pi.ID), zap.Error(err))
 	}
+	c.host.Peerstore().(wps.WakuPeerstore).ResetConnFailures(pi.ID)
 	<-sem
 }
