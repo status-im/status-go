@@ -18,12 +18,11 @@ func StartCPUProfile(dataDir string) error {
 	if cpuFile != nil {
 		return errors.New("cpu profiling is already started")
 	}
-	if cpuFile == nil {
-		var err error
-		cpuFile, err = os.Create(filepath.Join(dataDir, CPUFilename))
-		if err != nil {
-			return err
-		}
+
+	var err error
+	cpuFile, err = os.Create(filepath.Join(dataDir, CPUFilename))
+	if err != nil {
+		return err
 	}
 
 	return pprof.StartCPUProfile(cpuFile)
