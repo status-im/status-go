@@ -1850,7 +1850,7 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 	p := make(map[string]int)
 	for _, peerID := range wakuNode.Host().Network().Peers() {
 		peerInfo := wakuNode.Host().Peerstore().PeerInfo(peerID)
-		connFailures := wakuNode.Host().Peerstore().(wps.WakuPeerstore).ConnFailures(peerInfo)
+		connFailures := wakuNode.Host().Peerstore().(wps.WakuPeerstore).ConnFailures(peerInfo.ID)
 		if connFailures > 0 {
 			p[peerID.String()] = connFailures
 		}

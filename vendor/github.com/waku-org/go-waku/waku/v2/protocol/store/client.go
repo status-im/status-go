@@ -254,7 +254,7 @@ func (s *WakuStore) queryFrom(ctx context.Context, storeRequest *pb.StoreQueryRe
 	if err != nil {
 		logger.Error("creating stream to peer", zap.Error(err))
 		if ps, ok := s.h.Peerstore().(peerstore.WakuPeerstore); ok {
-			ps.AddConnFailure(peer.AddrInfo{ID: selectedPeer})
+			ps.AddConnFailure(selectedPeer)
 		}
 		return nil, err
 	}

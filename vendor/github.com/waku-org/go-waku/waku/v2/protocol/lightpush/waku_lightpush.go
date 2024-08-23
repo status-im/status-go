@@ -198,7 +198,7 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, p
 		logger.Error("creating stream to peer", zap.Error(err))
 		wakuLP.metrics.RecordError(dialFailure)
 		if ps, ok := wakuLP.h.Peerstore().(peerstore.WakuPeerstore); ok {
-			ps.AddConnFailure(peer.AddrInfo{ID: peerID})
+			ps.AddConnFailure(peerID)
 		}
 		return nil, err
 	}

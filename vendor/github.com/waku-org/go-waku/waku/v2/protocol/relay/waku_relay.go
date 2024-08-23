@@ -459,37 +459,28 @@ func (w *WakuRelay) Unsubscribe(ctx context.Context, contentFilter waku_proto.Co
 	defer w.topicsMutex.Unlock()
 
 	for pubSubTopic, cTopics := range pubSubTopicMap {
-		cfTemp := waku_proto.NewContentFilter(pubSubTopic, cTopics...)
 		pubsubUnsubscribe := false
-		sub, ok := w.topics[pubSubTopic]
+		topicData, ok := w.topics[pubSubTopic]
 		if !ok {
 			w.log.Error("not subscribed to topic", zap.String("topic", pubSubTopic))
 			return errors.New("not subscribed to topic")
 		}
 
-		topicData, ok := w.topics[pubSubTopic]
-		if ok {
-			//Remove relevant subscription
-			for subID, sub := range topicData.contentSubs {
-				if sub.contentFilter.Equals(cfTemp) {
-					sub.Unsubscribe()
-					delete(topicData.contentSubs, subID)
-				}
+		cfTemp := waku_proto.NewContentFilter(pubSubTopic, cTopics...)
+		//Remove relevant subscription
+		for subID, sub := range topicData.contentSubs {
+			if sub.contentFilter.Equals(cfTemp) {
+				sub.Unsubscribe()
+				delete(topicData.contentSubs, subID)
 			}
+		}
 
-			if len(topicData.contentSubs) == 0 {
-				pubsubUnsubscribe = true
-			}
-		} else {
-			//Should not land here ideally
-			w.log.Error("pubsub subscriptions exists, but contentSubscription doesn't for contentFilter",
-				zap.String("pubsubTopic", pubSubTopic), zap.Strings("contentTopics", cTopics))
-
-			return errors.New("unexpected error in unsubscribe")
+		if len(topicData.contentSubs) == 0 {
+			pubsubUnsubscribe = true
 		}
 
 		if pubsubUnsubscribe {
-			err = w.unsubscribeFromPubsubTopic(sub)
+			err = w.unsubscribeFromPubsubTopic(topicData)
 			if err != nil {
 				return err
 			}
@@ -502,6 +493,9 @@ func (w *WakuRelay) Unsubscribe(ctx context.Context, contentFilter waku_proto.Co
 // unsubscribeFromPubsubTopic unsubscribes subscription from underlying pubsub.
 // Note: caller has to acquire topicsMutex in order to avoid race conditions
 func (w *WakuRelay) unsubscribeFromPubsubTopic(topicData *pubsubTopicSubscriptionDetails) error {
+	if topicData.subscription == nil {
+		return nil
+	}
 
 	pubSubTopic := topicData.subscription.Topic()
 	w.log.Info("unsubscribing from pubsubTopic", zap.String("topic", pubSubTopic))

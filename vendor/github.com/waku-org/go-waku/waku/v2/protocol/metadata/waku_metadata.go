@@ -105,7 +105,7 @@ func (wakuM *WakuMetadata) Request(ctx context.Context, peerID peer.ID) (*pb.Wak
 	if err != nil {
 		logger.Error("creating stream to peer", zap.Error(err))
 		if ps, ok := wakuM.h.Peerstore().(peerstore.WakuPeerstore); ok {
-			ps.AddConnFailure(peer.AddrInfo{ID: peerID})
+			ps.AddConnFailure(peerID)
 		}
 		return nil, err
 	}
