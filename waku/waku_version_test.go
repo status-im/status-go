@@ -323,23 +323,6 @@ func (s *WakuTestSuite) TestWakuTimeDesyncEnvelopeIgnored() {
 	}
 }
 
-type MockMailserver struct {
-	deliverMail func([]byte, *common.Envelope)
-}
-
-func (*MockMailserver) Archive(e *common.Envelope) {
-}
-
-func (*MockMailserver) Deliver(peerID []byte, r common.MessagesRequest) {
-}
-
-func (m *MockMailserver) DeliverMail(peerID []byte, e *common.Envelope) {
-
-	if m.deliverMail != nil {
-		m.deliverMail(peerID, e)
-	}
-}
-
 func (s *WakuTestSuite) TestRateLimiterIntegration() {
 	conf := &Config{
 		MinimumAcceptedPoW: 0,
@@ -367,61 +350,6 @@ func (s *WakuTestSuite) TestRateLimiterIntegration() {
 	case err := <-errorc:
 		s.Require().NoError(err)
 	default:
-	}
-}
-
-func (s *WakuTestSuite) TestMailserverCompletionEvent() {
-	w1 := New(nil, nil)
-	s.Require().NoError(w1.Start())
-	defer func() { handleError(s.T(), w1.Stop()) }()
-
-	rw1, rw2 := p2p.MsgPipe()
-	errorc := make(chan error, 1)
-	go func() {
-		err := w1.HandlePeer(s.newPeer(w1, p2p.NewPeer(enode.ID{}, "1", []p2p.Cap{}), rw1, nil, s.stats), rw1)
-		errorc <- err
-	}()
-
-	w2 := New(nil, nil)
-	s.Require().NoError(w2.Start())
-	defer func() { handleError(s.T(), w2.Stop()) }()
-
-	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw2, nil, s.stats)
-	peer2.SetPeerTrusted(true)
-
-	events := make(chan common.EnvelopeEvent)
-	sub := w1.SubscribeEnvelopeEvents(events)
-	defer sub.Unsubscribe()
-
-	envelopes := []*common.Envelope{{Data: []byte{1}}, {Data: []byte{2}}}
-	s.Require().NoError(peer2.Start())
-	// Set peer trusted, we know the peer has been added as handshake was successful
-	w1.getPeers()[0].SetPeerTrusted(true)
-
-	s.Require().NoError(peer2.SendP2PMessages(envelopes))
-	s.Require().NoError(peer2.SendHistoricMessageResponse(make([]byte, 100)))
-	s.Require().NoError(rw2.Close())
-
-	// Wait for all messages to be read
-	err := <-errorc
-	s.Require().EqualError(err, "p2p: read or write on closed message pipe")
-
-	after := time.After(2 * time.Second)
-	count := 0
-	for {
-		select {
-		case <-after:
-			s.Require().FailNow("timed out waiting for all events")
-		case ev := <-events:
-			switch ev.Event {
-			case common.EventEnvelopeAvailable:
-				count++
-			case common.EventMailServerRequestCompleted:
-				s.Require().Equal(count, len(envelopes),
-					"all envelope.avaiable events mut be recevied before request is compelted")
-				return
-			}
-		}
 	}
 }
 

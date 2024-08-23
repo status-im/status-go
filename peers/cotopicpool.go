@@ -55,8 +55,7 @@ var sendEnodeDiscovered = signal.SendEnodeDiscovered
 // ConfirmAdded calls base TopicPool ConfirmAdded method and sends a signal
 // confirming the enode has been discovered.
 func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
-	trusted := t.verifier.VerifyNode(context.TODO(), nodeID)
-	if trusted {
+	if t.verifier == nil || t.verifier.VerifyNode(context.TODO(), nodeID) {
 		// add to cache only if trusted
 		t.TopicPool.ConfirmAdded(server, nodeID)
 		sendEnodeDiscovered(nodeID.String(), string(t.topic))

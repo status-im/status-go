@@ -35,16 +35,6 @@ func (h EnvelopeSignalHandlerMock) EnvelopeExpired(identifiers [][]byte, err err
 	signal.SendEnvelopeExpired(identifiers, err)
 }
 
-// MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
-func (h EnvelopeSignalHandlerMock) MailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
-	signal.SendMailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
-}
-
-// MailServerRequestExpired triggered when the mailserver request expires
-func (h EnvelopeSignalHandlerMock) MailServerRequestExpired(hash types.Hash) {
-	signal.SendMailServerRequestExpired(hash)
-}
-
 type EnvelopeEventsInterceptorMock struct {
 	EnvelopeEventsInterceptor
 
@@ -127,7 +117,6 @@ func (s *MessengerMessagesTrackingSuite) newMessenger(waku types.Waku, logger *z
 		EnvelopeEventsHandler:            EnvelopeSignalHandlerMock{},
 		MaxAttempts:                      1,
 		AwaitOnlyMailServerConfirmations: false,
-		IsMailserver:                     func(peer types.EnodeID) bool { return false },
 		Logger:                           s.logger,
 	}
 

@@ -3,9 +3,7 @@ package ext
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -20,14 +18,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/rlp"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/mailserver"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol"
@@ -44,12 +40,6 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/urls"
 	"github.com/status-im/status-go/protocol/verification"
-	"github.com/status-im/status-go/services/ext/mailservers"
-)
-
-const (
-	// defaultRequestTimeout is the default request timeout in seconds
-	defaultRequestTimeout = 10
 )
 
 var (
@@ -69,71 +59,9 @@ var (
 // PAYLOADS
 // -----
 
-// MessagesRequest is a RequestMessages() request payload.
-type MessagesRequest struct {
-	// MailServerPeer is MailServer's enode address.
-	MailServerPeer string `json:"mailServerPeer"`
-
-	// From is a lower bound of time range (optional).
-	// Default is 24 hours back from now.
-	From uint32 `json:"from"`
-
-	// To is a upper bound of time range (optional).
-	// Default is now.
-	To uint32 `json:"to"`
-
-	// Limit determines the number of messages sent by the mail server
-	// for the current paginated request
-	Limit uint32 `json:"limit"`
-
-	// Cursor is used as starting point for paginated requests
-	Cursor string `json:"cursor"`
-
-	// StoreCursor is used as starting point for WAKUV2 paginatedRequests
-	StoreCursor *StoreRequestCursor `json:"storeCursor"`
-
-	// Topic is a regular Whisper topic.
-	// DEPRECATED
-	Topic types.TopicType `json:"topic"`
-
-	// Topics is a list of Whisper topics.
-	Topics []types.TopicType `json:"topics"`
-
-	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
-	// It's derived from MailServer password.
-	SymKeyID string `json:"symKeyID"`
-
-	// Timeout is the time to live of the request specified in seconds.
-	// Default is 10 seconds
-	Timeout time.Duration `json:"timeout"`
-
-	// Force ensures that requests will bypass enforced delay.
-	Force bool `json:"force"`
-}
-
 type StoreRequestCursor struct {
 	Digest       []byte  `json:"digest"`
 	ReceivedTime float64 `json:"receivedTime"`
-}
-
-func (r *MessagesRequest) SetDefaults(now time.Time) {
-	// set From and To defaults
-	if r.To == 0 {
-		r.To = uint32(now.UTC().Unix())
-	}
-
-	if r.From == 0 {
-		oneDay := uint32(86400) // -24 hours
-		if r.To < oneDay {
-			r.From = 0
-		} else {
-			r.From = r.To - oneDay
-		}
-	}
-
-	if r.Timeout == 0 {
-		r.Timeout = defaultRequestTimeout
-	}
 }
 
 // MessagesResponse is a response for requestMessages2 method.
@@ -153,17 +81,15 @@ type MessagesResponse struct {
 
 // PublicAPI extends whisper public API.
 type PublicAPI struct {
-	service  *Service
-	eventSub mailservers.EnvelopeEventSubscriber
-	log      log.Logger
+	service *Service
+	log     log.Logger
 }
 
 // NewPublicAPI returns instance of the public API.
-func NewPublicAPI(s *Service, eventSub mailservers.EnvelopeEventSubscriber) *PublicAPI {
+func NewPublicAPI(s *Service) *PublicAPI {
 	return &PublicAPI{
-		service:  s,
-		eventSub: eventSub,
-		log:      log.New("package", "status-go/services/sshext.PublicAPI"),
+		service: s,
+		log:     log.New("package", "status-go/services/sshext.PublicAPI"),
 	}
 }
 
@@ -173,33 +99,6 @@ type RetryConfig struct {
 	// StepTimeout defines duration increase per each retry.
 	StepTimeout time.Duration
 	MaxRetries  int
-}
-
-func WaitForExpiredOrCompleted(requestID types.Hash, events chan types.EnvelopeEvent, timeout time.Duration) (*types.MailServerResponse, error) {
-	expired := fmt.Errorf("request %x expired", requestID)
-	after := time.NewTimer(timeout)
-	defer after.Stop()
-	for {
-		var ev types.EnvelopeEvent
-		select {
-		case ev = <-events:
-		case <-after.C:
-			return nil, expired
-		}
-		if ev.Hash != requestID {
-			continue
-		}
-		switch ev.Event {
-		case types.EventMailServerRequestCompleted:
-			data, ok := ev.Data.(*types.MailServerResponse)
-			if ok {
-				return data, nil
-			}
-			return nil, errors.New("invalid event data type")
-		case types.EventMailServerRequestExpired:
-			return nil, expired
-		}
-	}
 }
 
 type Author struct {
@@ -1860,57 +1759,6 @@ func (api *PublicAPI) GetCommunityMemberAllMessages(request *requests.CommunityM
 // Delete a specific community member messages or all community member messages (based on provided parameters)
 func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityMemberMessages(request)
-}
-
-// -----
-// HELPER
-// -----
-
-// MakeMessagesRequestPayload makes a specific payload for MailServer
-// to request historic messages.
-// DEPRECATED
-func MakeMessagesRequestPayload(r MessagesRequest) ([]byte, error) {
-	cursor, err := hex.DecodeString(r.Cursor)
-	if err != nil {
-		return nil, fmt.Errorf("invalid cursor: %v", err)
-	}
-
-	if len(cursor) > 0 && len(cursor) != mailserver.CursorLength {
-		return nil, fmt.Errorf("invalid cursor size: expected %d but got %d", mailserver.CursorLength, len(cursor))
-	}
-
-	payload := mailserver.MessagesRequestPayload{
-		Lower: r.From,
-		Upper: r.To,
-		// We need to pass bloom filter for
-		// backward compatibility
-		Bloom:  createBloomFilter(r),
-		Topics: topicsToByteArray(r.Topics),
-		Limit:  r.Limit,
-		Cursor: cursor,
-		// Client must tell the MailServer if it supports batch responses.
-		// This can be removed in the future.
-		Batch: true,
-	}
-
-	return rlp.EncodeToBytes(payload)
-}
-
-func topicsToByteArray(topics []types.TopicType) [][]byte {
-
-	var response [][]byte
-	for idx := range topics {
-		response = append(response, topics[idx][:])
-	}
-
-	return response
-}
-
-func createBloomFilter(r MessagesRequest) []byte {
-	if len(r.Topics) > 0 {
-		return topicsToBloom(r.Topics...)
-	}
-	return types.TopicToBloom(r.Topic)
 }
 
 func topicsToBloom(topics ...types.TopicType) []byte {

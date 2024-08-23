@@ -26,7 +26,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -297,13 +296,6 @@ func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.
 			w.SetTimeSource(timesource.Now)
 		}
 
-		// enable mail service
-		if wakuCfg.EnableMailServer {
-			if err := registerWakuMailServer(w, wakuCfg); err != nil {
-				return nil, fmt.Errorf("failed to register WakuMailServer: %v", err)
-			}
-		}
-
 		if wakuCfg.LightClient {
 			emptyBloomFilter := make([]byte, 64)
 			if err := w.SetBloomFilter(emptyBloomFilter); err != nil {
@@ -400,10 +392,7 @@ func setSettingsNotifier(db *accounts.Database, feed *event.Feed) {
 }
 
 func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) *wakucommon.PeerRateLimiter {
-	enodes := append(
-		parseNodes(clusterCfg.StaticNodes),
-		parseNodes(clusterCfg.TrustedMailServers)...,
-	)
+	enodes := parseNodes(clusterCfg.StaticNodes)
 	var (
 		ips     []string
 		peerIDs []enode.ID
@@ -604,13 +593,6 @@ func (b *StatusNode) peerService() *peer.Service {
 		b.peerSrvc = peer.New()
 	}
 	return b.peerSrvc
-}
-
-func registerWakuMailServer(wakuService *waku.Waku, config *params.WakuConfig) (err error) {
-	var mailServer mailserver.WakuMailServer
-	wakuService.RegisterMailServer(&mailServer)
-
-	return mailServer.Init(wakuService, config)
 }
 
 func appendIf(condition bool, services []common.StatusService, service common.StatusService) []common.StatusService {

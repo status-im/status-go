@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math"
 	"net"
@@ -259,16 +258,6 @@ func (p *Peer) handlePacket(packet p2p.Msg) error {
 			p.logger.Warn("failed to decode direct message, peer will be disconnected", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 			return err
 		}
-	case p2pRequestCode:
-		if err := p.handleP2PRequestCode(packet); err != nil {
-			p.logger.Warn("failed to decode p2p request message, peer will be disconnected", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
-			return err
-		}
-	case p2pRequestCompleteCode:
-		if err := p.handleP2PRequestCompleteCode(packet); err != nil {
-			p.logger.Warn("failed to decode p2p request complete message, peer will be disconnected", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
-			return err
-		}
 	default:
 		// New message common might be implemented in the future versions of Waku.
 		// For forward compatibility, just ignore.
@@ -321,43 +310,6 @@ func (p *Peer) handleMessageResponseCode(packet p2p.Msg) error {
 	return p.host.OnMessagesResponse(response, p)
 }
 
-func (p *Peer) handleP2PRequestCode(packet p2p.Msg) error {
-	// Must be processed if mail server is implemented. Otherwise ignore.
-	if !p.host.Mailserver() {
-		return nil
-	}
-
-	// Read all data as we will try to decode it possibly twice.
-	data, err := ioutil.ReadAll(packet.Payload)
-	if err != nil {
-		return fmt.Errorf("invalid p2p request messages: %v", err)
-	}
-	r := bytes.NewReader(data)
-	packet.Payload = r
-
-	var requestDeprecated common.Envelope
-	errDepReq := packet.Decode(&requestDeprecated)
-	if errDepReq == nil {
-		return p.host.OnDeprecatedMessagesRequest(&requestDeprecated, p)
-	}
-	p.logger.Info("failed to decode p2p request message (deprecated)", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(errDepReq))
-
-	// As we failed to decode the request, let's set the offset
-	// to the beginning and try decode it again.
-	if _, err := r.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("invalid p2p request message: %v", err)
-	}
-
-	var request common.MessagesRequest
-	errReq := packet.Decode(&request)
-	if errReq == nil {
-		return p.host.OnMessagesRequest(request, p)
-	}
-	p.logger.Info("failed to decode p2p request message", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(errReq))
-
-	return errors.New("invalid p2p request message")
-}
-
 func (p *Peer) handleBatchAcknowledgeCode(packet p2p.Msg) error {
 	var batchHash gethcommon.Hash
 	if err := packet.Decode(&batchHash); err != nil {
@@ -398,18 +350,6 @@ func (p *Peer) handleP2PMessageCode(packet p2p.Msg) error {
 	}
 
 	return p.host.OnNewP2PEnvelopes(envelopes)
-}
-
-func (p *Peer) handleP2PRequestCompleteCode(packet p2p.Msg) error {
-	if !p.trusted {
-		return nil
-	}
-
-	var payload []byte
-	if err := packet.Decode(&payload); err != nil {
-		return fmt.Errorf("invalid p2p request complete message: %v", err)
-	}
-	return p.host.OnP2PRequestCompleted(payload, p)
 }
 
 // sendConfirmation sends messageResponseCode and batchAcknowledgedCode messages.

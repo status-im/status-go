@@ -23,7 +23,6 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 		params.GoerliNetworkID,
 		params.WithFleet(params.FleetProd),
 		params.WithLES(),
-		params.WithMailserver(),
 	)
 	require.NoError(t, err)
 	assert.Equal(t, "/some/data/path", c.DataDir)
@@ -31,8 +30,6 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	// assert Whisper
 	assert.Equal(t, true, c.WakuConfig.Enabled)
 	assert.Equal(t, "/some/data/path/waku", c.WakuConfig.DataDir)
-	// assert MailServer
-	assert.Equal(t, false, c.WakuConfig.EnableMailServer)
 	// assert cluster
 	assert.Equal(t, false, c.NoDiscovery)
 	assert.Equal(t, params.FleetProd, c.ClusterConfig.Fleet)

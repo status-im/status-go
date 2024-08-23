@@ -102,8 +102,6 @@ type Waku struct {
 	settings   settings     // Holds configuration settings that can be dynamically changed
 	settingsMu sync.RWMutex // Mutex to sync the settings access
 
-	mailServer MailServer
-
 	rateLimiter *common.PeerRateLimiter
 
 	envelopeFeed event.Feed
@@ -484,12 +482,6 @@ func (w *Waku) Protocols() []p2p.Protocol {
 	return w.protocols
 }
 
-// RegisterMailServer registers MailServer interface.
-// MailServer will process all the incoming messages with p2pRequestCode.
-func (w *Waku) RegisterMailServer(server MailServer) {
-	w.mailServer = server
-}
-
 // SetRateLimiter registers a rate limiter.
 func (w *Waku) RegisterRateLimiter(r *common.PeerRateLimiter) {
 	w.rateLimiter = r
@@ -638,14 +630,6 @@ func (w *Waku) AllowP2PMessagesFromPeer(peerID []byte) error {
 	}
 	p.SetPeerTrusted(true)
 	return nil
-}
-
-func (w *Waku) SendHistoricMessageResponse(peerID []byte, payload []byte) error {
-	peer, err := w.getPeer(peerID)
-	if err != nil {
-		return err
-	}
-	return peer.SendHistoricMessageResponse(payload)
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
@@ -1126,30 +1110,6 @@ func (w *Waku) OnNewP2PEnvelopes(envelopes []*common.Envelope) error {
 	return nil
 }
 
-func (w *Waku) Mailserver() bool {
-	return w.mailServer != nil
-}
-
-func (w *Waku) OnMessagesRequest(request common.MessagesRequest, p common.Peer) error {
-	w.mailServer.Deliver(p.ID(), request)
-	return nil
-}
-
-func (w *Waku) OnDeprecatedMessagesRequest(request *common.Envelope, p common.Peer) error {
-	w.mailServer.DeliverMail(p.ID(), request)
-	return nil
-}
-
-func (w *Waku) OnP2PRequestCompleted(payload []byte, p common.Peer) error {
-	msEvent, err := CreateMailServerEvent(p.EnodeID(), payload)
-	if err != nil {
-		return fmt.Errorf("invalid p2p request complete payload: %v", err)
-	}
-
-	w.postP2P(*msEvent)
-	return nil
-}
-
 func (w *Waku) OnMessagesResponse(response common.MessagesResponse, p common.Peer) error {
 	w.envelopeFeed.Send(common.EnvelopeEvent{
 		Batch: response.Hash,
@@ -1338,14 +1298,6 @@ func (w *Waku) addAndBridge(envelope *common.Envelope, isP2P bool, bridged bool)
 		common.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
 		common.EnvelopesSizeMeter.Observe(float64(envelope.Size()))
 		w.postEvent(envelope, isP2P) // notify the local node about the new message
-		if w.mailServer != nil {
-			w.mailServer.Archive(envelope)
-			w.envelopeFeed.Send(common.EnvelopeEvent{
-				Topic: envelope.Topic,
-				Hash:  envelope.Hash(),
-				Event: common.EventMailServerEnvelopeArchived,
-			})
-		}
 		// Bridge only envelopes that are not p2p messages.
 		// In particular, if a node is a lightweight node,
 		// it should not bridge any envelopes.

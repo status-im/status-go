@@ -64,7 +64,6 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 	ensservice "github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/services/ext/mailservers"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
@@ -98,12 +97,9 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // layers.
 // It needs to expose an interface to manage installations
 // because installations are managed by the user.
-// Similarly, it needs to expose an interface to manage
-// mailservers because they can also be managed by the user.
 type Messenger struct {
 	node                      types.Node
 	server                    *p2p.Server
-	peerStore                 *mailservers.PeerStore
 	config                    *config
 	identity                  *ecdsa.PrivateKey
 	persistence               *sqlitePersistence
@@ -291,24 +287,11 @@ func (interceptor EnvelopeEventsInterceptor) EnvelopeExpired(identifiers [][]byt
 	interceptor.EnvelopeEventsHandler.EnvelopeExpired(identifiers, err)
 }
 
-// MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
-func (interceptor EnvelopeEventsInterceptor) MailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
-	//we don't track mailserver requests in Messenger, so just redirect to handler
-	interceptor.EnvelopeEventsHandler.MailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
-}
-
-// MailServerRequestExpired triggered when the mailserver request expires
-func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash types.Hash) {
-	//we don't track mailserver requests in Messenger, so just redirect to handler
-	interceptor.EnvelopeEventsHandler.MailServerRequestExpired(hash)
-}
-
 func NewMessenger(
 	nodeName string,
 	identity *ecdsa.PrivateKey,
 	node types.Node,
 	installationID string,
-	peerStore *mailservers.PeerStore,
 	version string,
 	opts ...Option,
 ) (*Messenger, error) {
@@ -594,7 +577,6 @@ func NewMessenger(
 		peersyncing:             peersyncing.New(peersyncing.Config{Database: database, Timesource: transp}),
 		peersyncingOffers:       make(map[string]uint64),
 		peersyncingRequests:     make(map[string]uint64),
-		peerStore:               peerStore,
 		mvdsStatusChangeEvent:   make(chan datasyncnode.PeerStatusChangeEvent, 5),
 		verificationDatabase:    verification.NewPersistence(database),
 		mailserverCycle: mailserverCycle{

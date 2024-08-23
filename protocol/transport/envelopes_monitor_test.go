@@ -55,7 +55,6 @@ func (s *EnvelopesMonitorSuite) SetupTest() {
 			EnvelopeEventsHandler:            s.eventsHandlerMock,
 			MaxAttempts:                      6,
 			AwaitOnlyMailServerConfirmations: false,
-			IsMailserver:                     func(types.EnodeID) bool { return false },
 			Logger:                           zap.NewNop(),
 		},
 	)

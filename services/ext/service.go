@@ -49,7 +49,6 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/communitytokens"
-	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/collectibles"
@@ -65,8 +64,6 @@ const providerID = "community"
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
 	EnvelopeExpired([][]byte, error)
-	MailServerRequestCompleted(types.Hash, types.Hash, []byte, error)
-	MailServerRequestExpired(types.Hash)
 }
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
@@ -78,9 +75,7 @@ type Service struct {
 	n               types.Node
 	rpcClient       *rpc.Client
 	config          params.NodeConfig
-	mailMonitor     *MailRequestMonitor
 	server          *p2p.Server
-	peerStore       *mailservers.PeerStore
 	accountsDB      *accounts.Database
 	multiAccountsDB *multiaccounts.Database
 	account         *multiaccounts.Account
@@ -94,18 +89,12 @@ func New(
 	n types.Node,
 	rpcClient *rpc.Client,
 	ldb *leveldb.DB,
-	mailMonitor *MailRequestMonitor,
-	eventSub mailservers.EnvelopeEventSubscriber,
 ) *Service {
-	cache := mailservers.NewCache(ldb)
-	peerStore := mailservers.NewPeerStore(cache)
 	return &Service{
-		storage:     db.NewLevelDBStorage(ldb),
-		n:           n,
-		rpcClient:   rpcClient,
-		config:      config,
-		mailMonitor: mailMonitor,
-		peerStore:   peerStore,
+		storage:   db.NewLevelDBStorage(ldb),
+		n:         n,
+		rpcClient: rpcClient,
+		config:    config,
 	}
 }
 
@@ -117,9 +106,6 @@ func (s *Service) NodeID() *ecdsa.PrivateKey {
 }
 
 func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
-	if len(rawURL) == 0 {
-		return mailservers.GetFirstConnected(s.server, s.peerStore)
-	}
 	return enode.ParseV4(rawURL)
 }
 
@@ -150,11 +136,8 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	envelopesMonitorConfig := &transport.EnvelopesMonitorConfig{
 		MaxAttempts:                      s.config.ShhextConfig.MaxMessageDeliveryAttempts,
 		AwaitOnlyMailServerConfirmations: s.config.ShhextConfig.MailServerConfirmations,
-		IsMailserver: func(peer types.EnodeID) bool {
-			return s.peerStore.Exist(peer)
-		},
-		EnvelopeEventsHandler: EnvelopeSignalHandler{},
-		Logger:                logger,
+		EnvelopeEventsHandler:            EnvelopeSignalHandler{},
+		Logger:                           logger,
 	}
 	s.accountsDB, err = accounts.NewDB(appDb)
 	if err != nil {
@@ -173,7 +156,6 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		identity,
 		s.n,
 		s.config.ShhextConfig.InstallationID,
-		s.peerStore,
 		params.Version,
 		options...,
 	)

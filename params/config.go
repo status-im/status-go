@@ -80,9 +80,6 @@ type WakuConfig struct {
 	// FullNode should be true if waku should always acta as a full node
 	FullNode bool
 
-	// EnableMailServer is mode when node is capable of delivering expired messages on demand
-	EnableMailServer bool
-
 	// DataDir is the file system folder Waku should use for any data storage needs.
 	// For instance, MailServer will use this directory to store its data.
 	DataDir string
@@ -91,25 +88,12 @@ type WakuConfig struct {
 	// We enforce a minimum as a bland spam prevention mechanism.
 	MinimumPoW float64
 
-	// MailServerPassword for symmetric encryption of waku message history requests.
-	// (if no account file selected, then this password is used for symmetric encryption).
-	MailServerPassword string
-
-	// MailServerRateLimit minimum time between queries to mail server per peer.
-	MailServerRateLimit int
-
-	// MailServerDataRetention is a number of days data should be stored by MailServer.
-	MailServerDataRetention int
-
 	// TTL time to live for messages, in seconds
 	TTL int
 
 	// MaxMessageSize is a maximum size of a devp2p packet handled by the Waku protocol,
 	// not only the size of envelopes sent in that packet.
 	MaxMessageSize uint32
-
-	// DatabaseConfig is configuration for which data store we use.
-	DatabaseConfig DatabaseConfig
 
 	// EnableRateLimiter set to true enables IP and peer ID rate limiting.
 	EnableRateLimiter bool
@@ -257,9 +241,6 @@ type ClusterConfig struct {
 	// BootNodes is a list of bootnodes.
 	// Deprecated: won't be used at all in wakuv2
 	BootNodes []string
-
-	// TrustedMailServers is a list of verified and trusted Mail Server nodes.
-	TrustedMailServers []string
 
 	// PushNotificationsServers is a list of default push notification servers.
 	PushNotificationsServers []string
@@ -526,9 +507,6 @@ type NodeConfig struct {
 	// discoverable peers with the discovery limits.
 	RequireTopics map[discv5.Topic]Limits `json:"RequireTopics"`
 
-	// MailServerRegistryAddress is the MailServerRegistry contract address
-	MailServerRegistryAddress string
-
 	// PushNotificationServerConfig is the config for the push notification server
 	PushNotificationServerConfig PushNotificationServerConfig `json:"PushNotificationServerConfig"`
 
@@ -766,13 +744,6 @@ func WithFleet(fleet string) Option {
 func WithLES() Option {
 	return func(c *NodeConfig) error {
 		return loadConfigFromAsset("../config/cli/les-enabled.json", c)
-	}
-}
-
-// WithMailserver enables MailServer.
-func WithMailserver() Option {
-	return func(c *NodeConfig) error {
-		return loadConfigFromAsset("../config/cli/mailserver-enabled.json", c)
 	}
 }
 
@@ -1077,14 +1048,6 @@ func (c *NodeConfig) Validate() error {
 
 	if c.WakuConfig.Enabled && c.WakuV2Config.Enabled && c.WakuConfig.DataDir == c.WakuV2Config.DataDir {
 		return fmt.Errorf("both Waku and WakuV2 are enabled and use the same data dir")
-	}
-
-	// Waku's data directory must be relative to the main data directory
-	// if EnableMailServer is true.
-	if c.WakuConfig.Enabled && c.WakuConfig.EnableMailServer {
-		if !strings.HasPrefix(c.WakuConfig.DataDir, c.DataDir) {
-			return fmt.Errorf("WakuConfig.DataDir must start with DataDir fragment")
-		}
 	}
 
 	if !c.NoDiscovery && len(c.ClusterConfig.BootNodes) == 0 {

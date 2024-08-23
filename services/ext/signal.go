@@ -22,16 +22,6 @@ func (h EnvelopeSignalHandler) EnvelopeExpired(identifiers [][]byte, err error) 
 	signal.SendEnvelopeExpired(identifiers, err)
 }
 
-// MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
-func (h EnvelopeSignalHandler) MailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
-	signal.SendMailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
-}
-
-// MailServerRequestExpired triggered when the mailserver request expires
-func (h EnvelopeSignalHandler) MailServerRequestExpired(hash types.Hash) {
-	signal.SendMailServerRequestExpired(hash)
-}
-
 // PublisherSignalHandler sends signals on protocol events
 type PublisherSignalHandler struct{}
 

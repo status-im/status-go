@@ -91,7 +91,6 @@ func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, 
 		config.privateKey,
 		&testNode{shh: waku},
 		uuid.New().String(),
-		nil,
 		"testVersion",
 		options...,
 	)

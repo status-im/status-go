@@ -20,14 +20,8 @@ func New(config params.NodeConfig, n types.Node, rpcClient *rpc.Client, handler 
 	if err != nil {
 		panic(err)
 	}
-	delay := ext.DefaultRequestsDelay
-	if config.ShhextConfig.RequestsDelay != 0 {
-		delay = config.ShhextConfig.RequestsDelay
-	}
-	requestsRegistry := ext.NewRequestsRegistry(delay)
-	mailMonitor := ext.NewMailRequestMonitor(w, handler, requestsRegistry)
 	return &Service{
-		Service: ext.New(config, n, rpcClient, ldb, mailMonitor, w),
+		Service: ext.New(config, n, rpcClient, ldb),
 		w:       w,
 	}
 }
