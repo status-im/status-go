@@ -870,6 +870,7 @@ func TestLoginAccount(t *testing.T) {
 
 	require.NotEmpty(t, accounts[0].KeyUID)
 	require.Equal(t, acc.KeyUID, accounts[0].KeyUID)
+	require.True(t, acc.HasAcceptedTerms)
 
 	loginAccountRequest := &requests.Login{
 		KeyUID:           accounts[0].KeyUID,
@@ -1765,6 +1766,33 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 	mnemonic, err := db.Mnemonic()
 	require.NoError(t, err)
 	require.Empty(t, mnemonic)
+}
+
+func TestAcceptTerms(t *testing.T) {
+	tmpdir := t.TempDir()
+	b := NewGethStatusBackend()
+	conf, err := params.NewNodeConfig(tmpdir, 1777)
+	require.NoError(t, err)
+	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
+	b.UpdateRootDataDir(conf.DataDir)
+	require.NoError(t, b.OpenAccounts())
+
+	nameserver := "8.8.8.8"
+	createAccountRequest := &requests.CreateAccount{
+		DisplayName:        "some-display-name",
+		CustomizationColor: "#ffffff",
+		Password:           "some-password",
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
+		WakuV2Nameserver:   &nameserver,
+		WakuV2Fleet:        "status.staging",
+	}
+
+	_, err = b.CreateAccountAndLogin(createAccountRequest)
+	require.NoError(t, err)
+
+	err = b.AcceptTerms()
+	require.NoError(t, err)
 }
 
 func TestCreateAccountPathsValidation(t *testing.T) {

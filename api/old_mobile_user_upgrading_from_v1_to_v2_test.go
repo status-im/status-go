@@ -141,6 +141,11 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 		s.Require().True(len(keyKps[0].Accounts) == 1)
 		info, err = generator.LoadAccount(keyKps[0].Accounts[0].Address.Hex(), oldMobileUserPasswd)
 		s.Require().NoError(err)
+
+		// The user should manually accept terms, so we make sure we don't set it
+		// automatically by mistake.
+		s.Require().False(info.ToMultiAccount().HasAcceptedTerms)
+
 		s.Require().Equal(keyKps[0].KeyUID, info.KeyUID)
 		s.Require().Equal(keyKps[0].Accounts[0].KeyUID, info.KeyUID)
 		info, err = generator.ImportPrivateKey("c3ad0b50652318f845565c13761e5369ce75dcbc2a94616e15b829d4b07410fe")
