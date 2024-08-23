@@ -45,9 +45,9 @@ const (
 )
 
 var (
-	testEstimationMap = map[string]uint64{
-		pathprocessor.ProcessorTransferName:  uint64(1000),
-		pathprocessor.ProcessorBridgeHopName: uint64(5000),
+	testEstimationMap = map[string]pathprocessor.Estimation{
+		pathprocessor.ProcessorTransferName:  {Value: uint64(1000), Err: nil},
+		pathprocessor.ProcessorBridgeHopName: {Value: uint64(5000), Err: nil},
 	}
 
 	testBbonderFeeMap = map[string]*big.Int{
@@ -208,6 +208,46 @@ type normalTestParams struct {
 
 func getNormalTestParamsList() []normalTestParams {
 	return []normalTestParams{
+		{
+			name: "ETH transfer - Insufficient Funds",
+			input: &RouteInputParams{
+				testnetMode:          false,
+				Uuid:                 uuid.NewString(),
+				SendType:             Transfer,
+				AddrFrom:             common.HexToAddress("0x1"),
+				AddrTo:               common.HexToAddress("0x2"),
+				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
+				TokenID:              pathprocessor.EthSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
+
+				testsMode: true,
+				testParams: &routerTestParams{
+					tokenFrom: &token.Token{
+						ChainID:  1,
+						Symbol:   pathprocessor.EthSymbol,
+						Decimals: 18,
+					},
+					tokenPrices:   testTokenPrices,
+					suggestedFees: testSuggestedFees,
+					balanceMap:    testBalanceMapPerChain,
+					estimationMap: map[string]pathprocessor.Estimation{
+						pathprocessor.ProcessorTransferName: {
+							Value: uint64(0),
+							Err:   fmt.Errorf("failed with 50000000 gas: insufficient funds for gas * price + value: address %s have 68251537427723 want 100000000000000", common.HexToAddress("0x1")),
+						},
+					},
+					bonderFeeMap:          testBbonderFeeMap,
+					approvalGasEstimation: testApprovalGasEstimation,
+					approvalL1Fee:         testApprovalL1Fee,
+				},
+			},
+			expectedError: &errors.ErrorResponse{
+				Code:    errors.GenericErrorCode,
+				Details: fmt.Sprintf("failed with 50000000 gas: insufficient funds for gas * price + value: address %s", common.HexToAddress("0x1")),
+			},
+			expectedCandidates: []*PathV2{},
+		},
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - 0 AmountIn",
 			input: &RouteInputParams{
@@ -2669,20 +2709,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedError: &errors.ErrorResponse{
-				Code:    ErrNotEnoughTokenBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, pathprocessor.UsdcSymbol, walletCommon.OptimismMainnet),
-			},
-			expectedCandidates: []*PathV2{
-				{
-					ProcessorName:         pathprocessor.ProcessorTransferName,
-					FromChain:             &optimism,
-					ToChain:               &optimism,
-					ApprovalRequired:      false,
-					requiredTokenBalance:  big.NewInt(testAmount100USDC),
-					requiredNativeBalance: big.NewInt((testBaseFee + testPriorityFeeLow) * testApprovalGasEstimation),
-				},
-			},
+			expectedError: ErrNoPositiveBalance,
 		},
 		{
 			name: "ERC20 transfer - Specific FromChain - Specific ToChain - Not Enough Native Balance",
@@ -2766,30 +2793,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedError: &errors.ErrorResponse{
-				Code:    ErrNotEnoughTokenBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, pathprocessor.UsdcSymbol, walletCommon.ArbitrumMainnet),
-			},
-			expectedCandidates: []*PathV2{
-				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
-					FromChain:        &mainnet,
-					ToChain:          &optimism,
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
-					FromChain:        &optimism,
-					ToChain:          &optimism,
-					ApprovalRequired: false,
-				},
-				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
-					FromChain:        &arbitrum,
-					ToChain:          &optimism,
-					ApprovalRequired: true,
-				},
-			},
+			expectedError: ErrNoPositiveBalance,
 		},
 		{
 			name: "ERC20 transfer - No Specific FromChain - Specific ToChain - Enough Token Balance On Arbitrum Chain But Not Enough Native Balance",

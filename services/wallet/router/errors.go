@@ -32,4 +32,5 @@ var (
 	ErrCannotCheckBalance                        = &errors.ErrorResponse{Code: errors.ErrorCode("WR-024"), Details: "cannot check balance"}
 	ErrCannotCheckLockedAmounts                  = &errors.ErrorResponse{Code: errors.ErrorCode("WR-025"), Details: "cannot check locked amounts"}
 	ErrLowAmountInForHopBridge                   = &errors.ErrorResponse{Code: errors.ErrorCode("WR-026"), Details: "bonder fee greater than estimated received, a higher amount is needed to cover fees"}
+	ErrNoPositiveBalance                         = &errors.ErrorResponse{Code: errors.ErrorCode("WR-027"), Details: "no positive balance"}
 )

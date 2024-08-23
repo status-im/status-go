@@ -56,8 +56,13 @@ type ProcessorInputParams struct {
 
 	// for testing purposes
 	TestsMode                 bool
-	TestEstimationMap         map[string]uint64   // [brifge-name, estimated-value]
-	TestBonderFeeMap          map[string]*big.Int // [token-symbol, bonder-fee]
+	TestEstimationMap         map[string]Estimation // [bridge-name, estimation]
+	TestBonderFeeMap          map[string]*big.Int   // [token-symbol, bonder-fee]
 	TestApprovalGasEstimation uint64
 	TestApprovalL1Fee         uint64
+}
+
+type Estimation struct {
+	Value uint64
+	Err   error
 }
