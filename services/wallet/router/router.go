@@ -308,14 +308,33 @@ func (r *Router) GetPathProcessors() map[string]pathprocessor.PathProcessor {
 	return r.pathProcessors
 }
 
-func containsNetworkChainID(chainID uint64, chainIDs []uint64) bool {
-	for _, cID := range chainIDs {
-		if cID == chainID {
+func arrayContainsElement[T comparable](el T, arr []T) bool {
+	for _, e := range arr {
+		if e == el {
 			return true
 		}
 	}
-
 	return false
+}
+
+func arraysWithSameElements[T comparable](ar1 []T, ar2 []T, isEqual func(T, T) bool) bool {
+	if len(ar1) != len(ar2) {
+		return false
+	}
+	for _, el := range ar1 {
+		if !arrayContainsElement(el, ar2) {
+			return false
+		}
+	}
+	return true
+}
+
+func sameSingleChainTransfer(fromChains []*params.Network, toChains []*params.Network) bool {
+	return len(fromChains) == 1 &&
+		len(toChains) == 1 &&
+		arraysWithSameElements(fromChains, toChains, func(a, b *params.Network) bool {
+			return a.ChainID == b.ChainID
+		})
 }
 
 type Router struct {
@@ -484,7 +503,7 @@ func (r *Router) SuggestedRoutes(
 			continue
 		}
 
-		if containsNetworkChainID(network.ChainID, disabledFromChainIDs) {
+		if arrayContainsElement(network.ChainID, disabledFromChainIDs) {
 			continue
 		}
 
@@ -568,10 +587,10 @@ func (r *Router) SuggestedRoutes(
 						continue
 					}
 
-					if len(preferedChainIDs) > 0 && !containsNetworkChainID(dest.ChainID, preferedChainIDs) {
+					if len(preferedChainIDs) > 0 && !arrayContainsElement(dest.ChainID, preferedChainIDs) {
 						continue
 					}
-					if containsNetworkChainID(dest.ChainID, disabledToChainIDs) {
+					if arrayContainsElement(dest.ChainID, disabledToChainIDs) {
 						continue
 					}
 

@@ -173,7 +173,7 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams) (uint64
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
-				return val, nil
+				return val.Value, val.Err
 			}
 		}
 		return 0, ErrNoEstimationFound

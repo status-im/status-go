@@ -112,7 +112,7 @@ func (s *ERC721Processor) EstimateGas(params ProcessorInputParams) (uint64, erro
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
-				return val, nil
+				return val.Value, val.Err
 			}
 		}
 		return 0, ErrNoEstimationFound

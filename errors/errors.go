@@ -27,6 +27,28 @@ func IsErrorResponse(err error) bool {
 	return ok
 }
 
+// ErrorCodeFromError returns the ErrorCode from an error.
+func ErrorCodeFromError(err error) ErrorCode {
+	if err == nil {
+		return GenericErrorCode
+	}
+	if errResp, ok := err.(*ErrorResponse); ok {
+		return errResp.Code
+	}
+	return GenericErrorCode
+}
+
+// DetailsFromError returns the details from an error.
+func DetailsFromError(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errResp, ok := err.(*ErrorResponse); ok {
+		return errResp.Details
+	}
+	return err.Error()
+}
+
 // CreateErrorResponseFromError creates an ErrorResponse from a generic error.
 func CreateErrorResponseFromError(err error) error {
 	if err == nil {

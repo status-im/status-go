@@ -228,7 +228,7 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, e
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[h.Name()]; ok {
-				return val, nil
+				return val.Value, val.Err
 			}
 		}
 		return 0, ErrNoEstimationFound

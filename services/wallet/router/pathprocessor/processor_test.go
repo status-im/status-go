@@ -47,10 +47,10 @@ var optimism = params.Network{
 	RelatedChainID:         walletCommon.OptimismMainnet,
 }
 
-var testEstimationMap = map[string]uint64{
-	ProcessorTransferName:     uint64(1000),
-	ProcessorBridgeHopName:    uint64(5000),
-	ProcessorSwapParaswapName: uint64(2000),
+var testEstimationMap = map[string]Estimation{
+	ProcessorTransferName:     {uint64(1000), nil},
+	ProcessorBridgeHopName:    {uint64(5000), nil},
+	ProcessorSwapParaswapName: {uint64(2000), nil},
 }
 
 type expectedResult struct {
@@ -329,17 +329,17 @@ func TestPathProcessors(t *testing.T) {
 					assert.Greater(t, estimatedGas, uint64(0))
 
 					input := tt.input
-					input.TestEstimationMap = map[string]uint64{
-						"randomName": 10000,
+					input.TestEstimationMap = map[string]Estimation{
+						"randomName": {10000, nil},
 					}
 					estimatedGas, err = processor.EstimateGas(input)
 					assert.Error(t, err)
-					assert.Equal(t, err, ErrNoEstimationFound)
+					assert.Equal(t, ErrNoEstimationFound, err)
 					assert.Equal(t, uint64(0), estimatedGas)
 				} else {
 					estimatedGas, err := processor.EstimateGas(tt.input)
 					assert.Error(t, err)
-					assert.Equal(t, err, ErrNoEstimationFound)
+					assert.Equal(t, ErrNoEstimationFound, err)
 					assert.Equal(t, uint64(0), estimatedGas)
 				}
 			})

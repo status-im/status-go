@@ -216,8 +216,12 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 			if tt.expectedError != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tt.expectedError.Error(), err.Error())
-				assert.NotNil(t, routes)
-				assertPathsEqual(t, tt.expectedCandidates, routes.Candidates)
+				if tt.expectedError == ErrNoPositiveBalance {
+					assert.Nil(t, routes)
+				} else {
+					assert.NotNil(t, routes)
+					assertPathsEqual(t, tt.expectedCandidates, routes.Candidates)
+				}
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, len(tt.expectedCandidates), len(routes.Candidates))

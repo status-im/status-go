@@ -133,6 +133,10 @@ func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
 	}
 }
 
+func (s SendType) simpleTransfer(p pathprocessor.PathProcessor) bool {
+	return s == Transfer && p.Name() == pathprocessor.ProcessorTransferName
+}
+
 func (s SendType) processZeroAmountInProcessor(amountIn *big.Int, amountOut *big.Int, processorName string) bool {
 	if amountIn.Cmp(pathprocessor.ZeroBigIntValue) == 0 {
 		if s == Transfer {

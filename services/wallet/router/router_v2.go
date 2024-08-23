@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/big"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -19,6 +20,10 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
+)
+
+const (
+	hexAddressLength = 42
 )
 
 var (
@@ -71,8 +76,8 @@ type RouteInputParams struct {
 type routerTestParams struct {
 	tokenFrom             *walletToken.Token
 	tokenPrices           map[string]float64
-	estimationMap         map[string]uint64   // [processor-name, estimated-value]
-	bonderFeeMap          map[string]*big.Int // [token-symbol, bonder-fee]
+	estimationMap         map[string]pathprocessor.Estimation // [processor-name, estimation]
+	bonderFeeMap          map[string]*big.Int                 // [token-symbol, bonder-fee]
 	suggestedFees         *SuggestedFees
 	baseFee               *big.Int
 	balanceMap            map[string]*big.Int // [token-symbol, balance]
@@ -407,7 +412,7 @@ func validateFromLockedAmount(input *RouteInputParams) error {
 	excludedChainCount := 0
 
 	for chainID, amount := range input.FromLockedAmount {
-		if containsNetworkChainID(chainID, input.DisabledFromChainIDs) {
+		if arrayContainsElement(chainID, input.DisabledFromChainIDs) {
 			return ErrDisabledChainFoundAmongLockedNetworks
 		}
 
@@ -500,8 +505,21 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 
 	balanceMap, err := r.getBalanceMapForTokenOnChains(ctx, input, selectedFromChains)
 	// return only if there are no balances, otherwise try to resolve the candidates for chains we know the balances for
-	if len(balanceMap) == 0 && err != nil {
-		return nil, errors.CreateErrorResponseFromError(err)
+	if len(balanceMap) == 0 {
+		if err != nil {
+			return nil, errors.CreateErrorResponseFromError(err)
+		}
+	} else {
+		noBalanceOnAnyChain := true
+		for _, value := range balanceMap {
+			if value.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+				noBalanceOnAnyChain = false
+				break
+			}
+		}
+		if noBalanceOnAnyChain {
+			return nil, ErrNoPositiveBalance
+		}
 	}
 
 	candidates, processorErrors, err := r.resolveCandidates(ctx, input, selectedFromChains, selectedToChains, balanceMap)
@@ -530,7 +548,23 @@ func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams)
 		}
 	}
 
-	return suggestedRoutes, err
+	mapError := func(err error) error {
+		if err == nil {
+			return nil
+		}
+		pattern := "insufficient funds for gas * price + value: address "
+		addressIndex := strings.Index(errors.DetailsFromError(err), pattern)
+		if addressIndex != -1 {
+			addressIndex += len(pattern) + hexAddressLength
+			return errors.CreateErrorResponseFromError(&errors.ErrorResponse{
+				Code:    errors.ErrorCodeFromError(err),
+				Details: errors.DetailsFromError(err)[:addressIndex],
+			})
+		}
+		return err
+	}
+	// map some errors to more user-friendly messages
+	return suggestedRoutes, mapError(err)
 }
 
 // getBalanceMapForTokenOnChains returns the balance map for passed address, where the key is in format "chainID-tokenSymbol" and
@@ -582,6 +616,10 @@ func (r *Router) getBalanceMapForTokenOnChains(ctx context.Context, input *Route
 		// add only if balance is not nil
 		if tokenBalance != nil {
 			balanceMap[makeBalanceKey(chain.ChainID, token.Symbol)] = tokenBalance
+		}
+
+		if token.IsNative() {
+			continue
 		}
 
 		// add native token balance for the chain
@@ -756,11 +794,11 @@ func (r *Router) getSelectedChains(input *RouteInputParams) (selectedFromChains 
 			continue
 		}
 
-		if !containsNetworkChainID(network.ChainID, input.DisabledFromChainIDs) {
+		if !arrayContainsElement(network.ChainID, input.DisabledFromChainIDs) {
 			selectedFromChains = append(selectedFromChains, network)
 		}
 
-		if !containsNetworkChainID(network.ChainID, input.DisabledToChainIDs) {
+		if !arrayContainsElement(network.ChainID, input.DisabledToChainIDs) {
 			selectedToChains = append(selectedToChains, network)
 		}
 	}
@@ -781,8 +819,8 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 		return nil, nil, errors.CreateErrorResponseFromError(err)
 	}
 
-	appendProcessorErrorFn := func(processorName string, err error) {
-		log.Error("routerv2.resolveCandidates error", "processor", processorName, "err", err)
+	appendProcessorErrorFn := func(processorName string, sendType SendType, fromChainID uint64, toChainID uint64, amount *big.Int, err error) {
+		log.Error("routerv2.resolveCandidates error", "processor", processorName, "sendType", sendType, "fromChainId: ", fromChainID, "toChainId", toChainID, "amount", amount, "err", err)
 		mu.Lock()
 		defer mu.Unlock()
 		processorErrors = append(processorErrors, &ProcessorError{
@@ -855,6 +893,11 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 						continue
 					}
 
+					// if just a single from and to chain is selected for transfer, we can skip the bridge as potential path
+					if !input.SendType.simpleTransfer(pProcessor) && sameSingleChainTransfer(selectedFromChains, selectedToChains) {
+						continue
+					}
+
 					if !input.SendType.processZeroAmountInProcessor(amountOption.amount, input.AmountOut.ToInt(), pProcessor.Name()) {
 						continue
 					}
@@ -893,7 +936,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 
 						can, err := pProcessor.AvailableFor(processorInputParams)
 						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), err)
+							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
 							continue
 						}
 						if !can {
@@ -902,24 +945,24 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 
 						bonderFees, tokenFees, err := pProcessor.CalculateFees(processorInputParams)
 						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), err)
+							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
 							continue
 						}
 
 						gasLimit, err := pProcessor.EstimateGas(processorInputParams)
 						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), err)
+							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
 							continue
 						}
 
 						approvalContractAddress, err := pProcessor.GetContractAddress(processorInputParams)
 						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), err)
+							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
 							continue
 						}
 						approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, input.SendType, &approvalContractAddress, processorInputParams)
 						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), err)
+							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
 							continue
 						}
 
@@ -936,7 +979,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 
 						amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
 						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), err)
+							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
 							continue
 						}
 
@@ -1041,7 +1084,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 	return candidates, processorErrors, nil
 }
 
-func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*PathV2, input *RouteInputParams, balanceMap map[string]*big.Int) (hasPositiveBalance bool, err error) {
+func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*PathV2, balanceMap map[string]*big.Int) (hasPositiveBalance bool, err error) {
 	balanceMapCopy := copyMapGeneric(balanceMap, func(v interface{}) interface{} {
 		return new(big.Int).Set(v.(*big.Int))
 	}).(map[string]*big.Int)
@@ -1182,7 +1225,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, can
 	for len(allRoutes) > 0 {
 		bestRoute = findBestV2(allRoutes, tokenPrice, nativeTokenPrice)
 		var hasPositiveBalance bool
-		hasPositiveBalance, err = r.checkBalancesForTheBestRoute(ctx, bestRoute, input, balanceMap)
+		hasPositiveBalance, err = r.checkBalancesForTheBestRoute(ctx, bestRoute, balanceMap)
 
 		if err != nil {
 			// If it's about transfer or bridge and there is more routes, but on the best (cheapest) one there is not enugh balance
