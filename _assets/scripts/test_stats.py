@@ -6,18 +6,17 @@ from collections import defaultdict
 
 test_stats = defaultdict(lambda: defaultdict(int))
 
-for file in glob.glob("**/report_*.xml", recursive=True):
-    tree = ET.parse(file)
-    root = tree.getroot()
-    for testcase in root.iter("testcase"):
-        test_name = testcase.attrib["name"]
+tree = ET.parse("report.xml")
+root = tree.getroot()
+for testcase in root.iter("testcase"):
+    test_name = testcase.attrib["name"]
 
-        test_stats[test_name]["total_runs"] += 1
+    test_stats[test_name]["total_runs"] += 1
 
-        if testcase.find("failure") is not None:
-            test_stats[test_name]["failed_runs"] += 1
-        elif testcase.find("error") is not None:
-            test_stats[test_name]["failed_runs"] += 1
+    if testcase.find("failure") is not None:
+        test_stats[test_name]["failed_runs"] += 1
+    elif testcase.find("error") is not None:
+        test_stats[test_name]["failed_runs"] += 1
 
 failing_test_stats = [
     {
