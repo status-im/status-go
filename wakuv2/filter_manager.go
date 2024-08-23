@@ -67,7 +67,7 @@ func newFilterManager(ctx context.Context, logger *zap.Logger, cfg *Config, onNe
 	mgr.node = node
 	mgr.onlineChecker = onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker)
 	mgr.node.SetOnlineChecker(mgr.onlineChecker)
-	mgr.filterSubBatchDuration = 5 * time.Second
+	mgr.filterSubBatchDuration = 300 * time.Millisecond
 	mgr.incompleteFilterBatch = make(map[string]filterConfig)
 	mgr.filterConfigs = make(appFilterMap)
 	mgr.waitingToSubQueue = make(chan filterConfig, 100)
