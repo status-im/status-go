@@ -13,6 +13,7 @@
 // 1679505708_add_customization_color.up.sql (78B)
 // 1687853321_add_customization_color_updated_at.up.sql (80B)
 // 1719915420_add_appmetrics.up.sql (377B)
+// 1724407149_add_has_accepted_terms_to_accounts.up.sql (81B)
 // doc.go (94B)
 
 package migrations
@@ -341,6 +342,26 @@ func _1719915420_add_appmetricsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1724407149_add_has_accepted_terms_to_accountsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x4b\x0e\x82\x21\x0c\x04\xe0\xbd\xa7\x98\x7b\xb8\x2a\x52\x56\x63\x9b\x68\x39\x00\xa9\x24\x6e\x7c\x44\xf0\xfe\xff\x27\x0c\xbd\x21\xa4\x50\x31\x32\x3f\xff\xf7\x5e\x90\x5a\x71\x71\xf6\xab\xe1\x39\x96\x64\xce\xef\x9e\x8f\x98\xbf\xd7\x42\x71\xa7\x8a\xc1\x3c\x60\x9d\x44\xd5\x26\x9d\x81\x26\xbc\xeb\xf9\x74\x04\x00\x00\xff\xff\xe0\x5c\x3b\x08\x51\x00\x00\x00")
+
+func _1724407149_add_has_accepted_terms_to_accountsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1724407149_add_has_accepted_terms_to_accountsUpSql,
+		"1724407149_add_has_accepted_terms_to_accounts.up.sql",
+	)
+}
+
+func _1724407149_add_has_accepted_terms_to_accountsUpSql() (*asset, error) {
+	bytes, err := _1724407149_add_has_accepted_terms_to_accountsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1724407149_add_has_accepted_terms_to_accounts.up.sql", size: 81, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x20, 0xc9, 0xc3, 0x79, 0x4f, 0xc5, 0xc, 0x76, 0x17, 0x26, 0x53, 0x92, 0xc1, 0xa1, 0xdd, 0x63, 0xdf, 0xc4, 0x2c, 0x6f, 0x59, 0x0, 0x4, 0xf5, 0x43, 0x45, 0x2f, 0x75, 0x8c, 0x2c, 0xae, 0xe8}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xcb\x41\x0e\x02\x31\x08\x05\xd0\x7d\x4f\xf1\x2f\x00\xe8\xca\xc4\xc4\xc3\xa0\x43\x08\x19\x5b\xc6\x96\xfb\xc7\x4d\xdf\xfe\x5d\xfa\x39\xd5\x0d\xeb\xf7\x6d\x4d\xc4\xf3\xe9\x36\x6c\x6a\x19\x3c\xe9\x1d\xe3\xd0\x52\x50\xcf\xa3\xa2\xdb\xeb\xfe\xb8\x6d\xa0\xeb\x74\xf4\xf0\xa9\x15\x39\x16\x28\xc1\x2c\x7b\xb0\x27\x58\xda\x3f\x00\x00\xff\xff\x57\xd4\xd5\x90\x5e\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -465,7 +486,8 @@ var _bindata = map[string]func() (*asset, error){
 	"1679505708_add_customization_color.up.sql":            _1679505708_add_customization_colorUpSql,
 	"1687853321_add_customization_color_updated_at.up.sql": _1687853321_add_customization_color_updated_atUpSql,
 	"1719915420_add_appmetrics.up.sql":                     _1719915420_add_appmetricsUpSql,
-	"doc.go":                                               docGo,
+	"1724407149_add_has_accepted_terms_to_accounts.up.sql": _1724407149_add_has_accepted_terms_to_accountsUpSql,
+	"doc.go": docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -527,7 +549,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1679505708_add_customization_color.up.sql":            {_1679505708_add_customization_colorUpSql, map[string]*bintree{}},
 	"1687853321_add_customization_color_updated_at.up.sql": {_1687853321_add_customization_color_updated_atUpSql, map[string]*bintree{}},
 	"1719915420_add_appmetrics.up.sql":                     {_1719915420_add_appmetricsUpSql, map[string]*bintree{}},
-	"doc.go":                                               {docGo, map[string]*bintree{}},
+	"1724407149_add_has_accepted_terms_to_accounts.up.sql": {_1724407149_add_has_accepted_terms_to_accountsUpSql, map[string]*bintree{}},
+	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
