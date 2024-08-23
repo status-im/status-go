@@ -37,7 +37,7 @@ type MissingMessageVerifier struct {
 	messageTracker MessageTracker
 
 	criteriaInterest   map[string]criteriaInterest // Track message verification requests and when was the last time a pubsub topic was verified for missing messages
-	criteriaInterestMu sync.Mutex
+	criteriaInterestMu sync.RWMutex
 
 	C <-chan *protocol.Envelope
 
@@ -110,8 +110,13 @@ func (m *MissingMessageVerifier) Start(ctx context.Context) {
 			select {
 			case <-t.C:
 				m.logger.Debug("checking for missing messages...")
-				m.criteriaInterestMu.Lock()
-				for _, interest := range m.criteriaInterest {
+				m.criteriaInterestMu.RLock()
+				critIntList := make([]criteriaInterest, 0, len(m.criteriaInterest))
+				for _, value := range m.criteriaInterest {
+					critIntList = append(critIntList, value)
+				}
+				m.criteriaInterestMu.RUnlock()
+				for _, interest := range critIntList {
 					select {
 					case <-ctx.Done():
 						return
@@ -123,7 +128,6 @@ func (m *MissingMessageVerifier) Start(ctx context.Context) {
 						}(interest)
 					}
 				}
-				m.criteriaInterestMu.Unlock()
 
 			case <-ctx.Done():
 				return
@@ -155,8 +159,8 @@ func (m *MissingMessageVerifier) fetchHistory(c chan<- *protocol.Envelope, inter
 		}
 
 		m.criteriaInterestMu.Lock()
-		c := m.criteriaInterest[interest.contentFilter.PubsubTopic]
-		if c.equals(interest) {
+		c, ok := m.criteriaInterest[interest.contentFilter.PubsubTopic]
+		if ok && c.equals(interest) {
 			c.lastChecked = now
 			m.criteriaInterest[interest.contentFilter.PubsubTopic] = c
 		}
@@ -261,7 +265,9 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 			defer wg.Wait()
 
 			result, err := m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (*store.Result, error) {
-				return m.store.QueryByHash(ctx, messageHashes, store.WithPeer(interest.peerID), store.WithPaging(false, maxMsgHashesPerRequest))
+				queryCtx, cancel := context.WithTimeout(ctx, m.params.storeQueryTimeout)
+				defer cancel()
+				return m.store.QueryByHash(queryCtx, messageHashes, store.WithPeer(interest.peerID), store.WithPaging(false, maxMsgHashesPerRequest))
 			}, logger, "retrieving missing messages")
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {

@@ -101,6 +101,8 @@ const (
 // some protocol
 var ErrNoPeersAvailable = errors.New("no suitable peers found")
 
+const maxFailedAttempts = 5
+const prunePeerStoreInterval = 10 * time.Minute
 const peerConnectivityLoopSecs = 15
 const maxConnsToPeerRatio = 5
 
@@ -123,6 +125,10 @@ func inAndOutRelayPeers(relayPeers int) (int, int) {
 // checkAndUpdateTopicHealth finds health of specified topic and updates and notifies of the same.
 // Also returns the healthyPeerCount
 func (pm *PeerManager) checkAndUpdateTopicHealth(topic *NodeTopicDetails) int {
+	if topic == nil {
+		return 0
+	}
+
 	healthyPeerCount := 0
 
 	for _, p := range pm.relay.PubSub().MeshPeers(topic.topic.String()) {
@@ -234,13 +240,115 @@ func (pm *PeerManager) SetPeerConnector(pc *PeerConnectionStrategy) {
 
 // Start starts the processing to be done by peer manager.
 func (pm *PeerManager) Start(ctx context.Context) {
-	pm.RegisterWakuProtocol(relay.WakuRelayID_v200, relay.WakuRelayENRField)
-
 	pm.ctx = ctx
-	if pm.sub != nil && pm.RelayEnabled {
-		go pm.peerEventLoop(ctx)
+	if pm.RelayEnabled {
+		pm.RegisterWakuProtocol(relay.WakuRelayID_v200, relay.WakuRelayENRField)
+		if pm.sub != nil {
+			go pm.peerEventLoop(ctx)
+		}
+		go pm.connectivityLoop(ctx)
 	}
-	go pm.connectivityLoop(ctx)
+	go pm.peerStoreLoop(ctx)
+}
+
+func (pm *PeerManager) peerStoreLoop(ctx context.Context) {
+	t := time.NewTicker(prunePeerStoreInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			pm.prunePeerStore()
+		}
+	}
+}
+
+func (pm *PeerManager) prunePeerStore() {
+	peers := pm.host.Peerstore().Peers()
+	numPeers := len(peers)
+	if numPeers < pm.maxPeers {
+		pm.logger.Debug("peerstore size within capacity, not pruning", zap.Int("capacity", pm.maxPeers), zap.Int("numPeers", numPeers))
+		return
+	}
+	peerCntBeforePruning := numPeers
+	pm.logger.Debug("peerstore capacity exceeded, hence pruning", zap.Int("capacity", pm.maxPeers), zap.Int("numPeers", peerCntBeforePruning))
+
+	for _, peerID := range peers {
+		connFailues := pm.host.Peerstore().(wps.WakuPeerstore).ConnFailures(peerID)
+		if connFailues > maxFailedAttempts {
+			// safety check so that we don't end up disconnecting connected peers.
+			if pm.host.Network().Connectedness(peerID) == network.Connected {
+				pm.host.Peerstore().(wps.WakuPeerstore).ResetConnFailures(peerID)
+				continue
+			}
+			pm.host.Peerstore().RemovePeer(peerID)
+			numPeers--
+		}
+		if numPeers < pm.maxPeers {
+			pm.logger.Debug("finished pruning peer store", zap.Int("capacity", pm.maxPeers), zap.Int("beforeNumPeers", peerCntBeforePruning), zap.Int("afterNumPeers", numPeers))
+			return
+		}
+	}
+
+	notConnectedPeers := pm.getPeersBasedOnconnectionStatus("", network.NotConnected)
+	peersByTopic := make(map[string]peer.IDSlice)
+	var prunedPeers peer.IDSlice
+
+	//prune not connected peers without shard
+	for _, peerID := range notConnectedPeers {
+		topics, err := pm.host.Peerstore().(wps.WakuPeerstore).PubSubTopics(peerID)
+		//Prune peers without pubsubtopics.
+		if err != nil || len(topics) == 0 {
+			if err != nil {
+				pm.logger.Error("pruning:failed to fetch pubsub topics", zap.Error(err), zap.Stringer("peer", peerID))
+			}
+			prunedPeers = append(prunedPeers, peerID)
+			pm.host.Peerstore().RemovePeer(peerID)
+			numPeers--
+		} else {
+			prunedPeers = append(prunedPeers, peerID)
+			for topic := range topics {
+				peersByTopic[topic] = append(peersByTopic[topic], peerID)
+			}
+		}
+		if numPeers < pm.maxPeers {
+			pm.logger.Debug("finished pruning peer store", zap.Int("capacity", pm.maxPeers), zap.Int("beforeNumPeers", peerCntBeforePruning), zap.Int("afterNumPeers", numPeers), zap.Stringers("prunedPeers", prunedPeers))
+			return
+		}
+	}
+	pm.logger.Debug("pruned notconnected peers", zap.Stringers("prunedPeers", prunedPeers))
+
+	// calculate the avg peers per shard
+	total, maxPeerCnt := 0, 0
+	for _, peersInTopic := range peersByTopic {
+		peerLen := len(peersInTopic)
+		total += peerLen
+		if peerLen > maxPeerCnt {
+			maxPeerCnt = peerLen
+		}
+	}
+	avgPerTopic := min(1, total/maxPeerCnt)
+	// prune peers from shard with higher than avg count
+
+	for topic, peers := range peersByTopic {
+		count := max(len(peers)-avgPerTopic, 0)
+		var prunedPeers peer.IDSlice
+		for i, pID := range peers {
+			if i > count {
+				break
+			}
+			prunedPeers = append(prunedPeers, pID)
+			pm.host.Peerstore().RemovePeer(pID)
+			numPeers--
+			if numPeers < pm.maxPeers {
+				pm.logger.Debug("finished pruning peer store", zap.Int("capacity", pm.maxPeers), zap.Int("beforeNumPeers", peerCntBeforePruning), zap.Int("afterNumPeers", numPeers), zap.Stringers("prunedPeers", prunedPeers))
+				return
+			}
+		}
+		pm.logger.Debug("pruned peers higher than average", zap.Stringers("prunedPeers", prunedPeers), zap.String("topic", topic))
+	}
+	pm.logger.Debug("finished pruning peer store", zap.Int("capacity", pm.maxPeers), zap.Int("beforeNumPeers", peerCntBeforePruning), zap.Int("afterNumPeers", numPeers))
 }
 
 // This is a connectivity loop, which currently checks and prunes inbound connections.
@@ -444,11 +552,6 @@ func (pm *PeerManager) processPeerENR(p *service.PeerData) []protocol.ID {
 // AddDiscoveredPeer to add dynamically discovered peers.
 // Note that these peers will not be set in service-slots.
 func (pm *PeerManager) AddDiscoveredPeer(p service.PeerData, connectNow bool) {
-	//Doing this check again inside addPeer, in order to avoid additional complexity of rollingBack other changes.
-	if pm.maxPeers <= pm.host.Peerstore().Peers().Len() {
-		return
-	}
-
 	//Check if the peer is already present, if so skip adding
 	_, err := pm.host.Peerstore().(wps.WakuPeerstore).Origin(p.AddrInfo.ID)
 	if err == nil {
@@ -503,10 +606,7 @@ func (pm *PeerManager) AddDiscoveredPeer(p service.PeerData, connectNow bool) {
 // addPeer adds peer to the peerStore.
 // It also sets additional metadata such as origin and supported protocols
 func (pm *PeerManager) addPeer(ID peer.ID, addrs []ma.Multiaddr, origin wps.Origin, pubSubTopics []string, protocols ...protocol.ID) error {
-	if pm.maxPeers <= pm.host.Peerstore().Peers().Len() {
-		pm.logger.Error("could not add peer as peer store capacity is reached", zap.Stringer("peer", ID), zap.Int("capacity", pm.maxPeers))
-		return errors.New("peer store capacity reached")
-	}
+
 	pm.logger.Info("adding peer to peerstore", zap.Stringer("peer", ID))
 	if origin == wps.Static {
 		pm.host.Peerstore().AddAddrs(ID, addrs, peerstore.PermanentAddrTTL)

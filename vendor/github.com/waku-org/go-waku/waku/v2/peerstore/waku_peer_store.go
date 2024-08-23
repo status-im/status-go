@@ -51,9 +51,9 @@ type WakuPeerstore interface {
 	PeersByOrigin(origin Origin) peer.IDSlice
 	SetENR(p peer.ID, enr *enode.Node) error
 	ENR(p peer.ID) (*enode.Node, error)
-	AddConnFailure(p peer.AddrInfo)
-	ResetConnFailures(p peer.AddrInfo)
-	ConnFailures(p peer.AddrInfo) int
+	AddConnFailure(pID peer.ID)
+	ResetConnFailures(pID peer.ID)
+	ConnFailures(pID peer.ID) int
 
 	SetDirection(p peer.ID, direction network.Direction) error
 	Direction(p peer.ID) (network.Direction, error)
@@ -136,24 +136,24 @@ func (ps *WakuPeerstoreImpl) ENR(p peer.ID) (*enode.Node, error) {
 }
 
 // AddConnFailure increments connectionFailures for a peer
-func (ps *WakuPeerstoreImpl) AddConnFailure(p peer.AddrInfo) {
+func (ps *WakuPeerstoreImpl) AddConnFailure(pID peer.ID) {
 	ps.connFailures.Lock()
 	defer ps.connFailures.Unlock()
-	ps.connFailures.failures[p.ID]++
+	ps.connFailures.failures[pID]++
 }
 
 // ResetConnFailures resets connectionFailures for a peer to 0
-func (ps *WakuPeerstoreImpl) ResetConnFailures(p peer.AddrInfo) {
+func (ps *WakuPeerstoreImpl) ResetConnFailures(pID peer.ID) {
 	ps.connFailures.Lock()
 	defer ps.connFailures.Unlock()
-	ps.connFailures.failures[p.ID] = 0
+	ps.connFailures.failures[pID] = 0
 }
 
 // ConnFailures fetches connectionFailures for a peer
-func (ps *WakuPeerstoreImpl) ConnFailures(p peer.AddrInfo) int {
+func (ps *WakuPeerstoreImpl) ConnFailures(pID peer.ID) int {
 	ps.connFailures.RLock()
 	defer ps.connFailures.RUnlock()
-	return ps.connFailures.failures[p.ID]
+	return ps.connFailures.failures[pID]
 }
 
 // SetDirection sets connection direction for a specific peer.

@@ -416,9 +416,9 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		w.peermanager.Start(ctx)
 		w.registerAndMonitorReachability(ctx)
 	}
+	w.peermanager.Start(ctx)
 
 	w.legacyStore = w.storeFactory(w)
 	w.legacyStore.SetHost(host)
@@ -752,7 +752,7 @@ func (w *WakuNode) DialPeerWithInfo(ctx context.Context, peerInfo peer.AddrInfo)
 func (w *WakuNode) connect(ctx context.Context, info peer.AddrInfo) error {
 	err := w.host.Connect(ctx, info)
 	if err != nil {
-		w.host.Peerstore().(wps.WakuPeerstore).AddConnFailure(info)
+		w.host.Peerstore().(wps.WakuPeerstore).AddConnFailure(info.ID)
 		return err
 	}
 
@@ -770,7 +770,7 @@ func (w *WakuNode) connect(ctx context.Context, info peer.AddrInfo) error {
 		}
 	}
 
-	w.host.Peerstore().(wps.WakuPeerstore).ResetConnFailures(info)
+	w.host.Peerstore().(wps.WakuPeerstore).ResetConnFailures(info.ID)
 
 	w.metrics.RecordDial()
 
