@@ -51,7 +51,7 @@ run_test_for_packages() {
   rm -f coverage.out.rerun.*
 
   # Run tests
-  gotestsum --packages=${UNIT_TEST_PACKAGES} ${gotestsum_flags} --raw-command -- \
+  gotestsum --packages="${UNIT_TEST_PACKAGES}" ${gotestsum_flags} --raw-command -- \
     ./_assets/scripts/test-with-coverage.sh \
     -v ${GOTEST_EXTRAFLAGS} \
     -timeout 45m \
