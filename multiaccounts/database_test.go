@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/status-im/status-go/common/dbsetup"
@@ -39,15 +40,68 @@ func TestAccounts(t *testing.T) {
 func TestAccountsUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	expected := Account{KeyUID: "string", CustomizationColor: common.CustomizationColorBlue, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: dbsetup.ReducedKDFIterationsNumber}
+	expected := Account{
+		KeyUID:             "string",
+		CustomizationColor: common.CustomizationColorBlue,
+		ColorHash:          ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}},
+		ColorID:            10,
+		KDFIterations:      dbsetup.ReducedKDFIterationsNumber,
+	}
 	require.NoError(t, db.SaveAccount(expected))
 	expected.Name = "chars"
 	expected.CustomizationColor = common.CustomizationColorMagenta
+	expected.HasAcceptedTerms = true
 	require.NoError(t, db.UpdateAccount(expected))
 	rst, err := db.GetAccounts()
 	require.NoError(t, err)
 	require.Len(t, rst, 1)
 	require.Equal(t, expected, rst[0])
+}
+
+func TestUpdateHasAcceptedTerms(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	keyUID := "string"
+	expected := Account{
+		KeyUID:        keyUID,
+		KDFIterations: dbsetup.ReducedKDFIterationsNumber,
+	}
+	require.NoError(t, db.SaveAccount(expected))
+	accounts, err := db.GetAccounts()
+	require.Equal(t, []Account{expected}, accounts)
+
+	// Update from false -> true
+	require.NoError(t, db.UpdateHasAcceptedTerms(keyUID, true))
+	account, err := db.GetAccount(keyUID)
+	require.NoError(t, err)
+	expected.HasAcceptedTerms = true
+	require.Equal(t, &expected, account)
+
+	// Update from true -> false
+	require.NoError(t, db.UpdateHasAcceptedTerms(keyUID, false))
+	account, err = db.GetAccount(keyUID)
+	require.NoError(t, err)
+	expected.HasAcceptedTerms = false
+	require.Equal(t, &expected, account)
+}
+
+func TestDatabase_GetAccountsCount(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	count, err := db.GetAccountsCount()
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	account := Account{
+		KeyUID:        keyUID,
+		KDFIterations: dbsetup.ReducedKDFIterationsNumber,
+	}
+	require.NoError(t, db.SaveAccount(account))
+
+	count, err = db.GetAccountsCount()
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
 }
 
 func TestLoginUpdate(t *testing.T) {
@@ -148,20 +202,26 @@ func TestDatabase_DeleteIdentityImage(t *testing.T) {
 	require.Empty(t, oii)
 }
 
+func removeAllWhitespace(s string) string {
+	tmp := strings.ReplaceAll(s, " ", "")
+	tmp = strings.ReplaceAll(tmp, "\n", "")
+	tmp = strings.ReplaceAll(tmp, "\t", "")
+	return tmp
+}
+
 func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
 	testAccs := []Account{
-		{Name: "string", KeyUID: keyUID, Identicon: "data"},
+		{Name: "string", KeyUID: keyUID, Identicon: "data", HasAcceptedTerms: true},
 		{Name: "string", KeyUID: keyUID2},
 		{Name: "string", KeyUID: keyUID2 + "2"},
 		{Name: "string", KeyUID: keyUID2 + "3"},
 	}
-	expected := `[{"name":"string","timestamp":100,"identicon":"data","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0xdeadbeef","images":[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}],"kdfIterations":3200},{"name":"string","timestamp":10,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef","images":null,"kdfIterations":3200},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef2","images":null,"kdfIterations":3200},{"name":"string","timestamp":0,"identicon":"","colorHash":null,"colorId":0,"keycard-pairing":"","key-uid":"0x1337beef3","images":[{"keyUid":"0x1337beef3","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"0x1337beef3","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}],"kdfIterations":3200}]`
 
 	for _, a := range testAccs {
-		require.NoError(t, db.SaveAccount(a))
+		require.NoError(t, db.SaveAccount(a), a.KeyUID)
 	}
 
 	seedTestDBWithIdentityImages(t, db, keyUID)
@@ -178,14 +238,116 @@ func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 	accJSON, err := json.Marshal(accs)
 	require.NoError(t, err)
 
-	require.Exactly(t, expected, string(accJSON))
+	expected := `
+[
+	{
+		"name": "string",
+		"timestamp": 100,
+		"identicon": "data",
+		"colorHash": null,
+		"colorId": 0,
+		"keycard-pairing": "",
+		"key-uid": "0xdeadbeef",
+		"images": [
+			{
+				"keyUid": "0xdeadbeef",
+				"type": "large",
+				"uri": "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+				"width": 240,
+				"height": 300,
+				"fileSize": 1024,
+				"resizeTarget": 240,
+				"clock": 0
+			},
+			{
+				"keyUid": "0xdeadbeef",
+				"type": "thumbnail",
+				"uri": "data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=",
+				"width": 80,
+				"height": 80,
+				"fileSize": 256,
+				"resizeTarget": 80,
+				"clock": 0
+			}
+		],
+		"kdfIterations": 3200,
+		"hasAcceptedTerms": true
+	},
+	{
+		"name": "string",
+		"timestamp": 10,
+		"identicon": "",
+		"colorHash": null,
+		"colorId": 0,
+		"keycard-pairing": "",
+		"key-uid": "0x1337beef",
+		"images": null,
+		"kdfIterations": 3200,
+		"hasAcceptedTerms": false
+	},
+	{
+		"name": "string",
+		"timestamp": 0,
+		"identicon": "",
+		"colorHash": null,
+		"colorId": 0,
+		"keycard-pairing": "",
+		"key-uid": "0x1337beef2",
+		"images": null,
+		"kdfIterations": 3200,
+		"hasAcceptedTerms": false
+	},
+	{
+		"name": "string",
+		"timestamp": 0,
+		"identicon": "",
+		"colorHash": null,
+		"colorId": 0,
+		"keycard-pairing": "",
+		"key-uid": "0x1337beef3",
+		"images": [
+			{
+				"keyUid": "0x1337beef3",
+				"type": "large",
+				"uri": "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+				"width": 240,
+				"height": 300,
+				"fileSize": 1024,
+				"resizeTarget": 240,
+				"clock": 0
+			},
+			{
+				"keyUid": "0x1337beef3",
+				"type": "thumbnail",
+				"uri": "data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=",
+				"width": 80,
+				"height": 80,
+				"fileSize": 256,
+				"resizeTarget": 80,
+				"clock": 0
+			}
+		],
+		"kdfIterations": 3200,
+		"hasAcceptedTerms": false
+	}
+]
+`
+
+	require.Exactly(t, removeAllWhitespace(expected), string(accJSON))
 }
 
 func TestDatabase_GetAccount(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	expected := Account{Name: "string", KeyUID: keyUID, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: dbsetup.ReducedKDFIterationsNumber}
+	expected := Account{
+		Name:             "string",
+		KeyUID:           keyUID,
+		ColorHash:        ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}},
+		ColorID:          10,
+		KDFIterations:    dbsetup.ReducedKDFIterationsNumber,
+		HasAcceptedTerms: true,
+	}
 	require.NoError(t, db.SaveAccount(expected))
 
 	account, err := db.GetAccount(expected.KeyUID)
