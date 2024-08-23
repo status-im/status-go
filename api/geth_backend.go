@@ -238,6 +238,24 @@ func (b *GethStatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
 	return b.multiaccountsDB.GetAccounts()
 }
 
+func (b *GethStatusBackend) AcceptTerms() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.multiaccountsDB == nil {
+		return errors.New("accounts db wasn't initialized")
+	}
+
+	accounts, err := b.multiaccountsDB.GetAccounts()
+	if err != nil {
+		return err
+	}
+	if len(accounts) == 0 {
+		return errors.New("accounts is empty")
+	}
+
+	return b.multiaccountsDB.UpdateHasAcceptedTerms(accounts[0].KeyUID, true)
+}
+
 func (b *GethStatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Account, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -1574,6 +1592,14 @@ func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, input 
 
 	if acc.KDFIterations == 0 {
 		acc.KDFIterations = dbsetup.ReducedKDFIterationsNumber
+	}
+
+	count, err := b.multiaccountsDB.GetAccountsCount()
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		acc.HasAcceptedTerms = true
 	}
 
 	if request.ImagePath != "" {
