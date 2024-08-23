@@ -34,8 +34,6 @@ redirect_stdout() {
 }
 
 run_test_for_packages() {
-  local packages=$1
-
   local output_file="test.log"
   local coverage_file="test.coverage.out"
   local report_file="report.xml"
@@ -53,9 +51,7 @@ run_test_for_packages() {
   rm -f coverage.out.rerun.*
 
   # Run tests
-  PACKAGES=${packages} \
-  UNIT_TEST_COUNT=${UNIT_TEST_COUNT} \
-  gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
+  gotestsum --packages=${UNIT_TEST_PACKAGES} ${gotestsum_flags} --raw-command -- \
     ./_assets/scripts/test-with-coverage.sh \
     -v ${GOTEST_EXTRAFLAGS} \
     -timeout 45m \
@@ -87,7 +83,7 @@ fi
 rm -rf ./**/*.coverage.out
 
 echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
-run_test_for_packages "${UNIT_TEST_PACKAGES}"
+run_test_for_packages
 
 # Gather test coverage results
 rm -f c.out c-full.out
