@@ -33,9 +33,6 @@ type MessengerProfilePictureHandlerSuite struct {
 	alice *Messenger // client instance of Messenger
 	bob   *Messenger // server instance of Messenger
 
-	aliceKey *ecdsa.PrivateKey // private key for the alice instance of Messenger
-	bobKey   *ecdsa.PrivateKey // private key for the bob instance of Messenger
-
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
 	shh    types.Waku
@@ -46,9 +43,21 @@ func (s *MessengerProfilePictureHandlerSuite) SetupSuite() {
 	s.logger = tt.MustCreateTestLogger()
 }
 
-func (s *MessengerProfilePictureHandlerSuite) SetupTest() {
-	var err error
+func (s *MessengerProfilePictureHandlerSuite) newMessenger(name string) *Messenger {
+	m, err := newTestMessenger(s.shh, testMessengerConfig{
+		logger:         s.logger.Named(fmt.Sprintf("messenger-%s", name)),
+		name:           name,
+		createSettings: true,
+	})
+	s.Require().NoError(err)
 
+	_, err = m.Start()
+	s.Require().NoError(err)
+
+	return m
+}
+
+func (s *MessengerProfilePictureHandlerSuite) SetupTest() {
 	// Setup Waku things
 	config := waku.DefaultConfig
 	config.MinimumAcceptedPoW = 0
@@ -57,21 +66,9 @@ func (s *MessengerProfilePictureHandlerSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	// Generate private keys for Alice and Bob
-	s.aliceKey, err = crypto.GenerateKey()
-	s.Require().NoError(err)
-	s.bobKey, err = crypto.GenerateKey()
-	s.Require().NoError(err)
-
 	// Generate Alice Messenger
-	aliceLogger := s.logger.Named("Alice messenger")
-	s.alice, err = newMessengerWithKey(s.shh, s.aliceKey, aliceLogger, []Option{})
-	s.Require().NoError(err)
-
-	// Generate Bob Messenger
-	bobLogger := s.logger.Named("Bob messenger")
-	s.bob, err = newMessengerWithKey(s.shh, s.bobKey, bobLogger, []Option{})
-	s.Require().NoError(err)
+	s.alice = s.newMessenger("Alice")
+	s.bob = s.newMessenger("Bobby")
 
 	// Setup MultiAccount for Alice Messenger
 	s.setupMultiAccount(s.alice)
@@ -87,10 +84,16 @@ func (s *MessengerProfilePictureHandlerSuite) TearDownTest() {
 }
 
 func (s *MessengerProfilePictureHandlerSuite) setupMultiAccount(m *Messenger) {
-	keyUID := m.IdentityPublicKeyString()
-	m.account = &multiaccounts.Account{KeyUID: keyUID}
+	name, err := m.settings.DisplayName()
+	s.Require().NoError(err)
 
-	err := m.multiAccounts.SaveAccount(multiaccounts.Account{Name: "string", KeyUID: keyUID})
+	keyUID := m.IdentityPublicKeyString()
+	m.account = &multiaccounts.Account{
+		Name:   name,
+		KeyUID: keyUID,
+	}
+
+	err = m.multiAccounts.SaveAccount(*m.account)
 	s.NoError(err)
 }
 
@@ -206,7 +209,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided()
 	err = s.alice.settings.SaveSettingField(settings.ProfilePicturesVisibility, settings.ProfilePicturesShowToEveryone)
 	s.Require().NoError(err)
 
-	bChat := CreateOneToOneChat(s.alice.IdentityPublicKeyString(), &s.aliceKey.PublicKey, s.alice.transport)
+	bChat := CreateOneToOneChat(s.alice.IdentityPublicKeyString(), s.alice.IdentityPublicKey(), s.alice.transport)
 	err = s.bob.SaveChat(bChat)
 	s.Require().NoError(err)
 
@@ -323,7 +326,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		_, err = s.bob.Join(bChat)
 		s.Require().NoError(err)
 	case privateChat:
-		bChat := CreateOneToOneChat(s.alice.IdentityPublicKeyString(), &s.aliceKey.PublicKey, s.alice.transport)
+		bChat := CreateOneToOneChat(s.alice.IdentityPublicKeyString(), s.alice.IdentityPublicKey(), s.alice.transport)
 		err = s.bob.SaveChat(bChat)
 		s.Require().NoError(err)
 
@@ -358,11 +361,10 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		response, err := s.alice.SendChatMessage(context.Background(), message)
 		s.Require().NoError(err)
 		s.Require().NotNil(response)
-
 		s.Require().Len(response.messages, 1)
 
 	case privateChat:
-		aChat = CreateOneToOneChat(s.bob.IdentityPublicKeyString(), &s.bobKey.PublicKey, s.bob.transport)
+		aChat = CreateOneToOneChat(s.bob.IdentityPublicKeyString(), s.bob.IdentityPublicKey(), s.bob.transport)
 		err = s.alice.SaveChat(aChat)
 		s.Require().NoError(err)
 
