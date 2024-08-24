@@ -2,7 +2,13 @@ package protocol
 
 import (
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/stretchr/testify/suite"
+	"testing"
 )
+
+func TestMessengerCollapsedCommunityCategoriesSuite(t *testing.T) {
+	suite.Run(t, new(MessengerCollapsedCommunityCategoriesSuite))
+}
 
 type MessengerCollapsedCommunityCategoriesSuite struct {
 	MessengerBaseTestSuite
