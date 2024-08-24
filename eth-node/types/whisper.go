@@ -43,7 +43,4 @@ type Whisper interface {
 	GetFilter(id string) Filter
 	Unsubscribe(id string) error
 	UnsubscribeMany(ids []string) error
-
-	// SyncMessages can be sent between two Mail Servers and syncs envelopes between them.
-	SyncMessages(peerID []byte, req SyncMailRequest) error
 }

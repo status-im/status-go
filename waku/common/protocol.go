@@ -31,8 +31,6 @@ type Peer interface {
 	// SetRWWriter sets the socket to read/write
 	SetRWWriter(p2p.MsgReadWriter)
 
-	RequestHistoricMessages(*Envelope) error
-	SendHistoricMessageResponse([]byte) error
 	SendP2PMessages([]*Envelope) error
 	SendRawP2PDirect([]rlp.RawValue) error
 
@@ -61,8 +59,6 @@ type WakuHost interface {
 	MaxMessageSize() uint32
 	// LightClientMode returns whether the host is running in light client mode
 	LightClientMode() bool
-	// Mailserver returns whether the host is running a mailserver
-	Mailserver() bool
 	// LightClientModeConnectionRestricted indicates that connection to light client in light client mode not allowed
 	LightClientModeConnectionRestricted() bool
 	// ConfirmationsEnabled returns true if message confirmations are enabled.
@@ -92,14 +88,5 @@ type WakuHost interface {
 	// OnMessagesResponse handles when the peer receive a message response
 	// from a mailserver
 	OnMessagesResponse(MessagesResponse, Peer) error
-	// OnMessagesRequest handles when the peer receive a message request
-	// this only works if the peer is a mailserver
-	OnMessagesRequest(MessagesRequest, Peer) error
-	// OnDeprecatedMessagesRequest handles when the peer receive a message request
-	// using the *Envelope format. Currently the only production client (status-mobile)
-	// is exclusively using this one.
-	OnDeprecatedMessagesRequest(*Envelope, Peer) error
-
 	OnBatchAcknowledged(common.Hash, Peer) error
-	OnP2PRequestCompleted([]byte, Peer) error
 }

@@ -28,7 +28,6 @@ type EnvelopesMonitorConfig struct {
 	EnvelopeEventsHandler            EnvelopeEventsHandler
 	MaxAttempts                      int
 	AwaitOnlyMailServerConfirmations bool
-	IsMailserver                     func(types.EnodeID) bool
 	Logger                           *zap.Logger
 }
 
@@ -36,8 +35,6 @@ type EnvelopesMonitorConfig struct {
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
 	EnvelopeExpired([][]byte, error)
-	MailServerRequestCompleted(types.Hash, types.Hash, []byte, error)
-	MailServerRequestExpired(types.Hash)
 }
 
 // NewEnvelopesMonitor returns a pointer to an instance of the EnvelopesMonitor.
@@ -59,7 +56,6 @@ func NewEnvelopesMonitor(w types.Waku, config EnvelopesMonitorConfig) *Envelopes
 		handler:                          config.EnvelopeEventsHandler,
 		awaitOnlyMailServerConfirmations: config.AwaitOnlyMailServerConfirmations,
 		maxAttempts:                      config.MaxAttempts,
-		isMailserver:                     config.IsMailserver,
 		logger:                           logger.With(zap.Namespace("EnvelopesMonitor")),
 
 		// key is envelope hash (event.Hash)
@@ -200,42 +196,46 @@ func (m *EnvelopesMonitor) handleEvent(event types.EnvelopeEvent) {
 
 func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 	// Mailserver confirmations for WakuV2 are disabled
-	if (m.w == nil || m.w.Version() < 2) && m.awaitOnlyMailServerConfirmations {
-		if !m.isMailserver(event.Peer) {
+	// Perhaps code might be reused?
+
+	/*
+		if (m.w == nil || m.w.Version() < 2) && m.awaitOnlyMailServerConfirmations {
+			if !m.isMailserver(event.Peer) {
+				return
+			}
+		}
+
+		m.mu.Lock()
+		defer m.mu.Unlock()
+
+		confirmationExpected := event.Batch != (types.Hash{})
+
+		envelope, ok := m.envelopes[event.Hash]
+
+		// If confirmations are not expected, we keep track of the envelope
+		// being sent
+		if !ok && !confirmationExpected {
+			m.envelopes[event.Hash] = &monitoredEnvelope{envelopeHashID: event.Hash, state: EnvelopeSent}
 			return
 		}
-	}
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	confirmationExpected := event.Batch != (types.Hash{})
-
-	envelope, ok := m.envelopes[event.Hash]
-
-	// If confirmations are not expected, we keep track of the envelope
-	// being sent
-	if !ok && !confirmationExpected {
-		m.envelopes[event.Hash] = &monitoredEnvelope{envelopeHashID: event.Hash, state: EnvelopeSent}
-		return
-	}
-
-	// if message was already confirmed - skip it
-	if envelope.state == EnvelopeSent {
-		return
-	}
-	m.logger.Debug("envelope is sent", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
-	if confirmationExpected {
-		if _, ok := m.batches[event.Batch]; !ok {
-			m.batches[event.Batch] = map[types.Hash]struct{}{}
+		// if message was already confirmed - skip it
+		if envelope.state == EnvelopeSent {
+			return
 		}
-		m.batches[event.Batch][event.Hash] = struct{}{}
-		m.logger.Debug("waiting for a confirmation", zap.String("batch", event.Batch.String()))
-	} else {
-		m.logger.Debug("confirmation not expected, marking as sent")
-		envelope.state = EnvelopeSent
-		m.processMessageIDs(envelope.messageIDs)
-	}
+		m.logger.Debug("envelope is sent", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
+		if confirmationExpected {
+			if _, ok := m.batches[event.Batch]; !ok {
+				m.batches[event.Batch] = map[types.Hash]struct{}{}
+			}
+			m.batches[event.Batch][event.Hash] = struct{}{}
+			m.logger.Debug("waiting for a confirmation", zap.String("batch", event.Batch.String()))
+		} else {
+			m.logger.Debug("confirmation not expected, marking as sent")
+			envelope.state = EnvelopeSent
+			m.processMessageIDs(envelope.messageIDs)
+		}
+	*/
 }
 
 func (m *EnvelopesMonitor) handleAcknowledgedBatch(event types.EnvelopeEvent) {

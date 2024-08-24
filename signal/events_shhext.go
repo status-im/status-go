@@ -20,12 +20,6 @@ const (
 	// to any peer
 	EventEnvelopeExpired = "envelope.expired"
 
-	// EventMailServerRequestCompleted is triggered when whisper receives a message ack from the mailserver
-	EventMailServerRequestCompleted = "mailserver.request.completed"
-
-	// EventMailServerRequestExpired is triggered when request TTL ends
-	EventMailServerRequestExpired = "mailserver.request.expired"
-
 	// EventEnodeDiscovered is tiggered when enode has been discovered.
 	EventEnodeDiscovered = "enode.discovered"
 
@@ -163,26 +157,6 @@ func SendHistoricMessagesRequestCompleted() {
 
 func SendUpdateAvailable(available bool, latestVersion string, url string) {
 	send(EventUpdateAvailable, UpdateAvailableSignal{Available: available, Version: latestVersion, URL: url})
-}
-
-// SendMailServerRequestCompleted triggered when mail server response has been received
-func SendMailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
-	errorMsg := ""
-	if err != nil {
-		errorMsg = err.Error()
-	}
-	sig := MailServerResponseSignal{
-		RequestID:        requestID,
-		LastEnvelopeHash: lastEnvelopeHash,
-		Cursor:           hex.EncodeToString(cursor),
-		ErrorMsg:         errorMsg,
-	}
-	send(EventMailServerRequestCompleted, sig)
-}
-
-// SendMailServerRequestExpired triggered when mail server request expires
-func SendMailServerRequestExpired(hash types.Hash) {
-	send(EventMailServerRequestExpired, EnvelopeSignal{Hash: hash})
 }
 
 // EnodeDiscoveredSignal includes enode address and topic

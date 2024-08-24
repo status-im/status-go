@@ -14,7 +14,6 @@ const (
 type Cluster struct {
 	StaticNodes     []string `json:"staticnodes"`
 	BootNodes       []string `json:"bootnodes"`
-	MailServers     []string `json:"mailservers"` // list of trusted mail servers
 	RendezvousNodes []string `json:"rendezvousnodes"`
 }
 

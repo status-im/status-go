@@ -14,7 +14,6 @@ import (
 
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/peers/verifier"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -55,8 +54,6 @@ type Options struct {
 	// TopicStopSearchDelay time stopSearch will be waiting for max cached peers to be
 	// filled before really stopping the search.
 	TopicStopSearchDelay time.Duration
-	// TrustedMailServers is a list of trusted nodes.
-	TrustedMailServers []enode.ID
 }
 
 // NewDefaultOptions returns a struct with default Options.
@@ -155,11 +152,7 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 		var topicPool TopicPoolInterface
 		t := newTopicPool(p.discovery, topic, limits, p.opts.SlowSync, p.opts.FastSync, p.cache)
 		if topic == MailServerDiscoveryTopic {
-			v, err := p.initVerifier()
-			if err != nil {
-				return err
-			}
-			topicPool = newCacheOnlyTopicPool(t, v)
+			topicPool = newCacheOnlyTopicPool(t, nil)
 		} else {
 			topicPool = t
 		}
@@ -173,10 +166,6 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	signal.SendDiscoveryStarted()
 
 	return nil
-}
-
-func (p *PeerPool) initVerifier() (v Verifier, err error) {
-	return verifier.NewLocalVerifier(p.opts.TrustedMailServers), nil
 }
 
 func (p *PeerPool) startDiscovery() error {
