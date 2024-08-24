@@ -859,6 +859,7 @@ func TestLoginAccount(t *testing.T) {
 	acc, err := b.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
 	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
+	require.True(t, acc.HasAcceptedTerms)
 
 	waitForLogin(c)
 	require.NoError(t, b.Logout())
@@ -870,7 +871,6 @@ func TestLoginAccount(t *testing.T) {
 
 	require.NotEmpty(t, accounts[0].KeyUID)
 	require.Equal(t, acc.KeyUID, accounts[0].KeyUID)
-	require.True(t, acc.HasAcceptedTerms)
 
 	loginAccountRequest := &requests.Login{
 		KeyUID:           accounts[0].KeyUID,
