@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -41,6 +42,19 @@ type MessengerProfilePictureHandlerSuite struct {
 
 func (s *MessengerProfilePictureHandlerSuite) SetupSuite() {
 	s.logger = tt.MustCreateTestLogger()
+
+	// Setup Waku things
+	config := waku.DefaultConfig
+	config.MinimumAcceptedPoW = 0
+	wakuLogger := s.logger.Named("Waku")
+	shh := waku.New(&config, wakuLogger)
+	s.shh = gethbridge.NewGethWakuWrapper(shh)
+	s.Require().NoError(shh.Start())
+}
+
+func (s *MessengerProfilePictureHandlerSuite) TearDownSuite() {
+	_ = gethbridge.GetGethWakuFrom(s.shh).Stop()
+	_ = s.logger.Sync()
 }
 
 func (s *MessengerProfilePictureHandlerSuite) newMessenger(name string) *Messenger {
@@ -58,14 +72,6 @@ func (s *MessengerProfilePictureHandlerSuite) newMessenger(name string) *Messeng
 }
 
 func (s *MessengerProfilePictureHandlerSuite) SetupTest() {
-	// Setup Waku things
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	wakuLogger := s.logger.Named("Waku")
-	shh := waku.New(&config, wakuLogger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
 	// Generate Alice Messenger
 	s.alice = s.newMessenger("Alice")
 	s.bob = s.newMessenger("Bobby")
@@ -282,7 +288,9 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 							ac: ac,
 							bc: bc,
 						}
-						s.testE2eSendingReceivingProfilePicture(args)
+						s.Run(args.TestCaseName(s.T()), func() {
+							s.testE2eSendingReceivingProfilePicture(args)
+						})
 					}
 				}
 			}
@@ -293,8 +301,20 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 }
 
 func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePicture(args *e2eArgs) {
-	s.SetupTest()
-	defer s.TearDownTest()
+	// Generate Alice Messenger
+	alice := s.newMessenger("Alice")
+	bob := s.newMessenger("Bobby")
+
+	// Setup MultiAccount for Alice Messenger
+	s.setupMultiAccount(alice)
+
+	defer func() {
+		TearDownMessenger(&s.Suite, alice)
+		alice = nil
+		TearDownMessenger(&s.Suite, bob)
+		bob = nil
+		_ = s.logger.Sync()
+	}()
 
 	s.logger.Info("testing with criteria:", zap.Any("args", args))
 	defer s.logger.Info("Completed testing with criteria:", zap.Any("args", args))
@@ -307,11 +327,11 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		zap.Error(err))
 
 	// Setting up Bob
-	err = s.bob.settings.SaveSettingField(settings.ProfilePicturesVisibility, args.vs)
+	err = bob.settings.SaveSettingField(settings.ProfilePicturesVisibility, args.vs)
 	s.Require().NoError(err)
 
 	if args.bc {
-		_, err = s.bob.AddContact(context.Background(), &requests.AddContact{ID: s.alice.IdentityPublicKeyString()})
+		_, err = bob.AddContact(context.Background(), &requests.AddContact{ID: alice.IdentityPublicKeyString()})
 		s.Require().NoError(err)
 	}
 
@@ -319,59 +339,64 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	switch args.cc {
 	case publicChat:
 		// Bob opens up the public chat and joins it
-		bChat := CreatePublicChat("status", s.alice.transport)
-		err = s.bob.SaveChat(bChat)
+		bChat := CreatePublicChat("status", alice.transport)
+		err = bob.SaveChat(bChat)
 		s.Require().NoError(err)
 
-		_, err = s.bob.Join(bChat)
+		_, err = bob.Join(bChat)
 		s.Require().NoError(err)
 	case privateChat:
-		bChat := CreateOneToOneChat(s.alice.IdentityPublicKeyString(), s.alice.IdentityPublicKey(), s.alice.transport)
-		err = s.bob.SaveChat(bChat)
+		bChat := CreateOneToOneChat(alice.IdentityPublicKeyString(), alice.IdentityPublicKey(), alice.transport)
+		err = bob.SaveChat(bChat)
 		s.Require().NoError(err)
 
-		_, err = s.bob.Join(bChat)
+		_, err = bob.Join(bChat)
 		s.Require().NoError(err)
 	default:
 		s.Failf("unexpected chat context type", "%s", string(args.cc))
 	}
 
 	// Setting up Alice
-	err = s.alice.settings.SaveSettingField(settings.ProfilePicturesShowTo, args.ss)
+	err = alice.settings.SaveSettingField(settings.ProfilePicturesShowTo, args.ss)
 	s.Require().NoError(err)
 
 	if args.ac {
-		_, err = s.alice.AddContact(context.Background(), &requests.AddContact{ID: s.bob.IdentityPublicKeyString()})
+		_, err = alice.AddContact(context.Background(), &requests.AddContact{ID: bob.IdentityPublicKeyString()})
 		s.Require().NoError(err)
 	}
 
-	iis := s.generateAndStoreIdentityImages(s.alice)
+	iis := s.generateAndStoreIdentityImages(alice)
 
 	// Create chats
 	var aChat *Chat
 	switch args.cc {
 	case publicChat:
 		// Alice opens creates a public chat
-		aChat = CreatePublicChat("status", s.alice.transport)
-		err = s.alice.SaveChat(aChat)
+		aChat = CreatePublicChat("status", alice.transport)
+		err = alice.SaveChat(aChat)
 		s.Require().NoError(err)
 
 		// Alice sends a message to the public chat
 		message := buildTestMessage(*aChat)
-		response, err := s.alice.SendChatMessage(context.Background(), message)
+		response, err := alice.SendChatMessage(context.Background(), message)
 		s.Require().NoError(err)
 		s.Require().NotNil(response)
 		s.Require().Len(response.messages, 1)
 
+		s.logger.Info("<<< MESSAGE SENT",
+			zap.String("messageID", response.Messages()[0].ID),
+			zap.Any("message", response.Messages()[0]),
+		)
+
 	case privateChat:
-		aChat = CreateOneToOneChat(s.bob.IdentityPublicKeyString(), s.bob.IdentityPublicKey(), s.bob.transport)
-		err = s.alice.SaveChat(aChat)
+		aChat = CreateOneToOneChat(bob.IdentityPublicKeyString(), bob.IdentityPublicKey(), bob.transport)
+		err = alice.SaveChat(aChat)
 		s.Require().NoError(err)
 
-		_, err = s.alice.Join(aChat)
+		_, err = alice.Join(aChat)
 		s.Require().NoError(err)
 
-		err = s.alice.publishContactCode()
+		err = alice.publishContactCode()
 		s.Require().NoError(err)
 
 	default:
@@ -385,8 +410,9 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 2 * time.Second
 	}
+
 	err = tt.RetryWithBackOff(func() error {
-		response, err := s.bob.RetrieveAll()
+		response, err := bob.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -410,7 +436,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	// Check if alice's contact data with profile picture is there
 	var contact *Contact
 	for _, c := range contacts {
-		if c.ID == s.alice.IdentityPublicKeyString() {
+		if c.ID == alice.IdentityPublicKeyString() {
 			contact = c
 		}
 	}
@@ -448,6 +474,20 @@ func (args *e2eArgs) String() string {
 		profilePicViewSettingsMap[args.vs],
 		args.ac,
 		args.bc,
+	)
+}
+
+func (args *e2eArgs) TestCaseName(t *testing.T) string {
+	expected, err := args.resultExpected()
+	require.NoError(t, err)
+
+	return fmt.Sprintf("%s-%s-%s-ac.%t-bc.%t-exp.%t",
+		string(args.cc),
+		profilePicShowSettingsMap[args.ss],
+		profilePicViewSettingsMap[args.vs],
+		args.ac,
+		args.bc,
+		expected,
 	)
 }
 
