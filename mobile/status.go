@@ -351,10 +351,7 @@ func CreateAccountAndLogin(requestJSON string) string {
 
 func AcceptTerms() string {
 	err := statusBackend.AcceptTerms()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	return makeJSONResponse(nil)
+	return makeJSONResponse(err)
 }
 
 func LoginAccount(requestJSON string) string {
