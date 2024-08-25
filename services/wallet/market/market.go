@@ -2,16 +2,21 @@ package market
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/patrickmn/go-cache"
 	"github.com/status-im/status-go/circuitbreaker"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -34,6 +39,11 @@ type Manager struct {
 	IsConnectedLock sync.RWMutex
 	circuitbreaker  *circuitbreaker.CircuitBreaker
 	providers       []thirdparty.MarketDataProvider
+	requestCounts   map[string]*atomic.Uint64
+	requestCountsMu sync.RWMutex
+	lastLogTime     time.Time
+	cache           *cache.Cache
+	rateLimiters    map[string]*rate.Limiter
 }
 
 func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Manager {
@@ -44,14 +54,62 @@ func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Ma
 		ErrorPercentThreshold: 25,
 	})
 
-	return &Manager{
+	manager := &Manager{
 		feed:           feed,
 		priceCache:     make(DataPerTokenAndCurrency),
 		IsConnected:    true,
 		LastCheckedAt:  time.Now().Unix(),
 		circuitbreaker: cb,
 		providers:      providers,
+		cache:          cache.New(5*time.Minute, 10*time.Minute),
+		rateLimiters:   make(map[string]*rate.Limiter),
 	}
+
+	for _, provider := range providers {
+		// Adjust the rate limit as needed for each provider
+		manager.rateLimiters[provider.ID()] = rate.NewLimiter(rate.Every(time.Second), 5)
+	}
+
+	manager.initRequestCounts()
+	return manager
+}
+
+func (pm *Manager) initRequestCounts() {
+	pm.requestCountsMu.Lock()
+	defer pm.requestCountsMu.Unlock()
+
+	pm.requestCounts = make(map[string]*atomic.Uint64)
+	for _, provider := range pm.providers {
+		pm.requestCounts[provider.ID()] = &atomic.Uint64{}
+	}
+	pm.lastLogTime = time.Now()
+}
+
+func (pm *Manager) incrementRequestCount(providerID string) {
+	pm.requestCountsMu.RLock()
+	counter, exists := pm.requestCounts[providerID]
+	pm.requestCountsMu.RUnlock()
+
+	if exists {
+		counter.Add(1)
+	}
+}
+
+func (pm *Manager) logRequestCounts() {
+	now := time.Now()
+	if now.Sub(pm.lastLogTime) < time.Hour {
+		return
+	}
+
+	pm.requestCountsMu.RLock()
+	defer pm.requestCountsMu.RUnlock()
+
+	for providerID, counter := range pm.requestCounts {
+		count := counter.Load()
+		log.Info("Market provider request count", "provider", providerID, "count", count)
+		counter.Store(0) // Reset the counter
+	}
+	pm.lastLogTime = now
 }
 
 func (pm *Manager) setIsConnected(value bool) {
@@ -78,6 +136,10 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 	for _, provider := range providers {
 		provider := provider
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
+			if err := pm.rateLimiters[provider.ID()].Wait(context.Background()); err != nil {
+				return nil, err
+			}
+			pm.incrementRequestCount(provider.ID())
 			result, err := f(provider)
 			return []interface{}{result}, err
 		}, provider.ID()))
@@ -85,6 +147,8 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 
 	result := pm.circuitbreaker.Execute(cmd)
 	pm.setIsConnected(result.Error() == nil)
+
+	pm.logRequestCounts() // Log request counts periodically
 
 	if result.Error() != nil {
 		log.Error("Error fetching prices", "error", result.Error())
@@ -252,5 +316,21 @@ func (pm *Manager) GetOrFetchPrices(symbols []string, currencies []string, maxAg
 
 	prices := pm.getCachedPricesFor(symbols, currencies)
 
+	return prices, nil
+}
+
+func (pm *Manager) FetchPricesWithCache(symbols []string, currencies []string) (map[string]map[string]float64, error) {
+	cacheKey := fmt.Sprintf("prices:%s:%s", strings.Join(symbols, ","), strings.Join(currencies, ","))
+
+	if cached, found := pm.cache.Get(cacheKey); found {
+		return cached.(map[string]map[string]float64), nil
+	}
+
+	prices, err := pm.FetchPrices(symbols, currencies)
+	if err != nil {
+		return nil, err
+	}
+
+	pm.cache.Set(cacheKey, prices, cache.DefaultExpiration)
 	return prices, nil
 }
