@@ -453,8 +453,9 @@ migration:
 migration-check:
 	bash _assets/scripts/migration_check.sh
 
+commit-check: SHELL := /bin/sh
 commit-check:
-	bash _assets/scripts/commit_check.sh
+	@bash _assets/scripts/commit_check.sh
 
 tag-version:
 	bash _assets/scripts/tag_version.sh $(TARGET_COMMIT)
