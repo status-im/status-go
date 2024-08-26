@@ -503,7 +503,7 @@ func (m *Messenger) syncFiltersFrom(ms mailservers.Mailserver, filters []*transp
 				chatID = filter.ChatID
 			}
 
-			topicData, ok := topicsData[filter.PubsubTopic+filter.ContentTopic.String()]
+			topicData, ok := topicsData[fmt.Sprintf("%s-%s", filter.PubsubTopic, filter.ContentTopic)]
 			var capToDefaultSyncPeriod = true
 			if !ok {
 				if lastRequest == 0 {
