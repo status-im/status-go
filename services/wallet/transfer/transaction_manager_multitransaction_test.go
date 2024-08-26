@@ -319,7 +319,7 @@ func TestCreateMultiTransactionFromCommand(t *testing.T) {
 	var command *MultiTransactionCommand
 
 	// Test types that should get chainID from the data
-	mtTypes := []MultiTransactionType{MultiTransactionSend, MultiTransactionApprove, MultiTransactionSwap, MultiTransactionType(7)}
+	mtTypes := []MultiTransactionType{MultiTransactionSend, MultiTransactionApprove, MultiTransactionSwap, MultiTransactionBridge, MultiTransactionType(7)}
 
 	for _, mtType := range mtTypes {
 		fromAmount := hexutil.Big(*big.NewInt(1000000000000000000))
@@ -338,6 +338,13 @@ func TestCreateMultiTransactionFromCommand(t *testing.T) {
 		data = append(data, &pathprocessor.MultipathProcessorTxArgs{
 			ChainID: 1,
 		})
+
+		if mtType == MultiTransactionBridge {
+			data[0].HopTx = &pathprocessor.HopBridgeTxArgs{
+				ChainID:   1,
+				ChainIDTo: 2,
+			}
+		}
 
 		multiTransaction, err := tm.CreateMultiTransactionFromCommand(command, data)
 		if mtType > MultiTransactionApprove {
