@@ -349,6 +349,11 @@ func CreateAccountAndLogin(requestJSON string) string {
 	return makeJSONResponse(nil)
 }
 
+func AcceptTerms() string {
+	err := statusBackend.AcceptTerms()
+	return makeJSONResponse(err)
+}
+
 func LoginAccount(requestJSON string) string {
 	var request requests.Login
 	err := json.Unmarshal([]byte(requestJSON), &request)
