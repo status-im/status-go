@@ -374,14 +374,6 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/wak
 	grep -v /transactions/fake | \
 	grep -E -v '/waku(/.*|$$)' | \
 	grep -E -v '/wakuv2(/.*|$$)')
-test-unit: export UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE ?= \
-	github.com/status-im/status-go/api \
-	github.com/status-im/status-go/mailserver \
-	github.com/status-im/status-go/multiaccounts/settings \
-	github.com/status-im/status-go/node \
-	github.com/status-im/status-go/services/wakuext
-test-unit: export UNIT_TEST_PACKAGES_WITH_EXTENDED_TIMEOUT ?= \
-	github.com/status-im/status-go/protocol
 test-unit: ##@tests Run unit and integration tests
 	./_assets/scripts/run_unit_tests.sh
 

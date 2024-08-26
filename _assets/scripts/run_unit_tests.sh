@@ -23,9 +23,6 @@ if [[ -z "${UNIT_TEST_COUNT}" ]]; then
   UNIT_TEST_COUNT=1
 fi
 
-UNIT_TEST_PACKAGE_TIMEOUT="3m"
-UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED="45m"
-
 redirect_stdout() {
   output_file=$1
 
@@ -36,43 +33,14 @@ redirect_stdout() {
   fi
 }
 
-has_extended_timeout() {
-  local package
-  for package in ${UNIT_TEST_PACKAGES_WITH_EXTENDED_TIMEOUT}; do
-    if [[ "$1" == "${package}" ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
+run_test_for_packages() {
+  local output_file="test.log"
+  local coverage_file="test.coverage.out"
+  local report_file="report.xml"
+  local rerun_report_file="report_rerun_fails.txt"
+  local exit_code_file="exit_code.txt"
 
-is_parallelizable() {
-  local package
-  for package in ${UNIT_TEST_PACKAGES_NOT_PARALLELIZABLE}; do
-    if [[ "$1" == "${package}" ]]; then
-      return 1
-    fi
-  done
-  return 0
-}
-
-run_test_for_package() {
-  local package=$1
-  local iteration=$2
-  echo -e "${GRN}Testing:${RST} ${package} Iteration:${iteration}"
-  package_dir=$(go list -f "{{.Dir}}" "${package}")
-  output_file="${package_dir}/test_${iteration}.log"
-  coverage_file="${package_dir}/test_${iteration}.coverage.out"
-
-  if has_extended_timeout "${package}"; then
-    package_timeout="${UNIT_TEST_PACKAGE_TIMEOUT_EXTENDED}"
-  else
-    package_timeout="${UNIT_TEST_PACKAGE_TIMEOUT}"
-  fi
-
-  local report_file="${package_dir}/report_${iteration}.xml"
-  local rerun_report_file="${package_dir}/report_rerun_fails_${iteration}.txt"
-  local exit_code_file="${package_dir}/exit_code_${iteration}.txt"
+  echo -e "${GRN}Testing:${RST} All packages. Single iteration. -test.count=${UNIT_TEST_COUNT}"
 
   gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"
   if [[ "${CI}" == 'true' ]]; then
@@ -80,24 +48,23 @@ run_test_for_package() {
   fi
 
   # Cleanup previous coverage reports
-  rm -f ${package_dir}/coverage.out.rerun.*
+  rm -f coverage.out.rerun.*
 
-  PACKAGE_DIR=${package_dir} gotestsum --packages="${package}" ${gotestsum_flags} --raw-command -- \
+  # Run tests
+  gotestsum --packages="${UNIT_TEST_PACKAGES}" ${gotestsum_flags} --raw-command -- \
     ./_assets/scripts/test-with-coverage.sh \
-    ${package} \
     -v ${GOTEST_EXTRAFLAGS} \
-    -timeout "${package_timeout}" \
-    -count 1 \
+    -timeout 45m \
     -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
 
   local go_test_exit=$?
 
   # Merge package coverage results
-  go run ./cmd/test-coverage-utils/gocovmerge.go ${package_dir}/coverage.out.rerun.* > ${coverage_file}
+  go run ./cmd/test-coverage-utils/gocovmerge.go coverage.out.rerun.* > ${coverage_file}
 
   # Cleanup coverage reports
-  rm -f ${package_dir}/coverage.out.rerun.*
+  rm -f coverage.out.rerun.*
 
   echo "${go_test_exit}" > "${exit_code_file}"
   if [[ "${go_test_exit}" -ne 0 ]]; then
@@ -113,26 +80,10 @@ if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
 	cc-test-reporter before-build
 fi
 
-echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
-
 rm -rf ./**/*.coverage.out
 
-for package in ${UNIT_TEST_PACKAGES}; do
-  for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-    if ! is_parallelizable "${package}" || [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
-      run_test_for_package "${package}" "${i}"
-      go_test_exit=$?
-      if [[ "$UNIT_TEST_FAILFAST" == 'true' ]]; then
-        if [[ "${go_test_exit}" -ne 0 ]]; then
-          exit "${go_test_exit}"
-        fi
-      fi
-    else
-      run_test_for_package "${package}" "${i}" &
-    fi
-  done
-  wait # Wait for all background jobs to finish
-done
+echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
+run_test_for_packages
 
 # Gather test coverage results
 rm -f c.out c-full.out
@@ -153,7 +104,7 @@ fi
 
 shopt -s globstar nullglob # Enable recursive globbing
 if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
-  for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do
+  for exit_code_file in "${GIT_ROOT}"/**/exit_code.txt; do
     read exit_code < "${exit_code_file}"
     if [[ "${exit_code}" -ne 0 ]]; then
       mkdir -p "${GIT_ROOT}/reports"
