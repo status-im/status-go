@@ -73,6 +73,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/telemetry"
+	"testing"
 )
 
 const (
@@ -2101,6 +2102,11 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec co
 }
 
 func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMessage) (common.RawMessage, error) {
+	if testing.Testing() && m.dispatchMessageTestCallback != nil {
+		m.dispatchMessageTestCallback(rawMessage)
+		return rawMessage, nil
+	}
+
 	var err error
 	var id []byte
 	logger := m.logger.With(zap.String("site", "dispatchMessage"), zap.String("chatID", rawMessage.LocalChatID))
