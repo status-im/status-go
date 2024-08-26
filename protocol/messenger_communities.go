@@ -1517,6 +1517,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 
 		rawMessage.ResendMethod = common.ResendMethodSendPrivate
 		rawMessage.ResendType = common.ResendTypeDataSync
+		// MVDS only supports sending encrypted message
 		rawMessage.SkipEncryptionLayer = false
 		rawMessage.ID = ""
 		rawMessage.Recipients = privMembersArray
@@ -4869,6 +4870,7 @@ func (m *Messenger) SendMessageToControlNode(community *communities.Community, r
 		m.logger.Debug("control node is different with community pubkey", zap.Any("control:", community.ControlNode()), zap.Any("communityPubkey:", community.PublicKey()))
 		rawMessage.ResendMethod = common.ResendMethodSendPrivate
 		rawMessage.ResendType = common.ResendTypeDataSync
+		// MVDS only supports sending encrypted message
 		rawMessage.SkipEncryptionLayer = false
 		rawMessage.Recipients = append(rawMessage.Recipients, community.ControlNode())
 		return m.sender.SendPrivate(context.Background(), community.ControlNode(), rawMessage)
