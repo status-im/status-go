@@ -13,11 +13,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/status-im/status-go/protocol/wakusync"
+	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/status-im/status-go/protocol/identity"
 
 	"github.com/status-im/status-go/eth-node/types"
-	waku2 "github.com/status-im/status-go/wakuv2"
 
 	"github.com/stretchr/testify/suite"
 
@@ -205,7 +205,7 @@ func WaitOnSignaledCommunityFound(m *Messenger, action func(), condition func(co
 	}
 }
 
-func WaitForConnectionStatus(s *suite.Suite, waku *waku2.Waku, action func() bool) {
+func WaitForConnectionStatus(s *suite.Suite, waku *wakuv2.NWaku, action func() bool) {
 	subscription := waku.SubscribeToConnStatusChanges()
 	defer subscription.Unsubscribe()
 
@@ -237,7 +237,7 @@ func hasAllPeers(m map[peer.ID]types.WakuV2Peer, checkSlice peer.IDSlice) bool {
 	return true
 }
 
-func WaitForPeersConnected(s *suite.Suite, waku *waku2.Waku, action func() peer.IDSlice) {
+func WaitForPeersConnected(s *suite.Suite, waku *wakuv2.NWaku, action func() peer.IDSlice) {
 	subscription := waku.SubscribeToConnStatusChanges()
 	defer subscription.Unsubscribe()
 

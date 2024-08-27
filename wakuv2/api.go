@@ -1,17 +1,17 @@
-// Copyright 2019 The Waku Library Authors.
+// Copyright 2019 The NWaku Library Authors.
 //
-// The Waku library is free software: you can redistribute it and/or modify
+// The NWaku library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The Waku library is distributed in the hope that it will be useful,
+// The NWaku library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty off
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the Waku library. If not, see <http://www.gnu.org/licenses/>.
+// along with the NWaku library. If not, see <http://www.gnu.org/licenses/>.
 //
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
@@ -52,14 +52,14 @@ var (
 // PublicWakuAPI provides the waku RPC service that can be
 // use publicly without security implications.
 type PublicWakuAPI struct {
-	w *Waku
+	w *NWaku
 
 	mu       sync.Mutex
 	lastUsed map[string]time.Time // keeps track when a filter was polled for the last time.
 }
 
 // NewPublicWakuAPI create a new RPC waku service.
-func NewPublicWakuAPI(w *Waku) *PublicWakuAPI {
+func NewPublicWakuAPI(w *NWaku) *PublicWakuAPI {
 	api := &PublicWakuAPI{
 		w:        w,
 		lastUsed: make(map[string]time.Time),
@@ -185,7 +185,7 @@ type NewMessage struct {
 	Priority     *int             `json:"priority"`
 }
 
-// Post posts a message on the Waku network.
+// Post posts a message on the NWaku network.
 // returns the hash of the message in case of success.
 func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
 	var (
@@ -252,7 +252,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Version:      &version,
 		ContentTopic: req.ContentTopic.ContentTopic(),
 		Timestamp:    proto.Int64(api.w.timestamp()),
-		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
+		Meta:         []byte{}, // TODO: empty for now. Once we use NWaku Archive v2, we should deprecate the timestamp and use an ULID here
 		Ephemeral:    &req.Ephemeral,
 	}
 

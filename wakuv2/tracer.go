@@ -11,7 +11,7 @@ import (
 
 // Trace implements EventTracer interface.
 // We use custom logging, because we want to base58-encode the peerIDs. And also make the messageIDs readable.
-func (w *Waku) Trace(evt *pubsub_pb.TraceEvent) {
+func (w *NWaku) Trace(evt *pubsub_pb.TraceEvent) {
 
 	f := []zap.Field{
 		zap.String("type", evt.Type.String()),

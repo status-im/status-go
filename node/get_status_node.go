@@ -119,18 +119,19 @@ type StatusNode struct {
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         *timesource.NTPTimeSource
-	wakuSrvc               *waku.Waku
-	wakuExtSrvc            *wakuext.Service
-	wakuV2Srvc             *wakuv2.Waku
-	wakuV2ExtSrvc          *wakuv2ext.Service
-	ensSrvc                *ens.Service
-	communityTokensSrvc    *communitytokens.Service
-	gifSrvc                *gif.Service
-	stickersSrvc           *stickers.Service
-	chatSrvc               *chat.Service
-	updatesSrvc            *updates.Service
-	pendingTracker         *transactions.PendingTxTracker
-	connectorSrvc          *connector.Service
+	// nwakuSrvc              *
+	wakuSrvc            *waku.Waku
+	wakuExtSrvc         *wakuext.Service
+	wakuV2Srvc          *wakuv2.NWaku
+	wakuV2ExtSrvc       *wakuv2ext.Service
+	ensSrvc             *ens.Service
+	communityTokensSrvc *communitytokens.Service
+	gifSrvc             *gif.Service
+	stickersSrvc        *stickers.Service
+	chatSrvc            *chat.Service
+	updatesSrvc         *updates.Service
+	pendingTracker      *transactions.PendingTxTracker
+	connectorSrvc       *connector.Service
 
 	walletFeed event.Feed
 }

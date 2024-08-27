@@ -10,15 +10,15 @@ import (
 )
 
 type Parameters struct {
-	selectedPeer      peer.ID
-	peerAddr          multiaddr.Multiaddr
-	peerSelectionType peermanager.PeerSelection
-	preferredPeers    peer.IDSlice
-	requestID         []byte
-	cursor            []byte
-	pageLimit         uint64
-	forward           bool
-	includeData       bool
+	SelectedPeer      peer.ID
+	PeerAddr          multiaddr.Multiaddr
+	PeerSelectionType peermanager.PeerSelection
+	PreferredPeers    peer.IDSlice
+	RequestID         []byte
+	Cursor            []byte
+	PageLimit         uint64
+	Forward           bool
+	IncludeData       bool
 }
 
 type RequestOption func(*Parameters) error
@@ -27,8 +27,8 @@ type RequestOption func(*Parameters) error
 // Note that this option is mutually exclusive to WithPeerAddr, only one of them can be used.
 func WithPeer(p peer.ID) RequestOption {
 	return func(params *Parameters) error {
-		params.selectedPeer = p
-		if params.peerAddr != nil {
+		params.SelectedPeer = p
+		if params.PeerAddr != nil {
 			return errors.New("WithPeer and WithPeerAddr options are mutually exclusive")
 		}
 		return nil
@@ -40,8 +40,8 @@ func WithPeer(p peer.ID) RequestOption {
 // Note that this option is mutually exclusive to WithPeerAddr, only one of them can be used.
 func WithPeerAddr(pAddr multiaddr.Multiaddr) RequestOption {
 	return func(params *Parameters) error {
-		params.peerAddr = pAddr
-		if params.selectedPeer != "" {
+		params.PeerAddr = pAddr
+		if params.SelectedPeer != "" {
 			return errors.New("WithPeerAddr and WithPeer options are mutually exclusive")
 		}
 		return nil
@@ -55,8 +55,8 @@ func WithPeerAddr(pAddr multiaddr.Multiaddr) RequestOption {
 // Note: This option is avaiable only with peerManager
 func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) RequestOption {
 	return func(params *Parameters) error {
-		params.peerSelectionType = peermanager.Automatic
-		params.preferredPeers = fromThesePeers
+		params.PeerSelectionType = peermanager.Automatic
+		params.PreferredPeers = fromThesePeers
 		return nil
 	}
 }
@@ -68,7 +68,7 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) RequestOption {
 // Note: This option is avaiable only with peerManager
 func WithFastestPeerSelection(fromThesePeers ...peer.ID) RequestOption {
 	return func(params *Parameters) error {
-		params.peerSelectionType = peermanager.LowestRTT
+		params.PeerSelectionType = peermanager.LowestRTT
 		return nil
 	}
 }
@@ -77,7 +77,7 @@ func WithFastestPeerSelection(fromThesePeers ...peer.ID) RequestOption {
 // creating a store request
 func WithRequestID(requestID []byte) RequestOption {
 	return func(params *Parameters) error {
-		params.requestID = requestID
+		params.RequestID = requestID
 		return nil
 	}
 }
@@ -86,14 +86,14 @@ func WithRequestID(requestID []byte) RequestOption {
 // when creating a store request
 func WithAutomaticRequestID() RequestOption {
 	return func(params *Parameters) error {
-		params.requestID = protocol.GenerateRequestID()
+		params.RequestID = protocol.GenerateRequestID()
 		return nil
 	}
 }
 
 func WithCursor(cursor []byte) RequestOption {
 	return func(params *Parameters) error {
-		params.cursor = cursor
+		params.Cursor = cursor
 		return nil
 	}
 }
@@ -101,8 +101,8 @@ func WithCursor(cursor []byte) RequestOption {
 // WithPaging is an option used to specify the order and maximum number of records to return
 func WithPaging(forward bool, limit uint64) RequestOption {
 	return func(params *Parameters) error {
-		params.forward = forward
-		params.pageLimit = limit
+		params.Forward = forward
+		params.PageLimit = limit
 		return nil
 	}
 }
@@ -110,7 +110,7 @@ func WithPaging(forward bool, limit uint64) RequestOption {
 // IncludeData is an option used to indicate whether you want to return the message content or not
 func IncludeData(v bool) RequestOption {
 	return func(params *Parameters) error {
-		params.includeData = v
+		params.IncludeData = v
 		return nil
 	}
 }

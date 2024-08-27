@@ -1,13 +1,13 @@
 package wakuv2
 
 import (
+	"encoding/json"
 	"errors"
 
 	"go.uber.org/zap"
 
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
@@ -35,7 +35,7 @@ func (pm PublishMethod) String() string {
 
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
-func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]byte, error) {
+func (w *NWaku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]byte, error) {
 	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
 	if w.protectedTopicStore != nil {
 		privKey, err := w.protectedTopicStore.FetchPrivateKey(pubsubTopic)
@@ -77,7 +77,7 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]b
 	return envelope.Hash().Bytes(), nil
 }
 
-func (w *Waku) broadcast() {
+func (w *NWaku) broadcast() {
 	for {
 		var envelope *protocol.Envelope
 
@@ -103,15 +103,30 @@ func (w *Waku) broadcast() {
 			publishMethod = LightPush
 			fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 				logger.Info("publishing message via lightpush")
-				_, err := w.node.Lightpush().Publish(w.ctx, env.Message(), lightpush.WithPubSubTopic(env.PubsubTopic()), lightpush.WithMaxPeers(peersToPublishForLightpush))
+				jsonMsg, err := json.Marshal(env.Message())
+				if err != nil {
+					return err
+				}
+				_, err = w.WakuLightpushPublish(string(jsonMsg), env.PubsubTopic())
 				return err
 			}
 		} else {
 			publishMethod = Relay
 			fn = func(env *protocol.Envelope, logger *zap.Logger) error {
-				peerCnt := len(w.node.Relay().PubSub().ListPeers(env.PubsubTopic()))
+				peerCnt, err := w.ListPeersInMesh(env.PubsubTopic())
+				if err != nil {
+					return err
+				}
+
 				logger.Info("publishing message via relay", zap.Int("peerCnt", peerCnt))
-				_, err := w.node.Relay().Publish(w.ctx, env.Message(), relay.WithPubSubTopic(env.PubsubTopic()))
+				timeoutMs := 1000
+				msg, err := json.Marshal(env.Message())
+
+				if err != nil {
+					return err
+				}
+
+				_, err = w.WakuRelayPublish(env.PubsubTopic(), string(msg), timeoutMs)
 				return err
 			}
 		}
@@ -138,7 +153,7 @@ func (w *Waku) broadcast() {
 	}
 }
 
-func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publish.PublishFn, logger *zap.Logger) {
+func (w *NWaku) publishEnvelope(envelope *protocol.Envelope, publishFn publish.PublishFn, logger *zap.Logger) {
 	defer w.wg.Done()
 
 	if err := publishFn(envelope, logger); err != nil {

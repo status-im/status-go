@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -264,7 +263,7 @@ func (b *StatusNode) WakuExtService() *wakuext.Service {
 func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
 	return b.wakuV2ExtSrvc
 }
-func (b *StatusNode) WakuV2Service() *wakuv2.Waku {
+func (b *StatusNode) WakuV2Service() *wakuv2.NWaku {
 	return b.wakuV2Srvc
 }
 
@@ -316,7 +315,7 @@ func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.
 
 }
 
-func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku, error) {
+func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.NWaku, error) {
 	if b.wakuV2Srvc == nil {
 		cfg := &wakuv2.Config{
 			MaxMessageSize:                         wakucommon.DefaultMaxMessageSize,
@@ -333,7 +332,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			Nameserver:                             nodeConfig.WakuV2Config.Nameserver,
 			UDPPort:                                nodeConfig.WakuV2Config.UDPPort,
 			AutoUpdate:                             nodeConfig.WakuV2Config.AutoUpdate,
-			DefaultShardPubsubTopic:                shard.DefaultShardPubsubTopic(),
+			DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
 			TelemetryServerURL:                     nodeConfig.WakuV2Config.TelemetryServerURL,
 			ClusterID:                              nodeConfig.ClusterConfig.ClusterID,
 			EnableMissingMessageVerification:       nodeConfig.WakuV2Config.EnableMissingMessageVerification,

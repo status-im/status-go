@@ -113,40 +113,40 @@ func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...Requ
 	}
 
 	//Add Peer to peerstore.
-	if s.pm != nil && params.peerAddr != nil {
-		pData, err := s.pm.AddPeer(params.peerAddr, peerstore.Static, pubsubTopics, StoreQueryID_v300)
+	if s.pm != nil && params.PeerAddr != nil {
+		pData, err := s.pm.AddPeer(params.PeerAddr, peerstore.Static, pubsubTopics, StoreQueryID_v300)
 		if err != nil {
 			return nil, err
 		}
 		s.pm.Connect(pData)
-		params.selectedPeer = pData.AddrInfo.ID
+		params.SelectedPeer = pData.AddrInfo.ID
 	}
 
-	if s.pm != nil && params.selectedPeer == "" {
+	if s.pm != nil && params.SelectedPeer == "" {
 		if isFilterCriteria {
 			selectedPeers, err := s.pm.SelectPeers(
 				peermanager.PeerSelectionCriteria{
-					SelectionType: params.peerSelectionType,
+					SelectionType: params.PeerSelectionType,
 					Proto:         StoreQueryID_v300,
 					PubsubTopics:  []string{filterCriteria.PubsubTopic},
-					SpecificPeers: params.preferredPeers,
+					SpecificPeers: params.PreferredPeers,
 					Ctx:           ctx,
 				},
 			)
 			if err != nil {
 				return nil, err
 			}
-			params.selectedPeer = selectedPeers[0]
+			params.SelectedPeer = selectedPeers[0]
 		} else {
 			return nil, ErrMustSelectPeer
 		}
 	}
 
-	if params.selectedPeer == "" {
+	if params.SelectedPeer == "" {
 		return nil, ErrNoPeersAvailable
 	}
 
-	pageLimit := params.pageLimit
+	pageLimit := params.PageLimit
 	if pageLimit == 0 {
 		pageLimit = DefaultPageSize
 	} else if pageLimit > uint64(MaxPageSize) {
@@ -154,16 +154,16 @@ func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...Requ
 	}
 
 	storeRequest := &pb.StoreQueryRequest{
-		RequestId:         hex.EncodeToString(params.requestID),
-		IncludeData:       params.includeData,
-		PaginationForward: params.forward,
+		RequestId:         hex.EncodeToString(params.RequestID),
+		IncludeData:       params.IncludeData,
+		PaginationForward: params.Forward,
 		PaginationLimit:   proto.Uint64(pageLimit),
 	}
 
 	criteria.PopulateStoreRequest(storeRequest)
 
-	if params.cursor != nil {
-		storeRequest.PaginationCursor = params.cursor
+	if params.Cursor != nil {
+		storeRequest.PaginationCursor = params.Cursor
 	}
 
 	err := storeRequest.Validate()
@@ -171,7 +171,7 @@ func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...Requ
 		return nil, err
 	}
 
-	response, err := s.queryFrom(ctx, storeRequest, params.selectedPeer)
+	response, err := s.queryFrom(ctx, storeRequest, params.SelectedPeer)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...Requ
 		messages:      response.Messages,
 		storeRequest:  storeRequest,
 		storeResponse: response,
-		peerID:        params.selectedPeer,
+		peerID:        params.SelectedPeer,
 		cursor:        response.PaginationCursor,
 	}
 
