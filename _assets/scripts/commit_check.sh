@@ -19,7 +19,6 @@ parse_commits() {
             # Check for breaking changes
             if [[ ${BASH_REMATCH[3]} == *'!'* ]]; then
                 is_breaking_change=true
-                break # FIXME: This break shouldn't be here
             fi
         else
             echo "Commit message \"$message\" is not well-formed"
