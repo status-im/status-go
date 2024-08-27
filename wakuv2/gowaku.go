@@ -1,3 +1,6 @@
+//go:build !use_nwaku
+// +build !use_nwaku
+
 // Copyright 2019 The Waku Library Authors.
 //
 // The Waku library is free software: you can redistribute it and/or modify
@@ -1624,8 +1627,8 @@ func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 	}, nil
 }
 
-func (w *Waku) ListenAddresses() []multiaddr.Multiaddr {
-	return w.node.ListenAddresses()
+func (w *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
+	return w.node.ListenAddresses(), nil
 }
 
 func (w *Waku) ENR() (*enode.Node, error) {
@@ -1878,20 +1881,12 @@ func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
 	return w.node.SetDiscV5Bootnodes(bootnodes)
 }
 
-func (w *Waku) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, store.StoreQueryID_v300)
-	if err != nil {
-		return "", err
-	}
-	return peerID, nil
-}
-
 func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
 }
 
 func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer([]multiaddr.Multiaddr{address}, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}
@@ -2008,4 +2003,9 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 
 func (w *Waku) LegacyStoreNode() legacy_store.Store {
 	return w.node.LegacyStore()
+}
+
+func (w *Waku) ListPeersInMesh(pubsubTopic string) (int, error) {
+	listPeers := w.node.Relay().PubSub().ListPeers(pubsubTopic)
+	return len(listPeers), nil
 }

@@ -338,6 +338,24 @@ func (m *StorenodeCycle) GetActiveStorenode() peer.ID {
 	return m.activeStorenode
 }
 
+func (m *StorenodeCycle) GetActiveStorenodePeerInfo() peer.AddrInfo {
+	m.RLock()
+	defer m.RUnlock()
+
+	storeNodes, err := m.storenodeConfigProvider.Storenodes()
+	if err != nil {
+		return peer.AddrInfo{}
+	}
+
+	for _, p := range storeNodes {
+		if p.ID == m.activeStorenode {
+			return p
+		}
+	}
+
+	return peer.AddrInfo{}
+}
+
 func (m *StorenodeCycle) IsStorenodeAvailable(peerID peer.ID) bool {
 	return m.storenodeStatus(peerID) == connected
 }
