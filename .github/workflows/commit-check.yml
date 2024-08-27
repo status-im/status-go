@@ -1,0 +1,81 @@
+name: "Conventional Commits"
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+jobs:
+  main:
+    name: Validate format
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.GITHUB_HEAD_REF }}
+          fetch-tags: true
+
+      - name: Fetch tags
+        run: |
+          git fetch --tags --quiet
+          git checkout origin/${GITHUB_HEAD_REF}
+
+      - name: Check commit message
+        id: check_commit_message
+        run: |
+          set +e
+
+          output=$(./_assets/scripts/commit_check.sh 2>&1)          
+          exit_code=$?
+          echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
+          
+          if [[ $exit_code -ne 0 ]]; then
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "error_message<<$EOF" >> "$GITHUB_ENV"
+            echo "$output" >> "$GITHUB_ENV"
+            echo "$EOF" >> "$GITHUB_ENV"
+          else
+            has_breaking_changes=$(echo "$output" | sed -n '2p')
+            echo "has_breaking_changes=$has_breaking_changes" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "Publish failed commit messages"
+        uses: marocchino/sticky-pull-request-comment@v2
+        # When the previous steps fails, the workflow would stop. By adding this
+        # condition you can continue the execution with the populated error message.
+        if: always() && (steps.check_commit_message.outputs.exit_code != 0)
+        with:
+          header: commit-message-lint-error
+          message: |
+            Thank you for opening this pull request!
+            
+            We require commits to follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/), but with `_` for non-breaking changes. 
+            And it looks like your PR needs to be adjusted.
+
+            Details:
+            ```
+            ${{ env.error_message }}
+            ```
+
+      - name: "Publish breaking changes message"
+        uses: marocchino/sticky-pull-request-comment@v2
+        # When the previous steps fails, the workflow would stop. By adding this
+        # condition you can continue the execution with the populated error message.
+        if: always() && (steps.check_commit_message.outputs.exit_code == 0 && steps.check_commit_message.outputs.has_breaking_changes == 'true')
+        with:
+          header: commit-message-lint-error
+          message: |
+            Thank you for opening this pull request!
+            
+            Looks like you have BREAKING CHANGES in your PR. 
+            Please make sure to update [status-desktop](https://github.com/status-im/status-desktop) and [status-mobile](https://github.com/status-im/status-mobile) clients accordingly.
+
+      # Delete a previous comment when the issue has been resolved
+      - name: "Delete previous comment"
+        if: ${{ steps.check_commit_message.outputs.exit_code == 0 && steps.check_commit_message.outputs.has_breaking_changes == 'false' }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: commit-message-lint-error
+          delete: true
