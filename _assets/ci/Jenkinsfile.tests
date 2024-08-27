@@ -99,18 +99,6 @@ pipeline {
       } }
     }
 
-    stage('Commit') {
-      environment {
-        BASE_BRANCH = "${env.BASE_BRANCH}"
-      }
-      when { // https://github.com/status-im/status-go/issues/4993#issuecomment-2022685544
-        expression { !isTestNightlyJob() }
-      }
-      steps { script {
-        nix.shell('make commit-check', pure: false)
-      } }
-    }
-
     stage('Lint') {
       steps { script {
         nix.shell('make lint', pure: true)
