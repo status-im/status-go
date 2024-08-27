@@ -1,3 +1,6 @@
+//go:build !use_nwaku
+// +build !use_nwaku
+
 // Copyright 2019 The Waku Library Authors.
 //
 // The Waku library is free software: you can redistribute it and/or modify
@@ -1575,8 +1578,8 @@ func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 	}, nil
 }
 
-func (w *Waku) ListenAddresses() []multiaddr.Multiaddr {
-	return w.node.ListenAddresses()
+func (w *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
+	return w.node.ListenAddresses(), nil
 }
 
 func (w *Waku) ENR() (*enode.Node, error) {
@@ -1946,4 +1949,25 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 
 func (w *Waku) LegacyStoreNode() legacy_store.Store {
 	return w.node.LegacyStore()
+}
+
+func (w *Waku) WakuLightpushPublish(message *pb.WakuMessage, pubsubTopic string) (string, error) {
+	msgHash, err := w.node.Lightpush().Publish(w.ctx, message, lightpush.WithPubSubTopic(pubsubTopic))
+	if err != nil {
+		return "", err
+	}
+	return msgHash.String(), nil
+}
+
+func (w *Waku) WakuRelayPublish(message *pb.WakuMessage, pubsubTopic string) (string, error) {
+	msgHash, err := w.node.Relay().Publish(w.ctx, message, relay.WithPubSubTopic(pubsubTopic))
+	if err != nil {
+		return "", err
+	}
+	return msgHash.String(), nil
+}
+
+func (w *Waku) ListPeersInMesh(pubsubTopic string) (int, error) {
+	listPeers := w.node.Relay().PubSub().ListPeers(pubsubTopic)
+	return len(listPeers), nil
 }

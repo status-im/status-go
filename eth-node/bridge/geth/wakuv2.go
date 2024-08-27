@@ -227,7 +227,7 @@ func (w *gethWakuV2Wrapper) DialPeerByID(peerID peer.ID) error {
 }
 
 func (w *gethWakuV2Wrapper) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return w.waku.ListenAddresses(), nil
+	return w.waku.ListenAddresses()
 }
 
 func (w *gethWakuV2Wrapper) RelayPeersByTopic(topic string) (*types.PeerList, error) {
