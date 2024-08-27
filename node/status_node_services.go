@@ -12,7 +12,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -338,7 +337,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			Nameserver:                             nodeConfig.WakuV2Config.Nameserver,
 			UDPPort:                                nodeConfig.WakuV2Config.UDPPort,
 			AutoUpdate:                             nodeConfig.WakuV2Config.AutoUpdate,
-			DefaultShardPubsubTopic:                shard.DefaultShardPubsubTopic(),
+			DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
 			TelemetryServerURL:                     nodeConfig.WakuV2Config.TelemetryServerURL,
 			ClusterID:                              nodeConfig.ClusterConfig.ClusterID,
 			EnableMissingMessageVerification:       nodeConfig.WakuV2Config.EnableMissingMessageVerification,

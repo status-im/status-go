@@ -38,13 +38,13 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -1738,7 +1738,7 @@ func (m *Messenger) InitFilters() error {
 	logger := m.logger.With(zap.String("site", "Init"))
 
 	// Community requests will arrive in this pubsub topic
-	err := m.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
+	err := m.SubscribeToPubsubTopic(wakuv2.DefaultNonProtectedPubsubTopic(), nil)
 	if err != nil {
 		return err
 	}
