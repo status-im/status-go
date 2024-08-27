@@ -30,6 +30,8 @@ const (
 	charCodeBlock  = "`"
 
 	intUnknown = -1
+
+	suggestionsLimit = 10
 )
 
 var (
@@ -370,7 +372,7 @@ func (m *MentionManager) calculateSuggestionsWithMentionableUsers(chatID string,
 		searchedText := strings.ToLower(subs(fullText, atSignIdx+1, end))
 		m.logger.Debug("calculateSuggestionsWithMentionableUsers", zap.Int("atSignIdx", atSignIdx), zap.String("searchedText", searchedText), zap.String("fullText", fullText), zap.Any("state", state), zap.Int("end", end))
 		if end-atSignIdx <= 100 {
-			suggestions = getUserSuggestions(mentionableUsers, searchedText, -1)
+			suggestions = getUserSuggestions(mentionableUsers, searchedText, suggestionsLimit)
 		}
 	}
 
@@ -729,7 +731,7 @@ func matchMention(text string, users map[string]*MentionableUser, mentionKeyIdx 
 			searchedText = string(tt[:lastChar])
 		}
 
-		userSuggestions := getUserSuggestions(users, searchedText, -1)
+		userSuggestions := getUserSuggestions(users, searchedText, suggestionsLimit)
 		userSuggestionsCnt := len(userSuggestions)
 		switch {
 		case userSuggestionsCnt == 0:
