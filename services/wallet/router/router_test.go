@@ -10,7 +10,9 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/helpers"
 
@@ -58,7 +60,7 @@ func amountOptionsMapsEqual(map1, map2 map[uint64][]amountOption) bool {
 	return true
 }
 
-func assertPathsEqual(t *testing.T, expected, actual []*Path) {
+func assertPathsEqual(t *testing.T, expected, actual routes.Route) {
 	assert.Equal(t, len(expected), len(actual))
 	if len(expected) == 0 {
 		return
@@ -124,19 +126,19 @@ func setupRouter(t *testing.T) (*Router, func()) {
 	return router, cleanTmpDb
 }
 
-type suggestedRoutesResponseEnvelope struct {
-	Type   string                  `json:"type"`
-	Routes SuggestedRoutesResponse `json:"event"`
+type routerSuggestedRoutesEnvelope struct {
+	Type   string                          `json:"type"`
+	Routes responses.RouterSuggestedRoutes `json:"event"`
 }
 
-func setupSignalHandler(t *testing.T) (chan SuggestedRoutesResponse, func()) {
-	suggestedRoutesCh := make(chan SuggestedRoutesResponse)
+func setupSignalHandler(t *testing.T) (chan responses.RouterSuggestedRoutes, func()) {
+	suggestedRoutesCh := make(chan responses.RouterSuggestedRoutes)
 	signalHandler := signal.MobileSignalHandler(func(data []byte) {
 		var envelope signal.Envelope
 		err := json.Unmarshal(data, &envelope)
 		assert.NoError(t, err)
 		if envelope.Type == string(signal.SuggestedRoutes) {
-			var response suggestedRoutesResponseEnvelope
+			var response routerSuggestedRoutesEnvelope
 			err := json.Unmarshal(data, &response)
 			assert.NoError(t, err)
 

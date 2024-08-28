@@ -1,4 +1,4 @@
-package router
+package routes
 
 import (
 	"math"
@@ -8,80 +8,10 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 )
 
-type Graph []*Node
+type Route []*Path
 
-type Node struct {
-	Path     *Path
-	Children Graph
-}
-
-func newNode(path *Path) *Node {
-	return &Node{Path: path, Children: make(Graph, 0)}
-}
-
-func buildGraph(AmountIn *big.Int, routes []*Path, level int, sourceChainIDs []uint64) Graph {
-	graph := make(Graph, 0)
-	for _, route := range routes {
-		found := false
-		for _, chainID := range sourceChainIDs {
-			if chainID == route.FromChain.ChainID {
-				found = true
-				break
-			}
-		}
-		if found {
-			continue
-		}
-		node := newNode(route)
-
-		newRoutes := make([]*Path, 0)
-		for _, r := range routes {
-			if route.Equal(r) {
-				continue
-			}
-			newRoutes = append(newRoutes, r)
-		}
-
-		newAmountIn := new(big.Int).Sub(AmountIn, route.AmountIn.ToInt())
-		if newAmountIn.Sign() > 0 {
-			newSourceChainIDs := make([]uint64, len(sourceChainIDs))
-			copy(newSourceChainIDs, sourceChainIDs)
-			newSourceChainIDs = append(newSourceChainIDs, route.FromChain.ChainID)
-			node.Children = buildGraph(newAmountIn, newRoutes, level+1, newSourceChainIDs)
-
-			if len(node.Children) == 0 {
-				continue
-			}
-		}
-
-		graph = append(graph, node)
-	}
-
-	return graph
-}
-
-func (n Node) buildAllRoutes() [][]*Path {
-	res := make([][]*Path, 0)
-
-	if len(n.Children) == 0 && n.Path != nil {
-		res = append(res, []*Path{n.Path})
-	}
-
-	for _, node := range n.Children {
-		for _, route := range node.buildAllRoutes() {
-			extendedRoute := route
-			if n.Path != nil {
-				extendedRoute = append([]*Path{n.Path}, route...)
-			}
-			res = append(res, extendedRoute)
-		}
-	}
-
-	return res
-}
-
-func findBest(routes [][]*Path, tokenPrice float64, nativeTokenPrice float64) []*Path {
-	var best []*Path
+func FindBestRoute(routes []Route, tokenPrice float64, nativeTokenPrice float64) Route {
+	var best Route
 	bestCost := big.NewFloat(math.Inf(1))
 	for _, route := range routes {
 		currentCost := big.NewFloat(0)
