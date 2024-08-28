@@ -70,18 +70,6 @@ func (s *SuggestedFees) feeFor(mode GasFeeMode) *big.Int {
 	return s.MaxFeesLevels.feeFor(mode)
 }
 
-func (s *SuggestedFeesGwei) feeFor(mode GasFeeMode) *big.Float {
-	if mode == GasFeeLow {
-		return s.MaxFeePerGasLow
-	}
-
-	if mode == GasFeeHigh {
-		return s.MaxFeePerGasHigh
-	}
-
-	return s.MaxFeePerGasMedium
-}
-
 const inclusionThreshold = 0.95
 
 type TransactionEstimation int
@@ -114,11 +102,6 @@ func weiToGwei(val *big.Int) *big.Float {
 
 func gweiToEth(val *big.Float) *big.Float {
 	return new(big.Float).Quo(val, big.NewFloat(1000000000))
-}
-
-func gweiToWei(val *big.Float) *big.Int {
-	res, _ := new(big.Float).Mul(val, big.NewFloat(1000000000)).Int(nil)
-	return res
 }
 
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {

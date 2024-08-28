@@ -14,12 +14,18 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/token"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/transactions"
 )
 
 const (
@@ -167,6 +173,53 @@ type GraphV2 []*NodeV2
 type NodeV2 struct {
 	Path     *PathV2
 	Children GraphV2
+}
+
+type Router struct {
+	rpcClient           *rpc.Client
+	tokenManager        *token.Manager
+	marketManager       *market.Manager
+	collectiblesService *collectibles.Service
+	collectiblesManager *collectibles.Manager
+	ensService          *ens.Service
+	stickersService     *stickers.Service
+	feesManager         *FeeManager
+	pathProcessors      map[string]pathprocessor.PathProcessor
+	scheduler           *async.Scheduler
+}
+
+func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager, marketManager *market.Manager,
+	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager, ensService *ens.Service, stickersService *stickers.Service) *Router {
+	processors := make(map[string]pathprocessor.PathProcessor)
+
+	return &Router{
+		rpcClient:           rpcClient,
+		tokenManager:        tokenManager,
+		marketManager:       marketManager,
+		collectiblesService: collectibles,
+		collectiblesManager: collectiblesManager,
+		ensService:          ensService,
+		stickersService:     stickersService,
+		feesManager:         &FeeManager{rpcClient},
+		pathProcessors:      processors,
+		scheduler:           async.NewScheduler(),
+	}
+}
+
+func (r *Router) AddPathProcessor(processor pathprocessor.PathProcessor) {
+	r.pathProcessors[processor.Name()] = processor
+}
+
+func (r *Router) Stop() {
+	r.scheduler.Stop()
+}
+
+func (r *Router) GetFeesManager() *FeeManager {
+	return r.feesManager
+}
+
+func (r *Router) GetPathProcessors() map[string]pathprocessor.PathProcessor {
+	return r.pathProcessors
 }
 
 func newSuggestedRoutesV2(
