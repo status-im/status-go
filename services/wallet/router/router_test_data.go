@@ -202,7 +202,7 @@ var defaultNetworks = []params.Network{
 type normalTestParams struct {
 	name               string
 	input              *RouteInputParams
-	expectedCandidates []*PathV2
+	expectedCandidates []*Path
 	expectedError      *errors.ErrorResponse
 }
 
@@ -246,7 +246,7 @@ func getNormalTestParamsList() []normalTestParams {
 				Code:    errors.GenericErrorCode,
 				Details: fmt.Sprintf("failed with 50000000 gas: insufficient funds for gas * price + value: address %s", common.HexToAddress("0x1")),
 			},
-			expectedCandidates: []*PathV2{},
+			expectedCandidates: []*Path{},
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - 0 AmountIn",
@@ -275,7 +275,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &mainnet,
@@ -323,7 +323,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &mainnet,
@@ -409,7 +409,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &mainnet,
@@ -459,7 +459,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &optimism,
@@ -528,7 +528,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &arbitrum,
@@ -578,7 +578,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &optimism,
@@ -647,7 +647,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &arbitrum,
@@ -686,7 +686,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
@@ -725,7 +725,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &arbitrum,
@@ -764,7 +764,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &mainnet,
@@ -821,7 +821,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
@@ -862,7 +862,7 @@ func getNormalTestParamsList() []normalTestParams {
 				},
 			},
 			expectedError:      ErrNoBestRouteFound,
-			expectedCandidates: []*PathV2{},
+			expectedCandidates: []*Path{},
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - Single Chain LockedAmount",
@@ -895,7 +895,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &mainnet,
@@ -994,7 +994,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &optimism,
@@ -1050,7 +1050,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &mainnet,
@@ -1149,7 +1149,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &mainnet,
@@ -1249,7 +1249,7 @@ func getNormalTestParamsList() []normalTestParams {
 				},
 			},
 			expectedError:      ErrLockedAmountLessThanSendAmountAllNetworks,
-			expectedCandidates: []*PathV2{},
+			expectedCandidates: []*Path{},
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - LockedAmount exceeds sending amount",
@@ -1284,7 +1284,7 @@ func getNormalTestParamsList() []normalTestParams {
 				},
 			},
 			expectedError:      ErrLockedAmountExceedsTotalSendAmount,
-			expectedCandidates: []*PathV2{},
+			expectedCandidates: []*Path{},
 		},
 		{
 			name: "ERC20 transfer - No Specific FromChain - No Specific ToChain",
@@ -1314,7 +1314,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &mainnet,
@@ -1400,7 +1400,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &mainnet,
@@ -1450,7 +1450,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &optimism,
@@ -1518,7 +1518,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &arbitrum,
@@ -1568,7 +1568,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &optimism,
@@ -1637,7 +1637,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &arbitrum,
@@ -1676,7 +1676,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
@@ -1715,7 +1715,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &arbitrum,
@@ -1754,7 +1754,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &mainnet,
@@ -1811,7 +1811,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
@@ -1851,7 +1851,7 @@ func getNormalTestParamsList() []normalTestParams {
 				},
 			},
 			expectedError:      ErrNoBestRouteFound,
-			expectedCandidates: []*PathV2{},
+			expectedCandidates: []*Path{},
 		},
 		{
 			name: "ERC20 transfer - All FromChains - No Locked Amount - Enough Token Balance Across All Chains",
@@ -1881,7 +1881,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorTransferName,
 					FromChain:        &mainnet,
@@ -2080,7 +2080,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
@@ -2148,7 +2148,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &optimism,
@@ -2192,7 +2192,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
@@ -2248,7 +2248,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
@@ -2292,7 +2292,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &optimism,
@@ -2350,7 +2350,7 @@ func getNormalTestParamsList() []normalTestParams {
 				},
 			},
 			expectedError:      ErrNoBestRouteFound,
-			expectedCandidates: []*PathV2{},
+			expectedCandidates: []*Path{},
 		},
 		{
 			name: "Bridge - Specific Single FromChain - Specific Single ToChain - Different Chains",
@@ -2382,7 +2382,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
@@ -2422,7 +2422,7 @@ func getNormalTestParamsList() []normalTestParams {
 				},
 			},
 			expectedError:      ErrNoBestRouteFound,
-			expectedCandidates: []*PathV2{},
+			expectedCandidates: []*Path{},
 		},
 		{
 			name: "Bridge - Specific Multiple FromChain - Specific Multiple ToChain - Multiple Common Chains",
@@ -2454,7 +2454,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
@@ -2499,7 +2499,7 @@ func getNormalTestParamsList() []normalTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
@@ -2539,7 +2539,7 @@ func getNormalTestParamsList() []normalTestParams {
 				},
 			},
 			expectedError:      ErrNoBestRouteFound,
-			expectedCandidates: []*PathV2{},
+			expectedCandidates: []*Path{},
 		},
 		{
 			name: "ETH transfer - Not Enough Native Balance",
@@ -2574,7 +2574,7 @@ func getNormalTestParamsList() []normalTestParams {
 				Code:    ErrNotEnoughNativeBalance.Code,
 				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.EthereumMainnet),
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
@@ -2616,7 +2616,7 @@ func getNormalTestParamsList() []normalTestParams {
 				Code:    ErrNotEnoughTokenBalance.Code,
 				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, pathprocessor.UsdcSymbol, walletCommon.EthereumMainnet),
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
@@ -2656,7 +2656,7 @@ func getNormalTestParamsList() []normalTestParams {
 				},
 			},
 			expectedError: ErrLowAmountInForHopBridge,
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
@@ -2671,8 +2671,8 @@ func getNormalTestParamsList() []normalTestParams {
 type noBalanceTestParams struct {
 	name               string
 	input              *RouteInputParams
-	expectedCandidates []*PathV2
-	expectedBest       []*PathV2
+	expectedCandidates []*Path
+	expectedBest       []*Path
 	expectedError      *errors.ErrorResponse
 }
 
@@ -2747,7 +2747,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				Code:    ErrNotEnoughNativeBalance.Code,
 				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.OptimismMainnet),
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:         pathprocessor.ProcessorTransferName,
 					FromChain:             &optimism,
@@ -2834,7 +2834,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				Code:    ErrNotEnoughNativeBalance.Code,
 				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.ArbitrumMainnet),
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
@@ -2888,7 +2888,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					approvalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedCandidates: []*PathV2{
+			expectedCandidates: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
@@ -2910,7 +2910,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					ApprovalRequired: true,
 				},
 			},
-			expectedBest: []*PathV2{
+			expectedBest: []*Path{
 				{
 					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
