@@ -488,22 +488,22 @@ func gweiToWei(val *big.Float) *big.Int {
 	return res
 }
 
-func (api *API) GetSuggestedRoutesV2(ctx context.Context, input *router.RouteInputParams) (*router.SuggestedRoutesV2, error) {
-	log.Debug("call to GetSuggestedRoutesV2")
+func (api *API) GetSuggestedRoutes(ctx context.Context, input *router.RouteInputParams) (*router.SuggestedRoutes, error) {
+	log.Debug("call to GetSuggestedRoutes")
 
-	return api.router.SuggestedRoutesV2(ctx, input)
+	return api.router.SuggestedRoutes(ctx, input)
 }
 
-func (api *API) GetSuggestedRoutesV2Async(ctx context.Context, input *router.RouteInputParams) {
-	log.Debug("call to GetSuggestedRoutesV2Async")
+func (api *API) GetSuggestedRoutesAsync(ctx context.Context, input *router.RouteInputParams) {
+	log.Debug("call to GetSuggestedRoutesAsync")
 
-	api.router.SuggestedRoutesV2Async(input)
+	api.router.SuggestedRoutesAsync(input)
 }
 
-func (api *API) StopSuggestedRoutesV2AsyncCalcualtion(ctx context.Context) {
-	log.Debug("call to StopSuggestedRoutesV2AsyncCalcualtion")
+func (api *API) StopSuggestedRoutesAsyncCalculation(ctx context.Context) {
+	log.Debug("call to StopSuggestedRoutesAsyncCalculation")
 
-	api.router.StopSuggestedRoutesV2AsyncCalcualtion()
+	api.router.StopSuggestedRoutesAsyncCalculation()
 }
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
