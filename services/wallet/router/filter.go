@@ -20,7 +20,7 @@ func init() {
 	}
 }
 
-func filterRoutesV2(routes [][]*PathV2, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) [][]*PathV2 {
+func filterRoutes(routes [][]*Path, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) [][]*Path {
 	for i := len(routes) - 1; i >= 0; i-- {
 		routeAmount := big.NewInt(0)
 		for _, p := range routes[i] {
@@ -38,18 +38,18 @@ func filterRoutesV2(routes [][]*PathV2, amountIn *big.Int, fromLockedAmount map[
 		return routes
 	}
 
-	routesAfterNetworkCompliance := filterNetworkComplianceV2(routes, fromLockedAmount)
-	return filterCapacityValidationV2(routesAfterNetworkCompliance, amountIn, fromLockedAmount)
+	routesAfterNetworkCompliance := filterNetworkCompliance(routes, fromLockedAmount)
+	return filterCapacityValidation(routesAfterNetworkCompliance, amountIn, fromLockedAmount)
 }
 
-// filterNetworkComplianceV2 performs the first level of filtering based on network inclusion/exclusion criteria.
-func filterNetworkComplianceV2(routes [][]*PathV2, fromLockedAmount map[uint64]*hexutil.Big) [][]*PathV2 {
-	filteredRoutes := make([][]*PathV2, 0)
+// filterNetworkCompliance performs the first level of filtering based on network inclusion/exclusion criteria.
+func filterNetworkCompliance(routes [][]*Path, fromLockedAmount map[uint64]*hexutil.Big) [][]*Path {
+	filteredRoutes := make([][]*Path, 0)
 	if routes == nil || fromLockedAmount == nil {
 		return filteredRoutes
 	}
 
-	fromIncluded, fromExcluded := setupRouteValidationMapsV2(fromLockedAmount)
+	fromIncluded, fromExcluded := setupRouteValidationMaps(fromLockedAmount)
 
 	for _, route := range routes {
 		if route == nil {
@@ -57,15 +57,15 @@ func filterNetworkComplianceV2(routes [][]*PathV2, fromLockedAmount map[uint64]*
 		}
 
 		// Create fresh copies of the maps for each route check, because they are manipulated
-		if isValidForNetworkComplianceV2(route, copyMapGeneric(fromIncluded, nil).(map[uint64]bool), copyMapGeneric(fromExcluded, nil).(map[uint64]bool)) {
+		if isValidForNetworkCompliance(route, copyMapGeneric(fromIncluded, nil).(map[uint64]bool), copyMapGeneric(fromExcluded, nil).(map[uint64]bool)) {
 			filteredRoutes = append(filteredRoutes, route)
 		}
 	}
 	return filteredRoutes
 }
 
-// isValidForNetworkComplianceV2 checks if a route complies with network inclusion/exclusion criteria.
-func isValidForNetworkComplianceV2(route []*PathV2, fromIncluded, fromExcluded map[uint64]bool) bool {
+// isValidForNetworkCompliance checks if a route complies with network inclusion/exclusion criteria.
+func isValidForNetworkCompliance(route []*Path, fromIncluded, fromExcluded map[uint64]bool) bool {
 	logger.Debug("Initial inclusion/exclusion maps",
 		zap.Any("fromIncluded", fromIncluded),
 		zap.Any("fromExcluded", fromExcluded),
@@ -101,8 +101,8 @@ func isValidForNetworkComplianceV2(route []*PathV2, fromIncluded, fromExcluded m
 	return true
 }
 
-// setupRouteValidationMapsV2 initializes maps for network inclusion and exclusion based on locked amounts.
-func setupRouteValidationMapsV2(fromLockedAmount map[uint64]*hexutil.Big) (map[uint64]bool, map[uint64]bool) {
+// setupRouteValidationMaps initializes maps for network inclusion and exclusion based on locked amounts.
+func setupRouteValidationMaps(fromLockedAmount map[uint64]*hexutil.Big) (map[uint64]bool, map[uint64]bool) {
 	fromIncluded := make(map[uint64]bool)
 	fromExcluded := make(map[uint64]bool)
 
@@ -116,20 +116,20 @@ func setupRouteValidationMapsV2(fromLockedAmount map[uint64]*hexutil.Big) (map[u
 	return fromIncluded, fromExcluded
 }
 
-// filterCapacityValidationV2 performs the second level of filtering based on amount and capacity validation.
-func filterCapacityValidationV2(routes [][]*PathV2, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) [][]*PathV2 {
-	filteredRoutes := make([][]*PathV2, 0)
+// filterCapacityValidation performs the second level of filtering based on amount and capacity validation.
+func filterCapacityValidation(routes [][]*Path, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) [][]*Path {
+	filteredRoutes := make([][]*Path, 0)
 
 	for _, route := range routes {
-		if hasSufficientCapacityV2(route, amountIn, fromLockedAmount) {
+		if hasSufficientCapacity(route, amountIn, fromLockedAmount) {
 			filteredRoutes = append(filteredRoutes, route)
 		}
 	}
 	return filteredRoutes
 }
 
-// hasSufficientCapacityV2 checks if a route has sufficient capacity to handle the required amount.
-func hasSufficientCapacityV2(route []*PathV2, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) bool {
+// hasSufficientCapacity checks if a route has sufficient capacity to handle the required amount.
+func hasSufficientCapacity(route []*Path, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) bool {
 	for _, path := range route {
 		if amount, ok := fromLockedAmount[path.FromChain.ChainID]; ok {
 			if path.AmountIn.ToInt().Cmp(amount.ToInt()) != 0 {
@@ -137,7 +137,7 @@ func hasSufficientCapacityV2(route []*PathV2, amountIn *big.Int, fromLockedAmoun
 				return false
 			}
 			requiredAmountIn := new(big.Int).Sub(amountIn, amount.ToInt())
-			restAmountIn := calculateRestAmountInV2(route, path)
+			restAmountIn := calculateRestAmountIn(route, path)
 
 			logger.Debug("Checking path", zap.Any("path", path))
 			logger.Debug("Required amount in", zap.String("requiredAmountIn", requiredAmountIn.String()))
@@ -153,7 +153,7 @@ func hasSufficientCapacityV2(route []*PathV2, amountIn *big.Int, fromLockedAmoun
 }
 
 // calculateRestAmountIn calculates the remaining amount in for the route excluding the specified path
-func calculateRestAmountInV2(route []*PathV2, excludePath *PathV2) *big.Int {
+func calculateRestAmountIn(route []*Path, excludePath *Path) *big.Int {
 	restAmountIn := big.NewInt(0)
 	for _, path := range route {
 		if path != excludePath {
