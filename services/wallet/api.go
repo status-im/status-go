@@ -488,31 +488,6 @@ func gweiToWei(val *big.Float) *big.Int {
 	return res
 }
 
-func (api *API) GetSuggestedRoutes(
-	ctx context.Context,
-	sendType router.SendType,
-	addrFrom common.Address,
-	addrTo common.Address,
-	amountIn *hexutil.Big,
-	tokenID string,
-	toTokenID string,
-	disabledFromChainIDs,
-	disabledToChainIDs,
-	preferedChainIDs []uint64,
-	gasFeeMode router.GasFeeMode,
-	fromLockedAmount map[uint64]*hexutil.Big,
-) (*router.SuggestedRoutes, error) {
-	log.Debug("call to GetSuggestedRoutes")
-
-	testnetMode, err := api.s.rpcClient.NetworkManager.GetTestNetworksEnabled()
-	if err != nil {
-		return nil, err
-	}
-
-	return api.router.SuggestedRoutes(ctx, sendType, addrFrom, addrTo, amountIn.ToInt(), tokenID, toTokenID, disabledFromChainIDs,
-		disabledToChainIDs, preferedChainIDs, gasFeeMode, fromLockedAmount, testnetMode)
-}
-
 func (api *API) GetSuggestedRoutesV2(ctx context.Context, input *router.RouteInputParams) (*router.SuggestedRoutesV2, error) {
 	log.Debug("call to GetSuggestedRoutesV2")
 
