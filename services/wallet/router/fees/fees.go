@@ -1,4 +1,4 @@
-package router
+package fees
 
 import (
 	"context"
@@ -54,7 +54,7 @@ type SuggestedFeesGwei struct {
 	EIP1559Enabled       bool       `json:"eip1559Enabled"`
 }
 
-func (m *MaxFeesLevels) feeFor(mode GasFeeMode) *big.Int {
+func (m *MaxFeesLevels) FeeFor(mode GasFeeMode) *big.Int {
 	if mode == GasFeeLow {
 		return m.Low.ToInt()
 	}
@@ -66,8 +66,8 @@ func (m *MaxFeesLevels) feeFor(mode GasFeeMode) *big.Int {
 	return m.Medium.ToInt()
 }
 
-func (s *SuggestedFees) feeFor(mode GasFeeMode) *big.Int {
-	return s.MaxFeesLevels.feeFor(mode)
+func (s *SuggestedFees) FeeFor(mode GasFeeMode) *big.Int {
+	return s.MaxFeesLevels.FeeFor(mode)
 }
 
 const inclusionThreshold = 0.95
@@ -88,20 +88,6 @@ type FeeHistory struct {
 
 type FeeManager struct {
 	RPCClient *rpc.Client
-}
-
-func weiToGwei(val *big.Int) *big.Float {
-	result := new(big.Float)
-	result.SetInt(val)
-
-	unit := new(big.Int)
-	unit.SetInt64(params.GWei)
-
-	return result.Quo(result, new(big.Float).SetInt(unit))
-}
-
-func gweiToEth(val *big.Float) *big.Float {
-	return new(big.Float).Quo(val, big.NewFloat(1000000000))
 }
 
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
@@ -151,12 +137,12 @@ func (f *FeeManager) SuggestedFeesGwei(ctx context.Context, chainID uint64) (*Su
 		return nil, err
 	}
 	return &SuggestedFeesGwei{
-		GasPrice:             weiToGwei(fees.GasPrice),
-		BaseFee:              weiToGwei(fees.BaseFee),
-		MaxPriorityFeePerGas: weiToGwei(fees.MaxPriorityFeePerGas),
-		MaxFeePerGasLow:      weiToGwei(fees.MaxFeesLevels.Low.ToInt()),
-		MaxFeePerGasMedium:   weiToGwei(fees.MaxFeesLevels.Medium.ToInt()),
-		MaxFeePerGasHigh:     weiToGwei(fees.MaxFeesLevels.High.ToInt()),
+		GasPrice:             common.WeiToGwei(fees.GasPrice),
+		BaseFee:              common.WeiToGwei(fees.BaseFee),
+		MaxPriorityFeePerGas: common.WeiToGwei(fees.MaxPriorityFeePerGas),
+		MaxFeePerGasLow:      common.WeiToGwei(fees.MaxFeesLevels.Low.ToInt()),
+		MaxFeePerGasMedium:   common.WeiToGwei(fees.MaxFeesLevels.Medium.ToInt()),
+		MaxFeePerGasHigh:     common.WeiToGwei(fees.MaxFeesLevels.High.ToInt()),
 		EIP1559Enabled:       fees.EIP1559Enabled,
 	}, nil
 }

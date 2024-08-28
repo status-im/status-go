@@ -11,6 +11,7 @@ type MultiTransactionIDType int64
 
 const (
 	NoMultiTransactionID = MultiTransactionIDType(0)
+	HexAddressLength     = 42
 )
 
 type ChainID uint64
@@ -32,6 +33,18 @@ const (
 
 var (
 	ZeroAddress = ethCommon.HexToAddress("0x0000000000000000000000000000000000000000")
+
+	SupportedNetworks = map[uint64]bool{
+		EthereumMainnet: true,
+		OptimismMainnet: true,
+		ArbitrumMainnet: true,
+	}
+
+	SupportedTestNetworks = map[uint64]bool{
+		EthereumSepolia: true,
+		OptimismSepolia: true,
+		ArbitrumSepolia: true,
+	}
 )
 
 type ContractType byte

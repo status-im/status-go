@@ -12,7 +12,10 @@ import (
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/requests"
+	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
 )
 
@@ -50,7 +53,7 @@ var (
 		pathprocessor.ProcessorBridgeHopName: {Value: uint64(5000), Err: nil},
 	}
 
-	testBbonderFeeMap = map[string]*big.Int{
+	testBBonderFeeMap = map[string]*big.Int{
 		pathprocessor.EthSymbol:  big.NewInt(testBonderFeeETH),
 		pathprocessor.UsdcSymbol: big.NewInt(testBonderFeeUSDC),
 	}
@@ -60,11 +63,11 @@ var (
 		pathprocessor.UsdcSymbol: 1,
 	}
 
-	testSuggestedFees = &SuggestedFees{
+	testSuggestedFees = &fees.SuggestedFees{
 		GasPrice:             big.NewInt(testGasPrice),
 		BaseFee:              big.NewInt(testBaseFee),
 		MaxPriorityFeePerGas: big.NewInt(testPriorityFeeLow),
-		MaxFeesLevels: &MaxFeesLevels{
+		MaxFeesLevels: &fees.MaxFeesLevels{
 			Low:    (*hexutil.Big)(big.NewInt(testPriorityFeeLow)),
 			Medium: (*hexutil.Big)(big.NewInt(testPriorityFeeMedium)),
 			High:   (*hexutil.Big)(big.NewInt(testPriorityFeeHigh)),
@@ -201,7 +204,7 @@ var defaultNetworks = []params.Network{
 
 type normalTestParams struct {
 	name               string
-	input              *RouteInputParams
+	input              *requests.RouteInputParams
 	expectedCandidates []*Path
 	expectedError      *errors.ErrorResponse
 }
@@ -210,10 +213,10 @@ func getNormalTestParamsList() []normalTestParams {
 	return []normalTestParams{
 		{
 			name: "ETH transfer - Insufficient Funds",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -221,25 +224,25 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:   testTokenPrices,
-					suggestedFees: testSuggestedFees,
-					balanceMap:    testBalanceMapPerChain,
-					estimationMap: map[string]pathprocessor.Estimation{
+					TokenPrices:   testTokenPrices,
+					SuggestedFees: testSuggestedFees,
+					BalanceMap:    testBalanceMapPerChain,
+					EstimationMap: map[string]pathprocessor.Estimation{
 						pathprocessor.ProcessorTransferName: {
 							Value: uint64(0),
 							Err:   fmt.Errorf("failed with 50000000 gas: insufficient funds for gas * price + value: address %s have 68251537427723 want 100000000000000", common.HexToAddress("0x1")),
 						},
 					},
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError: &errors.ErrorResponse{
@@ -250,29 +253,29 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - 0 AmountIn",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(0)),
 				TokenID:     pathprocessor.EthSymbol,
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -298,29 +301,29 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				TokenID:     pathprocessor.EthSymbol,
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -382,31 +385,31 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - Specific Single ToChain",
-			input: &RouteInputParams{
-				testnetMode:        false,
+			input: &requests.RouteInputParams{
+				TestnetMode:        false,
 				Uuid:               uuid.NewString(),
-				SendType:           Transfer,
+				SendType:           sendtype.Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				TokenID:            pathprocessor.EthSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -432,31 +435,31 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - Specific Multiple ToChain",
-			input: &RouteInputParams{
-				testnetMode:        false,
+			input: &requests.RouteInputParams{
+				TestnetMode:        false,
 				Uuid:               uuid.NewString(),
-				SendType:           Transfer,
+				SendType:           sendtype.Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				TokenID:            pathprocessor.EthSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -500,32 +503,32 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - Specific Single FromChain - No Specific ToChain",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				TokenID:              pathprocessor.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:   testTokenPrices,
-					baseFee:       big.NewInt(testBaseFee),
-					suggestedFees: testSuggestedFees,
-					balanceMap:    testBalanceMapPerChain,
+					TokenPrices:   testTokenPrices,
+					BaseFee:       big.NewInt(testBaseFee),
+					SuggestedFees: testSuggestedFees,
+					BalanceMap:    testBalanceMapPerChain,
 
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -551,31 +554,31 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - Specific Multiple FromChain - No Specific ToChain",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				TokenID:              pathprocessor.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -619,10 +622,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - Specific Single FromChain - Specific Single ToChain - Same Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -630,21 +633,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -658,10 +661,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - Specific Single FromChain - Specific Single ToChain - Different Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -669,21 +672,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -697,10 +700,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - Specific Multiple FromChain - Specific Multiple ToChain - Single Common Chain",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -708,21 +711,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -736,10 +739,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - Specific Multiple FromChain - Specific Multiple ToChain - Multiple Common Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -747,21 +750,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -793,10 +796,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - Specific Multiple FromChain - Specific Multiple ToChain - No Common Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -804,21 +807,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -832,10 +835,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - All FromChains Disabled - All ToChains Disabled",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -843,22 +846,22 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:   testTokenPrices,
-					baseFee:       big.NewInt(testBaseFee),
-					suggestedFees: testSuggestedFees,
-					balanceMap:    testBalanceMapPerChain,
+					TokenPrices:   testTokenPrices,
+					BaseFee:       big.NewInt(testBaseFee),
+					SuggestedFees: testSuggestedFees,
+					BalanceMap:    testBalanceMapPerChain,
 
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError:      ErrNoBestRouteFound,
@@ -866,10 +869,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - Single Chain LockedAmount",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -878,21 +881,21 @@ func getNormalTestParamsList() []normalTestParams {
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -963,10 +966,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - Specific ToChain - Single Chain LockedAmount",
-			input: &RouteInputParams{
-				testnetMode:        false,
+			input: &requests.RouteInputParams{
+				TestnetMode:        false,
 				Uuid:               uuid.NewString(),
-				SendType:           Transfer,
+				SendType:           sendtype.Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -977,21 +980,21 @@ func getNormalTestParamsList() []normalTestParams {
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1020,10 +1023,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - Multiple Chains LockedAmount",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -1033,21 +1036,21 @@ func getNormalTestParamsList() []normalTestParams {
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1118,10 +1121,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - All Chains LockedAmount",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -1132,21 +1135,21 @@ func getNormalTestParamsList() []normalTestParams {
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1217,10 +1220,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - All Chains LockedAmount with insufficient amount",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -1231,32 +1234,32 @@ func getNormalTestParamsList() []normalTestParams {
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point4ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedError:      ErrLockedAmountLessThanSendAmountAllNetworks,
+			expectedError:      requests.ErrLockedAmountLessThanSendAmountAllNetworks,
 			expectedCandidates: []*Path{},
 		},
 		{
 			name: "ETH transfer - No Specific FromChain - No Specific ToChain - LockedAmount exceeds sending amount",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -1266,52 +1269,52 @@ func getNormalTestParamsList() []normalTestParams {
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
-			expectedError:      ErrLockedAmountExceedsTotalSendAmount,
+			expectedError:      requests.ErrLockedAmountExceedsTotalSendAmount,
 			expectedCandidates: []*Path{},
 		},
 		{
 			name: "ERC20 transfer - No Specific FromChain - No Specific ToChain",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:     pathprocessor.UsdcSymbol,
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1373,31 +1376,31 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ERC20 transfer - No Specific FromChain - Specific Single ToChain",
-			input: &RouteInputParams{
-				testnetMode:        false,
+			input: &requests.RouteInputParams{
+				TestnetMode:        false,
 				Uuid:               uuid.NewString(),
-				SendType:           Transfer,
+				SendType:           sendtype.Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:            pathprocessor.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1423,31 +1426,31 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ERC20 transfer - No Specific FromChain - Specific Multiple ToChain",
-			input: &RouteInputParams{
-				testnetMode:        false,
+			input: &requests.RouteInputParams{
+				TestnetMode:        false,
 				Uuid:               uuid.NewString(),
-				SendType:           Transfer,
+				SendType:           sendtype.Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:            pathprocessor.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1491,31 +1494,31 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ERC20 transfer - Specific Single FromChain - No Specific ToChain",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:              pathprocessor.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1541,31 +1544,31 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ERC20 transfer - Specific Multiple FromChain - No Specific ToChain",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:              pathprocessor.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1609,10 +1612,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ERC20 transfer - Specific Single FromChain - Specific Single ToChain - Same Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -1620,21 +1623,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1648,10 +1651,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ERC20 transfer - Specific Single FromChain - Specific Single ToChain - Different Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -1659,21 +1662,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1687,10 +1690,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ERC20 transfer - Specific Multiple FromChain - Specific Multiple ToChain - Single Common Chain",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -1698,21 +1701,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1726,10 +1729,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ERC20 transfer - Specific Multiple FromChain - Specific Multiple ToChain - Multiple Common Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -1737,21 +1740,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1783,10 +1786,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ERC20 transfer - Specific Multiple FromChain - Specific Multiple ToChain - No Common Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -1794,21 +1797,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -1822,10 +1825,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ERC20 transfer - All FromChains Disabled - All ToChains Disabled",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -1833,21 +1836,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError:      ErrNoBestRouteFound,
@@ -1855,30 +1858,30 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ERC20 transfer - All FromChains - No Locked Amount - Enough Token Balance Across All Chains",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
 				TokenID:     pathprocessor.UsdcSymbol,
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -2054,30 +2057,30 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - No Specific FromChain - No Specific ToChain",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Bridge,
+				SendType:    sendtype.Bridge,
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:     pathprocessor.UsdcSymbol,
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -2121,31 +2124,31 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - No Specific FromChain - Specific Single ToChain",
-			input: &RouteInputParams{
-				testnetMode:        false,
+			input: &requests.RouteInputParams{
+				TestnetMode:        false,
 				Uuid:               uuid.NewString(),
-				SendType:           Bridge,
+				SendType:           sendtype.Bridge,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:            pathprocessor.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -2165,31 +2168,31 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - No Specific FromChain - Specific Multiple ToChain",
-			input: &RouteInputParams{
-				testnetMode:        false,
+			input: &requests.RouteInputParams{
+				TestnetMode:        false,
 				Uuid:               uuid.NewString(),
-				SendType:           Bridge,
+				SendType:           sendtype.Bridge,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:            pathprocessor.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -2221,31 +2224,31 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - Specific Single FromChain - No Specific ToChain",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Bridge,
+				SendType:             sendtype.Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:              pathprocessor.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -2265,31 +2268,31 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - Specific Multiple FromChain - No Specific ToChain",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Bridge,
+				SendType:             sendtype.Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:              pathprocessor.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -2321,10 +2324,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - Specific Single FromChain - Specific Single ToChain - Same Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Bridge,
+				SendType:             sendtype.Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -2332,21 +2335,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError:      ErrNoBestRouteFound,
@@ -2354,10 +2357,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - Specific Single FromChain - Specific Single ToChain - Different Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Bridge,
+				SendType:             sendtype.Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -2365,21 +2368,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -2393,10 +2396,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - Specific Multiple FromChain - Specific Multiple ToChain - Single Common Chain",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Bridge,
+				SendType:             sendtype.Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -2404,21 +2407,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError:      ErrNoBestRouteFound,
@@ -2426,10 +2429,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - Specific Multiple FromChain - Specific Multiple ToChain - Multiple Common Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Bridge,
+				SendType:             sendtype.Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -2437,21 +2440,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -2471,10 +2474,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - Specific Multiple FromChain - Specific Multiple ToChain - No Common Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Bridge,
+				SendType:             sendtype.Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -2482,21 +2485,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -2510,10 +2513,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - All FromChains Disabled - All ToChains Disabled",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Bridge,
+				SendType:             sendtype.Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
@@ -2521,21 +2524,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError:      ErrNoBestRouteFound,
@@ -2543,10 +2546,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - Not Enough Native Balance",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
@@ -2554,20 +2557,20 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					tokenPrices:           testTokenPrices,
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError: &errors.ErrorResponse{
@@ -2585,10 +2588,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "ETH transfer - Not Enough Native Balance",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(5 * testAmount100USDC)),
@@ -2596,20 +2599,20 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError: &errors.ErrorResponse{
@@ -2627,10 +2630,10 @@ func getNormalTestParamsList() []normalTestParams {
 		},
 		{
 			name: "Bridge - Specific Single FromChain - Specific Single ToChain - Sending Small Amount",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Bridge,
+				SendType:             sendtype.Bridge,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(0.01 * testAmount1USDC)),
@@ -2638,21 +2641,21 @@ func getNormalTestParamsList() []normalTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:           testTokenPrices,
-					baseFee:               big.NewInt(testBaseFee),
-					suggestedFees:         testSuggestedFees,
-					balanceMap:            testBalanceMapPerChain,
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					TokenPrices:           testTokenPrices,
+					BaseFee:               big.NewInt(testBaseFee),
+					SuggestedFees:         testSuggestedFees,
+					BalanceMap:            testBalanceMapPerChain,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError: ErrLowAmountInForHopBridge,
@@ -2670,7 +2673,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 type noBalanceTestParams struct {
 	name               string
-	input              *RouteInputParams
+	input              *requests.RouteInputParams
 	expectedCandidates []*Path
 	expectedBest       []*Path
 	expectedError      *errors.ErrorResponse
@@ -2680,10 +2683,10 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 	return []noBalanceTestParams{
 		{
 			name: "ERC20 transfer - Specific FromChain - Specific ToChain - Not Enough Token Balance",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount100USDC)),
@@ -2691,32 +2694,32 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:   testTokenPrices,
-					suggestedFees: testSuggestedFees,
-					balanceMap: map[string]*big.Int{
+					TokenPrices:   testTokenPrices,
+					SuggestedFees: testSuggestedFees,
+					BalanceMap: map[string]*big.Int{
 						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
 					},
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError: ErrNoPositiveBalance,
 		},
 		{
 			name: "ERC20 transfer - Specific FromChain - Specific ToChain - Not Enough Native Balance",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount100USDC)),
@@ -2724,23 +2727,23 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:   testTokenPrices,
-					suggestedFees: testSuggestedFees,
-					balanceMap: map[string]*big.Int{
+					TokenPrices:   testTokenPrices,
+					SuggestedFees: testSuggestedFees,
+					BalanceMap: map[string]*big.Int{
 						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
 						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
 					},
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError: &errors.ErrorResponse{
@@ -2760,26 +2763,26 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 		},
 		{
 			name: "ERC20 transfer - No Specific FromChain - Specific ToChain - Not Enough Token Balance Across All Chains",
-			input: &RouteInputParams{
-				testnetMode:        false,
+			input: &requests.RouteInputParams{
+				TestnetMode:        false,
 				Uuid:               uuid.NewString(),
-				SendType:           Transfer,
+				SendType:           sendtype.Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 				TokenID:            pathprocessor.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:   testTokenPrices,
-					suggestedFees: testSuggestedFees,
-					balanceMap: map[string]*big.Int{
+					TokenPrices:   testTokenPrices,
+					SuggestedFees: testSuggestedFees,
+					BalanceMap: map[string]*big.Int{
 						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
 						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
 						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
@@ -2787,36 +2790,36 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
 						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
 					},
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError: ErrNoPositiveBalance,
 		},
 		{
 			name: "ERC20 transfer - No Specific FromChain - Specific ToChain - Enough Token Balance On Arbitrum Chain But Not Enough Native Balance",
-			input: &RouteInputParams{
-				testnetMode:        false,
+			input: &requests.RouteInputParams{
+				TestnetMode:        false,
 				Uuid:               uuid.NewString(),
-				SendType:           Transfer,
+				SendType:           sendtype.Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 				TokenID:            pathprocessor.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:   testTokenPrices,
-					suggestedFees: testSuggestedFees,
-					balanceMap: map[string]*big.Int{
+					TokenPrices:   testTokenPrices,
+					SuggestedFees: testSuggestedFees,
+					BalanceMap: map[string]*big.Int{
 						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
 						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
 						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
@@ -2824,10 +2827,10 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
 						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
 					},
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedError: &errors.ErrorResponse{
@@ -2859,33 +2862,33 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 		},
 		{
 			name: "ERC20 transfer - No Specific FromChain - Specific ToChain - Enough Token Balance On Arbitrum Chain And Enough Native Balance On Arbitrum Chain",
-			input: &RouteInputParams{
-				testnetMode:        false,
+			input: &requests.RouteInputParams{
+				TestnetMode:        false,
 				Uuid:               uuid.NewString(),
-				SendType:           Transfer,
+				SendType:           sendtype.Transfer,
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 				TokenID:            pathprocessor.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.UsdcSymbol,
 						Decimals: 6,
 					},
-					tokenPrices:   testTokenPrices,
-					suggestedFees: testSuggestedFees,
-					balanceMap: map[string]*big.Int{
+					TokenPrices:   testTokenPrices,
+					SuggestedFees: testSuggestedFees,
+					BalanceMap: map[string]*big.Int{
 						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
 						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount1ETHInWei),
 					},
-					estimationMap:         testEstimationMap,
-					bonderFeeMap:          testBbonderFeeMap,
-					approvalGasEstimation: testApprovalGasEstimation,
-					approvalL1Fee:         testApprovalL1Fee,
+					EstimationMap:         testEstimationMap,
+					BonderFeeMap:          testBBonderFeeMap,
+					ApprovalGasEstimation: testApprovalGasEstimation,
+					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
 			expectedCandidates: []*Path{
@@ -2924,7 +2927,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 
 type amountOptionsTestParams struct {
 	name                  string
-	input                 *RouteInputParams
+	input                 *requests.RouteInputParams
 	expectedAmountOptions map[uint64][]amountOption
 }
 
@@ -2932,22 +2935,22 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 	return []amountOptionsTestParams{
 		{
 			name: "Transfer - Single From Chain - No Locked Amount",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				TokenID:              pathprocessor.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					balanceMap: map[string]*big.Int{},
+					BalanceMap: map[string]*big.Int{},
 				},
 			},
 			expectedAmountOptions: map[uint64][]amountOption{
@@ -2961,10 +2964,10 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 		},
 		{
 			name: "Transfer - Single From Chain - Locked Amount To Single Chain Equal Total Amount",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				TokenID:              pathprocessor.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
@@ -2972,14 +2975,14 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					balanceMap: map[string]*big.Int{},
+					BalanceMap: map[string]*big.Int{},
 				},
 			},
 			expectedAmountOptions: map[uint64][]amountOption{
@@ -2993,10 +2996,10 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 		},
 		{
 			name: "Transfer - Multiple From Chains - Locked Amount To Single Chain Is Less Than Total Amount",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
 				TokenID:              pathprocessor.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
@@ -3004,14 +3007,14 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					balanceMap: map[string]*big.Int{},
+					BalanceMap: map[string]*big.Int{},
 				},
 			},
 			expectedAmountOptions: map[uint64][]amountOption{
@@ -3031,10 +3034,10 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 		},
 		{
 			name: "Transfer - Multiple From Chains - Locked Amount To Multiple Chains",
-			input: &RouteInputParams{
-				testnetMode:          false,
+			input: &requests.RouteInputParams{
+				TestnetMode:          false,
 				Uuid:                 uuid.NewString(),
-				SendType:             Transfer,
+				SendType:             sendtype.Transfer,
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
 				TokenID:              pathprocessor.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
@@ -3043,14 +3046,14 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					balanceMap: map[string]*big.Int{},
+					BalanceMap: map[string]*big.Int{},
 				},
 			},
 			expectedAmountOptions: map[uint64][]amountOption{
@@ -3070,10 +3073,10 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 		},
 		{
 			name: "Transfer - All From Chains - Locked Amount To Multiple Chains Equal Total Amount",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
 				TokenID:     pathprocessor.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
@@ -3081,14 +3084,14 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					balanceMap: map[string]*big.Int{},
+					BalanceMap: map[string]*big.Int{},
 				},
 			},
 			expectedAmountOptions: map[uint64][]amountOption{
@@ -3108,10 +3111,10 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 		},
 		{
 			name: "Transfer - All From Chains - Locked Amount To Multiple Chains Is Less Than Total Amount",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount5ETHInWei)),
 				TokenID:     pathprocessor.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
@@ -3119,14 +3122,14 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					balanceMap: map[string]*big.Int{},
+					BalanceMap: map[string]*big.Int{},
 				},
 			},
 			expectedAmountOptions: map[uint64][]amountOption{
@@ -3152,21 +3155,21 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 		},
 		{
 			name: "Transfer - All From Chain - No Locked Amount - Enough Token Balance If All Chains Are Used",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
 				TokenID:     pathprocessor.EthSymbol,
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					balanceMap: map[string]*big.Int{
+					BalanceMap: map[string]*big.Int{
 						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
 						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
 						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
@@ -3208,24 +3211,24 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 		},
 		{
 			name: "Transfer - All From Chain - Locked Amount To Single Chain - Enough Token Balance If All Chains Are Used",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
 				TokenID:     pathprocessor.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					balanceMap: map[string]*big.Int{
+					BalanceMap: map[string]*big.Int{
 						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount2ETHInWei),
 						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
 						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount3ETHInWei),
@@ -3263,10 +3266,10 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 		},
 		{
 			name: "Transfer - All From Chain - Locked Amount To Multiple Chains - Enough Token Balance If All Chains Are Used",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
 				TokenID:     pathprocessor.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
@@ -3274,14 +3277,14 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				},
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					balanceMap: map[string]*big.Int{
+					BalanceMap: map[string]*big.Int{
 						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount2ETHInWei),
 						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
 						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount3ETHInWei),
@@ -3311,21 +3314,21 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 		},
 		{
 			name: "Transfer - All From Chain - No Locked Amount - Not Enough Token Balance",
-			input: &RouteInputParams{
-				testnetMode: false,
+			input: &requests.RouteInputParams{
+				TestnetMode: false,
 				Uuid:        uuid.NewString(),
-				SendType:    Transfer,
+				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount5ETHInWei)),
 				TokenID:     pathprocessor.EthSymbol,
 
-				testsMode: true,
-				testParams: &routerTestParams{
-					tokenFrom: &token.Token{
+				TestsMode: true,
+				TestParams: &requests.RouterTestParams{
+					TokenFrom: &token.Token{
 						ChainID:  1,
 						Symbol:   pathprocessor.EthSymbol,
 						Decimals: 18,
 					},
-					balanceMap: map[string]*big.Int{
+					BalanceMap: map[string]*big.Int{
 						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
 						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
 						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),

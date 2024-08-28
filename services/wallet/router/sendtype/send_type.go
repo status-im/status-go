@@ -1,4 +1,4 @@
-package router
+package sendtype
 
 import (
 	"math/big"
@@ -84,7 +84,7 @@ func (s SendType) FindToken(tokenManager *token.Manager, collectibles *collectib
 }
 
 // canUseProcessor is used to check if certain SendType can be used with a given path processor
-func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
+func (s SendType) CanUseProcessor(p pathprocessor.PathProcessor) bool {
 	pathProcessorName := p.Name()
 	switch s {
 	case Transfer:
@@ -111,7 +111,7 @@ func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
 	}
 }
 
-func (s SendType) processZeroAmountInProcessor(amountIn *big.Int, amountOut *big.Int, processorName string) bool {
+func (s SendType) ProcessZeroAmountInProcessor(amountIn *big.Int, amountOut *big.Int, processorName string) bool {
 	if amountIn.Cmp(pathprocessor.ZeroBigIntValue) == 0 {
 		if s == Transfer {
 			if processorName != pathprocessor.ProcessorTransferName {
@@ -129,7 +129,7 @@ func (s SendType) processZeroAmountInProcessor(amountIn *big.Int, amountOut *big
 	return true
 }
 
-func (s SendType) isAvailableBetween(from, to *params.Network) bool {
+func (s SendType) IsAvailableBetween(from, to *params.Network) bool {
 	if s.IsCollectiblesTransfer() ||
 		s.IsEnsTransfer() ||
 		s.IsStickersTransfer() ||
@@ -144,7 +144,7 @@ func (s SendType) isAvailableBetween(from, to *params.Network) bool {
 	return true
 }
 
-func (s SendType) isAvailableFor(network *params.Network) bool {
+func (s SendType) IsAvailableFor(network *params.Network) bool {
 	// Set of network ChainIDs allowed for any type of transaction
 	allAllowedNetworks := map[uint64]bool{
 		walletCommon.EthereumMainnet: true,

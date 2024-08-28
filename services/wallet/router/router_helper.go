@@ -17,10 +17,11 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
 )
 
-func (r *Router) requireApproval(ctx context.Context, sendType SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
+func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
 	bool, *big.Int, uint64, uint64, error) {
 	if sendType.IsCollectiblesTransfer() || sendType.IsEnsTransfer() || sendType.IsStickersTransfer() {
 		return false, nil, 0, 0, nil
