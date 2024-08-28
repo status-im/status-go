@@ -101,7 +101,7 @@ func makeBalanceKey(chainID uint64, symbol string) string {
 	return fmt.Sprintf("%d-%s", chainID, symbol)
 }
 
-type PathV2 struct {
+type Path struct {
 	ProcessorName  string
 	FromChain      *params.Network    // Source chain
 	ToChain        *params.Network    // Destination chain
@@ -147,32 +147,32 @@ type ProcessorError struct {
 	Error         error
 }
 
-func (p *PathV2) Equal(o *PathV2) bool {
+func (p *Path) Equal(o *Path) bool {
 	return p.FromChain.ChainID == o.FromChain.ChainID && p.ToChain.ChainID == o.ToChain.ChainID
 }
 
-type SuggestedRoutesV2 struct {
+type SuggestedRoutes struct {
 	Uuid                  string
-	Best                  []*PathV2
-	Candidates            []*PathV2
+	Best                  []*Path
+	Candidates            []*Path
 	TokenPrice            float64
 	NativeChainTokenPrice float64
 }
 
-type SuggestedRoutesV2Response struct {
+type SuggestedRoutesResponse struct {
 	Uuid                  string                `json:"Uuid"`
-	Best                  []*PathV2             `json:"Best,omitempty"`
-	Candidates            []*PathV2             `json:"Candidates,omitempty"`
+	Best                  []*Path               `json:"Best,omitempty"`
+	Candidates            []*Path               `json:"Candidates,omitempty"`
 	TokenPrice            *float64              `json:"TokenPrice,omitempty"`
 	NativeChainTokenPrice *float64              `json:"NativeChainTokenPrice,omitempty"`
 	ErrorResponse         *errors.ErrorResponse `json:"ErrorResponse,omitempty"`
 }
 
-type GraphV2 []*NodeV2
+type Graph []*Node
 
-type NodeV2 struct {
-	Path     *PathV2
-	Children GraphV2
+type Node struct {
+	Path     *Path
+	Children Graph
 }
 
 type Router struct {
@@ -222,15 +222,15 @@ func (r *Router) GetPathProcessors() map[string]pathprocessor.PathProcessor {
 	return r.pathProcessors
 }
 
-func newSuggestedRoutesV2(
+func newSuggestedRoutes(
 	uuid string,
 	amountIn *big.Int,
-	candidates []*PathV2,
+	candidates []*Path,
 	fromLockedAmount map[uint64]*hexutil.Big,
 	tokenPrice float64,
 	nativeChainTokenPrice float64,
-) (*SuggestedRoutesV2, [][]*PathV2) {
-	suggestedRoutes := &SuggestedRoutesV2{
+) (*SuggestedRoutes, [][]*Path) {
+	suggestedRoutes := &SuggestedRoutes{
 		Uuid:                  uuid,
 		Candidates:            candidates,
 		TokenPrice:            tokenPrice,
@@ -240,12 +240,12 @@ func newSuggestedRoutesV2(
 		return suggestedRoutes, nil
 	}
 
-	node := &NodeV2{
+	node := &Node{
 		Path:     nil,
-		Children: buildGraphV2(amountIn, candidates, 0, []uint64{}),
+		Children: buildGraph(amountIn, candidates, 0, []uint64{}),
 	}
-	allRoutes := node.buildAllRoutesV2()
-	allRoutes = filterRoutesV2(allRoutes, amountIn, fromLockedAmount)
+	allRoutes := node.buildAllRoutes()
+	allRoutes = filterRoutes(allRoutes, amountIn, fromLockedAmount)
 
 	if len(allRoutes) > 0 {
 		sort.Slice(allRoutes, func(i, j int) bool {
@@ -258,12 +258,12 @@ func newSuggestedRoutesV2(
 	return suggestedRoutes, allRoutes
 }
 
-func newNodeV2(path *PathV2) *NodeV2 {
-	return &NodeV2{Path: path, Children: make(GraphV2, 0)}
+func newNode(path *Path) *Node {
+	return &Node{Path: path, Children: make(Graph, 0)}
 }
 
-func buildGraphV2(AmountIn *big.Int, routes []*PathV2, level int, sourceChainIDs []uint64) GraphV2 {
-	graph := make(GraphV2, 0)
+func buildGraph(AmountIn *big.Int, routes []*Path, level int, sourceChainIDs []uint64) Graph {
+	graph := make(Graph, 0)
 	for _, route := range routes {
 		found := false
 		for _, chainID := range sourceChainIDs {
@@ -275,9 +275,9 @@ func buildGraphV2(AmountIn *big.Int, routes []*PathV2, level int, sourceChainIDs
 		if found {
 			continue
 		}
-		node := newNodeV2(route)
+		node := newNode(route)
 
-		newRoutes := make([]*PathV2, 0)
+		newRoutes := make([]*Path, 0)
 		for _, r := range routes {
 			if route.Equal(r) {
 				continue
@@ -290,7 +290,7 @@ func buildGraphV2(AmountIn *big.Int, routes []*PathV2, level int, sourceChainIDs
 			newSourceChainIDs := make([]uint64, len(sourceChainIDs))
 			copy(newSourceChainIDs, sourceChainIDs)
 			newSourceChainIDs = append(newSourceChainIDs, route.FromChain.ChainID)
-			node.Children = buildGraphV2(newAmountIn, newRoutes, level+1, newSourceChainIDs)
+			node.Children = buildGraph(newAmountIn, newRoutes, level+1, newSourceChainIDs)
 
 			if len(node.Children) == 0 {
 				continue
@@ -303,18 +303,18 @@ func buildGraphV2(AmountIn *big.Int, routes []*PathV2, level int, sourceChainIDs
 	return graph
 }
 
-func (n NodeV2) buildAllRoutesV2() [][]*PathV2 {
-	res := make([][]*PathV2, 0)
+func (n Node) buildAllRoutes() [][]*Path {
+	res := make([][]*Path, 0)
 
 	if len(n.Children) == 0 && n.Path != nil {
-		res = append(res, []*PathV2{n.Path})
+		res = append(res, []*Path{n.Path})
 	}
 
 	for _, node := range n.Children {
-		for _, route := range node.buildAllRoutesV2() {
+		for _, route := range node.buildAllRoutes() {
 			extendedRoute := route
 			if n.Path != nil {
-				extendedRoute = append([]*PathV2{n.Path}, route...)
+				extendedRoute = append([]*Path{n.Path}, route...)
 			}
 			res = append(res, extendedRoute)
 		}
@@ -323,8 +323,8 @@ func (n NodeV2) buildAllRoutesV2() [][]*PathV2 {
 	return res
 }
 
-func findBestV2(routes [][]*PathV2, tokenPrice float64, nativeTokenPrice float64) []*PathV2 {
-	var best []*PathV2
+func findBest(routes [][]*Path, tokenPrice float64, nativeTokenPrice float64) []*Path {
+	var best []*Path
 	bestCost := big.NewFloat(math.Inf(1))
 	for _, route := range routes {
 		currentCost := big.NewFloat(0)
@@ -503,11 +503,11 @@ func validateFromLockedAmount(input *RouteInputParams) error {
 	return nil
 }
 
-func (r *Router) SuggestedRoutesV2Async(input *RouteInputParams) {
+func (r *Router) SuggestedRoutesAsync(input *RouteInputParams) {
 	r.scheduler.Enqueue(routerTask, func(ctx context.Context) (interface{}, error) {
-		return r.SuggestedRoutesV2(ctx, input)
+		return r.SuggestedRoutes(ctx, input)
 	}, func(result interface{}, taskType async.TaskType, err error) {
-		routesResponse := SuggestedRoutesV2Response{
+		routesResponse := SuggestedRoutesResponse{
 			Uuid: input.Uuid,
 		}
 
@@ -516,7 +516,7 @@ func (r *Router) SuggestedRoutesV2Async(input *RouteInputParams) {
 			routesResponse.ErrorResponse = errorResponse.(*errors.ErrorResponse)
 		}
 
-		if suggestedRoutes, ok := result.(*SuggestedRoutesV2); ok && suggestedRoutes != nil {
+		if suggestedRoutes, ok := result.(*SuggestedRoutes); ok && suggestedRoutes != nil {
 			routesResponse.Best = suggestedRoutes.Best
 			routesResponse.Candidates = suggestedRoutes.Candidates
 			routesResponse.TokenPrice = &suggestedRoutes.TokenPrice
@@ -527,11 +527,11 @@ func (r *Router) SuggestedRoutesV2Async(input *RouteInputParams) {
 	})
 }
 
-func (r *Router) StopSuggestedRoutesV2AsyncCalcualtion() {
+func (r *Router) StopSuggestedRoutesAsyncCalculation() {
 	r.scheduler.Stop()
 }
 
-func (r *Router) SuggestedRoutesV2(ctx context.Context, input *RouteInputParams) (*SuggestedRoutesV2, error) {
+func (r *Router) SuggestedRoutes(ctx context.Context, input *RouteInputParams) (*SuggestedRoutes, error) {
 	testnetMode, err := r.rpcClient.NetworkManager.GetTestNetworksEnabled()
 	if err != nil {
 		return nil, errors.CreateErrorResponseFromError(err)
@@ -860,7 +860,7 @@ func (r *Router) getSelectedChains(input *RouteInputParams) (selectedFromChains 
 }
 
 func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams, selectedFromChains []*params.Network,
-	selectedToChains []*params.Network, balanceMap map[string]*big.Int) (candidates []*PathV2, processorErrors []*ProcessorError, err error) {
+	selectedToChains []*params.Network, balanceMap map[string]*big.Int) (candidates []*Path, processorErrors []*ProcessorError, err error) {
 	var (
 		testsMode = input.testsMode && input.testParams != nil
 		group     = async.NewAtomicGroup(ctx)
@@ -873,7 +873,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 	}
 
 	appendProcessorErrorFn := func(processorName string, sendType SendType, fromChainID uint64, toChainID uint64, amount *big.Int, err error) {
-		log.Error("routerv2.resolveCandidates error", "processor", processorName, "sendType", sendType, "fromChainId: ", fromChainID, "toChainId", toChainID, "amount", amount, "err", err)
+		log.Error("router.resolveCandidates error", "processor", processorName, "sendType", sendType, "fromChainId: ", fromChainID, "toChainId", toChainID, "amount", amount, "err", err)
 		mu.Lock()
 		defer mu.Unlock()
 		processorErrors = append(processorErrors, &ProcessorError{
@@ -882,7 +882,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 		})
 	}
 
-	appendPathFn := func(path *PathV2) {
+	appendPathFn := func(path *Path) {
 		mu.Lock()
 		defer mu.Unlock()
 		candidates = append(candidates, path)
@@ -1080,7 +1080,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 							requiredNativeBalance.Add(requiredNativeBalance, ethTotalFees)
 						}
 
-						appendPathFn(&PathV2{
+						appendPathFn(&Path{
 							ProcessorName:  pProcessor.Name(),
 							FromChain:      network,
 							ToChain:        dest,
@@ -1137,7 +1137,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 	return candidates, processorErrors, nil
 }
 
-func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*PathV2, balanceMap map[string]*big.Int) (hasPositiveBalance bool, err error) {
+func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*Path, balanceMap map[string]*big.Int) (hasPositiveBalance bool, err error) {
 	balanceMapCopy := copyMapGeneric(balanceMap, func(v interface{}) interface{} {
 		return new(big.Int).Set(v.(*big.Int))
 	}).(map[string]*big.Int)
@@ -1193,7 +1193,7 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute []*
 	return hasPositiveBalance, nil
 }
 
-func removeBestRouteFromAllRouters(allRoutes [][]*PathV2, best []*PathV2) [][]*PathV2 {
+func removeBestRouteFromAllRouters(allRoutes [][]*Path, best []*Path) [][]*Path {
 	for i := len(allRoutes) - 1; i >= 0; i-- {
 		route := allRoutes[i]
 		routeFound := true
@@ -1234,7 +1234,7 @@ func getChainPriority(chainID uint64) int {
 	}
 }
 
-func getRoutePriority(route []*PathV2) int {
+func getRoutePriority(route []*Path) int {
 	priority := 0
 	for _, path := range route {
 		priority += getChainPriority(path.FromChain.ChainID)
@@ -1242,7 +1242,7 @@ func getRoutePriority(route []*PathV2) int {
 	return priority
 }
 
-func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, candidates []*PathV2, balanceMap map[string]*big.Int) (suggestedRoutes *SuggestedRoutesV2, err error) {
+func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, candidates []*Path, balanceMap map[string]*big.Int) (suggestedRoutes *SuggestedRoutes, err error) {
 	var prices map[string]float64
 	if input.testsMode {
 		prices = input.testParams.tokenPrices
@@ -1256,8 +1256,8 @@ func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, can
 	tokenPrice := prices[input.TokenID]
 	nativeTokenPrice := prices[pathprocessor.EthSymbol]
 
-	var allRoutes [][]*PathV2
-	suggestedRoutes, allRoutes = newSuggestedRoutesV2(input.Uuid, input.AmountIn.ToInt(), candidates, input.FromLockedAmount, tokenPrice, nativeTokenPrice)
+	var allRoutes [][]*Path
+	suggestedRoutes, allRoutes = newSuggestedRoutes(input.Uuid, input.AmountIn.ToInt(), candidates, input.FromLockedAmount, tokenPrice, nativeTokenPrice)
 
 	defer func() {
 		if suggestedRoutes.Best != nil && len(suggestedRoutes.Best) > 0 {
@@ -1270,13 +1270,13 @@ func (r *Router) resolveRoutes(ctx context.Context, input *RouteInputParams, can
 	}()
 
 	var (
-		bestRoute                        []*PathV2
-		lastBestRouteWithPositiveBalance []*PathV2
+		bestRoute                        []*Path
+		lastBestRouteWithPositiveBalance []*Path
 		lastBestRouteErr                 error
 	)
 
 	for len(allRoutes) > 0 {
-		bestRoute = findBestV2(allRoutes, tokenPrice, nativeTokenPrice)
+		bestRoute = findBest(allRoutes, tokenPrice, nativeTokenPrice)
 		var hasPositiveBalance bool
 		hasPositiveBalance, err = r.checkBalancesForTheBestRoute(ctx, bestRoute, balanceMap)
 

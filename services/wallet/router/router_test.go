@@ -58,7 +58,7 @@ func amountOptionsMapsEqual(map1, map2 map[uint64][]amountOption) bool {
 	return true
 }
 
-func assertPathsEqual(t *testing.T, expected, actual []*PathV2) {
+func assertPathsEqual(t *testing.T, expected, actual []*Path) {
 	assert.Equal(t, len(expected), len(actual))
 	if len(expected) == 0 {
 		return
@@ -124,19 +124,19 @@ func setupRouter(t *testing.T) (*Router, func()) {
 	return router, cleanTmpDb
 }
 
-type suggestedRoutesV2ResponseEnvelope struct {
-	Type   string                    `json:"type"`
-	Routes SuggestedRoutesV2Response `json:"event"`
+type suggestedRoutesResponseEnvelope struct {
+	Type   string                  `json:"type"`
+	Routes SuggestedRoutesResponse `json:"event"`
 }
 
-func setupSignalHandler(t *testing.T) (chan SuggestedRoutesV2Response, func()) {
-	suggestedRoutesCh := make(chan SuggestedRoutesV2Response)
+func setupSignalHandler(t *testing.T) (chan SuggestedRoutesResponse, func()) {
+	suggestedRoutesCh := make(chan SuggestedRoutesResponse)
 	signalHandler := signal.MobileSignalHandler(func(data []byte) {
 		var envelope signal.Envelope
 		err := json.Unmarshal(data, &envelope)
 		assert.NoError(t, err)
 		if envelope.Type == string(signal.SuggestedRoutes) {
-			var response suggestedRoutesV2ResponseEnvelope
+			var response suggestedRoutesResponseEnvelope
 			err := json.Unmarshal(data, &response)
 			assert.NoError(t, err)
 
@@ -153,7 +153,7 @@ func setupSignalHandler(t *testing.T) (chan SuggestedRoutesV2Response, func()) {
 	return suggestedRoutesCh, closeFn
 }
 
-func TestRouterV2(t *testing.T) {
+func TestRouter(t *testing.T) {
 	router, cleanTmpDb := setupRouter(t)
 	defer cleanTmpDb()
 
@@ -165,7 +165,7 @@ func TestRouterV2(t *testing.T) {
 	// Test blocking endpoints
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			routes, err := router.SuggestedRoutesV2(context.Background(), tt.input)
+			routes, err := router.SuggestedRoutes(context.Background(), tt.input)
 
 			if tt.expectedError != nil {
 				assert.Error(t, err)
@@ -184,7 +184,7 @@ func TestRouterV2(t *testing.T) {
 
 	// Test async endpoints
 	for _, tt := range tests {
-		router.SuggestedRoutesV2Async(tt.input)
+		router.SuggestedRoutesAsync(tt.input)
 
 		select {
 		case asyncRoutes := <-suggestedRoutesCh:
@@ -198,7 +198,7 @@ func TestRouterV2(t *testing.T) {
 	}
 }
 
-func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
+func TestNoBalanceForTheBestRouteRouter(t *testing.T) {
 	router, cleanTmpDb := setupRouter(t)
 	defer cleanTmpDb()
 
@@ -211,7 +211,7 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			routes, err := router.SuggestedRoutesV2(context.Background(), tt.input)
+			routes, err := router.SuggestedRoutes(context.Background(), tt.input)
 
 			if tt.expectedError != nil {
 				assert.Error(t, err)
@@ -236,7 +236,7 @@ func TestNoBalanceForTheBestRouteRouterV2(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			router.SuggestedRoutesV2Async(tt.input)
+			router.SuggestedRoutesAsync(tt.input)
 
 			select {
 			case asyncRoutes := <-suggestedRoutesCh:
