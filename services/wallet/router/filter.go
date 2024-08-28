@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/routes"
 
 	"go.uber.org/zap"
 )
@@ -20,7 +21,7 @@ func init() {
 	}
 }
 
-func filterRoutes(routes [][]*Path, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) [][]*Path {
+func filterRoutes(routes []routes.Route, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) []routes.Route {
 	for i := len(routes) - 1; i >= 0; i-- {
 		routeAmount := big.NewInt(0)
 		for _, p := range routes[i] {
@@ -43,15 +44,15 @@ func filterRoutes(routes [][]*Path, amountIn *big.Int, fromLockedAmount map[uint
 }
 
 // filterNetworkCompliance performs the first level of filtering based on network inclusion/exclusion criteria.
-func filterNetworkCompliance(routes [][]*Path, fromLockedAmount map[uint64]*hexutil.Big) [][]*Path {
-	filteredRoutes := make([][]*Path, 0)
-	if routes == nil || fromLockedAmount == nil {
+func filterNetworkCompliance(allRoutes []routes.Route, fromLockedAmount map[uint64]*hexutil.Big) []routes.Route {
+	filteredRoutes := make([]routes.Route, 0)
+	if allRoutes == nil || fromLockedAmount == nil {
 		return filteredRoutes
 	}
 
 	fromIncluded, fromExcluded := setupRouteValidationMaps(fromLockedAmount)
 
-	for _, route := range routes {
+	for _, route := range allRoutes {
 		if route == nil {
 			continue
 		}
@@ -65,7 +66,7 @@ func filterNetworkCompliance(routes [][]*Path, fromLockedAmount map[uint64]*hexu
 }
 
 // isValidForNetworkCompliance checks if a route complies with network inclusion/exclusion criteria.
-func isValidForNetworkCompliance(route []*Path, fromIncluded, fromExcluded map[uint64]bool) bool {
+func isValidForNetworkCompliance(route routes.Route, fromIncluded, fromExcluded map[uint64]bool) bool {
 	logger.Debug("Initial inclusion/exclusion maps",
 		zap.Any("fromIncluded", fromIncluded),
 		zap.Any("fromExcluded", fromExcluded),
@@ -117,10 +118,10 @@ func setupRouteValidationMaps(fromLockedAmount map[uint64]*hexutil.Big) (map[uin
 }
 
 // filterCapacityValidation performs the second level of filtering based on amount and capacity validation.
-func filterCapacityValidation(routes [][]*Path, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) [][]*Path {
-	filteredRoutes := make([][]*Path, 0)
+func filterCapacityValidation(allRoutes []routes.Route, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) []routes.Route {
+	filteredRoutes := make([]routes.Route, 0)
 
-	for _, route := range routes {
+	for _, route := range allRoutes {
 		if hasSufficientCapacity(route, amountIn, fromLockedAmount) {
 			filteredRoutes = append(filteredRoutes, route)
 		}
@@ -129,7 +130,7 @@ func filterCapacityValidation(routes [][]*Path, amountIn *big.Int, fromLockedAmo
 }
 
 // hasSufficientCapacity checks if a route has sufficient capacity to handle the required amount.
-func hasSufficientCapacity(route []*Path, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) bool {
+func hasSufficientCapacity(route routes.Route, amountIn *big.Int, fromLockedAmount map[uint64]*hexutil.Big) bool {
 	for _, path := range route {
 		if amount, ok := fromLockedAmount[path.FromChain.ChainID]; ok {
 			if path.AmountIn.ToInt().Cmp(amount.ToInt()) != 0 {
@@ -153,7 +154,7 @@ func hasSufficientCapacity(route []*Path, amountIn *big.Int, fromLockedAmount ma
 }
 
 // calculateRestAmountIn calculates the remaining amount in for the route excluding the specified path
-func calculateRestAmountIn(route []*Path, excludePath *Path) *big.Int {
+func calculateRestAmountIn(route routes.Route, excludePath *routes.Path) *big.Int {
 	restAmountIn := big.NewInt(0)
 	for _, path := range route {
 		if path != excludePath {

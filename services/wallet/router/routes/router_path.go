@@ -1,4 +1,4 @@
-package router
+package routes
 
 import (
 	"math/big"
@@ -46,9 +46,9 @@ type Path struct {
 
 	EstimatedTime fees.TransactionEstimation
 
-	requiredTokenBalance  *big.Int // (in selected token)
-	requiredNativeBalance *big.Int // (in ETH WEI)
-	subtractFees          bool
+	RequiredTokenBalance  *big.Int // (in selected token)
+	RequiredNativeBalance *big.Int // (in ETH WEI)
+	SubtractFees          bool
 }
 
 func (p *Path) Equal(o *Path) bool {

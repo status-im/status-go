@@ -2,9 +2,10 @@ package router
 
 import (
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/router/routes"
 )
 
-func removeBestRouteFromAllRouters(allRoutes [][]*Path, best []*Path) [][]*Path {
+func removeBestRouteFromAllRouters(allRoutes []routes.Route, best routes.Route) []routes.Route {
 	for i := len(allRoutes) - 1; i >= 0; i-- {
 		route := allRoutes[i]
 		routeFound := true
@@ -45,7 +46,7 @@ func getChainPriority(chainID uint64) int {
 	}
 }
 
-func getRoutePriority(route []*Path) int {
+func getRoutePriority(route routes.Route) int {
 	priority := 0
 	for _, path := range route {
 		priority += getChainPriority(path.FromChain.ChainID)
