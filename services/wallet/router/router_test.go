@@ -266,7 +266,7 @@ func TestAmountOptions(t *testing.T) {
 			selectedFromChains, _, err := router.getSelectedChains(tt.input)
 			assert.NoError(t, err)
 
-			amountOptions, err := router.findOptionsForSendingAmount(tt.input, selectedFromChains, tt.input.testParams.balanceMap)
+			amountOptions, err := router.findOptionsForSendingAmount(tt.input, selectedFromChains, tt.input.TestParams.BalanceMap)
 			assert.NoError(t, err)
 
 			assert.Equal(t, len(tt.expectedAmountOptions), len(amountOptions))

@@ -2,9 +2,9 @@ package router
 
 import (
 	"math/big"
-	"reflect"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 
 	"go.uber.org/zap"
@@ -57,7 +57,7 @@ func filterNetworkCompliance(routes [][]*Path, fromLockedAmount map[uint64]*hexu
 		}
 
 		// Create fresh copies of the maps for each route check, because they are manipulated
-		if isValidForNetworkCompliance(route, copyMapGeneric(fromIncluded, nil).(map[uint64]bool), copyMapGeneric(fromExcluded, nil).(map[uint64]bool)) {
+		if isValidForNetworkCompliance(route, common.CopyMapGeneric(fromIncluded, nil).(map[uint64]bool), common.CopyMapGeneric(fromExcluded, nil).(map[uint64]bool)) {
 			filteredRoutes = append(filteredRoutes, route)
 		}
 	}
@@ -161,23 +161,4 @@ func calculateRestAmountIn(route []*Path, excludePath *Path) *big.Int {
 		}
 	}
 	return restAmountIn
-}
-
-// copyMapGeneric creates a copy of any map, if the deepCopyValue function is provided, it will be used to copy values.
-func copyMapGeneric(original interface{}, deepCopyValueFn func(interface{}) interface{}) interface{} {
-	originalVal := reflect.ValueOf(original)
-	if originalVal.Kind() != reflect.Map {
-		return nil
-	}
-
-	newMap := reflect.MakeMap(originalVal.Type())
-	for iter := originalVal.MapRange(); iter.Next(); {
-		if deepCopyValueFn != nil {
-			newMap.SetMapIndex(iter.Key(), reflect.ValueOf(deepCopyValueFn(iter.Value().Interface())))
-		} else {
-			newMap.SetMapIndex(iter.Key(), iter.Value())
-		}
-	}
-
-	return newMap.Interface()
 }

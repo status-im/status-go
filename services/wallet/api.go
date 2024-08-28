@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router"
+	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -468,7 +469,7 @@ func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[st
 	return api.s.marketManager.FetchTokenDetails(symbols)
 }
 
-func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*router.SuggestedFeesGwei, error) {
+func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*fees.SuggestedFeesGwei, error) {
 	log.Debug("call to GetSuggestedFees")
 	return api.router.GetFeesManager().SuggestedFeesGwei(ctx, chainID)
 }
@@ -478,7 +479,7 @@ func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint6
 	return api.s.blockChainState.GetEstimatedLatestBlockNumber(ctx, chainID)
 }
 
-func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (router.TransactionEstimation, error) {
+func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (fees.TransactionEstimation, error) {
 	log.Debug("call to getTransactionEstimatedTime")
 	return api.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, gweiToWei(maxFeePerGas)), nil
 }
@@ -488,13 +489,13 @@ func gweiToWei(val *big.Float) *big.Int {
 	return res
 }
 
-func (api *API) GetSuggestedRoutes(ctx context.Context, input *router.RouteInputParams) (*router.SuggestedRoutes, error) {
+func (api *API) GetSuggestedRoutes(ctx context.Context, input *requests.RouteInputParams) (*router.SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
 
 	return api.router.SuggestedRoutes(ctx, input)
 }
 
-func (api *API) GetSuggestedRoutesAsync(ctx context.Context, input *router.RouteInputParams) {
+func (api *API) GetSuggestedRoutesAsync(ctx context.Context, input *requests.RouteInputParams) {
 	log.Debug("call to GetSuggestedRoutesAsync")
 
 	api.router.SuggestedRoutesAsync(input)
