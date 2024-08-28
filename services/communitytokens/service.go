@@ -32,7 +32,7 @@ import (
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/router"
+	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -49,7 +49,7 @@ type Service struct {
 	walletFeed      *event.Feed
 	walletWatcher   *walletevent.Watcher
 	transactor      *transactions.Transactor
-	feeManager      *router.FeeManager
+	feeManager      *fees.FeeManager
 }
 
 // Returns a new Collectibles Service.
@@ -63,7 +63,7 @@ func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, pen
 		db:              communitytokensdatabase.NewCommunityTokensDatabase(appDb),
 		walletFeed:      walletFeed,
 		transactor:      transactor,
-		feeManager:      &router.FeeManager{RPCClient: rpcClient},
+		feeManager:      &fees.FeeManager{RPCClient: rpcClient},
 	}
 }
 
