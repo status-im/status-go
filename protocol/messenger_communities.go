@@ -1498,8 +1498,10 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
-	if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
-		return nil, err
+	if rawMessage.ResendType == common.ResendTypeRawMessage {
+		if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
+			return nil, err
+		}
 	}
 
 	if !community.AutoAccept() {
@@ -1514,6 +1516,9 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		privMembersArray = append(privMembersArray, privilegedMembersSorted[protobuf.CommunityMember_ROLE_ADMIN]...)
 
 		rawMessage.ResendMethod = common.ResendMethodSendPrivate
+		rawMessage.ResendType = common.ResendTypeDataSync
+		// MVDS only supports sending encrypted message
+		rawMessage.SkipEncryptionLayer = false
 		rawMessage.ID = ""
 		rawMessage.Recipients = privMembersArray
 
@@ -1527,14 +1532,9 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		rawMessage.Payload = payload
 
 		for _, member := range rawMessage.Recipients {
+			rawMessage.Sender = nil
 			_, err := m.sender.SendPrivate(context.Background(), member, rawMessage)
 			if err != nil {
-				return nil, err
-			}
-		}
-
-		if len(rawMessage.Recipients) > 0 {
-			if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
 				return nil, err
 			}
 		}
@@ -3687,10 +3687,10 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 	rawMessage := common.RawMessage{
 		Payload:             payload,
 		CommunityID:         community.ID(),
-		SkipEncryptionLayer: true,
+		SkipEncryptionLayer: false,
 		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
-		ResendType:          common.ResendTypeRawMessage,
+		ResendType:          common.ResendTypeDataSync,
 		ResendMethod:        common.ResendMethodSendPrivate,
 		Recipients:          []*ecdsa.PublicKey{receiver},
 	}
@@ -3703,8 +3703,6 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 	if err != nil {
 		return nil, err
 	}
-
-	_, err = m.AddRawMessageToWatch(&rawMessage)
 
 	return requestToJoin, err
 }
@@ -4869,7 +4867,11 @@ func (m *Messenger) CreateResponseWithACNotification(communityID string, acType 
 // use pointer to rawMessage to get the message ID and other updated properties.
 func (m *Messenger) SendMessageToControlNode(community *communities.Community, rawMessage *common.RawMessage) ([]byte, error) {
 	if !community.PublicKey().Equal(community.ControlNode()) {
+		m.logger.Debug("control node is different with community pubkey", zap.Any("control:", community.ControlNode()), zap.Any("communityPubkey:", community.PublicKey()))
 		rawMessage.ResendMethod = common.ResendMethodSendPrivate
+		rawMessage.ResendType = common.ResendTypeDataSync
+		// MVDS only supports sending encrypted message
+		rawMessage.SkipEncryptionLayer = false
 		rawMessage.Recipients = append(rawMessage.Recipients, community.ControlNode())
 		return m.sender.SendPrivate(context.Background(), community.ControlNode(), rawMessage)
 	}
