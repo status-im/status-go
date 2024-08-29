@@ -18,6 +18,7 @@ import (
 	common "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	rpc "github.com/ethereum/go-ethereum/rpc"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockPublicTransactionPoolAPI is a mock of PublicTransactionPoolAPI interface.

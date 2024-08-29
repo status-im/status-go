@@ -703,3 +703,89 @@ func (mr *MockCopyableMockRecorder) Copy() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Copy", reflect.TypeOf((*MockCopyable)(nil).Copy))
 }
+
+// MockHealthMonitor is a mock of HealthMonitor interface.
+type MockHealthMonitor struct {
+	ctrl     *gomock.Controller
+	recorder *MockHealthMonitorMockRecorder
+}
+
+// MockHealthMonitorMockRecorder is the mock recorder for MockHealthMonitor.
+type MockHealthMonitorMockRecorder struct {
+	mock *MockHealthMonitor
+}
+
+// NewMockHealthMonitor creates a new mock instance.
+func NewMockHealthMonitor(ctrl *gomock.Controller) *MockHealthMonitor {
+	mock := &MockHealthMonitor{ctrl: ctrl}
+	mock.recorder = &MockHealthMonitorMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockHealthMonitor) EXPECT() *MockHealthMonitorMockRecorder {
+	return m.recorder
+}
+
+// GetCircuitBreaker mocks base method.
+func (m *MockHealthMonitor) GetCircuitBreaker() *circuitbreaker.CircuitBreaker {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCircuitBreaker")
+	ret0, _ := ret[0].(*circuitbreaker.CircuitBreaker)
+	return ret0
+}
+
+// GetCircuitBreaker indicates an expected call of GetCircuitBreaker.
+func (mr *MockHealthMonitorMockRecorder) GetCircuitBreaker() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCircuitBreaker", reflect.TypeOf((*MockHealthMonitor)(nil).GetCircuitBreaker))
+}
+
+// SetCircuitBreaker mocks base method.
+func (m *MockHealthMonitor) SetCircuitBreaker(cb *circuitbreaker.CircuitBreaker) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCircuitBreaker", cb)
+}
+
+// SetCircuitBreaker indicates an expected call of SetCircuitBreaker.
+func (mr *MockHealthMonitorMockRecorder) SetCircuitBreaker(cb interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCircuitBreaker", reflect.TypeOf((*MockHealthMonitor)(nil).SetCircuitBreaker), cb)
+}
+
+// MockCopyable is a mock of Copyable interface.
+type MockCopyable struct {
+	ctrl     *gomock.Controller
+	recorder *MockCopyableMockRecorder
+}
+
+// MockCopyableMockRecorder is the mock recorder for MockCopyable.
+type MockCopyableMockRecorder struct {
+	mock *MockCopyable
+}
+
+// NewMockCopyable creates a new mock instance.
+func NewMockCopyable(ctrl *gomock.Controller) *MockCopyable {
+	mock := &MockCopyable{ctrl: ctrl}
+	mock.recorder = &MockCopyableMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCopyable) EXPECT() *MockCopyableMockRecorder {
+	return m.recorder
+}
+
+// Copy mocks base method.
+func (m *MockCopyable) Copy() interface{} {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Copy")
+	ret0, _ := ret[0].(interface{})
+	return ret0
+}
+
+// Copy indicates an expected call of Copy.
+func (mr *MockCopyableMockRecorder) Copy() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Copy", reflect.TypeOf((*MockCopyable)(nil).Copy))
+}

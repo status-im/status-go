@@ -1,5 +1,7 @@
 package thirdparty
 
+//go:generate mockgen -source=collectible_types.go -destination=mock/collectible_types.go
+
 import (
 	"context"
 	"database/sql"

@@ -1,5 +1,7 @@
 package paraswap
 
+//go:generate mockgen -source=types.go -destination=mock/types.go
+
 import (
 	"context"
 	"encoding/json"

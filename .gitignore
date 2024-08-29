@@ -111,3 +111,6 @@ report/results.xml
 integration-tests/coverage
 integration-tests/reports
 integration-tests/*.log
+
+# generated files
+mock

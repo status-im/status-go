@@ -1,5 +1,7 @@
 package network
 
+//go:generate mockgen -source=network.go -destination=mock/network.go
+
 import (
 	"bytes"
 	"database/sql"

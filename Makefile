@@ -312,13 +312,11 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
-generate-handlers:
-	go generate ./_assets/generate_handlers/
-generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./_assets/generate_handlers
-
-generate-appdatabase:
-	go generate ./appdatabase/...
+generate:
+	@packages=$(shell go list ./... | grep -v "./contracts")
+	@go generate "${packages}"
+	#go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./_assets/generate_handlers/...
+	#go generate ./appdatabase/...
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)

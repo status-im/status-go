@@ -53,6 +53,7 @@ in rec {
   });
 
   # Custom packages
+  go-gencodec = callPackage ./pkgs/go-gencodec { };
   go-modvendor = callPackage ./pkgs/go-modvendor { };
   cc-test-reporter = callPackage ./pkgs/cc-test-reporter { };
   codecov-cli = callPackage ./pkgs/codecov-cli { };

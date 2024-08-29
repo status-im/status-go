@@ -1,5 +1,7 @@
 package token
 
+//go:generate mockgen -source=token.go -destination=mock/token/tokenmanager.go
+
 import (
 	"context"
 	"database/sql"

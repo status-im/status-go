@@ -17,6 +17,7 @@ import (
 
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
+	gomock "github.com/golang/mock/gomock"
 	account "github.com/status-im/status-go/account"
 	types0 "github.com/status-im/status-go/eth-node/types"
 	pathprocessor "github.com/status-im/status-go/services/wallet/router/pathprocessor"

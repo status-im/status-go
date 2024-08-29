@@ -6,8 +6,8 @@
 //	mockgen -package=mock_transactor -destination=transactions/mock_transactor/transactor.go -source=transactions/transactor.go
 //
 
-// Package mock_transactor is a generated GoMock package.
-package mock_transactor
+// Package mock_transactions is a generated GoMock package.
+package mock_transactions
 
 import (
 	big "math/big"
@@ -17,6 +17,7 @@ import (
 
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
+	gomock "github.com/golang/mock/gomock"
 	account "github.com/status-im/status-go/account"
 	types0 "github.com/status-im/status-go/eth-node/types"
 	params "github.com/status-im/status-go/params"

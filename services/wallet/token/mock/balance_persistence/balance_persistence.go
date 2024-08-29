@@ -15,6 +15,7 @@ import (
 	gomock "go.uber.org/mock/gomock"
 
 	common "github.com/ethereum/go-ethereum/common"
+	gomock "github.com/golang/mock/gomock"
 	token "github.com/status-im/status-go/services/wallet/token"
 )
 
