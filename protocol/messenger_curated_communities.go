@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/services/wallet/common"
 )
 
 const (
@@ -89,9 +90,9 @@ func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCom
 		return nil, err
 	}
 
-	chainID := uint64(10) // Optimism Mainnet
+	chainID := common.OptimismMainnet
 	if testNetworksEnabled {
-		chainID = 420 // Optimism Goerli
+		chainID = common.OptimismSepolia
 	}
 
 	directory, err := m.contractMaker.NewDirectory(chainID)
