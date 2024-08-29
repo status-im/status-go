@@ -317,24 +317,10 @@ func arrayContainsElement[T comparable](el T, arr []T) bool {
 	return false
 }
 
-func arraysWithSameElements[T comparable](ar1 []T, ar2 []T, isEqual func(T, T) bool) bool {
-	if len(ar1) != len(ar2) {
-		return false
-	}
-	for _, el := range ar1 {
-		if !arrayContainsElement(el, ar2) {
-			return false
-		}
-	}
-	return true
-}
-
-func sameSingleChainTransfer(fromChains []*params.Network, toChains []*params.Network) bool {
+func isSingleChainOperation(fromChains []*params.Network, toChains []*params.Network) bool {
 	return len(fromChains) == 1 &&
 		len(toChains) == 1 &&
-		arraysWithSameElements(fromChains, toChains, func(a, b *params.Network) bool {
-			return a.ChainID == b.ChainID
-		})
+		fromChains[0].ChainID == toChains[0].ChainID
 }
 
 type Router struct {

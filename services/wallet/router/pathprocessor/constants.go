@@ -32,3 +32,11 @@ const (
 	ProcessorENSPublicKeyName = "ENSPublicKey"
 	ProcessorStickersBuyName  = "StickersBuy"
 )
+
+func IsProcessorBridge(name string) bool {
+	return name == ProcessorBridgeHopName || name == ProcessorBridgeCelerName
+}
+
+func IsProcessorSwap(name string) bool {
+	return name == ProcessorSwapParaswapName
+}
