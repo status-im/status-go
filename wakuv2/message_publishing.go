@@ -92,11 +92,11 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 		err = w.messageSender.Send(publish.NewRequest(w.ctx, envelope))
 	}
 
-	if w.statusTelemetryClient != nil {
+	if w.metricsHandler != nil {
 		if err == nil {
-			w.statusTelemetryClient.PushSentEnvelope(w.ctx, SentEnvelope{Envelope: envelope, PublishMethod: w.messageSender.PublishMethod()})
+			w.metricsHandler.PushSentEnvelope(SentEnvelope{Envelope: envelope, PublishMethod: w.messageSender.PublishMethod()})
 		} else {
-			w.statusTelemetryClient.PushErrorSendingEnvelope(w.ctx, ErrorSendingEnvelope{Error: err, SentEnvelope: SentEnvelope{Envelope: envelope, PublishMethod: w.messageSender.PublishMethod()}})
+			w.metricsHandler.PushErrorSendingEnvelope(ErrorSendingEnvelope{Error: err, SentEnvelope: SentEnvelope{Envelope: envelope, PublishMethod: w.messageSender.PublishMethod()}})
 		}
 	}
 

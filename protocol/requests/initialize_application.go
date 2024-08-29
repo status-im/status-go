@@ -23,6 +23,9 @@ type InitializeApplication struct {
 	LogEnabled        bool   `json:"logEnabled"`
 	LogLevel          string `json:"logLevel"`
 	APILoggingEnabled bool   `json:"apiLoggingEnabled"`
+
+	MetricsEnabled bool   `json:"metricsEnabled"`
+	MetricsAddress string `json:"metricsAddress"`
 }
 
 func (i *InitializeApplication) Validate() error {

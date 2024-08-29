@@ -180,6 +180,15 @@ func initializeLogging(request *requests.InitializeApplication) error {
 		}
 	}
 
+	if request.MetricsEnabled {
+		// Start metrics server
+		err := statusBackend.StartPrometheusMetricsServer(request.MetricsAddress)
+		if err != nil {
+			return err
+		}
+		logutils.ZapLogger().Info("metrics prometheus server started", zap.String("address", request.MetricsAddress))
+	}
+
 	return nil
 }
 

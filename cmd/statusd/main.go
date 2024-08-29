@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -313,7 +314,7 @@ func main() {
 		if *metricsEnabled || gethmetrics.Enabled {
 			go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
 			go gethmetrics.CollectProcessMetrics(3 * time.Second)
-			go metrics.NewMetricsServer(*metricsPort, gethmetrics.DefaultRegistry).Listen()
+			go metrics.NewMetricsServer("localhost:"+strconv.Itoa(*metricsPort), gethmetrics.DefaultRegistry).Listen()
 		}
 
 		// Check if profiling shall be enabled.

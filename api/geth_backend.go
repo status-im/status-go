@@ -39,6 +39,7 @@ import (
 	"github.com/status-im/status-go/internal/sentry"
 	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/metrics"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
@@ -104,6 +105,7 @@ type GethStatusBackend struct {
 	allowAllRPC              bool // used only for tests, disables api method restrictions
 	LocalPairingStateManager *statecontrol.ProcessStateManager
 	centralizedMetrics       *centralizedmetrics.MetricService
+	prometheusMetrics        *metrics.Server
 	sentryDSN                string
 
 	logger *zap.Logger
@@ -266,6 +268,15 @@ func (b *GethStatusBackend) AcceptTerms() error {
 	}
 
 	return b.multiaccountsDB.UpdateHasAcceptedTerms(accounts[0].KeyUID, true)
+}
+
+func (b *GethStatusBackend) StartPrometheusMetricsServer(address string) error {
+	if b.prometheusMetrics != nil {
+		return nil
+	}
+	b.prometheusMetrics = metrics.NewMetricsServer(address, nil)
+	go b.prometheusMetrics.Listen()
+	return nil
 }
 
 func (b *GethStatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Account, error) {

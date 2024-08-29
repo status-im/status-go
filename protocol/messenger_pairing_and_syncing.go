@@ -465,10 +465,10 @@ func (m *Messenger) InitInstallations() error {
 		return err
 	}
 
-	if m.telemetryClient != nil {
+	if m.wakuMetricsHandler != nil {
 		installation, ok := m.allInstallations.Load(m.installationID)
 		if ok {
-			m.telemetryClient.SetDeviceType(installation.InstallationMetadata.DeviceType)
+			m.wakuMetricsHandler.SetDeviceType(installation.InstallationMetadata.DeviceType)
 		}
 	}
 
