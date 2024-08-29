@@ -893,8 +893,8 @@ func (r *Router) resolveCandidates(ctx context.Context, input *RouteInputParams,
 						continue
 					}
 
-					// if just a single from and to chain is selected for transfer, we can skip the bridge as potential path
-					if !input.SendType.simpleTransfer(pProcessor) && sameSingleChainTransfer(selectedFromChains, selectedToChains) {
+					// if we're doing a single chain operation, we can skip bridge processors
+					if isSingleChainOperation(selectedFromChains, selectedToChains) && pathprocessor.IsProcessorBridge(pProcessor.Name()) {
 						continue
 					}
 

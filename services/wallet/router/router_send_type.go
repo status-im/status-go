@@ -109,13 +109,11 @@ func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
 	switch s {
 	case Transfer:
 		return pathProcessorName == pathprocessor.ProcessorTransferName ||
-			pathProcessorName == pathprocessor.ProcessorBridgeHopName ||
-			pathProcessorName == pathprocessor.ProcessorBridgeCelerName
+			pathprocessor.IsProcessorBridge(pathProcessorName)
 	case Bridge:
-		return pathProcessorName == pathprocessor.ProcessorBridgeHopName ||
-			pathProcessorName == pathprocessor.ProcessorBridgeCelerName
+		return pathprocessor.IsProcessorBridge(pathProcessorName)
 	case Swap:
-		return pathProcessorName == pathprocessor.ProcessorSwapParaswapName
+		return pathprocessor.IsProcessorSwap(pathProcessorName)
 	case ERC721Transfer:
 		return pathProcessorName == pathprocessor.ProcessorERC721Name
 	case ERC1155Transfer:
@@ -131,10 +129,6 @@ func (s SendType) canUseProcessor(p pathprocessor.PathProcessor) bool {
 	default:
 		return true
 	}
-}
-
-func (s SendType) simpleTransfer(p pathprocessor.PathProcessor) bool {
-	return s == Transfer && p.Name() == pathprocessor.ProcessorTransferName
 }
 
 func (s SendType) processZeroAmountInProcessor(amountIn *big.Int, amountOut *big.Int, processorName string) bool {
