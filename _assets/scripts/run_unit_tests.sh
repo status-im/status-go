@@ -37,15 +37,17 @@ run_test_for_packages() {
   local packages="$1"
   local iteration="$2"
   local count="$3"
-  local log_message="$4"
+  local single_timeout="$4"
+  local log_message="$5"
 
   local output_file="test_${iteration}.log"
   local coverage_file="test_${iteration}.coverage.out"
   local report_file="report_${iteration}.xml"
   local rerun_report_file="report_rerun_fails_${iteration}.txt"
   local exit_code_file="exit_code_${iteration}.txt"
+  local timeout="$(( single_timeout * count))m"
 
-  echo -e "${GRN}Testing:${RST} ${log_message}. Iteration ${iteration}. -test.count=${count}"
+  echo -e "${GRN}Testing:${RST} ${log_message}. Iteration ${iteration}. -test.count=${count}. Timeout: ${timeout}"
 
   gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"
   if [[ "${CI}" == 'true' ]]; then
@@ -63,7 +65,7 @@ run_test_for_packages() {
   gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
     ./_assets/scripts/test-with-coverage.sh \
     ${GOTEST_EXTRAFLAGS} \
-    -timeout 40m \
+    -timeout "${timeout}" \
     -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
 
@@ -93,13 +95,13 @@ rm -rf ./**/*.coverage.out
 
 echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
-run_test_for_packages "${UNIT_TEST_PACKAGES}" "${UNIT_TEST_COUNT}" "0" "All packages except 'protocol'" &
+run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" 3 "All packages except 'protocol'" &
 
 # NOTE: Run `protocol` package manually, because it lasts for 30 minutes.
 # Running -test.count=20 for it takes too much time, so we spawn separate processes for it.
 # This can be removed when the runtime of `protocol` package is optimized.
 for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-  run_test_for_packages github.com/status-im/status-go/protocol 1 "${i}" "Only 'protocol' package" &
+  run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 40 "Only 'protocol' package" &
 done
 
 wait
