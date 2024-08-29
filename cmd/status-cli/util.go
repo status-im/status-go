@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -12,11 +11,11 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/metrics/wakumetrics"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wakuv2ext"
-	"github.com/status-im/status-go/telemetry"
 
 	"github.com/urfave/cli/v2"
 )
@@ -74,14 +73,12 @@ func start(p StartParams, logger *zap.SugaredLogger) (*StatusCLI, error) {
 	}
 
 	if p.TelemetryURL != "" {
-		telemetryLogger, err := getLogger(true)
+		waku := backend.StatusNode().WakuV2Service()
+		telemetryClient, err := wakumetrics.NewClient(wakumetrics.WithPeerID(waku.PeerID().String()))
 		if err != nil {
 			return nil, err
 		}
-		waku := backend.StatusNode().WakuV2Service()
-		telemetryClient := telemetry.NewClient(telemetryLogger, p.TelemetryURL, backend.SelectedAccountKeyID(), p.Name, "cli", telemetry.WithPeerID(waku.PeerID().String()))
-		telemetryClient.Start(context.Background())
-		backend.StatusNode().WakuV2Service().SetStatusTelemetryClient(telemetryClient)
+		backend.StatusNode().WakuV2Service().SetMetricsHandler(telemetryClient)
 	}
 	wakuAPI := wakuv2ext.NewPublicAPI(wakuService)
 
@@ -152,7 +149,8 @@ func createAccountAndLogin(b *api.GethStatusBackend, rootDataDir, password strin
 			HTTPHost:    "127.0.0.1",
 			HTTPPort:    p.Port,
 		},
-		TelemetryServerURL: p.TelemetryURL,
+		TelemetryServerURL:                     p.TelemetryURL,
+		WakuV2EnableMissingMessageVerification: true,
 	}
 	return b.CreateAccountAndLogin(req,
 		params.WithFleet(p.Fleet),
