@@ -10,43 +10,46 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/contracts"
 	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	routs "github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
 )
 
 func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
-	bool, *big.Int, uint64, uint64, error) {
+	bool, *big.Int, error) {
 	if sendType.IsCollectiblesTransfer() || sendType.IsEnsTransfer() || sendType.IsStickersTransfer() {
-		return false, nil, 0, 0, nil
+		return false, nil, nil
 	}
 
 	if params.FromToken.IsNative() {
-		return false, nil, 0, 0, nil
+		return false, nil, nil
 	}
 
 	contractMaker, err := contracts.NewContractMaker(r.rpcClient)
 	if err != nil {
-		return false, nil, 0, 0, err
+		return false, nil, err
 	}
 
 	contract, err := contractMaker.NewERC20(params.FromChain.ChainID, params.FromToken.Address)
 	if err != nil {
-		return false, nil, 0, 0, err
+		return false, nil, err
 	}
 
 	if approvalContractAddress == nil || *approvalContractAddress == pathprocessor.ZeroAddress {
-		return false, nil, 0, 0, nil
+		return false, nil, nil
 	}
 
 	if params.TestsMode {
-		return true, params.AmountIn, params.TestApprovalGasEstimation, params.TestApprovalL1Fee, nil
+		return true, params.AmountIn, nil
 	}
 
 	allowance, err := contract.Allowance(&bind.CallOpts{
@@ -54,45 +57,65 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 	}, params.FromAddr, *approvalContractAddress)
 
 	if err != nil {
-		return false, nil, 0, 0, err
+		return false, nil, err
 	}
 
 	if allowance.Cmp(params.AmountIn) >= 0 {
-		return false, nil, 0, 0, nil
+		return false, nil, nil
 	}
 
-	ethClient, err := r.rpcClient.EthClient(params.FromChain.ChainID)
-	if err != nil {
-		return false, nil, 0, 0, err
+	return true, params.AmountIn, nil
+}
+
+func (r *Router) packApprovalInputData(amountIn *big.Int, approvalContractAddress *common.Address) ([]byte, error) {
+	if approvalContractAddress == nil || *approvalContractAddress == pathprocessor.ZeroAddress {
+		return []byte{}, nil
 	}
 
 	erc20ABI, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
 	if err != nil {
-		return false, nil, 0, 0, err
+		return []byte{}, err
 	}
 
-	data, err := erc20ABI.Pack("approve", approvalContractAddress, params.AmountIn)
+	return erc20ABI.Pack("approve", approvalContractAddress, amountIn)
+}
+
+func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParams, approvalContractAddress *common.Address) (uint64, error) {
+	data, err := r.packApprovalInputData(params.AmountIn, approvalContractAddress)
 	if err != nil {
-		return false, nil, 0, 0, err
+		return 0, err
 	}
 
-	estimate, err := ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
+	ethClient, err := r.rpcClient.EthClient(params.FromChain.ChainID)
+	if err != nil {
+		return 0, err
+	}
+
+	return ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
 		From:  params.FromAddr,
 		To:    &params.FromToken.Address,
 		Value: pathprocessor.ZeroBigIntValue,
 		Data:  data,
 	})
+}
+
+func (r *Router) calculateApprovalL1Fee(amountIn *big.Int, chainID uint64, approvalContractAddress *common.Address) (uint64, error) {
+	data, err := r.packApprovalInputData(amountIn, approvalContractAddress)
 	if err != nil {
-		return false, nil, 0, 0, err
+		return 0, err
 	}
 
-	// fetching l1 fee
+	ethClient, err := r.rpcClient.EthClient(chainID)
+	if err != nil {
+		return 0, err
+	}
+
 	var l1Fee uint64
-	oracleContractAddress, err := gaspriceoracle.ContractAddress(params.FromChain.ChainID)
+	oracleContractAddress, err := gaspriceoracle.ContractAddress(chainID)
 	if err == nil {
 		oracleContract, err := gaspriceoracle.NewGaspriceoracleCaller(oracleContractAddress, ethClient)
 		if err != nil {
-			return false, nil, 0, 0, err
+			return 0, err
 		}
 
 		callOpt := &bind.CallOpts{}
@@ -101,7 +124,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 		l1Fee = l1FeeResult.Uint64()
 	}
 
-	return true, params.AmountIn, estimate, l1Fee, nil
+	return l1Fee, nil
 }
 
 func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
@@ -135,4 +158,97 @@ func (r *Router) getBalance(ctx context.Context, chainID uint64, token *token.To
 	}
 
 	return r.tokenManager.GetBalance(ctx, client, account, token.Address)
+}
+
+func (r *Router) cacluateFees(ctx context.Context, path *routs.Path, fetchedFees *fees.SuggestedFees, testsMode bool, testApprovalL1Fee uint64) (err error) {
+
+	var (
+		l1ApprovalFee uint64
+	)
+	if path.ApprovalRequired {
+		if testsMode {
+			l1ApprovalFee = testApprovalL1Fee
+		} else {
+			l1ApprovalFee, err = r.calculateApprovalL1Fee(path.AmountIn.ToInt(), path.FromChain.ChainID, path.ApprovalContractAddress)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// TODO: keep l1 fees at 0 until we have the correct algorithm, as we do base fee x 2 that should cover the l1 fees
+	var l1FeeWei uint64 = 0
+	// if input.SendType.needL1Fee() {
+	// 	txInputData, err := pProcessor.PackTxInputData(processorInputParams)
+	// 	if err != nil {
+	// 		continue
+	// 	}
+
+	// 	l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, txInputData)
+	// }
+
+	r.lastInputParamsMutex.Lock()
+	gasFeeMode := r.lastInputParams.GasFeeMode
+	r.lastInputParamsMutex.Unlock()
+	maxFeesPerGas := fetchedFees.FeeFor(gasFeeMode)
+
+	// calculate ETH fees
+	ethTotalFees := big.NewInt(0)
+	txFeeInWei := new(big.Int).Mul(maxFeesPerGas, big.NewInt(int64(path.TxGasAmount)))
+	ethTotalFees.Add(ethTotalFees, txFeeInWei)
+
+	txL1FeeInWei := big.NewInt(0)
+	if l1FeeWei > 0 {
+		txL1FeeInWei = big.NewInt(int64(l1FeeWei))
+		ethTotalFees.Add(ethTotalFees, txL1FeeInWei)
+	}
+
+	approvalFeeInWei := big.NewInt(0)
+	approvalL1FeeInWei := big.NewInt(0)
+	if path.ApprovalRequired {
+		approvalFeeInWei.Mul(maxFeesPerGas, big.NewInt(int64(path.ApprovalGasAmount)))
+		ethTotalFees.Add(ethTotalFees, approvalFeeInWei)
+
+		if l1ApprovalFee > 0 {
+			approvalL1FeeInWei = big.NewInt(int64(l1ApprovalFee))
+			ethTotalFees.Add(ethTotalFees, approvalL1FeeInWei)
+		}
+	}
+
+	// calculate required balances (bonder and token fees are already included in the amountIn by Hop bridge (once we include Celar we need to check how they handle the fees))
+	requiredNativeBalance := big.NewInt(0)
+	requiredTokenBalance := big.NewInt(0)
+
+	if path.FromToken.IsNative() {
+		requiredNativeBalance.Add(requiredNativeBalance, path.AmountIn.ToInt())
+		if !path.SubtractFees {
+			requiredNativeBalance.Add(requiredNativeBalance, ethTotalFees)
+		}
+	} else {
+		requiredTokenBalance.Add(requiredTokenBalance, path.AmountIn.ToInt())
+		requiredNativeBalance.Add(requiredNativeBalance, ethTotalFees)
+	}
+
+	// set the values
+	path.SuggestedLevelsForMaxFeesPerGas = fetchedFees.MaxFeesLevels
+	path.MaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
+
+	path.TxBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
+	path.TxPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas)
+
+	path.TxFee = (*hexutil.Big)(txFeeInWei)
+	path.TxL1Fee = (*hexutil.Big)(txL1FeeInWei)
+
+	path.ApprovalBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
+	path.ApprovalPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas)
+
+	path.ApprovalFee = (*hexutil.Big)(approvalFeeInWei)
+	path.ApprovalL1Fee = (*hexutil.Big)(approvalL1FeeInWei)
+
+	path.TxTotalFee = (*hexutil.Big)(ethTotalFees)
+
+	path.RequiredTokenBalance = requiredTokenBalance
+	path.RequiredNativeBalance = requiredNativeBalance
+
+	return nil
 }
