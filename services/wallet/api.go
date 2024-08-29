@@ -507,6 +507,12 @@ func (api *API) StopSuggestedRoutesAsyncCalculation(ctx context.Context) {
 	api.router.StopSuggestedRoutesAsyncCalculation()
 }
 
+func (api *API) StopSuggestedRoutesCalculation(ctx context.Context) {
+	log.Debug("call to StopSuggestedRoutesCalculation")
+
+	api.router.StopSuggestedRoutesCalculation()
+}
+
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
 func (api *API) GetDerivedAddresses(ctx context.Context, password string, derivedFrom string, paths []string) ([]*DerivedAddress, error) {
 	info, err := api.s.gethManager.AccountsGenerator().LoadAccount(derivedFrom, password)

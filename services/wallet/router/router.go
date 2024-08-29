@@ -73,6 +73,14 @@ type Router struct {
 	feesManager         *fees.FeeManager
 	pathProcessors      map[string]pathprocessor.PathProcessor
 	scheduler           *async.Scheduler
+
+	activeRoutesMutex sync.Mutex
+	activeRoutes      *SuggestedRoutes
+
+	lastInputParamsMutex sync.Mutex
+	lastInputParams      *requests.RouteInputParams
+
+	clientsForUpdatesPerChains sync.Map
 }
 
 func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager, marketManager *market.Manager,
@@ -147,41 +155,46 @@ func newSuggestedRoutes(
 	return suggestedRoutes, allRoutes
 }
 
+func sendRouterResult(uuid string, result interface{}, err error) {
+	routesResponse := responses.RouterSuggestedRoutes{
+		Uuid: uuid,
+	}
+
+	if err != nil {
+		errorResponse := errors.CreateErrorResponseFromError(err)
+		routesResponse.ErrorResponse = errorResponse.(*errors.ErrorResponse)
+	}
+
+	if suggestedRoutes, ok := result.(*SuggestedRoutes); ok && suggestedRoutes != nil {
+		routesResponse.Best = suggestedRoutes.Best
+		routesResponse.Candidates = suggestedRoutes.Candidates
+		routesResponse.TokenPrice = &suggestedRoutes.TokenPrice
+		routesResponse.NativeChainTokenPrice = &suggestedRoutes.NativeChainTokenPrice
+	}
+
+	signal.SendWalletEvent(signal.SuggestedRoutes, routesResponse)
+}
+
 func (r *Router) SuggestedRoutesAsync(input *requests.RouteInputParams) {
 	r.scheduler.Enqueue(routerTask, func(ctx context.Context) (interface{}, error) {
 		return r.SuggestedRoutes(ctx, input)
 	}, func(result interface{}, taskType async.TaskType, err error) {
-		routesResponse := responses.RouterSuggestedRoutes{
-			Uuid: input.Uuid,
-		}
-
-		if err != nil {
-			errorResponse := errors.CreateErrorResponseFromError(err)
-			routesResponse.ErrorResponse = errorResponse.(*errors.ErrorResponse)
-		}
-
-		if suggestedRoutes, ok := result.(*SuggestedRoutes); ok && suggestedRoutes != nil {
-			routesResponse.Best = suggestedRoutes.Best
-			routesResponse.Candidates = suggestedRoutes.Candidates
-			routesResponse.TokenPrice = &suggestedRoutes.TokenPrice
-			routesResponse.NativeChainTokenPrice = &suggestedRoutes.NativeChainTokenPrice
-		}
-
-		signal.SendWalletEvent(signal.SuggestedRoutes, routesResponse)
+		sendRouterResult(input.Uuid, result, err)
 	})
 }
 
 func (r *Router) StopSuggestedRoutesAsyncCalculation() {
+	r.unsubscribeFeesUpdateAccrossAllChains()
 	r.scheduler.Stop()
 }
 
-func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInputParams) (*SuggestedRoutes, error) {
-	testnetMode, err := r.rpcClient.NetworkManager.GetTestNetworksEnabled()
-	if err != nil {
-		return nil, errors.CreateErrorResponseFromError(err)
-	}
+func (r *Router) StopSuggestedRoutesCalculation() {
+	r.unsubscribeFeesUpdateAccrossAllChains()
+}
 
-	input.TestnetMode = testnetMode
+func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInputParams) (suggestedRoutes *SuggestedRoutes, err error) {
+	// unsubscribe from updates
+	r.unsubscribeFeesUpdateAccrossAllChains()
 
 	// clear all processors
 	for _, processor := range r.pathProcessors {
@@ -189,6 +202,29 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 			clearable.Clear()
 		}
 	}
+
+	r.lastInputParamsMutex.Lock()
+	r.lastInputParams = input
+	r.lastInputParamsMutex.Unlock()
+
+	defer func() {
+		r.activeRoutesMutex.Lock()
+		r.activeRoutes = suggestedRoutes
+		r.activeRoutesMutex.Unlock()
+		if suggestedRoutes != nil && err == nil {
+			// subscribe for updates
+			for _, path := range suggestedRoutes.Best {
+				err = r.subscribeForUdates(path.FromChain.ChainID)
+			}
+		}
+	}()
+
+	testnetMode, err := r.rpcClient.NetworkManager.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, errors.CreateErrorResponseFromError(err)
+	}
+
+	input.TestnetMode = testnetMode
 
 	err = input.Validate()
 	if err != nil {
@@ -224,7 +260,7 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
-	suggestedRoutes, err := r.resolveRoutes(ctx, input, candidates, balanceMap)
+	suggestedRoutes, err = r.resolveRoutes(ctx, input, candidates, balanceMap)
 
 	if err == nil && (suggestedRoutes == nil || len(suggestedRoutes.Best) == 0) {
 		// No best route found, but no error given.
@@ -657,22 +693,24 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
 							continue
 						}
-						approvalRequired, approvalAmountRequired, approvalGasLimit, l1ApprovalFee, err := r.requireApproval(ctx, input.SendType, &approvalContractAddress, processorInputParams)
+						approvalRequired, approvalAmountRequired, err := r.requireApproval(ctx, input.SendType, &approvalContractAddress, processorInputParams)
 						if err != nil {
 							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
 							continue
 						}
 
-						// TODO: keep l1 fees at 0 until we have the correct algorithm, as we do base fee x 2 that should cover the l1 fees
-						var l1FeeWei uint64 = 0
-						// if input.SendType.needL1Fee() {
-						// 	txInputData, err := pProcessor.PackTxInputData(processorInputParams)
-						// 	if err != nil {
-						// 		continue
-						// 	}
-
-						// 	l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, txInputData)
-						// }
+						var approvalGasLimit uint64
+						if approvalRequired {
+							if processorInputParams.TestsMode {
+								approvalGasLimit = processorInputParams.TestApprovalGasEstimation
+							} else {
+								approvalGasLimit, err = r.estimateGasForApproval(processorInputParams, &approvalContractAddress)
+								if err != nil {
+									appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
+									continue
+								}
+							}
+						}
 
 						amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
 						if err != nil {
@@ -687,44 +725,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 							estimatedTime += 1
 						}
 
-						// calculate ETH fees
-						ethTotalFees := big.NewInt(0)
-						txFeeInWei := new(big.Int).Mul(maxFeesPerGas, big.NewInt(int64(gasLimit)))
-						ethTotalFees.Add(ethTotalFees, txFeeInWei)
-
-						txL1FeeInWei := big.NewInt(0)
-						if l1FeeWei > 0 {
-							txL1FeeInWei = big.NewInt(int64(l1FeeWei))
-							ethTotalFees.Add(ethTotalFees, txL1FeeInWei)
-						}
-
-						approvalFeeInWei := big.NewInt(0)
-						approvalL1FeeInWei := big.NewInt(0)
-						if approvalRequired {
-							approvalFeeInWei.Mul(maxFeesPerGas, big.NewInt(int64(approvalGasLimit)))
-							ethTotalFees.Add(ethTotalFees, approvalFeeInWei)
-
-							if l1ApprovalFee > 0 {
-								approvalL1FeeInWei = big.NewInt(int64(l1ApprovalFee))
-								ethTotalFees.Add(ethTotalFees, approvalL1FeeInWei)
-							}
-						}
-
-						// calculate required balances (bonder and token fees are already included in the amountIn by Hop bridge (once we include Celar we need to check how they handle the fees))
-						requiredNativeBalance := big.NewInt(0)
-						requiredTokenBalance := big.NewInt(0)
-
-						if token.IsNative() {
-							requiredNativeBalance.Add(requiredNativeBalance, amountOption.amount)
-							if !amountOption.subtractFees {
-								requiredNativeBalance.Add(requiredNativeBalance, ethTotalFees)
-							}
-						} else {
-							requiredTokenBalance.Add(requiredTokenBalance, amountOption.amount)
-							requiredNativeBalance.Add(requiredNativeBalance, ethTotalFees)
-						}
-
-						appendPathFn(&routes.Path{
+						path := &routes.Path{
 							ProcessorName:  pProcessor.Name(),
 							FromChain:      network,
 							ToChain:        dest,
@@ -734,36 +735,28 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 							AmountInLocked: amountOption.locked,
 							AmountOut:      (*hexutil.Big)(amountOut),
 
-							SuggestedLevelsForMaxFeesPerGas: fetchedFees.MaxFeesLevels,
-							MaxFeesPerGas:                   (*hexutil.Big)(maxFeesPerGas),
-
-							TxBaseFee:     (*hexutil.Big)(fetchedFees.BaseFee),
-							TxPriorityFee: (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas),
-							TxGasAmount:   gasLimit,
-							TxBonderFees:  (*hexutil.Big)(bonderFees),
-							TxTokenFees:   (*hexutil.Big)(tokenFees),
-
-							TxFee:   (*hexutil.Big)(txFeeInWei),
-							TxL1Fee: (*hexutil.Big)(txL1FeeInWei),
+							// set params that we don't want to be recalculated with every new block creation
+							TxGasAmount:  gasLimit,
+							TxBonderFees: (*hexutil.Big)(bonderFees),
+							TxTokenFees:  (*hexutil.Big)(tokenFees),
 
 							ApprovalRequired:        approvalRequired,
 							ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
 							ApprovalContractAddress: &approvalContractAddress,
-							ApprovalBaseFee:         (*hexutil.Big)(fetchedFees.BaseFee),
-							ApprovalPriorityFee:     (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas),
 							ApprovalGasAmount:       approvalGasLimit,
-
-							ApprovalFee:   (*hexutil.Big)(approvalFeeInWei),
-							ApprovalL1Fee: (*hexutil.Big)(approvalL1FeeInWei),
-
-							TxTotalFee: (*hexutil.Big)(ethTotalFees),
 
 							EstimatedTime: estimatedTime,
 
-							SubtractFees:          amountOption.subtractFees,
-							RequiredTokenBalance:  requiredTokenBalance,
-							RequiredNativeBalance: requiredNativeBalance,
-						})
+							SubtractFees: amountOption.subtractFees,
+						}
+
+						err = r.cacluateFees(ctx, path, fetchedFees, processorInputParams.TestsMode, processorInputParams.TestApprovalL1Fee)
+						if err != nil {
+							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
+							continue
+						}
+
+						appendPathFn(path)
 					}
 				}
 			}
