@@ -121,8 +121,9 @@ type Waku struct {
 	node  *node.WakuNode // reference to a libp2p waku node
 	appDB *sql.DB
 
-	dnsAddressCache     map[string][]dnsdisc.DiscoveredNode // Map to store the multiaddresses returned by dns discovery
-	dnsAddressCacheLock *sync.RWMutex                       // lock to handle access to the map
+	dnsAddressCache             map[string][]dnsdisc.DiscoveredNode // Map to store the multiaddresses returned by dns discovery
+	dnsAddressCacheLock         *sync.RWMutex                       // lock to handle access to the map
+	dnsDiscAsyncRetrievedSignal chan struct{}
 
 	// Filter-related
 	filters       *common.Filters // Message filters installed with Subscribe function
@@ -237,6 +238,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		wg:                              sync.WaitGroup{},
 		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
 		dnsAddressCacheLock:             &sync.RWMutex{},
+		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
 		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
 		timesource:                      ts,
 		storeMsgIDsMu:                   sync.RWMutex{},
@@ -282,7 +284,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 	}
 
 	if cfg.EnableDiscV5 {
-		bootnodes, err := waku.getDiscV5BootstrapNodes(waku.ctx, cfg.DiscV5BootstrapNodes)
+		bootnodes, err := waku.getDiscV5BootstrapNodes(waku.ctx, cfg.DiscV5BootstrapNodes, false)
 		if err != nil {
 			logger.Error("failed to get bootstrap nodes", zap.Error(err))
 			return nil, err
@@ -370,7 +372,7 @@ func (w *Waku) GetNodeENRString() (string, error) {
 	return w.node.ENR().String(), nil
 }
 
-func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) ([]*enode.Node, error) {
+func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, useOnlyDnsDiscCache bool) ([]*enode.Node, error) {
 	wg := sync.WaitGroup{}
 	mu := sync.Mutex{}
 	var result []*enode.Node
@@ -397,10 +399,8 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) 
 			go func(addr string) {
 				defer gocommon.LogOnPanic()
 				defer wg.Done()
-				if err := w.dnsDiscover(ctx, addr, retrieveENR); err != nil {
-					mu.Lock()
-					w.seededBootnodesForDiscV5 = false
-					mu.Unlock()
+				if err := w.dnsDiscover(ctx, addr, retrieveENR, useOnlyDnsDiscCache); err != nil {
+					go w.retryDnsDiscoveryWithBackoff(ctx, addr, w.dnsDiscAsyncRetrievedSignal)
 				}
 			}(addrString)
 		} else {
@@ -409,17 +409,23 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) 
 			if err != nil {
 				return nil, err
 			}
+			mu.Lock()
 			result = append(result, bootnode)
+			mu.Unlock()
 		}
 	}
 	wg.Wait()
+
+	if len(result) == 0 {
+		w.seededBootnodesForDiscV5 = false
+	}
 
 	return result, nil
 }
 
 type fnApplyToEachPeer func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup)
 
-func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnApplyToEachPeer) error {
+func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnApplyToEachPeer, useOnlyCache bool) error {
 	w.logger.Info("retrieving nodes", zap.String("enr", enrtreeAddress))
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
@@ -428,7 +434,7 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 	defer w.dnsAddressCacheLock.Unlock()
 
 	discNodes, ok := w.dnsAddressCache[enrtreeAddress]
-	if !ok {
+	if !ok && !useOnlyCache {
 		nameserver := w.cfg.Nameserver
 		resolver := w.cfg.Resolver
 
@@ -462,6 +468,32 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 	return nil
 }
 
+func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, successChan chan<- struct{}) {
+	retries := 0
+	for {
+		err := w.dnsDiscover(ctx, addr, func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {}, false)
+		if err == nil {
+			select {
+			case successChan <- struct{}{}:
+			default:
+			}
+
+			break
+		}
+
+		retries++
+		backoff := time.Second * time.Duration(math.Exp2(float64(retries)))
+		t := time.NewTimer(backoff)
+		select {
+		case <-w.ctx.Done():
+			t.Stop()
+			return
+		case <-t.C:
+			t.Stop()
+		}
+	}
+}
+
 func (w *Waku) discoverAndConnectPeers() {
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -476,7 +508,7 @@ func (w *Waku) discoverAndConnectPeers() {
 			// Use DNS Discovery
 			go func() {
 				defer gocommon.LogOnPanic()
-				if err := w.dnsDiscover(w.ctx, addrString, fnApply); err != nil {
+				if err := w.dnsDiscover(w.ctx, addrString, fnApply, false); err != nil {
 					w.logger.Error("could not obtain dns discovery peers for ClusterConfig.WakuNodes", zap.Error(err), zap.String("dnsDiscURL", addrString))
 				}
 			}()
@@ -1730,6 +1762,16 @@ func (w *Waku) seedBootnodesForDiscV5() {
 
 	for {
 		select {
+		case <-w.dnsDiscAsyncRetrievedSignal:
+			if canQuery() {
+				err := w.restartDiscV5(true)
+				if err != nil {
+					w.logger.Warn("failed to restart discv5", zap.Error(err))
+				}
+				retries = 0
+				lastTry = now()
+			}
+
 		case <-ticker.C:
 			if w.seededBootnodesForDiscV5 && len(w.node.Host().Network().Peers()) > 3 {
 				w.logger.Debug("not querying bootnodes", zap.Bool("seeded", w.seededBootnodesForDiscV5), zap.Int("peer-count", len(w.node.Host().Network().Peers())))
@@ -1737,7 +1779,7 @@ func (w *Waku) seedBootnodesForDiscV5() {
 			}
 			if canQuery() {
 				w.logger.Info("querying bootnodes to restore connectivity", zap.Int("peer-count", len(w.node.Host().Network().Peers())))
-				err := w.restartDiscV5()
+				err := w.restartDiscV5(false)
 				if err != nil {
 					w.logger.Warn("failed to restart discv5", zap.Error(err))
 				}
@@ -1755,13 +1797,10 @@ func (w *Waku) seedBootnodesForDiscV5() {
 			}
 		// If we go online, trigger immediately
 		case <-w.goingOnline:
-			if w.cfg.EnableDiscV5 {
-				if canQuery() {
-					err := w.restartDiscV5()
-					if err != nil {
-						w.logger.Warn("failed to restart discv5", zap.Error(err))
-					}
-
+			if canQuery() {
+				err := w.restartDiscV5(false)
+				if err != nil {
+					w.logger.Warn("failed to restart discv5", zap.Error(err))
 				}
 				retries = 0
 				lastTry = now()
@@ -1775,10 +1814,10 @@ func (w *Waku) seedBootnodesForDiscV5() {
 }
 
 // Restart discv5, re-retrieving bootstrap nodes
-func (w *Waku) restartDiscV5() error {
+func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
 	ctx, cancel := context.WithTimeout(w.ctx, 30*time.Second)
 	defer cancel()
-	bootnodes, err := w.getDiscV5BootstrapNodes(ctx, w.discV5BootstrapNodes)
+	bootnodes, err := w.getDiscV5BootstrapNodes(ctx, w.discV5BootstrapNodes, useOnlyDNSDiscCache)
 	if err != nil {
 		return err
 	}
