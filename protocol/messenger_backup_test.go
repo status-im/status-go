@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/wakusync"
+	"github.com/status-im/status-go/services/accounts/accountsevent"
 
 	"github.com/stretchr/testify/suite"
 
@@ -813,6 +816,9 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
 	s.Require().NoError(err)
+	s.Require().NotNil(bob2.config.accountsFeed)
+	ch := make(chan accountsevent.Event, 20)
+	sub := bob2.config.accountsFeed.Subscribe(ch)
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
@@ -838,6 +844,19 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbWoAccounts2))
 	s.Require().True(haveSameElements(woAccounts, dbWoAccounts2, accounts.SameAccounts))
+
+	// Check whether accounts added event is sent
+	select {
+	case <-time.After(1 * time.Second):
+		s.Fail("Timed out waiting for accountsevent")
+	case event := <-ch:
+		switch event.Type {
+		case accountsevent.EventTypeAdded:
+			s.Require().Equal(1, len(event.Accounts))
+			s.Require().Equal(common.Address(dbWoAccounts2[0].Address), event.Accounts[0])
+		}
+	}
+	sub.Unsubscribe()
 }
 
 func (s *MessengerBackupSuite) TestBackupChats() {
