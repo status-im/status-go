@@ -82,7 +82,7 @@ func TestGetFilterChangesResetsTimer(t *testing.T) {
 }
 
 func TestGetFilterLogs(t *testing.T) {
-	t.Skip("Skipping due to flakiness: https://github.com/status-im/status-go/issues/1281")
+	t.Skip("flaky test")
 
 	tracker := new(callTracker)
 	api := &PublicAPI{
