@@ -34,13 +34,18 @@ redirect_stdout() {
 }
 
 run_test_for_packages() {
-  local output_file="test.log"
-  local coverage_file="test.coverage.out"
-  local report_file="report.xml"
-  local rerun_report_file="report_rerun_fails.txt"
-  local exit_code_file="exit_code.txt"
+  local packages="$1"
+  local iteration="$2"
+  local count="$3"
+  local log_message="$4"
 
-  echo -e "${GRN}Testing:${RST} All packages. Single iteration. -test.count=${UNIT_TEST_COUNT}"
+  local output_file="test_${iteration}.log"
+  local coverage_file="test_${iteration}.coverage.out"
+  local report_file="report_${iteration}.xml"
+  local rerun_report_file="report_rerun_fails_${iteration}.txt"
+  local exit_code_file="exit_code_${iteration}.txt"
+
+  echo -e "${GRN}Testing:${RST} ${log_message}. Iteration ${iteration}. -test.count=${count}"
 
   gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"
   if [[ "${CI}" == 'true' ]]; then
@@ -50,11 +55,15 @@ run_test_for_packages() {
   # Cleanup previous coverage reports
   rm -f coverage.out.rerun.*
 
+  # Prepare env variables for `test-with-coverage.sh`
+  export TEST_WITH_COVERAGE_PACKAGES="${packages}"
+  export TEST_WITH_COVERAGE_COUNT="${count}"
+
   # Run tests
-  gotestsum --packages="${UNIT_TEST_PACKAGES}" ${gotestsum_flags} --raw-command -- \
+  gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
     ./_assets/scripts/test-with-coverage.sh \
-    -v ${GOTEST_EXTRAFLAGS} \
-    -timeout 45m \
+    ${GOTEST_EXTRAFLAGS} \
+    -timeout 40m \
     -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
 
@@ -83,7 +92,17 @@ fi
 rm -rf ./**/*.coverage.out
 
 echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
-run_test_for_packages
+
+run_test_for_packages "${UNIT_TEST_PACKAGES}" "${UNIT_TEST_COUNT}" "0" "All packages except 'protocol'" &
+
+# NOTE: Run `protocol` package manually, because it lasts for 30 minutes.
+# Running -test.count=20 for it takes too much time, so we spawn separate processes for it.
+# This can be removed when the runtime of `protocol` package is optimized.
+for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
+  run_test_for_packages github.com/status-im/status-go/protocol 1 "${i}" "Only 'protocol' package" &
+done
+
+wait
 
 # Gather test coverage results
 rm -f c.out c-full.out
@@ -104,7 +123,7 @@ fi
 
 shopt -s globstar nullglob # Enable recursive globbing
 if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
-  for exit_code_file in "${GIT_ROOT}"/**/exit_code.txt; do
+  for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do
     read exit_code < "${exit_code_file}"
     if [[ "${exit_code}" -ne 0 ]]; then
       mkdir -p "${GIT_ROOT}/reports"

@@ -181,12 +181,12 @@ pipeline {
         env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
         if (isTestNightlyJob()) {
-          archiveArtifacts('report.xml, test.log')
+          archiveArtifacts('report_*.xml, test_*.log')
         }
         if (params.UNIT_TEST_RERUN_FAILS) {
-          def rerunReports = findFiles(glob: 'report_rerun_fails.txt')
+          def rerunReports = findFiles(glob: 'report_rerun_fails_*.txt')
           if (rerunReports.length > 0) {
-            archiveArtifacts('report_rerun_fails.txt')
+            archiveArtifacts('report_rerun_fails_*.txt')
           }
         }
         junit(
