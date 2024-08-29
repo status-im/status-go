@@ -84,6 +84,7 @@ require (
 	github.com/andybalholm/brotli v1.0.5
 	github.com/bits-and-blooms/bloom/v3 v3.7.0
 	github.com/cenkalti/backoff/v4 v4.2.1
+	github.com/go-auxiliaries/shrinking-map v0.3.0
 	github.com/gorilla/sessions v1.2.1
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/jellydator/ttlcache/v3 v3.2.0

@@ -12,6 +12,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
@@ -94,6 +95,11 @@ type PeerConnFailure struct {
 	FailureCount int
 }
 
+type PrometheusMetricWrapper struct {
+	Typ  TelemetryType
+	Data *json.RawMessage
+}
+
 type Client struct {
 	serverURL            string
 	httpClient           *http.Client
@@ -113,6 +119,8 @@ type Client struct {
 	lastPeerCountTime    time.Time
 	lastPeerConnFailures map[string]int
 	deviceType           string
+
+	promMetrics *PrometheusMetrics
 }
 
 type TelemetryClientOption func(*Client)
@@ -148,7 +156,12 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 		lastPeerCount:        0,
 		lastPeerCountTime:    time.Time{},
 		lastPeerConnFailures: make(map[string]int),
+
+		promMetrics: NewPrometheusMetrics(),
 	}
+
+	//client.promMetrics.Register("waku_connected_peers", GaugeType, nil, nil)
+	client.promMetrics.Register("waku2_envelopes_validated_total", CounterType, prometheus.Labels{"type": "relay"}, client.ProcessReuglarStoryRetrievedMsgs)
 
 	for _, opt := range opts {
 		opt(client)
@@ -189,6 +202,8 @@ func (c *Client) Start(ctx context.Context) {
 				c.telemetryCacheLock.Unlock()
 
 				if len(telemetryRequests) > 0 {
+					d, _ := json.MarshalIndent(telemetryRequests, "", "  ")
+					fmt.Println(string(d))
 					err := c.pushTelemetryRequest(telemetryRequests)
 					if err != nil {
 						if sendPeriod < 60*time.Second { //Stop the growing if the timer is > 60s to at least retry every minute
@@ -204,6 +219,21 @@ func (c *Client) Start(ctx context.Context) {
 			}
 		}
 
+	}()
+
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Println("exit")
+				return
+			case <-ticker.C:
+				c.promMetrics.Snapshot()
+
+			}
+		}
 	}()
 }
 
@@ -245,6 +275,13 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			Id:            c.nextId,
 			TelemetryType: PeerConnFailuresMetric,
 			TelemetryData: c.ProcessPeerConnFailure(v),
+		}
+	case PrometheusMetricWrapper:
+		pmd := data.(PrometheusMetricWrapper)
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: pmd.Typ,
+			TelemetryData: pmd.Data,
 		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
@@ -406,4 +443,27 @@ func (c *Client) UpdateEnvelopeProcessingError(shhMessage *types.Message, proces
 	if err != nil {
 		c.logger.Error("Error sending envelope update to telemetry server", zap.Error(err))
 	}
+}
+
+func (c *Client) ProcessReuglarStoryRetrievedMsgs(data MetricPayload) {
+	fmt.Println(data)
+
+	postBody := map[string]interface{}{
+		"msgCount":      data.Value,
+		"pubsubTopic":   data.Labels["pubsubTopic"],
+		"nodeName":      c.nodeName,
+		"nodeKeyUID":    c.keyUID,
+		"peerId":        c.peerId,
+		"statusVersion": c.version,
+		"timestamp":     time.Now().Unix(),
+	}
+
+	telemtryData, err := json.Marshal(postBody)
+	if err != nil {
+		return
+	}
+
+	rawData := json.RawMessage(telemtryData)
+
+	c.processAndPushTelemetry(context.Background(), PrometheusMetricWrapper{Typ: "ReuglarStoryRetrievedMsgs", Data: &rawData})
 }

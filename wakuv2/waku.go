@@ -37,6 +37,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"go.uber.org/zap"
 
@@ -274,6 +275,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		node.WithLogLevel(logger.Level()),
 		node.WithClusterID(cfg.ClusterID),
 		node.WithMaxMsgSize(1024 * 1024),
+		node.WithPrometheusRegisterer(prometheus.DefaultRegisterer),
 	}
 
 	if cfg.EnableDiscV5 {
@@ -1105,10 +1107,11 @@ func (w *Waku) Start() error {
 			w.logger)
 
 		w.missingMsgVerifier.Start(w.ctx)
+		w.logger.Info("Started missing message verifier")
 
 		w.wg.Add(1)
 		go func() {
-			w.wg.Done()
+			defer w.wg.Done()
 			for {
 				select {
 				case <-w.ctx.Done():
@@ -1118,6 +1121,7 @@ func (w *Waku) Start() error {
 					if err != nil {
 						w.logger.Error("OnNewEnvelopes error", zap.Error(err))
 					}
+					w.logger.Info("Got a missing message!")
 				}
 			}
 		}()
@@ -1347,7 +1351,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 		trouble = true
 	}
 
-	common.EnvelopesValidatedCounter.Inc()
+	common.EnvelopesValidatedCounter.With(prometheus.Labels{"pubsubTopic": envelope.PubsubTopic(), "type": msgType}).Inc()
 
 	if trouble {
 		return errors.New("received invalid envelope")

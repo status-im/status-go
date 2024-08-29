@@ -27,10 +27,10 @@ var (
 		Name: "waku2_envelopes_received_total",
 		Help: "Number of envelopes received.",
 	})
-	EnvelopesValidatedCounter = prom.NewCounter(prom.CounterOpts{
+	EnvelopesValidatedCounter = prom.NewCounterVec(prom.CounterOpts{
 		Name: "waku2_envelopes_validated_total",
 		Help: "Number of envelopes processed successfully.",
-	})
+	}, []string{"pubsubTopic", "type"})
 	EnvelopesRejectedCounter = prom.NewCounterVec(prom.CounterOpts{
 		Name: "waku2_envelopes_rejected_total",
 		Help: "Number of envelopes rejected.",
@@ -52,7 +52,7 @@ var (
 
 func init() {
 	prom.MustRegister(EnvelopesReceivedCounter)
-	prom.MustRegister(EnvelopesRejectedCounter)
+	prom.MustRegister(EnvelopesValidatedCounter)
 	prom.MustRegister(EnvelopesCacheFailedCounter)
 	prom.MustRegister(EnvelopesCachedCounter)
 	prom.MustRegister(EnvelopesSizeMeter)
