@@ -142,7 +142,6 @@ INSERT INTO settings (
   profile_pictures_show_to,
   profile_pictures_visibility,
   url_unfurling_mode,
-  omit_transfers_history_scan,
   mnemonic_was_not_shown,
   wallet_token_preferences_group_by_community,
   wallet_collectible_preferences_group_by_collection,
@@ -151,7 +150,7 @@ INSERT INTO settings (
   fleet
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -179,7 +178,6 @@ INSERT INTO settings (
 		s.ProfilePicturesShowTo,
 		s.ProfilePicturesVisibility,
 		s.URLUnfurlingMode,
-		s.OmitTransfersHistoryScan,
 		s.MnemonicWasNotShown,
 		s.TokenGroupByCommunity,
 		s.CollectibleGroupByCollection,
@@ -388,7 +386,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents,
 		gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key,
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, is_goerli_enabled, wallet_token_preferences_group_by_community, url_unfurling_mode,
-		omit_transfers_history_scan, mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
+		mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
 		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community, 
 		peer_syncing_enabled
 	FROM
@@ -467,7 +465,6 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.IsGoerliEnabled,
 		&s.TokenGroupByCommunity,
 		&s.URLUnfurlingMode,
-		&s.OmitTransfersHistoryScan,
 		&s.MnemonicWasNotShown,
 		&s.ShowCommunityAssetWhenSendingTokens,
 		&s.DisplayAssetsBelowBalance,

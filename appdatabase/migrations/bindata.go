@@ -120,6 +120,7 @@
 // 1721215212_create_keycard_and_accounts.up.sql (725B)
 // 1721832718_rename_shard_test.up.sql (3.186kB)
 // 1722415278_remove_incorrectly_added_keycards.up.sql (67B)
+// 1724939813_remove_omit_transfers_history_scan_from_settings.up.sql (62B)
 // doc.go (94B)
 
 package migrations
@@ -2588,6 +2589,26 @@ func _1722415278_remove_incorrectly_added_keycardsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1724939813_remove_omit_transfers_history_scan_from_settingsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x70\x09\xf2\x0f\x50\x70\xf6\xf7\x09\xf5\xf5\x53\xc8\xcf\xcd\x2c\x89\x2f\x29\x4a\xcc\x2b\x4e\x4b\x2d\x2a\x8e\xcf\xc8\x2c\x2e\xc9\x2f\xaa\x8c\x2f\x4e\x4e\xcc\xb3\xe6\x02\x04\x00\x00\xff\xff\x7c\x2c\xfc\x27\x3e\x00\x00\x00")
+
+func _1724939813_remove_omit_transfers_history_scan_from_settingsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1724939813_remove_omit_transfers_history_scan_from_settingsUpSql,
+		"1724939813_remove_omit_transfers_history_scan_from_settings.up.sql",
+	)
+}
+
+func _1724939813_remove_omit_transfers_history_scan_from_settingsUpSql() (*asset, error) {
+	bytes, err := _1724939813_remove_omit_transfers_history_scan_from_settingsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1724939813_remove_omit_transfers_history_scan_from_settings.up.sql", size: 62, mode: os.FileMode(0644), modTime: time.Unix(1700000000, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x30, 0x96, 0x97, 0xae, 0x3b, 0x38, 0xc9, 0x4c, 0xcc, 0xbe, 0x5b, 0x67, 0x6d, 0xc9, 0xd7, 0xbd, 0xbe, 0xf5, 0x2, 0x54, 0x31, 0x38, 0x81, 0xfb, 0x49, 0x76, 0x8b, 0xa0, 0x56, 0xe, 0xb8, 0xbf}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xcb\x41\x0e\x02\x31\x08\x05\xd0\x7d\x4f\xf1\x2f\x00\xe8\xca\xc4\xc4\xc3\xa0\x43\x08\x19\x5b\xc6\x96\xfb\xc7\x4d\xdf\xfe\x5d\xfa\x39\xd5\x0d\xeb\xf7\x6d\x4d\xc4\xf3\xe9\x36\x6c\x6a\x19\x3c\xe9\x1d\xe3\xd0\x52\x50\xcf\xa3\xa2\xdb\xeb\xfe\xb8\x6d\xa0\xeb\x74\xf4\xf0\xa9\x15\x39\x16\x28\xc1\x2c\x7b\xb0\x27\x58\xda\x3f\x00\x00\xff\xff\x57\xd4\xd5\x90\x5e\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -2819,6 +2840,7 @@ var _bindata = map[string]func() (*asset, error){
 	"1721215212_create_keycard_and_accounts.up.sql":                            _1721215212_create_keycard_and_accountsUpSql,
 	"1721832718_rename_shard_test.up.sql":                                      _1721832718_rename_shard_testUpSql,
 	"1722415278_remove_incorrectly_added_keycards.up.sql":                      _1722415278_remove_incorrectly_added_keycardsUpSql,
+	"1724939813_remove_omit_transfers_history_scan_from_settings.up.sql":       _1724939813_remove_omit_transfers_history_scan_from_settingsUpSql,
 	"doc.go": docGo,
 }
 
@@ -2988,6 +3010,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1721215212_create_keycard_and_accounts.up.sql":                            {_1721215212_create_keycard_and_accountsUpSql, map[string]*bintree{}},
 	"1721832718_rename_shard_test.up.sql":                                      {_1721832718_rename_shard_testUpSql, map[string]*bintree{}},
 	"1722415278_remove_incorrectly_added_keycards.up.sql":                      {_1722415278_remove_incorrectly_added_keycardsUpSql, map[string]*bintree{}},
+	"1724939813_remove_omit_transfers_history_scan_from_settings.up.sql":       {_1724939813_remove_omit_transfers_history_scan_from_settingsUpSql, map[string]*bintree{}},
 	"doc.go": {docGo, map[string]*bintree{}},
 }}
 
