@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/requestlog"
+	"github.com/status-im/status-go/metrics"
 	"github.com/status-im/status-go/mobile/callog"
 	m_requests "github.com/status-im/status-go/mobile/requests"
 	"github.com/status-im/status-go/multiaccounts"
@@ -53,6 +54,10 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
+)
+
+var (
+	metricsServer *metrics.Server
 )
 
 func call(fn any, params ...any) any {
@@ -178,6 +183,19 @@ func initializeLogging(request *requests.InitializeApplication) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if request.WakuMetricsEnabled {
+		// Start metrics server
+		if metricsServer != nil {
+			metricsServer.Stop()
+		}
+		if request.WakuMetricsPort == 0 {
+			request.WakuMetricsPort = 9305
+		}
+		metricsServer = metrics.NewMetricsServer(request.WakuMetricsPort, nil)
+		go metricsServer.Listen()
+		logutils.ZapLogger().Info("waku metrics prometheus server started", zap.Int("port", request.WakuMetricsPort))
 	}
 
 	return nil

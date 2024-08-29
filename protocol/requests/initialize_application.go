@@ -23,6 +23,9 @@ type InitializeApplication struct {
 	LogEnabled        bool   `json:"logEnabled"`
 	LogLevel          string `json:"logLevel"`
 	APILoggingEnabled bool   `json:"apiLoggingEnabled"`
+
+	WakuMetricsEnabled bool `json:"wakuMetricsEnabled"`
+	WakuMetricsPort    int  `json:"wakuMetricsServerPort"`
 }
 
 func (i *InitializeApplication) Validate() error {

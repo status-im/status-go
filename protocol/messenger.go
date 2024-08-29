@@ -35,6 +35,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 
 	"github.com/status-im/status-go/multiaccounts"
@@ -69,7 +70,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/telemetry"
 )
 
 const (
@@ -160,7 +160,7 @@ type Messenger struct {
 	}
 
 	connectionState       connection.State
-	telemetryClient       *telemetry.Client
+	wakuMetricsHandler    *wakumetrics.Client
 	contractMaker         *contracts.ContractMaker
 	verificationDatabase  *verification.Persistence
 	savedAddressesManager *wallet.SavedAddressesManager
@@ -523,16 +523,22 @@ func NewMessenger(
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	var telemetryClient *telemetry.Client
+	var wakuMetricsHandler *wakumetrics.Client
 	if c.telemetryServerURL != "" {
-		options := []telemetry.TelemetryClientOption{
-			telemetry.WithPeerID(peerId.String()),
+		options := []wakumetrics.TelemetryClientOption{
+			wakumetrics.WithPeerID(peerId.String()),
 		}
-		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName, version, options...)
+		wakuMetricsHandler, err = wakumetrics.NewClient(options...)
+		if err != nil {
+			return nil, err
+		}
 		if c.wakuService != nil {
-			c.wakuService.SetStatusTelemetryClient(telemetryClient)
+			c.wakuService.SetMetricsHandler(wakuMetricsHandler)
 		}
-		telemetryClient.Start(ctx)
+		err = wakuMetricsHandler.RegisterWithRegistry()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	messenger = &Messenger{
@@ -545,7 +551,7 @@ func NewMessenger(
 		sender:                     sender,
 		anonMetricsClient:          anonMetricsClient,
 		anonMetricsServer:          anonMetricsServer,
-		telemetryClient:            telemetryClient,
+		wakuMetricsHandler:         wakuMetricsHandler,
 		communityTokensService:     c.communityTokensService,
 		pushNotificationClient:     pushNotificationClient,
 		pushNotificationServer:     pushNotificationServer,
@@ -3358,9 +3364,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 			handleMessagesResponse, err := m.sender.HandleMessages(shhMessage)
 			if err != nil {
-				if m.telemetryClient != nil {
-					go m.telemetryClient.UpdateEnvelopeProcessingError(shhMessage, err)
-				}
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
 			}
@@ -3371,8 +3374,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 			statusMessages := handleMessagesResponse.StatusMessages
 
-			if m.telemetryClient != nil {
-				m.telemetryClient.PushReceivedMessages(m.ctx, telemetry.ReceivedMessages{
+			if m.wakuMetricsHandler != nil {
+				m.wakuMetricsHandler.PushReceivedMessages(wakumetrics.ReceivedMessages{
 					Filter:     filter,
 					SSHMessage: shhMessage,
 					Messages:   statusMessages,

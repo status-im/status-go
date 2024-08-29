@@ -37,6 +37,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"go.uber.org/zap"
 
@@ -104,21 +105,21 @@ type ErrorSendingEnvelope struct {
 	SentEnvelope SentEnvelope
 }
 
-type ITelemetryClient interface {
+type IMetricsHandler interface {
 	SetDeviceType(deviceType string)
-	PushSentEnvelope(ctx context.Context, sentEnvelope SentEnvelope)
-	PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvelope ErrorSendingEnvelope)
-	PushPeerCount(ctx context.Context, peerCount int)
-	PushPeerConnFailures(ctx context.Context, peerConnFailures map[string]int)
-	PushMessageCheckSuccess(ctx context.Context, messageHash string)
-	PushMessageCheckFailure(ctx context.Context, messageHash string)
-	PushPeerCountByShard(ctx context.Context, peerCountByShard map[uint16]uint)
-	PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin map[wps.Origin]uint)
-	PushDialFailure(ctx context.Context, dialFailure common.DialError)
-	PushMissedMessage(ctx context.Context, envelope *protocol.Envelope)
-	PushMissedRelevantMessage(ctx context.Context, message *common.ReceivedMessage)
-	PushMessageDeliveryConfirmed(ctx context.Context, messageHash string)
-	PushSentMessageTotal(ctx context.Context, messageSize uint32)
+	PushSentEnvelope(sentEnvelope SentEnvelope)
+	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
+	PushPeerCount(peerCount int)
+	PushPeerConnFailures(peerConnFailures map[string]int)
+	PushMessageCheckSuccess()
+	PushMessageCheckFailure()
+	PushPeerCountByShard(peerCountByShard map[uint16]uint)
+	PushPeerCountByOrigin(peerCountByOrigin map[wps.Origin]uint)
+	PushDialFailure(dialFailure common.DialError)
+	PushMissedMessage(envelope *protocol.Envelope)
+	PushMissedRelevantMessage(message *common.ReceivedMessage)
+	PushMessageDeliveryConfirmed()
+	PushSentMessageTotal(messageSize uint32, publishMethod string)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -194,13 +195,13 @@ type Waku struct {
 	onHistoricMessagesRequestFailed func([]byte, peer.ID, error)
 	onPeerStats                     func(types.ConnStatus)
 
-	statusTelemetryClient ITelemetryClient
+	metricsHandler IMetricsHandler
 
 	defaultShardInfo protocol.RelayShards
 }
 
-func (w *Waku) SetStatusTelemetryClient(client ITelemetryClient) {
-	w.statusTelemetryClient = client
+func (w *Waku) SetMetricsHandler(client IMetricsHandler) {
+	w.metricsHandler = client
 }
 
 func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
@@ -293,6 +294,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		node.WithLogLevel(logger.Level()),
 		node.WithClusterID(cfg.ClusterID),
 		node.WithMaxMsgSize(1024 * 1024),
+		node.WithPrometheusRegisterer(prometheus.DefaultRegisterer),
 	}
 
 	if cfg.EnableDiscV5 {
@@ -1036,10 +1038,8 @@ func (w *Waku) SkipPublishToTopic(value bool) {
 
 func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
 	w.messageSender.MessagesDelivered(hashes)
-	if w.statusTelemetryClient != nil {
-		for _, hash := range hashes {
-			w.statusTelemetryClient.PushMessageDeliveryConfirmed(w.ctx, hash.String())
-		}
+	if w.metricsHandler != nil {
+		w.metricsHandler.PushMessageDeliveryConfirmed()
 	}
 }
 
@@ -1127,6 +1127,11 @@ func (w *Waku) Start() error {
 				return
 			}
 
+			publishMethod := "relay"
+			if w.cfg.LightClient {
+				publishMethod = "lightpush"
+			}
+
 			for {
 				select {
 				case <-w.ctx.Done():
@@ -1136,10 +1141,10 @@ func (w *Waku) Start() error {
 				case dialErr := <-dialErrSub.Out():
 					errors := common.ParseDialErrors(dialErr.(utils.DialError).Err.Error())
 					for _, dialError := range errors {
-						w.statusTelemetryClient.PushDialFailure(w.ctx, common.DialError{ErrType: dialError.ErrType, ErrMsg: dialError.ErrMsg, Protocols: dialError.Protocols})
+						w.metricsHandler.PushDialFailure(common.DialError{ErrType: dialError.ErrType, ErrMsg: dialError.ErrMsg, Protocols: dialError.Protocols})
 					}
 				case messageSent := <-messageSentSub.Out():
-					w.statusTelemetryClient.PushSentMessageTotal(w.ctx, messageSent.(publish.MessageSent).Size)
+					w.metricsHandler.PushSentMessageTotal(messageSent.(publish.MessageSent).Size, publishMethod)
 				}
 			}
 		}()
@@ -1161,6 +1166,7 @@ func (w *Waku) Start() error {
 			w.logger)
 
 		w.missingMsgVerifier.Start(w.ctx)
+		w.logger.Info("Started missing message verifier")
 
 		w.wg.Add(1)
 		go func() {
@@ -1175,6 +1181,7 @@ func (w *Waku) Start() error {
 					if err != nil {
 						w.logger.Error("OnNewEnvelopes error", zap.Error(err))
 					}
+					w.logger.Info("Got a missing message!")
 				}
 			}
 		}()
@@ -1256,10 +1263,10 @@ func (w *Waku) checkForConnectionChanges() {
 }
 
 func (w *Waku) reportPeerMetrics() {
-	if w.statusTelemetryClient != nil {
+	if w.metricsHandler != nil {
 		connFailures := FormatPeerConnFailures(w.node)
-		w.statusTelemetryClient.PushPeerCount(w.ctx, w.PeerCount())
-		w.statusTelemetryClient.PushPeerConnFailures(w.ctx, connFailures)
+		w.metricsHandler.PushPeerCount(w.PeerCount())
+		w.metricsHandler.PushPeerConnFailures(connFailures)
 
 		peerCountByOrigin := make(map[wps.Origin]uint)
 		peerCountByShard := make(map[uint16]uint)
@@ -1292,8 +1299,8 @@ func (w *Waku) reportPeerMetrics() {
 				}
 			}
 		}
-		w.statusTelemetryClient.PushPeerCountByShard(w.ctx, peerCountByShard)
-		w.statusTelemetryClient.PushPeerCountByOrigin(w.ctx, peerCountByOrigin)
+		w.metricsHandler.PushPeerCountByShard(peerCountByShard)
+		w.metricsHandler.PushPeerCountByOrigin(peerCountByOrigin)
 	}
 }
 
@@ -1332,16 +1339,16 @@ func (w *Waku) startMessageSender() error {
 						Hash:  hash,
 						Event: common.EventEnvelopeSent,
 					})
-					if w.statusTelemetryClient != nil {
-						w.statusTelemetryClient.PushMessageCheckSuccess(w.ctx, hash.Hex())
+					if w.metricsHandler != nil {
+						w.metricsHandler.PushMessageCheckSuccess()
 					}
 				case hash := <-msgExpiredChan:
 					w.SendEnvelopeEvent(common.EnvelopeEvent{
 						Hash:  hash,
 						Event: common.EventEnvelopeExpired,
 					})
-					if w.statusTelemetryClient != nil {
-						w.statusTelemetryClient.PushMessageCheckFailure(w.ctx, hash.Hex())
+					if w.metricsHandler != nil {
+						w.metricsHandler.PushMessageCheckFailure()
 					}
 				}
 			}
@@ -1437,9 +1444,9 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 		return nil
 	}
 
-	if w.statusTelemetryClient != nil {
+	if w.metricsHandler != nil {
 		if msgType == common.MissingMessageType {
-			w.statusTelemetryClient.PushMissedMessage(w.ctx, envelope)
+			w.metricsHandler.PushMissedMessage(envelope)
 		}
 	}
 
@@ -1460,7 +1467,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 		trouble = true
 	}
 
-	common.EnvelopesValidatedCounter.Inc()
+	common.EnvelopesValidatedCounter.With(prometheus.Labels{"pubsubTopic": envelope.PubsubTopic(), "type": msgType}).Inc()
 
 	if trouble {
 		return errors.New("received invalid envelope")
@@ -1561,8 +1568,8 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 		w.storeMsgIDsMu.Unlock()
 	} else {
 		logger.Debug("filters did match")
-		if w.statusTelemetryClient != nil && e.MsgType == common.MissingMessageType {
-			w.statusTelemetryClient.PushMissedRelevantMessage(w.ctx, e)
+		if w.metricsHandler != nil && e.MsgType == common.MissingMessageType {
+			w.metricsHandler.PushMissedRelevantMessage(e)
 		}
 		e.Processed.Store(true)
 	}
