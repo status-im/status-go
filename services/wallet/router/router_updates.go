@@ -1,0 +1,147 @@
+package router
+
+import (
+	"context"
+	"time"
+
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/rpc/chain"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
+)
+
+var (
+	newBlockCheckIntervalMainnet  = 3 * time.Second
+	newBlockCheckIntervalOptimism = 1 * time.Second
+	newBlockCheckIntervalArbitrum = 200 * time.Millisecond
+
+	feeRecalculationTimeout = 5 * time.Minute
+)
+
+type fetchingLastBlock struct {
+	client    chain.ClientInterface
+	lastBlock uint64
+	closeCh   chan struct{}
+}
+
+func (r *Router) subscribeForUdates(chainID uint64) error {
+	if _, ok := r.clientsForUpdatesPerChains.Load(chainID); ok {
+		return nil
+	}
+
+	ethClient, err := r.rpcClient.EthClient(chainID)
+	if err != nil {
+		log.Error("Failed to get eth client", "error", err)
+		return err
+	}
+
+	flb := fetchingLastBlock{
+		client:    ethClient,
+		lastBlock: 0,
+		closeCh:   make(chan struct{}),
+	}
+	r.clientsForUpdatesPerChains.Store(chainID, flb)
+
+	r.startTimeoutForUpdates(flb.closeCh)
+
+	var ticker *time.Ticker
+	switch chainID {
+	case walletCommon.EthereumMainnet:
+		ticker = time.NewTicker(newBlockCheckIntervalMainnet)
+	case walletCommon.OptimismMainnet:
+		ticker = time.NewTicker(newBlockCheckIntervalOptimism)
+	case walletCommon.ArbitrumMainnet:
+		ticker = time.NewTicker(newBlockCheckIntervalArbitrum)
+	}
+
+	ctx, cancelCtx := context.WithCancel(context.Background())
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				var blockNumber uint64
+				blockNumber, err := ethClient.BlockNumber(ctx)
+				if err != nil {
+					log.Error("Failed to get block number", "error", err)
+					continue
+				}
+
+				val, ok := r.clientsForUpdatesPerChains.Load(chainID)
+				if !ok {
+					log.Error("Failed to get fetchingLastBlock", "chain", chainID)
+					continue
+				}
+
+				flbLoaded, ok := val.(fetchingLastBlock)
+				if !ok {
+					log.Error("Failed to get fetchingLastBlock", "chain", chainID)
+					continue
+				}
+
+				if blockNumber > flbLoaded.lastBlock {
+					flbLoaded.lastBlock = blockNumber
+					r.clientsForUpdatesPerChains.Store(chainID, flbLoaded)
+
+					fees, err := r.feesManager.SuggestedFees(ctx, chainID)
+					if err != nil {
+						log.Error("Failed to get suggested fees", "error", err)
+						continue
+					}
+
+					r.lastInputParamsMutex.Lock()
+					uuid := r.lastInputParams.Uuid
+					r.lastInputParamsMutex.Unlock()
+
+					r.activeRoutesMutex.Lock()
+					if r.activeRoutes != nil && r.activeRoutes.Best != nil && len(r.activeRoutes.Best) > 0 {
+						for _, path := range r.activeRoutes.Best {
+							err = r.cacluateFees(ctx, path, fees, false, 0)
+							if err != nil {
+								log.Error("Failed to calculate fees", "error", err)
+								continue
+							}
+						}
+
+						sendRouterResult(uuid, r.activeRoutes, nil)
+					}
+					r.activeRoutesMutex.Unlock()
+				}
+			case <-flb.closeCh:
+				ticker.Stop()
+				cancelCtx()
+				return
+			}
+		}
+	}()
+	return nil
+}
+
+func (r *Router) startTimeoutForUpdates(closeCh chan struct{}) {
+	dedlineTicker := time.NewTicker(feeRecalculationTimeout)
+	go func() {
+		for {
+			select {
+			case <-dedlineTicker.C:
+				r.unsubscribeFeesUpdateAccrossAllChains()
+				return
+			case <-closeCh:
+				dedlineTicker.Stop()
+				return
+			}
+		}
+	}()
+}
+
+func (r *Router) unsubscribeFeesUpdateAccrossAllChains() {
+	r.clientsForUpdatesPerChains.Range(func(key, value interface{}) bool {
+		flb, ok := value.(fetchingLastBlock)
+		if !ok {
+			log.Error("Failed to get fetchingLastBlock", "chain", key)
+			return false
+		}
+
+		close(flb.closeCh)
+		r.clientsForUpdatesPerChains.Delete(key)
+		return true
+	})
+}
