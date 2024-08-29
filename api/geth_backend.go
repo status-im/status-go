@@ -1613,7 +1613,6 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, inp
 	settings.TestNetworksEnabled = request.TestNetworksEnabled
 	if !input.restoringAccount {
 		settings.Mnemonic = &input.mnemonic
-		settings.OmitTransfersHistoryScan = true
 		// TODO(rasom): uncomment it as soon as address will be properly
 		// marked as shown on mobile client
 		//settings.MnemonicWasNotShown = true

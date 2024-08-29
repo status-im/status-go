@@ -496,11 +496,6 @@ var (
 			protobufType:      protobuf.SyncSetting_URL_UNFURLING_MODE,
 		},
 	}
-	OmitTransfersHistoryScan = SettingField{
-		reactFieldName: "omit-transfers-history-scan",
-		dBColumnName:   "omit_transfers_history_scan",
-		valueHandler:   BoolHandler,
-	}
 	MnemonicWasNotShown = SettingField{
 		reactFieldName: "mnemonic-was-not-shown?",
 		dBColumnName:   "mnemonic_was_not_shown",

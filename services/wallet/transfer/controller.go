@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	statusaccounts "github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
@@ -120,21 +119,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 		return nil
 	}
 
-	omitHistory := false
-	multiaccSettings, err := c.accountsDB.GetSettings()
-	if err != nil {
-		log.Error("Failed to get multiacc settings") // not critical
-	} else {
-		omitHistory = multiaccSettings.OmitTransfersHistoryScan
-	}
-
-	if omitHistory {
-		err := c.accountsDB.SaveSettingField(settings.OmitTransfersHistoryScan, false)
-		if err != nil {
-			return err
-		}
-	}
-
+	const omitHistory = true
 	c.reactor = NewReactor(c.db, c.blockDAO, c.blockRangesSeqDAO, c.accountsDB, c.TransferFeed, c.transactionManager,
 		c.pendingTxManager, c.tokenManager, c.balanceCacher, omitHistory, c.blockChainState)
 
