@@ -21,7 +21,7 @@ import (
 )
 
 func TestMessengerPeersyncingSuite(t *testing.T) {
-	t.SkipNow() // FIXME
+	t.Skip("broken test") // FIXME
 	suite.Run(t, new(MessengerPeersyncingSuite))
 }
 
