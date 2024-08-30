@@ -106,7 +106,7 @@ if [[ $HAS_PROTOCOL_PACKAGE != 'true' ]]; then
   run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages"
 else
   # Spawn a process to test all packages except `protocol`
-  UNIT_TEST_PACKAGES=$(echo "${UNIT_TEST_PACKAGES}" | sed 's/github.com\/status-im\/status-go\/protocol//g')
+  UNIT_TEST_PACKAGES=$(echo "${UNIT_TEST_PACKAGES}" | grep -v '.*/protocol$$')
   run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
 
   # Spawn separate processes to run `protocol` package
