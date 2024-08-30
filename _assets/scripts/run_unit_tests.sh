@@ -118,24 +118,25 @@ else
 fi
 
 # Gather test coverage results
-echo "Gathering test coverage results"
 merged_coverage_report="coverage_merged.out"
 final_coverage_report="c.out" # Name expected by cc-test-reporter
 coverage_reports=$(find . -iname "*.coverage.out")
 rm -f ${final_coverage_report} ${merged_coverage_report}
-echo $coverage_reports | xargs go run ./cmd/test-coverage-utils/gocovmerge.go >> ${merged_coverage_report}
+
+echo -e "${GRN}Gathering test coverage results: ${RST} output: ${merged_coverage_report}, input: ${coverage_reports}"
+echo $coverage_reports | xargs go run ./cmd/test-coverage-utils/gocovmerge.go > ${merged_coverage_report}
 
 # Filter out test coverage for packages in ./cmd
-echo "Filtering out test coverage for packages in ./cmd"
+echo -e "${GRN}Filtering test coverage packages:${RST} ./cmd"
 grep -v '^github.com/status-im/status-go/cmd/' ${merged_coverage_report} > ${final_coverage_report}
 
 # Generate HTML coverage report
-echo "Generating HTML coverage report"
+echo -e "${GRN}Generating HTML coverage report${RST}"
 go tool cover -html ${final_coverage_report} -o test-coverage.html
 
 # Upload coverage report to CodeClimate
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
-  echo "Uploading coverage report to CodeClimate"
+  echo -e "${GRN}Uploading coverage report to CodeClimate${RST}"
   # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
   GIT_COMMIT=$(git log | grep -m1 -oE '[^ ]+$')
   cc-test-reporter format-coverage --prefix=github.com/status-im/status-go # To generate 'coverage/codeclimate.json'
@@ -145,15 +146,15 @@ fi
 # Generate report with test stats
 shopt -s globstar nullglob # Enable recursive globbing
 if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
-  echo "Generating test stats"
   for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do
     read exit_code < "${exit_code_file}"
     if [[ "${exit_code}" -ne 0 ]]; then
+      echo -e "${GRN}Generating test stats${RST}, exit code: ${exit_code}"
       mkdir -p "${GIT_ROOT}/reports"
-      "${GIT_ROOT}/_assets/scripts/test_stats.py" | redirect_stdout "${GIT_ROOT}/reports/test_stats.txt"
+      "${GIT_ROOT}/_assets/scripts/test_stats.py" | tee "${GIT_ROOT}/reports/test_stats.txt"
       exit ${exit_code}
     fi
   done
 fi
 
-echo "${GRN}Testing finished${RST}"
+echo -e "${GRN}Testing finished${RST}"

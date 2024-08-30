@@ -164,7 +164,7 @@ pipeline {
               nix.shell('make test-unit V=1', pure: false)
             }
             sh "mv c.out test-coverage.out"
-            archiveArtifacts('test-coverage.out, coverage/codeclimate.json, test-coverage.html')
+            archiveArtifacts('test-coverage.out, coverage/codeclimate.json, test-coverage.html, coverage_merged.out')
           }
         }
       } }
@@ -181,7 +181,7 @@ pipeline {
         env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
         if (isTestNightlyJob()) {
-          archiveArtifacts('report_*.xml, test_*.log, *.coverage.out')
+          archiveArtifacts('report_*.xml, test_*.log, exit_code_*.txt, *.coverage.out')
         }
         if (params.UNIT_TEST_RERUN_FAILS) {
           def rerunReports = findFiles(glob: 'report_rerun_fails_*.txt')
@@ -190,7 +190,7 @@ pipeline {
           }
         }
         junit(
-          testResults: 'report.xml',
+          testResults: 'report_*.xml',
           skipOldReports: true,
           skipPublishingChecks: true,
           skipMarkingBuildUnstable: true
@@ -210,7 +210,7 @@ pipeline {
     failure { 
       script { 
         github.notifyPR(false) 
-        archiveArtifacts('test.log')
+        archiveArtifacts('**/test_*.log')
       }
     }
     cleanup {
