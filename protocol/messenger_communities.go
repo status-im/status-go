@@ -2010,10 +2010,10 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			Payload:             payload,
 			Sender:              community.PrivateKey(),
 			CommunityID:         community.ID(),
-			SkipEncryptionLayer: true,
+			SkipEncryptionLayer: false,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
 			PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
-			ResendType:          common.ResendTypeRawMessage,
+			ResendType:          common.ResendTypeDataSync,
 			ResendMethod:        common.ResendMethodSendPrivate,
 			Recipients:          []*ecdsa.PublicKey{pk},
 			Priority:            &common.HighPriority,
@@ -2026,10 +2026,6 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 
 		_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
 		if err != nil {
-			return nil, err
-		}
-
-		if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
 			return nil, err
 		}
 	}
