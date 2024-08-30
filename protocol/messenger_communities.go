@@ -2008,7 +2008,6 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 
 		rawMessage := &common.RawMessage{
 			Payload:             payload,
-			Sender:              community.PrivateKey(),
 			CommunityID:         community.ID(),
 			SkipEncryptionLayer: false,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
