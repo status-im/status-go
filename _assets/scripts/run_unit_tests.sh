@@ -119,18 +119,19 @@ fi
 
 # Gather test coverage results
 echo "Gathering test coverage results"
-rm -f c.out c-full.out
+merged_coverage_report="coverage_merged.out"
+final_coverage_report="c.out" # Name expected by cc-test-reporter
 coverage_reports=$(find . -iname "*.coverage.out")
-echo "Found reports: ${coverage_reports}"
-go run ./cmd/test-coverage-utils/gocovmerge.go ${coverage_reports} >> c-full.out
+rm -f ${final_coverage_report} ${merged_coverage_report}
+echo $coverage_reports | xargs go run ./cmd/test-coverage-utils/gocovmerge.go >> ${merged_coverage_report}
 
 # Filter out test coverage for packages in ./cmd
 echo "Filtering out test coverage for packages in ./cmd"
-grep -v '^github.com/status-im/status-go/cmd/' c-full.out > c.out
+grep -v '^github.com/status-im/status-go/cmd/' ${merged_coverage_report} > ${final_coverage_report}
 
 # Generate HTML coverage report
 echo "Generating HTML coverage report"
-go tool cover -html c.out -o test-coverage.html
+go tool cover -html ${final_coverage_report} -o test-coverage.html
 
 # Upload coverage report to CodeClimate
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
@@ -144,7 +145,7 @@ fi
 # Generate report with test stats
 shopt -s globstar nullglob # Enable recursive globbing
 if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
-  echo "Generating report with test stats"
+  echo "Generating test stats"
   for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do
     read exit_code < "${exit_code_file}"
     if [[ "${exit_code}" -ne 0 ]]; then
