@@ -133,7 +133,8 @@ type StatusNode struct {
 	connectorSrvc          *connector.Service
 	appGeneralSrvc         *appgeneral.Service
 
-	walletFeed event.Feed
+	accountsFeed event.Feed
+	walletFeed   event.Feed
 }
 
 // New makes new instance of StatusNode.
