@@ -1,9 +1,11 @@
 package protocol
 
 import (
-	"github.com/status-im/status-go/protocol/requests"
-	"github.com/stretchr/testify/suite"
 	"testing"
+
+	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/protocol/requests"
 )
 
 func TestMessengerCollapsedCommunityCategoriesSuite(t *testing.T) {
