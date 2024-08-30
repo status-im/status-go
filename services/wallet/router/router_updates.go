@@ -105,7 +105,9 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 							}
 						}
 
-						sendRouterResult(uuid, r.activeRoutes, nil)
+						_, err = r.checkBalancesForTheBestRoute(ctx, r.activeRoutes.Best)
+
+						sendRouterResult(uuid, r.activeRoutes, err)
 					}
 					r.activeRoutesMutex.Unlock()
 				}
