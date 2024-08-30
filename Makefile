@@ -368,7 +368,6 @@ test-unit: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
 test-unit: export UNIT_TEST_REPORT_CODECLIMATE ?= false
 test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/waku(/.*|$$)|/wakuv2(/.*|$$)') \
 	$(call sh, go list ./... | \
-	grep -v '.*/protocol$$' | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
