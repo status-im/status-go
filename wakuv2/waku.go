@@ -102,6 +102,7 @@ type ErrorSendingEnvelope struct {
 }
 
 type ITelemetryClient interface {
+	SetDeviceType(deviceType string)
 	PushReceivedEnvelope(ctx context.Context, receivedEnvelope *protocol.Envelope)
 	PushSentEnvelope(ctx context.Context, sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvelope ErrorSendingEnvelope)
