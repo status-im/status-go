@@ -3699,10 +3699,6 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 			for _, acc := range dbKeypair.Accounts {
 				removedAddresses = append(removedAddresses, gethcommon.Address(acc.Address))
 			}
-			m.config.accountsFeed.Send(accountsevent.Event{
-				Type:     accountsevent.EventTypeRemoved,
-				Accounts: removedAddresses,
-			})
 		} else {
 			for _, acc := range dbKeypair.Accounts {
 				if acc.Chat {
@@ -3714,10 +3710,14 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 					addedAddresses = append(addedAddresses, gethcommon.Address(acc.Address))
 				}
 			}
+		}
+		if len(addedAddresses) > 0 {
 			m.config.accountsFeed.Send(accountsevent.Event{
 				Type:     accountsevent.EventTypeAdded,
 				Accounts: addedAddresses,
 			})
+		}
+		if len(removedAddresses) > 0 {
 			m.config.accountsFeed.Send(accountsevent.Event{
 				Type:     accountsevent.EventTypeRemoved,
 				Accounts: removedAddresses,

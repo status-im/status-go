@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
@@ -814,7 +815,8 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	s.Require().True(haveSameElements(woAccounts, dbWoAccounts1, accounts.SameAccounts))
 
 	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	accountsFeed := &event.Feed{}
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, []Option{WithAccountsFeed(accountsFeed)})
 	s.Require().NoError(err)
 	s.Require().NotNil(bob2.config.accountsFeed)
 	ch := make(chan accountsevent.Event, 20)
@@ -852,7 +854,7 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	case event := <-ch:
 		switch event.Type {
 		case accountsevent.EventTypeAdded:
-			s.Require().Equal(1, len(event.Accounts))
+			s.Require().Len(event.Accounts, 1)
 			s.Require().Equal(common.Address(dbWoAccounts2[0].Address), event.Accounts[0])
 		}
 	}

@@ -6,8 +6,6 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/event"
-
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
@@ -75,8 +73,6 @@ func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, 
 		return nil, err
 	}
 
-	accountsFeed := &event.Feed{}
-
 	options := []Option{
 		WithCustomLogger(config.logger),
 		WithDatabase(appDb),
@@ -87,7 +83,6 @@ func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, 
 		WithToplevelDatabaseMigrations(),
 		WithBrowserDatabase(nil),
 		WithCuratedCommunitiesUpdateLoop(false),
-		WithAccountsFeed(accountsFeed),
 	}
 	options = append(options, config.extraOptions...)
 
