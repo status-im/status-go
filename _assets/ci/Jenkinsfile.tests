@@ -181,7 +181,7 @@ pipeline {
         env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
         if (isTestNightlyJob()) {
-          archiveArtifacts('report_*.xml, test_*.log')
+          archiveArtifacts('report_*.xml, test_*.log, *.coverage.out')
         }
         if (params.UNIT_TEST_RERUN_FAILS) {
           def rerunReports = findFiles(glob: 'report_rerun_fails_*.txt')

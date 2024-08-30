@@ -118,17 +118,23 @@ else
 fi
 
 # Gather test coverage results
+echo "Gathering test coverage results"
 rm -f c.out c-full.out
-go run ./cmd/test-coverage-utils/gocovmerge.go $(find -iname "*.coverage.out") >> c-full.out
+coverage_reports=$(find . -iname "*.coverage.out")
+echo "Found reports: ${coverage_reports}"
+go run ./cmd/test-coverage-utils/gocovmerge.go ${coverage_reports} >> c-full.out
 
 # Filter out test coverage for packages in ./cmd
+echo "Filtering out test coverage for packages in ./cmd"
 grep -v '^github.com/status-im/status-go/cmd/' c-full.out > c.out
 
 # Generate HTML coverage report
+echo "Generating HTML coverage report"
 go tool cover -html c.out -o test-coverage.html
 
 # Upload coverage report to CodeClimate
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
+  echo "Uploading coverage report to CodeClimate"
   # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
   GIT_COMMIT=$(git log | grep -m1 -oE '[^ ]+$')
   cc-test-reporter format-coverage --prefix=github.com/status-im/status-go # To generate 'coverage/codeclimate.json'
@@ -138,6 +144,7 @@ fi
 # Generate report with test stats
 shopt -s globstar nullglob # Enable recursive globbing
 if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
+  echo "Generating report with test stats"
   for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do
     read exit_code < "${exit_code_file}"
     if [[ "${exit_code}" -ne 0 ]]; then
@@ -147,3 +154,5 @@ if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
     fi
   done
 fi
+
+echo "${GRN}Testing finished${RST}"
