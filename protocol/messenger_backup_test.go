@@ -701,8 +701,12 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	s.Require().True(accounts.SameKeypairs(seedKp, dbSeedKp1))
 
 	// Create bob2
-	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	accountsFeed := &event.Feed{}
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, []Option{WithAccountsFeed(accountsFeed)})
 	s.Require().NoError(err)
+	s.Require().NotNil(bob2.config.accountsFeed)
+	ch := make(chan accountsevent.Event, 20)
+	sub := bob2.config.accountsFeed.Subscribe(ch)
 	defer TearDownMessenger(&s.Suite, bob2)
 
 	// Backup
@@ -732,6 +736,37 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	dbSeedKp2, err := bob2.settings.GetKeypairByKeyUID(seedKp.KeyUID)
 	s.Require().NoError(err)
 	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(seedKp, dbSeedKp2, false, accounts.SyncedFromBackup, accounts.AccountNonOperable))
+
+	// Check whether accounts added event is sent
+	expectedAddresses := [][]common.Address{}
+	profileKpWalletAddresses := []common.Address{}
+	seedKpAddresses := []common.Address{}
+	for _, acc := range dbProfileKp2.Accounts {
+		if acc.Chat {
+			continue
+		}
+		profileKpWalletAddresses = append(profileKpWalletAddresses, common.Address(acc.Address))
+	}
+	expectedAddresses = append(expectedAddresses, profileKpWalletAddresses)
+
+	for _, acc := range dbSeedKp2.Accounts {
+		seedKpAddresses = append(seedKpAddresses, common.Address(acc.Address))
+	}
+	expectedAddresses = append(expectedAddresses, seedKpAddresses)
+
+	for i := 0; i < len(expectedAddresses); i++ {
+		select {
+		case <-time.After(1 * time.Second):
+			s.Fail("Timed out waiting for accountsevent")
+		case event := <-ch:
+			switch event.Type {
+			case accountsevent.EventTypeAdded:
+				s.Require().Len(event.Accounts, len(expectedAddresses[i]))
+				s.Require().True(reflect.DeepEqual(expectedAddresses[i], event.Accounts))
+			}
+		}
+	}
+	sub.Unsubscribe()
 }
 
 func (s *MessengerBackupSuite) TestBackupKeycards() {
