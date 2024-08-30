@@ -827,7 +827,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.schedulePublishGrantsForControlledCommunities()
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
-	m.watchChatsAndCommunitiesToUnmute()
+	m.watchChatsToUnmute()
 	m.watchCommunitiesToUnmute()
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
@@ -1577,34 +1577,42 @@ func (m *Messenger) watchConnectionChange() {
 	go subscribedConnectionStatus(subscription)
 }
 
-// watchChatsAndCommunitiesToUnmute regularly checks for chats and communities that should be unmuted
-func (m *Messenger) watchChatsAndCommunitiesToUnmute() {
-	m.logger.Debug("watching unmuted chats")
+// watchChatsToUnmute checks every minute to identify and unmute chats that should no longer be muted.
+func (m *Messenger) watchChatsToUnmute() {
+	m.logger.Debug("Checking for chats to unmute every minute")
 	go func() {
 		for {
-			select {
-			case <-time.After(1 * time.Minute):
-				response := &MessengerResponse{}
-				m.allChats.Range(func(chatID string, c *Chat) bool {
-					chatMuteTill := c.MuteTill.Truncate(time.Second)
-					currTime := time.Now().Truncate(time.Second)
+			// Execute the check immediately upon starting
+			response := &MessengerResponse{}
+			currTime := time.Now()
 
-					if currTime.After(chatMuteTill) && !chatMuteTill.Equal(time.Time{}) && c.Muted {
-						err := m.persistence.UnmuteChat(c.ID)
-						if err != nil {
-							m.logger.Info("err", zap.Any("Couldn't unmute chat", err))
-							return false
-						}
-						c.Muted = false
-						c.MuteTill = time.Time{}
-						response.AddChat(c)
+			m.allChats.Range(func(chatID string, c *Chat) bool {
+				chatMuteTill := c.MuteTill
+				if currTime.After(chatMuteTill) && !chatMuteTill.Equal(time.Time{}) && c.Muted {
+					err := m.persistence.UnmuteChat(c.ID)
+					if err != nil {
+						m.logger.Warn("watchChatsToUnmute error", zap.Any("Couldn't unmute chat", err))
+						return false
 					}
-					return true
-				})
-
-				if !response.IsEmpty() {
-					signal.SendNewMessages(response)
+					c.Muted = false
+					c.MuteTill = time.Time{}
+					response.AddChat(c)
 				}
+				return true
+			})
+
+			if !response.IsEmpty() {
+				signal.SendNewMessages(response)
+			}
+
+			// Calculate the time until the next whole minute
+			now := time.Now()
+			waitDuration := time.Until(now.Truncate(time.Minute).Add(time.Minute))
+
+			// Wait until the next minute
+			select {
+			case <-time.After(waitDuration):
+				// Continue to next iteration
 			case <-m.quit:
 				return
 			}
@@ -1612,21 +1620,27 @@ func (m *Messenger) watchChatsAndCommunitiesToUnmute() {
 	}()
 }
 
-// watchCommunitiesToUnmute regularly checks for communities that should be unmuted
+// watchCommunitiesToUnmute checks every minute to identify and unmute communities that should no longer be muted.
 func (m *Messenger) watchCommunitiesToUnmute() {
-	m.logger.Debug("watching unmuted communities")
+	m.logger.Debug("Checking for communities to unmute every minute")
 	go func() {
 		for {
-			select {
-			case <-time.After(1 * time.Minute):
-				response, err := m.CheckCommunitiesToUnmute()
-				if err != nil {
-					return
-				}
+			// Execute the check immediately upon starting
+			response, err := m.CheckCommunitiesToUnmute()
+			if err != nil {
+				m.logger.Warn("watchCommunitiesToUnmute error", zap.Any("Couldn't unmute communities", err))
+			} else if !response.IsEmpty() {
+				signal.SendNewMessages(response)
+			}
 
-				if !response.IsEmpty() {
-					signal.SendNewMessages(response)
-				}
+			// Calculate the time until the next whole minute
+			now := time.Now()
+			waitDuration := time.Until(now.Truncate(time.Minute).Add(time.Minute))
+
+			// Wait until the next minute
+			select {
+			case <-time.After(waitDuration):
+				// Continue to next iteration
 			case <-m.quit:
 				return
 			}
