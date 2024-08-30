@@ -54,12 +54,13 @@ run_test_for_packages() {
     gotestsum_flags="${gotestsum_flags} --junitfile=${report_file} --rerun-fails-report=${rerun_report_file}"
   fi
 
-  # Cleanup previous coverage reports
-  rm -f coverage.out.rerun.*
-
   # Prepare env variables for `test-with-coverage.sh`
   export TEST_WITH_COVERAGE_PACKAGES="${packages}"
   export TEST_WITH_COVERAGE_COUNT="${count}"
+  export TEST_WITH_COVERAGE_REPORTS_DIR="$(mktemp -d)"
+
+  # Cleanup previous coverage reports
+  rm -f "${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.*"
 
   # Run tests
   gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
@@ -72,10 +73,8 @@ run_test_for_packages() {
   local go_test_exit=$?
 
   # Merge package coverage results
-  go run ./cmd/test-coverage-utils/gocovmerge.go coverage.out.rerun.* > ${coverage_file}
-
-  # Cleanup coverage reports
-  rm -f coverage.out.rerun.*
+  go run ./cmd/test-coverage-utils/gocovmerge.go ${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.* > ${coverage_file}
+  rm -f "${COVERAGE_REPORTS_DIR}/coverage.out.rerun.*"
 
   echo "${go_test_exit}" > "${exit_code_file}"
   if [[ "${go_test_exit}" -ne 0 ]]; then
@@ -95,16 +94,28 @@ rm -rf ./**/*.coverage.out
 
 echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
-run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" 3 "All packages except 'protocol'" &
+DEFAULT_TIMEOUT_MINUTES=3
+PROTOCOL_TIMEOUT_MINUTES=40
+if [[ "${UNIT_TEST_PACKAGES}" == *"github.com/status-im/status-go/protocol"* ]]; then
+  HAS_PROTOCOL_PACKAGE=true
+fi
 
-# NOTE: Run `protocol` package manually, because it lasts for 30 minutes.
-# Running -test.count=20 for it takes too much time, so we spawn separate processes for it.
-# This can be removed when the runtime of `protocol` package is optimized.
-for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-  run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 40 "Only 'protocol' package" &
-done
+if [[ $HAS_PROTOCOL_PACKAGE != 'true' ]]; then
+  # This is the default single-line flow for testing all packages
+  # The `else` branch is temporary and will be removed once the `protocol` package runtime is optimized.
+  run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages"
+else
+  # Spawn a process to test all packages except `protocol`
+  UNIT_TEST_PACKAGES=$(echo "${UNIT_TEST_PACKAGES}" | sed 's/github.com\/status-im\/status-go\/protocol//g')
+  run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
 
-wait
+  # Spawn separate processes to run `protocol` package
+  for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
+    run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
+  done
+
+  wait
+fi
 
 # Gather test coverage results
 rm -f c.out c-full.out
@@ -116,6 +127,7 @@ grep -v '^github.com/status-im/status-go/cmd/' c-full.out > c.out
 # Generate HTML coverage report
 go tool cover -html c.out -o test-coverage.html
 
+# Upload coverage report to CodeClimate
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
   # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
   GIT_COMMIT=$(git log | grep -m1 -oE '[^ ]+$')
@@ -123,6 +135,7 @@ if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
   cc-test-reporter after-build --prefix=github.com/status-im/status-go
 fi
 
+# Generate report with test stats
 shopt -s globstar nullglob # Enable recursive globbing
 if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
   for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do

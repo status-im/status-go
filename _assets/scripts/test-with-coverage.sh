@@ -2,7 +2,7 @@
 set -eu
 
 packages=""
-coverage_file_path="$(mktemp coverage.out.rerun.XXXXXXXXXX)"
+coverage_file_path="$(mktemp coverage.out.rerun.XXXXXXXXXX --tmpdir="${TEST_WITH_COVERAGE_REPORTS_DIR}")"
 count=1
 
 # This is a hack to workaround gotestsum behaviour. When using a --raw-command,
