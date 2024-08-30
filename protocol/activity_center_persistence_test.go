@@ -191,6 +191,7 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 
 	notif, err := p.GetActivityCenterNotificationByID(nID1)
 	s.Require().NoError(err)
+	s.Require().NotNil(notif)
 	s.Require().True(notif.Deleted)
 	s.Require().True(notif.Dismissed)
 	s.Require().True(notif.Read)
@@ -199,26 +200,35 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 	for _, id := range []types.HexBytes{nID2, nID3, nID4} {
 		notif, err = p.GetActivityCenterNotificationByID(id)
 		s.Require().NoError(err)
+		s.Require().NotNil(notif)
 		s.Require().False(notif.Deleted, notif.ID)
 		s.Require().False(notif.Dismissed, notif.ID)
 		s.Require().False(notif.Read, notif.ID)
 	}
 
 	// Test: soft delete the notifications that have Message.ID == messages[1].ID
-	// or LastMessage.ID == chat.LastMessage.
 	_, err = p.DeleteActivityCenterNotificationForMessage(chat.ID, messages[1].ID, currentMilliseconds())
 	s.Require().NoError(err)
 
-	for _, id := range []types.HexBytes{nID2, nID3} {
-		notif, err = p.GetActivityCenterNotificationByID(id)
-		s.Require().NoError(err, notif.ID)
-		s.Require().True(notif.Deleted, notif.ID)
-		s.Require().True(notif.Dismissed, notif.ID)
-		s.Require().True(notif.Read, notif.ID)
-	}
+	notif, err = p.GetActivityCenterNotificationByID(nID2)
+	s.Require().NoError(err)
+	s.Require().NotNil(notif)
+	s.Require().True(notif.Deleted, notif.ID)
+	s.Require().True(notif.Dismissed, notif.ID)
+	s.Require().True(notif.Read, notif.ID)
+
+	// Check that notifications with LastMessage.ID == messages[1].ID will remain.
+	// Unless the notification is of type NewOneToOne or NewPrivateGroupChat.
+	notif, err = p.GetActivityCenterNotificationByID(nID3)
+	s.Require().NoError(err)
+	s.Require().NotNil(notif)
+	s.Require().False(notif.Deleted, notif.ID)
+	s.Require().False(notif.Dismissed, notif.ID)
+	s.Require().False(notif.Read, notif.ID)
 
 	notif, err = p.GetActivityCenterNotificationByID(nID4)
 	s.Require().NoError(err)
+	s.Require().NotNil(notif)
 	s.Require().False(notif.Deleted)
 	s.Require().False(notif.Dismissed)
 	s.Require().False(notif.Read)
@@ -226,6 +236,106 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 	// Test: don't do anything if passed a chat and message without notifications.
 	_, err = p.DeleteActivityCenterNotificationForMessage(chat2.ID, messages[2].ID, currentMilliseconds())
 	s.Require().NoError(err)
+}
+
+func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificationsForMessage_LastMessage() {
+	// Create the temporary test-database that will be used to store chats, messages, and notifications
+	db, err := openTestDB()
+	s.Require().NoError(err)
+	p := newSQLitePersistence(db)
+
+	// Create and save the public chat that will be used to group our test messages
+	chat := CreatePublicChat("test-chat", &testTimeSource{})
+	err = p.SaveChat(*chat)
+	s.Require().NoError(err)
+
+	// Define multiple test messages for our chat so we can emulate a chat with a latest message.
+	messages := []*common.Message{
+		{
+			ID:          "0x1",
+			ChatMessage: &protobuf.ChatMessage{},
+			LocalChatID: chat.ID,
+		},
+		{
+			ID:          "0x2",
+			ChatMessage: &protobuf.ChatMessage{},
+			LocalChatID: chat.ID,
+		},
+	}
+	err = p.SaveMessages(messages)
+	s.Require().NoError(err)
+
+	chat.LastMessage = messages[1]
+	err = p.SaveChat(*chat)
+	s.Require().NoError(err)
+
+	chatMessages, _, err := p.MessageByChatID(chat.ID, "", 2)
+	s.Require().NoError(err)
+	s.Require().Len(chatMessages, 2)
+
+	// Define multiple notifications of different types to emulate the removal of notifications when deleting a message
+	nID1 := types.HexBytes("1")
+	nID2 := types.HexBytes("2")
+	nID3 := types.HexBytes("3")
+	nID4 := types.HexBytes("4")
+
+	s.createNotifications(p, []*ActivityCenterNotification{
+		{
+			ID:          nID1,
+			ChatID:      chat.ID,
+			Type:        ActivityCenterNotificationTypeMention,
+			Message:     messages[0],
+			LastMessage: messages[1],
+		},
+		{
+			ID:      nID2,
+			ChatID:  chat.ID,
+			Type:    ActivityCenterNotificationTypeMention,
+			Message: messages[1],
+		},
+		{
+			ID:          nID3,
+			ChatID:      chat.ID,
+			Type:        ActivityCenterNotificationTypeNewOneToOne,
+			LastMessage: messages[1],
+		},
+		{
+			ID:          nID4,
+			ChatID:      chat.ID,
+			Type:        ActivityCenterNotificationTypeNewPrivateGroupChat,
+			LastMessage: messages[1],
+		},
+	})
+
+	// Action: soft delete notifications related to a chat and message
+	_, err = p.DeleteActivityCenterNotificationForMessage(chat.ID, messages[1].ID, currentMilliseconds())
+	s.Require().NoError(err)
+
+	// Test: check that notifications unrelated to the message are not affected.
+	notif, err := p.GetActivityCenterNotificationByID(nID1)
+	s.Require().NoError(err)
+	s.Require().NotNil(notif)
+	s.Require().False(notif.Deleted, notif.ID)
+	s.Require().False(notif.Dismissed, notif.ID)
+	s.Require().False(notif.Read, notif.ID)
+
+	// Test: check notifications directly related to the message are soft deleted
+	notif, err = p.GetActivityCenterNotificationByID(nID2)
+	s.Require().NoError(err)
+	s.Require().NotNil(notif)
+	s.Require().True(notif.Deleted)
+	s.Require().True(notif.Dismissed)
+	s.Require().True(notif.Read)
+
+	// Test: check NewOneToOne or NewPrivateGroupChat notifications that are indirectly related to the message are soft deleted
+	for _, id := range []types.HexBytes{nID3, nID4} {
+		notif, err = p.GetActivityCenterNotificationByID(id)
+		s.Require().NoError(err)
+		s.Require().NotNil(notif)
+		s.Require().True(notif.Deleted)
+		s.Require().True(notif.Dismissed)
+		s.Require().True(notif.Read)
+	}
 }
 
 func (s *ActivityCenterPersistenceTestSuite) Test_AcceptActivityCenterNotificationsForInvitesFromUser() {

@@ -295,7 +295,7 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 	notification := &ActivityCenterNotification{
 		ID:          types.FromHex(chat.ID),
 		Name:        chat.Name,
-		LastMessage: message,
+		Message:     message,
 		Type:        notificationType,
 		Author:      messageState.CurrentMessageState.Contact.ID,
 		Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,

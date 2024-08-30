@@ -61,7 +61,10 @@ func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID st
 
 	for _, notification := range notifications {
 		if notification.LastMessage != nil && notification.LastMessage.ID == messageID {
-			withNotification(notification)
+			switch notification.Type {
+			case ActivityCenterNotificationTypeNewOneToOne, ActivityCenterNotificationTypeNewPrivateGroupChat:
+				withNotification(notification)
+			}
 		}
 
 		if notification.Message != nil && notification.Message.ID == messageID {
