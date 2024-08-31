@@ -96,17 +96,19 @@ echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
 DEFAULT_TIMEOUT_MINUTES=5
 PROTOCOL_TIMEOUT_MINUTES=45
-if [[ "${UNIT_TEST_PACKAGES}" == *"github.com/status-im/status-go/protocol"* ]]; then
-  HAS_PROTOCOL_PACKAGE=true
+
+HAS_PROTOCOL_PACKAGE=true
+if [[ $(echo "${UNIT_TEST_PACKAGES}" | grep -E '.*/protocol\s+') == "" ]]; then
+  HAS_PROTOCOL_PACKAGE=false
 fi
 
-if [[ $HAS_PROTOCOL_PACKAGE != 'true' ]]; then
+if [[ $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
   # This is the default single-line flow for testing all packages
   # The `else` branch is temporary and will be removed once the `protocol` package runtime is optimized.
   run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages"
 else
   # Spawn a process to test all packages except `protocol`
-  UNIT_TEST_PACKAGES=$(echo "${UNIT_TEST_PACKAGES}" | grep -v '.*/protocol$$')
+  UNIT_TEST_PACKAGES=$(echo "${UNIT_TEST_PACKAGES}" | grep -v '.*/protocol\s+')
   run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
 
   # Spawn separate processes to run `protocol` package
