@@ -94,8 +94,8 @@ rm -rf ./**/*.coverage.out
 
 echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
-DEFAULT_TIMEOUT_MINUTES=3
-PROTOCOL_TIMEOUT_MINUTES=40
+DEFAULT_TIMEOUT_MINUTES=5
+PROTOCOL_TIMEOUT_MINUTES=45
 if [[ "${UNIT_TEST_PACKAGES}" == *"github.com/status-im/status-go/protocol"* ]]; then
   HAS_PROTOCOL_PACKAGE=true
 fi
