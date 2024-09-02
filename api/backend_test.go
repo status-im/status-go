@@ -842,7 +842,7 @@ func TestLoginAccount(t *testing.T) {
 			c <- struct{}{}
 		}
 	})
-	defer signal.SetMobileSignalHandler(nil)
+	t.Cleanup(signal.ResetMobileSignalHandler)
 	waitForLogin := func(chan interface{}) {
 		select {
 		case <-c:
@@ -1403,6 +1403,7 @@ func TestCreateWallet(t *testing.T) {
 			c <- struct{}{}
 		}
 	})
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	account, err := b.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
@@ -1463,6 +1464,7 @@ func TestSetFleet(t *testing.T) {
 			c <- struct{}{}
 		}
 	})
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	newAccount, err := b.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
@@ -1531,6 +1533,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 			c <- struct{}{}
 		}
 	})
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	newAccount, err := b.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)

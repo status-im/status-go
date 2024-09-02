@@ -86,6 +86,7 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	// Request accounts, now for real
 	request := "{\"method\": \"eth_requestAccounts\", \"params\": [], \"url\": \"http://testDAppURL123\", \"name\": \"testDAppName\", \"iconUrl\": \"http://testDAppIconUrl\" }"
@@ -221,6 +222,7 @@ func TestRequestAccountsAfterPermisasionsRevokeTest(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	for range [10]int{} {
 		dAppPermissionRevoked = false

@@ -102,6 +102,7 @@ func TestSwitchEthereumChainSuccess(t *testing.T) {
 			chainIdSwitched = true
 		}
 	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	cmd := &SwitchEthereumChainCommand{
 		Db:             db,
