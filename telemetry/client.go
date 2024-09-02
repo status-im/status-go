@@ -166,7 +166,7 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 	client.promMetrics = promMetrics
 
 	//client.promMetrics.Register("waku_connected_peers", GaugeType, nil, nil)
-	client.promMetrics.Register("waku2_envelopes_validated_total", CounterType, prometheus.Labels{"type": "missing"})
+	client.promMetrics.Register("waku2_envelopes_validated_total", CounterType, prometheus.Labels{})
 	client.promMetrics.Register("waku_lightpush_messages", CounterType, prometheus.Labels{})
 	client.promMetrics.Register("waku_lightpush_errors", CounterType, prometheus.Labels{})
 
