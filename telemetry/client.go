@@ -156,16 +156,19 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 		lastPeerCount:        0,
 		lastPeerCountTime:    time.Time{},
 		lastPeerConnFailures: make(map[string]int),
-
-		promMetrics: NewPrometheusMetrics(),
 	}
-
-	//client.promMetrics.Register("waku_connected_peers", GaugeType, nil, nil)
-	client.promMetrics.Register("waku2_envelopes_validated_total", CounterType, prometheus.Labels{"type": "relay"}, client.ProcessReuglarStoryRetrievedMsgs)
 
 	for _, opt := range opts {
 		opt(client)
 	}
+
+	promMetrics := NewPrometheusMetrics(client.processAndPushTelemetry, TelemetryRecord{NodeName: nodeName, PeerID: client.peerId, StatusVersion: version, DeviceType: client.deviceType})
+	client.promMetrics = promMetrics
+
+	//client.promMetrics.Register("waku_connected_peers", GaugeType, nil, nil)
+	client.promMetrics.Register("waku2_envelopes_validated_total", CounterType, prometheus.Labels{"type": "missing"})
+	client.promMetrics.Register("waku_lightpush_messages", CounterType, prometheus.Labels{})
+	client.promMetrics.Register("waku_lightpush_errors", CounterType, prometheus.Labels{})
 
 	return client
 }
@@ -202,8 +205,6 @@ func (c *Client) Start(ctx context.Context) {
 				c.telemetryCacheLock.Unlock()
 
 				if len(telemetryRequests) > 0 {
-					d, _ := json.MarshalIndent(telemetryRequests, "", "  ")
-					fmt.Println(string(d))
 					err := c.pushTelemetryRequest(telemetryRequests)
 					if err != nil {
 						if sendPeriod < 60*time.Second { //Stop the growing if the timer is > 60s to at least retry every minute
@@ -427,6 +428,7 @@ func (c *Client) UpdateEnvelopeProcessingError(shhMessage *types.Message, proces
 	if processingError != nil {
 		errorString = processingError.Error()
 	}
+
 	postBody := map[string]interface{}{
 		"messageHash":     types.EncodeHex(shhMessage.Hash),
 		"sentAt":          shhMessage.Timestamp,
@@ -443,27 +445,4 @@ func (c *Client) UpdateEnvelopeProcessingError(shhMessage *types.Message, proces
 	if err != nil {
 		c.logger.Error("Error sending envelope update to telemetry server", zap.Error(err))
 	}
-}
-
-func (c *Client) ProcessReuglarStoryRetrievedMsgs(data MetricPayload) {
-	fmt.Println(data)
-
-	postBody := map[string]interface{}{
-		"msgCount":      data.Value,
-		"pubsubTopic":   data.Labels["pubsubTopic"],
-		"nodeName":      c.nodeName,
-		"nodeKeyUID":    c.keyUID,
-		"peerId":        c.peerId,
-		"statusVersion": c.version,
-		"timestamp":     time.Now().Unix(),
-	}
-
-	telemtryData, err := json.Marshal(postBody)
-	if err != nil {
-		return
-	}
-
-	rawData := json.RawMessage(telemtryData)
-
-	c.processAndPushTelemetry(context.Background(), PrometheusMetricWrapper{Typ: "ReuglarStoryRetrievedMsgs", Data: &rawData})
 }

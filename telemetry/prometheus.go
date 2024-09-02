@@ -1,7 +1,10 @@
 package telemetry
 
 import (
+	"context"
+	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -14,7 +17,14 @@ const (
 	GaugeType
 )
 
-type ToTelemetryRequest func(payload MetricPayload)
+type TelemetryRecord struct {
+	NodeName      string `json:"nodeName"`
+	PeerID        string `json:"peerId"`
+	StatusVersion string `json:"statusVersion"`
+	DeviceType    string `json:"deviceType"`
+}
+
+type ProcessTelemetryRequest func(ctx context.Context, data interface{})
 
 type MetricPayload struct {
 	Labels map[string]string
@@ -23,23 +33,26 @@ type MetricPayload struct {
 }
 
 type Metric struct {
-	typ                MetricType
-	labels             map[string]string
-	toTelemetryRequest ToTelemetryRequest
+	typ    MetricType
+	labels map[string]string
 }
 
 type PrometheusMetrics struct {
-	metrics map[string]Metric
+	metrics         map[string]Metric
+	process         ProcessTelemetryRequest
+	telemetryRecord TelemetryRecord
 }
 
-func NewPrometheusMetrics() *PrometheusMetrics {
+func NewPrometheusMetrics(process ProcessTelemetryRequest, tc TelemetryRecord) *PrometheusMetrics {
 	return &PrometheusMetrics{
-		metrics: make(map[string]Metric),
+		metrics:         make(map[string]Metric),
+		process:         process,
+		telemetryRecord: tc,
 	}
 }
 
-func (pm *PrometheusMetrics) Register(name string, typ MetricType, labels prometheus.Labels, toTelemetryRequest ToTelemetryRequest) {
-	pm.metrics[name] = Metric{typ, labels, toTelemetryRequest}
+func (pm *PrometheusMetrics) Register(name string, typ MetricType, labels prometheus.Labels) {
+	pm.metrics[name] = Metric{typ, labels}
 }
 
 func (pm *PrometheusMetrics) Snapshot() {
@@ -84,7 +97,6 @@ func (pm *PrometheusMetrics) Snapshot() {
 
 			switch metric.typ {
 			case CounterType:
-
 				p = MetricPayload{
 					Name:   *mf.Name,
 					Value:  *m.Counter.Value,
@@ -98,12 +110,36 @@ func (pm *PrometheusMetrics) Snapshot() {
 				}
 			}
 
-			metric.toTelemetryRequest(p)
+			pm.ToTelemetryRequest(p)
 		}
 	}
 
 }
 
-func (pm *PrometheusMetrics) Get(name string) {
+func (pm *PrometheusMetrics) ToTelemetryRequest(p MetricPayload) error {
+	postBody := map[string]interface{}{
+		"value":         p.Value,
+		"name":          p.Name,
+		"labels":        p.Labels,
+		"nodeName":      pm.telemetryRecord.NodeName,
+		"deviceType":    pm.telemetryRecord.DeviceType,
+		"peerId":        pm.telemetryRecord.PeerID,
+		"statusVersion": pm.telemetryRecord.StatusVersion,
+		"timestamp":     time.Now().Unix(),
+	}
 
+	telemtryData, err := json.Marshal(postBody)
+	if err != nil {
+		return err
+	}
+
+	rawData := json.RawMessage(telemtryData)
+
+	wrap := PrometheusMetricWrapper{
+		Typ:  "PrometheusMetric",
+		Data: &rawData,
+	}
+
+	pm.process(context.Background(), wrap)
+	return nil
 }
