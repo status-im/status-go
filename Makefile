@@ -361,6 +361,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 test: test-unit ##@tests Run basic, short tests during development
 
 test-unit: export BUILD_TAGS ?=
+test-unit: export UNIT_TEST_DRY_RUN ?= false
 test-unit: export UNIT_TEST_COUNT ?= 1
 test-unit: export UNIT_TEST_FAILFAST ?= true
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true

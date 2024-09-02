@@ -47,6 +47,14 @@ run_test_for_packages() {
   local exit_code_file="exit_code_${iteration}.txt"
   local timeout="$(( single_timeout * count))m"
 
+  if [[ "${UNIT_TEST_DRY_RUN}" == 'true' ]]; then
+    echo -e "${GRN}Dry run ${iteration}. message:${RST} ${log_message}\n"\
+    "${YLW}Dry run ${iteration}. packages:${RST} ${packages}\n"\
+    "${YLW}Dry run ${iteration}. count:${RST} ${count}\n"\
+    "${YLW}Dry run ${iteration}. timeout:${RST} ${timeout}"
+    return 0
+  fi
+
   echo -e "${GRN}Testing:${RST} ${log_message}. Iteration ${iteration}. -test.count=${count}. Timeout: ${timeout}"
 
   gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"

@@ -35,6 +35,11 @@ pipeline {
       defaultValue: true,
       description: 'Should the job report test coverage to CodeClimate?'
     )
+    booleanParam(
+      name: 'UNIT_TEST_DRY_RUN',
+      defaultValue: false,
+      description: 'Should the job report ignore the actual test run and just print the test plan?'
+    )
   }
 
   options {
@@ -72,6 +77,7 @@ pipeline {
     UNIT_TEST_RERUN_FAILS =            "${params.UNIT_TEST_RERUN_FAILS}"
     UNIT_TEST_USE_DEVELOPMENT_LOGGER = "${params.UNIT_TEST_USE_DEVELOPMENT_LOGGER}"
     UNIT_TEST_REPORT_CODECLIMATE =     "${params.UNIT_TEST_REPORT_CODECLIMATE}"
+    UNIT_TEST_DRY_RUN =                "${params.UNIT_TEST_DRY_RUN}"
   }
 
   stages {
