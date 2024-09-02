@@ -106,7 +106,7 @@ DEFAULT_TIMEOUT_MINUTES=5
 PROTOCOL_TIMEOUT_MINUTES=45
 
 HAS_PROTOCOL_PACKAGE=true
-if [[ $(echo "${UNIT_TEST_PACKAGES}" | grep -E '.*/protocol\s+') == "" ]]; then
+if [[ $(echo "${UNIT_TEST_PACKAGES}" | grep -E '\s?\S+protocol\s+') == "" ]]; then
   HAS_PROTOCOL_PACKAGE=false
 fi
 
@@ -116,8 +116,8 @@ if [[ $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
   run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages"
 else
   # Spawn a process to test all packages except `protocol`
-  UNIT_TEST_PACKAGES=$(echo "${UNIT_TEST_PACKAGES}" | grep -v '.*/protocol\s+')
-  run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
+  UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES}" | tr ' ' '\n' | grep -v '/protocol$' | tr '\n' ' ')
+  run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
 
   # Spawn separate processes to run `protocol` package
   for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
