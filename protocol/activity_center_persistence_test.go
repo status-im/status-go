@@ -218,7 +218,6 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 	s.Require().True(notif.Read, notif.ID)
 
 	// Check that notifications with LastMessage.ID == messages[1].ID will remain.
-	// Unless the notification is of type NewOneToOne or NewPrivateGroupChat.
 	notif, err = p.GetActivityCenterNotificationByID(nID3)
 	s.Require().NoError(err)
 	s.Require().NotNil(notif)
@@ -332,9 +331,9 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 		notif, err = p.GetActivityCenterNotificationByID(id)
 		s.Require().NoError(err)
 		s.Require().NotNil(notif)
-		s.Require().True(notif.Deleted)
-		s.Require().True(notif.Dismissed)
-		s.Require().True(notif.Read)
+		s.Require().False(notif.Deleted)
+		s.Require().False(notif.Dismissed)
+		s.Require().False(notif.Read)
 	}
 }
 
