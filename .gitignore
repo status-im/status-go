@@ -108,3 +108,7 @@ __pycache__/
 .pytest_cache/
 .envrc
 report/results.xml
+
+# make lint-fix
+.clj-kondo/
+.lsp/
