@@ -145,12 +145,12 @@ func TestResourceURL(t *testing.T) {
 	require.Equal(t, "bafybeidzlqpkbtvpjtxnzgew6ffxhozq5f4ojbk64iq3tjl7lkjue2biby", uri.Host)
 	require.Equal(t, "", uri.Path)
 
-	//fixme: this is not working ATM, as it blocks PRs, i commented it out
-	//uri, err = api.ResourceURL(context.Background(), 1, "swarm.eth")
-	//require.NoError(t, err)
-	//require.Equal(t, "https", uri.Scheme)
-	//require.Equal(t, "swarm-gateways.net", uri.Host)
-	//require.Equal(t, "/bzz:/b7976f7fabd7ba88a897452a2860228dcefec427302a3dedae164b51c780a5b8/", uri.Path)
+	//fixme: this block is the broken part
+	uri, err = api.ResourceURL(context.Background(), 1, "swarm.eth")
+	require.NoError(t, err)
+	require.Equal(t, "https", uri.Scheme)
+	require.Equal(t, "swarm-gateways.net", uri.Host)
+	require.Equal(t, "/bzz:/b7976f7fabd7ba88a897452a2860228dcefec427302a3dedae164b51c780a5b8/", uri.Path)
 
 	uri, err = api.ResourceURL(context.Background(), 1, "noahzinsmeister.eth")
 	require.NoError(t, err)

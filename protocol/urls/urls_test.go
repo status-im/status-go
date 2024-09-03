@@ -118,62 +118,62 @@ func TestStatusLinkPreviewData(t *testing.T) {
 }
 
 // Medium unfurling is failing - https://github.com/status-im/status-go/issues/2192
-//
-// func TestMediumLinkPreviewData(t *testing.T) {
 
-// 	statusSecurityAudit := LinkPreviewData{
-// 		Site:         "Medium",
-// 		Title:        "A Look at the Status.im ICO Token Distribution",
-// 		ThumbnailURL: "https://miro.medium.com/max/700/1*Smc0y_TOL1XsofS1wxa3rg.jpeg",
-// 	}
+func TestMediumLinkPreviewData(t *testing.T) {
+	t.Skip("broken test") // https://github.com/status-im/status-go/issues/2192
 
-// 	previewData, err := GetLinkPreviewData("https://medium.com/the-bitcoin-podcast-blog/a-look-at-the-status-im-ico-token-distribution-f5bcf7f00907")
-// 	require.NoError(t, err)
-// 	require.Equal(t, statusSecurityAudit.Site, previewData.Site)
-// 	require.Equal(t, statusSecurityAudit.Title, previewData.Title)
-// 	require.Equal(t, statusSecurityAudit.ThumbnailURL, previewData.ThumbnailURL)
-// }
+	statusSecurityAudit := LinkPreviewData{
+		Site:         "Medium",
+		Title:        "A Look at the Status.im ICO Token Distribution",
+		ThumbnailURL: "https://miro.medium.com/max/700/1*Smc0y_TOL1XsofS1wxa3rg.jpeg",
+	}
 
-// Flaky test, gives the following error:
-// Error: Received unexpected error: invalid character '<' looking for beginning of value
-//
-// func TestTwitterLinkPreviewData(t *testing.T) {
-// 	statusTweet1 := LinkPreviewData{
-// 		Site:  "Twitter",
-// 		Title: "Crypto isn't going anywhere.— Status (@ethstatus) July 26, 2021",
-// 	}
-// 	statusTweet2 := LinkPreviewData{
-// 		Site: "Twitter",
-// 		Title: "🎉 Status v1.15 is a go! 🎉\n\n📌 Pin important messages in chats and groups" +
-// 			"\n✏️ Edit messages after sending\n🔬 Scan QR codes with the browser\n⚡️ FASTER app navigation!" +
-// 			"\nhttps://t.co/qKrhDArVKb— Status (@ethstatus) July 27, 2021",
-// 	}
-// 	statusProfile := LinkPreviewData{
-// 		Site:  "Twitter",
-// 		Title: "Tweets by ethstatus",
-// 	}
+	previewData, err := GetLinkPreviewData("https://medium.com/the-bitcoin-podcast-blog/a-look-at-the-status-im-ico-token-distribution-f5bcf7f00907")
+	require.NoError(t, err)
+	require.Equal(t, statusSecurityAudit.Site, previewData.Site)
+	require.Equal(t, statusSecurityAudit.Title, previewData.Title)
+	require.Equal(t, statusSecurityAudit.ThumbnailURL, previewData.ThumbnailURL)
+}
 
-// 	ts := []struct {
-// 		URL        string
-// 		Expected   LinkPreviewData
-// 		ShouldFail bool
-// 	}{
-// 		{"https://twitter.com/ethstatus/status/1419674733885407236", statusTweet1, false},
-// 		{"https://twitter.com/ethstatus/status/1420035091997278214", statusTweet2, false},
-// 		{"https://twitter.com/ethstatus", statusProfile, false},
-// 		{"https://www.test.com/unknown", LinkPreviewData{}, true},
-// 	}
+func TestTwitterLinkPreviewData(t *testing.T) {
+	t.Skip("flaky test") // https://github.com/status-im/status-go/issues/3529
 
-// 	for _, u := range ts {
-// 		previewData, err := GetLinkPreviewData(u.URL)
-// 		if u.ShouldFail {
-// 			require.Error(t, err)
-// 			continue
-// 		}
+	statusTweet1 := LinkPreviewData{
+		Site:  "Twitter",
+		Title: "Crypto isn't going anywhere.— Status (@ethstatus) July 26, 2021",
+	}
+	statusTweet2 := LinkPreviewData{
+		Site: "Twitter",
+		Title: "🎉 Status v1.15 is a go! 🎉\n\n📌 Pin important messages in chats and groups" +
+			"\n✏️ Edit messages after sending\n🔬 Scan QR codes with the browser\n⚡️ FASTER app navigation!" +
+			"\nhttps://t.co/qKrhDArVKb— Status (@ethstatus) July 27, 2021",
+	}
+	statusProfile := LinkPreviewData{
+		Site:  "Twitter",
+		Title: "Tweets by ethstatus",
+	}
 
-// 		require.NoError(t, err)
-// 		require.Equal(t, u.Expected.Site, previewData.Site)
-// 		require.Equal(t, u.Expected.Title, previewData.Title)
-// 		require.Equal(t, u.Expected.ThumbnailURL, previewData.ThumbnailURL)
-// 	}
-// }
+	ts := []struct {
+		URL        string
+		Expected   LinkPreviewData
+		ShouldFail bool
+	}{
+		{"https://twitter.com/ethstatus/status/1419674733885407236", statusTweet1, false},
+		{"https://twitter.com/ethstatus/status/1420035091997278214", statusTweet2, false},
+		{"https://twitter.com/ethstatus", statusProfile, false},
+		{"https://www.test.com/unknown", LinkPreviewData{}, true},
+	}
+
+	for _, u := range ts {
+		previewData, err := GetLinkPreviewData(u.URL)
+		if u.ShouldFail {
+			require.Error(t, err)
+			continue
+		}
+
+		require.NoError(t, err)
+		require.Equal(t, u.Expected.Site, previewData.Site)
+		require.Equal(t, u.Expected.Title, previewData.Title)
+		require.Equal(t, u.Expected.ThumbnailURL, previewData.ThumbnailURL)
+	}
+}
