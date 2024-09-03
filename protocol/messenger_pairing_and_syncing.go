@@ -35,26 +35,11 @@ func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallati
 	}
 
 	// Delete AC notif
-	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(request.InstallationID))
+	err = m.deleteNotification(response, request.InstallationID)
 	if err != nil {
 		return nil, err
 	}
 
-	if notification != nil {
-		updatedAt := m.GetCurrentTimeInMillis()
-		notification.UpdatedAt = updatedAt
-		notification.Deleted = true
-		// we shouldn't sync deleted notification here,
-		// as the same user on different devices will receive the same message(CommunityCancelRequestToJoin) ?
-		err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(request.InstallationID), updatedAt)
-		if err != nil {
-			m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
-			return nil, err
-		}
-
-		// sending signal to client to remove the activity center notification from UI
-		response.AddActivityCenterNotification(notification)
-	}
 	return response, nil
 }
 
