@@ -361,19 +361,17 @@ docker-test: ##@tests Run tests in a docker container with golang.
 test: test-unit ##@tests Run basic, short tests during development
 
 test-unit: export BUILD_TAGS ?=
+test-unit: export UNIT_TEST_DRY_RUN ?= false
 test-unit: export UNIT_TEST_COUNT ?= 1
 test-unit: export UNIT_TEST_FAILFAST ?= true
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true
 test-unit: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
 test-unit: export UNIT_TEST_REPORT_CODECLIMATE ?= false
-test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/waku(/.*|$$)|/wakuv2(/.*|$$)') \
-	$(call sh, go list ./... | \
+test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
-	grep -v /transactions/fake | \
-	grep -E -v '/waku(/.*|$$)' | \
-	grep -E -v '/wakuv2(/.*|$$)')
+	grep -v /transactions/fake)
 test-unit: ##@tests Run unit and integration tests
 	./_assets/scripts/run_unit_tests.sh
 

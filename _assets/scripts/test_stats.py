@@ -8,7 +8,9 @@ import re
 test_stats = defaultdict(lambda: defaultdict(int))
 skipped_tests = {}  # Use a dictionary to store test names and their skip reasons
 
-for file in glob.glob("report.xml", recursive=True):
+file_path = "**/report_*.xml"
+
+for file in glob.glob(file_path, recursive=True):
     tree = ET.parse(file)
     root = tree.getroot()
     for testcase in root.iter("testcase"):

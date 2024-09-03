@@ -34,37 +34,55 @@ redirect_stdout() {
 }
 
 run_test_for_packages() {
-  local output_file="test.log"
-  local coverage_file="test.coverage.out"
-  local report_file="report.xml"
-  local rerun_report_file="report_rerun_fails.txt"
-  local exit_code_file="exit_code.txt"
+  local packages="$1"
+  local iteration="$2"
+  local count="$3"
+  local single_timeout="$4"
+  local log_message="$5"
 
-  echo -e "${GRN}Testing:${RST} All packages. Single iteration. -test.count=${UNIT_TEST_COUNT}"
+  local output_file="test_${iteration}.log"
+  local coverage_file="test_${iteration}.coverage.out"
+  local report_file="report_${iteration}.xml"
+  local rerun_report_file="report_rerun_fails_${iteration}.txt"
+  local exit_code_file="exit_code_${iteration}.txt"
+  local timeout="$(( single_timeout * count))m"
+
+  if [[ "${UNIT_TEST_DRY_RUN}" == 'true' ]]; then
+    echo -e "${GRN}Dry run ${iteration}. message:${RST} ${log_message}\n"\
+    "${YLW}Dry run ${iteration}. packages:${RST} ${packages}\n"\
+    "${YLW}Dry run ${iteration}. count:${RST} ${count}\n"\
+    "${YLW}Dry run ${iteration}. timeout:${RST} ${timeout}"
+    return 0
+  fi
+
+  echo -e "${GRN}Testing:${RST} ${log_message}. Iteration ${iteration}. -test.count=${count}. Timeout: ${timeout}"
 
   gotestsum_flags="${GOTESTSUM_EXTRAFLAGS}"
   if [[ "${CI}" == 'true' ]]; then
     gotestsum_flags="${gotestsum_flags} --junitfile=${report_file} --rerun-fails-report=${rerun_report_file}"
   fi
 
+  # Prepare env variables for `test-with-coverage.sh`
+  export TEST_WITH_COVERAGE_PACKAGES="${packages}"
+  export TEST_WITH_COVERAGE_COUNT="${count}"
+  export TEST_WITH_COVERAGE_REPORTS_DIR="$(mktemp -d)"
+
   # Cleanup previous coverage reports
-  rm -f coverage.out.rerun.*
+  rm -f "${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.*"
 
   # Run tests
-  gotestsum --packages="${UNIT_TEST_PACKAGES}" ${gotestsum_flags} --raw-command -- \
+  gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
     ./_assets/scripts/test-with-coverage.sh \
-    -v ${GOTEST_EXTRAFLAGS} \
-    -timeout 45m \
+    ${GOTEST_EXTRAFLAGS} \
+    -timeout "${timeout}" \
     -tags "${BUILD_TAGS}" | \
     redirect_stdout "${output_file}"
 
   local go_test_exit=$?
 
   # Merge package coverage results
-  go run ./cmd/test-coverage-utils/gocovmerge.go coverage.out.rerun.* > ${coverage_file}
-
-  # Cleanup coverage reports
-  rm -f coverage.out.rerun.*
+  go run ./cmd/test-coverage-utils/gocovmerge.go ${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.* > ${coverage_file}
+  rm -f "${COVERAGE_REPORTS_DIR}/coverage.out.rerun.*"
 
   echo "${go_test_exit}" > "${exit_code_file}"
   if [[ "${go_test_exit}" -ne 0 ]]; then
@@ -83,33 +101,70 @@ fi
 rm -rf ./**/*.coverage.out
 
 echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
-run_test_for_packages
+
+DEFAULT_TIMEOUT_MINUTES=5
+PROTOCOL_TIMEOUT_MINUTES=45
+
+HAS_PROTOCOL_PACKAGE=true
+if [[ $(echo "${UNIT_TEST_PACKAGES}" | grep -E '\s?\S+protocol\s+') == "" ]]; then
+  HAS_PROTOCOL_PACKAGE=false
+fi
+
+if [[ $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
+  # This is the default single-line flow for testing all packages
+  # The `else` branch is temporary and will be removed once the `protocol` package runtime is optimized.
+  run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages"
+else
+  # Spawn a process to test all packages except `protocol`
+  UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES}" | tr ' ' '\n' | grep -v '/protocol$' | tr '\n' ' ')
+  run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
+
+  # Spawn separate processes to run `protocol` package
+  for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
+    run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
+  done
+
+  wait
+fi
 
 # Gather test coverage results
-rm -f c.out c-full.out
-go run ./cmd/test-coverage-utils/gocovmerge.go $(find -iname "*.coverage.out") >> c-full.out
+merged_coverage_report="coverage_merged.out"
+final_coverage_report="c.out" # Name expected by cc-test-reporter
+coverage_reports=$(find . -iname "*.coverage.out")
+rm -f ${final_coverage_report} ${merged_coverage_report}
+
+echo -e "${GRN}Gathering test coverage results: ${RST} output: ${merged_coverage_report}, input: ${coverage_reports}"
+echo $coverage_reports | xargs go run ./cmd/test-coverage-utils/gocovmerge.go > ${merged_coverage_report}
 
 # Filter out test coverage for packages in ./cmd
-grep -v '^github.com/status-im/status-go/cmd/' c-full.out > c.out
+echo -e "${GRN}Filtering test coverage packages:${RST} ./cmd"
+grep -v '^github.com/status-im/status-go/cmd/' ${merged_coverage_report} > ${final_coverage_report}
 
 # Generate HTML coverage report
-go tool cover -html c.out -o test-coverage.html
+echo -e "${GRN}Generating HTML coverage report${RST}"
+go tool cover -html ${final_coverage_report} -o test-coverage.html
 
+# Upload coverage report to CodeClimate
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
+  echo -e "${GRN}Uploading coverage report to CodeClimate${RST}"
   # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
   GIT_COMMIT=$(git log | grep -m1 -oE '[^ ]+$')
   cc-test-reporter format-coverage --prefix=github.com/status-im/status-go # To generate 'coverage/codeclimate.json'
   cc-test-reporter after-build --prefix=github.com/status-im/status-go
 fi
 
+# Generate report with test stats
 shopt -s globstar nullglob # Enable recursive globbing
 if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then
-  for exit_code_file in "${GIT_ROOT}"/**/exit_code.txt; do
+  for exit_code_file in "${GIT_ROOT}"/**/exit_code_*.txt; do
     read exit_code < "${exit_code_file}"
     if [[ "${exit_code}" -ne 0 ]]; then
+      echo -e "${GRN}Generating test stats${RST}, exit code: ${exit_code}"
       mkdir -p "${GIT_ROOT}/reports"
-      "${GIT_ROOT}/_assets/scripts/test_stats.py" | redirect_stdout "${GIT_ROOT}/reports/test_stats.txt"
+      "${GIT_ROOT}/_assets/scripts/test_stats.py" | tee "${GIT_ROOT}/reports/test_stats.txt"
       exit ${exit_code}
     fi
   done
 fi
+
+echo -e "${GRN}Testing finished${RST}"
