@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -29,8 +28,7 @@ type testMessengerConfig struct {
 	unhandledMessagesTracker *unhandledMessagesTracker
 	messagesOrderController  *MessagesOrderController
 
-	extraOptions   []Option
-	createSettings bool
+	extraOptions []Option
 }
 
 func (tmc *testMessengerConfig) complete() error {
@@ -49,17 +47,6 @@ func (tmc *testMessengerConfig) complete() error {
 	if tmc.logger == nil {
 		logger := tt.MustCreateTestLogger()
 		tmc.logger = logger.Named(tmc.name)
-	}
-
-	if tmc.createSettings {
-		s := settings.Settings{
-			DisplayName:               DefaultProfileDisplayName,
-			ProfilePicturesShowTo:     1,
-			ProfilePicturesVisibility: 1,
-			URLUnfurlingMode:          settings.URLUnfurlingAlwaysAsk,
-		}
-		opt := WithAppSettings(s, params.NodeConfig{})
-		tmc.extraOptions = append(tmc.extraOptions, opt)
 	}
 
 	return nil
@@ -155,4 +142,13 @@ func (u *unhandledMessagesTracker) addMessage(msg *v1protocol.StatusMessage, err
 		err:           err,
 	}
 	u.messages[msgType] = append(u.messages[msgType], newMessage)
+}
+
+func newTestSettings() settings.Settings {
+	return settings.Settings{
+		DisplayName:               DefaultProfileDisplayName,
+		ProfilePicturesShowTo:     1,
+		ProfilePicturesVisibility: 1,
+		URLUnfurlingMode:          settings.URLUnfurlingAlwaysAsk,
+	}
 }

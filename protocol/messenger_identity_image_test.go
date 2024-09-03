@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -59,9 +60,11 @@ func (s *MessengerProfilePictureHandlerSuite) TearDownSuite() {
 
 func (s *MessengerProfilePictureHandlerSuite) newMessenger(name string) *Messenger {
 	m, err := newTestMessenger(s.shh, testMessengerConfig{
-		logger:         s.logger.Named(fmt.Sprintf("messenger-%s", name)),
-		name:           name,
-		createSettings: true,
+		logger: s.logger.Named(fmt.Sprintf("messenger-%s", name)),
+		name:   name,
+		extraOptions: []Option{
+			WithAppSettings(newTestSettings(), params.NodeConfig{}),
+		},
 	})
 	s.Require().NoError(err)
 
@@ -282,11 +285,11 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 				for _, ac := range isContactFor["alice"] {
 					for _, bc := range isContactFor["bob"] {
 						args := &e2eArgs{
-							cc: cc,
-							ss: ss,
-							vs: vs,
-							ac: ac,
-							bc: bc,
+							chatContext:    cc,
+							showToType:     ss,
+							visibilityType: vs,
+							aliceContact:   ac,
+							bobContact:     bc,
 						}
 						s.Run(args.TestCaseName(s.T()), func() {
 							s.testE2eSendingReceivingProfilePicture(args)
@@ -327,16 +330,16 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		zap.Error(err))
 
 	// Setting up Bob
-	err = bob.settings.SaveSettingField(settings.ProfilePicturesVisibility, args.vs)
+	err = bob.settings.SaveSettingField(settings.ProfilePicturesVisibility, args.visibilityType)
 	s.Require().NoError(err)
 
-	if args.bc {
+	if args.bobContact {
 		_, err = bob.AddContact(context.Background(), &requests.AddContact{ID: alice.IdentityPublicKeyString()})
 		s.Require().NoError(err)
 	}
 
 	// Create Bob's chats
-	switch args.cc {
+	switch args.chatContext {
 	case publicChat:
 		// Bob opens up the public chat and joins it
 		bChat := CreatePublicChat("status", alice.transport)
@@ -353,14 +356,14 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		_, err = bob.Join(bChat)
 		s.Require().NoError(err)
 	default:
-		s.Failf("unexpected chat context type", "%s", string(args.cc))
+		s.Failf("unexpected chat context type", "%s", string(args.chatContext))
 	}
 
 	// Setting up Alice
-	err = alice.settings.SaveSettingField(settings.ProfilePicturesShowTo, args.ss)
+	err = alice.settings.SaveSettingField(settings.ProfilePicturesShowTo, args.showToType)
 	s.Require().NoError(err)
 
-	if args.ac {
+	if args.aliceContact {
 		_, err = alice.AddContact(context.Background(), &requests.AddContact{ID: bob.IdentityPublicKeyString()})
 		s.Require().NoError(err)
 	}
@@ -369,7 +372,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 
 	// Create chats
 	var aChat *Chat
-	switch args.cc {
+	switch args.chatContext {
 	case publicChat:
 		// Alice opens creates a public chat
 		aChat = CreatePublicChat("status", alice.transport)
@@ -383,11 +386,6 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		s.Require().NotNil(response)
 		s.Require().Len(response.messages, 1)
 
-		s.logger.Info("<<< MESSAGE SENT",
-			zap.String("messageID", response.Messages()[0].ID),
-			zap.Any("message", response.Messages()[0]),
-		)
-
 	case privateChat:
 		aChat = CreateOneToOneChat(bob.IdentityPublicKeyString(), bob.IdentityPublicKey(), bob.transport)
 		err = alice.SaveChat(aChat)
@@ -400,7 +398,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		s.Require().NoError(err)
 
 	default:
-		s.Failf("unexpected chat context type", "%s", string(args.cc))
+		s.Failf("unexpected chat context type", "%s", string(args.chatContext))
 	}
 
 	// Poll bob to see if he got the chatIdentity
@@ -443,7 +441,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	s.Require().NotNil(contact)
 
 	// Check that Bob now has Alice's profile picture(s)
-	switch args.cc {
+	switch args.chatContext {
 	case publicChat:
 		// In public chat context we only need the images.SmallDimName, but also may have the large
 		s.Require().GreaterOrEqual(len(contact.Images), 1)
@@ -460,20 +458,20 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 }
 
 type e2eArgs struct {
-	cc ChatContext
-	ss settings.ProfilePicturesShowToType
-	vs settings.ProfilePicturesVisibilityType
-	ac bool
-	bc bool
+	chatContext    ChatContext
+	showToType     settings.ProfilePicturesShowToType
+	visibilityType settings.ProfilePicturesVisibilityType
+	aliceContact   bool
+	bobContact     bool
 }
 
 func (args *e2eArgs) String() string {
 	return fmt.Sprintf("ChatContext: %s, ShowTo: %s, Visibility: %s, AliceContact: %t, BobContact: %t",
-		string(args.cc),
-		profilePicShowSettingsMap[args.ss],
-		profilePicViewSettingsMap[args.vs],
-		args.ac,
-		args.bc,
+		string(args.chatContext),
+		profilePicShowSettingsMap[args.showToType],
+		profilePicViewSettingsMap[args.visibilityType],
+		args.aliceContact,
+		args.bobContact,
 	)
 }
 
@@ -482,19 +480,19 @@ func (args *e2eArgs) TestCaseName(t *testing.T) string {
 	require.NoError(t, err)
 
 	return fmt.Sprintf("%s-%s-%s-ac.%t-bc.%t-exp.%t",
-		string(args.cc),
-		profilePicShowSettingsMap[args.ss],
-		profilePicViewSettingsMap[args.vs],
-		args.ac,
-		args.bc,
+		string(args.chatContext),
+		profilePicShowSettingsMap[args.showToType],
+		profilePicViewSettingsMap[args.visibilityType],
+		args.aliceContact,
+		args.bobContact,
 		expected,
 	)
 }
 
 func (args *e2eArgs) resultExpected() (bool, error) {
-	switch args.ss {
+	switch args.showToType {
 	case settings.ProfilePicturesShowToContactsOnly:
-		if args.ac {
+		if args.aliceContact {
 			return args.resultExpectedVS()
 		}
 		return false, nil
@@ -508,14 +506,14 @@ func (args *e2eArgs) resultExpected() (bool, error) {
 }
 
 func (args *e2eArgs) resultExpectedVS() (bool, error) {
-	switch args.vs {
+	switch args.visibilityType {
 	case settings.ProfilePicturesVisibilityContactsOnly:
 		return true, nil
 	case settings.ProfilePicturesVisibilityEveryone:
 		return true, nil
 	case settings.ProfilePicturesVisibilityNone:
 		// If we are contacts, we save the image regardless
-		return args.bc, nil
+		return args.bobContact, nil
 	default:
 		return false, errors.New("unknown ProfilePicturesVisibilityType")
 	}
