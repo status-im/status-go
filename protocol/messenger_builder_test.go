@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -141,4 +142,13 @@ func (u *unhandledMessagesTracker) addMessage(msg *v1protocol.StatusMessage, err
 		err:           err,
 	}
 	u.messages[msgType] = append(u.messages[msgType], newMessage)
+}
+
+func newTestSettings() settings.Settings {
+	return settings.Settings{
+		DisplayName:               DefaultProfileDisplayName,
+		ProfilePicturesShowTo:     1,
+		ProfilePicturesVisibility: 1,
+		URLUnfurlingMode:          settings.URLUnfurlingAlwaysAsk,
+	}
 }

@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/wakuv2"
-	"github.com/waku-org/go-waku/waku/v2/api/publish"
 )
 
 var (

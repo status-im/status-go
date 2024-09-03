@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"crypto/ecdsa"
-	"testing"
 
 	"github.com/stretchr/testify/suite"
 
@@ -18,10 +17,6 @@ import (
 )
 
 const DefaultProfileDisplayName = ""
-
-func TestMessengerCollapsedComunityCategoriesSuite(t *testing.T) {
-	suite.Run(t, new(MessengerCollapsedCommunityCategoriesSuite))
-}
 
 func (s *MessengerBaseTestSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
