@@ -91,6 +91,7 @@ func TestTransactionNotification(t *testing.T) {
 	})
 
 	signal.SetMobileSignalHandler(signalHandler)
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	feed := &event.Feed{}
 	require.NoError(t, s.SubscribeWallet(feed))

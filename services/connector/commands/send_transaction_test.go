@@ -129,6 +129,7 @@ func TestSendTransactionWithSignalAccepted(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
@@ -169,6 +170,7 @@ func TestSendTransactionWithSignalRejected(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	_, err = cmd.Execute(request)
 	assert.Equal(t, ErrSendTransactionRejectedByUser, err)

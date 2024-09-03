@@ -144,10 +144,10 @@ func setupSignalHandler(t *testing.T) (chan SuggestedRoutesV2Response, func()) {
 		}
 	})
 	signal.SetMobileSignalHandler(signalHandler)
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	closeFn := func() {
 		close(suggestedRoutesCh)
-		signal.SetMobileSignalHandler(nil)
 	}
 
 	return suggestedRoutesCh, closeFn

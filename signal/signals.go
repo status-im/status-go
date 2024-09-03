@@ -111,6 +111,10 @@ func SetMobileSignalHandler(handler MobileSignalHandler) {
 	mobileSignalHandler = handler
 }
 
+func ResetMobileSignalHandler() {
+	mobileSignalHandler = nil
+}
+
 // SetSignalEventCallback set callback
 // this function uses C implementation (see `signals.c` file)
 func SetSignalEventCallback(cb unsafe.Pointer) {

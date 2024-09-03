@@ -56,6 +56,7 @@ func TestRevokePermissionsSucceeded(t *testing.T) {
 			dAppPermissionRevoked = true
 		}
 	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	err := PersistDAppData(db, testDAppData, sharedAccount, 0x123)
 	assert.NoError(t, err)

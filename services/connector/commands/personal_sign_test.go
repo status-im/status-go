@@ -135,6 +135,7 @@ func TestPersonalSignWithSignalAccepted(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	response, err := cmd.Execute(request)
 	assert.NoError(t, err)
@@ -177,6 +178,7 @@ func TestPersonalSignWithSignalRejected(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	_, err = cmd.Execute(request)
 	assert.Equal(t, ErrPersonalSignRejectedByUser, err)

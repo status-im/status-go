@@ -88,6 +88,7 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 			dAppPermissionGranted = true
 		}
 	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	expectedResponse := FormatAccountAddressToResponse(accountAddress)
 	response, err := cmd.Execute(request)
@@ -142,6 +143,7 @@ func TestRequestAccountsRejected(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}))
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	_, err = cmd.Execute(request)
 	assert.Equal(t, ErrRequestAccountsRejectedByUser, err)
