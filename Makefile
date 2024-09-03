@@ -499,3 +499,6 @@ run-integration-tests:
 run-anvil: SHELL := /bin/sh
 run-anvil:
 	docker-compose -f integration-tests/docker-compose.anvil.yml up --remove-orphans
+
+codecov-validate:
+	curl -X POST --data-binary @codecov.yml https://codecov.io/validate
