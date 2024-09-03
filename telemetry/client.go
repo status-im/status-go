@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
@@ -165,7 +166,7 @@ func NewClient(logger *zap.Logger, serverURL string, keyUID string, nodeName str
 	promMetrics := NewPrometheusMetrics(client.processAndPushTelemetry, TelemetryRecord{NodeName: nodeName, PeerID: client.peerId, StatusVersion: version, DeviceType: client.deviceType})
 	client.promMetrics = promMetrics
 
-	//client.promMetrics.Register("waku_connected_peers", GaugeType, nil, nil)
+	client.promMetrics.Register("waku_connected_peers", GaugeType, nil)
 	client.promMetrics.Register("waku2_envelopes_validated_total", CounterType, prometheus.Labels{})
 	client.promMetrics.Register("waku_lightpush_messages", CounterType, prometheus.Labels{})
 	client.promMetrics.Register("waku_lightpush_errors", CounterType, prometheus.Labels{})

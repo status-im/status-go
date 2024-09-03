@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	prom_model "github.com/prometheus/client_model/go"
 )
 
 type MetricType int
@@ -27,9 +28,8 @@ type TelemetryRecord struct {
 type ProcessTelemetryRequest func(ctx context.Context, data interface{})
 
 type MetricPayload struct {
-	Labels map[string]string
-	Name   string
-	Value  float64
+	Name  string
+	Value []*prom_model.Metric
 }
 
 type Metric struct {
@@ -67,13 +67,18 @@ func (pm *PrometheusMetrics) Snapshot() {
 		if !ok {
 			continue
 		}
-		if len(mf.GetMetric()) == 0 {
+
+		metricFamilyValue := mf.GetMetric()
+
+		if len(metricFamilyValue) == 0 {
 			continue
 		}
 
-		for _, m := range mf.GetMetric() {
-			var p MetricPayload
-			if metric.labels != nil {
+		metricValue := []*prom_model.Metric{}
+
+		if metric.labels != nil { //filter out metrics based on labels
+			for _, m := range mf.GetMetric() {
+
 				matchCnt := len(metric.labels)
 
 				for name, value := range metric.labels {
@@ -87,31 +92,21 @@ func (pm *PrometheusMetrics) Snapshot() {
 				if matchCnt > 0 {
 					continue
 				}
+
+				metricValue = append(metricValue, m)
+
 			}
-
-			labelMap := make(map[string]string)
-
-			for _, l := range m.GetLabel() {
-				labelMap[*l.Name] = *l.Value
-			}
-
-			switch metric.typ {
-			case CounterType:
-				p = MetricPayload{
-					Name:   *mf.Name,
-					Value:  *m.Counter.Value,
-					Labels: labelMap,
-				}
-			case GaugeType:
-				p = MetricPayload{
-					Name:   *mf.Name,
-					Value:  *m.Gauge.Value,
-					Labels: labelMap,
-				}
-			}
-
-			pm.ToTelemetryRequest(p)
+		} else {
+			metricValue = metricFamilyValue
 		}
+
+		if len(metricValue) == 0 {
+			continue
+		}
+
+		p := MetricPayload{Name: *mf.Name, Value: metricValue}
+
+		pm.ToTelemetryRequest(p)
 	}
 
 }
@@ -120,7 +115,6 @@ func (pm *PrometheusMetrics) ToTelemetryRequest(p MetricPayload) error {
 	postBody := map[string]interface{}{
 		"value":         p.Value,
 		"name":          p.Name,
-		"labels":        p.Labels,
 		"nodeName":      pm.telemetryRecord.NodeName,
 		"deviceType":    pm.telemetryRecord.DeviceType,
 		"peerId":        pm.telemetryRecord.PeerID,
