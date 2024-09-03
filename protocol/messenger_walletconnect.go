@@ -49,7 +49,12 @@ func (m *Messenger) NewWalletConnectV2SessionCreatedNotification(session walletc
 		notification.DAppIconURL = session.Peer.Metadata.Icons[0]
 	}
 
-	_, err := m.persistence.SaveActivityCenterNotification(notification, true)
+	response := &MessengerResponse{}
+	err := m.addActivityCenterNotification(response, notification, nil)
+
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.MessengerResponse(response)
+	}
 
 	return err
 }
