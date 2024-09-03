@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 )
 
-func (m *Messenger) EnableAndSyncInstallation(request *requests.EnableAndSyncInstallation) (*MessengerResponse, error) {
+func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallationAndSync) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
