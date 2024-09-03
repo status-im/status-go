@@ -59,6 +59,7 @@ func NewConnectionParams(netIPs []net.IP, port int, publicKey *ecdsa.PublicKey, 
 //   - AES encryption key
 //   - string InstallationID of the sending device
 //   - string KeyUID of the sending device
+//
 // NOTE:
 // - append(accrete) parameters instead of changing(breaking) existing parameters. Appending should **never** break, modifying existing parameters will break. Watch this before making changes: https://www.youtube.com/watch?v=oyLBGkS5ICk
 // - never strictly check version, unless you really want to break
