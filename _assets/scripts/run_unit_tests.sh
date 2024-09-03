@@ -144,13 +144,20 @@ grep -v '^github.com/status-im/status-go/cmd/' ${merged_coverage_report} > ${fin
 echo -e "${GRN}Generating HTML coverage report${RST}"
 go tool cover -html ${final_coverage_report} -o test-coverage.html
 
+# https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
+GIT_COMMIT=$(git log | grep -m1 -oE '[^ ]+$')
+
 # Upload coverage report to CodeClimate
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
   echo -e "${GRN}Uploading coverage report to CodeClimate${RST}"
-  # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
-  GIT_COMMIT=$(git log | grep -m1 -oE '[^ ]+$')
   cc-test-reporter format-coverage --prefix=github.com/status-im/status-go # To generate 'coverage/codeclimate.json'
   cc-test-reporter after-build --prefix=github.com/status-im/status-go
+fi
+
+if [[ $UNIT_TEST_REPORT_CODECOV == 'true' ]]; then
+  echo -e "${GRN}Uploading coverage report to Codecov${RST}"
+  # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
+  codecov -t ${CODECOV_TOKEN} -f ${final_coverage_report} -F "unit" ${GIT_COMMIT}
 fi
 
 # Generate report with test stats
