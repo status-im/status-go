@@ -102,7 +102,7 @@ func (s *MessengerPairingSuite) TestMessengerPairAfterSeedPhrase() {
 	)
 	s.Require().NoError(err)
 
-	_, err = alice1.EnableAndSyncInstallation(&requests.EnableAndSyncInstallation{InstallationID: installationID2})
+	_, err = alice1.EnableInstallationAndSync(&requests.EnableInstallationAndSync{InstallationID: installationID2})
 	s.Require().NoError(err)
 
 	// check if the display name is synced
