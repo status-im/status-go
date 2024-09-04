@@ -161,8 +161,8 @@ if [[ $UNIT_TEST_REPORT_CODECOV == 'true' ]]; then
   for file in report_*.xml; do
     codecov_report_files_args+="--file ${file} "
   done
-  codecov do-upload --report-type test_results -t ${CODECOV_TOKEN} ${codecov_report_files_args}
-  codecov -t ${CODECOV_TOKEN} -f ${final_coverage_report} -F "unit"
+  codecov do-upload --token "${CODECOV_TOKEN}" --report-type test_results ${codecov_report_files_args}
+  codecov --token "${CODECOV_TOKEN}" -f ${final_coverage_report} -F "unit"
 fi
 
 # Generate report with test stats

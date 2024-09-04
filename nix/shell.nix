@@ -21,7 +21,7 @@ in pkgs.mkShell {
 
   buildInputs = with pkgs; [
     git jq which
-    go golangci-lint go-junit-report gopls go-bindata gomobileMod python312Packages.codecov
+    go golangci-lint go-junit-report gopls go-bindata gomobileMod codecov-cli
     mockgen protobuf3_20 protoc-gen-go gotestsum go-modvendor openjdk cc-test-reporter
    ] ++ lib.optionals (stdenv.isDarwin) [ xcodeWrapper ];
 
