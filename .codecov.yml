@@ -1,8 +1,12 @@
 coverage:
+  require_ci_to_pass: no
+  wait_for_ci: no
   status:
     project:
       default:
         informational: true
+#        paths:
+#          - "!cmd/"
     patch:
       default:
         informational: true

@@ -502,4 +502,4 @@ run-anvil:
 	docker-compose -f integration-tests/docker-compose.anvil.yml up --remove-orphans
 
 codecov-validate:
-	curl -X POST --data-binary @codecov.yml https://codecov.io/validate
+	curl -X POST --data-binary @.codecov.yml https://codecov.io/validate
