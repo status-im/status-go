@@ -12,6 +12,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
@@ -25,18 +26,19 @@ import (
 type TelemetryType string
 
 const (
-	ProtocolStatsMetric        TelemetryType = "ProtocolStats"
-	SentEnvelopeMetric         TelemetryType = "SentEnvelope"
-	UpdateEnvelopeMetric       TelemetryType = "UpdateEnvelope"
-	ReceivedMessagesMetric     TelemetryType = "ReceivedMessages"
-	ErrorSendingEnvelopeMetric TelemetryType = "ErrorSendingEnvelope"
-	PeerCountMetric            TelemetryType = "PeerCount"
-	PeerConnFailuresMetric     TelemetryType = "PeerConnFailure"
-	MessageCheckSuccessMetric  TelemetryType = "MessageCheckSuccess"
-	MessageCheckFailureMetric  TelemetryType = "MessageCheckFailure"
-	PeerCountByShardMetric     TelemetryType = "PeerCountByShard"
-	PeerCountByOriginMetric    TelemetryType = "PeerCountByOrigin"
-	MaxRetryCache                            = 5000
+	ProtocolStatsMetric           TelemetryType = "ProtocolStats"
+	SentEnvelopeMetric            TelemetryType = "SentEnvelope"
+	UpdateEnvelopeMetric          TelemetryType = "UpdateEnvelope"
+	ReceivedMessagesMetric        TelemetryType = "ReceivedMessages"
+	ErrorSendingEnvelopeMetric    TelemetryType = "ErrorSendingEnvelope"
+	PeerCountMetric               TelemetryType = "PeerCount"
+	PeerConnFailuresMetric        TelemetryType = "PeerConnFailure"
+	MessageCheckSuccessMetric     TelemetryType = "MessageCheckSuccess"
+	MessageCheckFailureMetric     TelemetryType = "MessageCheckFailure"
+	PeerCountByShardMetric        TelemetryType = "PeerCountByShard"
+	PeerCountByOriginMetric       TelemetryType = "PeerCountByOrigin"
+	StoreConfirmationFailedMetric TelemetryType = "StoreConfirmationFailed"
+	MaxRetryCache                               = 5000
 )
 
 type TelemetryRequest struct {
@@ -102,6 +104,10 @@ func (c *Client) PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin ma
 	}
 }
 
+func (c *Client) PushStoreConfirmationFailed(ctx context.Context, msgHash common.Hash) {
+	c.processAndPushTelemetry(ctx, StoreConfirmationFailed{MessageHash: msgHash.String()})
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
@@ -133,6 +139,10 @@ type PeerCountByShard struct {
 type PeerCountByOrigin struct {
 	Origin wps.Origin
 	Count  uint
+}
+
+type StoreConfirmationFailed struct {
+	MessageHash string
 }
 
 type Client struct {
@@ -305,6 +315,12 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			TelemetryType: PeerCountByOriginMetric,
 			TelemetryData: c.ProcessPeerCountByOrigin(v),
 		}
+	case StoreConfirmationFailed:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: StoreConfirmationFailedMetric,
+			TelemetryData: c.ProcessStoreConfirmationFailed(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
@@ -459,6 +475,14 @@ func (c *Client) ProcessPeerCountByOrigin(peerCountByOrigin PeerCountByOrigin) *
 	postBody := c.commonPostBody()
 	postBody["origin"] = peerCountByOrigin.Origin
 	postBody["count"] = peerCountByOrigin.Count
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessStoreConfirmationFailed(storeConfirmationFailed StoreConfirmationFailed) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageHash"] = storeConfirmationFailed.MessageHash
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage

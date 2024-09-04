@@ -112,6 +112,7 @@ type ITelemetryClient interface {
 	PushMessageCheckFailure(ctx context.Context, messageHash string)
 	PushPeerCountByShard(ctx context.Context, peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin map[wps.Origin]uint)
+	PushStoreConfirmationFailed(ctx context.Context, msgHash gethcommon.Hash)
 }
 
 // Waku represents a dark communication interface through the Ethereum
