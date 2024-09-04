@@ -12,12 +12,12 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
 
-	"github.com/status-im/status-go/wakuv2/common"
+	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 
@@ -105,9 +105,9 @@ func (c *Client) PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin ma
 	}
 }
 
-func (c *Client) PushDialFailure(ctx context.Context, dialFailure common.DialError) {
+func (c *Client) PushDialFailure(ctx context.Context, dialFailure wakuv2common.DialError) {
 	var errorMessage string = ""
-	if dialFailure.ErrType == common.ErrorUnknown {
+	if dialFailure.ErrType == wakuv2common.ErrorUnknown {
 		errorMessage = dialFailure.ErrMsg
 	}
 	c.processAndPushTelemetry(ctx, DialFailure{ErrorType: dialFailure.ErrType, ErrorMsg: errorMessage, Protocols: dialFailure.Protocols})
@@ -147,7 +147,7 @@ type PeerCountByOrigin struct {
 }
 
 type DialFailure struct {
-	ErrorType common.DialErrorType
+	ErrorType wakuv2common.DialErrorType
 	ErrorMsg  string
 	Protocols string
 }
