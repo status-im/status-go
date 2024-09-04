@@ -157,7 +157,11 @@ fi
 if [[ $UNIT_TEST_REPORT_CODECOV == 'true' ]]; then
   echo -e "${GRN}Uploading coverage report to Codecov${RST}"
   # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
-  # codecovcli do-upload --report-type test_results # --file <report_name>.junit.xml
+  codecov_report_files_args=""
+  for file in report_*.xml; do
+    codecov_report_files_args+="--file ${file} "
+  done
+  codecov do-upload --report-type test_results -t ${CODECOV_TOKEN} ${codecov_report_files_args}
   codecov -t ${CODECOV_TOKEN} -f ${final_coverage_report} -F "unit"
 fi
 

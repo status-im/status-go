@@ -37,7 +37,7 @@ pipeline {
     )
     booleanParam(
       name: 'UNIT_TEST_REPORT_CODECOV',
-      defaultValue: false,
+      defaultValue: true,
       description: 'Should the job report test coverage to Codecov?'
     )
     booleanParam(
