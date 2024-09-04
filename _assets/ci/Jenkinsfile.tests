@@ -172,6 +172,10 @@ pipeline {
                 credentialsId: 'codeclimate-test-reporter-id',
                 variable: 'CC_TEST_REPORTER_ID'
               ),
+              string(
+                credentialsId: 'codecov-repository-upload-token',
+                variable: 'CODECOV_TOKEN'
+              ),
             ]) {
               nix.shell('make test-unit V=1', pure: false)
             }
