@@ -5,8 +5,6 @@ coverage:
     project:
       default:
         informational: true
-#        paths:
-#          - "!cmd/"
     patch:
       default:
         informational: true
