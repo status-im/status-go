@@ -1951,6 +1951,10 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 }
 
 func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) (*MessengerResponse, error) {
+	m.logger.Debug("accept request to join community",
+		zap.String("community", requestToJoin.CommunityID.String()),
+		zap.String("pubkey", requestToJoin.PublicKey))
+
 	community, err := m.communitiesManager.AcceptRequestToJoin(requestToJoin)
 	if err != nil {
 		return nil, err
@@ -2008,14 +2012,21 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 
 		rawMessage := &common.RawMessage{
 			Payload:             payload,
+			Sender:              community.PrivateKey(),
 			CommunityID:         community.ID(),
-			SkipEncryptionLayer: false,
+			SkipEncryptionLayer: true,
 			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
 			PubsubTopic:         shard.DefaultNonProtectedPubsubTopic(),
-			ResendType:          common.ResendTypeDataSync,
+			ResendType:          common.ResendTypeRawMessage,
 			ResendMethod:        common.ResendMethodSendPrivate,
 			Recipients:          []*ecdsa.PublicKey{pk},
 			Priority:            &common.HighPriority,
+		}
+
+		if !community.PublicKey().Equal(community.ControlNode()) {
+			rawMessage.ResendType = common.ResendTypeDataSync
+			rawMessage.SkipEncryptionLayer = false
+			rawMessage.Sender = nil
 		}
 
 		if community.Encrypted() {
@@ -2026,6 +2037,12 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 		_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
 		if err != nil {
 			return nil, err
+		}
+
+		if rawMessage.ResendType == common.ResendTypeRawMessage {
+			if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
+				return nil, err
+			}
 		}
 	}
 

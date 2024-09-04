@@ -3520,6 +3520,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 
 	isControlNodeSigner := common.IsPubKeyEqual(community.ControlNode(), signer)
 	if !isControlNodeSigner {
+		m.logger.Debug("signer is not control node", zap.String("signer", common.PubkeyToHex(signer)), zap.String("controlNode", common.PubkeyToHex(community.ControlNode())))
 		return nil, ErrNotAuthorized
 	}
 
