@@ -127,6 +127,14 @@ else
   wait
 fi
 
+for exit_code_file in "${GIT_ROOT}"/exit_code_*.txt; do
+  read exit_code < "${exit_code_file}"
+  if [[ "${exit_code}" -ne 0 ]]; then
+    echo -e "${RED}Testing failed${RST}, exit code: ${exit_code}"
+    exit ${exit_code}
+  fi
+done
+
 # Gather test coverage results
 merged_coverage_report="coverage_merged.out"
 final_coverage_report="c.out" # Name expected by cc-test-reporter
