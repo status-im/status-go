@@ -16,25 +16,7 @@ import (
 func TestHashMessage(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
+	backend, err := setupGethStatusBackend(t)
 	require.NoError(t, err)
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)

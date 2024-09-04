@@ -1,0 +1,16 @@
+services:
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    platform: linux/amd64
+    command:
+      - anvil --host 0.0.0.0 --block-time 2
+
+  go-test:
+    image: golang:1.21.4
+    depends_on:
+      - anvil
+    volumes:
+      - ../:/go/src/github.com/status-im/status-go/
+    working_dir: /go/src/github.com/status-im/status-go/integration-tests-anvil
+    command: |
+        go test -tags gowaku_skip_migrations github.com/status-im/status-go/integration-tests-anvil/... -v -- -anvil-host=http://anvil:8545

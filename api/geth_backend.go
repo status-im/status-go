@@ -384,14 +384,14 @@ func (b *GethStatusBackend) ensureDBsOpened(account multiaccounts.Account, passw
 		return err
 	}
 
-	if err = b.ensureAppDBOpened(account, password); err != nil {
+	if err = b.EnsureAppDBOpened(account, password); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {
+func (b *GethStatusBackend) EnsureAppDBOpened(account multiaccounts.Account, password string) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.appDB != nil {
@@ -1601,7 +1601,7 @@ func (b *GethStatusBackend) buildAccount(request *requests.CreateAccount, input 
 }
 
 func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, input *prepareAccountInput) (*settings.Settings, error) {
-	settings, err := defaultSettings(input.keyUID, input.address, input.derivedAddresses)
+	settings, err := DefaultSettings(input.keyUID, input.address, input.derivedAddresses)
 	if err != nil {
 		return nil, err
 	}

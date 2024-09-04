@@ -499,3 +499,10 @@ run-integration-tests:
 run-anvil: SHELL := /bin/sh
 run-anvil:
 	docker-compose -f integration-tests/docker-compose.anvil.yml up --remove-orphans
+
+run-integration-anvil:
+	docker compose -f integration-tests-anvil/docker-compose.yml up -d --remove-orphans; \
+	docker compose -f integration-tests-anvil/docker-compose.yml logs -f go-test; \
+	exit_code=$$(docker inspect integration-tests-anvil-go-test-1 -f '{{.State.ExitCode}}'); \
+	docker compose -f integration-tests-anvil/docker-compose.yml down; \
+	exit $$exit_code

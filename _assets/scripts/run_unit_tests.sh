@@ -47,6 +47,9 @@ run_test_for_packages() {
   local exit_code_file="exit_code_${iteration}.txt"
   local timeout="$(( single_timeout * count))m"
 
+  # exclude integration-tests-anvil package
+  packages=$(echo "${packages}" | tr ' ' '\n' | grep -v '/integration-tests-anvil$' | tr '\n' ' ')
+
   if [[ "${UNIT_TEST_DRY_RUN}" == 'true' ]]; then
     echo -e "${GRN}Dry run ${iteration}. message:${RST} ${log_message}\n"\
     "${YLW}Dry run ${iteration}. packages:${RST} ${packages}\n"\

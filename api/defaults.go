@@ -49,7 +49,7 @@ var (
 	overrideApiConfig = overrideApiConfigProd
 )
 
-func defaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
+func DefaultSettings(keyUID string, address string, derivedAddresses map[string]generator.AccountInfo) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
 	s := &settings.Settings{}

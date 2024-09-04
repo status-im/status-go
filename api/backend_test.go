@@ -35,7 +35,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
-	walletservice "github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
@@ -90,51 +90,39 @@ func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
 	}, nil
 }
 
-func setupGethStatusBackend() (*GethStatusBackend, func() error, func() error, func() error, error) {
+func setupGethStatusBackend(t *testing.T) (*GethStatusBackend, error) {
 	db, stop1, err := setupTestDB()
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, err
 	}
 	backend := NewGethStatusBackend()
 	backend.StatusNode().SetAppDB(db)
 
 	ma, stop2, err := setupTestMultiDB()
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, err
 	}
 	backend.StatusNode().SetMultiaccountsDB(ma)
 
 	walletDb, stop3, err := setupTestWalletDB()
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, err
 	}
 	backend.StatusNode().SetWalletDB(walletDb)
 
-	return backend, stop1, stop2, stop3, err
+	t.Cleanup(func() {
+		require.NoError(t, stop1())
+		require.NoError(t, stop2())
+		require.NoError(t, stop3())
+		require.NoError(t, backend.StopNode())
+	})
+	return backend, err
 }
 
 func TestBackendStartNodeConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, stop3, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop3()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
+	backend, err := setupGethStatusBackend(t)
 	require.NoError(t, err)
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
@@ -171,25 +159,7 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 func TestBackendRestartNodeConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
+	backend, err := setupGethStatusBackend(t)
 	require.NoError(t, err)
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
@@ -219,25 +189,7 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 func TestBackendGettersConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
+	backend, err := setupGethStatusBackend(t)
 	require.NoError(t, err)
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
@@ -324,25 +276,7 @@ func TestBackendConnectionChangesToOffline(t *testing.T) {
 func TestBackendCallRPCConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
+	backend, err := setupGethStatusBackend(t)
 	require.NoError(t, err)
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
@@ -420,25 +354,7 @@ func TestAppStateChange(t *testing.T) {
 func TestBlockedRPCMethods(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
+	backend, err := setupGethStatusBackend(t)
 	require.NoError(t, err)
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
@@ -480,25 +396,7 @@ func TestCallRPCWithStoppedNode(t *testing.T) {
 func TestStartStopMultipleTimes(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
+	backend, err := setupGethStatusBackend(t)
 	require.NoError(t, err)
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
@@ -519,25 +417,7 @@ func TestStartStopMultipleTimes(t *testing.T) {
 func TestHashTypedData(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
+	backend, err := setupGethStatusBackend(t)
 	require.NoError(t, err)
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
@@ -950,7 +830,7 @@ func TestDeleteMultiaccount(t *testing.T) {
 		KeyUID:         generateAccount.KeyUID,
 	}
 
-	err = backend.ensureAppDBOpened(account, "123123")
+	err = backend.EnsureAppDBOpened(account, "123123")
 	require.NoError(t, err)
 
 	s := settings.Settings{
@@ -1031,25 +911,7 @@ func TestConvertAccount(t *testing.T) {
 
 	utils.Init()
 
-	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
-	defer func() {
-		err := stop1()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stop2()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
-	defer func() {
-		err := stopWallet()
-		if err != nil {
-			require.NoError(t, backend.StopNode())
-		}
-	}()
+	backend, err := setupGethStatusBackend(t)
 	require.NoError(t, err)
 
 	backend.rootDataDir = rootDataDir
@@ -1076,7 +938,7 @@ func TestConvertAccount(t *testing.T) {
 	found = keystoreContainsFileForAccount(keyStoreDir, chatAddress)
 	require.True(t, found)
 
-	defaultSettings, err := defaultSettings(genAccInfo.KeyUID, genAccInfo.Address, derivedAccounts)
+	defaultSettings, err := DefaultSettings(genAccInfo.KeyUID, genAccInfo.Address, derivedAccounts)
 	require.NoError(t, err)
 	nodeConfig, err := DefaultNodeConfig(defaultSettings.InstallationID, &requests.CreateAccount{
 		LogLevel: defaultSettings.LogLevel,
@@ -1135,7 +997,7 @@ func TestConvertAccount(t *testing.T) {
 		KeyUID:    profileKeypair.KeyUID,
 	}
 
-	err = backend.ensureAppDBOpened(account, password)
+	err = backend.EnsureAppDBOpened(account, password)
 	require.NoError(t, err)
 
 	err = backend.StartNodeWithAccountAndInitialConfig(account, password, *defaultSettings, nodeConfig, profileKeypair.Accounts, nil)
@@ -1160,7 +1022,7 @@ func TestConvertAccount(t *testing.T) {
 	}
 
 	// Ensure we're able to open the DB
-	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
+	err = backend.EnsureAppDBOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
 
 	// db creation
@@ -1199,7 +1061,7 @@ func TestConvertAccount(t *testing.T) {
 	}()
 
 	// Ensure we're able to open the DB
-	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
+	err = backend.EnsureAppDBOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
 
 	// db creation after re-encryption
@@ -1229,7 +1091,7 @@ func TestConvertAccount(t *testing.T) {
 	require.True(t, found)
 
 	// Ensure we're able to open the DB
-	err = backend.ensureAppDBOpened(keycardAccount, password)
+	err = backend.EnsureAppDBOpened(keycardAccount, password)
 	require.NoError(t, err)
 
 	// db creation after re-encryption
@@ -1412,7 +1274,7 @@ func TestCreateWallet(t *testing.T) {
 
 	walletService := statusNode.WalletService()
 	require.NotNil(t, walletService)
-	walletAPI := walletservice.NewAPI(walletService)
+	walletAPI := wallet.NewAPI(walletService)
 
 	paths := []string{"m/44'/60'/0'/0/1"}
 
@@ -1568,12 +1430,12 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	}
 
 	require.Equal(t, b.config.WalletConfig.InfuraAPIKey, infuraToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[mainnetChainID], alchemyEthereumMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[sepoliaChainID], alchemyEthereumSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[arbitrumChainID], alchemyArbitrumMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[arbitrumSepoliaChainID], alchemyArbitrumSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[optimismChainID], alchemyOptimismMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[optimismSepoliaChainID], alchemyOptimismSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.EthereumMainnet], alchemyEthereumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.EthereumSepolia], alchemyEthereumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.ArbitrumMainnet], alchemyArbitrumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.ArbitrumSepolia], alchemyArbitrumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.OptimismMainnet], alchemyOptimismMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.OptimismSepolia], alchemyOptimismSepoliaToken)
 	require.Equal(t, b.config.WalletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
 	require.Equal(t, b.config.WalletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
 
