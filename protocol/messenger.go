@@ -216,7 +216,30 @@ type mailserverCycle struct {
 	allMailservers            []mailserversDB.Mailserver
 	activeMailserver          *mailserversDB.Mailserver
 	peers                     map[string]peerStatus
-	availabilitySubscriptions []chan struct{}
+	availabilitySubscriptions *availabilitySubscriptions
+}
+
+type availabilitySubscriptions struct {
+	sync.Mutex
+	subscriptions []chan struct{}
+}
+
+func (s *availabilitySubscriptions) Subscribe() <-chan struct{} {
+	s.Lock()
+	defer s.Unlock()
+	c := make(chan struct{})
+	s.subscriptions = append(s.subscriptions, c)
+	return c
+}
+
+func (s *availabilitySubscriptions) EmitMailserverAvailable() {
+	s.Lock()
+	defer s.Unlock()
+
+	for _, subs := range s.subscriptions {
+		close(subs)
+	}
+	s.subscriptions = nil
 }
 
 type EnvelopeEventsInterceptor struct {
@@ -602,7 +625,7 @@ func NewMessenger(
 		verificationDatabase:    verification.NewPersistence(database),
 		mailserverCycle: mailserverCycle{
 			peers:                     make(map[string]peerStatus),
-			availabilitySubscriptions: make([]chan struct{}, 0),
+			availabilitySubscriptions: &availabilitySubscriptions{},
 		},
 		mailserversDatabase:  c.mailserversDatabase,
 		communityStorenodes:  storenodes.NewCommunityStorenodes(storenodes.NewDB(database), logger),
@@ -882,7 +905,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	if m.archiveManager.IsReady() {
-		available := m.SubscribeMailserverAvailable()
+		available := m.mailserverCycle.availabilitySubscriptions.Subscribe()
 		go func() {
 			<-available
 			m.InitHistoryArchiveTasks(controlledCommunities)
