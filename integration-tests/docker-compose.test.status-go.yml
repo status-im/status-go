@@ -18,7 +18,7 @@ services:
     environment:
       GOCOVERDIR: "./coverage/binary"
     volumes:
-      - ./coverage:/coverage
+      - ./coverage/binary:/coverage/binary
 
   # TODO: Remove this duplication when implemented: https://github.com/status-im/status-go/issues/5803
   status-go-no-funds:
@@ -40,7 +40,7 @@ services:
     environment:
       GOCOVERDIR: "/coverage/binary"
     volumes:
-      - ./coverage:/coverage
+      - ./coverage/binary:/coverage/binary
 
   tests-rpc:
     user: ${INTEGRATION_TESTS_DOCKER_UID}

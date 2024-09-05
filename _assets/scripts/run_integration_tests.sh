@@ -6,9 +6,11 @@ source "${GIT_ROOT}/_assets/scripts/codecov.sh"
 
 root_path=./integration-tests
 coverage_reports_path="${root_path}/coverage"
+test_results_path="${root_path}/reports"
 
 # Cleanup any previous coverage reports
 rm -rf ${coverage_reports_path}
+rm -rf ${test_results_path}
 
 # Run integration tests
 echo -e "${GRN}Running integration tests${RST}, HEAD: $(git rev-parse HEAD)"
@@ -39,23 +41,22 @@ if [[ "$exit_code" -ne 0 ]]; then
   exit $exit_code
 fi
 
-# Report to Codecov
+# Prepare coverage reports
+binary_coverage_reports_path="${coverage_reports_path}/binary"
+merged_coverage_reports_path="${coverage_reports_path}/merged"
+full_coverage_profile="${coverage_reports_path}/coverage.out"
+
+# Clean merged reports directory
+mkdir -p ${merged_coverage_reports_path}
+
+# Merge coverage reports
+go tool covdata merge -i=${binary_coverage_reports_path} -o=${merged_coverage_reports_path}
+
+# Convert coverage reports to profile
+go tool covdata textfmt -i=${merged_coverage_reports_path} -o=${full_coverage_profile}
+
+# Upload reports to Codecov
 if [[ ${INTEGRATION_TESTS_REPORT_CODECOV} == 'true' ]]; then
-  # Docs: https://go.dev/blog/integration-test-coverage
-  binary_coverage_reports_path="${coverage_reports_path}/binary"
-  merged_coverage_reports_path="${coverage_reports_path}/merged"
-  full_coverage_profile="${coverage_reports_path}/coverage.out"
-  test_results_path="${root_path}/reports"
-
-  # Clean merged reports directory
-  mkdir -p ${merged_coverage_reports_path}
-
-  # Merge coverage reports
-  go tool covdata merge -i=${binary_coverage_reports_path} -o=${merged_coverage_reports_path}
-
-  # Convert coverage reports to profile
-  go tool covdata textfmt -i=${merged_coverage_reports_path} -o=${full_coverage_profile}
-
-  # Upload reports to Codecov
+# Docs: https://go.dev/blog/integration-test-coverage
   report_to_codecov "${test_results_path}/*.xml" "${full_coverage_profile}" "integration"
 fi
