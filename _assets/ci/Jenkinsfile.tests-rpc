@@ -10,6 +10,11 @@ pipeline {
       defaultValue: 'develop',
       description: 'Name of branch to build.'
     )
+    booleanParam(
+      name: 'UNIT_TEST_REPORT_CODECOV',
+      defaultValue: true,
+      description: 'Should the job report test coverage to Codecov?'
+    )
   }
 
   options {
@@ -28,13 +33,26 @@ pipeline {
   environment {
     PLATFORM = 'tests-rpc'
     PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
+
+    /* Hack-fix for params not being set in env on first job run. */
+    BRANCH =                    "${params.BRANCH}"
+    UNIT_TEST_REPORT_CODECOV =  "${params.UNIT_TEST_REPORT_CODECOV}"
   }
 
   stages {
     stage('RPC Tests') {
-      steps { script {
-        sh 'make run-integration-tests'
-      } }
+      withCredentials([
+        string(
+          credentialsId: 'codeclimate-test-reporter-id',
+          variable: 'CC_TEST_REPORTER_ID'
+        ),
+        string(
+          credentialsId: 'codecov-repository-upload-token',
+          variable: 'CODECOV_TOKEN'
+        ),
+      ]) {
+        nix.shell('make run-integration-tests', pure: false)
+      }
     }
   } // stages
 
@@ -42,11 +60,11 @@ pipeline {
     always {
       script {
         archiveArtifacts(
-          artifacts: 'reports/*.xml',
+          artifacts: 'integration-tests/reports/*.xml',
           allowEmptyArchive: true,
         )
         junit(
-          testResults: 'reports/*.xml',
+          testResults: 'integration-tests/reports/*.xml',
           skipOldReports: true,
           skipPublishingChecks: true,
           skipMarkingBuildUnstable: true,
