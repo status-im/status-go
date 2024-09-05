@@ -490,7 +490,7 @@ test-verif-proxy-wrapper:
 
 #run-integration-tests: SHELL := /bin/sh # Run not in nix-shell, we need codecov
 run-integration-tests: export INTEGRATION_TESTS_DOCKER_UID ?= $(call sh, id -u $$USER)
-run-integration-tests: export INTEGRATION_TESTS_REPORT_CODECOV = false
+run-integration-tests: export INTEGRATION_TESTS_REPORT_CODECOV ?= false
 run-integration-tests:
 	@./_assets/scripts/run_integration_tests.sh
 

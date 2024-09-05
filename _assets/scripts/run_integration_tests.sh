@@ -4,8 +4,6 @@ GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/_assets/scripts/colors.sh"
 source "${GIT_ROOT}/_assets/scripts/codecov.sh"
 
-echo -e "${GRN}Running integration tests${RST}, HEAD: $(git rev-parse HEAD)"
-
 root_path=./integration-tests
 coverage_reports_path="${root_path}/coverage"
 
@@ -13,12 +11,14 @@ coverage_reports_path="${root_path}/coverage"
 rm -rf ${coverage_reports_path}
 
 # Run integration tests
+echo -e "${GRN}Running integration tests${RST}, HEAD: $(git rev-parse HEAD)"
 docker-compose \
   -f ${root_path}/docker-compose.anvil.yml \
   -f ${root_path}/docker-compose.test.status-go.yml \
   up -d --build --remove-orphans;
 
 # Save logs
+echo -e "${GRN}Saving logs${RST}"
 docker-compose \
   -f ${root_path}/docker-compose.anvil.yml \
   -f ${root_path}/docker-compose.test.status-go.yml \
@@ -28,6 +28,7 @@ docker-compose \
 exit_code=$(docker inspect integration-tests_tests-rpc_1 -f '{{.State.ExitCode}}');
 
 # Stop and remove containers
+echo -e "${GRN}Stopping docker containers${RST}"
 docker-compose \
   -f ${root_path}/docker-compose.anvil.yml \
   -f ${root_path}/docker-compose.test.status-go.yml \
