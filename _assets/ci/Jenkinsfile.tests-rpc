@@ -58,7 +58,7 @@ pipeline {
     always {
       script {
         archiveArtifacts(
-          artifacts: 'integration-tests/reports/*.xml',
+          artifacts: 'integration-tests/reports/*.xml, integration-tests/tests.log',
           allowEmptyArchive: true,
         )
         junit(
