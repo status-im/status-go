@@ -54,11 +54,12 @@ fi
 
 # Prepare coverage reports
 binary_coverage_reports_path="${coverage_reports_path}/binary"
-merged_coverage_reports_path="${coverage_reports_path}/merged"
+#merged_coverage_reports_path="${coverage_reports_path}/merged"
+merged_coverage_reports_path="$(mktemp -d)"
 full_coverage_profile="${coverage_reports_path}/coverage.out"
 
 # Clean merged reports directory
-mkdir -p "${merged_coverage_reports_path}"
+#mkdir -p "${merged_coverage_reports_path}"
 
 # Merge coverage reports
 go tool covdata merge -i="${binary_coverage_reports_path}" -o="${merged_coverage_reports_path}"
