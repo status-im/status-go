@@ -1953,6 +1953,10 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 }
 
 func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) (*MessengerResponse, error) {
+	m.logger.Debug("accept request to join community",
+		zap.String("community", requestToJoin.CommunityID.String()),
+		zap.String("pubkey", requestToJoin.PublicKey))
+
 	community, err := m.communitiesManager.AcceptRequestToJoin(requestToJoin)
 	if err != nil {
 		return nil, err
@@ -2021,6 +2025,16 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			Priority:            &common.HighPriority,
 		}
 
+		// Non-tokenized community treat community public key as the control node,
+		// tokenized community set control node to the public key of token owner.
+		// MVDS doesn't support custom sender, and use the identity key for signing messages,
+		// receiver will verify the message of community join response is signed by control node.
+		if !community.PublicKey().Equal(community.ControlNode()) {
+			rawMessage.ResendType = common.ResendTypeDataSync
+			rawMessage.SkipEncryptionLayer = false
+			rawMessage.Sender = nil
+		}
+
 		if community.Encrypted() {
 			rawMessage.HashRatchetGroupID = community.ID()
 			rawMessage.CommunityKeyExMsgType = common.KeyExMsgReuse
@@ -2031,8 +2045,10 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			return nil, err
 		}
 
-		if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
-			return nil, err
+		if rawMessage.ResendType == common.ResendTypeRawMessage {
+			if _, err = m.AddRawMessageToWatch(rawMessage); err != nil {
+				return nil, err
+			}
 		}
 	}
 
