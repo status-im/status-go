@@ -2023,6 +2023,10 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			Priority:            &common.HighPriority,
 		}
 
+		// Non-tokenized community treat community public key as the control node,
+		// tokenized community set control node to the public key of token owner.
+		// MVDS doesn't support custom sender, and use the identity key for signing messages,
+		// receiver will verify the message of community join response is signed by control node.
 		if !community.PublicKey().Equal(community.ControlNode()) {
 			rawMessage.ResendType = common.ResendTypeDataSync
 			rawMessage.SkipEncryptionLayer = false
