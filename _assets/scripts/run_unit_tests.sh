@@ -161,6 +161,17 @@ if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
   cc-test-reporter after-build --prefix=github.com/status-im/status-go
 fi
 
+if [[ $UNIT_TEST_REPORT_CODECOV == 'true' ]]; then
+  echo -e "${GRN}Uploading coverage report to Codecov${RST}"
+  # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
+  codecov_report_files_args=""
+  for file in report_*.xml; do
+    codecov_report_files_args+="--file ${file} "
+  done
+  codecov do-upload --token "${CODECOV_TOKEN}" --report-type test_results ${codecov_report_files_args}
+  codecov --token "${CODECOV_TOKEN}" -f ${final_coverage_report} -F "unit"
+fi
+
 # Generate report with test stats
 shopt -s globstar nullglob # Enable recursive globbing
 if [[ "${UNIT_TEST_COUNT}" -gt 1 ]]; then

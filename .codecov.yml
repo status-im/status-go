@@ -1,0 +1,13 @@
+coverage:
+  require_ci_to_pass: no
+  wait_for_ci: no
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+# When modifying this file, please validate using:
+# make codecov-validate
