@@ -4,9 +4,12 @@ GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/_assets/scripts/colors.sh"
 source "${GIT_ROOT}/_assets/scripts/codecov.sh"
 
-root_path=./integration-tests
+root_path="${GIT_ROOT}/integration-tests"
 coverage_reports_path="${root_path}/coverage"
 test_results_path="${root_path}/reports"
+
+# Create directories
+mkdir -p "${GIT_ROOT}/integration-tests/coverage"
 
 # Cleanup any previous coverage reports
 rm -rf ${coverage_reports_path}
