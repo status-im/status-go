@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+source "${GIT_ROOT}/_assets/scripts/colors.sh"
+
+report_to_codecov() {
+  # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
+  echo -e "${GRN}Uploading coverage report to Codecov${RST}"
+
+  local tests_report_wildcard="${1}"
+  local coverage_report="${2}"
+  local test_type="${3}"
+
+  # Gather report files with given wildcard
+  local report_files_args=""
+  for file in ${tests_report_wildcard}; do
+    report_files_args+="--file ${file} "
+  done
+
+  codecov do-upload --token "${CODECOV_TOKEN}" --report-type test_results ${report_files_args}
+  codecov upload-process --token "${CODECOV_TOKEN}" -f ${coverage_report} -F "${test_type}"
+}

@@ -42,11 +42,11 @@ pipeline {
     always {
       script {
         archiveArtifacts(
-          artifacts: '**/results.xml',
+          artifacts: 'reports/*.xml',
           allowEmptyArchive: true,
         )
         junit(
-          testResults: '**/results.xml',
+          testResults: 'reports/*.xml',
           skipOldReports: true,
           skipPublishingChecks: true,
           skipMarkingBuildUnstable: true,

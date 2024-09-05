@@ -2,8 +2,8 @@
 set -o pipefail
 
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
-
 source "${GIT_ROOT}/_assets/scripts/colors.sh"
+source "${GIT_ROOT}/_assets/scripts/codecov.sh"
 
 if [[ $UNIT_TEST_RERUN_FAILS == 'true' ]]; then
   GOTESTSUM_EXTRAFLAGS="${GOTESTSUM_EXTRAFLAGS} --rerun-fails"
@@ -162,14 +162,7 @@ if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
 fi
 
 if [[ $UNIT_TEST_REPORT_CODECOV == 'true' ]]; then
-  echo -e "${GRN}Uploading coverage report to Codecov${RST}"
-  # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
-  codecov_report_files_args=""
-  for file in report_*.xml; do
-    codecov_report_files_args+="--file ${file} "
-  done
-  codecov do-upload --token "${CODECOV_TOKEN}" --report-type test_results ${codecov_report_files_args}
-  codecov --token "${CODECOV_TOKEN}" -f ${final_coverage_report} -F "unit"
+  report_to_codecov "report_*.xml" ${final_coverage_report} "unit"
 fi
 
 # Generate report with test stats

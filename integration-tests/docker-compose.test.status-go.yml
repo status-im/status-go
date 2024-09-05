@@ -16,10 +16,11 @@ services:
       timeout: 2s
       retries: 120
     environment:
-      GOCOVERDIR: "./coverage/integration"
+      GOCOVERDIR: "./coverage/binary"
     volumes:
-      - ./coverage:./coverage/integration
+      - ./coverage:/coverage
 
+  # TODO: Remove this duplication when implemented: https://github.com/status-im/status-go/issues/5803
   status-go-no-funds:
     build:
       context: ../
@@ -37,9 +38,9 @@ services:
       timeout: 2s
       retries: 120
     environment:
-      GOCOVERDIR: "./coverage/integration"
+      GOCOVERDIR: "/coverage/binary"
     volumes:
-      - ./coverage:./coverage/integration
+      - ./coverage:/coverage
 
   tests-rpc:
     user: ${INTEGRATION_TESTS_DOCKER_UID}
@@ -53,6 +54,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.tests-rpc
-    entrypoint: ["pytest", "-m", "wallet", "--rpc_url=http://status-go:3333", "--rpc_url_2=http://status-go-no-funds:3333"]
+    entrypoint: [
+      "pytest",
+      "-m", "wallet",
+      "--rpc_url=http://status-go:3333",
+      "--rpc_url_2=http://status-go-no-funds:3333",
+      "--junitxml=/tests-rpc/reports/report.xml",
+    ]
     volumes:
       - .:/tests-rpc
