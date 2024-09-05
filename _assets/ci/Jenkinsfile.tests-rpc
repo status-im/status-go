@@ -41,18 +41,16 @@ pipeline {
 
   stages {
     stage('RPC Tests') {
-      withCredentials([
-        string(
-          credentialsId: 'codeclimate-test-reporter-id',
-          variable: 'CC_TEST_REPORTER_ID'
-        ),
-        string(
-          credentialsId: 'codecov-repository-upload-token',
-          variable: 'CODECOV_TOKEN'
-        ),
-      ]) {
-        nix.shell('make run-integration-tests', pure: false)
-      }
+      steps { script {
+        withCredentials([
+          string(
+            credentialsId: 'codecov-repository-upload-token',
+            variable: 'CODECOV_TOKEN'
+          ),
+        ]) {
+          nix.shell('make run-integration-tests', pure: false)
+        }
+      } }
     }
   } // stages
 
