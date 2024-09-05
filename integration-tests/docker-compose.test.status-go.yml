@@ -6,7 +6,7 @@ services:
       args:
         build_tags: gowaku_no_rln
         build_target: statusd
-        build_flags: -ldflags="-X github.com/status-im/status-go/params.Version= -X github.com/status-im/status-go/params.GitCommit=11f83780d -X github.com/status-im/status-go/params.IpfsGatewayURL=https://ipfs.status.im/ -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true"
+        build_flags: -cover -ldflags="-X github.com/status-im/status-go/params.Version= -X github.com/status-im/status-go/params.GitCommit=11f83780d -X github.com/status-im/status-go/params.IpfsGatewayURL=https://ipfs.status.im/ -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true"
     entrypoint: ["statusd", "-c", "/static/configs/config.json", "--seed-phrase=test test test test test test test test test test test junk", "--password=Strong12345"]
     ports:
       - 3333:3333
@@ -15,6 +15,10 @@ services:
       interval: 5s
       timeout: 2s
       retries: 120
+    environment:
+      GOCOVERDIR: "./coverage/integration"
+    volumes:
+      - ./coverage:./coverage/integration
 
   status-go-no-funds:
     build:
@@ -23,7 +27,7 @@ services:
       args:
         build_tags: gowaku_no_rln
         build_target: statusd
-        build_flags: -ldflags="-X github.com/status-im/status-go/params.Version= -X github.com/status-im/status-go/params.GitCommit=11f83780d -X github.com/status-im/status-go/params.IpfsGatewayURL=https://ipfs.status.im/ -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true"
+        build_flags: -cover -ldflags="-X github.com/status-im/status-go/params.Version= -X github.com/status-im/status-go/params.GitCommit=11f83780d -X github.com/status-im/status-go/params.IpfsGatewayURL=https://ipfs.status.im/ -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true"
     entrypoint: ["statusd", "-c", "/static/configs/config.json", "--seed-phrase=test test test test test test test test test test test takoe", "--password=Strong12345"]
     ports:
       - 3334:3333
@@ -32,6 +36,10 @@ services:
       interval: 5s
       timeout: 2s
       retries: 120
+    environment:
+      GOCOVERDIR: "./coverage/integration"
+    volumes:
+      - ./coverage:./coverage/integration
 
   tests-rpc:
     user: ${INTEGRATION_TESTS_DOCKER_UID}
