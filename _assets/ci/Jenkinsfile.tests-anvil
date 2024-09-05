@@ -1,0 +1,60 @@
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.9.6'
+
+pipeline {
+  agent { label 'linux && x86_64 && nix-2.19' }
+
+  parameters {
+    string(
+      name: 'BRANCH',
+      defaultValue: 'develop',
+      description: 'Name of branch to build.'
+    )
+  }
+
+  options {
+    timestamps()
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: 30, unit: 'MINUTES')
+    disableConcurrentBuilds()
+    /* manage how many builds we keep */
+    buildDiscarder(logRotator(
+      numToKeepStr: '5',
+      daysToKeepStr: '30',
+      artifactNumToKeepStr: '1',
+    ))
+  }
+
+  environment {
+    PLATFORM = 'tests-anvil'
+    PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
+  }
+
+  stages {
+    stage('Anvil Tests') {
+      steps { script {
+        sh 'make run-integration-anvil'
+      } }
+    }
+  } // stages
+
+  post {
+    always {
+      script {
+        archiveArtifacts(
+          artifacts: '**/results.xml',
+          allowEmptyArchive: true,
+        )
+        junit(
+          testResults: '**/results.xml',
+          skipOldReports: true,
+          skipPublishingChecks: true,
+          skipMarkingBuildUnstable: true,
+        )
+      }
+    }
+    success { script { github.notifyPR(true) } }
+    failure { script { github.notifyPR(false) } }
+    cleanup { sh 'make git-clean' }
+  } // post
+} // pipeline
