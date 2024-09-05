@@ -19,7 +19,6 @@
 package waku
 
 import (
-	"errors"
 	mrand "math/rand"
 	"testing"
 	"time"
@@ -36,7 +35,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestWakuV0(t *testing.T) {
@@ -280,20 +278,6 @@ func (s *WakuTestSuite) TestEventsWithoutConfirmation() {
 	timer.Stop()
 }
 
-func discardPipe() *p2p.MsgPipeRW {
-	rw1, rw2 := p2p.MsgPipe()
-	go func() {
-		for {
-			msg, err := rw1.ReadMsg()
-			if err != nil {
-				return
-			}
-			msg.Discard() // nolint: errcheck
-		}
-	}()
-	return rw2
-}
-
 func (s *WakuTestSuite) TestWakuTimeDesyncEnvelopeIgnored() {
 	c := &Config{
 		MaxMessageSize:     common.DefaultMaxMessageSize,
@@ -339,31 +323,6 @@ func (s *WakuTestSuite) TestWakuTimeDesyncEnvelopeIgnored() {
 	}
 }
 
-func (s *WakuTestSuite) TestRequestSentEventWithExpiry() {
-	w := New(nil, nil)
-	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{Name: "waku", Version: 1}})
-	rw := discardPipe()
-	defer func() { handleError(s.T(), rw.Close()) }()
-	w.peers[s.newPeer(w, p, rw, nil, s.stats)] = struct{}{}
-	events := make(chan common.EnvelopeEvent, 1)
-	sub := w.SubscribeEnvelopeEvents(events)
-	defer sub.Unsubscribe()
-	e := &common.Envelope{Nonce: 1}
-	s.Require().NoError(w.RequestHistoricMessagesWithTimeout(p.ID().Bytes(), e, time.Millisecond))
-	verifyEvent := func(etype common.EventType) {
-		select {
-		case <-time.After(time.Second):
-			s.Require().FailNow("error waiting for a event type %s", etype)
-		case ev := <-events:
-			s.Require().Equal(etype, ev.Event)
-			s.Require().Equal(p.ID(), ev.Peer)
-			s.Require().Equal(e.Hash(), ev.Hash)
-		}
-	}
-	verifyEvent(common.EventMailServerRequestSent)
-	verifyEvent(common.EventMailServerRequestExpired)
-}
-
 type MockMailserver struct {
 	deliverMail func([]byte, *common.Envelope)
 }
@@ -379,87 +338,6 @@ func (m *MockMailserver) DeliverMail(peerID []byte, e *common.Envelope) {
 	if m.deliverMail != nil {
 		m.deliverMail(peerID, e)
 	}
-}
-
-func (s *WakuTestSuite) TestDeprecatedDeliverMail() {
-
-	w1 := New(nil, nil)
-	w2 := New(nil, nil)
-
-	var deliverMailCalled bool
-
-	w2.RegisterMailServer(&MockMailserver{
-		deliverMail: func(peerID []byte, e *common.Envelope) {
-			deliverMailCalled = true
-		},
-	})
-
-	rw1, rw2 := p2p.MsgPipe()
-	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{Name: "waku", Version: 0}}), rw2, nil, s.stats)
-
-	go func() { handleError(s.T(), w1.HandlePeer(p1, rw2)) }()
-
-	timer := time.AfterFunc(5*time.Second, func() {
-		handleError(s.T(), rw1.Close())
-	})
-	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil, s.stats)
-	s.Require().NoError(peer2.Start())
-
-	go func() { handleError(s.T(), peer2.Run()) }()
-
-	s.Require().NoError(w1.RequestHistoricMessages(p1.ID(), &common.Envelope{Data: []byte{1}}))
-
-	err := tt.RetryWithBackOff(func() error {
-		if !deliverMailCalled {
-			return errors.New("DeliverMail not called")
-		}
-		return nil
-	})
-	s.Require().NoError(err)
-	s.Require().NoError(rw1.Close())
-	s.Require().NoError(rw2.Close())
-
-	timer.Stop()
-
-}
-
-func (s *WakuTestSuite) TestSendMessagesRequest() {
-	validMessagesRequest := common.MessagesRequest{
-		ID:    make([]byte, 32),
-		From:  0,
-		To:    10,
-		Bloom: []byte{0x01},
-	}
-
-	s.Run("InvalidID", func() {
-		w := New(nil, nil)
-		err := w.SendMessagesRequest([]byte{0x01, 0x02}, common.MessagesRequest{})
-		s.Require().EqualError(err, "invalid 'ID', expected a 32-byte slice")
-	})
-
-	s.Run("WithoutPeer", func() {
-		w := New(nil, nil)
-		err := w.SendMessagesRequest([]byte{0x01, 0x02}, validMessagesRequest)
-		s.Require().EqualError(err, "could not find peer with ID: 0102")
-	})
-
-	s.Run("AllGood", func() {
-		p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
-		rw1, rw2 := p2p.MsgPipe()
-		w := New(nil, nil)
-		w.peers[s.newPeer(w, p, rw1, nil, s.stats)] = struct{}{}
-
-		go func() {
-			// Read out so that it's consumed
-			_, err := rw2.ReadMsg()
-			s.Require().NoError(err)
-			s.Require().NoError(rw1.Close())
-			s.Require().NoError(rw2.Close())
-
-		}()
-		err := w.SendMessagesRequest(p.ID().Bytes(), validMessagesRequest)
-		s.Require().NoError(err)
-	})
 }
 
 func (s *WakuTestSuite) TestRateLimiterIntegration() {

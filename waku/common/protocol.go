@@ -32,7 +32,6 @@ type Peer interface {
 	SetRWWriter(p2p.MsgReadWriter)
 
 	RequestHistoricMessages(*Envelope) error
-	SendMessagesRequest(MessagesRequest) error
 	SendHistoricMessageResponse([]byte) error
 	SendP2PMessages([]*Envelope) error
 	SendRawP2PDirect([]rlp.RawValue) error

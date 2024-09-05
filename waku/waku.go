@@ -41,7 +41,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -639,73 +638,6 @@ func (w *Waku) AllowP2PMessagesFromPeer(peerID []byte) error {
 	}
 	p.SetPeerTrusted(true)
 	return nil
-}
-
-// RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
-// which is known to implement MailServer interface, and is supposed to process this
-// request and respond with a number of peer-to-peer messages (possibly expired),
-// which are not supposed to be forwarded any further.
-// The waku protocol is agnostic of the format and contents of envelope.
-func (w *Waku) RequestHistoricMessages(peerID []byte, envelope *common.Envelope) error {
-	return w.RequestHistoricMessagesWithTimeout(peerID, envelope, 0)
-}
-
-// RequestHistoricMessagesWithTimeout acts as RequestHistoricMessages but requires to pass a timeout.
-// It sends an event EventMailServerRequestExpired after the timeout.
-func (w *Waku) RequestHistoricMessagesWithTimeout(peerID []byte, envelope *common.Envelope, timeout time.Duration) error {
-	p, err := w.getPeer(peerID)
-	if err != nil {
-		return err
-	}
-	p.SetPeerTrusted(true)
-
-	w.envelopeFeed.Send(common.EnvelopeEvent{
-		Peer:  p.EnodeID(),
-		Topic: envelope.Topic,
-		Hash:  envelope.Hash(),
-		Event: common.EventMailServerRequestSent,
-	})
-
-	err = p.RequestHistoricMessages(envelope)
-	if timeout != 0 {
-		go w.expireRequestHistoricMessages(p.EnodeID(), envelope.Hash(), timeout)
-	}
-	return err
-}
-
-func (w *Waku) SendMessagesRequest(peerID []byte, request common.MessagesRequest) error {
-	if err := request.Validate(); err != nil {
-		return err
-	}
-	p, err := w.getPeer(peerID)
-	if err != nil {
-		return err
-	}
-	p.SetPeerTrusted(true)
-	if err := p.SendMessagesRequest(request); err != nil {
-		return err
-	}
-	w.envelopeFeed.Send(common.EnvelopeEvent{
-		Peer:  p.EnodeID(),
-		Hash:  gethcommon.BytesToHash(request.ID),
-		Event: common.EventMailServerRequestSent,
-	})
-	return nil
-}
-
-func (w *Waku) expireRequestHistoricMessages(peer enode.ID, hash gethcommon.Hash, timeout time.Duration) {
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-	select {
-	case <-w.quit:
-		return
-	case <-timer.C:
-		w.envelopeFeed.Send(common.EnvelopeEvent{
-			Peer:  peer,
-			Hash:  hash,
-			Event: common.EventMailServerRequestExpired,
-		})
-	}
 }
 
 func (w *Waku) SendHistoricMessageResponse(peerID []byte, payload []byte) error {

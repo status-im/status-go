@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/services/mailservers"
 )
 
 const (
@@ -102,8 +104,8 @@ type BundleAddedSignal struct {
 }
 
 type MailserverSignal struct {
-	Address string `json:"address"`
-	ID      string `json:"id"`
+	Address *multiaddr.Multiaddr `json:"address"`
+	ID      string               `json:"id"`
 }
 
 type Filter struct {
@@ -218,20 +220,23 @@ func SendNewMessages(obj json.Marshaler) {
 	send(EventNewMessages, obj)
 }
 
-func SendMailserverAvailable(nodeAddress, id string) {
-	send(EventMailserverAvailable, MailserverSignal{
-		Address: nodeAddress,
-		ID:      id,
-	})
+func sendMailserverSignal(ms *mailservers.Mailserver, event string) {
+	msSignal := MailserverSignal{}
+	if ms != nil {
+		msSignal.Address = ms.Addr
+		msSignal.ID = ms.ID
+	}
+	send(event, msSignal)
 }
 
-func SendMailserverChanged(nodeAddress, id string) {
-	send(EventMailserverChanged, MailserverSignal{
-		Address: nodeAddress,
-		ID:      id,
-	})
+func SendMailserverAvailable(ms *mailservers.Mailserver) {
+	sendMailserverSignal(ms, EventMailserverAvailable)
+}
+
+func SendMailserverChanged(ms *mailservers.Mailserver) {
+	sendMailserverSignal(ms, EventMailserverChanged)
 }
 
 func SendMailserverNotWorking() {
-	send(EventMailserverNotWorking, MailserverSignal{})
+	sendMailserverSignal(nil, EventMailserverNotWorking)
 }

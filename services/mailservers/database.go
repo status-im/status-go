@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -19,57 +20,69 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 )
 
+func MustDecodeENR(enrStr string) *enode.Node {
+	node, err := enode.Parse(enode.ValidSchemes, enrStr)
+	if err != nil || node == nil {
+		panic("could not decode enr: " + enrStr)
+	}
+	return node
+}
+
+func MustDecodeMultiaddress(multiaddrsStr string) *multiaddr.Multiaddr {
+	maddr, err := multiaddr.NewMultiaddr(multiaddrsStr)
+	if err != nil || maddr == nil {
+		panic("could not decode multiaddr: " + multiaddrsStr)
+	}
+	return &maddr
+}
+
 type Mailserver struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Custom         bool   `json:"custom"`
-	Address        string `json:"address"`
+	ID     string               `json:"id"`
+	Name   string               `json:"name"`
+	Custom bool                 `json:"custom"`
+	ENR    *enode.Node          `json:"enr"`
+	Addr   *multiaddr.Multiaddr `json:"addr"`
+
+	// Deprecated: only used with WakuV1
 	Password       string `json:"password,omitempty"`
 	Fleet          string `json:"fleet"`
-	Version        uint   `json:"version"`
 	FailedRequests uint   `json:"-"`
 }
 
-func (m Mailserver) Enode() (*enode.Node, error) {
-	return enode.ParseV4(m.Address)
-}
+func (m Mailserver) PeerInfo() (*peer.AddrInfo, error) {
+	var maddrs []multiaddr.Multiaddr
 
-func (m Mailserver) IDBytes() ([]byte, error) {
-	if m.Version == 2 {
-		p, err := m.PeerID()
+	if m.ENR != nil {
+		addrInfo, err := enr.EnodeToPeerInfo(m.ENR)
 		if err != nil {
 			return nil, err
 		}
-
-		return p.Marshal()
+		addrInfo.Addrs = utils.EncapsulatePeerID(addrInfo.ID, addrInfo.Addrs...)
+		maddrs = append(maddrs, addrInfo.Addrs...)
 	}
 
-	node, err := enode.ParseV4(m.Address)
+	if m.Addr != nil {
+		maddrs = append(maddrs, *m.Addr)
+	}
+
+	p, err := peer.AddrInfosFromP2pAddrs(maddrs...)
 	if err != nil {
 		return nil, err
 	}
-	return node.ID().Bytes(), nil
+
+	if len(p) != 1 {
+		return nil, errors.New("invalid mailserver setup")
+	}
+
+	return &p[0], nil
 }
 
 func (m Mailserver) PeerID() (peer.ID, error) {
-	if m.Version != 2 {
-		return "", errors.New("not available")
-	}
-
-	addr, err := multiaddr.NewMultiaddr(m.Address)
+	p, err := m.PeerInfo()
 	if err != nil {
 		return "", err
 	}
-
-	return utils.GetPeerID(addr)
-}
-
-func (m Mailserver) UniqueID() string {
-	if m.Version == 2 {
-		p, _ := m.PeerID()
-		return p.String()
-	}
-	return m.Address
+	return p.ID, nil
 }
 
 func (m Mailserver) nullablePassword() (val sql.NullString) {
@@ -133,6 +146,8 @@ func NewDB(db *sql.DB) *Database {
 }
 
 func (d *Database) Add(mailserver Mailserver) error {
+	// TODO: we are only storing the multiaddress.
+	// In a future PR we must allow storing multiple multiaddresses and ENR
 	_, err := d.db.Exec(`INSERT OR REPLACE INTO mailservers(
 			id,
 			name,
@@ -142,7 +157,7 @@ func (d *Database) Add(mailserver Mailserver) error {
 		) VALUES (?, ?, ?, ?, ?)`,
 		mailserver.ID,
 		mailserver.Name,
-		mailserver.Address,
+		(*mailserver.Addr).String(),
 		mailserver.nullablePassword(),
 		mailserver.Fleet,
 	)
@@ -164,12 +179,13 @@ func toMailservers(rows *sql.Rows) ([]Mailserver, error) {
 	for rows.Next() {
 		var (
 			m        Mailserver
+			addrStr  string
 			password sql.NullString
 		)
 		if err := rows.Scan(
 			&m.ID,
 			&m.Name,
-			&m.Address,
+			&addrStr,
 			&password,
 			&m.Fleet,
 		); err != nil {
@@ -179,6 +195,15 @@ func toMailservers(rows *sql.Rows) ([]Mailserver, error) {
 		if password.Valid {
 			m.Password = password.String
 		}
+
+		// TODO: we are only storing the multiaddress.
+		// In a future PR we must allow storing multiple multiaddresses and ENR
+		maddr, err := multiaddr.NewMultiaddr(addrStr)
+		if err != nil {
+			return nil, err
+		}
+		m.Addr = &maddr
+
 		result = append(result, m)
 	}
 

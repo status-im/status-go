@@ -1,12 +1,10 @@
 package transport
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/hex"
-	"fmt"
 	"sync"
 	"time"
 
@@ -18,7 +16,6 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -463,43 +460,9 @@ func (t *Transport) Peers() types.PeerStats {
 	return t.waku.Peers()
 }
 
-func (t *Transport) createMessagesRequestV1(
+func (t *Transport) createMessagesRequest(
 	ctx context.Context,
-	peerID []byte,
-	from, to uint32,
-	previousCursor []byte,
-	topics []types.TopicType,
-	waitForResponse bool,
-) (cursor []byte, err error) {
-	r := createMessagesRequest(from, to, previousCursor, nil, "", topics, 1000)
-
-	events := make(chan types.EnvelopeEvent, 10)
-	sub := t.waku.SubscribeEnvelopeEvents(events)
-	defer sub.Unsubscribe()
-
-	err = t.waku.SendMessagesRequest(peerID, r)
-	if err != nil {
-		return
-	}
-
-	if !waitForResponse {
-		return
-	}
-
-	var resp *types.MailServerResponse
-	resp, err = t.waitForRequestCompleted(ctx, r.ID, events)
-	if err == nil && resp != nil && resp.Error != nil {
-		err = resp.Error
-	} else if err == nil && resp != nil {
-		cursor = resp.Cursor
-	}
-
-	return
-}
-
-func (t *Transport) createMessagesRequestV2(
-	ctx context.Context,
-	peerID []byte,
+	peerID peer.ID,
 	from, to uint32,
 	previousStoreCursor types.StoreRequestCursor,
 	pubsubTopic string,
@@ -546,25 +509,16 @@ func (t *Transport) createMessagesRequestV2(
 
 func (t *Transport) SendMessagesRequestForTopics(
 	ctx context.Context,
-	peerID []byte,
+	peerID peer.ID,
 	from, to uint32,
-	previousCursor []byte,
-	previousStoreCursor types.StoreRequestCursor,
+	prevCursor types.StoreRequestCursor,
 	pubsubTopic string,
 	contentTopics []types.TopicType,
 	limit uint32,
 	waitForResponse bool,
 	processEnvelopes bool,
-) (cursor []byte, storeCursor types.StoreRequestCursor, envelopesCount int, err error) {
-	switch t.waku.Version() {
-	case 2:
-		storeCursor, envelopesCount, err = t.createMessagesRequestV2(ctx, peerID, from, to, previousStoreCursor, pubsubTopic, contentTopics, limit, waitForResponse, processEnvelopes)
-	case 1:
-		cursor, err = t.createMessagesRequestV1(ctx, peerID, from, to, previousCursor, contentTopics, waitForResponse)
-	default:
-		err = fmt.Errorf("unsupported version %d", t.waku.Version())
-	}
-	return
+) (cursor types.StoreRequestCursor, envelopesCount int, err error) {
+	return t.createMessagesRequest(ctx, peerID, from, to, prevCursor, pubsubTopic, contentTopics, limit, waitForResponse, processEnvelopes)
 }
 
 func createMessagesRequest(from, to uint32, cursor []byte, storeCursor types.StoreRequestCursor, pubsubTopic string, topics []types.TopicType, limit uint32) types.MessagesRequest {
@@ -584,26 +538,6 @@ func createMessagesRequest(from, to uint32, cursor []byte, storeCursor types.Sto
 		PubsubTopic:   pubsubTopic,
 		ContentTopics: topicBytes,
 		StoreCursor:   storeCursor,
-	}
-}
-
-func (t *Transport) waitForRequestCompleted(ctx context.Context, requestID []byte, events chan types.EnvelopeEvent) (*types.MailServerResponse, error) {
-	for {
-		select {
-		case ev := <-events:
-			if !bytes.Equal(ev.Hash.Bytes(), requestID) {
-				continue
-			}
-			if ev.Event != types.EventMailServerRequestCompleted {
-				continue
-			}
-			data, ok := ev.Data.(*types.MailServerResponse)
-			if ok {
-				return data, nil
-			}
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
 	}
 }
 
@@ -695,6 +629,10 @@ func (t *Transport) SubscribeToConnStatusChanges() (*types.ConnStatusSubscriptio
 
 func (t *Transport) ConnectionChanged(state connection.State) {
 	t.waku.ConnectionChanged(state)
+}
+
+func (t *Transport) PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error) {
+	return t.waku.PingPeer(ctx, peerID)
 }
 
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected

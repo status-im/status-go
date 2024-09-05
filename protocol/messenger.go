@@ -25,7 +25,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
 
 	"github.com/status-im/status-go/account"
@@ -203,7 +202,6 @@ type connStatus int
 
 const (
 	disconnected connStatus = iota + 1
-	connecting
 	connected
 )
 
@@ -218,8 +216,6 @@ type mailserverCycle struct {
 	allMailservers            []mailserversDB.Mailserver
 	activeMailserver          *mailserversDB.Mailserver
 	peers                     map[string]peerStatus
-	events                    chan *p2p.PeerEvent
-	subscription              event.Subscription
 	availabilitySubscriptions []chan struct{}
 }
 

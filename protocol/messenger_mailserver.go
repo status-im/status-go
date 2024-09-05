@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -114,7 +115,7 @@ func (m *Messenger) performMailserverRequest(ms *mailservers.Mailserver, fn func
 	var tries uint = 0
 	for tries < mailserverMaxTries {
 		if !m.communityStorenodes.IsCommunityStoreNode(ms.ID) && !m.isMailserverAvailable(ms.ID) {
-			return nil, errors.New("mailserver not available")
+			return nil, errors.New("storenode not available")
 		}
 		m.logger.Info("trying performing mailserver requests", zap.Uint("try", tries), zap.String("mailserverID", ms.ID))
 
@@ -346,6 +347,10 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 	backupFetched, err := m.settings.BackupFetched()
 	if err != nil {
 		return nil, err
+	}
+
+	if m.mailserversDatabase == nil {
+		return nil, nil
 	}
 
 	if forceFetchingBackup || !backupFetched {
@@ -714,31 +719,29 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 type work struct {
 	pubsubTopic   string
 	contentTopics []types.TopicType
-	cursor        []byte
-	storeCursor   types.StoreRequestCursor
+	cursor        types.StoreRequestCursor
 	limit         uint32
 }
 
 type messageRequester interface {
 	SendMessagesRequestForTopics(
 		ctx context.Context,
-		peerID []byte,
+		peerID peer.ID,
 		from, to uint32,
-		previousCursor []byte,
 		previousStoreCursor types.StoreRequestCursor,
 		pubsubTopic string,
 		contentTopics []types.TopicType,
 		limit uint32,
 		waitForResponse bool,
 		processEnvelopes bool,
-	) (cursor []byte, storeCursor types.StoreRequestCursor, envelopesCount int, err error)
+	) (cursor types.StoreRequestCursor, envelopesCount int, err error)
 }
 
 func processMailserverBatch(
 	ctx context.Context,
 	messageRequester messageRequester,
 	batch MailserverBatch,
-	mailserverID []byte,
+	storenodeID peer.ID,
 	logger *zap.Logger,
 	pageLimit uint32,
 	shouldProcessNextPage func(int) (bool, uint32),
@@ -834,8 +837,7 @@ loop:
 				}()
 
 				queryCtx, queryCancel := context.WithTimeout(ctx, mailserverRequestTimeout)
-				cursor, storeCursor, envelopesCount, err := messageRequester.SendMessagesRequestForTopics(queryCtx, mailserverID, batch.From, batch.To, w.cursor, w.storeCursor, w.pubsubTopic, w.contentTopics, w.limit, true, processEnvelopes)
-
+				cursor, envelopesCount, err := messageRequester.SendMessagesRequestForTopics(queryCtx, storenodeID, batch.From, batch.To, w.cursor, w.pubsubTopic, w.contentTopics, w.limit, true, processEnvelopes)
 				queryCancel()
 
 				if err != nil {
@@ -857,7 +859,7 @@ loop:
 
 				// Check the cursor after calling `shouldProcessNextPage`.
 				// The app might use process the fetched envelopes in the callback for own needs.
-				if len(cursor) == 0 && storeCursor == nil {
+				if cursor == nil {
 					return
 				}
 
@@ -868,7 +870,6 @@ loop:
 					pubsubTopic:   w.pubsubTopic,
 					contentTopics: w.contentTopics,
 					cursor:        cursor,
-					storeCursor:   storeCursor,
 					limit:         nextPageLimit,
 				}
 			}(w)
@@ -917,7 +918,7 @@ func (m *Messenger) processMailserverBatch(ms mailservers.Mailserver, batch Mail
 		return nil
 	}
 
-	mailserverID, err := ms.IDBytes()
+	mailserverID, err := ms.PeerID()
 	if err != nil {
 		return err
 	}
@@ -934,7 +935,7 @@ func (m *Messenger) processMailserverBatchWithOptions(ms mailservers.Mailserver,
 		return nil
 	}
 
-	mailserverID, err := ms.IDBytes()
+	mailserverID, err := ms.PeerID()
 	if err != nil {
 		return err
 	}

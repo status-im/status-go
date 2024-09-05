@@ -65,11 +65,10 @@ func FromProtobuf(storenodes []*protobuf.Storenode, clock uint64) Storenodes {
 
 func toMailserver(m Storenode) mailservers.Mailserver {
 	return mailservers.Mailserver{
-		ID:      m.StorenodeID,
-		Name:    m.Name,
-		Custom:  true,
-		Address: m.Address.String(),
-		Fleet:   m.Fleet,
-		Version: m.Version,
+		ID:     m.StorenodeID,
+		Name:   m.Name,
+		Custom: true,
+		Addr:   &m.Address,
+		Fleet:  m.Fleet,
 	}
 }
