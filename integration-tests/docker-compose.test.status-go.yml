@@ -16,7 +16,7 @@ services:
       timeout: 2s
       retries: 120
     environment:
-      GOCOVERDIR: "./coverage/binary"
+      GOCOVERDIR: "/coverage/binary"
     volumes:
       - ./coverage/binary:/coverage/binary
 
