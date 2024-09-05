@@ -82,7 +82,7 @@ run_test_for_packages() {
 
   # Merge package coverage results
   go run ./cmd/test-coverage-utils/gocovmerge.go ${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.* > ${coverage_file}
-  rm -f "${COVERAGE_REPORTS_DIR}/coverage.out.rerun.*"
+  rm -f "${TEST_WITH_COVERAGE_REPORTS_DIR}/coverage.out.rerun.*"
 
   echo "${go_test_exit}" > "${exit_code_file}"
   if [[ "${go_test_exit}" -ne 0 ]]; then
