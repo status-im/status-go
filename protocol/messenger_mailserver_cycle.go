@@ -357,7 +357,7 @@ func (m *Messenger) connectToMailserver(ms mailservers.Mailserver) error {
 		}
 
 		m.logger.Info("mailserver available", zap.String("mailserverID", m.mailserverCycle.activeMailserver.ID))
-		m.EmitMailserverAvailable()
+		m.mailserverCycle.availabilitySubscriptions.EmitMailserverAvailable()
 		signal.SendMailserverAvailable(m.mailserverCycle.activeMailserver)
 
 		m.transport.SetStorePeerID(peerID)
@@ -483,21 +483,6 @@ func (m *Messenger) getPinnedMailserver() (*mailservers.Mailserver, error) {
 	return nil, nil
 }
 
-func (m *Messenger) EmitMailserverAvailable() {
-	for _, s := range m.mailserverCycle.availabilitySubscriptions {
-		s <- struct{}{}
-		close(s)
-		l := len(m.mailserverCycle.availabilitySubscriptions)
-		m.mailserverCycle.availabilitySubscriptions = m.mailserverCycle.availabilitySubscriptions[:l-1]
-	}
-}
-
-func (m *Messenger) SubscribeMailserverAvailable() chan struct{} {
-	c := make(chan struct{})
-	m.mailserverCycle.availabilitySubscriptions = append(m.mailserverCycle.availabilitySubscriptions, c)
-	return c
-}
-
 func (m *Messenger) disconnectStorenodeIfRequired() error {
 	m.logger.Debug("wakuV2 storenode status verification")
 
@@ -537,7 +522,7 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 		}()
 		for !m.isMailserverAvailable(m.getActiveMailserverID()) {
 			select {
-			case <-m.SubscribeMailserverAvailable():
+			case <-m.mailserverCycle.availabilitySubscriptions.Subscribe():
 			case <-cancel:
 				return
 			}
