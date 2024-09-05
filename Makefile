@@ -496,18 +496,15 @@ test-verif-proxy-wrapper:
 	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)
 
 
-run-integration-tests: SHELL := /bin/sh
-run-integration-tests: export INTEGRATION_TESTS_DOCKER_UID ?= $(shell id -u $$USER)
+run-integration-tests: export INTEGRATION_TESTS_DOCKER_UID ?= $(call sh, id -u)
+run-integration-tests: export INTEGRATION_TESTS_REPORT_CODECOV ?= false
 run-integration-tests:
-	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml up -d --build --remove-orphans; \
-	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml logs -f tests-rpc; \
-	exit_code=$$(docker inspect integration-tests_tests-rpc_1 -f '{{.State.ExitCode}}'); \
-	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml down; \
-	exit $$exit_code
+	@./_assets/scripts/run_integration_tests.sh
 
 run-anvil: SHELL := /bin/sh
 run-anvil:
 	docker-compose -f integration-tests/docker-compose.anvil.yml up --remove-orphans
 
+codecov-validate: SHELL := /bin/sh
 codecov-validate:
 	curl -X POST --data-binary @.codecov.yml https://codecov.io/validate
