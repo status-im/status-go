@@ -2,6 +2,7 @@ package sendtype
 
 import (
 	"math/big"
+	"slices"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -39,8 +40,11 @@ func (s SendType) IsStickersTransfer() bool {
 	return s == StickersBuy
 }
 
-func (s SendType) FetchPrices(marketManager *market.Manager, tokenID string) (map[string]float64, error) {
-	symbols := []string{tokenID, "ETH"}
+func (s SendType) FetchPrices(marketManager *market.Manager, tokenIDs []string) (map[string]float64, error) {
+	nonUniqueSymbols := append(tokenIDs, "ETH")
+	// remove duplicate enteries
+	slices.Sort(nonUniqueSymbols)
+	symbols := slices.Compact(nonUniqueSymbols)
 	if s.IsCollectiblesTransfer() {
 		symbols = []string{"ETH"}
 	}
@@ -54,7 +58,9 @@ func (s SendType) FetchPrices(marketManager *market.Manager, tokenID string) (ma
 		prices[symbol] = pricePerCurrency["USD"]
 	}
 	if s.IsCollectiblesTransfer() {
-		prices[tokenID] = 0
+		for _, tokenID := range tokenIDs {
+			prices[tokenID] = 0
+		}
 	}
 	return prices, nil
 }

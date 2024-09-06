@@ -6,10 +6,9 @@ import (
 )
 
 type RouterSuggestedRoutes struct {
-	Uuid                  string                `json:"Uuid"`
-	Best                  routes.Route          `json:"Best,omitempty"`
-	Candidates            routes.Route          `json:"Candidates,omitempty"`
-	TokenPrice            *float64              `json:"TokenPrice,omitempty"`
-	NativeChainTokenPrice *float64              `json:"NativeChainTokenPrice,omitempty"`
-	ErrorResponse         *errors.ErrorResponse `json:"ErrorResponse,omitempty"`
+	Uuid          string                `json:"Uuid"`
+	Best          routes.Route          `json:"Best,omitempty"`
+	Candidates    routes.Route          `json:"Candidates,omitempty"`
+	UpdatedPrices map[string]float64    `json:"UpdatedPrices,omitempty"`
+	ErrorResponse *errors.ErrorResponse `json:"ErrorResponse,omitempty"`
 }
