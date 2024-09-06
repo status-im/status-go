@@ -55,11 +55,10 @@ type ProcessorError struct {
 }
 
 type SuggestedRoutes struct {
-	Uuid                  string
-	Best                  routes.Route
-	Candidates            routes.Route
-	TokenPrice            float64
-	NativeChainTokenPrice float64
+	Uuid          string
+	Best          routes.Route
+	Candidates    routes.Route
+	UpdatedPrices map[string]float64
 }
 
 type Router struct {
@@ -128,18 +127,14 @@ func (r *Router) SetTestBalanceMap(balanceMap map[string]*big.Int) {
 }
 
 func newSuggestedRoutes(
-	uuid string,
-	amountIn *big.Int,
+	input *requests.RouteInputParams,
 	candidates routes.Route,
-	fromLockedAmount map[uint64]*hexutil.Big,
-	tokenPrice float64,
-	nativeChainTokenPrice float64,
+	updatedPrices map[string]float64,
 ) (*SuggestedRoutes, []routes.Route) {
 	suggestedRoutes := &SuggestedRoutes{
-		Uuid:                  uuid,
-		Candidates:            candidates,
-		TokenPrice:            tokenPrice,
-		NativeChainTokenPrice: nativeChainTokenPrice,
+		Uuid:          input.Uuid,
+		Candidates:    candidates,
+		UpdatedPrices: updatedPrices,
 	}
 	if len(candidates) == 0 {
 		return suggestedRoutes, nil
@@ -147,10 +142,10 @@ func newSuggestedRoutes(
 
 	node := &routes.Node{
 		Path:     nil,
-		Children: routes.BuildGraph(amountIn, candidates, 0, []uint64{}),
+		Children: routes.BuildGraph(input.AmountIn.ToInt(), candidates, 0, []uint64{}),
 	}
 	allRoutes := node.BuildAllRoutes()
-	allRoutes = filterRoutes(allRoutes, amountIn, fromLockedAmount)
+	allRoutes = filterRoutes(allRoutes, input.AmountIn.ToInt(), input.FromLockedAmount)
 
 	if len(allRoutes) > 0 {
 		sort.Slice(allRoutes, func(i, j int) bool {
@@ -176,8 +171,7 @@ func sendRouterResult(uuid string, result interface{}, err error) {
 	if suggestedRoutes, ok := result.(*SuggestedRoutes); ok && suggestedRoutes != nil {
 		routesResponse.Best = suggestedRoutes.Best
 		routesResponse.Candidates = suggestedRoutes.Candidates
-		routesResponse.TokenPrice = &suggestedRoutes.TokenPrice
-		routesResponse.NativeChainTokenPrice = &suggestedRoutes.NativeChainTokenPrice
+		routesResponse.UpdatedPrices = suggestedRoutes.UpdatedPrices
 	}
 
 	signal.SendWalletEvent(signal.SuggestedRoutes, routesResponse)
@@ -851,7 +845,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputPa
 	if input.TestsMode {
 		prices = input.TestParams.TokenPrices
 	} else {
-		prices, err = input.SendType.FetchPrices(r.marketManager, input.TokenID)
+		prices, err = input.SendType.FetchPrices(r.marketManager, []string{input.TokenID, input.ToTokenID})
 		if err != nil {
 			return nil, errors.CreateErrorResponseFromError(err)
 		}
@@ -861,7 +855,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputPa
 	nativeTokenPrice := prices[pathprocessor.EthSymbol]
 
 	var allRoutes []routes.Route
-	suggestedRoutes, allRoutes = newSuggestedRoutes(input.Uuid, input.AmountIn.ToInt(), candidates, input.FromLockedAmount, tokenPrice, nativeTokenPrice)
+	suggestedRoutes, allRoutes = newSuggestedRoutes(input, candidates, prices)
 
 	defer func() {
 		if suggestedRoutes.Best != nil && len(suggestedRoutes.Best) > 0 {
