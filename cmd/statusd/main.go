@@ -80,7 +80,8 @@ var (
 			params.FleetProd,
 		),
 	)
-	listenAddr = flag.String("addr", "", "address to bind listener to")
+	listenAddr           = flag.String("addr", "", "address to bind listener to")
+	signalsServerAddress = flag.String("signals-server", "", "Address `host:port` for signals server")
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metricsEnabled = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
@@ -166,6 +167,22 @@ func main() {
 	if *version {
 		printVersion(config)
 		return
+	}
+
+	if signalsServerAddress != nil && *signalsServerAddress != "" {
+		signalsServer := NewSignalsServer()
+		signalsServer.Setup()
+		err = signalsServer.Listen(*signalsServerAddress)
+		if err != nil {
+			logger.Error("failed to start signals server", "error", err)
+			return
+		}
+		log.Info("Signals server started", "address", signalsServer.Address())
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			signalsServer.Stop(ctx)
+		}()
 	}
 
 	backend := api.NewGethStatusBackend()
