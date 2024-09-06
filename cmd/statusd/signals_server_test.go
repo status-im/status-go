@@ -64,6 +64,7 @@ func TestSignalsServer(t *testing.T) {
 
 	receivedEvent := signal.MessageDeliveredSignal{}
 	err = json.Unmarshal(tempJson, &receivedEvent)
+	require.NoError(t, err)
 	require.Equal(t, sentEvent, receivedEvent)
 }
 

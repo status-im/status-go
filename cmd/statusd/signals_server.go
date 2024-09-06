@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -53,7 +54,8 @@ func (s *SignalsServer) Listen(address string) error {
 	}
 
 	s.server = &http.Server{
-		Addr: address,
+		Addr:              address,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	http.HandleFunc("/signals", s.signals)
