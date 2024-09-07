@@ -127,13 +127,17 @@ else
   wait
 fi
 
-for exit_code_file in "${GIT_ROOT}"/exit_code_*.txt; do
-  read exit_code < "${exit_code_file}"
-  if [[ "${exit_code}" -ne 0 ]]; then
-    echo -e "${RED}Testing failed${RST}, exit code: ${exit_code}"
-    exit ${exit_code}
-  fi
-done
+# When running in PRs (count=1), early exit if any test failed.
+# When running nightly (count>1), generate test stats ant coverage reports anyway.
+if [[ $UNIT_TEST_COUNT -eq 1 ]]; then
+  for exit_code_file in "${GIT_ROOT}"/exit_code_*.txt; do
+    read exit_code < "${exit_code_file}"
+    if [[ "${exit_code}" -ne 0 ]]; then
+      echo -e "${RED}Testing failed${RST}, exit code: ${exit_code}"
+      exit ${exit_code}
+    fi
+  done
+fi
 
 # Gather test coverage results
 merged_coverage_report="coverage_merged.out"
