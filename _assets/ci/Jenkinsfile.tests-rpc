@@ -24,9 +24,9 @@ pipeline {
     disableConcurrentBuilds()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
-      numToKeepStr: '5',
+      numToKeepStr: '15',
       daysToKeepStr: '30',
-      artifactNumToKeepStr: '1',
+      artifactNumToKeepStr: '15',
     ))
   }
 
