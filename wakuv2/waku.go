@@ -113,6 +113,8 @@ type ITelemetryClient interface {
 	PushPeerCountByShard(ctx context.Context, peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin map[wps.Origin]uint)
 	PushStoreConfirmationFailed(ctx context.Context, msgHash gethcommon.Hash)
+	PushMissedMessage(ctx context.Context, envelope *protocol.Envelope)
+	PushMissedRelevantMessage(ctx context.Context, message *common.ReceivedMessage)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -1125,7 +1127,6 @@ func (w *Waku) Start() error {
 	go w.runPeerExchangeLoop()
 
 	if w.cfg.EnableMissingMessageVerification {
-
 		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
 			w.node.Store(),
 			w,
@@ -1401,6 +1402,12 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 		return nil
 	}
 
+	if w.statusTelemetryClient != nil {
+		if msgType == common.MissingMessageType {
+			w.statusTelemetryClient.PushMissedMessage(w.ctx, envelope)
+		}
+	}
+
 	logger := w.logger.With(
 		zap.String("messageType", msgType),
 		zap.Stringer("envelopeHash", envelope.Hash()),
@@ -1518,6 +1525,9 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 		w.storeMsgIDsMu.Unlock()
 	} else {
 		logger.Debug("filters did match")
+		if w.statusTelemetryClient != nil && e.MsgType == common.MissingMessageType {
+			w.statusTelemetryClient.PushMissedRelevantMessage(w.ctx, e)
+		}
 		e.Processed.Store(true)
 	}
 
