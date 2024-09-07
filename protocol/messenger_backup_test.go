@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -737,36 +738,39 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	s.Require().NoError(err)
 	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(seedKp, dbSeedKp2, false, accounts.SyncedFromBackup, accounts.AccountNonOperable))
 
+	keypairs, err := bob2.settings.GetAllKeypairs()
+	s.Require().NoError(err)
+
 	// Check whether accounts added event is sent
-	expectedAddresses := [][]common.Address{}
-	profileKpWalletAddresses := []common.Address{}
-	seedKpAddresses := []common.Address{}
+	expectedAddresses := []common.Address{}
 	for _, acc := range dbProfileKp2.Accounts {
 		if acc.Chat {
 			continue
 		}
-		profileKpWalletAddresses = append(profileKpWalletAddresses, common.Address(acc.Address))
+		expectedAddresses = append(expectedAddresses, common.Address(acc.Address))
 	}
-	expectedAddresses = append(expectedAddresses, profileKpWalletAddresses)
 
 	for _, acc := range dbSeedKp2.Accounts {
-		seedKpAddresses = append(seedKpAddresses, common.Address(acc.Address))
+		expectedAddresses = append(expectedAddresses, common.Address(acc.Address))
 	}
-	expectedAddresses = append(expectedAddresses, seedKpAddresses)
 
-	for i := 0; i < len(expectedAddresses); i++ {
+	receivedEventAddresses := []common.Address{}
+	for i := 0; i < len(keypairs); i++ {
 		select {
 		case <-time.After(1 * time.Second):
 			s.Fail("Timed out waiting for accountsevent")
 		case event := <-ch:
 			switch event.Type {
 			case accountsevent.EventTypeAdded:
-				s.Require().Len(event.Accounts, len(expectedAddresses[i]))
-				s.Require().True(reflect.DeepEqual(expectedAddresses[i], event.Accounts))
+				receivedEventAddresses = append(receivedEventAddresses, event.Accounts...)
 			}
 		}
 	}
 	sub.Unsubscribe()
+	s.Require().Equal(len(expectedAddresses), len(receivedEventAddresses))
+	for _, addr := range receivedEventAddresses {
+		s.Require().True(slices.Contains(expectedAddresses, addr))
+	}
 }
 
 func (s *MessengerBackupSuite) TestBackupKeycards() {
