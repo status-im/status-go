@@ -102,6 +102,12 @@ var masterPow = 0.00000001
 var round = 1
 
 func TestSimulationBloomFilter(t *testing.T) {
+	result = TestData{}
+	nodes = [NumNodes]*TestNode{}
+	masterBloomFilter = []byte{}
+	masterPow = 0.00000001
+	round = 1
+
 	// create a chain of waku nodes,
 	// installs the filters with shared (predefined) parameters
 	initializeBloomFilterMode(t)
