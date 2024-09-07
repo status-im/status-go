@@ -1,11 +1,15 @@
 package protocol
 
 import (
+	"bytes"
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
+
+	"github.com/andybalholm/brotli"
 
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -15,7 +19,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/urls"
 	"github.com/status-im/status-go/services/utils"
 )
 
@@ -140,7 +143,7 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 		return "", "", err
 	}
 
-	encodedData, err := urls.EncodeDataURL(urlData)
+	encodedData, err := encodeDataURL(urlData)
 	if err != nil {
 		return "", "", err
 	}
@@ -168,7 +171,7 @@ func parseCommunityURLWithData(data string, chatKey string) (*URLDataResponse, e
 		return nil, err
 	}
 
-	urlData, err := urls.DecodeDataURL(data)
+	urlData, err := decodeDataURL(data)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +294,7 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 	if err != nil {
 		return "", "", err
 	}
-	encodedData, err := urls.EncodeDataURL(urlData)
+	encodedData, err := encodeDataURL(urlData)
 	if err != nil {
 		return "", "", err
 	}
@@ -337,7 +340,7 @@ func parseCommunityChannelURLWithData(data string, chatKey string) (*URLDataResp
 		return nil, err
 	}
 
-	urlData, err := urls.DecodeDataURL(data)
+	urlData, err := decodeDataURL(data)
 	if err != nil {
 		return nil, err
 	}
@@ -461,7 +464,7 @@ func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, er
 		return "", "", err
 	}
 
-	encodedData, err := urls.EncodeDataURL(urlData)
+	encodedData, err := encodeDataURL(urlData)
 	if err != nil {
 		return "", "", err
 	}
@@ -484,7 +487,7 @@ func (m *Messenger) ShareUserURLWithData(contactID string) (string, error) {
 }
 
 func parseUserURLWithData(data string, chatKey string) (*URLDataResponse, error) {
-	urlData, err := urls.DecodeDataURL(data)
+	urlData, err := decodeDataURL(data)
 	if err != nil {
 		return nil, err
 	}
@@ -574,4 +577,37 @@ func ParseSharedURL(url string) (*URLDataResponse, error) {
 	}
 
 	return nil, fmt.Errorf("not a status shared url")
+}
+
+func encodeDataURL(data []byte) (string, error) {
+	bb := bytes.NewBuffer([]byte{})
+	writer := brotli.NewWriter(bb)
+	_, err := writer.Write(data)
+	if err != nil {
+		return "", err
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(bb.Bytes()), nil
+}
+
+func decodeDataURL(data string) ([]byte, error) {
+	decoded, err := base64.URLEncoding.DecodeString(data)
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]byte, 4096)
+	bb := bytes.NewBuffer(decoded)
+	reader := brotli.NewReader(bb)
+	n, err := reader.Read(output)
+	if err != nil {
+		return nil, err
+	}
+
+	return output[:n], nil
 }
