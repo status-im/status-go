@@ -1610,11 +1610,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 	isOnline := !state.Offline
 	if w.cfg.LightClient {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
-		w.wg.Add(1)
-		go func() {
-			defer w.wg.Done()
-			w.filterManager.OnConnectionStatusChange("", isOnline)
-		}()
+		go w.filterManager.OnConnectionStatusChange("", isOnline)
 		w.handleNetworkChangeFromApp(state)
 	} else {
 		// for lightClient state update and onlineChange is handled in filterManager.
