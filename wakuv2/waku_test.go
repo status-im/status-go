@@ -352,7 +352,10 @@ func TestPeerExchange(t *testing.T) {
 	config.EnableDiscV5 = true
 	config.EnablePeerExchangeServer = false
 	config.EnablePeerExchangeClient = false
-	config.DiscV5BootstrapNodes = []string{pxServerNode.node.ENR().String()}
+	enr, err := pxServerNode.ENR()
+	require.NoError(t, err)
+
+	config.DiscV5BootstrapNodes = []string{enr.String()}
 	discV5Node, err := New(nil, "", config, logger.Named("discV5Node"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, discV5Node.Start())
@@ -360,7 +363,7 @@ func TestPeerExchange(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// start light node which use PeerExchange to discover peers
-	enrNodes := []*enode.Node{pxServerNode.node.ENR()}
+	enrNodes := []*enode.Node{enr}
 	tree, url := makeTestTree("n", enrNodes, nil)
 	resolver := mapResolver(tree.ToTXT("n"))
 
@@ -385,17 +388,23 @@ func TestPeerExchange(t *testing.T) {
 		// in light client mode,the peer will be closed via `w.node.Host().Network().ClosePeer(peerInfo.ID)`
 		// after invoking identifyAndConnect, instead, we should check the peerStore, peers from peerStore
 		// won't get deleted especially if they are statically added.
-		if len(lightNode.node.Host().Peerstore().Peers()) == 2 {
+		numConnected, err := lightNode.GetNumConnectedPeers()
+		if err != nil {
+			return err
+		}
+		if numConnected == 2 {
 			return nil
 		}
 		return errors.New("no peers discovered")
 	}, options)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	require.NoError(t, discV5Node.node.PeerExchange().Request(ctx, 1))
-	require.Error(t, discV5Node.node.PeerExchange().Request(ctx, 1)) //should fail due to rate limit
+	_, err = discV5Node.WakuPeerExchangeRequest(1)
+	require.NoError(t, err)
+	_, err = discV5Node.WakuPeerExchangeRequest(1)
+	require.Error(t, err) //should fail due to rate limit
 
 	require.NoError(t, lightNode.Stop())
 	require.NoError(t, pxServerNode.Stop())
@@ -430,7 +439,7 @@ func TestWakuV2Filter(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		peers, err := w.node.PeerManager().FilterPeersByProto(nil, nil, filter.FilterSubscribeID_v20beta1)
+		peers, err := w.GetPeerIdsByProtocol(string(filter.FilterSubscribeID_v20beta1))
 		if err != nil {
 			return err
 		}
@@ -466,20 +475,20 @@ func TestWakuV2Filter(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	// Ensure there is at least 1 active filter subscription
-	subscriptions := w.node.FilterLightnode().Subscriptions()
+	subscriptions := w.FilterLightnode().Subscriptions()
 	require.Greater(t, len(subscriptions), 0)
 
 	messages := filter.Retrieve()
 	require.Len(t, messages, 1)
 
 	// Mock peers going down
-	_, err = w.node.FilterLightnode().UnsubscribeWithSubscription(w.ctx, subscriptions[0])
+	_, err = w.FilterLightnode().UnsubscribeWithSubscription(w.ctx, subscriptions[0])
 	require.NoError(t, err)
 
 	time.Sleep(10 * time.Second)
 
 	// Ensure there is at least 1 active filter subscription
-	subscriptions = w.node.FilterLightnode().Subscriptions()
+	subscriptions = w.FilterLightnode().Subscriptions()
 	require.Greater(t, len(subscriptions), 0)
 
 	// Ensure that messages are retrieved with a fresh sub
@@ -551,11 +560,11 @@ func TestWakuV2Store(t *testing.T) {
 	}()
 
 	// Connect the two nodes directly
-	peer2Addr := w2.node.ListenAddresses()[0].String()
-	err = w1.node.DialPeer(context.Background(), peer2Addr)
+	peer2Addr := w2.ListenAddresses()[0].String()
+	err = w1.DialPeer(context.Background(), peer2Addr)
 	require.NoError(t, err)
 
-	waitForPeerConnection(t, w2.node.Host().ID(), w1PeersCh)
+	waitForPeerConnection(t, w2.Host().ID(), w1PeersCh)
 
 	// Create a filter for the second node to catch messages
 	filter := &common.Filter{
@@ -591,7 +600,7 @@ func TestWakuV2Store(t *testing.T) {
 	// Query the second node's store for the message
 	_, envelopeCount, err := w1.Query(
 		context.Background(),
-		w2.node.Host().ID(),
+		w2.Host().ID(),
 		store.FilterCriteria{
 			TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
 			TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
@@ -729,7 +738,7 @@ func TestLightpushRateLimit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	//Connect the relay peer and full node
-	err = w1.node.DialPeer(ctx, w0.node.ListenAddresses()[0].String())
+	err = w1.DialPeer(ctx, w0.ListenAddresses()[0].String())
 	require.NoError(t, err)
 
 	err = tt.RetryWithBackOff(func() error {
@@ -756,9 +765,9 @@ func TestLightpushRateLimit(t *testing.T) {
 	}()
 
 	//Use this instead of DialPeer to make sure the peer is added to PeerStore and can be selected for Lighpush
-	w2.node.AddDiscoveredPeer(w1.PeerID(), w1.node.ListenAddresses(), wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
+	w2.AddDiscoveredPeer(w1.PeerID(), w1.ListenAddresses(), wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
 
-	waitForPeerConnectionWithTimeout(t, w2.node.Host().ID(), w1PeersCh, 5*time.Second)
+	waitForPeerConnectionWithTimeout(t, w2.Host().ID(), w1PeersCh, 5*time.Second)
 
 	event := make(chan common.EnvelopeEvent, 10)
 	w2.SubscribeEnvelopeEvents(event)

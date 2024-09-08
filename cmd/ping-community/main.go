@@ -24,12 +24,12 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	wakuextn "github.com/status-im/status-go/services/wakuext"
@@ -48,8 +48,8 @@ var (
 	seedPhrase       = flag.String("seed-phrase", "", "Seed phrase")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
 	communityID      = flag.String("community-id", "", "The id of the community")
-	shardCluster     = flag.Int("shard-cluster", shard.MainStatusShardCluster, "The shard cluster in which the of the community is published")
-	shardIndex       = flag.Int("shard-index", shard.DefaultShardIndex, "The shard index in which the community is published")
+	shardCluster     = flag.Int("shard-cluster", wakuv2.MainStatusShardCluster, "The shard cluster in which the of the community is published")
+	shardIndex       = flag.Int("shard-index", wakuv2.DefaultShardIndex, "The shard index in which the community is published")
 	chatID           = flag.String("chat-id", "", "The id of the chat")
 
 	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
@@ -148,9 +148,9 @@ func main() {
 
 	messenger := wakuextservice.Messenger()
 
-	var s *shard.Shard = nil
+	var s *wakuv2.Shard = nil
 	if shardCluster != nil && shardIndex != nil {
-		s = &shard.Shard{
+		s = &wakuv2.Shard{
 			Cluster: uint16(*shardCluster),
 			Index:   uint16(*shardIndex),
 		}

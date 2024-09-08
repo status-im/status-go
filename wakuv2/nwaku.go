@@ -188,6 +188,10 @@ package wakuv2
 		WAKU_CALL (waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
 
+	void cGoWakuGetNumConnectedPeers(void* ctx, char* pubSubTopic, void* resp) {
+		WAKU_CALL (waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
+	}
+
 	void cGoWakuLightpushPublish(void* wakuCtx,
 					const char* pubSubTopic,
 					const char* jsonWakuMessage,
@@ -214,6 +218,26 @@ package wakuv2
 									resp));
 	}
 
+	void cGoWakuPeerExchangeQuery(void* wakuCtx,
+								uint64_t numPeers,
+								void* resp) {
+
+		WAKU_CALL (waku_peer_exchange_request(wakuCtx,
+									numPeers,
+									(WakuCallBack) callback,
+									resp));
+	}
+
+	void cGoWakuGetPeerIdsByProtocol(void* wakuCtx,
+									 const char* protocol,
+									 void* resp) {
+
+		WAKU_CALL (waku_get_peerids_by_protocol(wakuCtx,
+									protocol,
+									(WakuCallBack) callback,
+									resp));
+	}
+
 */
 import "C"
 
@@ -226,6 +250,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -246,6 +272,7 @@ import (
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/peer"
+	peermod "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
@@ -2092,6 +2119,20 @@ func (self *NWaku) wakuStoreQuery(
 	return "", errors.New(errMsg)
 }
 
+func (self *NWaku) WakuPeerExchangeRequest(numPeers uint64) (string, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+
+	C.cGoWakuPeerExchangeQuery(self.wakuCtx, C.uint64_t(numPeers), resp)
+	if C.getRet(resp) == C.RET_OK {
+		msg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		return msg, nil
+	}
+	errMsg := "error WakuPeerExchangeRequest: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return "", errors.New(errMsg)
+}
+
 func (self *NWaku) WakuConnect(peerMultiAddr string, timeoutMs int) error {
 	var resp = C.allocResp()
 	var cPeerMultiAddr = C.CString(peerMultiAddr)
@@ -2144,7 +2185,11 @@ func (self *NWaku) ENR() (*enode.Node, error) {
 
 	if C.getRet(resp) == C.RET_OK {
 		enrStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		return enode.Parse(enode.ValidSchemes, enrStr)
+		n, err := enode.Parse(enode.ValidSchemes, enrStr)
+		if err != nil {
+			return nil, err
+		}
+		return n, nil
 	}
 	errMsg := "error WakuGetMyENR: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
@@ -2172,6 +2217,59 @@ func (self *NWaku) ListPeersInMesh(pubsubTopic string) (int, error) {
 	errMsg := "error ListPeersInMesh: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return 0, errors.New(errMsg)
+}
+
+func (self *NWaku) GetNumConnectedPeers(pubsubTopic string) (int, error) {
+	var resp = C.allocResp()
+	var cPubsubTopic = C.CString(pubsubTopic)
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPubsubTopic))
+
+	C.cGoWakuGetNumConnectedPeers(self.wakuCtx, cPubsubTopic, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		numPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		numPeers, err := strconv.Atoi(numPeersStr)
+		if err != nil {
+			fmt.Println(":", err)
+			errMsg := "ListPeersInMesh - error converting string to int: " + err.Error()
+			return 0, errors.New(errMsg)
+		}
+		return numPeers, nil
+	}
+	errMsg := "error ListPeersInMesh: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return 0, errors.New(errMsg)
+}
+
+func (self *NWaku) GetPeerIdsByProtocol(protocol string) (peer.IDSlice, error) {
+	var resp = C.allocResp()
+	var cProtocol = C.CString(protocol)
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cProtocol))
+
+	C.cGoWakuGetPeerIdsByProtocol(self.wakuCtx, cProtocol, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		// peersStr contains a comma-separated list of peer ids
+		itemsPeerIds := strings.Split(peersStr, ",")
+
+		var peers peer.IDSlice
+		for _, peer := range itemsPeerIds {
+			id, err := peermod.Decode(peer)
+			if err != nil {
+				errMsg := "ListPeersInMesh - error converting string to int: " + err.Error()
+				return nil, errors.New(errMsg)
+			}
+			peers = append(peers, id)
+		}
+
+		return peers, nil
+	}
+	errMsg := "error GetPeerIdsByProtocol: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, errors.New(errMsg)
 }
 
 // func main() {
@@ -2423,4 +2521,52 @@ func New(nodeKey *ecdsa.PrivateKey,
 	// waku.logger.Info("setup the go-waku node successfully")
 
 	// return waku, nil
+}
+
+type NwakuInfo struct {
+	ListenAddresses []string `json:"listenAddresses"`
+	EnrUri          string   `json:"enrUri"`
+}
+
+func GetNwakuInfo(host *string, port *int) (NwakuInfo, error) {
+	nwakuRestPort := 8645
+	if port != nil {
+		nwakuRestPort = *port
+	}
+	envNwakuRestPort := os.Getenv("NWAKU_REST_PORT")
+	if envNwakuRestPort != "" {
+		v, err := strconv.Atoi(envNwakuRestPort)
+		if err != nil {
+			return NwakuInfo{}, err
+		}
+		nwakuRestPort = v
+	}
+
+	nwakuRestHost := "localhost"
+	if host != nil {
+		nwakuRestHost = *host
+	}
+	envNwakuRestHost := os.Getenv("NWAKU_REST_HOST")
+	if envNwakuRestHost != "" {
+		nwakuRestHost = envNwakuRestHost
+	}
+
+	resp, err := http.Get(fmt.Sprintf("http://%s:%d/debug/v1/info", nwakuRestHost, nwakuRestPort))
+	if err != nil {
+		return NwakuInfo{}, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return NwakuInfo{}, err
+	}
+
+	var data NwakuInfo
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		return NwakuInfo{}, err
+	}
+
+	return data, nil
 }
