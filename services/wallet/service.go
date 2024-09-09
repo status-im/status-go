@@ -2,12 +2,10 @@ package wallet
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"sync"
+
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -42,10 +40,6 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-const (
-	EventBlockchainStatusChanged walletevent.EventType = "wallet-blockchain-status-changed"
-)
-
 // NewService initializes service instance.
 func NewService(
 	db *sql.DB,
@@ -67,38 +61,6 @@ func NewService(
 	signals := &walletevent.SignalsTransmitter{
 		Publisher: feed,
 	}
-	blockchainStatus := make(map[uint64]string)
-	mutex := sync.Mutex{}
-	rpcClient.SetWalletNotifier(func(chainID uint64, message string) {
-		mutex.Lock()
-		defer mutex.Unlock()
-
-		if len(blockchainStatus) == 0 {
-			networks, err := rpcClient.NetworkManager.Get(false)
-			if err != nil {
-				return
-			}
-
-			for _, network := range networks {
-				blockchainStatus[network.ChainID] = "up"
-			}
-		}
-
-		blockchainStatus[chainID] = message
-		encodedmessage, err := json.Marshal(blockchainStatus)
-		if err != nil {
-			return
-		}
-
-		feed.Send(walletevent.Event{
-			Type:     EventBlockchainStatusChanged,
-			Accounts: []common.Address{},
-			Message:  string(encodedmessage),
-			At:       time.Now().Unix(),
-			ChainID:  chainID,
-		})
-	})
-
 	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
 	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountFeed, accountsDB, token.NewPersistence(db))
@@ -280,6 +242,7 @@ func (s *Service) Stop() error {
 	s.activity.Stop()
 	s.collectibles.Stop()
 	s.tokenManager.Stop()
+
 	s.started = false
 	log.Info("wallet stopped")
 	return nil
