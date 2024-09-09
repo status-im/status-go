@@ -42,7 +42,6 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
-	"github.com/status-im/status-go/protocol/urls"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/services/ext/mailservers"
 )
@@ -1260,14 +1259,6 @@ func (api *PublicAPI) EmojiReactionsByChatID(chatID string, cursor string, limit
 
 func (api *PublicAPI) EmojiReactionsByChatIDMessageID(chatID string, messageID string) ([]*protocol.EmojiReaction, error) {
 	return api.service.messenger.EmojiReactionsByChatIDMessageID(chatID, messageID)
-}
-
-func (api *PublicAPI) GetLinkPreviewWhitelist() []urls.Site {
-	return urls.LinkPreviewWhitelist()
-}
-
-func (api *PublicAPI) GetLinkPreviewData(link string) (previewData urls.LinkPreviewData, err error) {
-	return urls.GetLinkPreviewData(link)
 }
 
 // GetTextURLsToUnfurl parses text and returns a deduplicated and (somewhat) normalized
