@@ -536,7 +536,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 					ChangePct24hour: tokenMarketValues[tok.Symbol].CHANGEPCT24HOUR,
 					Change24hour:    tokenMarketValues[tok.Symbol].CHANGE24HOUR,
 					Price:           prices[tok.Symbol][currency].Price,
-					HasError:        !r.marketManager.IsConnected,
+					HasError:        !r.marketManager.IsConnected(),
 				}
 			}
 

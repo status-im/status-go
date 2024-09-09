@@ -155,10 +155,8 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)
 
-	chainClient, err := c.EthClient(chainID)
+	_, err = c.EthClient(chainID)
 	require.NoError(t, err)
-	chainClient.SetWalletNotifier(func(chainID uint64, message string) {})
-	c.SetWalletNotifier(func(chainID uint64, message string) {})
 
 	service := NewService(db, accountsDb, appDB, c, accountFeed, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, nil, "")
 

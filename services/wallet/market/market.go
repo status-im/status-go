@@ -2,7 +2,8 @@ package market
 
 import (
 	"context"
-	"sync"
+	"encoding/json"
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,12 +11,14 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/circuitbreaker"
+	healthManager "github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 const (
-	EventMarketStatusChanged walletevent.EventType = "wallet-market-status-changed"
+	EventMarketStatusChanged walletevent.EventType = "wallet-market-status-changed" // deprecated
+	EventMarketHealthChanged walletevent.EventType = "wallet-market-health-changed"
 )
 
 const (
@@ -39,14 +42,13 @@ type TokenMarketCache MarketValuesPerCurrencyAndToken
 type TokenPriceCache DataPerTokenAndCurrency
 
 type Manager struct {
-	feed            *event.Feed
-	priceCache      MarketCache[TokenPriceCache]
-	marketCache     MarketCache[TokenMarketCache]
-	IsConnected     bool
-	LastCheckedAt   int64
-	IsConnectedLock sync.RWMutex
-	circuitbreaker  *circuitbreaker.CircuitBreaker
-	providers       []thirdparty.MarketDataProvider
+	feed               *event.Feed
+	priceCache         MarketCache[TokenPriceCache]
+	marketCache        MarketCache[TokenMarketCache]
+	circuitbreaker     *circuitbreaker.CircuitBreaker
+	healthManager      *healthManager.ProvidersHealthManager
+	stopMonitoringFunc context.CancelFunc
+	providers          []thirdparty.MarketDataProvider
 }
 
 func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Manager {
@@ -61,30 +63,10 @@ func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Ma
 		feed:           feed,
 		priceCache:     *NewCache(make(TokenPriceCache)),
 		marketCache:    *NewCache(make(TokenMarketCache)),
-		IsConnected:    true,
-		LastCheckedAt:  time.Now().Unix(),
 		circuitbreaker: cb,
 		providers:      providers,
+		healthManager:  healthManager.NewProvidersHealthManager(0),
 	}
-}
-
-func (pm *Manager) setIsConnected(value bool) {
-	pm.IsConnectedLock.Lock()
-	defer pm.IsConnectedLock.Unlock()
-	pm.LastCheckedAt = time.Now().Unix()
-	if value != pm.IsConnected {
-		message := "down"
-		if value {
-			message = "up"
-		}
-		pm.feed.Send(walletevent.Event{
-			Type:     EventMarketStatusChanged,
-			Accounts: []common.Address{},
-			Message:  message,
-			At:       time.Now().Unix(),
-		})
-	}
-	pm.IsConnected = value
 }
 
 func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(provider thirdparty.MarketDataProvider) (interface{}, error)) (interface{}, error) {
@@ -98,7 +80,10 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 	}
 
 	result := pm.circuitbreaker.Execute(cmd)
-	pm.setIsConnected(result.Error() == nil)
+	if pm.healthManager != nil {
+		rpcCallStatuses := convertFunctorCallStatuses(result.FunctorCallStatuses())
+		pm.healthManager.Update(context.Background(), rpcCallStatuses)
+	}
 
 	if result.Error() != nil {
 		log.Error("Error fetching prices", "error", result.Error())
@@ -106,6 +91,79 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 	}
 
 	return result.Result()[0], nil
+}
+
+func (pm *Manager) monitorHealth(ctx context.Context, statusCh chan struct{}) {
+	sendFullStatusEventFunc := func() {
+		if pm.feed == nil {
+			return
+		}
+
+		marketStatus := pm.healthManager.GetAggregatedProviderStatus()
+		encodedMessage, err := json.Marshal(marketStatus)
+		if err != nil {
+			log.Warn("could not marshal full market status", "error", err)
+			return
+		}
+
+		pm.feed.Send(walletevent.Event{
+			Type:    EventMarketHealthChanged,
+			Message: string(encodedMessage),
+			At:      time.Now().Unix(),
+		})
+	}
+
+	sendOldStatusEventFunc := func() {
+		if pm.feed == nil {
+			return
+		}
+		marketStatus := pm.healthManager.Status()
+		message := "down"
+		if marketStatus.Status == rpcstatus.StatusUp {
+			message = "up"
+		}
+
+		pm.feed.Send(walletevent.Event{
+			Type:     EventMarketStatusChanged,
+			Accounts: []common.Address{},
+			Message:  message,
+			At:       time.Now().Unix(),
+		})
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-statusCh:
+			sendOldStatusEventFunc()
+			sendFullStatusEventFunc()
+		}
+	}
+}
+
+func (pm *Manager) Start(ctx context.Context) {
+	if pm.stopMonitoringFunc != nil {
+		log.Warn("Market health manager already started")
+		return
+	}
+
+	cancelableCtx, cancel := context.WithCancel(ctx)
+	pm.stopMonitoringFunc = cancel
+	statusCh := pm.healthManager.Subscribe()
+	go pm.monitorHealth(cancelableCtx, statusCh)
+}
+
+func (pm *Manager) Stop() {
+	if pm.stopMonitoringFunc == nil {
+		return
+	}
+	pm.stopMonitoringFunc()
+	pm.stopMonitoringFunc = nil
+}
+
+func (pm *Manager) IsConnected() bool {
+	return pm.healthManager.Status().Status == rpcstatus.StatusUp
 }
 
 func (pm *Manager) FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
@@ -340,4 +398,15 @@ func (pm *Manager) GetOrFetchPrices(symbols []string, currencies []string, maxAg
 	prices := pm.getCachedPricesFor(symbols, currencies)
 
 	return prices, nil
+}
+
+func convertFunctorCallStatuses(statuses []circuitbreaker.FunctorCallStatus) (result []rpcstatus.RpcProviderCallStatus) {
+	for _, f := range statuses {
+		result = append(result, rpcstatus.RpcProviderCallStatus{
+			Name:      f.Name,
+			Timestamp: f.Timestamp,
+			Err:       f.Err,
+		})
+	}
+	return
 }

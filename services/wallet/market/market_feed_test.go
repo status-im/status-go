@@ -1,6 +1,7 @@
 package market
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -59,6 +60,7 @@ func (s *MarketTestSuite) TestEventOnNetworkError() {
 	customErr := errors.New("dial tcp: lookup optimism-goerli.infura.io: no such host")
 	priceProviderWithError := mock_market.NewMockPriceProviderWithError(ctrl, customErr)
 	manager := NewManager([]thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
+	manager.Start(context.Background())
 
 	_, err := manager.FetchPrices(s.symbols, s.currencies)
 	s.Require().Error(err, "expected error from FetchPrices due to MockPriceProviderWithError")

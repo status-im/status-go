@@ -52,6 +52,7 @@ const (
 	// if we see this user agent in the logs that means parts of the application are using a malconfigured http client
 	rpcUserAgentUpstreamFormat = "procuratee-%s-upstream/%s"
 
+	EventBlockchainStatusChanged walletevent.EventType = "wallet-blockchain-status-changed" // deprecated
 	EventBlockchainHealthChanged walletevent.EventType = "wallet-blockchain-health-changed" // Full status of the blockchain (including provider statuses)
 )
 
@@ -114,7 +115,6 @@ type Client struct {
 	handlers   map[string]Handler // locally registered handlers
 	log        log.Logger
 
-	walletNotifier  func(chainID uint64, message string)
 	providerConfigs []params.ProviderConfig
 }
 
@@ -161,7 +161,7 @@ func NewClient(config ClientConfig) (*Client, error) {
 		walletFeed:         config.WalletFeed,
 	}
 
-	c.UpstreamChainID = upstreamChainID
+	c.UpstreamChainID = config.UpstreamChainID
 	c.router = newRouter(true)
 
 	if verifProxyInitFn != nil {
@@ -194,17 +194,42 @@ func (c *Client) Stop() {
 
 func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
 	sendFullStatusEventFunc := func() {
+		if c.walletFeed == nil {
+			return
+		}
+
 		blockchainStatus := c.healthMgr.GetFullStatus()
 		encodedMessage, err := json.Marshal(blockchainStatus)
 		if err != nil {
 			c.log.Warn("could not marshal full blockchain status", "error", err)
 			return
 		}
+
+		c.walletFeed.Send(walletevent.Event{
+			Type:    EventBlockchainHealthChanged,
+			Message: string(encodedMessage),
+			At:      time.Now().Unix(),
+		})
+	}
+
+	sendShortStatusEventFunc := func() {
 		if c.walletFeed == nil {
 			return
 		}
+
+		blockchainShortStatus := c.healthMgr.GetStatusPerChain()
+		result := make(map[uint64]string)
+		for chainID, status := range blockchainShortStatus.StatusPerChain {
+			result[chainID] = string(status.Status)
+		}
+		encodedMessage, err := json.Marshal(result)
+		if err != nil {
+			c.log.Warn("could not marshal blockchain status", "error", err)
+			return
+		}
+
 		c.walletFeed.Send(walletevent.Event{
-			Type:    EventBlockchainHealthChanged,
+			Type:    EventBlockchainStatusChanged,
 			Message: string(encodedMessage),
 			At:      time.Now().Unix(),
 		})
@@ -215,6 +240,7 @@ func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
 		case <-ctx.Done():
 			return
 		case <-statusCh:
+			sendShortStatusEventFunc()
 			sendFullStatusEventFunc()
 		}
 	}
@@ -222,10 +248,6 @@ func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
 
 func (c *Client) GetNetworkManager() *network.Manager {
 	return c.NetworkManager
-}
-
-func (c *Client) SetWalletNotifier(notifier func(chainID uint64, message string)) {
-	c.walletNotifier = notifier
 }
 
 func extractHostFromURL(inputURL string) (string, error) {
@@ -261,9 +283,6 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 	c.rpcClientsMutex.Lock()
 	defer c.rpcClientsMutex.Unlock()
 	if rpcClient, ok := c.rpcClients[chainID]; ok {
-		if rpcClient.GetWalletNotifier() == nil {
-			rpcClient.SetWalletNotifier(c.walletNotifier)
-		}
 		return rpcClient, nil
 	}
 
@@ -453,8 +472,7 @@ func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result in
 	if c.router.routeRemote(method) {
 		client, err := c.getClientUsingCache(chainID)
 		if err == nil {
-			return client.CallContext(ctx, r
-			esult, method, args...)
+			return client.CallContext(ctx, result, method, args...)
 		}
 	}
 

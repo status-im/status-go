@@ -9,6 +9,12 @@ import (
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 )
 
+// Aggregated provider contains both aggregated status of providers and status per provider.
+type AggregatedProviderStatus struct {
+	Status            rpcstatus.ProviderStatus            `json:"status"`
+	StatusPerProvider map[string]rpcstatus.ProviderStatus `json:"statusPerProvider"`
+}
+
 type ProvidersHealthManager struct {
 	mu          sync.RWMutex
 	chainID     uint64
@@ -106,6 +112,15 @@ func (p *ProvidersHealthManager) Status() rpcstatus.ProviderStatus {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.aggregator.GetAggregatedStatus()
+}
+
+func (p *ProvidersHealthManager) GetAggregatedProviderStatus() AggregatedProviderStatus {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return AggregatedProviderStatus{
+		Status:            p.aggregator.GetAggregatedStatus(),
+		StatusPerProvider: p.aggregator.GetStatuses(),
+	}
 }
 
 // ChainID returns the ID of the chain.
