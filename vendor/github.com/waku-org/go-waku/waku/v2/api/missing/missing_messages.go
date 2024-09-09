@@ -144,6 +144,13 @@ func (m *MissingMessageVerifier) fetchHistory(c chan<- *protocol.Envelope, inter
 			j = len(contentTopics)
 		}
 
+		select {
+		case <-interest.ctx.Done():
+			return
+		default:
+			// continue...
+		}
+
 		now := m.timesource.Now()
 		err := m.fetchMessagesBatch(c, interest, i, j, now)
 		if err != nil {
@@ -258,6 +265,13 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 		j := i + maxMsgHashesPerRequest
 		if j > len(missingHashes) {
 			j = len(missingHashes)
+		}
+
+		select {
+		case <-interest.ctx.Done():
+			return nil
+		default:
+			// continue...
 		}
 
 		wg.Add(1)

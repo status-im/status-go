@@ -59,7 +59,7 @@ func (w *WakuNode) startKeepAlive(ctx context.Context, randomPeersPingDuration t
 	if allPeersPingDuration != 0 {
 		allPeersTicker := time.NewTicker(allPeersPingDuration)
 		defer allPeersTicker.Stop()
-		randomPeersTickerC = allPeersTicker.C
+		allPeersTickerC = allPeersTicker.C
 	}
 
 	lastTimeExecuted := w.timesource.Now()

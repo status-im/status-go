@@ -280,10 +280,18 @@ func (w *WakuRelay) Publish(ctx context.Context, message *pb.WakuMessage, opts .
 		if err != nil {
 			return pb.MessageHash{}, err
 		}
+		_, err = w.subscribeToPubsubTopic(params.pubsubTopic)
+		if err != nil {
+			return pb.MessageHash{}, err
+		}
 	}
 
 	if !w.EnoughPeersToPublishToTopic(params.pubsubTopic) {
 		return pb.MessageHash{}, errors.New("not enough peers to publish")
+	}
+
+	if !w.IsSubscribed(params.pubsubTopic) {
+		return pb.MessageHash{}, errors.New("cannot publish to unsubscribed topic")
 	}
 
 	w.topicsMutex.Lock()
