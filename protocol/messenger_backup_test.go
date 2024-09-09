@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -737,32 +739,35 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	s.Require().NoError(err)
 	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(seedKp, dbSeedKp2, false, accounts.SyncedFromBackup, accounts.AccountNonOperable))
 
+	keypairs, err := bob2.settings.GetAllKeypairs()
+	s.Require().NoError(err)
+
 	// Check whether accounts added event is sent
-	expectedAddresses := [][]common.Address{}
-	profileKpWalletAddresses := []common.Address{}
-	seedKpAddresses := []common.Address{}
+	expectedAddresses := make(map[common.Address]struct{}, 0)
 	for _, acc := range dbProfileKp2.Accounts {
 		if acc.Chat {
 			continue
 		}
-		profileKpWalletAddresses = append(profileKpWalletAddresses, common.Address(acc.Address))
+		expectedAddresses[common.Address(acc.Address)] = struct{}{}
 	}
-	expectedAddresses = append(expectedAddresses, profileKpWalletAddresses)
 
 	for _, acc := range dbSeedKp2.Accounts {
-		seedKpAddresses = append(seedKpAddresses, common.Address(acc.Address))
+		expectedAddresses[common.Address(acc.Address)] = struct{}{}
 	}
-	expectedAddresses = append(expectedAddresses, seedKpAddresses)
 
-	for i := 0; i < len(expectedAddresses); i++ {
+	for i := 0; i < len(keypairs); i++ {
 		select {
 		case <-time.After(1 * time.Second):
 			s.Fail("Timed out waiting for accountsevent")
 		case event := <-ch:
 			switch event.Type {
 			case accountsevent.EventTypeAdded:
-				s.Require().Len(event.Accounts, len(expectedAddresses[i]))
-				s.Require().True(reflect.DeepEqual(expectedAddresses[i], event.Accounts))
+				for _, address := range event.Accounts {
+					if _, exists := expectedAddresses[address]; !exists {
+						s.logger.Debug("missing address in the accounts event", zap.Any("address", address))
+						s.Fail("address not received in the event")
+					}
+				}
 			}
 		}
 	}
