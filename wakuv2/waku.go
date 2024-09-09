@@ -116,6 +116,7 @@ type ITelemetryClient interface {
 	PushDialFailure(ctx context.Context, dialFailure common.DialError)
 	PushMissedMessage(ctx context.Context, envelope *protocol.Envelope)
 	PushMissedRelevantMessage(ctx context.Context, message *common.ReceivedMessage)
+	PushMessageDeliveryConfirmed(ctx context.Context, messageHash string)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -993,6 +994,11 @@ func (w *Waku) SkipPublishToTopic(value bool) {
 
 func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
 	w.messageSender.MessagesDelivered(hashes)
+	if w.statusTelemetryClient != nil {
+		for _, hash := range hashes {
+			w.statusTelemetryClient.PushMessageDeliveryConfirmed(w.ctx, hash.String())
+		}
+	}
 }
 
 func (w *Waku) SetStorePeerID(peerID peer.ID) {

@@ -12,12 +12,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
 
-	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -28,21 +27,22 @@ import (
 type TelemetryType string
 
 const (
-	ProtocolStatsMetric         TelemetryType = "ProtocolStats"
-	SentEnvelopeMetric          TelemetryType = "SentEnvelope"
-	UpdateEnvelopeMetric        TelemetryType = "UpdateEnvelope"
-	ReceivedMessagesMetric      TelemetryType = "ReceivedMessages"
-	ErrorSendingEnvelopeMetric  TelemetryType = "ErrorSendingEnvelope"
-	PeerCountMetric             TelemetryType = "PeerCount"
-	PeerConnFailuresMetric      TelemetryType = "PeerConnFailure"
-	MessageCheckSuccessMetric   TelemetryType = "MessageCheckSuccess"
-	MessageCheckFailureMetric   TelemetryType = "MessageCheckFailure"
-	PeerCountByShardMetric      TelemetryType = "PeerCountByShard"
-	PeerCountByOriginMetric     TelemetryType = "PeerCountByOrigin"
-	DialFailureMetric           TelemetryType = "DialFailure"
-	MissedMessageMetric         TelemetryType = "MissedMessage"
-	MissedRelevantMessageMetric TelemetryType = "MissedRelevantMessage"
-	MaxRetryCache                             = 5000
+	ProtocolStatsMetric            TelemetryType = "ProtocolStats"
+	SentEnvelopeMetric             TelemetryType = "SentEnvelope"
+	UpdateEnvelopeMetric           TelemetryType = "UpdateEnvelope"
+	ReceivedMessagesMetric         TelemetryType = "ReceivedMessages"
+	ErrorSendingEnvelopeMetric     TelemetryType = "ErrorSendingEnvelope"
+	PeerCountMetric                TelemetryType = "PeerCount"
+	PeerConnFailuresMetric         TelemetryType = "PeerConnFailure"
+	MessageCheckSuccessMetric      TelemetryType = "MessageCheckSuccess"
+	MessageCheckFailureMetric      TelemetryType = "MessageCheckFailure"
+	PeerCountByShardMetric         TelemetryType = "PeerCountByShard"
+	PeerCountByOriginMetric        TelemetryType = "PeerCountByOrigin"
+	DialFailureMetric              TelemetryType = "DialFailure"
+	MissedMessageMetric            TelemetryType = "MissedMessage"
+	MissedRelevantMessageMetric    TelemetryType = "MissedRelevantMessage"
+	MessageDeliveryConfirmedMetric TelemetryType = "MessageDeliveryConfirmed"
+	MaxRetryCache                                = 5000
 )
 
 type TelemetryRequest struct {
@@ -108,9 +108,9 @@ func (c *Client) PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin ma
 	}
 }
 
-func (c *Client) PushDialFailure(ctx context.Context, dialFailure wakuv2common.DialError) {
+func (c *Client) PushDialFailure(ctx context.Context, dialFailure v2common.DialError) {
 	var errorMessage string = ""
-	if dialFailure.ErrType == wakuv2common.ErrorUnknown {
+	if dialFailure.ErrType == v2common.ErrorUnknown {
 		errorMessage = dialFailure.ErrMsg
 	}
 	c.processAndPushTelemetry(ctx, DialFailure{ErrorType: dialFailure.ErrType, ErrorMsg: errorMessage, Protocols: dialFailure.Protocols})
@@ -122,6 +122,10 @@ func (c *Client) PushMissedMessage(ctx context.Context, envelope *v2protocol.Env
 
 func (c *Client) PushMissedRelevantMessage(ctx context.Context, receivedMessage *v2common.ReceivedMessage) {
 	c.processAndPushTelemetry(ctx, MissedRelevantMessage{ReceivedMessage: receivedMessage})
+}
+
+func (c *Client) PushMessageDeliveryConfirmed(ctx context.Context, messageHash string) {
+	c.processAndPushTelemetry(ctx, MessageDeliveryConfirmed{MessageHash: messageHash})
 }
 
 type ReceivedMessages struct {
@@ -158,7 +162,7 @@ type PeerCountByOrigin struct {
 }
 
 type DialFailure struct {
-	ErrorType wakuv2common.DialErrorType
+	ErrorType v2common.DialErrorType
 	ErrorMsg  string
 	Protocols string
 }
@@ -169,6 +173,10 @@ type MissedMessage struct {
 
 type MissedRelevantMessage struct {
 	ReceivedMessage *v2common.ReceivedMessage
+}
+
+type MessageDeliveryConfirmed struct {
+	MessageHash string
 }
 
 type Client struct {
@@ -361,6 +369,12 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			TelemetryType: MissedRelevantMessageMetric,
 			TelemetryData: c.ProcessMissedRelevantMessage(v),
 		}
+	case MessageDeliveryConfirmed:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: MessageDeliveryConfirmedMetric,
+			TelemetryData: c.ProcessMessageDeliveryConfirmed(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
@@ -547,6 +561,14 @@ func (c *Client) ProcessMissedRelevantMessage(missedMessage MissedRelevantMessag
 	postBody["sentAt"] = missedMessage.ReceivedMessage.Sent
 	postBody["pubsubTopic"] = missedMessage.ReceivedMessage.PubsubTopic
 	postBody["contentTopic"] = missedMessage.ReceivedMessage.ContentTopic
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessMessageDeliveryConfirmed(messageDeliveryConfirmed MessageDeliveryConfirmed) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageHash"] = messageDeliveryConfirmed.MessageHash
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage
