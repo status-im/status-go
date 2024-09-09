@@ -112,9 +112,9 @@ type ITelemetryClient interface {
 	PushMessageCheckFailure(ctx context.Context, messageHash string)
 	PushPeerCountByShard(ctx context.Context, peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin map[wps.Origin]uint)
-	PushStoreConfirmationFailed(ctx context.Context, msgHash gethcommon.Hash)
 	PushMissedMessage(ctx context.Context, envelope *protocol.Envelope)
 	PushMissedRelevantMessage(ctx context.Context, message *common.ReceivedMessage)
+	PushMessageDeliveryConfirmed(ctx context.Context, numMessages int)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -986,6 +986,9 @@ func (w *Waku) SkipPublishToTopic(value bool) {
 
 func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
 	w.messageSender.MessagesDelivered(hashes)
+	if w.statusTelemetryClient != nil {
+		w.statusTelemetryClient.PushMessageDeliveryConfirmed(w.ctx, len(hashes))
+	}
 }
 
 func (w *Waku) SetStorePeerID(peerID peer.ID) {
