@@ -109,6 +109,8 @@ type ITelemetryClient interface {
 	PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvelope ErrorSendingEnvelope)
 	PushPeerCount(ctx context.Context, peerCount int)
 	PushPeerConnFailures(ctx context.Context, peerConnFailures map[string]int)
+	PushPeerCountByShard(ctx context.Context, peerCountByShard map[uint16]uint)
+	PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin map[wps.Origin]uint)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -1092,6 +1094,22 @@ func (w *Waku) Start() error {
 		}
 	}()
 
+	if w.cfg.TelemetryServerURL != "" {
+		go func() {
+			peerTelemetryTicker := time.NewTicker(10 * time.Second)
+			defer peerTelemetryTicker.Stop()
+
+			for {
+				select {
+				case <-w.ctx.Done():
+					return
+				case <-peerTelemetryTicker.C:
+					w.reportPeerMetrics()
+				}
+			}
+		}()
+	}
+
 	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
 	//TODO: commenting for now so that only fleet nodes are used.
 	//Need to uncomment once filter peer scoring etc is implemented.
@@ -1187,16 +1205,52 @@ func (w *Waku) checkForConnectionChanges() {
 		w.onPeerStats(latestConnStatus)
 	}
 
-	if w.statusTelemetryClient != nil {
-		connFailures := FormatPeerConnFailures(w.node)
-		w.statusTelemetryClient.PushPeerCount(w.ctx, w.PeerCount())
-		w.statusTelemetryClient.PushPeerConnFailures(w.ctx, connFailures)
-	}
-
 	w.ConnectionChanged(connection.State{
 		Type:    w.state.Type, //setting state type as previous one since there won't be a change here
 		Offline: !latestConnStatus.IsOnline,
 	})
+}
+
+func (w *Waku) reportPeerMetrics() {
+	if w.statusTelemetryClient != nil {
+		connFailures := FormatPeerConnFailures(w.node)
+		w.statusTelemetryClient.PushPeerCount(w.ctx, w.PeerCount())
+		w.statusTelemetryClient.PushPeerConnFailures(w.ctx, connFailures)
+
+		peerCountByOrigin := make(map[wps.Origin]uint)
+		peerCountByShard := make(map[uint16]uint)
+		for _, peerID := range w.node.Host().Network().Peers() {
+			wakuPeerStore := w.node.Host().Peerstore().(wps.WakuPeerstore)
+
+			origin, err := wakuPeerStore.Origin(peerID)
+			if err != nil {
+				continue
+			}
+
+			peerCountByOrigin[origin]++
+			pubsubTopics, err := wakuPeerStore.PubSubTopics(peerID)
+			if err != nil {
+				continue
+			}
+
+			keys := make([]string, 0, len(pubsubTopics))
+			for k := range pubsubTopics {
+				keys = append(keys, k)
+			}
+			relayShards, err := protocol.TopicsToRelayShards(keys...)
+			if err != nil {
+				continue
+			}
+
+			for _, shards := range relayShards {
+				for _, shard := range shards.ShardIDs {
+					peerCountByShard[shard]++
+				}
+			}
+		}
+		w.statusTelemetryClient.PushPeerCountByShard(w.ctx, peerCountByShard)
+		w.statusTelemetryClient.PushPeerCountByOrigin(w.ctx, peerCountByOrigin)
+	}
 }
 
 func (w *Waku) startMessageSender() error {
