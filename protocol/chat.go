@@ -60,15 +60,17 @@ const (
 	MuteFor1WeekDuration  = 7 * 24 * time.Hour
 )
 
+// NOTE: Add items to the end of the list, because desktop and mobile
+// use this enum by number rater than by string.
 const (
 	MuteFor15Min requests.MutingVariation = iota + 1
 	MuteFor1Hr
 	MuteFor8Hr
-	MuteFor24Hr
 	MuteFor1Week
 	MuteTillUnmuted
 	MuteTill1Min
 	Unmuted
+	MuteFor24Hr
 )
 
 const pkStringLength = 68
