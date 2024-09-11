@@ -109,6 +109,8 @@ type ITelemetryClient interface {
 	PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvelope ErrorSendingEnvelope)
 	PushPeerCount(ctx context.Context, peerCount int)
 	PushPeerConnFailures(ctx context.Context, peerConnFailures map[string]int)
+	PushMessageCheckSuccess(ctx context.Context, messageHash string)
+	PushMessageCheckFailure(ctx context.Context, messageHash string)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -1233,11 +1235,17 @@ func (w *Waku) startMessageSender() error {
 						Hash:  hash,
 						Event: common.EventEnvelopeSent,
 					})
+					if w.statusTelemetryClient != nil {
+						w.statusTelemetryClient.PushMessageCheckSuccess(w.ctx, hash.Hex())
+					}
 				case hash := <-msgExpiredChan:
 					w.SendEnvelopeEvent(common.EnvelopeEvent{
 						Hash:  hash,
 						Event: common.EventEnvelopeExpired,
 					})
+					if w.statusTelemetryClient != nil {
+						w.statusTelemetryClient.PushMessageCheckFailure(w.ctx, hash.Hex())
+					}
 				}
 			}
 		}()

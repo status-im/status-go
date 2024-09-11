@@ -32,6 +32,8 @@ const (
 	ErrorSendingEnvelopeMetric TelemetryType = "ErrorSendingEnvelope"
 	PeerCountMetric            TelemetryType = "PeerCount"
 	PeerConnFailuresMetric     TelemetryType = "PeerConnFailure"
+	MessageCheckSuccessMetric  TelemetryType = "MessageCheckSuccess"
+	MessageCheckFailureMetric  TelemetryType = "MessageCheckFailure"
 
 	MaxRetryCache = 5000
 )
@@ -79,6 +81,14 @@ func (c *Client) PushPeerConnFailures(ctx context.Context, peerConnFailures map[
 	}
 }
 
+func (c *Client) PushMessageCheckSuccess(ctx context.Context, messageHash string) {
+	c.processAndPushTelemetry(ctx, MessageCheckSuccess{MessageHash: messageHash})
+}
+
+func (c *Client) PushMessageCheckFailure(ctx context.Context, messageHash string) {
+	c.processAndPushTelemetry(ctx, MessageCheckFailure{MessageHash: messageHash})
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
@@ -92,6 +102,14 @@ type PeerCount struct {
 type PeerConnFailure struct {
 	FailedPeerId string
 	FailureCount int
+}
+
+type MessageCheckSuccess struct {
+	MessageHash string
+}
+
+type MessageCheckFailure struct {
+	MessageHash string
 }
 
 type Client struct {
@@ -246,6 +264,18 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			TelemetryType: PeerConnFailuresMetric,
 			TelemetryData: c.ProcessPeerConnFailure(v),
 		}
+	case MessageCheckSuccess:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: MessageCheckSuccessMetric,
+			TelemetryData: c.ProcessMessageCheckSuccess(v),
+		}
+	case MessageCheckFailure:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: MessageCheckFailureMetric,
+			TelemetryData: c.ProcessMessageCheckFailure(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
@@ -378,6 +408,22 @@ func (c *Client) ProcessPeerConnFailure(peerConnFailure PeerConnFailure) *json.R
 	postBody["failedPeerId"] = peerConnFailure.FailedPeerId
 	postBody["failureCount"] = peerConnFailure.FailureCount
 	postBody["nodeKeyUID"] = c.keyUID
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessMessageCheckSuccess(messageCheckSuccess MessageCheckSuccess) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageHash"] = messageCheckSuccess.MessageHash
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessMessageCheckFailure(messageCheckFailure MessageCheckFailure) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageHash"] = messageCheckFailure.MessageHash
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage
