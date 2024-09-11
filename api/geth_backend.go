@@ -2508,17 +2508,22 @@ func (b *GethStatusBackend) Logout() error {
 	defer b.mu.Unlock()
 
 	b.log.Debug("logging out")
+
+	b.AccountManager().Logout()
+	b.account = nil
+	b.log.Debug("account manager logout done")
+
 	err := b.cleanupServices()
 	if err != nil {
 		return err
 	}
+	b.log.Debug("cleanup services done")
+
 	err = b.closeDBs()
 	if err != nil {
 		return err
 	}
-
-	b.AccountManager().Logout()
-	b.account = nil
+	b.log.Debug("close dbs done")
 
 	if b.statusNode != nil {
 		if err := b.statusNode.Stop(); err != nil {
@@ -2526,6 +2531,7 @@ func (b *GethStatusBackend) Logout() error {
 		}
 		b.statusNode = nil
 	}
+	b.log.Debug("stop node done")
 
 	if !b.LocalPairingStateManager.IsPairing() {
 		signal.SendNodeStopped()
