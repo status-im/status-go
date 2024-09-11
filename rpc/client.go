@@ -104,6 +104,8 @@ type Client struct {
 
 	walletNotifier  func(chainID uint64, message string)
 	providerConfigs []params.ProviderConfig
+
+	db *sql.DB
 }
 
 // Is initialized in a build-tag-dependent module
@@ -136,6 +138,7 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		limiterPerProvider: make(map[string]*chain.RPCRpsLimiter),
 		log:                log,
 		providerConfigs:    providerConfigs,
+		db:                 db,
 	}
 
 	var opts []gethrpc.ClientOption
@@ -165,7 +168,10 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		// Include the chain-id in the rpc client
 		rpcName := fmt.Sprintf("%s-chain-id-%d", hostPortUpstream, upstreamChainID)
 
-		c.upstream = chain.NewSimpleClient(*chain.NewEthClient(ethclient.NewClient(upstreamClient), limiter, upstreamClient, rpcName), upstreamChainID)
+		ethClients := []*chain.EthClient{
+			chain.NewEthClient(ethclient.NewClient(upstreamClient), limiter, upstreamClient, rpcName),
+		}
+		c.upstream = chain.NewCachedClient(ethClients, upstreamChainID, db)
 	}
 
 	c.router = newRouter(c.upstreamEnabled)
@@ -233,7 +239,7 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 		return nil, fmt.Errorf("could not find any RPC URL for chain: %d", chainID)
 	}
 
-	client := chain.NewClient(ethClients, chainID)
+	client := chain.NewCachedClient(ethClients, chainID, c.db)
 	client.WalletNotifier = c.walletNotifier
 	c.rpcClients[chainID] = client
 	return client, nil
@@ -371,7 +377,12 @@ func (c *Client) UpdateUpstreamURL(url string) error {
 	if err != nil {
 		hostPortUpstream = "upstream"
 	}
-	c.upstream = chain.NewSimpleClient(*chain.NewEthClient(ethclient.NewClient(rpcClient), rpsLimiter, rpcClient, hostPortUpstream), c.UpstreamChainID)
+
+	ethClients := []*chain.EthClient{
+		chain.NewEthClient(chain.NewEthClient(ethclient.NewClient(rpcClient), rpsLimiter, rpcClient, hostPortUpstream)),
+	}
+	c.upstream = chain.NewCachedClient(ethClients, c.UpstreamChainID, c.db)
+
 	c.upstreamURL = url
 	c.Unlock()
 

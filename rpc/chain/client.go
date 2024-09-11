@@ -161,25 +161,6 @@ var propagateErrors = []error{
 	bind.ErrNoCode,
 }
 
-func NewSimpleClient(ethClient EthClient, chainID uint64) *ClientWithFallback {
-	cbConfig := circuitbreaker.Config{
-		Timeout:               20000,
-		MaxConcurrentRequests: 100,
-		SleepWindow:           300000,
-		ErrorPercentThreshold: 25,
-	}
-
-	isConnected := &atomic.Bool{}
-	isConnected.Store(true)
-	return &ClientWithFallback{
-		ChainID:        chainID,
-		ethClients:     []*EthClient{&ethClient},
-		isConnected:    isConnected,
-		LastCheckedAt:  time.Now().Unix(),
-		circuitbreaker: circuitbreaker.NewCircuitBreaker(cbConfig),
-	}
-}
-
 func NewClient(ethClients []*EthClient, chainID uint64) *ClientWithFallback {
 	cbConfig := circuitbreaker.Config{
 		Timeout:               20000,
