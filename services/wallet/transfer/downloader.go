@@ -434,7 +434,8 @@ func (d *ETHDownloader) subTransactionsFromTransactionData(address, from common.
 	for _, txLog := range receipt.Logs {
 		eventType := w_common.GetEventType(txLog)
 		switch eventType {
-		case w_common.UniswapV2SwapEventType, w_common.UniswapV3SwapEventType,
+		case w_common.Erc20ApprovalEventType,
+			w_common.UniswapV2SwapEventType, w_common.UniswapV3SwapEventType,
 			w_common.HopBridgeTransferSentToL2EventType, w_common.HopBridgeTransferFromL1CompletedEventType,
 			w_common.HopBridgeWithdrawalBondedEventType, w_common.HopBridgeTransferSentEventType:
 			transfer := Transfer{

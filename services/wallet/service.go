@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/onramp"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/coingecko"
@@ -112,7 +113,16 @@ func NewService(
 	cryptoOnRampManager := onramp.NewManager(cryptoOnRampProviders)
 
 	savedAddressesManager := &SavedAddressesManager{db: db}
-	transactionManager := transfer.NewTransactionManager(transfer.NewMultiTransactionDB(db), gethManager, transactor, config, accountsDB, pendingTxManager, feed)
+	transactionManager := transfer.NewTransactionManager(
+		transfer.NewMultiTransactionDB(db),
+		pathprocessor.NewTransactionInputDataDB(db),
+		gethManager,
+		transactor,
+		config,
+		accountsDB,
+		pendingTxManager,
+		feed,
+	)
 	blockChainState := blockchainstate.NewBlockChainState()
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
 		tokenManager, balanceCacher, blockChainState)
@@ -181,12 +191,7 @@ func NewService(
 	)
 	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, settingsFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
 
-	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed, pendingTxManager)
-
-	featureFlags := &protocolCommon.FeatureFlags{}
-	if config.WalletConfig.EnableCelerBridge {
-		featureFlags.EnableCelerBridge = true
-	}
+	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed, pendingTxManager, featureFlags)
 
 	return &Service{
 		db:                    db,

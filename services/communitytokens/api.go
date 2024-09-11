@@ -130,6 +130,7 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 		transactions.DeployCommunityToken,
 		transactions.Keep,
 		"",
+		tx.To(),
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
@@ -242,6 +243,7 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 		transactions.DeployOwnerToken,
 		transactions.Keep,
 		"",
+		tx.To(),
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
@@ -305,6 +307,7 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		transactions.DeployCommunityToken,
 		transactions.Keep,
 		"",
+		tx.To(),
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
@@ -402,6 +405,7 @@ func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress 
 		transactions.AirdropCommunityToken,
 		transactions.Keep,
 		"",
+		tx.To(),
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
@@ -469,6 +473,7 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 		transactions.RemoteDestructCollectible,
 		transactions.Keep,
 		additionalData,
+		tx.To(),
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
@@ -521,6 +526,7 @@ func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string
 		transactions.BurnCommunityToken,
 		transactions.Keep,
 		"",
+		tx.To(),
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)

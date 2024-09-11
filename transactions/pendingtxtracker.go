@@ -343,7 +343,7 @@ func (tm *PendingTxTracker) emitNotifications(chainID common.ChainID, changes []
 }
 
 // PendingTransaction called with autoDelete = false will keep the transaction in the database until it is confirmed by the caller using Delete
-func (tm *PendingTxTracker) TrackPendingTransaction(chainID common.ChainID, hash eth.Hash, from eth.Address, to eth.Address, trType PendingTrxType, autoDelete AutoDeleteType, additionalData string) error {
+func (tm *PendingTxTracker) TrackPendingTransaction(chainID common.ChainID, hash eth.Hash, from eth.Address, to eth.Address, trType PendingTrxType, autoDelete AutoDeleteType, additionalData string, transactionTo *eth.Address) error {
 	err := tm.addPending(&PendingTransaction{
 		ChainID:        chainID,
 		Hash:           hash,
@@ -353,6 +353,7 @@ func (tm *PendingTxTracker) TrackPendingTransaction(chainID common.ChainID, hash
 		Type:           trType,
 		AutoDelete:     &autoDelete,
 		AdditionalData: additionalData,
+		TransactionTo:  transactionTo,
 	})
 	if err != nil {
 		return err
@@ -419,6 +420,7 @@ type PendingTransaction struct {
 	GasLimit           bigint.BigInt                        `json:"gasLimit"`
 	Type               PendingTrxType                       `json:"type"`
 	AdditionalData     string                               `json:"additionalData"`
+	TransactionTo      *eth.Address                         `json:"transactionTo"`
 	ChainID            common.ChainID                       `json:"network_id"`
 	MultiTransactionID wallet_common.MultiTransactionIDType `json:"multi_transaction_id"`
 	Nonce              uint64                               `json:"nonce"`
@@ -430,7 +432,7 @@ type PendingTransaction struct {
 }
 
 const selectFromPending = `SELECT hash, timestamp, value, from_address, to_address, data,
-								symbol, gas_price, gas_limit, type, additional_data,
+								symbol, gas_price, gas_limit, type, additional_data, transaction_to,
 								network_id, COALESCE(multi_transaction_id, 0), status, auto_delete, nonce
 							FROM pending_transactions
 							`
@@ -456,6 +458,7 @@ func rowsToTransactions(rows *sql.Rows) (transactions []*PendingTransaction, err
 			(*bigint.SQLBigIntBytes)(transaction.GasLimit.Int),
 			&transaction.Type,
 			&transaction.AdditionalData,
+			&transaction.TransactionTo,
 			&transaction.ChainID,
 			&transaction.MultiTransactionID,
 			transaction.Status,
@@ -608,10 +611,10 @@ func (tm *PendingTxTracker) addPending(transaction *PendingTransaction) error {
 	var insert *sql.Stmt
 	insert, err = tx.Prepare(`INSERT OR REPLACE INTO pending_transactions
                                       (network_id, hash, timestamp, value, from_address, to_address,
-                                       data, symbol, gas_price, gas_limit, type, additional_data, multi_transaction_id, status,
+                                       data, symbol, gas_price, gas_limit, type, additional_data, transaction_to, multi_transaction_id, status,
 																			 auto_delete, nonce)
                                       VALUES
-                                      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ?, ?)`)
+                                      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -630,6 +633,7 @@ func (tm *PendingTxTracker) addPending(transaction *PendingTransaction) error {
 		(*bigint.SQLBigIntBytes)(transaction.GasLimit.Int),
 		transaction.Type,
 		transaction.AdditionalData,
+		transaction.TransactionTo,
 		transaction.MultiTransactionID,
 		transaction.Status,
 		transaction.AutoDelete,

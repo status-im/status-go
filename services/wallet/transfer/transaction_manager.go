@@ -34,13 +34,14 @@ type TransactionDescription struct {
 }
 
 type TransactionManager struct {
-	storage        MultiTransactionStorage
-	gethManager    *account.GethManager
-	transactor     transactions.TransactorIface
-	config         *params.NodeConfig
-	accountsDB     accounts.AccountsStorage
-	pendingTracker *transactions.PendingTxTracker
-	eventFeed      *event.Feed
+	storage            MultiTransactionStorage
+	txInputDataStorage TransactionInputDataStorage
+	gethManager        *account.GethManager
+	transactor         transactions.TransactorIface
+	config             *params.NodeConfig
+	accountsDB         accounts.AccountsStorage
+	pendingTracker     *transactions.PendingTxTracker
+	eventFeed          *event.Feed
 
 	multiTransactionForKeycardSigning *MultiTransaction
 	multipathTransactionsData         []*pathprocessor.MultipathProcessorTxArgs
@@ -54,8 +55,13 @@ type MultiTransactionStorage interface {
 	DeleteMultiTransaction(id wallet_common.MultiTransactionIDType) error
 }
 
+type TransactionInputDataStorage interface {
+	UpsertInputData(chainID wallet_common.ChainID, txHash types.Hash, inputData pathprocessor.TransactionInputData) error
+}
+
 func NewTransactionManager(
 	storage MultiTransactionStorage,
+	txInputDataStorage TransactionInputDataStorage,
 	gethManager *account.GethManager,
 	transactor transactions.TransactorIface,
 	config *params.NodeConfig,
@@ -64,13 +70,14 @@ func NewTransactionManager(
 	eventFeed *event.Feed,
 ) *TransactionManager {
 	return &TransactionManager{
-		storage:        storage,
-		gethManager:    gethManager,
-		transactor:     transactor,
-		config:         config,
-		accountsDB:     accountsDB,
-		pendingTracker: pendingTxManager,
-		eventFeed:      eventFeed,
+		storage:            storage,
+		txInputDataStorage: txInputDataStorage,
+		gethManager:        gethManager,
+		transactor:         transactor,
+		config:             config,
+		accountsDB:         accountsDB,
+		pendingTracker:     pendingTxManager,
+		eventFeed:          eventFeed,
 	}
 }
 

@@ -197,6 +197,7 @@ func createPendingTransaction(from common.Address, symbol string, chainID uint64
 		MultiTransactionID: multiTransactionID,
 		Symbol:             symbol,
 		AutoDelete:         new(bool),
+		TransactionTo:      tx.To(),
 	}
 	// Transaction downloader will delete pending transaction as soon as it is confirmed
 	*pTx.AutoDelete = false

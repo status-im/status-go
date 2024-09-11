@@ -57,7 +57,7 @@ func setupTransactionManager(t *testing.T) (*TransactionManager, *mock_transacto
 	// Create a mock transactor
 	transactor := mock_transactor.NewMockTransactorIface(ctrl)
 	// Create a new instance of the TransactionManager
-	tm := NewTransactionManager(NewInMemMultiTransactionStorage(), nil, transactor, nil, nil, nil, nil)
+	tm := NewTransactionManager(NewInMemMultiTransactionStorage(), NewInMemTransactionInputDataStorage(), nil, transactor, nil, nil, nil, nil)
 
 	return tm, transactor, ctrl
 }

@@ -67,12 +67,14 @@ func GenerateTestPendingTransactions(start int, count int) []PendingTransaction 
 
 	txs := make([]PendingTransaction, count)
 	for i := start; i < count; i++ {
+		transactionTo := eth.HexToAddress(fmt.Sprintf("0x4%d", i))
 		txs[i] = PendingTransaction{
 			Hash:           eth.HexToHash(fmt.Sprintf("0x1%d", i)),
 			From:           eth.HexToAddress(fmt.Sprintf("0x2%d", i)),
 			To:             eth.HexToAddress(fmt.Sprintf("0x3%d", i)),
 			Type:           RegisterENS,
 			AdditionalData: "someuser.stateofus.eth",
+			TransactionTo:  &transactionTo,
 			Value:          bigint.BigInt{Int: big.NewInt(int64(i))},
 			GasLimit:       bigint.BigInt{Int: big.NewInt(21000)},
 			GasPrice:       bigint.BigInt{Int: big.NewInt(int64(i))},

@@ -9,9 +9,12 @@ import (
 	eth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	eth_types "github.com/status-im/status-go/eth-node/types"
 
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/testutils"
 	"github.com/status-im/status-go/services/wallet/token"
 
@@ -40,6 +43,13 @@ type TestTransfer struct {
 type TestCollectibleTransfer struct {
 	TestTransfer
 	TestCollectible
+}
+
+type TestApprove struct {
+	TestTransaction
+	Spender eth_common.Address // [address]
+	Amount  int64
+	Token   *token.Token
 }
 
 func SeedToToken(seed int) *token.Token {
@@ -106,6 +116,17 @@ func generateTestCollectibleTransfer(seed int) TestCollectibleTransfer {
 	return tr
 }
 
+func generateTestApprove(seed int) TestApprove {
+	tokenIndex := seed % len(TestTokens)
+	token := TestTokens[tokenIndex]
+	return TestApprove{
+		TestTransaction: generateTestTransaction(seed),
+		Spender:         eth_common.HexToAddress(fmt.Sprintf("0x3%d", seed)),
+		Amount:          int64(seed),
+		Token:           token,
+	}
+}
+
 func GenerateTestSendMultiTransaction(tr TestTransfer) MultiTransaction {
 	return MultiTransaction{
 		ID:          multiTransactionIDGenerator(),
@@ -148,15 +169,15 @@ func GenerateTestBridgeMultiTransaction(fromTr, toTr TestTransfer) MultiTransact
 	}
 }
 
-func GenerateTestApproveMultiTransaction(tr TestTransfer) MultiTransaction {
+func GenerateTestApproveMultiTransaction(tr TestApprove) MultiTransaction {
 	return MultiTransaction{
 		ID:          multiTransactionIDGenerator(),
 		Type:        MultiTransactionApprove,
 		FromAddress: tr.From,
-		ToAddress:   tr.To,
+		ToAddress:   tr.Spender,
 		FromAsset:   tr.Token.Symbol,
 		ToAsset:     tr.Token.Symbol,
-		FromAmount:  (*hexutil.Big)(big.NewInt(tr.Value)),
+		FromAmount:  (*hexutil.Big)(big.NewInt(tr.Amount)),
 		ToAmount:    (*hexutil.Big)(big.NewInt(0)),
 		Timestamp:   uint64(tr.Timestamp),
 	}
@@ -169,6 +190,17 @@ func GenerateTestTransfers(tb testing.TB, db *sql.DB, firstStartIndex int, count
 		tr := generateTestTransfer(i)
 		fromAddresses = append(fromAddresses, tr.From)
 		toAddresses = append(toAddresses, tr.To)
+		result = append(result, tr)
+	}
+	return
+}
+
+// GenerateTesApproves will generate transaction based on the TestTokens index and roll over if there are more than
+// len(TestTokens) transactions
+func GenerateTestApproves(tb testing.TB, db *sql.DB, firstStartIndex int, count int) (result []TestApprove, fromAddresses []eth_common.Address) {
+	for i := firstStartIndex; i < (firstStartIndex + count); i++ {
+		tr := generateTestApprove(i)
+		fromAddresses = append(fromAddresses, tr.From)
 		result = append(result, tr)
 	}
 	return
@@ -361,6 +393,14 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 		}
 	}
 
+	var transactionTo *eth_common.Address
+	if opt.Tx != nil {
+		transactionTo = opt.Tx.To()
+	}
+	var eventLogAddress *eth_common.Address
+	if opt.Receipt != nil {
+		eventLogAddress = &opt.Receipt.Logs[0].Address
+	}
 	transfer := transferDBFields{
 		chainID:            uint64(tr.ChainID),
 		id:                 tr.Hash,
@@ -383,6 +423,8 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 		tokenID:            opt.TokenID,
 		transaction:        opt.Tx,
 		receipt:            opt.Receipt,
+		transactionTo:      transactionTo,
+		eventLogAddress:    eventLogAddress,
 	}
 	err = updateOrInsertTransfersDBFields(tx, []transferDBFields{transfer})
 	require.NoError(tb, err)
@@ -391,9 +433,9 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 func InsertTestPendingTransaction(tb testing.TB, db *sql.DB, tr *TestTransfer) {
 	_, err := db.Exec(`
 		INSERT INTO pending_transactions (network_id, hash, timestamp, from_address, to_address,
-			symbol, gas_price, gas_limit, value, data, type, additional_data, multi_transaction_id
-		) VALUES (?, ?, ?, ?, ?, 'ETH', 0, 0, ?, '', 'eth', '', ?)`,
-		tr.ChainID, tr.Hash, tr.Timestamp, tr.From, tr.To, (*bigint.SQLBigIntBytes)(big.NewInt(tr.Value)), tr.MultiTransactionID)
+			symbol, gas_price, gas_limit, value, data, type, additional_data, multi_transaction_id, transaction_to,
+		) VALUES (?, ?, ?, ?, ?, 'ETH', 0, 0, ?, '', 'eth', '', ?, ?)`,
+		tr.ChainID, tr.Hash, tr.Timestamp, tr.From, tr.To, (*bigint.SQLBigIntBytes)(big.NewInt(tr.Value)), tr.MultiTransactionID, tr.Token.Address)
 	require.NoError(tb, err)
 }
 
@@ -498,4 +540,20 @@ func (s *InMemMultiTransactionStorage) ReadMultiTransactions(details *MultiTxDet
 		multiTxs = append(multiTxs, multiTx)
 	}
 	return multiTxs, nil
+}
+
+type InMemTransactionInputDataStorage struct {
+	storage map[string]*pathprocessor.TransactionInputData
+}
+
+func NewInMemTransactionInputDataStorage() *InMemTransactionInputDataStorage {
+	return &InMemTransactionInputDataStorage{
+		storage: make(map[string]*pathprocessor.TransactionInputData),
+	}
+}
+
+func (s *InMemTransactionInputDataStorage) UpsertInputData(chainID wallet_common.ChainID, txHash eth_types.Hash, inputData pathprocessor.TransactionInputData) error {
+	key := fmt.Sprintf("%d-%s", chainID, txHash.String())
+	s.storage[key] = &inputData
+	return nil
 }

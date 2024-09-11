@@ -29,9 +29,11 @@ const (
 	UniswapV3Swap      Type = "uniswapV3Swap"
 	HopBridgeFrom      Type = "HopBridgeFrom"
 	HopBridgeTo        Type = "HopBridgeTo"
+	Erc20Approval      Type = "Erc20Approval"
 	unknownTransaction Type = "unknown"
 
 	// Event types
+	Erc20ApprovalEventType                    EventType = "erc20ApprovalEvent"
 	WETHDepositEventType                      EventType = "wethDepositEvent"
 	WETHWithdrawalEventType                   EventType = "wethWithdrawalEvent"
 	Erc20TransferEventType                    EventType = "erc20Event"
@@ -45,6 +47,10 @@ const (
 	HopBridgeWithdrawalBondedEventType        EventType = "hopBridgeWithdrawalBondedEvent"
 	HopBridgeTransferSentEventType            EventType = "hopBridgeTransferSentEvent"
 	UnknownEventType                          EventType = "unknownEvent"
+
+	// ERC20: Approval (index_topic_1 address owner, index_topic_2 address spender, uint256 value)
+	Erc20_721ApprovalEventSignature     = "Approval(address,address,uint256)"
+	erc20ApprovalEventIndexedParameters = 3 // signature, owner, spender
 
 	// Deposit (index_topic_1 address dst, uint256 wad)
 	wethDepositEventSignature = "Deposit(address,uint256)"
@@ -83,6 +89,7 @@ var (
 
 // Detect event type for a cetain item from the Events Log
 func GetEventType(log *types.Log) EventType {
+	erc20_721ApprovalEventSignatureHash := GetEventSignatureHash(Erc20_721ApprovalEventSignature)
 	wethDepositEventSignatureHash := GetEventSignatureHash(wethDepositEventSignature)
 	wethWithdrawalEventSignatureHash := GetEventSignatureHash(wethWithdrawalEventSignature)
 	erc20_721TransferEventSignatureHash := GetEventSignatureHash(Erc20_721TransferEventSignature)
@@ -97,6 +104,11 @@ func GetEventType(log *types.Log) EventType {
 
 	if len(log.Topics) > 0 {
 		switch log.Topics[0] {
+		case erc20_721ApprovalEventSignatureHash:
+			switch len(log.Topics) {
+			case erc20ApprovalEventIndexedParameters:
+				return Erc20ApprovalEventType
+			}
 		case wethDepositEventSignatureHash:
 			return WETHDepositEventType
 		case wethWithdrawalEventSignatureHash:
@@ -132,6 +144,8 @@ func GetEventType(log *types.Log) EventType {
 
 func EventTypeToSubtransactionType(eventType EventType) Type {
 	switch eventType {
+	case Erc20ApprovalEventType:
+		return Erc20Approval
 	case Erc20TransferEventType:
 		return Erc20Transfer
 	case Erc721TransferEventType:
@@ -309,6 +323,35 @@ func getFromToAddresses(ethlog types.Log) (from, to common.Address, err error) {
 
 	return from, to, fmt.Errorf("unsupported event type to get from/to adddresses %s", eventType)
 }
+
+func ParseErc20ApprovalLog(ethlog *types.Log) (owner, spender common.Address, value *big.Int, err error) {
+	value = new(big.Int)
+	if len(ethlog.Topics) < erc20ApprovalEventIndexedParameters {
+		err = fmt.Errorf("not enough topics for erc20 approval %s, %v", "topics", ethlog.Topics)
+		log.Error("log_parser::ParseErc20ApprovalLog", "err", err)
+		return
+	}
+
+	err = checkTopicsLength(*ethlog, 1, erc20ApprovalEventIndexedParameters)
+	if err != nil {
+		return
+	}
+
+	addressIdx := common.HashLength - common.AddressLength
+	copy(owner[:], ethlog.Topics[1][addressIdx:])
+	copy(spender[:], ethlog.Topics[2][addressIdx:])
+
+	if len(ethlog.Data) != common.HashLength {
+		err = fmt.Errorf("data is not padded to 32 byts big int %s, %v", "data", ethlog.Data)
+		log.Error("log_parser::ParseErc20ApprovalLog", "err", err)
+		return
+	}
+
+	value.SetBytes(ethlog.Data[:common.HashLength])
+
+	return
+}
+
 func ParseTransferLog(ethlog types.Log) (from, to common.Address, txIDs []common.Hash, tokenIDs, values []*big.Int, err error) {
 	eventType := GetEventType(&ethlog)
 

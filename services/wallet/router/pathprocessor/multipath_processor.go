@@ -11,6 +11,7 @@ type MultipathProcessorTxArgs struct {
 	Name              string `json:"bridgeName"`
 	ChainID           uint64
 	TransferTx        *transactions.SendTxArgs
+	ApproveTx         *ApproveTxArgs
 	HopTx             *HopBridgeTxArgs
 	CbridgeTx         *CelerBridgeTxArgs
 	ERC721TransferTx  *ERC721TxArgs

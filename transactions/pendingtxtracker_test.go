@@ -302,7 +302,7 @@ func TestPendingTxTracker_MultipleClients(t *testing.T) {
 	sub := eventFeed.Subscribe(eventChan)
 
 	for i := range txs {
-		err := m.TrackPendingTransaction(txs[i].ChainID, txs[i].Hash, txs[i].From, txs[i].To, txs[i].Type, AutoDelete, "")
+		err := m.TrackPendingTransaction(txs[i].ChainID, txs[i].Hash, txs[i].From, txs[i].To, txs[i].Type, AutoDelete, "", txs[i].TransactionTo)
 		require.NoError(t, err)
 	}
 
@@ -377,7 +377,7 @@ func TestPendingTxTracker_Watch(t *testing.T) {
 	sub := eventFeed.Subscribe(eventChan)
 
 	// Track the first transaction
-	err := m.TrackPendingTransaction(txs[1].ChainID, txs[1].Hash, txs[1].From, txs[1].To, txs[1].Type, Keep, "")
+	err := m.TrackPendingTransaction(txs[1].ChainID, txs[1].Hash, txs[1].From, txs[1].To, txs[1].Type, Keep, "", txs[1].TransactionTo)
 	require.NoError(t, err)
 
 	// Store the confirmed already
@@ -476,7 +476,7 @@ func TestPendingTxTracker_Watch_StatusChangeIncrementally(t *testing.T) {
 
 	for i := range txs {
 		// Track the first transaction
-		err := m.TrackPendingTransaction(txs[i].ChainID, txs[i].Hash, txs[i].From, txs[i].To, txs[i].Type, Keep, "")
+		err := m.TrackPendingTransaction(txs[i].ChainID, txs[i].Hash, txs[i].From, txs[i].To, txs[i].Type, Keep, "", txs[i].TransactionTo)
 		require.NoError(t, err)
 	}
 

@@ -90,7 +90,7 @@ func (tm *TransactionManager) SendTransactionForSigningToKeycard(ctx context.Con
 
 func (tm *TransactionManager) SendTransactions(ctx context.Context, multiTransaction *MultiTransaction, data []*pathprocessor.MultipathProcessorTxArgs, pathProcessors map[string]pathprocessor.PathProcessor, account *account.SelectedExtKey) (*MultiTransactionCommandResult, error) {
 	updateDataFromMultiTx(data, multiTransaction)
-	hashes, err := sendTransactions(data, pathProcessors, account)
+	hashes, err := sendTransactions(data, pathProcessors, account, tm.txInputDataStorage)
 	if err != nil {
 		return nil, err
 	}

@@ -124,3 +124,7 @@ func (s *ENSReleaseProcessor) GetContractAddress(params ProcessorInputParams) (c
 	}
 	return addr, nil
 }
+
+func (s *ENSReleaseProcessor) GetTransactionInputData(sendArgs *MultipathProcessorTxArgs) (*TransactionInputData, error) {
+	return nil, nil
+}

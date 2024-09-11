@@ -211,3 +211,18 @@ func (mr *MockPathProcessorClearableMockRecorder) Clear() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clear", reflect.TypeOf((*MockPathProcessorClearable)(nil).Clear))
 }
+
+// GetTransactionInputData mocks base method.
+func (m *MockPathProcessor) GetTransactionInputData(sendArgs *pathprocessor.MultipathProcessorTxArgs) (*pathprocessor.TransactionInputData, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTransactionInputData", sendArgs)
+	ret0, _ := ret[0].(*pathprocessor.TransactionInputData)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Send indicates an expected call of Send.
+func (mr *MockPathProcessorMockRecorder) GetTransactionInputData(sendArgs interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTransactionInputData", reflect.TypeOf((*MockPathProcessor)(nil).GetTransactionInputData), sendArgs)
+}

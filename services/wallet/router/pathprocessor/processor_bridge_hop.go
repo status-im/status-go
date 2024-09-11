@@ -651,3 +651,7 @@ func (h *HopBridgeProcessor) sendL2BridgeTx(contractAddress common.Address, ethC
 
 	return tx, ErrTxForChainNotSupported
 }
+
+func (s *HopBridgeProcessor) GetTransactionInputData(sendArgs *MultipathProcessorTxArgs) (*TransactionInputData, error) {
+	return nil, nil
+}

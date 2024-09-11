@@ -146,3 +146,7 @@ func (s *StickersBuyProcessor) CalculateAmountOut(params ProcessorInputParams) (
 func (s *StickersBuyProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	return snt.ContractAddress(params.FromChain.ChainID)
 }
+
+func (s *StickersBuyProcessor) GetTransactionInputData(sendArgs *MultipathProcessorTxArgs) (*TransactionInputData, error) {
+	return nil, nil
+}

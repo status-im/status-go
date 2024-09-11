@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -36,7 +37,7 @@ func TestController_watchAccountsChanges(t *testing.T) {
 
 	bcstate := blockchainstate.NewBlockChainState()
 	SetMultiTransactionIDGenerator(StaticIDCounter()) // to have different multi-transaction IDs even with fast execution
-	transactionManager := NewTransactionManager(NewInMemMultiTransactionStorage(), nil, nil, nil, accountsDB, nil, nil)
+	transactionManager := NewTransactionManager(NewInMemMultiTransactionStorage(), NewInMemTransactionInputDataStorage(), nil, nil, nil, accountsDB, nil, nil)
 	c := NewTransferController(
 		walletDB,
 		accountsDB,
@@ -239,7 +240,7 @@ func TestController_cleanupAccountLeftovers(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, storedAccs, 1)
 
-	transactionManager := NewTransactionManager(NewMultiTransactionDB(walletDB), nil, nil, nil, accountsDB, nil, nil)
+	transactionManager := NewTransactionManager(NewMultiTransactionDB(walletDB), pathprocessor.NewTransactionInputDataDB(walletDB), nil, nil, nil, accountsDB, nil, nil)
 	bcstate := blockchainstate.NewBlockChainState()
 	c := NewTransferController(
 		walletDB,

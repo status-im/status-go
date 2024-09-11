@@ -526,6 +526,7 @@ func (s *Service) SetSignerPubKey(ctx context.Context, chainID uint64, contractA
 		transactions.SetSignerPublicKey,
 		transactions.Keep,
 		"",
+		tx.To(),
 	)
 	if err != nil {
 		log.Error("TrackPendingTransaction error", "error", err)
@@ -711,17 +712,19 @@ func (s *Service) ReTrackOwnerTokenDeploymentTransaction(ctx context.Context, ch
 		transactionType = transactions.DeployOwnerToken
 	}
 
+	deployerAddress := common.HexToAddress(communityToken.Deployer)
 	_, err = s.pendingTracker.GetPendingEntry(wcommon.ChainID(chainID), common.HexToHash(hashString))
 	if errors.Is(err, sql.ErrNoRows) {
 		// start only if no pending transaction in database
 		err = s.pendingTracker.TrackPendingTransaction(
 			wcommon.ChainID(chainID),
 			common.HexToHash(hashString),
-			common.HexToAddress(communityToken.Deployer),
+			deployerAddress,
 			common.Address{},
 			transactionType,
 			transactions.Keep,
 			"",
+			&deployerAddress,
 		)
 		log.Debug("retracking pending transaction with hashId ", hashString)
 	} else {

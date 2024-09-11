@@ -388,3 +388,7 @@ func (s *CelerBridgeProcessor) CalculateAmountOut(params ProcessorInputParams) (
 	amountOut, _ := new(big.Int).SetString(amt.EqValueTokenAmt, 10)
 	return amountOut, nil
 }
+
+func (s *CelerBridgeProcessor) GetTransactionInputData(sendArgs *MultipathProcessorTxArgs) (*TransactionInputData, error) {
+	return nil, nil
+}

@@ -47,6 +47,7 @@ var (
 	ErrPriceTimeout                   = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-037"), Details: "price timeout"}
 	ErrNotEnoughLiquidity             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-038"), Details: "not enough liquidity"}
 	ErrPriceImpactTooHigh             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-039"), Details: "price impact too high"}
+	ErrFromTokenShouldNotBeNative     = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-040"), Details: "from token should not be the native token"}
 )
 
 func createErrorResponse(processorName string, err error) error {

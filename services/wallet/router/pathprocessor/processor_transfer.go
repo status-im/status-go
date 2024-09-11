@@ -128,3 +128,18 @@ func (s *TransferProcessor) CalculateAmountOut(params ProcessorInputParams) (*bi
 func (s *TransferProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	return common.Address{}, nil
 }
+
+func (s *TransferProcessor) GetTransactionInputData(sendArgs *MultipathProcessorTxArgs) (*TransactionInputData, error) {
+	if sendArgs.ApproveTx == nil {
+		return nil, nil
+	}
+
+	ret := &TransactionInputData{
+		ProcessorName:   s.Name(),
+		FromAsset:       &sendArgs.TransferTx.Symbol,
+		ApprovalAmount:  sendArgs.ApproveTx.ApprovalAmount,
+		ApprovalSpender: &sendArgs.ApproveTx.ApprovalSpender,
+	}
+
+	return ret, nil
+}

@@ -227,3 +227,7 @@ func (s *ERC721Processor) CalculateAmountOut(params ProcessorInputParams) (*big.
 func (s *ERC721Processor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	return params.FromToken.Address, nil
 }
+
+func (s *ERC721Processor) GetTransactionInputData(sendArgs *MultipathProcessorTxArgs) (*TransactionInputData, error) {
+	return nil, nil
+}

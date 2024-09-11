@@ -675,12 +675,14 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	// Add 6 extractable transactions: one MultiTransactionSwap, two MultiTransactionBridge, two MultiTransactionSend and one MultiTransactionApprove
 	multiTxs := make([]transfer.MultiTransaction, 6)
 	trs, fromAddrs, toAddrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, len(multiTxs)*2)
+	approveTxs, approveFromAddrs := transfer.GenerateTestApproves(t, deps.db, td.nextIndex+len(trs), 2)
+
 	multiTxs[0] = transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1])
 	multiTxs[1] = transfer.GenerateTestSwapMultiTransaction(trs[2], testutils.SntSymbol, 100) // trs[3]
 	multiTxs[2] = transfer.GenerateTestSendMultiTransaction(trs[4])                           // trs[5]
 	multiTxs[3] = transfer.GenerateTestBridgeMultiTransaction(trs[6], trs[7])
-	multiTxs[4] = transfer.GenerateTestSendMultiTransaction(trs[8])     // trs[9]
-	multiTxs[5] = transfer.GenerateTestApproveMultiTransaction(trs[10]) // trs[11]
+	multiTxs[4] = transfer.GenerateTestSendMultiTransaction(trs[8]) // trs[9]
+	multiTxs[5] = transfer.GenerateTestApproveMultiTransaction(approveTxs[1])
 
 	var lastMT common.MultiTransactionIDType
 	for i := range trs {
@@ -695,6 +697,7 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 
 	// Here not to include the modified To and From addresses
 	allAddresses := append(append(append(append(append(tdFromAdds, tdToAddrs...), fromAddrs...), toAddrs...), fromSpecial...), toSpecial...)
+	allAddresses = append(allAddresses, approveFromAddrs...)
 
 	// Insert MintAT Collectible
 	trsSpecial[0].From = eth.HexToAddress("0x0")

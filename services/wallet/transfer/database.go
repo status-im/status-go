@@ -359,16 +359,33 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 		var tokenID *big.Int
 		var txFrom *common.Address
 		var txTo *common.Address
+		var transactionTo *common.Address
+		var eventLogAddress *common.Address
 		if t.Transaction != nil {
 			if t.Log != nil {
-				_, tokenAddress, txFrom, txTo = w_common.ExtractTokenTransferData(t.Type, t.Log, t.Transaction)
-				tokenID = t.TokenID
-				// Zero tokenID can be used for ERC721 and ERC1155 transfers but when serialzed/deserialized it becomes nil
-				// as 0 value of big.Int bytes is nil.
-				if tokenID == nil && (t.Type == w_common.Erc721Transfer || t.Type == w_common.Erc1155Transfer) {
-					tokenID = big.NewInt(0)
+				eventType := w_common.GetEventType(t.Log)
+				switch eventType {
+				case w_common.Erc20ApprovalEventType:
+					tokenAddress = &t.Log.Address
+					owner, spender, value, err := w_common.ParseErc20ApprovalLog(t.Log)
+					if err != nil {
+						log.Error("can't parse erc20 approval log", "err", err)
+						continue
+					}
+					txFrom = &owner
+					txTo = &spender
+					txValue = value
+				default:
+					_, tokenAddress, txFrom, txTo = w_common.ExtractTokenTransferData(t.Type, t.Log, t.Transaction)
+					tokenID = t.TokenID
+					// Zero tokenID can be used for ERC721 and ERC1155 transfers but when serialzed/deserialized it becomes nil
+					// as 0 value of big.Int bytes is nil.
+					if tokenID == nil && (t.Type == w_common.Erc721Transfer || t.Type == w_common.Erc1155Transfer) {
+						tokenID = big.NewInt(0)
+					}
+					txValue = t.TokenValue
 				}
-				txValue = t.TokenValue
+				eventLogAddress = &t.Log.Address
 			} else {
 				txValue = new(big.Int).Set(t.Transaction.Value())
 				txFrom = &t.From
@@ -388,6 +405,7 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 			*txNonce = t.Transaction.Nonce()
 			txSize = new(uint64)
 			*txSize = t.Transaction.Size()
+			transactionTo = t.Transaction.To()
 		}
 
 		dbFields := transferDBFields{
@@ -426,6 +444,8 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 			tokenID:            tokenID,
 			txFrom:             txFrom,
 			txTo:               txTo,
+			transactionTo:      transactionTo,
+			eventLogAddress:    eventLogAddress,
 		}
 		txsDBFields = append(txsDBFields, dbFields)
 	}
@@ -469,15 +489,18 @@ type transferDBFields struct {
 	tokenID            *big.Int
 	txFrom             *common.Address
 	txTo               *common.Address
+	transactionTo      *common.Address
+	eventLogAddress    *common.Address
 }
 
 func updateOrInsertTransfersDBFields(creator statementCreator, transfers []transferDBFields) error {
 	insert, err := creator.Prepare(`INSERT OR REPLACE INTO transfers
         (network_id, hash, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, type, loaded, base_gas_fee, multi_transaction_id,
 		status, receipt_type, tx_hash, log_index, block_hash, cumulative_gas_used, contract_address, gas_used, tx_index,
-		tx_type, protected, gas_limit, gas_price_clamped64, gas_tip_cap_clamped64, gas_fee_cap_clamped64, amount_padded128hex, account_nonce, size, token_address, token_id, tx_from_address, tx_to_address)
+		tx_type, protected, gas_limit, gas_price_clamped64, gas_tip_cap_clamped64, gas_fee_cap_clamped64, amount_padded128hex, account_nonce, size, token_address, token_id, tx_from_address, tx_to_address,
+		transaction_to, event_log_address)
 	VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -489,7 +512,8 @@ func updateOrInsertTransfersDBFields(creator statementCreator, transfers []trans
 
 		_, err = insert.Exec(t.chainID, t.id, t.blockHash, (*bigint.SQLBigInt)(t.blockNumber), t.timestamp, t.address, &JSONBlob{t.transaction}, t.sender, &JSONBlob{t.receipt}, &JSONBlob{t.log}, t.transferType, t.baseGasFees, t.multiTransactionID,
 			t.receiptStatus, t.receiptType, t.txHash, t.logIndex, t.receiptBlockHash, t.cumulativeGasUsed, t.contractAddress, t.gasUsed, t.transactionIndex,
-			t.txType, t.txProtected, t.txGas, txGasPrice, txGasTipCap, txGasFeeCap, txValue, t.txNonce, t.txSize, t.tokenAddress, (*bigint.SQLBigIntBytes)(t.tokenID), t.txFrom, t.txTo)
+			t.txType, t.txProtected, t.txGas, txGasPrice, txGasTipCap, txGasFeeCap, txValue, t.txNonce, t.txSize, t.tokenAddress, (*bigint.SQLBigIntBytes)(t.tokenID), t.txFrom, t.txTo,
+			t.transactionTo, t.eventLogAddress)
 		if err != nil {
 			log.Error("can't save transfer", "b-hash", t.blockHash, "b-n", t.blockNumber, "a", t.address, "h", t.id)
 			return err

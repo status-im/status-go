@@ -11,6 +11,8 @@ var (
 	ZeroBigIntValue = big.NewInt(0)
 )
 
+type SwapSide uint8
+
 const (
 	IncreaseEstimatedGasFactor = 1.1
 	SevenDaysInSeconds         = 60 * 60 * 24 * 7
@@ -31,6 +33,9 @@ const (
 	ProcessorENSReleaseName   = "ENSRelease"
 	ProcessorENSPublicKeyName = "ENSPublicKey"
 	ProcessorStickersBuyName  = "StickersBuy"
+
+	SwapSideBuy  SwapSide = 0
+	SwapSideSell SwapSide = 1
 )
 
 func IsProcessorBridge(name string) bool {

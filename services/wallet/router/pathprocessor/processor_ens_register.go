@@ -154,3 +154,7 @@ func (s *ENSRegisterProcessor) CalculateAmountOut(params ProcessorInputParams) (
 func (s *ENSRegisterProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
 	return snt.ContractAddress(params.FromChain.ChainID)
 }
+
+func (s *ENSRegisterProcessor) GetTransactionInputData(sendArgs *MultipathProcessorTxArgs) (*TransactionInputData, error) {
+	return nil, nil
+}

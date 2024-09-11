@@ -468,7 +468,7 @@ func TestService_IncrementalUpdateOnTop(t *testing.T) {
 			ChainID:   5,
 		}, newTx.tokenOut)
 		require.Equal(t, (*Token)(nil), newTx.tokenIn)
-		require.Equal(t, (*eth.Address)(nil), newTx.contractAddress)
+		require.Equal(t, (*eth.Address)(nil), newTx.deployedContractAddress)
 
 		// Check the order of the following transaction data
 		require.Equal(t, SimpleTransactionPT, payload.Activities[1].payloadType)

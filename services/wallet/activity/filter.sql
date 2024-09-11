@@ -23,6 +23,8 @@ WITH filter_conditions AS (
 		? AS filterActivityTypeReceive,
 		? AS filterActivityTypeContractDeployment,
 		? AS filterActivityTypeMint,
+		? AS filterActivityTypeSwap,
+		? AS filterActivityTypeApprove,
 		? AS mTTypeSend,
 		? AS fromTrType,
 		? AS toTrType,
@@ -221,12 +223,22 @@ SELECT
 		WHEN transfers.type = 'erc20' THEN (SELECT community_id FROM tokens WHERE transfers.token_address = tokens.address AND transfers.network_id = tokens.network_id)
 		WHEN transfers.type = 'erc721' OR transfers.type = 'erc1155' THEN (SELECT community_id FROM collectible_data_cache WHERE transfers.token_address = collectible_data_cache.contract_address AND transfers.network_id = collectible_data_cache.chain_id)
 		ELSE NULL
-	END AS community_id
+	END AS community_id,
+	transaction_input_data.approval_spender as input_approval_spender,
+	transaction_input_data.approval_amount as input_approval_amount,
+	transaction_input_data.from_asset as input_from_asset,
+	transaction_input_data.from_amount as input_from_amount,
+	transaction_input_data.to_asset as input_to_asset,
+	transaction_input_data.to_amount as input_to_amount,
+	transaction_input_data.side as input_side,
+	transaction_input_data.slippage_bps as input_slippage_bps,
+	transfers.transaction_to as interacted_contract_address
 FROM
 	transfers
 	CROSS JOIN filter_conditions
 	LEFT JOIN filter_addresses from_join ON transfers.tx_from_address = from_join.address
 	LEFT JOIN filter_addresses to_join ON transfers.tx_to_address = to_join.address
+	LEFT JOIN transaction_input_data ON transfers.network_id = transaction_input_data.chain_id AND transfers.tx_hash = transaction_input_data.tx_hash
 WHERE
 	transfers.loaded == 1
 	AND transfers.multi_transaction_id = 0
@@ -272,6 +284,11 @@ WHERE
 					)
 				)
 			)
+		)
+		OR (
+			filterActivityTypeApprove
+			AND tr_type = fromTrType
+			AND transfers.type = 'Erc20Approval'
 		)
 		OR (
 			filterActivityTypeContractDeployment
@@ -391,12 +408,22 @@ SELECT
 	NULL as contract_address,
 	NULL AS method_hash,
 	NULL AS community_mint_event,
-	NULL AS community_id
+	NULL AS community_id,
+	transaction_input_data.approval_spender as input_approval_spender,
+	transaction_input_data.approval_amount as input_approval_amount,
+	transaction_input_data.from_asset as input_from_asset,
+	transaction_input_data.from_amount as input_from_amount,
+	transaction_input_data.to_asset as input_to_asset,
+	transaction_input_data.to_amount as input_to_amount,
+	transaction_input_data.side as input_side,
+	transaction_input_data.slippage_bps as input_slippage_bps,
+	pending_transactions.transaction_to as interacted_contract_address
 FROM
 	pending_transactions
 	CROSS JOIN filter_conditions
 	LEFT JOIN filter_addresses from_join ON pending_transactions.from_address = from_join.address
 	LEFT JOIN filter_addresses to_join ON pending_transactions.to_address = to_join.address
+	LEFT JOIN transaction_input_data ON pending_transactions.network_id = transaction_input_data.chain_id AND pending_transactions.hash = transaction_input_data.tx_hash
 WHERE
 	pending_transactions.multi_transaction_id = 0
 	AND pending_transactions.status = pendingStatus
@@ -484,7 +511,16 @@ SELECT
 	NULL as contract_address,
 	NULL AS method_hash,
 	NULL AS community_mint_event,
-	NULL AS community_id
+	NULL AS community_id,
+	NULL as input_approval_spender,
+	NULL as input_approval_amount,
+	NULL as input_from_asset,
+	NULL as input_from_amount,
+	NULL as input_to_asset,
+	NULL as input_to_amount,
+	NULL as input_side,
+	NULL as input_slippage_bps,
+	NULL as interacted_contract_address
 FROM
 	multi_transactions
 	CROSS JOIN filter_conditions

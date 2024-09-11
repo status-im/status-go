@@ -208,15 +208,25 @@ func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) 
 	return priceRoute.TokenTransferProxy, nil
 }
 
-func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {
-	slippageBP := uint(sendArgs.SwapTx.SlippagePercentage * 100) // convert to basis points
-
+func (s *SwapParaswapProcessor) getPriceRoute(sendArgs *MultipathProcessorTxArgs) (*paraswap.Route, error) {
 	key := makeKey(sendArgs.SwapTx.ChainID, sendArgs.SwapTx.ChainIDTo, sendArgs.SwapTx.TokenIDFrom, sendArgs.SwapTx.TokenIDTo)
 	priceRouteIns, ok := s.priceRoute.Load(key)
 	if !ok {
-		return ErrPriceRouteNotFound
+		return nil, ErrPriceRouteNotFound
 	}
-	priceRoute := priceRouteIns.(*paraswap.Route)
+	return priceRouteIns.(*paraswap.Route), nil
+}
+
+func percentageToBasisPoints(percentage float32) uint {
+	return uint(percentage * 100)
+}
+
+func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {
+	slippageBP := percentageToBasisPoints(sendArgs.SwapTx.SlippagePercentage)
+	priceRoute, err := s.getPriceRoute(sendArgs)
+	if err != nil {
+		return statusErrors.CreateErrorResponseFromError(err)
+	}
 
 	tx, err := s.paraswapClient.BuildTransaction(context.Background(), priceRoute.SrcTokenAddress, priceRoute.SrcTokenDecimals, priceRoute.SrcAmount.Int,
 		priceRoute.DestTokenAddress, priceRoute.DestTokenDecimals, priceRoute.DestAmount.Int, slippageBP,
@@ -283,4 +293,32 @@ func (s *SwapParaswapProcessor) CalculateAmountOut(params ProcessorInputParams) 
 	destAmount, _ := calcReceivedAmountAndFee(priceRoute.DestAmount.Int, partnerFeePcnt)
 
 	return destAmount, nil
+}
+
+func paraswapSidetoCommon(side paraswap.SwapSide) SwapSide {
+	if side == paraswap.BuySide {
+		return SwapSideBuy
+	}
+	return SwapSideSell
+}
+
+func (s *SwapParaswapProcessor) GetTransactionInputData(sendArgs *MultipathProcessorTxArgs) (*TransactionInputData, error) {
+	slippageBP := (uint16)(percentageToBasisPoints(sendArgs.SwapTx.SlippagePercentage))
+	priceRoute, err := s.getPriceRoute(sendArgs)
+	if err != nil {
+		return nil, err
+	}
+	swapSide := paraswapSidetoCommon(priceRoute.Side)
+
+	ret := &TransactionInputData{
+		ProcessorName: s.Name(),
+		FromAsset:     &sendArgs.SwapTx.TokenIDFrom,
+		FromAmount:    (*hexutil.Big)(priceRoute.SrcAmount.Int),
+		ToAsset:       &sendArgs.SwapTx.TokenIDTo,
+		ToAmount:      (*hexutil.Big)(priceRoute.DestAmount.Int),
+		Side:          &swapSide,
+		SlippageBps:   &slippageBP,
+	}
+
+	return ret, nil
 }

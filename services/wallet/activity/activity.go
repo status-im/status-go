@@ -50,50 +50,52 @@ const (
 )
 
 type Entry struct {
-	payloadType     PayloadType
-	transaction     *transfer.TransactionIdentity
-	id              common.MultiTransactionIDType
-	timestamp       int64
-	activityType    Type
-	activityStatus  Status
-	amountOut       *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
-	amountIn        *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT, ApproveAT
-	tokenOut        *Token       // Used for activityType SendAT, SwapAT, BridgeAT
-	tokenIn         *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT, ApproveAT
-	symbolOut       *string
-	symbolIn        *string
-	sender          *eth.Address
-	recipient       *eth.Address
-	chainIDOut      *common.ChainID
-	chainIDIn       *common.ChainID
-	transferType    *TransferType
-	contractAddress *eth.Address
-	communityID     *string
+	payloadType               PayloadType
+	transaction               *transfer.TransactionIdentity
+	id                        common.MultiTransactionIDType
+	timestamp                 int64
+	activityType              Type
+	activityStatus            Status
+	amountOut                 *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
+	amountIn                  *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT, ApproveAT
+	tokenOut                  *Token       // Used for activityType SendAT, SwapAT, BridgeAT
+	tokenIn                   *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT, ApproveAT
+	symbolOut                 *string
+	symbolIn                  *string
+	sender                    *eth.Address
+	recipient                 *eth.Address
+	chainIDOut                *common.ChainID
+	chainIDIn                 *common.ChainID
+	transferType              *TransferType
+	deployedContractAddress   *eth.Address
+	communityID               *string
+	interactedContractAddress *eth.Address
 
 	isNew bool // isNew is used to indicate if the entry is newer than session start (changed state also)
 }
 
 // Only used for JSON marshalling
 type EntryData struct {
-	PayloadType     PayloadType                    `json:"payloadType"`
-	Transaction     *transfer.TransactionIdentity  `json:"transaction,omitempty"`
-	ID              *common.MultiTransactionIDType `json:"id,omitempty"`
-	Timestamp       *int64                         `json:"timestamp,omitempty"`
-	ActivityType    *Type                          `json:"activityType,omitempty"`
-	ActivityStatus  *Status                        `json:"activityStatus,omitempty"`
-	AmountOut       *hexutil.Big                   `json:"amountOut,omitempty"`
-	AmountIn        *hexutil.Big                   `json:"amountIn,omitempty"`
-	TokenOut        *Token                         `json:"tokenOut,omitempty"`
-	TokenIn         *Token                         `json:"tokenIn,omitempty"`
-	SymbolOut       *string                        `json:"symbolOut,omitempty"`
-	SymbolIn        *string                        `json:"symbolIn,omitempty"`
-	Sender          *eth.Address                   `json:"sender,omitempty"`
-	Recipient       *eth.Address                   `json:"recipient,omitempty"`
-	ChainIDOut      *common.ChainID                `json:"chainIdOut,omitempty"`
-	ChainIDIn       *common.ChainID                `json:"chainIdIn,omitempty"`
-	TransferType    *TransferType                  `json:"transferType,omitempty"`
-	ContractAddress *eth.Address                   `json:"contractAddress,omitempty"`
-	CommunityID     *string                        `json:"communityId,omitempty"`
+	PayloadType               PayloadType                    `json:"payloadType"`
+	Transaction               *transfer.TransactionIdentity  `json:"transaction,omitempty"`
+	ID                        *common.MultiTransactionIDType `json:"id,omitempty"`
+	Timestamp                 *int64                         `json:"timestamp,omitempty"`
+	ActivityType              *Type                          `json:"activityType,omitempty"`
+	ActivityStatus            *Status                        `json:"activityStatus,omitempty"`
+	AmountOut                 *hexutil.Big                   `json:"amountOut,omitempty"`
+	AmountIn                  *hexutil.Big                   `json:"amountIn,omitempty"`
+	TokenOut                  *Token                         `json:"tokenOut,omitempty"`
+	TokenIn                   *Token                         `json:"tokenIn,omitempty"`
+	SymbolOut                 *string                        `json:"symbolOut,omitempty"`
+	SymbolIn                  *string                        `json:"symbolIn,omitempty"`
+	Sender                    *eth.Address                   `json:"sender,omitempty"`
+	Recipient                 *eth.Address                   `json:"recipient,omitempty"`
+	ChainIDOut                *common.ChainID                `json:"chainIdOut,omitempty"`
+	ChainIDIn                 *common.ChainID                `json:"chainIdIn,omitempty"`
+	TransferType              *TransferType                  `json:"transferType,omitempty"`
+	DeployedContractAddress   *eth.Address                   `json:"contractAddress,omitempty"`
+	CommunityID               *string                        `json:"communityId,omitempty"`
+	InteractedContractAddress *eth.Address                   `json:"interactedContractAddress,omitempty"`
 
 	IsNew *bool `json:"isNew,omitempty"`
 
@@ -103,22 +105,23 @@ type EntryData struct {
 
 func (e *Entry) MarshalJSON() ([]byte, error) {
 	data := EntryData{
-		Timestamp:       &e.timestamp,
-		ActivityType:    &e.activityType,
-		ActivityStatus:  &e.activityStatus,
-		AmountOut:       e.amountOut,
-		AmountIn:        e.amountIn,
-		TokenOut:        e.tokenOut,
-		TokenIn:         e.tokenIn,
-		SymbolOut:       e.symbolOut,
-		SymbolIn:        e.symbolIn,
-		Sender:          e.sender,
-		Recipient:       e.recipient,
-		ChainIDOut:      e.chainIDOut,
-		ChainIDIn:       e.chainIDIn,
-		TransferType:    e.transferType,
-		ContractAddress: e.contractAddress,
-		CommunityID:     e.communityID,
+		Timestamp:                 &e.timestamp,
+		ActivityType:              &e.activityType,
+		ActivityStatus:            &e.activityStatus,
+		AmountOut:                 e.amountOut,
+		AmountIn:                  e.amountIn,
+		TokenOut:                  e.tokenOut,
+		TokenIn:                   e.tokenIn,
+		SymbolOut:                 e.symbolOut,
+		SymbolIn:                  e.symbolIn,
+		Sender:                    e.sender,
+		Recipient:                 e.recipient,
+		ChainIDOut:                e.chainIDOut,
+		ChainIDIn:                 e.chainIDIn,
+		TransferType:              e.transferType,
+		DeployedContractAddress:   e.deployedContractAddress,
+		CommunityID:               e.communityID,
+		InteractedContractAddress: e.interactedContractAddress,
 	}
 
 	if e.payloadType == MultiTransactionPT {
@@ -486,6 +489,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		startFilterDisabled, filter.Period.StartTimestamp, endFilterDisabled, filter.Period.EndTimestamp,
 		filterActivityTypeAll, sliceContains(filter.Types, SendAT), sliceContains(filter.Types, ReceiveAT),
 		sliceContains(filter.Types, ContractDeploymentAT), sliceContains(filter.Types, MintAT),
+		sliceContains(filter.Types, SwapAT), sliceContains(filter.Types, ApproveAT),
 		transfer.MultiTransactionSend,
 		fromTrType, toTrType,
 		allAddresses, filterAllToAddresses,
@@ -511,21 +515,36 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var timestamp int64
 		var dbMtType, dbTrType sql.NullByte
 		var toAddress, fromAddress eth.Address
-		var toAddressDB, ownerAddressDB, contractAddressDB, dbTokenID sql.RawBytes
-		var tokenAddress, contractAddress *eth.Address
+		var toAddressDB, ownerAddressDB, deployedContractAddressDB, dbTokenID sql.RawBytes
+		var tokenAddress, deployedContractAddress, interactedContractAddress *eth.Address
 		var aggregatedStatus int
 		var dbTrAmount sql.NullString
 		dbPTrAmount := new(big.Int)
-		var dbMtFromAmount, dbMtToAmount, contractType sql.NullString
+		var dbMtFromAmount, dbMtToAmount, dbContractType sql.NullString
+		var contractType string
 		var tokenCode, fromTokenCode, toTokenCode sql.NullString
 		var methodHash, communityID sql.NullString
 		var transferType *TransferType
 		var communityMintEventDB sql.NullBool
 		var communityMintEvent bool
+		var dbInteractedContractAddress sql.RawBytes
+		// Transaction Input parameters
+		var dbTrInputApprovalSpender sql.RawBytes
+		var dbTrInputApprovalAmount = new(big.Int)
+		var dbTrInputFromAsset sql.NullString
+		var dbTrInputFromAmount = new(big.Int)
+		var dbTrInputToAsset sql.NullString
+		var dbTrInputToAmount = new(big.Int)
+		var dbTrInputSide sql.NullInt64
+		var dbTrInputSlippageBps sql.NullInt64
+
 		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress,
 			&toAddressDB, &ownerAddressDB, &dbTrAmount, (*bigint.SQLBigIntBytes)(dbPTrAmount), &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
-			&tokenAddress, &dbTokenID, &tokenCode, &fromTokenCode, &toTokenCode, &outChainIDDB, &inChainIDDB, &contractType,
-			&contractAddressDB, &methodHash, &communityMintEventDB, &communityID)
+			&tokenAddress, &dbTokenID, &tokenCode, &fromTokenCode, &toTokenCode, &outChainIDDB, &inChainIDDB, &dbContractType,
+			&deployedContractAddressDB, &methodHash, &communityMintEventDB, &communityID,
+			&dbTrInputApprovalSpender, (*bigint.SQLBigIntBytes)(dbTrInputApprovalAmount), &dbTrInputFromAsset, (*bigint.SQLBigIntBytes)(dbTrInputFromAmount),
+			&dbTrInputToAsset, (*bigint.SQLBigIntBytes)(dbTrInputToAmount), &dbTrInputSide, &dbTrInputSlippageBps,
+			&dbInteractedContractAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -534,24 +553,32 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			toAddress = eth.BytesToAddress(toAddressDB)
 		}
 
-		if contractType.Valid {
-			transferType = contractTypeFromDBType(contractType.String)
+		if dbContractType.Valid {
+			contractType = dbContractType.String
+			transferType = contractTypeFromDBType(contractType)
 		}
 
 		if communityMintEventDB.Valid {
 			communityMintEvent = communityMintEventDB.Bool
 		}
 
-		if len(contractAddressDB) > 0 {
-			contractAddress = new(eth.Address)
-			*contractAddress = eth.BytesToAddress(contractAddressDB)
+		if len(deployedContractAddressDB) > 0 {
+			deployedContractAddress = new(eth.Address)
+			*deployedContractAddress = eth.BytesToAddress(deployedContractAddressDB)
+		}
+
+		if len(dbInteractedContractAddress) > 0 {
+			interactedContractAddress := new(eth.Address)
+			*interactedContractAddress = eth.BytesToAddress(dbInteractedContractAddress)
 		}
 
 		getActivityType := func(trType sql.NullByte) (activityType Type, filteredAddress eth.Address) {
 			if trType.Valid {
 				if trType.Byte == fromTrType {
-					if toAddress == ZeroAddress && transferType != nil && *transferType == TransferTypeEth && contractAddress != nil && *contractAddress != ZeroAddress {
+					if toAddress == ZeroAddress && transferType != nil && *transferType == TransferTypeEth && deployedContractAddress != nil && *deployedContractAddress != ZeroAddress {
 						return ContractDeploymentAT, fromAddress
+					} else if contractType == string(common.Erc20Approval) {
+						return ApproveAT, fromAddress
 					}
 					return SendAT, fromAddress
 				} else if trType.Byte == toTrType {
@@ -624,14 +651,11 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			entry.amountIn = inAmount
 		} else if pendingHash != nil && chainID.Valid {
 			// Process `pending_transactions` row
-
-			// Extract activity type: SendAT/ReceiveAT
-			activityType, _ := getActivityType(dbTrType)
-
-			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount, dbPTrAmount)
-
 			outChainID = new(common.ChainID)
 			*outChainID = common.ChainID(chainID.Int64)
+
+			// Extract activity type: SendAT/ReceiveAT/ApproveAT
+			activityType, _ := getActivityType(dbTrType)
 
 			entry = newActivityEntryWithPendingTransaction(
 				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64),
@@ -640,17 +664,36 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 				timestamp, activityType, activityStatus,
 			)
 
-			// Extract tokens
-			if tokenCode.Valid {
-				cID := common.ChainID(chainID.Int64)
-				entry.tokenOut = deps.tokenFromSymbol(&cID, tokenCode.String)
+			if activityType == ApproveAT {
+				// Extract Approve token
+				if dbTrInputFromAsset.Valid {
+					entry.tokenOut = deps.tokenFromSymbol(outChainID, dbTrInputFromAsset.String)
+					entry.symbolOut = common.NewAndSet(dbTrInputFromAsset.String)
+				}
+
+				// Extract Approve amount
+				if dbTrInputApprovalAmount != nil {
+					entry.amountOut = (*hexutil.Big)(dbTrInputApprovalAmount)
+				}
+
+				// Extract Approve spender
+				if len(dbTrInputApprovalSpender) > 0 {
+					toAddress = eth.BytesToAddress(dbTrInputApprovalSpender)
+				}
+			} else {
+				inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount, dbPTrAmount)
+
+				// Extract tokens
+				if tokenCode.Valid {
+					cID := common.ChainID(chainID.Int64)
+					entry.tokenOut = deps.tokenFromSymbol(&cID, tokenCode.String)
+				}
+				entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, nil)
+
+				// Complete the data
+				entry.amountOut = outAmount
+				entry.amountIn = inAmount
 			}
-			entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, nil)
-
-			// Complete the data
-			entry.amountOut = outAmount
-			entry.amountIn = inAmount
-
 		} else if multiTxID.Valid {
 			// Process `multi_transactions` row
 
@@ -693,12 +736,12 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		}
 
 		// Complete common data
-		entry.recipient = &toAddress
 		entry.sender = &fromAddress
 		entry.recipient = &toAddress
 		entry.chainIDOut = outChainID
 		entry.chainIDIn = inChainID
 		entry.transferType = transferType
+		entry.interactedContractAddress = interactedContractAddress
 
 		entries = append(entries, entry)
 	}

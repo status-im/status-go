@@ -154,13 +154,16 @@ func updateDataFromMultiTx(data []*pathprocessor.MultipathProcessorTxArgs, multi
 	}
 }
 
-func sendTransactions(data []*pathprocessor.MultipathProcessorTxArgs, pathProcessors map[string]pathprocessor.PathProcessor, account *account.SelectedExtKey) (
+func sendTransactions(
+	data []*pathprocessor.MultipathProcessorTxArgs,
+	pathProcessors map[string]pathprocessor.PathProcessor,
+	account *account.SelectedExtKey,
+	txInputDataStorage TransactionInputDataStorage) (
 	map[uint64][]types.Hash, error) {
 
 	hashes := make(map[uint64][]types.Hash)
 	usedNonces := make(map[uint64]int64)
 	for _, tx := range data {
-
 		lastUsedNonce := int64(-1)
 		if nonce, ok := usedNonces[tx.ChainID]; ok {
 			lastUsedNonce = nonce
@@ -169,6 +172,18 @@ func sendTransactions(data []*pathprocessor.MultipathProcessorTxArgs, pathProces
 		hash, usedNonce, err := pathProcessors[tx.Name].Send(tx, lastUsedNonce, account)
 		if err != nil {
 			return nil, err // TODO: One of transfers within transaction could have been sent. Need to notify user about it
+		}
+
+		// Store transaction input data
+		txInputData, err := pathProcessors[tx.Name].GetTransactionInputData(tx)
+		if err != nil {
+			return nil, err
+		}
+		if txInputData != nil {
+			err = txInputDataStorage.UpsertInputData(wallet_common.ChainID(tx.ChainID), hash, *txInputData)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		hashes[tx.ChainID] = append(hashes[tx.ChainID], hash)

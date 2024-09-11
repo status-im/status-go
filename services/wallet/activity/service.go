@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	protocolCommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
@@ -74,13 +75,22 @@ type Service struct {
 	debounceDuration time.Duration
 
 	pendingTracker *transactions.PendingTxTracker
+
+	featureFlags *protocolCommon.FeatureFlags
 }
 
 func (s *Service) nextSessionID() SessionID {
 	return SessionID(s.lastSessionID.Add(1))
 }
 
-func NewService(db *sql.DB, accountsDB *accounts.Database, tokenManager token.ManagerInterface, collectibles collectibles.ManagerInterface, eventFeed *event.Feed, pendingTracker *transactions.PendingTxTracker) *Service {
+func NewService(
+	db *sql.DB,
+	accountsDB *accounts.Database,
+	tokenManager token.ManagerInterface,
+	collectibles collectibles.ManagerInterface,
+	eventFeed *event.Feed,
+	pendingTracker *transactions.PendingTxTracker,
+	featureFlags *protocolCommon.FeatureFlags) *Service {
 	return &Service{
 		db:           db,
 		accountsDB:   accountsDB,
@@ -94,6 +104,8 @@ func NewService(db *sql.DB, accountsDB *accounts.Database, tokenManager token.Ma
 		debounceDuration: 1 * time.Second,
 
 		pendingTracker: pendingTracker,
+
+		featureFlags: featureFlags,
 	}
 }
 

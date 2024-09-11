@@ -31,6 +31,8 @@ type PathProcessor interface {
 	GetContractAddress(params ProcessorInputParams) (common.Address, error)
 	// BuildTransaction builds the transaction based on MultipathProcessorTxArgs, returns the transaction and the used nonce (lastUsedNonce is -1 if it's the first tx)
 	BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error)
+	// GetTransactionInputData returns the input data used to build the transaction
+	GetTransactionInputData(sendArgs *MultipathProcessorTxArgs) (*TransactionInputData, error)
 }
 
 type PathProcessorClearable interface {
