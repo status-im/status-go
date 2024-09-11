@@ -32,12 +32,13 @@ jobs:
           echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
           
           if [[ $exit_code -ne 0 ]]; then
+            invalid_commit_messages=$(echo $output | sed '1d;$d')
             EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
             echo "error_message<<$EOF" >> "$GITHUB_ENV"
-            echo "$output" >> "$GITHUB_ENV"
+            echo "invalid_commit_messages" >> "$GITHUB_ENV"
             echo "$EOF" >> "$GITHUB_ENV"
           else
-            has_breaking_changes=$(echo "$output" | sed -n '2p')
+            has_breaking_changes=$(echo "$output" | tail -n 1)
             echo "has_breaking_changes=$has_breaking_changes" >> $GITHUB_OUTPUT
           fi
 
