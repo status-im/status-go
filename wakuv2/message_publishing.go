@@ -59,6 +59,7 @@ func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]b
 }
 
 func (w *Waku) broadcast() {
+	defer w.wg.Done()
 	for {
 		var envelope *protocol.Envelope
 
