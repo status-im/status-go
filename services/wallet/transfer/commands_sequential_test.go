@@ -1120,63 +1120,66 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 
 func TestFindBlocksCommand(t *testing.T) {
 	for idx, testCase := range getCases() {
-		t.Log("case #", idx+1)
+		t.Run(fmt.Sprintf("case #%d", idx+1), func(t *testing.T) {
 
-		accountAddress := common.HexToAddress("0x1234")
-		rangeSize := 20
-		if testCase.rangeSize != 0 {
-			rangeSize = testCase.rangeSize
-		}
+			t.Log("case #", idx+1)
 
-		balances := map[common.Address][][]int{accountAddress: testCase.balanceChanges}
-		outgoingERC20Transfers := map[common.Address][]testERC20Transfer{accountAddress: testCase.outgoingERC20Transfers}
-		incomingERC20Transfers := map[common.Address][]testERC20Transfer{accountAddress: testCase.incomingERC20Transfers}
-		outgoingERC1155SingleTransfers := map[common.Address][]testERC20Transfer{accountAddress: testCase.outgoingERC1155SingleTransfers}
-		incomingERC1155SingleTransfers := map[common.Address][]testERC20Transfer{accountAddress: testCase.incomingERC1155SingleTransfers}
+			accountAddress := common.HexToAddress("0x1234")
+			rangeSize := 20
+			if testCase.rangeSize != 0 {
+				rangeSize = testCase.rangeSize
+			}
 
-		fbc, tc, blockChannel, blockRangeDAO := setupFindBlocksCommand(t, accountAddress, big.NewInt(testCase.fromBlock), big.NewInt(testCase.toBlock), rangeSize, balances, outgoingERC20Transfers, incomingERC20Transfers, outgoingERC1155SingleTransfers, incomingERC1155SingleTransfers)
-		ctx := context.Background()
-		group := async.NewGroup(ctx)
-		group.Add(fbc.Command())
+			balances := map[common.Address][][]int{accountAddress: testCase.balanceChanges}
+			outgoingERC20Transfers := map[common.Address][]testERC20Transfer{accountAddress: testCase.outgoingERC20Transfers}
+			incomingERC20Transfers := map[common.Address][]testERC20Transfer{accountAddress: testCase.incomingERC20Transfers}
+			outgoingERC1155SingleTransfers := map[common.Address][]testERC20Transfer{accountAddress: testCase.outgoingERC1155SingleTransfers}
+			incomingERC1155SingleTransfers := map[common.Address][]testERC20Transfer{accountAddress: testCase.incomingERC1155SingleTransfers}
 
-		foundBlocks := []*DBHeader{}
-		select {
-		case <-ctx.Done():
-			t.Log("ERROR")
-		case <-group.WaitAsync():
-			close(blockChannel)
-			for {
-				bloks, ok := <-blockChannel
-				if !ok {
-					break
+			fbc, tc, blockChannel, blockRangeDAO := setupFindBlocksCommand(t, accountAddress, big.NewInt(testCase.fromBlock), big.NewInt(testCase.toBlock), rangeSize, balances, outgoingERC20Transfers, incomingERC20Transfers, outgoingERC1155SingleTransfers, incomingERC1155SingleTransfers)
+			ctx := context.Background()
+			group := async.NewGroup(ctx)
+			group.Add(fbc.Command())
+
+			var foundBlocks []*DBHeader
+			select {
+			case <-ctx.Done():
+				t.Log("ERROR")
+			case <-group.WaitAsync():
+				close(blockChannel)
+				for {
+					blocks, ok := <-blockChannel
+					if !ok {
+						break
+					}
+					foundBlocks = append(foundBlocks, blocks...)
 				}
-				foundBlocks = append(foundBlocks, bloks...)
-			}
 
-			numbers := []int64{}
-			for _, block := range foundBlocks {
-				numbers = append(numbers, block.Number.Int64())
-			}
+				numbers := []int64{}
+				for _, block := range foundBlocks {
+					numbers = append(numbers, block.Number.Int64())
+				}
 
-			if tc.traceAPICalls {
-				tc.printCounter()
-			}
+				if tc.traceAPICalls {
+					tc.printCounter()
+				}
 
-			for name, cnt := range testCase.expectedCalls {
-				require.Equal(t, cnt, tc.callsCounter[name], "calls to "+name)
-			}
+				for name, cnt := range testCase.expectedCalls {
+					require.Equal(t, cnt, tc.callsCounter[name], "calls to "+name)
+				}
 
-			sort.Slice(numbers, func(i, j int) bool { return numbers[i] < numbers[j] })
-			require.Equal(t, testCase.expectedBlocksFound, len(foundBlocks), testCase.label, "found blocks", numbers)
+				sort.Slice(numbers, func(i, j int) bool { return numbers[i] < numbers[j] })
+				require.Equal(t, testCase.expectedBlocksFound, len(foundBlocks), testCase.label, "found blocks", numbers)
 
-			blRange, _, err := blockRangeDAO.getBlockRange(tc.NetworkID(), accountAddress)
-			require.NoError(t, err)
-			require.NotNil(t, blRange.eth.FirstKnown)
-			require.NotNil(t, blRange.tokens.FirstKnown)
-			if testCase.fromBlock == 0 {
-				require.Equal(t, 0, blRange.tokens.FirstKnown.Cmp(zero))
+				blRange, _, err := blockRangeDAO.getBlockRange(tc.NetworkID(), accountAddress)
+				require.NoError(t, err)
+				require.NotNil(t, blRange.eth.FirstKnown)
+				require.NotNil(t, blRange.tokens.FirstKnown)
+				if testCase.fromBlock == 0 {
+					require.Equal(t, 0, blRange.tokens.FirstKnown.Cmp(zero))
+				}
 			}
-		}
+		})
 	}
 }
 

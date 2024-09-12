@@ -1,0 +1,2 @@
+WEBSOCKET ws://localhost:12345/signals
+Content-Type: application/json

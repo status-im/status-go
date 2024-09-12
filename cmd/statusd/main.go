@@ -19,23 +19,15 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/ethereum/go-ethereum/log"
-	gethmetrics "github.com/ethereum/go-ethereum/metrics"
-
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/cmd/statusd/server"
 	"github.com/status-im/status-go/common/dbsetup"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/metrics"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/pushnotificationserver"
-	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -186,202 +178,202 @@ func main() {
 		}()
 	}
 
-	backend := api.NewGethStatusBackend()
-	if config.NodeKey == "" {
-		logger.Error("node key needs to be set if running a push notification server")
-		return
-	}
+	//backend := api.NewGethStatusBackend()
+	//if config.NodeKey == "" {
+	//	logger.Error("node key needs to be set if running a push notification server")
+	//	return
+	//}
+	//
+	//identity, err := crypto.HexToECDSA(config.NodeKey)
+	//if err != nil {
+	//	logger.Error("node key is invalid", "error", err)
+	//	return
+	//}
+	//
+	//// Generate installationID from public key, so it's always the same
+	//installationID, err := uuid.FromBytes(crypto.CompressPubkey(&identity.PublicKey)[:16])
+	//if err != nil {
+	//	logger.Error("cannot create installation id", "error", err)
+	//	return
+	//}
+	//
+	//if *seedPhrase != "" {
+	//	// Remove data inside dir to avoid conflicts with existing data or account restoration fails
+	//	if err := os.RemoveAll(config.DataDir); err != nil {
+	//		logger.Error("failed to remove data dir", "error", err)
+	//		return
+	//	}
+	//
+	//	if err := createDirsFromConfig(config); err != nil {
+	//		logger.Error("failed to create directories", "error", err)
+	//		return
+	//	}
+	//
+	//	request := requests.RestoreAccount{
+	//		Mnemonic:    *seedPhrase,
+	//		FetchBackup: false,
+	//		CreateAccount: requests.CreateAccount{
+	//			DisplayName:        "Account1",
+	//			DeviceName:         "StatusIM",
+	//			Password:           *password,
+	//			CustomizationColor: "0x000000",
+	//			RootDataDir:        config.DataDir,
+	//			APIConfig: &requests.APIConfig{
+	//				ConnectorEnabled: config.ClusterConfig.Enabled,
+	//				HTTPEnabled:      config.HTTPEnabled,
+	//				HTTPHost:         config.HTTPHost,
+	//				HTTPPort:         config.HTTPPort,
+	//				HTTPVirtualHosts: config.HTTPVirtualHosts,
+	//				WSEnabled:        config.WSEnabled,
+	//				WSHost:           config.WSHost,
+	//				WSPort:           config.WSPort,
+	//				APIModules:       config.APIModules,
+	//			},
+	//			NetworkID:            &config.NetworkID,
+	//			TestOverrideNetworks: config.Networks,
+	//		},
+	//	}
+	//
+	//	api.OverrideApiConfigTest()
+	//
+	//	_, err := backend.RestoreAccountAndLogin(&request)
+	//	if err != nil {
+	//		logger.Error("failed to import account", "error", err)
+	//		return
+	//	}
+	//
+	//	appDB, walletDB, err := openDatabases(config.DataDir + "/" + installationID.String())
+	//	if err != nil {
+	//		log.Error("failed to open databases")
+	//		return
+	//	}
+	//
+	//	options := []protocol.Option{
+	//		protocol.WithDatabase(appDB),
+	//		protocol.WithWalletDatabase(walletDB),
+	//		protocol.WithTorrentConfig(&config.TorrentConfig),
+	//		protocol.WithWalletConfig(&config.WalletConfig),
+	//		protocol.WithAccountManager(backend.AccountManager()),
+	//	}
+	//
+	//	messenger, err := protocol.NewMessenger(
+	//		config.Name,
+	//		identity,
+	//		gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
+	//		installationID.String(),
+	//		nil,
+	//		config.Version,
+	//		options...,
+	//	)
+	//
+	//	if err != nil {
+	//		logger.Error("failed to create messenger", "error", err)
+	//		return
+	//	}
+	//
+	//	_, err = messenger.Start()
+	//	if err != nil {
+	//		logger.Error("failed to start messenger", "error", err)
+	//		return
+	//	}
+	//
+	//	interruptCh := haltOnInterruptSignal(backend.StatusNode())
+	//	go retrieveMessagesLoop(messenger, 300*time.Millisecond, interruptCh)
+	//
+	//} else {
+	//	appDB, walletDB, err := startNode(config, backend, installationID)
+	//	if err != nil {
+	//		logger.Error("failed to start node", "error", err)
+	//		return
+	//	}
+	//
+	//	err = sdnotify.Ready()
+	//	if err == sdnotify.ErrSdNotifyNoSocket {
+	//		logger.Debug("sd_notify socket not available")
+	//	} else if err != nil {
+	//		logger.Warn("sd_notify READY call failed", "error", err)
+	//	} else {
+	//		// systemd aliveness notifications, affects only Linux
+	//		go startSystemDWatchdog()
+	//	}
+	//
+	//	// handle interrupt signals
+	//	interruptCh := haltOnInterruptSignal(backend.StatusNode())
+	//
+	//	// Start collecting metrics. Metrics can be enabled by providing `-metrics` flag
+	//	// or setting `gethmetrics.Enabled` to true during compilation time:
+	//	// https://github.com/status-im/go-ethereum/pull/76.
+	//	if *metricsEnabled || gethmetrics.Enabled {
+	//		go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
+	//		go gethmetrics.CollectProcessMetrics(3 * time.Second)
+	//		go metrics.NewMetricsServer(*metricsPort, gethmetrics.DefaultRegistry).Listen()
+	//	}
+	//
+	//	// Check if profiling shall be enabled.
+	//	if *pprofEnabled {
+	//		profiling.NewProfiler(*pprofPort).Go()
+	//	}
+	//
+	//	if config.PushNotificationServerConfig.Enabled {
+	//		options := []protocol.Option{
+	//			protocol.WithPushNotifications(),
+	//			protocol.WithPushNotificationServerConfig(&pushnotificationserver.Config{
+	//				Enabled:   config.PushNotificationServerConfig.Enabled,
+	//				Identity:  config.PushNotificationServerConfig.Identity,
+	//				GorushURL: config.PushNotificationServerConfig.GorushURL,
+	//			}),
+	//			protocol.WithDatabase(appDB),
+	//			protocol.WithWalletDatabase(walletDB),
+	//			protocol.WithTorrentConfig(&config.TorrentConfig),
+	//			protocol.WithWalletConfig(&config.WalletConfig),
+	//			protocol.WithAccountManager(backend.AccountManager()),
+	//		}
+	//
+	//		messenger, err := protocol.NewMessenger(
+	//			config.Name,
+	//			identity,
+	//			gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
+	//			installationID.String(),
+	//			nil,
+	//			config.Version,
+	//			options...,
+	//		)
+	//		if err != nil {
+	//			logger.Error("failed to create messenger", "error", err)
+	//			return
+	//		}
+	//
+	//		err = messenger.InitInstallations()
+	//		if err != nil {
+	//			logger.Error("failed to init messenger installations", "error", err)
+	//			return
+	//		}
+	//
+	//		err = messenger.InitFilters()
+	//		if err != nil {
+	//			logger.Error("failed to init messenger filters", "error", err)
+	//			return
+	//		}
+	//
+	//		// This will start the push notification server as well as
+	//		// the config is set to Enabled
+	//		_, err = messenger.Start()
+	//		if err != nil {
+	//			logger.Error("failed to start messenger", "error", err)
+	//			return
+	//		}
+	//		go retrieveMessagesLoop(messenger, 300*time.Millisecond, interruptCh)
+	//	}
+	//}
 
-	identity, err := crypto.HexToECDSA(config.NodeKey)
-	if err != nil {
-		logger.Error("node key is invalid", "error", err)
-		return
-	}
-
-	// Generate installationID from public key, so it's always the same
-	installationID, err := uuid.FromBytes(crypto.CompressPubkey(&identity.PublicKey)[:16])
-	if err != nil {
-		logger.Error("cannot create installation id", "error", err)
-		return
-	}
-
-	if *seedPhrase != "" {
-		// Remove data inside dir to avoid conflicts with existing data or account restoration fails
-		if err := os.RemoveAll(config.DataDir); err != nil {
-			logger.Error("failed to remove data dir", "error", err)
-			return
-		}
-
-		if err := createDirsFromConfig(config); err != nil {
-			logger.Error("failed to create directories", "error", err)
-			return
-		}
-
-		request := requests.RestoreAccount{
-			Mnemonic:    *seedPhrase,
-			FetchBackup: false,
-			CreateAccount: requests.CreateAccount{
-				DisplayName:        "Account1",
-				DeviceName:         "StatusIM",
-				Password:           *password,
-				CustomizationColor: "0x000000",
-				RootDataDir:        config.DataDir,
-				APIConfig: &requests.APIConfig{
-					ConnectorEnabled: config.ClusterConfig.Enabled,
-					HTTPEnabled:      config.HTTPEnabled,
-					HTTPHost:         config.HTTPHost,
-					HTTPPort:         config.HTTPPort,
-					HTTPVirtualHosts: config.HTTPVirtualHosts,
-					WSEnabled:        config.WSEnabled,
-					WSHost:           config.WSHost,
-					WSPort:           config.WSPort,
-					APIModules:       config.APIModules,
-				},
-				NetworkID:            &config.NetworkID,
-				TestOverrideNetworks: config.Networks,
-			},
-		}
-
-		api.OverrideApiConfigTest()
-
-		_, err := backend.RestoreAccountAndLogin(&request)
-		if err != nil {
-			logger.Error("failed to import account", "error", err)
-			return
-		}
-
-		appDB, walletDB, err := openDatabases(config.DataDir + "/" + installationID.String())
-		if err != nil {
-			log.Error("failed to open databases")
-			return
-		}
-
-		options := []protocol.Option{
-			protocol.WithDatabase(appDB),
-			protocol.WithWalletDatabase(walletDB),
-			protocol.WithTorrentConfig(&config.TorrentConfig),
-			protocol.WithWalletConfig(&config.WalletConfig),
-			protocol.WithAccountManager(backend.AccountManager()),
-		}
-
-		messenger, err := protocol.NewMessenger(
-			config.Name,
-			identity,
-			gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
-			installationID.String(),
-			nil,
-			config.Version,
-			options...,
-		)
-
-		if err != nil {
-			logger.Error("failed to create messenger", "error", err)
-			return
-		}
-
-		_, err = messenger.Start()
-		if err != nil {
-			logger.Error("failed to start messenger", "error", err)
-			return
-		}
-
-		interruptCh := haltOnInterruptSignal(backend.StatusNode())
-		go retrieveMessagesLoop(messenger, 300*time.Millisecond, interruptCh)
-
-	} else {
-		appDB, walletDB, err := startNode(config, backend, installationID)
-		if err != nil {
-			logger.Error("failed to start node", "error", err)
-			return
-		}
-
-		err = sdnotify.Ready()
-		if err == sdnotify.ErrSdNotifyNoSocket {
-			logger.Debug("sd_notify socket not available")
-		} else if err != nil {
-			logger.Warn("sd_notify READY call failed", "error", err)
-		} else {
-			// systemd aliveness notifications, affects only Linux
-			go startSystemDWatchdog()
-		}
-
-		// handle interrupt signals
-		interruptCh := haltOnInterruptSignal(backend.StatusNode())
-
-		// Start collecting metrics. Metrics can be enabled by providing `-metrics` flag
-		// or setting `gethmetrics.Enabled` to true during compilation time:
-		// https://github.com/status-im/go-ethereum/pull/76.
-		if *metricsEnabled || gethmetrics.Enabled {
-			go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
-			go gethmetrics.CollectProcessMetrics(3 * time.Second)
-			go metrics.NewMetricsServer(*metricsPort, gethmetrics.DefaultRegistry).Listen()
-		}
-
-		// Check if profiling shall be enabled.
-		if *pprofEnabled {
-			profiling.NewProfiler(*pprofPort).Go()
-		}
-
-		if config.PushNotificationServerConfig.Enabled {
-			options := []protocol.Option{
-				protocol.WithPushNotifications(),
-				protocol.WithPushNotificationServerConfig(&pushnotificationserver.Config{
-					Enabled:   config.PushNotificationServerConfig.Enabled,
-					Identity:  config.PushNotificationServerConfig.Identity,
-					GorushURL: config.PushNotificationServerConfig.GorushURL,
-				}),
-				protocol.WithDatabase(appDB),
-				protocol.WithWalletDatabase(walletDB),
-				protocol.WithTorrentConfig(&config.TorrentConfig),
-				protocol.WithWalletConfig(&config.WalletConfig),
-				protocol.WithAccountManager(backend.AccountManager()),
-			}
-
-			messenger, err := protocol.NewMessenger(
-				config.Name,
-				identity,
-				gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
-				installationID.String(),
-				nil,
-				config.Version,
-				options...,
-			)
-			if err != nil {
-				logger.Error("failed to create messenger", "error", err)
-				return
-			}
-
-			err = messenger.InitInstallations()
-			if err != nil {
-				logger.Error("failed to init messenger installations", "error", err)
-				return
-			}
-
-			err = messenger.InitFilters()
-			if err != nil {
-				logger.Error("failed to init messenger filters", "error", err)
-				return
-			}
-
-			// This will start the push notification server as well as
-			// the config is set to Enabled
-			_, err = messenger.Start()
-			if err != nil {
-				logger.Error("failed to start messenger", "error", err)
-				return
-			}
-			go retrieveMessagesLoop(messenger, 300*time.Millisecond, interruptCh)
-		}
-	}
-
-	gethNode := backend.StatusNode().GethNode()
-	if gethNode != nil {
-		// wait till node has been stopped
-		gethNode.Wait()
-		if err := sdnotify.Stopping(); err != nil {
-			logger.Warn("sd_notify STOPPING call failed", "error", err)
-		}
-	}
+	//gethNode := backend.StatusNode().GethNode()
+	//if gethNode != nil {
+	//	// wait till node has been stopped
+	//	gethNode.Wait()
+	//	if err := sdnotify.Stopping(); err != nil {
+	//		logger.Warn("sd_notify STOPPING call failed", "error", err)
+	//	}
+	//}
 }
 
 func getDefaultDataDir() string {

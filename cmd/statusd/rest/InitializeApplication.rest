@@ -1,0 +1,6 @@
+GET http://localhost:12345/InitializeApplication
+Content-Type: application/json
+
+{
+    "dataDir": "/Users/igorsirotin/Repositories/Status/status-desktop/Status/data"
+}

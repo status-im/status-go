@@ -12,7 +12,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
+	statusgo "github.com/status-im/status-go/mobile"
 	"github.com/status-im/status-go/signal"
+	"io"
 )
 
 type Server struct {
@@ -59,6 +61,10 @@ func (s *Server) Listen(address string) error {
 	}
 
 	http.HandleFunc("/signals", s.signals)
+	s.addStatusGoEndpoint("/InitializeApplication", statusgo.InitializeApplication)
+	s.addStatusGoEndpoint("/CreateAccountAndLogin", statusgo.CreateAccountAndLogin)
+	s.addStatusGoEndpoint("/RestoreAccountAndLogin", statusgo.RestoreAccountAndLogin)
+	s.addStatusGoEndpoint("/LoginAccount", statusgo.LoginAccount)
 
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
@@ -67,12 +73,12 @@ func (s *Server) Listen(address string) error {
 
 	s.address = listener.Addr().String()
 
-	go func() {
-		err := s.server.Serve(listener)
-		if !errors.Is(err, http.ErrServerClosed) {
-			log.Error("signals server closed with error: %w", err)
-		}
-	}()
+	//go func() {
+	err = s.server.Serve(listener)
+	if !errors.Is(err, http.ErrServerClosed) {
+		log.Error("signals server closed with error: %w", err)
+	}
+	//}()
 
 	return nil
 }
@@ -112,4 +118,21 @@ func (s *Server) signals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.connections[connection] = struct{}{}
+}
+
+func (s *SignalsServer) addStatusGoEndpoint(endpoint string, handler func(string) string) {
+	http.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
+		request, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Error("failed to read request: %w", err)
+			return
+		}
+
+		response := handler(string(request))
+
+		_, err = w.Write([]byte(response))
+		if err != nil {
+			log.Error("failed to write response: %w", err)
+		}
+	})
 }
