@@ -36,12 +36,8 @@ exit_code=$(docker inspect integration-tests_tests-rpc_1 -f '{{.State.ExitCode}}
 echo -e "${GRN}Stopping docker containers${RST}"
 docker-compose ${all_compose_files} down
 
-# Early exit if tests failed
-if [[ "$exit_code" -ne 0 ]]; then
-  exit $exit_code
-fi
-
 # Prepare coverage reports
+echo -e "${GRN}Gathering code coverage reports${RST}"
 binary_coverage_reports_path="${coverage_reports_path}/binary"
 merged_coverage_reports_path="${coverage_reports_path}/merged"
 full_coverage_profile="${coverage_reports_path}/coverage.out"
@@ -59,3 +55,6 @@ go tool covdata textfmt -i="${merged_coverage_reports_path}" -o="${full_coverage
 if [[ ${INTEGRATION_TESTS_REPORT_CODECOV} == 'true' ]]; then
   report_to_codecov "${test_results_path}/*.xml" "${full_coverage_profile}" "integration"
 fi
+
+echo -e "${GRN}Testing finished${RST}"
+exit $exit_code
