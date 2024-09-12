@@ -3010,24 +3010,6 @@ func (db sqlitePersistence) FindStatusMessageIDForBridgeMessageID(messageID stri
 	return "", nil
 }
 
-func (db sqlitePersistence) findStatusMessageIDForBridgeMessageID(tx *sql.Tx, messageID string) (string, error) {
-	rows, err := tx.Query(`SELECT user_messages_id FROM bridge_messages WHERE message_id = ?`, messageID)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-
-	if rows.Next() {
-		var statusMessageID string
-		err = rows.Scan(&statusMessageID)
-		if err != nil {
-			return "", err
-		}
-		return statusMessageID, nil
-	}
-	return "", nil
-}
-
 func (db sqlitePersistence) updateStatusMessagesWithResponse(tx *sql.Tx, statusMessagesToUpdate []string, responseValue string) error {
 	sql := "UPDATE user_messages SET response_to = ? WHERE id IN (?" + strings.Repeat(",?", len(statusMessagesToUpdate)-1) + ")" //nolint: gosec
 	stmt, err := tx.Prepare(sql)
@@ -3075,15 +3057,7 @@ func (db sqlitePersistence) findAndUpdateReplies(tx *sql.Tx, bridgeMessageID str
 }
 
 func (db sqlitePersistence) findAndUpdateRepliedTo(tx *sql.Tx, discordParentMessageID string, statusMessageID string) error {
-	// Finds status messages id which are replies for bridgeMessageID
-	repliedMessageID, err := db.findStatusMessageIDForBridgeMessageID(tx, discordParentMessageID)
-	if err != nil {
-		return err
-	}
-	if repliedMessageID == "" {
-		return nil
-	}
-	return db.updateStatusMessagesWithResponse(tx, []string{statusMessageID}, repliedMessageID)
+	return db.updateStatusMessagesWithResponse(tx, []string{statusMessageID}, discordParentMessageID)
 }
 
 func (db sqlitePersistence) GetCommunityMemberAllMessages(member string, communityID string) ([]*common.Message, error) {
