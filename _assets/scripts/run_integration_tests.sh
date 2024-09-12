@@ -9,12 +9,6 @@ echo -e "${GRN}Running integration tests${RST}"
 root_path="${GIT_ROOT}/integration-tests"
 coverage_reports_path="${root_path}/coverage"
 test_results_path="${root_path}/reports"
-log_file="${root_path}/tests.log"
-
-echo -e "${GRN}root_path:${RST} ${root_path}"
-echo -e "${GRN}coverage_reports_path:${RST} ${coverage_reports_path}"
-echo -e "${GRN}test_results_path:${RST} ${test_results_path}"
-echo -e "${GRN}log_file:${RST} ${log_file}"
 
 # Create directories
 mkdir -p "${GIT_ROOT}/integration-tests/coverage"
@@ -23,29 +17,24 @@ mkdir -p "${GIT_ROOT}/integration-tests/coverage"
 rm -rf "${coverage_reports_path}"
 rm -rf "${test_results_path}"
 
+all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.test.status-go.yml"
+
 # Run integration tests
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
-docker-compose \
-  -f ${root_path}/docker-compose.anvil.yml \
-  -f ${root_path}/docker-compose.test.status-go.yml \
-  up -d --build --remove-orphans > ${log_file}
+docker-compose ${all_compose_files} up -d --build --remove-orphans
 
 # Save logs
 echo -e "${GRN}Saving logs${RST}"
-docker-compose \
-  -f ${root_path}/docker-compose.anvil.yml \
-  -f ${root_path}/docker-compose.test.status-go.yml \
-  logs -f tests-rpc > ${log_file}
+docker-compose ${all_compose_files} logs -f tests-rpc > "${root_path}/tests-rpc.log"
+docker-compose ${all_compose_files} logs status-go > "${root_path}/statusd.log"
+docker-compose ${all_compose_files} logs status-go-no-funds > "${root_path}/statusd-no-funds.log"
 
 # Retrieve exit code
 exit_code=$(docker inspect integration-tests_tests-rpc_1 -f '{{.State.ExitCode}}');
 
 # Stop and remove containers
 echo -e "${GRN}Stopping docker containers${RST}"
-docker-compose \
-  -f ${root_path}/docker-compose.anvil.yml \
-  -f ${root_path}/docker-compose.test.status-go.yml \
-  down > ${log_file}
+docker-compose ${all_compose_files} down
 
 # Early exit if tests failed
 if [[ "$exit_code" -ne 0 ]]; then
@@ -54,12 +43,11 @@ fi
 
 # Prepare coverage reports
 binary_coverage_reports_path="${coverage_reports_path}/binary"
-#merged_coverage_reports_path="${coverage_reports_path}/merged"
-merged_coverage_reports_path="$(mktemp -d)"
+merged_coverage_reports_path="${coverage_reports_path}/merged"
 full_coverage_profile="${coverage_reports_path}/coverage.out"
 
 # Clean merged reports directory
-#mkdir -p "${merged_coverage_reports_path}"
+mkdir -p "${merged_coverage_reports_path}"
 
 # Merge coverage reports
 go tool covdata merge -i="${binary_coverage_reports_path}" -o="${merged_coverage_reports_path}"
@@ -69,6 +57,5 @@ go tool covdata textfmt -i="${merged_coverage_reports_path}" -o="${full_coverage
 
 # Upload reports to Codecov
 if [[ ${INTEGRATION_TESTS_REPORT_CODECOV} == 'true' ]]; then
-# Docs: https://go.dev/blog/integration-test-coverage
   report_to_codecov "${test_results_path}/*.xml" "${full_coverage_profile}" "integration"
 fi

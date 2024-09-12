@@ -3,7 +3,7 @@
 source "${GIT_ROOT}/_assets/scripts/colors.sh"
 
 report_to_codecov() {
-  # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
+  # https://go.dev/blog/integration-test-coverage
   echo -e "${GRN}Uploading coverage report to Codecov${RST}"
 
   local tests_report_wildcard="${1}"

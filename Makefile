@@ -488,8 +488,8 @@ test-verif-proxy-wrapper:
 	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)
 
 
-#run-integration-tests: SHELL := /bin/sh # Run not in nix-shell, we need codecov
-run-integration-tests: export INTEGRATION_TESTS_DOCKER_UID ?= $(call sh, id -u $$USER)
+#run-integration-tests: SHELL := /bin/sh # Run in nix-shell, we need codecov
+run-integration-tests: export INTEGRATION_TESTS_DOCKER_UID ?= $(call sh, id -u)
 run-integration-tests: export INTEGRATION_TESTS_REPORT_CODECOV ?= false
 run-integration-tests:
 	@./_assets/scripts/run_integration_tests.sh
