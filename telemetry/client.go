@@ -16,9 +16,9 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
 
-	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
-
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
+	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 )
 
 type TelemetryType string
@@ -34,8 +34,9 @@ const (
 	PeerConnFailuresMetric     TelemetryType = "PeerConnFailure"
 	MessageCheckSuccessMetric  TelemetryType = "MessageCheckSuccess"
 	MessageCheckFailureMetric  TelemetryType = "MessageCheckFailure"
-
-	MaxRetryCache = 5000
+	PeerCountByShardMetric     TelemetryType = "PeerCountByShard"
+	PeerCountByOriginMetric    TelemetryType = "PeerCountByOrigin"
+	MaxRetryCache                            = 5000
 )
 
 type TelemetryRequest struct {
@@ -89,6 +90,18 @@ func (c *Client) PushMessageCheckFailure(ctx context.Context, messageHash string
 	c.processAndPushTelemetry(ctx, MessageCheckFailure{MessageHash: messageHash})
 }
 
+func (c *Client) PushPeerCountByShard(ctx context.Context, peerCountByShard map[uint16]uint) {
+	for shard, count := range peerCountByShard {
+		c.processAndPushTelemetry(ctx, PeerCountByShard{Shard: shard, Count: count})
+	}
+}
+
+func (c *Client) PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin map[wps.Origin]uint) {
+	for origin, count := range peerCountByOrigin {
+		c.processAndPushTelemetry(ctx, PeerCountByOrigin{Origin: origin, Count: count})
+	}
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
@@ -110,6 +123,16 @@ type MessageCheckSuccess struct {
 
 type MessageCheckFailure struct {
 	MessageHash string
+}
+
+type PeerCountByShard struct {
+	Shard uint16
+	Count uint
+}
+
+type PeerCountByOrigin struct {
+	Origin wps.Origin
+	Count  uint
 }
 
 type Client struct {
@@ -276,6 +299,18 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			TelemetryType: MessageCheckFailureMetric,
 			TelemetryData: c.ProcessMessageCheckFailure(v),
 		}
+	case PeerCountByShard:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: PeerCountByShardMetric,
+			TelemetryData: c.ProcessPeerCountByShard(v),
+		}
+	case PeerCountByOrigin:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: PeerCountByOriginMetric,
+			TelemetryData: c.ProcessPeerCountByOrigin(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
@@ -421,9 +456,27 @@ func (c *Client) ProcessMessageCheckSuccess(messageCheckSuccess MessageCheckSucc
 	return &jsonRawMessage
 }
 
+func (c *Client) ProcessPeerCountByShard(peerCountByShard PeerCountByShard) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["shard"] = peerCountByShard.Shard
+	postBody["count"] = peerCountByShard.Count
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
 func (c *Client) ProcessMessageCheckFailure(messageCheckFailure MessageCheckFailure) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["messageHash"] = messageCheckFailure.MessageHash
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessPeerCountByOrigin(peerCountByOrigin PeerCountByOrigin) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["origin"] = peerCountByOrigin.Origin
+	postBody["count"] = peerCountByOrigin.Count
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage

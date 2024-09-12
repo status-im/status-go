@@ -357,7 +357,7 @@ func setDefaultConfig(config *wakuv2.Config, lightMode bool) {
 var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.shards.nodes.status.im"
 
 func TestPeerCount(t *testing.T) {
-	t.Skip("flaky test")
+	// t.Skip("flaky test")
 
 	expectedCondition := func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
 		found := slices.ContainsFunc(received, func(req TelemetryRequest) bool {
@@ -371,6 +371,9 @@ func TestPeerCount(t *testing.T) {
 		setDefaultConfig(config, false)
 		config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
 		config.DiscoveryLimit = 20
+		config.TelemetryServerURL = client.serverURL
+		config.TelemetrySendPeriodMs = 1500
+		config.TelemetryPeerCountSendPeriod = 1500
 		w, err := wakuv2.New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
 		require.NoError(t, err)
 
@@ -417,4 +420,76 @@ func TestPeerId(t *testing.T) {
 
 	})
 
+}
+
+func TestPeerCountByShard(t *testing.T) {
+	expectedCondition := func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
+		found := slices.ContainsFunc(received, func(req TelemetryRequest) bool {
+			return req.TelemetryType == PeerCountByShardMetric
+		})
+		return found, false
+	}
+	withMockServer(t, PeerCountByShardMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+		config := &wakuv2.Config{}
+		setDefaultConfig(config, false)
+		config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
+		config.DiscoveryLimit = 20
+		config.TelemetryServerURL = client.serverURL
+		config.TelemetryPeerCountSendPeriod = 1500
+		config.TelemetrySendPeriodMs = 1500
+		w, err := wakuv2.New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
+		require.NoError(t, err)
+
+		w.SetStatusTelemetryClient(client)
+		client.Start(ctx)
+
+		require.NoError(t, w.Start())
+
+		err = tt.RetryWithBackOff(func() error {
+			if len(w.Peers()) == 0 {
+				return errors.New("no peers discovered")
+			}
+			return nil
+		})
+
+		require.NoError(t, err)
+
+		require.NotEqual(t, 0, len(w.Peers()))
+	})
+}
+
+func TestPeerCountByOrigin(t *testing.T) {
+	expectedCondition := func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
+		found := slices.ContainsFunc(received, func(req TelemetryRequest) bool {
+			return req.TelemetryType == PeerCountByOriginMetric
+		})
+		return found, false
+	}
+	withMockServer(t, PeerCountByOriginMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+		config := &wakuv2.Config{}
+		setDefaultConfig(config, false)
+		config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
+		config.DiscoveryLimit = 20
+		config.TelemetryServerURL = client.serverURL
+		config.TelemetryPeerCountSendPeriod = 1500
+		config.TelemetrySendPeriodMs = 1500
+		w, err := wakuv2.New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
+		require.NoError(t, err)
+
+		w.SetStatusTelemetryClient(client)
+		client.Start(ctx)
+
+		require.NoError(t, w.Start())
+
+		err = tt.RetryWithBackOff(func() error {
+			if len(w.Peers()) == 0 {
+				return errors.New("no peers discovered")
+			}
+			return nil
+		})
+
+		require.NoError(t, err)
+
+		require.NotEqual(t, 0, len(w.Peers()))
+	})
 }
