@@ -14,8 +14,8 @@ test_results_path="${root_path}/reports"
 mkdir -p "${GIT_ROOT}/integration-tests/coverage"
 
 # Cleanup any previous coverage reports
-rm -rf "${coverage_reports_path}"
-rm -rf "${test_results_path}"
+rm -rf "${coverage_reports_path:?}"/*
+rm -rf "${test_results_path:?}"/*
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.test.status-go.yml"
 
