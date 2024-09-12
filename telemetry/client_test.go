@@ -21,8 +21,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/waku-org/go-waku/waku/v2/api/publish"
-
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
