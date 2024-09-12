@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 )
 
 func TestSignalsServer(t *testing.T) {
-	server := NewSignalsServer()
+	server := NewServer()
 	server.Setup()
 	err := server.Listen("localhost:0")
 	require.NoError(t, err)

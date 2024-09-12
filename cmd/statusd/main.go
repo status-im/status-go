@@ -23,6 +23,7 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/cmd/statusd/server"
 	"github.com/status-im/status-go/common/dbsetup"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -80,8 +81,8 @@ var (
 			params.FleetProd,
 		),
 	)
-	listenAddr           = flag.String("addr", "", "address to bind listener to")
-	signalsServerAddress = flag.String("signals-server", "", "Address `host:port` for signals server")
+	listenAddr = flag.String("addr", "", "address to bind listener to")
+	serverAddr = flag.String("server", "", "Address `host:port` for HTTP API server of statusd")
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metricsEnabled = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
@@ -169,19 +170,19 @@ func main() {
 		return
 	}
 
-	if signalsServerAddress != nil && *signalsServerAddress != "" {
-		signalsServer := NewSignalsServer()
-		signalsServer.Setup()
-		err = signalsServer.Listen(*signalsServerAddress)
+	if serverAddr != nil && *serverAddr != "" {
+		srv := server.NewServer()
+		srv.Setup()
+		err = srv.Listen(*serverAddr)
 		if err != nil {
-			logger.Error("failed to start signals server", "error", err)
+			logger.Error("failed to start server", "error", err)
 			return
 		}
-		log.Info("Signals server started", "address", signalsServer.Address())
+		log.Info("server started", "address", srv.Address())
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			signalsServer.Stop(ctx)
+			srv.Stop(ctx)
 		}()
 	}
 

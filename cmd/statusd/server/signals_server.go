@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -15,28 +15,28 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
-type SignalsServer struct {
+type Server struct {
 	server      *http.Server
 	lock        sync.Mutex
 	connections map[*websocket.Conn]struct{}
 	address     string
 }
 
-func NewSignalsServer() *SignalsServer {
-	return &SignalsServer{
+func NewServer() *Server {
+	return &Server{
 		connections: make(map[*websocket.Conn]struct{}, 1),
 	}
 }
 
-func (s *SignalsServer) Address() string {
+func (s *Server) Address() string {
 	return s.address
 }
 
-func (s *SignalsServer) Setup() {
+func (s *Server) Setup() {
 	signal.SetMobileSignalHandler(s.signalHandler)
 }
 
-func (s *SignalsServer) signalHandler(data []byte) {
+func (s *Server) signalHandler(data []byte) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -48,7 +48,7 @@ func (s *SignalsServer) signalHandler(data []byte) {
 	}
 }
 
-func (s *SignalsServer) Listen(address string) error {
+func (s *Server) Listen(address string) error {
 	if s.server != nil {
 		return errors.New("server already started")
 	}
@@ -77,7 +77,7 @@ func (s *SignalsServer) Listen(address string) error {
 	return nil
 }
 
-func (s *SignalsServer) Stop(ctx context.Context) {
+func (s *Server) Stop(ctx context.Context) {
 	for connection := range s.connections {
 		err := connection.Close()
 		if err != nil {
@@ -95,7 +95,7 @@ func (s *SignalsServer) Stop(ctx context.Context) {
 	s.address = ""
 }
 
-func (s *SignalsServer) signals(w http.ResponseWriter, r *http.Request) {
+func (s *Server) signals(w http.ResponseWriter, r *http.Request) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -105,6 +105,11 @@ func (s *SignalsServer) signals(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	connection, _ := upgrader.Upgrade(w, r, nil)
+	connection, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Error("failed to upgrade connection: %w", err)
+		return
+	}
+
 	s.connections[connection] = struct{}{}
 }
