@@ -72,7 +72,7 @@ func TestLogAndCall(t *testing.T) {
 	}))
 	requestlog.NewRequestLogger().SetHandler(mockLogger.GetHandler())
 
-	// Test case
+	// Test case 1: Normal execution
 	testFunc := func(param string) string {
 		return "test result: " + param
 	}
@@ -94,6 +94,31 @@ func TestLogAndCall(t *testing.T) {
 		}
 	}
 
+	// Test case 2: Panic -> recovery -> re-panic
+	oldRootHandler := log.Root().GetHandler()
+	defer log.Root().SetHandler(oldRootHandler)
+	log.Root().SetHandler(mockLogger.GetHandler())
+	// Clear log output for next test
+	logOutput = ""
+	e := "test panic"
+	panicFunc := func() {
+		panic(e)
+	}
+
+	require.PanicsWithValue(t, e, func() {
+		logAndCall(panicFunc)
+	})
+
+	// Check if the panic was logged
+	if !strings.Contains(logOutput, "panic found in logAndCall") {
+		t.Errorf("Log output doesn't contain panic information")
+	}
+	if !strings.Contains(logOutput, e) {
+		t.Errorf("Log output doesn't contain panic message")
+	}
+	if !strings.Contains(logOutput, "stacktrace") {
+		t.Errorf("Log output doesn't contain stacktrace")
+	}
 }
 
 func TestGetFunctionName(t *testing.T) {
