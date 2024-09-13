@@ -32,6 +32,10 @@ type Login struct {
 	// - Password is ignored and replaced with encryption public key
 	// - KeycardWhisperPrivateKey is ignored and replaced with chat private key
 	Mnemonic string `json:"mnemonic"`
+	// https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki#from-mnemonic-to-seed
+	// A user may decide to protect their mnemonic with a passphrase. If a passphrase is not present,
+	// an empty string "" is used instead.
+	BIP39Passphrase string `json:"BIP39Passphrase"`
 
 	WalletSecretsConfig
 

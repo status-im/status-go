@@ -1035,17 +1035,22 @@ func colorID(pk string) string {
 }
 
 func ValidateMnemonic(mnemonic string) string {
-	return logAndCallString(validateMnemonic, mnemonic)
+	return logAndCallString(validateMnemonic, mnemonic, "")
 }
 
-func validateMnemonic(mnemonic string) string {
+func ValidateMnemonicWithPassphrase(mnemonic, passphrase string) string {
+	return logAndCallString(validateMnemonic, mnemonic, passphrase)
+}
+
+func validateMnemonic(mnemonic, passphrase string) string {
 	m := extkeys.NewMnemonic()
 	err := m.ValidateMnemonic(mnemonic, extkeys.Language(0))
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	keyUID, err := statusBackend.GetKeyUIDByMnemonic(mnemonic)
+	keyUID, err := statusBackend.GetKeyUIDByMnemonic(mnemonic, passphrase)
+
 	if err != nil {
 		return makeJSONResponse(err)
 	}
