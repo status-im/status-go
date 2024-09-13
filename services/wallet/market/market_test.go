@@ -52,7 +52,7 @@ func (mpp *MockPriceProviderWithError) FetchPrices(symbols []string, currencies 
 	return nil, errors.New("error")
 }
 
-func setupTestPrice(t *testing.T, providers []thirdparty.MarketDataProvider) *Manager {
+func setupMarketManager(t *testing.T, providers []thirdparty.MarketDataProvider) *Manager {
 	return NewManager(providers, &event.Feed{})
 }
 
@@ -83,7 +83,7 @@ func TestPrice(t *testing.T) {
 	priceProvider := NewMockPriceProvider(ctrl)
 	priceProvider.setMockPrices(mockPrices)
 
-	manager := setupTestPrice(t, []thirdparty.MarketDataProvider{priceProvider, priceProvider})
+	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{priceProvider, priceProvider})
 
 	{
 		rst := manager.GetCachedPrices()
@@ -131,7 +131,7 @@ func TestFetchPriceErrorFirstProvider(t *testing.T) {
 	symbols := []string{"BTC", "ETH"}
 	currencies := []string{"USD", "EUR"}
 
-	manager := setupTestPrice(t, []thirdparty.MarketDataProvider{priceProviderWithError, priceProvider})
+	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{priceProviderWithError, priceProvider})
 	rst, err := manager.FetchPrices(symbols, currencies)
 	require.NoError(t, err)
 	for _, symbol := range symbols {
@@ -172,7 +172,7 @@ func TestFetchTokenMarketValues(t *testing.T) {
 	provider := mock_thirdparty.NewMockMarketDataProvider(ctrl)
 	provider.EXPECT().ID().Return("MockPriceProvider").AnyTimes()
 	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(expectedMarketValues, nil)
-	manager := setupTestPrice(t, []thirdparty.MarketDataProvider{provider})
+	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{provider})
 	marketValues, err := manager.FetchTokenMarketValues(symbols, currency)
 	require.NoError(t, err)
 	require.Equal(t, expectedMarketValues, marketValues)
@@ -182,4 +182,79 @@ func TestFetchTokenMarketValues(t *testing.T) {
 	marketValues, err = manager.FetchTokenMarketValues(symbols, currency)
 	require.Error(t, err)
 	require.Nil(t, marketValues)
+}
+
+func TestGetOrFetchTokenMarketValues(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	symbols := []string{"BTC", "ETH"}
+	currency := "EUR"
+	initialTokenMarketValues := map[string]thirdparty.TokenMarketValues{
+		"BTC": {
+			MKTCAP:          1000000000,
+			HIGHDAY:         1.23456,
+			LOWDAY:          1.00000,
+			CHANGEPCTHOUR:   0.1,
+			CHANGEPCTDAY:    0.2,
+			CHANGEPCT24HOUR: 0.3,
+			CHANGE24HOUR:    0.4,
+		},
+		"ETH": {
+			MKTCAP:          2000000000,
+			HIGHDAY:         4.56789,
+			LOWDAY:          4.00000,
+			CHANGEPCTHOUR:   0.5,
+			CHANGEPCTDAY:    0.6,
+			CHANGEPCT24HOUR: 0.7,
+			CHANGE24HOUR:    0.8,
+		},
+	}
+	updatedTokenMarketValues := map[string]thirdparty.TokenMarketValues{
+		"BTC": {
+			MKTCAP:          1000000000,
+			HIGHDAY:         2.23456,
+			LOWDAY:          1.00000,
+			CHANGEPCTHOUR:   0.1,
+			CHANGEPCTDAY:    0.2,
+			CHANGEPCT24HOUR: 0.3,
+			CHANGE24HOUR:    0.4,
+		},
+		"ETH": {
+			MKTCAP:          2000000000,
+			HIGHDAY:         5.56789,
+			LOWDAY:          4.00000,
+			CHANGEPCTHOUR:   0.5,
+			CHANGEPCTDAY:    0.6,
+			CHANGEPCT24HOUR: 0.7,
+			CHANGE24HOUR:    0.8,
+		},
+	}
+
+	provider := mock_thirdparty.NewMockMarketDataProvider(ctrl)
+	provider.EXPECT().ID().Return("MockMarketProvider").AnyTimes()
+	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{provider})
+
+	// Test: ensure errors are propagated
+	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(nil, errors.New("error"))
+	marketValues, err := manager.GetOrFetchTokenMarketValues(symbols, currency, 0)
+	require.Error(t, err)
+	require.Nil(t, marketValues)
+
+	// Test: ensure token market values are retrieved
+	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(initialTokenMarketValues, nil)
+	marketValues, err = manager.GetOrFetchTokenMarketValues(symbols, currency, 10)
+	require.NoError(t, err)
+	require.Equal(t, initialTokenMarketValues, marketValues)
+
+	// Test: ensure token market values are cached
+	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(updatedTokenMarketValues, nil)
+	marketValues, err = manager.GetOrFetchTokenMarketValues(symbols, currency, 10)
+	require.NoError(t, err)
+	require.Equal(t, initialTokenMarketValues, marketValues)
+
+	// Test: ensure token market values are updated
+	marketValues, err = manager.GetOrFetchTokenMarketValues(symbols, currency, -1)
+	require.NoError(t, err)
+	require.Equal(t, updatedTokenMarketValues, marketValues)
 }
