@@ -13,7 +13,7 @@ var (
 	// requestLogger is the request logger object
 	requestLogger log.Logger
 	// isRequestLoggingEnabled controls whether request logging is enabled
-	isRequestLoggingEnabled uint32
+	isRequestLoggingEnabled atomic.Bool
 )
 
 // NewRequestLogger creates a new request logger object
@@ -25,15 +25,15 @@ func NewRequestLogger(ctx ...interface{}) log.Logger {
 // EnableRequestLogging enables or disables RPC logging
 func EnableRequestLogging(enable bool) {
 	if enable {
-		atomic.StoreUint32(&isRequestLoggingEnabled, 1)
+		isRequestLoggingEnabled.Store(true)
 	} else {
-		atomic.StoreUint32(&isRequestLoggingEnabled, 0)
+		isRequestLoggingEnabled.Store(false)
 	}
 }
 
 // IsRequestLoggingEnabled returns whether RPC logging is enabled
 func IsRequestLoggingEnabled() bool {
-	return atomic.LoadUint32(&isRequestLoggingEnabled) == 1
+	return isRequestLoggingEnabled.Load()
 }
 
 // GetRequestLogger returns the RPC logger object

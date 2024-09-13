@@ -38,10 +38,7 @@ func TestInitLogging(t *testing.T) {
 	}
 	_, err = statusBackend.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
-	result := CallPrivateRPC(fmt.Sprintf(
-		`{"jsonrpc":"2.0","method":"settings_getSettings","params":[],"id":%d}`,
-		1,
-	))
+	result := CallPrivateRPC(`{"jsonrpc":"2.0","method":"settings_getSettings","params":[],"id":1}`)
 	require.NotContains(t, result, "error")
 	// Check if request log file exists now
 	_, err = os.Stat(requestsLogFile)

@@ -13,6 +13,8 @@ import (
 	"github.com/status-im/status-go/logutils/requestlog"
 )
 
+var sensitiveRegex = regexp.MustCompile(`(?i)(".*?(password|mnemonic|openseaAPIKey|poktToken|alchemyArbitrumMainnetToken|raribleTestnetAPIKey|alchemyOptimismMainnetToken|statusProxyBlockchainUser|alchemyEthereumSepoliaToken|alchemyArbitrumSepoliaToken|infuraToken|raribleMainnetAPIKey|alchemyEthereumMainnetToken).*?")\s*:\s*("[^"]*")`)
+
 func getFunctionName(fn any) string {
 	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
 }
@@ -34,9 +36,6 @@ func logAndCall(fn any, params ...any) any {
 	}()
 
 	var startTime time.Time
-	var duration time.Duration
-
-	methodName := getShortFunctionName(fn)
 
 	if requestlog.IsRequestLoggingEnabled() {
 		startTime = time.Now()
@@ -62,7 +61,8 @@ func logAndCall(fn any, params ...any) any {
 	}
 
 	if requestlog.IsRequestLoggingEnabled() {
-		duration = time.Since(startTime)
+		duration := time.Since(startTime)
+		methodName := getShortFunctionName(fn)
 		paramsString := removeSensitiveInfo(fmt.Sprintf("%+v", params))
 		respString := removeSensitiveInfo(fmt.Sprintf("%+v", resp))
 		requestlog.GetRequestLogger().Debug(methodName, "params", paramsString, "resp", respString, "duration", duration)
@@ -81,9 +81,8 @@ func logAndCallString(fn any, params ...any) string {
 
 func removeSensitiveInfo(jsonStr string) string {
 	// see related test for the usage of this function
-	re := regexp.MustCompile(`(?i)(".*?(password|mnemonic|openseaAPIKey|poktToken|alchemyArbitrumMainnetToken|raribleTestnetAPIKey|alchemyOptimismMainnetToken|statusProxyBlockchainUser|alchemyEthereumSepoliaToken|alchemyArbitrumSepoliaToken|infuraToken|raribleMainnetAPIKey|alchemyEthereumMainnetToken).*?")\s*:\s*("[^"]*")`)
-	return re.ReplaceAllStringFunc(jsonStr, func(match string) string {
-		parts := re.FindStringSubmatch(match)
+	return sensitiveRegex.ReplaceAllStringFunc(jsonStr, func(match string) string {
+		parts := sensitiveRegex.FindStringSubmatch(match)
 		return fmt.Sprintf(`%s:"***"`, parts[1])
 	})
 }

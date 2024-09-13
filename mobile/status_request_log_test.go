@@ -79,7 +79,6 @@ func TestLogAndCall(t *testing.T) {
 	testParam := "test input"
 	expectedResult := "test result: test input"
 
-	// Call logAndCall
 	result := logAndCallString(testFunc, testParam)
 
 	// Check the result
@@ -114,6 +113,7 @@ func TestSetMobileSignalHandler(t *testing.T) {
 	// Setup
 	handler := &testSignalHandler{}
 	SetMobileSignalHandler(handler)
+	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	// Test data
 	testAccount := &multiaccounts.Account{Name: "test"}
