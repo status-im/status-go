@@ -10,13 +10,13 @@ import (
 )
 
 type LogSettings struct {
-	Enabled         bool
-	MobileSystem    bool
-	Level           string
-	File            string
-	MaxSize         int
-	MaxBackups      int
-	CompressRotated bool
+	Enabled         bool   `json:"Enabled"`
+	MobileSystem    bool   `json:"MobileSystem"`
+	Level           string `json:"Level"`
+	File            string `json:"File"`
+	MaxSize         int    `json:"MaxSize"`
+	MaxBackups      int    `json:"MaxBackups"`
+	CompressRotated bool   `json:"CompressRotated"`
 }
 
 // OverrideWithStdLogger overwrites ethereum's root logger with a logger from golang std lib.

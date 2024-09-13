@@ -1697,8 +1697,8 @@ func deserializeAndCompressKey(DesktopKey string) string {
 
 type InitLoggingRequest struct {
 	logutils.LogSettings
-	LogRequestGo   bool
-	LogRequestFile string
+	LogRequestGo   bool   `json:"LogRequestGo"`
+	LogRequestFile string `json:"LogRequestFile"`
 }
 
 // InitLogging The InitLogging function should be called when the application starts.
