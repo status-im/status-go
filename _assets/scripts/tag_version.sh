@@ -14,18 +14,20 @@ get_latest_tag() {
 bump_version() {
     local tag=$1
     local is_breaking_change=$2
-    IFS='.' read -r major minor patch <<< "$tag"
+    IFS='v.' read -r _ major minor patch <<< "$tag"
 
     # Bump the version based on the type of change
     if [[ "$is_breaking_change" = true ]]; then
         ((major++))
         ((minor=0))
+        ((patch=0))
     else
         ((minor++))
+        ((patch=0))
     fi
 
     new_version="$major.$minor.$patch"
-    echo "$new_version"
+    echo "v$new_version"
 }
 
 calculate_new_version() {
