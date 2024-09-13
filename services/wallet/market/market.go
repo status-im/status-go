@@ -23,12 +23,21 @@ type DataPoint struct {
 	UpdatedAt int64
 }
 
+type MarketValuesSnapshot struct {
+	MarketValues thirdparty.TokenMarketValues
+	UpdatedAt    int64
+}
+
 type DataPerTokenAndCurrency = map[string]map[string]DataPoint
+type MarketValuesPerToken = map[string]MarketValuesSnapshot
+type MarketValuesPerCurrencyAndToken = map[string]MarketValuesPerToken
 
 type Manager struct {
 	feed            *event.Feed
 	priceCache      DataPerTokenAndCurrency
 	priceCacheLock  sync.RWMutex
+	marketCache     MarketValuesPerCurrencyAndToken
+	marketCacheLock sync.RWMutex
 	IsConnected     bool
 	LastCheckedAt   int64
 	IsConnectedLock sync.RWMutex
@@ -47,6 +56,7 @@ func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Ma
 	return &Manager{
 		feed:           feed,
 		priceCache:     make(DataPerTokenAndCurrency),
+		marketCache:    make(MarketValuesPerCurrencyAndToken),
 		IsConnected:    true,
 		LastCheckedAt:  time.Now().Unix(),
 		circuitbreaker: cb,
@@ -133,7 +143,84 @@ func (pm *Manager) FetchTokenMarketValues(symbols []string, currency string) (ma
 	}
 
 	marketValues := result.(map[string]thirdparty.TokenMarketValues)
+	pm.updateMarketCache(currency, marketValues)
 	return marketValues, nil
+}
+
+func (pm *Manager) GetCachedTokenMarketValues() MarketValuesPerCurrencyAndToken {
+	pm.marketCacheLock.RLock()
+	defer pm.marketCacheLock.RUnlock()
+	return pm.marketCache
+}
+
+func (pm *Manager) GetOrFetchTokenMarketValues(symbols []string, currency string, maxAgeInSeconds int64) (map[string]thirdparty.TokenMarketValues, error) {
+	symbolsToFetchMap := make(map[string]bool)
+	symbolsToFetch := make([]string, 0, len(symbols))
+
+	now := time.Now().Unix()
+	tokenMarketValuesCache, ok := pm.GetCachedTokenMarketValues()[currency]
+	if !ok {
+		return pm.FetchTokenMarketValues(symbols, currency)
+	}
+
+	for _, symbol := range symbols {
+		marketValueSnapshot, found := tokenMarketValuesCache[symbol]
+		if !found {
+			if !symbolsToFetchMap[symbol] {
+				symbolsToFetchMap[symbol] = true
+				symbolsToFetch = append(symbolsToFetch, symbol)
+			}
+			continue
+		}
+		if now-marketValueSnapshot.UpdatedAt > maxAgeInSeconds {
+			if !symbolsToFetchMap[symbol] {
+				symbolsToFetchMap[symbol] = true
+				symbolsToFetch = append(symbolsToFetch, symbol)
+			}
+			continue
+		}
+	}
+
+	if len(symbolsToFetch) > 0 {
+		_, err := pm.FetchTokenMarketValues(symbolsToFetch, currency)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	tokenMarketValues := pm.getCachedTokenMarketValuesFor(currency, symbols)
+	return tokenMarketValues, nil
+}
+
+func (pm *Manager) updateMarketCache(currency string, marketValuesPerToken map[string]thirdparty.TokenMarketValues) {
+	pm.marketCacheLock.Lock()
+	defer pm.marketCacheLock.Unlock()
+
+	for token, tokenMarketValues := range marketValuesPerToken {
+		_, present := pm.marketCache[currency]
+		if !present {
+			pm.marketCache[currency] = make(map[string]MarketValuesSnapshot)
+		}
+
+		pm.marketCache[currency][token] = MarketValuesSnapshot{
+			UpdatedAt:    time.Now().Unix(),
+			MarketValues: tokenMarketValues,
+		}
+	}
+}
+
+func (pm *Manager) getCachedTokenMarketValuesFor(currency string, symbols []string) map[string]thirdparty.TokenMarketValues {
+	tokenMarketValues := make(map[string]thirdparty.TokenMarketValues)
+
+	if cachedTokenMarketValues, ok := pm.marketCache[currency]; ok {
+		for _, symbol := range symbols {
+			if marketValuesSnapshot, found := cachedTokenMarketValues[symbol]; found {
+				tokenMarketValues[symbol] = marketValuesSnapshot.MarketValues
+			}
+		}
+	}
+
+	return tokenMarketValues
 }
 
 func (pm *Manager) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
