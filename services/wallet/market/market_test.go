@@ -258,3 +258,51 @@ func TestGetOrFetchTokenMarketValues(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, updatedTokenMarketValues, marketValues)
 }
+
+func TestGetCachedTokenMarketValues(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	symbols := []string{"BTC", "ETH"}
+	currency := "EUR"
+	initialTokenMarketValues := map[string]thirdparty.TokenMarketValues{
+		"BTC": {
+			MKTCAP:          1000000000,
+			HIGHDAY:         1.23456,
+			LOWDAY:          1.00000,
+			CHANGEPCTHOUR:   0.1,
+			CHANGEPCTDAY:    0.2,
+			CHANGEPCT24HOUR: 0.3,
+			CHANGE24HOUR:    0.4,
+		},
+		"ETH": {
+			MKTCAP:          2000000000,
+			HIGHDAY:         4.56789,
+			LOWDAY:          4.00000,
+			CHANGEPCTHOUR:   0.5,
+			CHANGEPCTDAY:    0.6,
+			CHANGEPCT24HOUR: 0.7,
+			CHANGE24HOUR:    0.8,
+		},
+	}
+
+	provider := mock_thirdparty.NewMockMarketDataProvider(ctrl)
+	provider.EXPECT().ID().Return("MockMarketProvider").AnyTimes()
+	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{provider})
+
+	// Test: ensure token market cache is empty
+	tokenMarketCache := manager.GetCachedTokenMarketValues()
+	require.Empty(t, tokenMarketCache)
+
+	// Test: ensure token market values are retrieved
+	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(initialTokenMarketValues, nil)
+	marketValues, err := manager.GetOrFetchTokenMarketValues(symbols, currency, 10)
+	tokenMarketCache = manager.GetCachedTokenMarketValues()
+	require.NoError(t, err)
+
+	for _, token := range symbols {
+		tokenMarketValues := marketValues[token]
+		cachedTokenMarketValues := tokenMarketCache[currency][token]
+		require.Equal(t, cachedTokenMarketValues.MarketValues, tokenMarketValues)
+	}
+}
