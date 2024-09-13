@@ -149,8 +149,7 @@ echo -e "${GRN}Filtering test coverage packages:${RST} ./cmd"
 grep -v '^github.com/status-im/status-go/cmd/' ${merged_coverage_report} > ${final_coverage_report}
 
 # Generate HTML coverage report
-echo -e "${GRN}Generating HTML coverage report${RST}"
-go tool cover -html ${final_coverage_report} -o test-coverage.html
+convert_coverage_to_html ${final_coverage_report} "test-coverage.html"
 
 # Upload coverage report to CodeClimate
 if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then

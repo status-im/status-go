@@ -17,10 +17,12 @@ test_results_path="${root_path}/reports"
 
 # Cleanup any previous coverage reports
 rm -rf "${coverage_reports_path}"
+rm -rf "${test_results_path}"
 
 # Create directories
 mkdir -p "${binary_coverage_reports_path}"
 mkdir -p "${merged_coverage_reports_path}"
+mkdir -p "${test_results_path}"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.test.status-go.yml"
 
@@ -41,15 +43,12 @@ exit_code=$(docker inspect integration-tests_tests-rpc_1 -f '{{.State.ExitCode}}
 echo -e "${GRN}Stopping docker containers${RST}"
 docker-compose ${all_compose_files} down
 
-# Prepare coverage reports
-echo -e "${GRN}Gathering code coverage reports${RST}"
+# Collect coverage reports
+echo -e "${GRN}Collecting code coverage reports${RST}"
 full_coverage_profile="${coverage_reports_path}/coverage.out"
-
-# Merge coverage reports
 go tool covdata merge -i="${binary_coverage_reports_path}" -o="${merged_coverage_reports_path}"
-
-# Convert coverage reports to profile
 go tool covdata textfmt -i="${merged_coverage_reports_path}" -o="${full_coverage_profile}"
+convert_coverage_to_html "${full_coverage_profile}" "${coverage_reports_path}/coverage.html"
 
 # Upload reports to Codecov
 if [[ ${INTEGRATION_TESTS_REPORT_CODECOV} == 'true' ]]; then

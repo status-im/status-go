@@ -19,3 +19,12 @@ report_to_codecov() {
   codecov do-upload --token "${CODECOV_TOKEN}" --report-type test_results ${report_files_args}
   codecov upload-process --token "${CODECOV_TOKEN}" -f ${coverage_report} -F "${test_type}"
 }
+
+convert_coverage_to_html() {
+  echo -e "${GRN}Generating HTML coverage report${RST}"
+
+  local input_coverage_report="${1}"
+  local output_coverage_report="${2}"
+
+  go tool cover -html "${input_coverage_report}" -o "${output_coverage_report}"
+}
