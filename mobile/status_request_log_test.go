@@ -6,11 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/status-im/status-go/logutils/requestlog"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/signal"
-	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/log"
 )
