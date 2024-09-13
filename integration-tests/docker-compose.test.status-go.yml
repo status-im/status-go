@@ -10,11 +10,10 @@ services:
         build_flags: -cover -ldflags="-X github.com/status-im/status-go/params.Version= -X github.com/status-im/status-go/params.GitCommit=11f83780d -X github.com/status-im/status-go/params.IpfsGatewayURL=https://ipfs.status.im/ -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true"
     entrypoint: [
       "statusd",
-      "--log", "DEBUG",
       "-c", "/static/configs/config.json",
       "--seed-phrase", "test test test test test test test test test test test junk",
       "--password", "Strong12345",
-      "--dir", "/tmp/status-go-data", # Keep in sync with `config.json/DataDir` value. Later this arg not be needed.
+      "--dir", "/tmp/status-go-data", # Keep in sync with `config.json/DataDir` value. Later this arg will not be needed.
     ]
     ports:
       - 3333:3333
@@ -27,6 +26,7 @@ services:
       GOCOVERDIR: "/coverage/binary"
     volumes:
       - ./coverage/binary:/coverage/binary
+    stop_signal: SIGINT
 
   # TODO: Remove this duplication when implemented: https://github.com/status-im/status-go/issues/5803
   status-go-no-funds:
@@ -43,7 +43,7 @@ services:
       "-c", "/static/configs/config.json",
       "--seed-phrase", "test test test test test test test test test test test takoe",
       "--password", "Strong12345",
-      "--dir", "/tmp/status-go-data", # Keep in sync with `config.json/DataDir` value. Later this arg not be needed.
+      "--dir", "/tmp/status-go-data", # Keep in sync with `config.json/DataDir` value. Later this arg will not be needed.
     ]
     ports:
       - 3334:3333
@@ -56,6 +56,7 @@ services:
       GOCOVERDIR: "/coverage/binary"
     volumes:
       - ./coverage/binary:/coverage/binary
+    stop_signal: SIGINT
 
   tests-rpc:
     user: ${INTEGRATION_TESTS_DOCKER_UID}

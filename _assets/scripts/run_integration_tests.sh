@@ -30,6 +30,10 @@ all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/dock
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
 docker-compose ${all_compose_files} up -d --build --remove-orphans
 
+# Stop containers
+echo -e "${GRN}Stopping docker containers${RST}"
+docker-compose ${all_compose_files} stop
+
 # Save logs
 echo -e "${GRN}Saving logs${RST}"
 docker-compose ${all_compose_files} logs -f tests-rpc > "${root_path}/tests-rpc.log"
@@ -39,8 +43,8 @@ docker-compose ${all_compose_files} logs status-go-no-funds > "${root_path}/stat
 # Retrieve exit code
 exit_code=$(docker inspect integration-tests_tests-rpc_1 -f '{{.State.ExitCode}}');
 
-# Stop and remove containers
-echo -e "${GRN}Stopping docker containers${RST}"
+# Cleanup containers
+echo -e "${GRN}Removing docker containers${RST}"
 docker-compose ${all_compose_files} down
 
 # Collect coverage reports
