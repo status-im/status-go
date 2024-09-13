@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -143,8 +144,27 @@ func (pm *Manager) FetchTokenMarketValues(symbols []string, currency string) (ma
 	}
 
 	marketValues := result.(map[string]thirdparty.TokenMarketValues)
-	pm.updateMarketCache(currency, marketValues)
 	return marketValues, nil
+}
+
+func (pm *Manager) MakeCacheForFetchTokenMarketValues(ttl time.Duration) *Cache[string, map[string]thirdparty.TokenMarketValues] {
+	parseKey := func(key string) (string, []string) {
+		keyParts := strings.Split(key, "-")
+		currency := keyParts[0]
+		tokenSymbols := keyParts[1:]
+		return currency, tokenSymbols
+	}
+
+	fetcher := func(key string) (map[string]thirdparty.TokenMarketValues, error) {
+		currency, tokenSymbols := parseKey(key)
+		return pm.FetchTokenMarketValues(tokenSymbols, currency)
+	}
+
+	return NewCache(ttl, fetcher)
+}
+
+func GenerateCacheKeyForFetchTokenMarketValues(currency string, tokenSymbols []string) string {
+	return currency + "-" + strings.Join(tokenSymbols, "-")
 }
 
 func (pm *Manager) GetCachedTokenMarketValues() MarketValuesPerCurrencyAndToken {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -501,9 +502,13 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 	})
 
 	group.Add(func(parent context.Context) error {
-		tokenMarketValues, err = r.marketManager.GetOrFetchTokenMarketValues(tokenSymbols, currency, 60)
+		ttl := 60 * time.Second
+		cache := r.marketManager.MakeCacheForFetchTokenMarketValues(ttl)
+
+		fresh := false
+		tokenMarketValues, err = cache.Get(market.GenerateCacheKeyForFetchTokenMarketValues(currency, tokenSymbols), fresh)
 		if err != nil {
-			log.Info("marketManager.GetOrFetchTokenMarketValues err", err)
+			log.Info("marketManager.FetchTokenMarketValues err", err)
 		}
 		return nil
 	})

@@ -3,6 +3,7 @@ package market
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -184,7 +185,7 @@ func TestFetchTokenMarketValues(t *testing.T) {
 	require.Nil(t, marketValues)
 }
 
-func TestGetOrFetchTokenMarketValues(t *testing.T) {
+func TestCachedFetchTokenMarketValues(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -235,74 +236,41 @@ func TestGetOrFetchTokenMarketValues(t *testing.T) {
 	provider.EXPECT().ID().Return("MockMarketProvider").AnyTimes()
 	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{provider})
 
+	ttl := 200 * time.Millisecond
+	cache := manager.MakeCacheForFetchTokenMarketValues(ttl)
+	cacheKey := GenerateCacheKeyForFetchTokenMarketValues(currency, symbols)
+	fresh := false
+
 	// Test: ensure errors are propagated
 	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(nil, errors.New("error"))
-	marketValues, err := manager.GetOrFetchTokenMarketValues(symbols, currency, 0)
+	marketValues, err := cache.Get(cacheKey, fresh)
 	require.Error(t, err)
 	require.Nil(t, marketValues)
 
 	// Test: ensure token market values are retrieved
 	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(initialTokenMarketValues, nil)
-	marketValues, err = manager.GetOrFetchTokenMarketValues(symbols, currency, 10)
+	marketValues, err = cache.Get(cacheKey, fresh)
 	require.NoError(t, err)
 	require.Equal(t, initialTokenMarketValues, marketValues)
 
 	// Test: ensure token market values are cached
-	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(updatedTokenMarketValues, nil)
-	marketValues, err = manager.GetOrFetchTokenMarketValues(symbols, currency, 10)
+	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(updatedTokenMarketValues, nil).MaxTimes(0)
+	marketValues, err = cache.Get(cacheKey, fresh)
 	require.NoError(t, err)
 	require.Equal(t, initialTokenMarketValues, marketValues)
 
-	// Test: ensure token market values are updated
-	marketValues, err = manager.GetOrFetchTokenMarketValues(symbols, currency, -1)
+	// Test: ensure token market values are updated when requesting fresh data
+	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(updatedTokenMarketValues, nil).Times(1)
+	fresh = true
+	marketValues, err = cache.Get(cacheKey, fresh)
 	require.NoError(t, err)
 	require.Equal(t, updatedTokenMarketValues, marketValues)
-}
 
-func TestGetCachedTokenMarketValues(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	symbols := []string{"BTC", "ETH"}
-	currency := "EUR"
-	initialTokenMarketValues := map[string]thirdparty.TokenMarketValues{
-		"BTC": {
-			MKTCAP:          1000000000,
-			HIGHDAY:         1.23456,
-			LOWDAY:          1.00000,
-			CHANGEPCTHOUR:   0.1,
-			CHANGEPCTDAY:    0.2,
-			CHANGEPCT24HOUR: 0.3,
-			CHANGE24HOUR:    0.4,
-		},
-		"ETH": {
-			MKTCAP:          2000000000,
-			HIGHDAY:         4.56789,
-			LOWDAY:          4.00000,
-			CHANGEPCTHOUR:   0.5,
-			CHANGEPCTDAY:    0.6,
-			CHANGEPCT24HOUR: 0.7,
-			CHANGE24HOUR:    0.8,
-		},
-	}
-
-	provider := mock_thirdparty.NewMockMarketDataProvider(ctrl)
-	provider.EXPECT().ID().Return("MockMarketProvider").AnyTimes()
-	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{provider})
-
-	// Test: ensure token market cache is empty
-	tokenMarketCache := manager.GetCachedTokenMarketValues()
-	require.Empty(t, tokenMarketCache)
-
-	// Test: ensure token market values are retrieved
-	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(initialTokenMarketValues, nil)
-	marketValues, err := manager.GetOrFetchTokenMarketValues(symbols, currency, 10)
-	tokenMarketCache = manager.GetCachedTokenMarketValues()
+	// Test: stale data is ignored and the cache is refreshed
+	time.Sleep(ttl + time.Millisecond)
+	provider.EXPECT().FetchTokenMarketValues(symbols, currency).Return(initialTokenMarketValues, nil).Times(1)
+	fresh = false
+	marketValues, err = cache.Get(cacheKey, fresh)
 	require.NoError(t, err)
-
-	for _, token := range symbols {
-		tokenMarketValues := marketValues[token]
-		cachedTokenMarketValues := tokenMarketCache[currency][token]
-		require.Equal(t, cachedTokenMarketValues.MarketValues, tokenMarketValues)
-	}
+	require.Equal(t, initialTokenMarketValues, marketValues)
 }
