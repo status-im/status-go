@@ -1,13 +1,11 @@
 services:
   anvil:
-    user: ${INTEGRATION_TESTS_DOCKER_UID}
     image: ghcr.io/foundry-rs/foundry:latest
     platform: linux/amd64
     command:
       - anvil --host 0.0.0.0
 
   deploy-sntv2:
-    user: ${INTEGRATION_TESTS_DOCKER_UID}
     platform: linux/amd64
     environment:
       - API_KEY_ETHERSCAN="" # API_KEY env var is required, but value isn't used
@@ -25,7 +23,6 @@ services:
             --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
   deploy-communities-contracts:
-    user: ${INTEGRATION_TESTS_DOCKER_UID}
     platform: linux/amd64
     environment:
     # API_KEY_* env vars are required, but values aren't used
