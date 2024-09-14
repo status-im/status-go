@@ -28,7 +28,7 @@ parse_commits() {
                 is_breaking_change=true
             fi
         else
-            echo -e "${YLW}Commit message is not well-formed:${RST} \"$message\""
+            echo -e "${YLW}Commit message is ill-formed:${RST} $message"
             exit_code=1
         fi
     done < <(git log --format=%s "$start_commit".."$end_commit")

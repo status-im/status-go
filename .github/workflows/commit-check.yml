@@ -27,19 +27,28 @@ jobs:
         run: |
           set +e
 
-          output=$(./_assets/scripts/commit_check.sh 2>&1)          
+          output=$(./_assets/scripts/commit_check.sh 2>&1)
           exit_code=$?
+          
+          echo "$output" | sed '$d'
+          echo "has_breaking_changes=$has_breaking_changes"
+          
           echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
           
+          has_breaking_changes=$(echo "$output" | tail -n 1)
+          echo "has_breaking_changes=$has_breaking_changes" >> $GITHUB_OUTPUT
+          
+          invalid_commit_messages=$(echo "$output" | sed '1d;$d')
+          invalid_commit_messages=$(echo "$output" | sed '1d;$d')
+          invalid_commit_messages=$(echo "$invalid_commit_messages" | sed 's/\x1b\[[0-9;]*m//g') # Remove color codes
+          invalid_commit_messages=$(echo "$invalid_commit_messages" | sed 's/^Commit message is ill-formed: //') # Remove prefix
+          
           if [[ $exit_code -ne 0 ]]; then
-            invalid_commit_messages=$(echo $output | sed '1d;$d')
             EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
             echo "error_message<<$EOF" >> "$GITHUB_ENV"
-            echo "invalid_commit_messages" >> "$GITHUB_ENV"
+            echo "$invalid_commit_messages" >> "$GITHUB_ENV"
             echo "$EOF" >> "$GITHUB_ENV"
-          else
-            has_breaking_changes=$(echo "$output" | tail -n 1)
-            echo "has_breaking_changes=$has_breaking_changes" >> $GITHUB_OUTPUT
+          
           fi
 
       - name: "Publish failed commit messages"
@@ -50,12 +59,8 @@ jobs:
         with:
           header: commit-message-lint-error
           message: |
-            Thank you for opening this pull request!
-            
             We require commits to follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/), but with `_` for non-breaking changes. 
-            And it looks like your PR needs to be adjusted.
-
-            Details:
+            Please fix these commit messages:
             ```
             ${{ env.error_message }}
             ```
@@ -68,10 +73,14 @@ jobs:
         with:
           header: commit-message-lint-error
           message: |
-            Thank you for opening this pull request!
-            
             Looks like you have BREAKING CHANGES in your PR. 
-            Please make sure to update [status-desktop](https://github.com/status-im/status-desktop) and [status-mobile](https://github.com/status-im/status-mobile) clients accordingly.
+            Please make sure to follow [💔How to introduce breaking changes](https://www.notion.so/How-to-introduce-breaking-changes-ded9ec2d91464a46a2593c0d8de62fbe?pvs=4) guide:
+            
+            ### Check-list
+            
+            - [ ] Tried to prevent this breaking change
+            - [ ] Updated [status-desktop](https://github.com/status-im/status-desktop) 
+            - [ ] Updated [status-mobile](https://github.com/status-im/status-mobile)
 
       # Delete a previous comment when the issue has been resolved
       - name: "Delete previous comment"
@@ -80,3 +89,25 @@ jobs:
         with:
           header: commit-message-lint-error
           delete: true
+
+      - name: "Mark as failed"
+        if: steps.check_commit_message.outputs.exit_code != 0
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setFailed("Some commit messages are ill-formed")
+
+      - name: "Update breaking changes label"
+        if: always()
+        run: |
+          if [[ $ADD_LABEL == 'true' ]]; then
+            command="--add-label"
+          else
+            command="--remove-label"
+          fi
+          gh issue edit "$NUMBER" $command "breaking change"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          ADD_LABEL: ${{ steps.check_commit_message.outputs.has_breaking_changes == 'true' }}
