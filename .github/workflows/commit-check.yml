@@ -78,7 +78,7 @@ jobs:
             
             ### Check-list
             
-            - [ ] Tried to prevent this breaking change
+            - [ ] Tried to avoid this breaking change
             - [ ] Updated [status-desktop](https://github.com/status-im/status-desktop) 
             - [ ] Updated [status-mobile](https://github.com/status-im/status-mobile)
 
