@@ -8,37 +8,37 @@ type CacheStore[T any] interface {
 	CreateStore() T
 }
 
-type Cache[T CacheStore[T]] struct {
+type MarketCache[T CacheStore[T]] struct {
 	store T
 	lock  sync.RWMutex
 }
 
-func NewCache[T CacheStore[T]]() *Cache[T] {
-	var cache Cache[T]
+func NewCache[T CacheStore[T]]() *MarketCache[T] {
+	var cache MarketCache[T]
 	cache.store = cache.store.CreateStore()
 	return &cache
 }
 
-func Read[T CacheStore[T], R any](cache *Cache[T], reader func(store T) R) R {
+func Read[T CacheStore[T], R any](cache *MarketCache[T], reader func(store T) R) R {
 	cache.lock.RLock()
 	defer cache.lock.RUnlock()
 	return reader(cache.store)
 }
 
-func Write[T CacheStore[T]](cache *Cache[T], writer func(store *T) *T) *Cache[T] {
+func Write[T CacheStore[T]](cache *MarketCache[T], writer func(store *T) *T) *MarketCache[T] {
 	cache.lock.Lock()
 	defer cache.lock.Unlock()
 	cache.store = *writer(&cache.store)
 	return cache
 }
 
-func (cache *Cache[T]) Get() T {
+func (cache *MarketCache[T]) Get() T {
 	cache.lock.RLock()
 	defer cache.lock.RUnlock()
 	return cache.store
 }
 
-func (cache *Cache[T]) Set(update func(T) T) *Cache[T] {
+func (cache *MarketCache[T]) Set(update func(T) T) *MarketCache[T] {
 	cache.lock.Lock()
 	defer cache.lock.Unlock()
 	cache.store = update(cache.store)

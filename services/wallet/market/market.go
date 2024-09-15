@@ -40,7 +40,7 @@ type Manager struct {
 	feed            *event.Feed
 	priceCache      DataPerTokenAndCurrency
 	priceCacheLock  sync.RWMutex
-	marketCache     Cache[TokenMarketCache]
+	marketCache     MarketCache[TokenMarketCache]
 	IsConnected     bool
 	LastCheckedAt   int64
 	IsConnectedLock sync.RWMutex
