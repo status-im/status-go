@@ -58,7 +58,9 @@ func (s *Server) Listen(address string) error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	http.HandleFunc("/signals", s.signals)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/signals", s.signals)
+	s.server.Handler = mux
 
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
