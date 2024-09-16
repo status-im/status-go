@@ -86,7 +86,7 @@ func TestPrice(t *testing.T) {
 	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{priceProvider, priceProvider})
 
 	{
-		rst := manager.GetCachedPrices()
+		rst := manager.priceCache.Get()
 		require.Empty(t, rst)
 	}
 
@@ -114,7 +114,7 @@ func TestPrice(t *testing.T) {
 		}
 	}
 
-	cache := manager.GetCachedPrices()
+	cache := manager.priceCache.Get()
 	for symbol, pricePerCurrency := range mockPrices {
 		for currency, price := range pricePerCurrency {
 			require.Equal(t, price, cache[symbol][currency].Price)

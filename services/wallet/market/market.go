@@ -31,11 +31,11 @@ type MarketValuesSnapshot struct {
 type DataPerTokenAndCurrency = map[string]map[string]DataPoint
 type MarketValuesPerCurrencyAndToken = map[string]map[string]MarketValuesSnapshot
 type TokenMarketCache MarketValuesPerCurrencyAndToken
+type TokenPriceCache DataPerTokenAndCurrency
 
 type Manager struct {
 	feed            *event.Feed
-	priceCache      DataPerTokenAndCurrency
-	priceCacheLock  sync.RWMutex
+	priceCache      MarketCache[TokenPriceCache]
 	marketCache     MarketCache[TokenMarketCache]
 	IsConnected     bool
 	LastCheckedAt   int64
@@ -54,7 +54,7 @@ func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Ma
 
 	return &Manager{
 		feed:           feed,
-		priceCache:     make(DataPerTokenAndCurrency),
+		priceCache:     *NewCache(make(TokenPriceCache)),
 		marketCache:    *NewCache(make(TokenMarketCache)),
 		IsConnected:    true,
 		LastCheckedAt:  time.Now().Unix(),
@@ -263,69 +263,67 @@ func (pm *Manager) FetchPrices(symbols []string, currencies []string) (map[strin
 }
 
 func (pm *Manager) getCachedPricesFor(symbols []string, currencies []string) DataPerTokenAndCurrency {
-	prices := make(DataPerTokenAndCurrency)
-
-	for _, symbol := range symbols {
-		prices[symbol] = make(map[string]DataPoint)
-		for _, currency := range currencies {
-			prices[symbol][currency] = pm.priceCache[symbol][currency]
+	return Read(&pm.priceCache, func(tokenPriceCache TokenPriceCache) DataPerTokenAndCurrency {
+		prices := make(DataPerTokenAndCurrency)
+		for _, symbol := range symbols {
+			prices[symbol] = make(map[string]DataPoint)
+			for _, currency := range currencies {
+				prices[symbol][currency] = tokenPriceCache[symbol][currency]
+			}
 		}
-	}
-
-	return prices
+		return prices
+	})
 }
 
 func (pm *Manager) updatePriceCache(prices map[string]map[string]float64) {
-	pm.priceCacheLock.Lock()
-	defer pm.priceCacheLock.Unlock()
-
-	for token, pricesPerCurrency := range prices {
-		_, present := pm.priceCache[token]
-		if !present {
-			pm.priceCache[token] = make(map[string]DataPoint)
-		}
-		for currency, price := range pricesPerCurrency {
-			pm.priceCache[token][currency] = DataPoint{
-				Price:     price,
-				UpdatedAt: time.Now().Unix(),
+	Write(&pm.priceCache, func(tokenPriceCache TokenPriceCache) TokenPriceCache {
+		for token, pricesPerCurrency := range prices {
+			_, present := tokenPriceCache[token]
+			if !present {
+				tokenPriceCache[token] = make(map[string]DataPoint)
+			}
+			for currency, price := range pricesPerCurrency {
+				tokenPriceCache[token][currency] = DataPoint{
+					Price:     price,
+					UpdatedAt: time.Now().Unix(),
+				}
 			}
 		}
-	}
-}
 
-func (pm *Manager) GetCachedPrices() DataPerTokenAndCurrency {
-	pm.priceCacheLock.RLock()
-	defer pm.priceCacheLock.RUnlock()
-
-	return pm.priceCache
+		return tokenPriceCache
+	})
 }
 
 // Return cached price if present in cache and age is less than maxAgeInSeconds. Fetch otherwise.
 func (pm *Manager) GetOrFetchPrices(symbols []string, currencies []string, maxAgeInSeconds int64) (DataPerTokenAndCurrency, error) {
-	symbolsToFetchMap := make(map[string]bool)
-	symbolsToFetch := make([]string, 0, len(symbols))
+	symbolsToFetch := Read(&pm.priceCache, func(tokenPriceCache TokenPriceCache) []string {
+		symbolsToFetchMap := make(map[string]bool)
+		symbolsToFetch := make([]string, 0, len(symbols))
 
-	now := time.Now().Unix()
+		now := time.Now().Unix()
 
-	for _, symbol := range symbols {
-		tokenPriceCache, ok := pm.GetCachedPrices()[symbol]
-		if !ok {
-			if !symbolsToFetchMap[symbol] {
-				symbolsToFetchMap[symbol] = true
-				symbolsToFetch = append(symbolsToFetch, symbol)
-			}
-			continue
-		}
-		for _, currency := range currencies {
-			if now-tokenPriceCache[currency].UpdatedAt > maxAgeInSeconds {
+		for _, symbol := range symbols {
+			tokenPriceCache, ok := tokenPriceCache[symbol]
+			if !ok {
 				if !symbolsToFetchMap[symbol] {
 					symbolsToFetchMap[symbol] = true
 					symbolsToFetch = append(symbolsToFetch, symbol)
 				}
-				break
+				continue
+			}
+			for _, currency := range currencies {
+				if now-tokenPriceCache[currency].UpdatedAt > maxAgeInSeconds {
+					if !symbolsToFetchMap[symbol] {
+						symbolsToFetchMap[symbol] = true
+						symbolsToFetch = append(symbolsToFetch, symbol)
+					}
+					break
+				}
 			}
 		}
-	}
+
+		return symbolsToFetch
+	})
 
 	if len(symbolsToFetch) > 0 {
 		_, err := pm.FetchPrices(symbolsToFetch, currencies)

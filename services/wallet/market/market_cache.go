@@ -27,3 +27,9 @@ func Write[T any](cache *MarketCache[T], writer func(store T) T) *MarketCache[T]
 	cache.store = writer(cache.store)
 	return cache
 }
+
+func (cache *MarketCache[T]) Get() T {
+	cache.lock.RLock()
+	defer cache.lock.RUnlock()
+	return cache.store
+}
