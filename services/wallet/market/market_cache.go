@@ -4,28 +4,24 @@ import (
 	"sync"
 )
 
-type CacheStore[T any] interface {
-	CreateStore() T
-}
-
-type MarketCache[T CacheStore[T]] struct {
+type MarketCache[T any] struct {
 	store T
 	lock  sync.RWMutex
 }
 
-func NewCache[T CacheStore[T]]() *MarketCache[T] {
+func NewCache[T any](store T) *MarketCache[T] {
 	var cache MarketCache[T]
-	cache.store = cache.store.CreateStore()
+	cache.store = store
 	return &cache
 }
 
-func Read[T CacheStore[T], R any](cache *MarketCache[T], reader func(store T) R) R {
+func Read[T any, R any](cache *MarketCache[T], reader func(store T) R) R {
 	cache.lock.RLock()
 	defer cache.lock.RUnlock()
 	return reader(cache.store)
 }
 
-func Write[T CacheStore[T]](cache *MarketCache[T], writer func(store *T) *T) *MarketCache[T] {
+func Write[T any](cache *MarketCache[T], writer func(store *T) *T) *MarketCache[T] {
 	cache.lock.Lock()
 	defer cache.lock.Unlock()
 	cache.store = *writer(&cache.store)

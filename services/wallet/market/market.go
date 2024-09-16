@@ -32,10 +32,6 @@ type DataPerTokenAndCurrency = map[string]map[string]DataPoint
 type MarketValuesPerCurrencyAndToken = map[string]map[string]MarketValuesSnapshot
 type TokenMarketCache MarketValuesPerCurrencyAndToken
 
-func (m TokenMarketCache) CreateStore() TokenMarketCache {
-	return make(TokenMarketCache)
-}
-
 type Manager struct {
 	feed            *event.Feed
 	priceCache      DataPerTokenAndCurrency
@@ -59,7 +55,7 @@ func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Ma
 	return &Manager{
 		feed:           feed,
 		priceCache:     make(DataPerTokenAndCurrency),
-		marketCache:    *NewCache[TokenMarketCache](),
+		marketCache:    *NewCache(make(TokenMarketCache)),
 		IsConnected:    true,
 		LastCheckedAt:  time.Now().Unix(),
 		circuitbreaker: cb,
