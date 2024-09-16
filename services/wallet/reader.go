@@ -485,7 +485,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 	)
 
 	group.Add(func(parent context.Context) error {
-		prices, err = r.marketManager.GetOrFetchPrices(tokenSymbols, currencies, 60)
+		prices, err = r.marketManager.GetOrFetchPrices(tokenSymbols, currencies, market.MaxAgeInSecondsForBalances)
 		if err != nil {
 			log.Info("marketManager.GetOrFetchPrices err", err)
 		}
@@ -501,7 +501,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 	})
 
 	group.Add(func(parent context.Context) error {
-		tokenMarketValues, err = r.marketManager.GetOrFetchTokenMarketValues(tokenSymbols, currency, 60)
+		tokenMarketValues, err = r.marketManager.GetOrFetchTokenMarketValues(tokenSymbols, currency, market.MaxAgeInSecondsForBalances)
 		if err != nil {
 			log.Info("marketManager.GetOrFetchTokenMarketValues err", err)
 		}

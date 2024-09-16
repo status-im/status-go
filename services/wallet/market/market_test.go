@@ -239,7 +239,7 @@ func TestGetOrFetchTokenMarketValues(t *testing.T) {
 		},
 		{
 			description:                "token values fetched if fetch forced",
-			requestMaxCachedAgeSeconds: -1, // N.B. Force a fetch
+			requestMaxCachedAgeSeconds: MaxAgeInSecondsForFresh, // N.B. Force a fetch
 			cachedTokenMarketValues:    initialTokenMarketValues,
 			fetchTokenMarketValues:     updatedTokenMarketValues,
 			fetchErr:                   nil,

@@ -18,6 +18,11 @@ const (
 	EventMarketStatusChanged walletevent.EventType = "wallet-market-status-changed"
 )
 
+const (
+	MaxAgeInSecondsForFresh    int64 = -1
+	MaxAgeInSecondsForBalances int64 = 60
+)
+
 type DataPoint struct {
 	Price     float64
 	UpdatedAt int64
