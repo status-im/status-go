@@ -21,22 +21,9 @@ func Read[T any, R any](cache *MarketCache[T], reader func(store T) R) R {
 	return reader(cache.store)
 }
 
-func Write[T any](cache *MarketCache[T], writer func(store *T) *T) *MarketCache[T] {
+func Write[T any](cache *MarketCache[T], writer func(store T) T) *MarketCache[T] {
 	cache.lock.Lock()
 	defer cache.lock.Unlock()
-	cache.store = *writer(&cache.store)
-	return cache
-}
-
-func (cache *MarketCache[T]) Get() T {
-	cache.lock.RLock()
-	defer cache.lock.RUnlock()
-	return cache.store
-}
-
-func (cache *MarketCache[T]) Set(update func(T) T) *MarketCache[T] {
-	cache.lock.Lock()
-	defer cache.lock.Unlock()
-	cache.store = update(cache.store)
+	cache.store = writer(cache.store)
 	return cache
 }
