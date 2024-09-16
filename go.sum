@@ -2020,8 +2020,8 @@ github.com/status-im/doubleratchet v3.0.0+incompatible h1:aJ1ejcSERpSzmWZBgtfYti
 github.com/status-im/doubleratchet v3.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
 github.com/status-im/go-ethereum v1.10.25-status.16 h1:6CjK8qdlUc/7n42UJ743rf13x/ICSwxrh/NlDGyvmOk=
 github.com/status-im/go-ethereum v1.10.25-status.16/go.mod h1:Dt4K5JYMhJRdtXJwBEyGZLZn9iz/chSOZyjVmt5ZhwQ=
-github.com/status-im/go-sqlcipher/v4 v4.5.4-status.2 h1:Oi9JTAI2DZEe5UKlpUcvKBCCSn3ULsLIrix7jPnEoPE=
-github.com/status-im/go-sqlcipher/v4 v4.5.4-status.2/go.mod h1:mF2UmIpBnzFeBdu/ypTDb/LdbS0nk0dfSN1WUsWTjMA=
+github.com/status-im/go-sqlcipher/v4 v4.5.4-status.3 h1:/73h1w1hUfb3wVyTlNrUIwahZxatgesCHa6lwO57C2M=
+github.com/status-im/go-sqlcipher/v4 v4.5.4-status.3/go.mod h1:mF2UmIpBnzFeBdu/ypTDb/LdbS0nk0dfSN1WUsWTjMA=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4 h1:CtobZoiNdHpx+xurFxnuJ1xsGm3oKMfcZkB3vmomJmA=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4/go.mod h1:hmpnZzkzSZJbFYWAUkrPV8I36x7mdYiPhPqnALP4fKA=
 github.com/status-im/keycard-go v0.0.0-20190316090335-8537d3370df4/go.mod h1:RZLeN1LMWmRsyYjvAu+I6Dm9QmlDaIIt+Y+4Kd7Tp+Q=
