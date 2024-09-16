@@ -101,6 +101,7 @@ int mbedtls_aesce_has_support(void)
 #endif
 }
 
+__attribute__((target("aes,crypto")))
 static uint8x16_t aesce_encrypt_block(uint8x16_t block,
                                       unsigned char *keys,
                                       int rounds)
@@ -125,6 +126,7 @@ static uint8x16_t aesce_encrypt_block(uint8x16_t block,
     return block;
 }
 
+__attribute__((target("aes,crypto")))
 static uint8x16_t aesce_decrypt_block(uint8x16_t block,
                                       unsigned char *keys,
                                       int rounds)
@@ -182,10 +184,12 @@ int mbedtls_aesce_crypt_ecb(mbedtls_aes_context *ctx,
 /*
  * Compute decryption round keys from encryption round keys
  */
+__attribute__((target("aes,crypto")))
 void mbedtls_aesce_inverse_key(unsigned char *invkey,
                                const unsigned char *fwdkey,
                                int nr)
 {
+
     int i, j;
     j = nr;
     vst1q_u8(invkey, vld1q_u8(fwdkey + j * 16));
@@ -202,6 +206,7 @@ static inline uint32_t aes_rot_word(uint32_t word)
     return (word << (32 - 8)) | (word >> 8);
 }
 
+__attribute__((target("aes,crypto")))
 static inline uint32_t aes_sub_word(uint32_t in)
 {
     uint8x16_t v = vreinterpretq_u8_u32(vdupq_n_u32(in));
