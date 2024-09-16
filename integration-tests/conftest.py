@@ -15,7 +15,12 @@ def pytest_addoption(parser):
         help="",
         default="http://0.0.0.0:3334",
     )
-
+    parser.addoption(
+        "--ws_url",
+        action="store",
+        help="",
+        default="ws://0.0.0.0:8354",
+    )
     parser.addoption(
         "--password",
         action="store",

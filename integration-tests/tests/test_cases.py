@@ -1,4 +1,7 @@
 import json
+import websocket
+import threading
+import logging
 import jsonschema
 import requests
 from conftest import option, user_1, user_2
@@ -44,7 +47,9 @@ class RpcTestCase:
 
     def verify_json_schema(self, response, method):
         with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
-            jsonschema.validate(instance=response.json(), schema=json.load(schema))
+            jsonschema.validate(instance=response.json(),
+                                schema=json.load(schema))
+
 
 class TransactionTestCase(RpcTestCase):
 
@@ -86,10 +91,46 @@ class TransactionTestCase(RpcTestCase):
 
     def setup_method(self):
         super().setup_method()
-        
+
         response = self.wallet_create_multi_transaction()
         try:
-            self.tx_hash = response.json()["result"]["hashes"][str(self.network_id)][0]
+            self.tx_hash = response.json(
+            )["result"]["hashes"][str(self.network_id)][0]
         except (KeyError, json.JSONDecodeError):
             raise Exception(response.content)
 
+
+class SignalTestCase(RpcTestCase):
+
+    received_signals = []
+
+    def _on_message(self, ws, signal):
+        self.received_signals.append(signal)
+
+    def _on_error(self, ws, error):
+        logging.info(f"Error: {error}")
+
+    def _on_close(self, ws, close_status_code, close_msg):
+        logging.info(f"Connection closed: {close_status_code}, {close_msg}")
+
+    def _on_open(self, ws):
+        logging.info("Connection opened")
+
+    def _connect(self):
+        self.url = f"{option.ws_url}/signals"
+
+        ws = websocket.WebSocketApp(self.url,
+                                    on_message=self._on_message,
+                                    on_error=self._on_error,
+                                    on_close=self._on_close)
+
+        ws.on_open = self._on_open
+
+        ws.run_forever()
+
+    def setup_method(self):
+        super().setup_method()
+
+        websocket_thread = threading.Thread(target=self._connect)
+        websocket_thread.daemon = True
+        websocket_thread.start()
