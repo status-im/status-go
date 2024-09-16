@@ -16,7 +16,12 @@ let
     inherit xcodeWrapper;
     withAndroidPkgs = !isMacM1;
   };
-in pkgs.mkShell {
+  /* Override the default SDK to enable darwin-x86_64 builds */
+  appleSdk11Stdenv = pkgs.overrideSDK pkgs.stdenv "11.0";
+  sdk11mkShell = pkgs.mkShell.override { stdenv = appleSdk11Stdenv; };
+  mkShell = if stdenv.isDarwin then sdk11mkShell else pkgs.mkShell;
+
+in mkShell {
   name = "status-go-shell";
 
   buildInputs = with pkgs; [

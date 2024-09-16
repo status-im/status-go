@@ -193,6 +193,11 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld build/bin/statusgo-*
 
+status-go-deps:
+	go install go.uber.org/mock/mockgen@v0.4.0
+	go install github.com/kevinburke/go-bindata/v4/...@v4.0.2
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
+
 statusgo-android: generate
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."

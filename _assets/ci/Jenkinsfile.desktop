@@ -1,0 +1,166 @@
+#!/usr/bin/env groovy
+library 'status-jenkins-lib@v1.9.12'
+
+pipeline {
+  /* This way we run the same Jenkinsfile on different platforms. */
+  agent { label "${params.AGENT_LABEL}" }
+
+  parameters {
+    string(
+      name: 'BRANCH',
+      defaultValue: 'develop',
+      description: 'Name of branch to build.'
+    )
+    string(
+      name: 'AGENT_LABEL',
+      description: 'Label for targetted CI slave host.',
+      defaultValue: params.AGENT_LABEL ?: getAgentLabel(),
+    )
+    booleanParam(
+      name: 'RELEASE',
+      defaultValue: false,
+      description: 'Enable to create build for release.',
+    )
+  }
+
+  options {
+    timestamps()
+    ansiColor('xterm')
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: 15, unit: 'MINUTES')
+    disableConcurrentBuilds()
+    /* manage how many builds we keep */
+    buildDiscarder(logRotator(
+      numToKeepStr: '5',
+      daysToKeepStr: '30',
+      artifactNumToKeepStr: '1',
+    ))
+  }
+
+  environment {
+    PLATFORM = getPlatformFromLabel(params.AGENT_LABEL)
+    TMPDIR   = "${WORKSPACE_TMP}"
+    GOPATH   = "${WORKSPACE_TMP}/go"
+    GOCACHE  = "${WORKSPACE_TMP}/gocache"
+    PATH     = "${PATH}:${GOPATH}/bin:/c/Users/jenkins/go/bin"
+    REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
+    VERSION  = sh(script: "./_assets/scripts/version.sh", returnStdout: true)
+    ARTIFACT = utils.pkgFilename(
+      name:    'status-go',
+      type:    env.PLATFORM,
+      version: env.VERSION,
+      ext:     'zip',
+    )
+    /* prevent sharing cache dir across different jobs */
+    GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
+  }
+
+  stages {
+    stage('Setup') {
+        steps {
+          script {
+            if (env.PLATFORM != 'windows') {
+                sh "mkdir -p \$(dirname ${REPO_SRC})"
+                sh "ln -s ${WORKSPACE} ${REPO_SRC}"
+              }
+          }
+      }
+  }
+
+    stage('Deps') {
+      steps { script {
+        shell('make status-go-deps')
+      }
+    }
+  }
+
+    stage('Generate') {
+      steps { script {
+        shell('make generate')
+      }
+    }
+  }
+
+    stage('Build Static Lib') {
+        steps {
+            script {
+                shell('make statusgo-library')
+                }
+            }
+        }
+
+    stage('Build Shared Lib') {
+        steps {
+            script {
+                shell('make statusgo-shared-library')
+                }
+            }
+        }
+
+    stage('Archive') {
+        steps {
+          zip zipFile: "${ARTIFACT}", archive: true, dir: 'build/bin'
+            }
+        }
+
+    stage('Upload') {
+        steps {
+            script {
+                env.PKG_URL = s5cmd.upload(ARTIFACT)
+            }
+        }
+    }
+    stage('Cleanup') {
+        steps {
+            script {
+                cleanTmp()
+                }
+            }
+        }
+} // stages
+  post {
+     success { script { github.notifyPR(true) } }
+     failure { script { github.notifyPR(false) } }
+     cleanup { cleanWs() }
+  } // post
+} // pipeline
+
+/* This allows us to use one Jenkinsfile and run
+ * jobs on different platforms based on job name. */
+def getAgentLabel() {
+    if (params.AGENT_LABEL) { return params.AGENT_LABEL }
+    /* We extract the name of the job from currentThread because
+     * before an agent is picket env is not available. */
+    def tokens = Thread.currentThread().getName().split('/')
+    def labels = []
+    /* Check if the job path contains any of the valid labels. */
+    ['linux', 'macos', 'windows', 'x86_64', 'aarch64', 'arm64'].each {
+        if (tokens.contains(it)) { labels.add(it) }
+    }
+    return labels.join(' && ')
+}
+
+/* This function extracts the platform from the AGENT_LABEL */
+def getPlatformFromLabel(label) {
+    for (platform in ['linux', 'macos', 'windows']) {
+        if (label.contains(platform)) {
+            return platform
+        }
+    }
+}
+
+def shell(cmd) {
+    if (env.PLATFORM == 'windows') {
+        sh "${cmd} SHELL=/bin/sh"
+    } else {
+        nix.shell(cmd, pure: false) // Use nix.shell for Linux/macOS
+    }
+}
+
+def cleanTmp() {
+    if (env.PLATFORM == 'windows') {
+        sh "rm -rf ${env.WORKSPACE}@tmp"
+    } else {
+        dir("${env.WORKSPACE}@tmp") { deleteDir() }
+    }
+}
