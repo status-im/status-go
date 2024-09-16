@@ -145,6 +145,23 @@ func (pm *Manager) FetchTokenMarketValues(symbols []string, currency string) (ma
 	return marketValues, nil
 }
 
+func (pm *Manager) updateMarketCache(currency string, marketValues map[string]thirdparty.TokenMarketValues) {
+	pm.marketCache.Set(func(marketCache TokenMarketCache) TokenMarketCache {
+		for token, tokenMarketValues := range marketValues {
+			if _, present := marketCache[currency]; !present {
+				marketCache[currency] = make(map[string]MarketValuesSnapshot)
+			}
+
+			marketCache[currency][token] = MarketValuesSnapshot{
+				UpdatedAt:    time.Now().Unix(),
+				MarketValues: tokenMarketValues,
+			}
+		}
+
+		return marketCache
+	})
+}
+
 func (pm *Manager) GetOrFetchTokenMarketValues(symbols []string, currency string, maxAgeInSeconds int64) (map[string]thirdparty.TokenMarketValues, error) {
 	// docs: Determine which token market data to fetch based on what's inside the cache and the last time the cache was updated
 	symbolsToFetch := Read(&pm.marketCache, func(marketCache TokenMarketCache) []string {
@@ -184,21 +201,7 @@ func (pm *Manager) GetOrFetchTokenMarketValues(symbols []string, currency string
 		if err != nil {
 			return nil, err
 		}
-
-		pm.marketCache.Set(func(marketCache TokenMarketCache) TokenMarketCache {
-			for token, tokenMarketValues := range marketValues {
-				if _, present := marketCache[currency]; !present {
-					marketCache[currency] = make(map[string]MarketValuesSnapshot)
-				}
-
-				marketCache[currency][token] = MarketValuesSnapshot{
-					UpdatedAt:    time.Now().Unix(),
-					MarketValues: tokenMarketValues,
-				}
-			}
-
-			return marketCache
-		})
+		pm.updateMarketCache(currency, marketValues)
 	}
 
 	// docs: Extract token market data from populated cache
