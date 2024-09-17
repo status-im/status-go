@@ -3664,21 +3664,23 @@ func (m *Messenger) deleteNotification(response *MessengerResponse, installation
 		return err
 	}
 
-	if notification != nil {
-		updatedAt := m.GetCurrentTimeInMillis()
-		notification.UpdatedAt = updatedAt
-		notification.Deleted = true
-		// we shouldn't sync deleted notification here,
-		// as the same user on different devices will receive the same message(CommunityCancelRequestToJoin) ?
-		err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(installationID), updatedAt)
-		if err != nil {
-			m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
-			return err
-		}
-
-		// sending signal to client to remove the activity center notification from UI
-		response.AddActivityCenterNotification(notification)
+	if notification == nil {
+		return nil
 	}
+
+	updatedAt := m.GetCurrentTimeInMillis()
+	notification.UpdatedAt = updatedAt
+	notification.Deleted = true
+	// we shouldn't sync deleted notification here,
+	// as the same user on different devices will receive the same message(CommunityCancelRequestToJoin) ?
+	err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(installationID), updatedAt)
+	if err != nil {
+		m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
+		return err
+	}
+
+	// sending signal to client to remove the activity center notification from UI
+	response.AddActivityCenterNotification(notification)
 	return nil
 }
 
