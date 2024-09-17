@@ -560,11 +560,11 @@ func TestWakuV2Store(t *testing.T) {
 	}()
 
 	// Connect the two nodes directly
-	peer2Addr := w2.ListenAddresses()[0].String()
-	err = w1.DialPeer(context.Background(), peer2Addr)
+	peer2Addr, err := w2.ListenAddresses()
 	require.NoError(t, err)
 
-	waitForPeerConnection(t, w2.Host().ID(), w1PeersCh)
+	err = w1.DialPeer(peer2Addr[0])
+	require.NoError(t, err)
 
 	// Create a filter for the second node to catch messages
 	filter := &common.Filter{
