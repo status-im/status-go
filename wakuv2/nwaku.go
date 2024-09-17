@@ -2219,7 +2219,14 @@ func (self *NWaku) ListPeersInMesh(pubsubTopic string) (int, error) {
 	return 0, errors.New(errMsg)
 }
 
-func (self *NWaku) GetNumConnectedPeers(pubsubTopic string) (int, error) {
+func (self *NWaku) GetNumConnectedPeers(paramPubsubTopic ...string) (int, error) {
+	var pubsubTopic string
+	if len(paramPubsubTopic) == 0 {
+		pubsubTopic = ""
+	} else {
+		pubsubTopic = paramPubsubTopic[0]
+	}
+
 	var resp = C.allocResp()
 	var cPubsubTopic = C.CString(pubsubTopic)
 	defer C.freeResp(resp)
