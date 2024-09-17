@@ -153,6 +153,10 @@ func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs SendTxA
 func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs, lastUsedNonce int64) (tx *gethtypes.Transaction, nonce uint64, err error) {
 	wrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
 	tx, err = t.validateAndBuildTransaction(wrapper, sendArgs, lastUsedNonce)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	return tx, tx.Nonce(), err
 }
 
@@ -412,7 +416,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 		if args.IsDynamicFeeTx() {
 			gasFeeCap := (*big.Int)(args.MaxFeePerGas)
 			gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
-			gas, err = t.rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
+			gas, err = rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
 				From:      common.Address(args.From),
 				To:        gethToPtr,
 				GasFeeCap: gasFeeCap,
@@ -421,7 +425,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 				Data:      args.GetInput(),
 			})
 		} else {
-			gas, err = t.rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
+			gas, err = rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
 				From:     common.Address(args.From),
 				To:       gethToPtr,
 				GasPrice: gasPrice,
