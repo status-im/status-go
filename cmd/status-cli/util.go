@@ -153,7 +153,8 @@ func createAccountAndLogin(b *api.GethStatusBackend, rootDataDir, password strin
 			HTTPHost:    "127.0.0.1",
 			HTTPPort:    p.Port,
 		},
-		TelemetryServerURL: p.TelemetryURL,
+		TelemetryServerURL:                     p.TelemetryURL,
+		WakuV2EnableMissingMessageVerification: true,
 	}
 	return b.CreateAccountAndLogin(req,
 		params.WithFleet(p.Fleet),
