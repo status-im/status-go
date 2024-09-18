@@ -456,6 +456,10 @@ commit-check: SHELL := /bin/sh
 commit-check:
 	@bash _assets/scripts/commit_check.sh
 
+version: SHELL := /bin/sh
+version:
+	@./_assets/scripts/version.sh
+
 tag-version:
 	bash _assets/scripts/tag_version.sh $(TARGET_COMMIT)
 
@@ -463,6 +467,7 @@ migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := walletdatabase/migrations/sql
 migration-wallet:
 	touch $(DEFAULT_WALLET_MIGRATION_PATH)/$$(date +%s)_$(D).up.sql
 
+install-git-hooks: SHELL := /bin/sh
 install-git-hooks:
 	@ln -sf $(if $(filter $(detected_OS), Linux),-r,) \
 		$(GIT_ROOT)/_assets/hooks/* $(GIT_ROOT)/.git/hooks
