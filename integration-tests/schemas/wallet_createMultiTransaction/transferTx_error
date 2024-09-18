@@ -1,0 +1,32 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "error": {
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "code",
+                "message"
+            ],
+            "type": "object"
+        },
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "error",
+        "id",
+        "jsonrpc"
+    ],
+    "type": "object"
+}

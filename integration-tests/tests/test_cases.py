@@ -12,16 +12,19 @@ class RpcTestCase:
     def setup_method(self):
         self.network_id = 31337
 
+    def _try_except_JSONDecodeError_KeyError(self, response, key: str):
+        try:
+            return response.json()[key]
+        except json.JSONDecodeError:
+            raise AssertionError(f"Invalid JSON in response: {response.content}")
+        except KeyError:
+            raise AssertionError(f"Key '{key}' not found in the JSON response.")
+
     def verify_is_valid_json_rpc_response(self, response, _id=None):
         assert response.status_code == 200
         assert response.content
+        self._try_except_JSONDecodeError_KeyError(response, "result")
 
-        try:
-            response.json()["result"]
-        except json.JSONDecodeError:
-            raise AssertionError(f"invalid JSON in {response.content}")
-        except KeyError:
-            raise AssertionError(f"no 'result' in {response.json()}")
         if _id:
             try:
                 if _id != response.json()["id"]:
@@ -31,6 +34,12 @@ class RpcTestCase:
             except KeyError:
                 raise AssertionError(f"no id in response {response.json()}")
         return response
+
+    def verify_is_json_rpc_error(self, response):
+        assert response.status_code == 200
+        assert response.content
+        self._try_except_JSONDecodeError_KeyError(response, "error")
+
 
     def rpc_request(self, method, params=[], _id=None, client=None, url=None):
         client = client if client else requests.Session()
@@ -51,11 +60,28 @@ class RpcTestCase:
                                 schema=json.load(schema))
 
 
+
 class TransactionTestCase(RpcTestCase):
 
-    def wallet_create_multi_transaction(self):
 
+    def wallet_create_multi_transaction(self, **kwargs):
         method = "wallet_createMultiTransaction"
+        transferTx_data = {
+                        "data": "",
+                        "from": user_1.address,
+                        "gas": "0x5BBF",
+                        "input": "",
+                        "maxFeePerGas": "0xbcc0f04fd",
+                        "maxPriorityFeePerGas": "0xbcc0f04fd",
+                        "to": user_2.address,
+                        "type": "0x02",
+                        "value": "0x5af3107a4000",
+                    }
+        for key, new_value in kwargs.items():
+            if key in transferTx_data:
+                transferTx_data[key] = new_value
+            else:
+                print(f"Warning: The key '{key}' does not exist in the transferTx parameters and will be ignored.")
         params = [
             {
                 "fromAddress": user_1.address,
@@ -69,24 +95,12 @@ class TransactionTestCase(RpcTestCase):
                 {
                     "bridgeName": "Transfer",
                     "chainID": 31337,
-                    "transferTx": {
-                        "data": "",
-                        "from": user_1.address,
-                        "gas": "0x5BBF",
-                        "input": "",
-                        "maxFeePerGas": "0xbcc0f04fd",
-                        "maxPriorityFeePerGas": "0x3b9aca00",
-                        "to": user_2.address,
-                        "type": "0x02",
-                        "value": "0x5af3107a4000",
-                    },
+                    "transferTx": transferTx_data
                 }
             ],
             f"{option.password}",
         ]
-
         response = self.rpc_request(method, params, 13)
-        self.verify_is_valid_json_rpc_response(response)
         return response
 
     def setup_method(self):
