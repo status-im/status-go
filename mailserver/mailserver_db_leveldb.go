@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	waku "github.com/status-im/status-go/waku/common"
 )
@@ -96,7 +97,7 @@ func NewLevelDB(dataDir string) (*LevelDB, error) {
 	// initialize the metric value
 	instance.updateArchivedEnvelopesCount()
 	// checking count on every insert is inefficient
-	go func() {
+	common.SafeGo(func() {
 		for {
 			select {
 			case <-instance.done:
@@ -105,7 +106,7 @@ func NewLevelDB(dataDir string) (*LevelDB, error) {
 				instance.updateArchivedEnvelopesCount()
 			}
 		}
-	}()
+	})
 	return &instance, err
 }
 

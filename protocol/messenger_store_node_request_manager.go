@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/common/shard"
-
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/services/mailservers"
@@ -105,12 +105,12 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 		}
 
 		if !cfg.WaitForResponse {
-			go func() {
+			common.SafeGo(func() {
 				shardResult := <-fetchedShard
 				communityShard = shardResult.shard
 
 				_, _, _ = requestCommunity(community.CommunityID, communityShard)
-			}()
+			})
 			return nil, StoreNodeRequestStats{}, nil
 		}
 

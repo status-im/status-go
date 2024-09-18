@@ -16,6 +16,7 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/services/mailservers"
@@ -210,7 +211,8 @@ func (m *Messenger) getAvailableMailserversSortedByRTT(allMailservers []mailserv
 	availableMailserversWg := sync.WaitGroup{}
 	for _, mailserver := range allMailservers {
 		availableMailserversWg.Add(1)
-		go func(mailserver mailservers.Mailserver) {
+		mailserver := mailserver
+		common.SafeGo(func() {
 			defer availableMailserversWg.Done()
 
 			peerID, err := mailserver.PeerID()
@@ -227,7 +229,7 @@ func (m *Messenger) getAvailableMailserversSortedByRTT(allMailservers []mailserv
 				availableMailservers[mailserver.ID] = rtt
 				availableMailserversMutex.Unlock()
 			}
-		}(mailserver)
+		})
 	}
 	availableMailserversWg.Wait()
 
@@ -416,12 +418,12 @@ func (m *Messenger) asyncRequestAllHistoricMessages() {
 
 	m.logger.Debug("asyncRequestAllHistoricMessages")
 
-	go func() {
+	common.SafeGo(func() {
 		_, err := m.RequestAllHistoricMessages(false, true)
 		if err != nil {
 			m.logger.Error("failed to request historic messages", zap.Error(err))
 		}
-	}()
+	})
 }
 
 func (m *Messenger) verifyStorenodeStatus() {
@@ -516,7 +518,7 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	go func() {
+	common.SafeGo(func() {
 		defer func() {
 			wg.Done()
 		}()
@@ -527,14 +529,14 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 				return
 			}
 		}
-	}()
+	})
 
-	go func() {
+	common.SafeGo(func() {
 		defer func() {
 			close(finish)
 		}()
 		wg.Wait()
-	}()
+	})
 
 	select {
 	case <-finish:

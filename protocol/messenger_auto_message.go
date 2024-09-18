@@ -7,6 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/signal"
@@ -35,7 +36,7 @@ func (m *Messenger) startAutoMessageLoop() error {
 	m.logger.Info("[auto message] starting auto message loop")
 	ticker := time.NewTicker(autoMessageInterval)
 	count := 0
-	go func() {
+	gocommon.SafeGo(func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -69,7 +70,7 @@ func (m *Messenger) startAutoMessageLoop() error {
 				return
 			}
 		}
-	}()
+	})
 
 	return nil
 }

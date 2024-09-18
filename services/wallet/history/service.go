@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
+	gocommon "github.com/status-im/status-go/common"
 	statustypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -106,7 +107,7 @@ func (s *Service) Start() {
 	s.startTransfersWatcher()
 	s.startAccountWatcher()
 
-	go func() {
+	gocommon.SafeGo(func() {
 		s.serviceContext, s.cancelFn = context.WithCancel(context.Background())
 
 		err := s.updateBalanceHistory(s.serviceContext)
@@ -116,7 +117,7 @@ func (s *Service) Start() {
 		if err != nil {
 			s.triggerEvent(EventBalanceHistoryUpdateFinishedWithError, statustypes.Address{}, err.Error())
 		}
-	}()
+	})
 }
 
 func (s *Service) mergeChainsBalances(chainIDs []uint64, addresses []common.Address, tokenSymbol string, fromTimestamp uint64, data map[uint64][]*entry) ([]*DataPoint, error) {

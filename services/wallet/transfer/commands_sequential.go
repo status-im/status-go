@@ -11,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	nodetypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -873,7 +875,8 @@ func (c *findBlocksCommand) fastIndexErc20(ctx context.Context, fromBlockNumber 
 // Start transfers loop to load transfers for new blocks
 func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) {
 	c.incLoops()
-	go func() {
+
+	gocommon.SafeGo(func() {
 		defer func() {
 			c.decLoops()
 		}()
@@ -894,13 +897,13 @@ func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) 
 					blocksByAddress[dbHeader.Address] = append(blocksByAddress[dbHeader.Address], dbHeader.Number)
 				}
 
-				go func() {
+				gocommon.SafeGo(func() {
 					_ = loadTransfers(ctx, c.blockDAO, c.db, c.chainClient, noBlockLimit,
 						blocksByAddress, c.transactionManager, c.pendingTxManager, c.tokenManager, c.feed)
-				}()
+				})
 			}
 		}
-	}()
+	})
 }
 
 func newLoadBlocksAndTransfersCommand(accounts []common.Address, db *Database, accountsDB *accounts.Database,
@@ -1157,7 +1160,7 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(ctx context.Conte
 	log.Debug("startFetchingNewBlocks start", "chainID", c.chainClient.NetworkID(), "accounts", addresses)
 
 	c.incLoops()
-	go func() {
+	gocommon.SafeGo(func() {
 		defer func() {
 			c.decLoops()
 		}()
@@ -1189,7 +1192,7 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(ctx context.Conte
 		<-ctx.Done()
 
 		log.Debug("startFetchingNewBlocks end", "chainID", c.chainClient.NetworkID(), "accounts", addresses, "error", ctx.Err())
-	}()
+	})
 }
 
 func (c *loadBlocksAndTransfersCommand) getBlocksToLoad() (map[common.Address][]*big.Int, error) {
@@ -1225,7 +1228,7 @@ func (c *loadBlocksAndTransfersCommand) startFetchingTransfersForLoadedBlocks(gr
 		return err
 	}
 
-	go func() {
+	gocommon.SafeGo(func() {
 		txCommand := &loadTransfersCommand{
 			accounts:           c.accounts,
 			db:                 c.db,
@@ -1240,7 +1243,7 @@ func (c *loadBlocksAndTransfersCommand) startFetchingTransfersForLoadedBlocks(gr
 
 		group.Add(txCommand.Command())
 		log.Debug("fetchTransfers end", "chainID", c.chainClient.NetworkID(), "accounts", c.accounts)
-	}()
+	})
 
 	return nil
 }

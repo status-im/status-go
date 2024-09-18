@@ -20,8 +20,9 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/status-im/status-go/eth-node/types"
 
+	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku/common"
 )
 
@@ -397,9 +398,9 @@ func (p *Peer) handshake() error {
 	// Send the handshake status message asynchronously
 	errc := make(chan error, 1)
 	opts := StatusOptionsFromHost(p.host)
-	go func() {
+	gocommon.SafeGo(func() {
 		errc <- p2p.SendItems(p.rw, statusCode, Version, opts)
-	}()
+	})
 
 	// Fetch the remote status packet and verify protocol match
 	packet, err := p.rw.ReadMsg()

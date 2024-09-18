@@ -9,6 +9,7 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -405,7 +406,9 @@ func (s *Service) detectNew(changeCount int) {
 		s.sessionsRWMutex.Unlock()
 
 		if len(session.new) > 0 || len(mixed) > 0 {
-			go notify(s.eventFeed, sessionID, len(session.new) > 0, mixed)
+			gocommon.SafeGo(func() {
+				notify(s.eventFeed, sessionID, len(session.new) > 0, mixed)
+			})
 		}
 	}
 }
@@ -450,13 +453,12 @@ func (s *Service) getActivityDetailsAsync(requestID int32, entries []Entry) {
 	}
 
 	ctx := context.Background()
-
-	go func() {
+	gocommon.SafeGo(func() {
 		activityData, err := s.getActivityDetails(ctx, entries)
 		if len(activityData) != 0 {
 			sendResponseEvent(s.eventFeed, &requestID, EventActivityFilteringUpdate, activityData, err)
 		}
-	}()
+	})
 }
 
 type mixedIdentityResult struct {

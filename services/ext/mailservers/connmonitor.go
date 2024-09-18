@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 )
 
@@ -33,7 +34,7 @@ type LastUsedConnectionMonitor struct {
 func (mon *LastUsedConnectionMonitor) Start() {
 	mon.quit = make(chan struct{})
 	mon.wg.Add(1)
-	go func() {
+	common.SafeGo(func() {
 		events := make(chan types.EnvelopeEvent, whisperEventsBuffer)
 		sub := mon.eventSub.SubscribeEnvelopeEvents(events)
 		defer sub.Unsubscribe()
@@ -58,7 +59,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 				}
 			}
 		}
-	}()
+	})
 }
 
 func (mon *LastUsedConnectionMonitor) updateRecord(nodeID types.EnodeID) error {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/status-im/status-go/common"
 
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -256,7 +257,7 @@ func (rl *RPCRpsLimiter) ReduceLimit() {
 
 func (rl *RPCRpsLimiter) start() {
 	ticker := time.NewTicker(tickerInterval)
-	go func() {
+	common.SafeGo(func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -304,7 +305,7 @@ func (rl *RPCRpsLimiter) start() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (rl *RPCRpsLimiter) Stop() {

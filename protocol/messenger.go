@@ -906,10 +906,10 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	if m.archiveManager.IsReady() {
 		available := m.mailserverCycle.availabilitySubscriptions.Subscribe()
-		go func() {
+		utils.SafeGo(func() {
 			<-available
 			m.InitHistoryArchiveTasks(controlledCommunities)
-		}()
+		})
 	}
 
 	for _, c := range controlledCommunities {
@@ -1458,7 +1458,7 @@ func (m *Messenger) handleInstallations(installations []*multidevice.Installatio
 
 // handleEncryptionLayerSubscriptions handles events from the encryption layer
 func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption.Subscriptions) {
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			select {
 			case <-subscriptions.SendContactCode:
@@ -1482,7 +1482,7 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
@@ -1512,7 +1512,7 @@ func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 }
 
 func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.VerificationRecord) {
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			select {
 			case records, more := <-c:
@@ -1528,7 +1528,7 @@ func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.Verification
 				return
 			}
 		}
-	}()
+	})
 }
 
 // watchConnectionChange checks the connection status and call handleConnectionChange when this changes
@@ -1588,7 +1588,7 @@ func (m *Messenger) watchConnectionChange() {
 		// No waku v2, we can't watch connection changes
 		// Instead we will poll the connection status.
 		m.logger.Warn("using WakuV1, can't watch connection changes, this might be have side-effects")
-		go pollConnectionStatus()
+		utils.SafeGo(pollConnectionStatus)
 		return
 	}
 
@@ -1596,13 +1596,15 @@ func (m *Messenger) watchConnectionChange() {
 	// from SubscribeToConnStatusChanges
 	subscription, _ := waku.SubscribeToConnStatusChanges()
 
-	go subscribedConnectionStatus(subscription)
+	utils.SafeGo(func() {
+		subscribedConnectionStatus(subscription)
+	})
 }
 
 // watchChatsToUnmute checks every minute to identify and unmute chats that should no longer be muted.
 func (m *Messenger) watchChatsToUnmute() {
 	m.logger.Debug("Checking for chats to unmute every minute")
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			// Execute the check immediately upon starting
 			response := &MessengerResponse{}
@@ -1639,13 +1641,13 @@ func (m *Messenger) watchChatsToUnmute() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 // watchCommunitiesToUnmute checks every minute to identify and unmute communities that should no longer be muted.
 func (m *Messenger) watchCommunitiesToUnmute() {
 	m.logger.Debug("Checking for communities to unmute every minute")
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			// Execute the check immediately upon starting
 			response, err := m.CheckCommunitiesToUnmute()
@@ -1667,7 +1669,7 @@ func (m *Messenger) watchCommunitiesToUnmute() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 // watchIdentityImageChanges checks for identity images changes and publishes to the contact code when it happens
@@ -1678,8 +1680,7 @@ func (m *Messenger) watchIdentityImageChanges() {
 	}
 
 	channel := m.multiAccounts.SubscribeToIdentityImageChanges()
-
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			select {
 			case change := <-channel:
@@ -1710,13 +1711,12 @@ func (m *Messenger) watchIdentityImageChanges() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (m *Messenger) watchPendingCommunityRequestToJoin() {
 	m.logger.Debug("watching community request to join")
-
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			select {
 			case <-time.After(time.Minute * 10):
@@ -1728,7 +1728,7 @@ func (m *Messenger) watchPendingCommunityRequestToJoin() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (m *Messenger) PublishIdentityImage() error {
@@ -1750,7 +1750,7 @@ func (m *Messenger) PublishIdentityImage() error {
 
 // handlePushNotificationClientRegistration handles registration events
 func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			_, more := <-c
 			if !more {
@@ -1761,7 +1761,7 @@ func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 			}
 
 		}
-	}()
+	})
 }
 
 // InitFilters analyzes chats and contacts in order to setup filters
@@ -3066,7 +3066,7 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 
 func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
 	m.shutdownWaitGroup.Add(1)
-	go func() {
+	utils.SafeGo(func() {
 		defer m.shutdownWaitGroup.Done()
 		ticker := time.NewTicker(tick)
 		defer ticker.Stop()
@@ -3078,7 +3078,7 @@ func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan 
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (m *Messenger) ProcessAllMessages() {
@@ -5747,7 +5747,7 @@ func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.SyncDeleteForMeMessage
 func (m *Messenger) startCleanupLoop(name string, cleanupFunc func() error) {
 	logger := m.logger.Named(name)
 
-	go func() {
+	utils.SafeGo(func() {
 		// Delay by a few minutes to minimize messenger's startup time
 		var interval time.Duration = 5 * time.Minute
 		for {
@@ -5765,7 +5765,7 @@ func (m *Messenger) startCleanupLoop(name string, cleanupFunc func() error) {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (m *Messenger) startMessageSegmentsCleanupLoop() {

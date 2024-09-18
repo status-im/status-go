@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/signal"
 )
@@ -29,7 +30,7 @@ type API struct {
 }
 
 func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVersion string) {
-	go func() {
+	common.SafeGo(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer cancel()
 
@@ -95,5 +96,5 @@ func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVe
 		}
 
 		signal.SendUpdateAvailable(latest.GreaterThan(current), latestStr, url)
-	}()
+	})
 }

@@ -33,6 +33,8 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
@@ -511,7 +513,7 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 	errCh := make(chan error)
 	cancelProcessing := make(chan struct{})
 
-	go func() {
+	gocommon.SafeGo(func() {
 		counter := 0
 		for bundle := range bundles {
 			if err := s.sendRawEnvelopes(peerID, bundle, req.Batch); err != nil {
@@ -528,7 +530,7 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 			"requestID", reqID.String(),
 			"counter", counter,
 		)
-	}()
+	})
 
 	nextPageCursor, lastEnvelopeHash := s.processRequestInBundles(
 		iter,
@@ -610,7 +612,7 @@ func (s *mailServer) SyncMail(peerID types.Hash, req MessagesRequestPayload) err
 	errCh := make(chan error)
 	cancelProcessing := make(chan struct{})
 
-	go func() {
+	gocommon.SafeGo(func() {
 		for bundle := range bundles {
 			resp := s.adapter.CreateRawSyncResponse(bundle, nil, false, "")
 			if err := s.service.SendRawSyncResponse(peerID.Bytes(), resp); err != nil {
@@ -620,7 +622,7 @@ func (s *mailServer) SyncMail(peerID types.Hash, req MessagesRequestPayload) err
 			}
 		}
 		close(errCh)
-	}()
+	})
 
 	nextCursor, _ := s.processRequestInBundles(
 		iter,

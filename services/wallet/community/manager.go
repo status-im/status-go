@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -86,13 +87,13 @@ func (cm *Manager) FetchCommunityInfo(communityID string) (*thirdparty.Community
 }
 
 func (cm *Manager) FetchCommunityMetadataAsync(communityID string) {
-	go func() {
+	common.SafeGo(func() {
 		communityInfo, err := cm.FetchCommunityMetadata(communityID)
 		if err != nil {
 			log.Error("FetchCommunityInfo failed", "communityID", communityID, "err", err)
 		}
 		cm.signalUpdatedCommunityMetadata(communityID, communityInfo)
-	}()
+	})
 }
 
 func (cm *Manager) FetchCommunityMetadata(communityID string) (*thirdparty.CommunityInfo, error) {

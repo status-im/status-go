@@ -44,6 +44,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/waku/common"
@@ -224,7 +225,7 @@ func (w *Waku) SetMinimumPoW(val float64, tolerate bool) error {
 	w.notifyPeersAboutPowRequirementChange(val)
 
 	if tolerate {
-		go func() {
+		gocommon.SafeGo(func() {
 			// allow some time before all the peers have processed the notification
 			select {
 			case <-w.quit:
@@ -234,7 +235,7 @@ func (w *Waku) SetMinimumPoW(val float64, tolerate bool) error {
 				w.settings.MinPowTolerance = val
 				w.settingsMu.Unlock()
 			}
-		}()
+		})
 	}
 
 	return nil
@@ -304,7 +305,7 @@ func (w *Waku) SetBloomFilter(bloom []byte) error {
 	w.settingsMu.Unlock()
 	w.notifyPeersAboutBloomFilterChange(b)
 
-	go func() {
+	gocommon.SafeGo(func() {
 		// allow some time before all the peers have processed the notification
 		select {
 		case <-w.quit:
@@ -314,8 +315,7 @@ func (w *Waku) SetBloomFilter(bloom []byte) error {
 			w.settings.BloomFilterTolerance = b
 			w.settingsMu.Unlock()
 		}
-
-	}()
+	})
 
 	return nil
 }
@@ -374,7 +374,7 @@ func (w *Waku) SetTopicInterest(topicInterest []common.TopicType) error {
 	w.settingsMu.Unlock()
 	w.notifyPeersAboutTopicInterestChange(topicInterest)
 
-	go func() {
+	gocommon.SafeGo(func() {
 		// allow some time before all the peers have processed the notification
 		select {
 		case <-w.quit:
@@ -384,7 +384,7 @@ func (w *Waku) SetTopicInterest(topicInterest []common.TopicType) error {
 			w.settings.TopicInterestTolerance = topicInterestMap
 			w.settingsMu.Unlock()
 		}
-	}()
+	})
 
 	return nil
 }

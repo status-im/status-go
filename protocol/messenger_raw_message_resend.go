@@ -6,18 +6,18 @@ import (
 	"math"
 	"time"
 
-	"github.com/status-im/status-go/protocol/protobuf"
-
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 // watchExpiredMessages regularly checks for expired emojis and invoke their resending
 func (m *Messenger) watchExpiredMessages() {
 	m.logger.Debug("watching expired messages")
-	go func() {
+	gocommon.SafeGo(func() {
 		for {
 			select {
 			case <-time.After(time.Second):
@@ -31,7 +31,7 @@ func (m *Messenger) watchExpiredMessages() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (m *Messenger) resendExpiredMessages() error {

@@ -1365,9 +1365,8 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 
 			m.archiveManager.UnseedHistoryArchiveTorrent(id)
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
-
-			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
-
+			communityID := id
+			utils.SafeGo(func() {
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
 					currentTask.Cancel()
@@ -1391,8 +1390,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 				m.shutdownWaitGroup.Add(1)
 				defer m.shutdownWaitGroup.Done()
 				m.downloadAndImportHistoryArchives(communityID, magnetlink, task.CancelChan)
-			}(currentTask, id)
-
+			})
 			return m.communitiesManager.UpdateMagnetlinkMessageClock(id, clock)
 		}
 	}
@@ -1741,8 +1739,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		if m.archiveManager.IsReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
 
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
-			go func(currentTask *communities.HistoryArchiveDownloadTask) {
-
+			utils.SafeGo(func() {
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
 					currentTask.Cancel()
@@ -1763,7 +1760,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 				defer m.shutdownWaitGroup.Done()
 
 				m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
-			}(currentTask)
+			})
 
 			clock := requestToJoinResponseProto.Community.ArchiveMagnetlinkClock
 			return m.communitiesManager.UpdateMagnetlinkMessageClock(community.ID(), clock)

@@ -218,8 +218,7 @@ func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities
 }
 
 func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communities.Subscription) {
-
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			select {
 			case sub, more := <-c:
@@ -292,7 +291,7 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 				return
 			}
 		}
-	}()
+	})
 }
 
 // handleCommunitiesSubscription handles events from communities
@@ -381,7 +380,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 		recentlyPublishedOrgs[community.IDString()] = community.CreateDeepCopy()
 	}
 
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			select {
 			case sub, more := <-c:
@@ -494,7 +493,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
@@ -503,7 +502,7 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 	// We check every 5 minutes if we need to update
 	ticker := time.NewTicker(5 * time.Minute)
 
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -539,7 +538,7 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (m *Messenger) HandleCommunityUpdateGrant(state *ReceivedMessageState, message *protobuf.CommunityUpdateGrant, statusMessage *v1protocol.StatusMessage) error {
@@ -821,7 +820,7 @@ func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
 
 	ticker := time.NewTicker(grantUpdateInterval)
 
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -831,7 +830,7 @@ func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (m *Messenger) CheckCommunitiesToUnmute() (*MessengerResponse, error) {
@@ -1547,7 +1546,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	response.AddCommunity(community)
 
 	// We send a push notification in the background
-	go func() {
+	utils.SafeGo(func() {
 		if m.pushNotificationClient != nil {
 			pks, err := community.CanManageUsersPublicKeys()
 			if err != nil {
@@ -1563,7 +1562,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 				}
 			}
 		}
-	}()
+	})
 
 	// Activity center notification
 	notification := &ActivityCenterNotification{
@@ -4020,12 +4019,12 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 }
 
 func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
-	go func() {
+	utils.SafeGo(func() {
 		time.Sleep(importInitialDelay)
 		m.importDelayer.once.Do(func() {
 			close(m.importDelayer.wait)
 		})
-	}()
+	})
 }
 
 func (m *Messenger) checkIfIMemberOfCommunity(communityID types.HexBytes) error {
@@ -4076,14 +4075,14 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 	// this wait groups tracks the ongoing task for a particular community
 	task.Waiter.Add(1)
 
-	go func() {
+	utils.SafeGo(func() {
 		defer task.Waiter.Done()
 		err := m.importHistoryArchives(communityID, task.CancelChan)
 		if err != nil {
 			m.logger.Error("failed to import history archives", zap.Error(err))
 		}
 		m.config.messengerSignalsHandler.DownloadingHistoryArchivesFinished(types.EncodeHex(communityID))
-	}()
+	})
 	return nil
 }
 
@@ -4100,10 +4099,10 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 	defer importTicker.Stop()
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	go func() {
+	utils.SafeGo(func() {
 		<-cancel
 		cancelFunc()
-	}()
+	})
 
 	// don't proceed until initial import delay has passed
 	select {
@@ -4661,7 +4660,7 @@ func (m *Messenger) startCommunityRekeyLoop() {
 	}
 
 	ticker := time.NewTicker(d)
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -4672,7 +4671,7 @@ func (m *Messenger) startCommunityRekeyLoop() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 // rekeyCommunities loops over controlled communities and rekeys if rekey interval elapsed
@@ -5107,7 +5106,7 @@ func (m *Messenger) requestCommunityEncryptionKeys(community *communities.Commun
 func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 	logger := m.logger.Named("requestMissingCommunityChannelsHRKeysLoop")
 
-	go func() {
+	utils.SafeGo(func() {
 		for {
 			select {
 			case <-time.After(5 * time.Minute):
@@ -5140,5 +5139,5 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 				return
 			}
 		}
-	}()
+	})
 }

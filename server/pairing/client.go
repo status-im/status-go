@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
@@ -57,7 +58,8 @@ func findServerCert(c *ConnectionParams, reachableIPs []net.IP) (*url.URL, *x509
 	successCh := make(chan result, 1) // as we close on the first success
 
 	for _, ip := range reachableIPs {
-		go func(ip net.IP) {
+		ip := ip
+		common.SafeGo(func() {
 			u := c.BuildURL(ip)
 			cert, err := getServerCert(u)
 			if err != nil {
@@ -66,7 +68,7 @@ func findServerCert(c *ConnectionParams, reachableIPs []net.IP) (*url.URL, *x509
 			}
 			// If no error, send the results to the success channel
 			successCh <- result{u: u, cert: cert}
-		}(ip)
+		})
 	}
 
 	// Keep track of error counts

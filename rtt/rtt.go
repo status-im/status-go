@@ -6,6 +6,7 @@ import (
 	"time"
 
 	errors "github.com/pkg/errors"
+	"github.com/status-im/status-go/common"
 	tcp "github.com/status-im/tcp-shaker"
 )
 
@@ -72,9 +73,9 @@ func CheckHosts(addresses []string, timeout time.Duration) ([]Result, error) {
 	defer stopChecker()
 
 	// loop that queries Epoll and pipes events to CheckAddr() calls
-	go func() {
+	common.SafeGo(func() {
 		errCh <- c.CheckingLoop(ctx)
-	}()
+	})
 	// wait for CheckingLoop to prepare the epoll/kqueue
 	<-c.WaitReady()
 
@@ -84,10 +85,11 @@ func CheckHosts(addresses []string, timeout time.Duration) ([]Result, error) {
 	var wg sync.WaitGroup
 	for i := 0; i < len(addresses); i++ {
 		wg.Add(1)
-		go func(address string, resCh chan<- Result) {
+		address := addresses[i]
+		common.SafeGo(func() {
 			defer wg.Done()
 			resCh <- runCheck(c, address, timeout)
-		}(addresses[i], resCh)
+		})
 	}
 	// wait for all the routines to finish before closing results channel
 	wg.Wait()

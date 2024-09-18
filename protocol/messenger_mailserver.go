@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -67,7 +68,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 		return false, nil
 	}
 
-	go func() {
+	gocommon.SafeGo(func() {
 		ms := m.getActiveMailserver(chat.CommunityID)
 		_, err = m.performMailserverRequest(ms, func(mailServer mailservers.Mailserver) (*MessengerResponse, error) {
 			response, err := m.syncChatWithFilters(mailServer, chat.ID)
@@ -85,7 +86,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 		if err != nil {
 			m.logger.Error("failed to perform mailserver request", zap.Error(err))
 		}
-	}()
+	})
 	return true, nil
 }
 
@@ -161,7 +162,7 @@ func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, erro
 		return false, nil
 	}
 
-	go func() {
+	gocommon.SafeGo(func() {
 		// split filters by community store node so we can request the filters to the correct mailserver
 		filtersByMs := m.SplitFiltersByStoreNode(filters)
 		for communityID, filtersForMs := range filtersByMs {
@@ -183,8 +184,7 @@ func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, erro
 				m.logger.Error("failed to perform mailserver request", zap.Error(err))
 			}
 		}
-
-	}()
+	})
 	return true, nil
 }
 
@@ -773,7 +773,7 @@ func processMailserverBatch(
 
 	// Producer
 	wg.Add(1)
-	go func() {
+	gocommon.SafeGo(func() {
 		defer func() {
 			logger.Debug("mailserver batch producer complete")
 			wg.Done()
@@ -803,13 +803,13 @@ func processMailserverBatch(
 			}
 		}
 
-		go func() {
+		gocommon.SafeGo(func() {
 			workWg.Wait()
 			workCompleteCh <- struct{}{}
-		}()
+		})
 
 		logger.Debug("processBatch producer complete")
-	}()
+	})
 
 	var result error
 
@@ -830,14 +830,15 @@ loop:
 
 			logger.Debug("processBatch - received work")
 			semaphore <- 1
-			go func(w work) { // Consumer
+			w2 := w
+			gocommon.SafeGo(func() {
 				defer func() {
 					workWg.Done()
 					<-semaphore
 				}()
 
 				queryCtx, queryCancel := context.WithTimeout(ctx, mailserverRequestTimeout)
-				cursor, envelopesCount, err := messageRequester.SendMessagesRequestForTopics(queryCtx, storenodeID, batch.From, batch.To, w.cursor, w.pubsubTopic, w.contentTopics, w.limit, true, processEnvelopes)
+				cursor, envelopesCount, err := messageRequester.SendMessagesRequestForTopics(queryCtx, storenodeID, batch.From, batch.To, w2.cursor, w2.pubsubTopic, w2.contentTopics, w2.limit, true, processEnvelopes)
 				queryCancel()
 
 				if err != nil {
@@ -867,12 +868,12 @@ loop:
 
 				workWg.Add(1)
 				workCh <- work{
-					pubsubTopic:   w.pubsubTopic,
-					contentTopics: w.contentTopics,
+					pubsubTopic:   w2.pubsubTopic,
+					contentTopics: w2.contentTopics,
 					cursor:        cursor,
 					limit:         nextPageLimit,
 				}
-			}(w)
+			})
 		case err := <-errCh:
 			logger.Debug("processBatch - received error", zap.Error(err))
 			cancel() // Kill go routines

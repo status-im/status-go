@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
@@ -122,7 +123,7 @@ func (m *Messenger) extractAndSaveSyncSetting(syncSetting *protobuf.SyncSetting)
 
 // startSyncSettingsLoop watches the m.settings.SyncQueue and sends a sync message in response to a settings update
 func (m *Messenger) startSyncSettingsLoop() {
-	go func() {
+	gocommon.SafeGo(func() {
 		logger := m.logger.Named("SyncSettingsLoop")
 
 		for {
@@ -157,12 +158,12 @@ func (m *Messenger) startSyncSettingsLoop() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (m *Messenger) startSettingsChangesLoop() {
 	channel := m.settings.SubscribeToChanges()
-	go func() {
+	gocommon.SafeGo(func() {
 		for {
 			select {
 			case s := <-channel:
@@ -181,5 +182,5 @@ func (m *Messenger) startSettingsChangesLoop() {
 				return
 			}
 		}
-	}()
+	})
 }

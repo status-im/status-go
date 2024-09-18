@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/beevik/ntp"
+	"github.com/status-im/status-go/common"
 
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -72,7 +73,8 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 	}
 	responses := make(chan queryResponse, len(servers))
 	for _, server := range servers {
-		go func(server string) {
+		server := server
+		common.SafeGo(func() {
 			response, err := timeQuery(server, ntp.QueryOptions{
 				Timeout: DefaultRPCTimeout,
 			})
@@ -84,7 +86,7 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 				return
 			}
 			responses <- queryResponse{Offset: response.ClockOffset}
-		}(server)
+		})
 	}
 	var (
 		rpcErrors multiRPCError
@@ -182,7 +184,7 @@ func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod 
 		period = s.slowNTPSyncPeriod
 	}
 	s.quit = make(chan struct{})
-	go func() {
+	common.SafeGo(func() {
 		for {
 			select {
 			case <-time.After(period):
@@ -196,7 +198,7 @@ func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod 
 				return
 			}
 		}
-	}()
+	})
 }
 
 // Start initializes the local offset and starts a goroutine that periodically updates the local offset.

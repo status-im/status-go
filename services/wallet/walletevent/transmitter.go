@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -32,7 +33,7 @@ func (tmr *SignalsTransmitter) Start() error {
 	sub := tmr.Publisher.Subscribe(events)
 
 	tmr.wg.Add(1)
-	go func() {
+	common.SafeGo(func() {
 		defer tmr.wg.Done()
 		for {
 			select {
@@ -52,7 +53,7 @@ func (tmr *SignalsTransmitter) Start() error {
 				}
 			}
 		}
-	}()
+	})
 	return nil
 }
 

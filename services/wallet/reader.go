@@ -13,6 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/market"
@@ -116,7 +118,7 @@ func (r *Reader) Start() error {
 
 	r.startWalletEventsWatcher()
 
-	go func() {
+	gocommon.SafeGo(func() {
 		ticker := time.NewTicker(walletTickReloadPeriod)
 		defer ticker.Stop()
 		for {
@@ -127,7 +129,7 @@ func (r *Reader) Start() error {
 				r.triggerWalletReload()
 			}
 		}
-	}()
+	})
 	return nil
 }
 

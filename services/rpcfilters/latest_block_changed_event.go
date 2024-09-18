@@ -7,6 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+
+	gocommon "github.com/status-im/status-go/common"
 )
 
 const (
@@ -77,7 +79,7 @@ func (e *latestBlockChangedEvent) Start() error {
 
 	e.quit = make(chan struct{})
 
-	go func() {
+	gocommon.SafeGo(func() {
 		ticker := time.NewTicker(e.tickerPeriod)
 		for {
 			select {
@@ -96,7 +98,7 @@ func (e *latestBlockChangedEvent) Start() error {
 				return
 			}
 		}
-	}()
+	})
 
 	return nil
 }

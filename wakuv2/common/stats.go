@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 )
 
@@ -35,7 +36,7 @@ func measure(input interface{}) (*Measure, error) {
 }
 
 func (s *StatsTracker) AddUpload(input interface{}) {
-	go func(input interface{}) {
+	common.SafeGo(func() {
 		m, err := measure(input)
 		if err != nil {
 			return
@@ -44,11 +45,11 @@ func (s *StatsTracker) AddUpload(input interface{}) {
 		s.statsMutex.Lock()
 		defer s.statsMutex.Unlock()
 		s.Uploads = append(s.Uploads, *m)
-	}(input)
+	})
 }
 
 func (s *StatsTracker) AddDownload(input interface{}) {
-	go func(input interface{}) {
+	common.SafeGo(func() {
 		m, err := measure(input)
 		if err != nil {
 			return
@@ -57,11 +58,11 @@ func (s *StatsTracker) AddDownload(input interface{}) {
 		s.statsMutex.Lock()
 		defer s.statsMutex.Unlock()
 		s.Downloads = append(s.Downloads, *m)
-	}(input)
+	})
 }
 
 func (s *StatsTracker) AddUploadBytes(size uint64) {
-	go func(size uint64) {
+	common.SafeGo(func() {
 		m := Measure{
 			Timestamp: time.Now().UnixNano(),
 			Size:      size,
@@ -70,11 +71,11 @@ func (s *StatsTracker) AddUploadBytes(size uint64) {
 		s.statsMutex.Lock()
 		defer s.statsMutex.Unlock()
 		s.Uploads = append(s.Uploads, m)
-	}(size)
+	})
 }
 
 func (s *StatsTracker) AddDownloadBytes(size uint64) {
-	go func(size uint64) {
+	common.SafeGo(func() {
 		m := Measure{
 			Timestamp: time.Now().UnixNano(),
 			Size:      size,
@@ -83,7 +84,7 @@ func (s *StatsTracker) AddDownloadBytes(size uint64) {
 		s.statsMutex.Lock()
 		defer s.statsMutex.Unlock()
 		s.Downloads = append(s.Downloads, m)
-	}(size)
+	})
 }
 
 func calculateAverage(measures []Measure, minTime int64) (validMeasures []Measure, rate uint64) {

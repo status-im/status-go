@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	udpp2p "github.com/schollz/peerdiscovery"
+	"github.com/status-im/status-go/common"
 	"go.uber.org/zap"
 )
 
@@ -95,9 +96,9 @@ func Search(deviceName, deviceType string, notify NotifyHandler, stop chan struc
 	settings.TimeLimit = searchLimit
 	settings.StopChan = stop
 
-	go func() {
+	common.SafeGo(func() {
 		_, err = udpp2p.Discover(*settings)
 		logger.Error("error while discovering udp peers", zap.Error(err))
-	}()
+	})
 	return nil
 }

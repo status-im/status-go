@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/signal"
@@ -170,7 +171,7 @@ func (s *Service) Start() error {
 	sub := s.transmitter.publisher.Subscribe(events)
 
 	s.transmitter.wg.Add(1)
-	go func() {
+	gocommon.SafeGo(func() {
 		defer s.transmitter.wg.Done()
 		for {
 			select {
@@ -186,7 +187,7 @@ func (s *Service) Start() error {
 				s.transactionsHandler(event)
 			}
 		}
-	}()
+	})
 
 	log.Info("Successful start")
 

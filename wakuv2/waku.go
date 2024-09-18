@@ -72,6 +72,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
@@ -394,14 +395,15 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) 
 		if strings.HasPrefix(addrString, "enrtree://") {
 			// Use DNS Discovery
 			wg.Add(1)
-			go func(addr string) {
+			addr := addrString
+			gocommon.SafeGo(func() {
 				defer wg.Done()
 				if err := w.dnsDiscover(ctx, addr, retrieveENR); err != nil {
 					mu.Lock()
 					w.seededBootnodesForDiscV5 = false
 					mu.Unlock()
 				}
-			}(addrString)
+			})
 		} else {
 			// It's a normal enr
 			bootnode, err := enode.Parse(enode.ValidSchemes, addrString)
@@ -473,11 +475,11 @@ func (w *Waku) discoverAndConnectPeers() {
 		addrString := addrString
 		if strings.HasPrefix(addrString, "enrtree://") {
 			// Use DNS Discovery
-			go func() {
+			gocommon.SafeGo(func() {
 				if err := w.dnsDiscover(w.ctx, addrString, fnApply); err != nil {
 					w.logger.Error("could not obtain dns discovery peers for ClusterConfig.WakuNodes", zap.Error(err), zap.String("dnsDiscURL", addrString))
 				}
-			}()
+			})
 		} else {
 			// It is a normal multiaddress
 			addr, err := multiaddr.NewMultiaddr(addrString)
@@ -635,7 +637,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 	}
 
 	w.wg.Add(1)
-	go func() {
+	gocommon.SafeGo(func() {
 		defer w.wg.Done()
 		for {
 			select {
@@ -652,7 +654,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 				}
 			}
 		}
-	}()
+	})
 
 	return nil
 }
@@ -1076,7 +1078,7 @@ func (w *Waku) Start() error {
 	}
 
 	w.wg.Add(1)
-	go func() {
+	gocommon.SafeGo(func() {
 		defer w.wg.Done()
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -1092,7 +1094,7 @@ func (w *Waku) Start() error {
 				w.checkForConnectionChanges()
 			}
 		}
-	}()
+	})
 
 	if w.cfg.TelemetryServerURL != "" {
 		w.wg.Add(1)
@@ -1135,7 +1137,7 @@ func (w *Waku) Start() error {
 		w.missingMsgVerifier.Start(w.ctx)
 
 		w.wg.Add(1)
-		go func() {
+		gocommon.SafeGo(func() {
 			w.wg.Done()
 			for {
 				select {
@@ -1148,7 +1150,7 @@ func (w *Waku) Start() error {
 					}
 				}
 			}
-		}()
+		})
 	}
 
 	if w.cfg.LightClient {
@@ -1284,7 +1286,7 @@ func (w *Waku) startMessageSender() error {
 		sender.WithMessageSentCheck(messageSentCheck)
 
 		w.wg.Add(1)
-		go func() {
+		gocommon.SafeGo(func() {
 			defer w.wg.Done()
 			for {
 				select {
@@ -1308,7 +1310,7 @@ func (w *Waku) startMessageSender() error {
 					}
 				}
 			}
-		}()
+		})
 	}
 
 	if !w.cfg.UseThrottledPublish || testing.Testing() {

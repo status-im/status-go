@@ -12,7 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/account"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
@@ -171,7 +173,8 @@ func (api *API) execTokenPackID(chainID uint64, tokenIDs []*big.Int, resultChan 
 	c := goccm.New(maxConcurrentRequests)
 	for _, tokenID := range tokenIDs {
 		c.Wait()
-		go func(tokenID *big.Int) {
+		tokenID := tokenID
+		gocommon.SafeGo(func() {
 			defer c.Done()
 			packID, err := stickerPack.TokenPackId(callOpts, tokenID)
 			if err != nil {
@@ -179,7 +182,7 @@ func (api *API) execTokenPackID(chainID uint64, tokenIDs []*big.Int, resultChan 
 				return
 			}
 			resultChan <- packID
-		}(tokenID)
+		})
 	}
 	c.WaitAllDone()
 }
@@ -269,17 +272,18 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 	c := goccm.New(maxConcurrentRequests)
 	for i := uint64(0); i < numPacks.Uint64(); i++ {
 		c.Wait()
-		go func(i uint64) {
+		ii := i
+		gocommon.SafeGo(func() {
 			defer c.Done()
 
-			packID := new(big.Int).SetUint64(i)
+			packID := new(big.Int).SetUint64(ii)
 
-			_, exists := installedPacks[uint(i)]
+			_, exists := installedPacks[uint(ii)]
 			if exists {
 				return // We already have the sticker pack data, no need to query it
 			}
 
-			_, exists = pendingPacks[uint(i)]
+			_, exists = pendingPacks[uint(ii)]
 			if exists {
 				return // We already have the sticker pack data, no need to query it
 			}
@@ -292,7 +296,7 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 			}
 
 			resultChan <- stickerPack
-		}(i)
+		})
 	}
 
 	c.WaitAllDone()
@@ -406,7 +410,8 @@ func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accounts.Accoun
 	c := goccm.New(maxConcurrentRequests)
 	for _, account := range accs {
 		c.Wait()
-		go func(acc *accounts.Account) {
+		acc := account
+		gocommon.SafeGo(func() {
 			defer c.Done()
 			packs, err := api.getPurchasedPackIDs(chainID, acc.Address)
 			if err != nil {
@@ -417,7 +422,7 @@ func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accounts.Accoun
 			for _, p := range packs {
 				resultChan <- p
 			}
-		}(account)
+		})
 	}
 	c.WaitAllDone()
 }
@@ -442,16 +447,17 @@ func (api *API) execTokenOwnerOfIndex(chainID uint64, account types.Address, bal
 	c := goccm.New(maxConcurrentRequests)
 	for i := uint64(0); i < balance.Uint64(); i++ {
 		c.Wait()
-		go func(i uint64) {
+		ii := i
+		gocommon.SafeGo(func() {
 			defer c.Done()
-			tokenID, err := stickerPack.TokenOfOwnerByIndex(callOpts, common.Address(account), new(big.Int).SetUint64(i))
+			tokenID, err := stickerPack.TokenOfOwnerByIndex(callOpts, common.Address(account), new(big.Int).SetUint64(ii))
 			if err != nil {
 				errChan <- err
 				return
 			}
 
 			resultChan <- tokenID
-		}(i)
+		})
 	}
 	c.WaitAllDone()
 }

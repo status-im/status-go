@@ -28,13 +28,13 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/waku/common"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
+	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/waku/common"
 )
 
 // List of errors
@@ -401,7 +401,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 
 	// create subscription and start waiting for message events
 	rpcSub := notifier.CreateSubscription()
-	go func() {
+	gocommon.SafeGo(func() {
 		// for now poll internally, refactor waku internal for channel support
 		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()
@@ -421,7 +421,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 				return
 			}
 		}
-	}()
+	})
 
 	return rpcSub, nil
 }

@@ -15,6 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/log"
 	getrpc "github.com/ethereum/go-ethereum/rpc"
+
+	gocommon "github.com/status-im/status-go/common"
 )
 
 const (
@@ -115,7 +117,9 @@ func (api *PublicAPI) NewFilter(crit filters.FilterCriteria) (getrpc.ID, error) 
 	api.filtersMu.Lock()
 	api.filters[id] = f
 	api.filtersMu.Unlock()
-	go pollLogs(api.client(), api.chainID(), f, defaultLogsQueryTimeout, defaultLogsPeriod)
+	gocommon.SafeGo(func() {
+		pollLogs(api.client(), api.chainID(), f, defaultLogsQueryTimeout, defaultLogsPeriod)
+	})
 	return id, nil
 }
 
@@ -129,8 +133,7 @@ func (api *PublicAPI) NewBlockFilter() getrpc.ID {
 	id := getrpc.ID(uuid.New())
 
 	api.filters[id] = f
-
-	go func() {
+	gocommon.SafeGo(func() {
 		id, si := api.latestBlockChangedEvent.Subscribe()
 		s, ok := si.(chan common.Hash)
 		if !ok {
@@ -149,8 +152,7 @@ func (api *PublicAPI) NewBlockFilter() getrpc.ID {
 				return
 			}
 		}
-
-	}()
+	})
 
 	return id
 }
@@ -166,7 +168,7 @@ func (api *PublicAPI) NewPendingTransactionFilter() getrpc.ID {
 
 	api.filters[id] = f
 
-	go func() {
+	gocommon.SafeGo(func() {
 		id, si := api.transactionSentToUpstreamEvent.Subscribe()
 		s, ok := si.(chan *PendingTxInfo)
 		if !ok {
@@ -184,7 +186,7 @@ func (api *PublicAPI) NewPendingTransactionFilter() getrpc.ID {
 				return
 			}
 		}
-	}()
+	})
 
 	return id
 

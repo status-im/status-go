@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/communities"
 )
@@ -27,7 +28,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 		return
 	}
 
-	go func() {
+	common.SafeGo(func() {
 		// Initialize interval to 0 for immediate execution
 		var interval time.Duration = 0
 
@@ -76,7 +77,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCommunities, error) {
@@ -140,9 +141,9 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 		})
 	}
 
-	go func() {
+	common.SafeGo(func() {
 		_ = m.fetchCommunities(unknownCommunities)
-	}()
+	})
 
 	return response, nil
 }
