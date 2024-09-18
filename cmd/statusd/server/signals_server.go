@@ -126,7 +126,7 @@ func (s *Server) signals(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) addEndpointWithResponse(handler func(string) string) {
 	endpoint := endpointName(functionName(handler))
-	log.Info("adding endpoint", "name", endpoint)
+	log.Debug("adding endpoint", "name", endpoint)
 	s.mux.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
 		request, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -145,7 +145,7 @@ func (s *Server) addEndpointWithResponse(handler func(string) string) {
 
 func (s *Server) addEndpointNoRequest(handler func() string) {
 	endpoint := endpointName(functionName(handler))
-	log.Info("adding endpoint", "name", endpoint)
+	log.Debug("adding endpoint", "name", endpoint)
 	s.mux.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
 		response := handler()
 
@@ -158,7 +158,7 @@ func (s *Server) addEndpointNoRequest(handler func() string) {
 
 func (s *Server) addUnsupportedEndpoint(name string) {
 	endpoint := endpointName(name)
-	log.Info("marking unsupported endpoint", "name", endpoint)
+	log.Debug("marking unsupported endpoint", "name", endpoint)
 	s.mux.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotImplemented)
 	})

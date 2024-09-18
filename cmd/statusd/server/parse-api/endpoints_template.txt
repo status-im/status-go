@@ -1,20 +1,20 @@
 package server
 
-import "github.com/status-im/status-go/mobile"
+import statusgo "github.com/status-im/status-go/mobile"
 
-var EndpointsWithResponse = []func(string) string {
+var EndpointsWithResponse = []func(string) string{
     {{- range .FunctionsWithResp }}
     {{ $.PackageName }}.{{ . }},
 {{- end }}
 }
 
-var EndpointsNoRequest = []func() string {
+var EndpointsNoRequest = []func() string{
     {{- range .FunctionsNoArgs }}
     {{ $.PackageName }}.{{ . }},
 {{- end }}
 }
 
-var EndpointsUnsupported = []string {
+var EndpointsUnsupported = []string{
     {{- range .UnsupportedEndpoints }}
     "{{ . }}",
 {{- end }}

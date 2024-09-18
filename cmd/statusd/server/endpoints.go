@@ -1,8 +1,8 @@
 package server
 
-import "github.com/status-im/status-go/mobile"
+import statusgo "github.com/status-im/status-go/mobile"
 
-var EndpointsWithResponse = []func(string) string {
+var EndpointsWithResponse = []func(string) string{
     statusgo.InitializeApplication,
     statusgo.ExtractGroupMembershipSignatures,
     statusgo.SignGroupMembership,
@@ -54,7 +54,7 @@ var EndpointsWithResponse = []func(string) string {
     statusgo.AddCentralizedMetric,
 }
 
-var EndpointsNoRequest = []func() string {
+var EndpointsNoRequest = []func() string{
     statusgo.GetNodeConfig,
     statusgo.ResetChainData,
     statusgo.Logout,
@@ -70,7 +70,7 @@ var EndpointsNoRequest = []func() string {
     statusgo.CentralizedMetricsInfo,
 }
 
-var EndpointsUnsupported = []string {
+var EndpointsUnsupported = []string{
     "VerifyAccountPassword",
     "VerifyDatabasePassword",
     "MigrateKeyStoreDir",
@@ -93,6 +93,7 @@ var EndpointsUnsupported = []string {
     "ConvertToKeycardAccount",
     "ConvertToRegularAccount",
     "SwitchFleet",
+    "GenerateImages",
     "InputConnectionStringForBootstrapping",
     "InputConnectionStringForBootstrappingAnotherDevice",
     "InputConnectionStringForImportingKeypairsKeystores",

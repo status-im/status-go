@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/cmd/statusd/server"
@@ -13,7 +14,6 @@ var (
 )
 
 func main() {
-	
 	srv := server.NewServer()
 	srv.Setup()
 
