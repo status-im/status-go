@@ -3,8 +3,13 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"reflect"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +22,8 @@ import (
 
 type Server struct {
 	server      *http.Server
+	listener    net.Listener
+	mux         *http.ServeMux
 	lock        sync.Mutex
 	connections map[*websocket.Conn]struct{}
 	address     string
@@ -58,25 +65,26 @@ func (s *Server) Listen(address string) error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/signals", s.signals)
-	s.server.Handler = mux
+	s.mux = http.NewServeMux()
+	s.mux.HandleFunc("/signals", s.signals)
+	s.server.Handler = s.mux
 
-	listener, err := net.Listen("tcp", address)
+	var err error
+	s.listener, err = net.Listen("tcp", address)
 	if err != nil {
 		return err
 	}
 
-	s.address = listener.Addr().String()
-
-	go func() {
-		err := s.server.Serve(listener)
-		if !errors.Is(err, http.ErrServerClosed) {
-			log.Error("signals server closed with error: %w", err)
-		}
-	}()
+	s.address = s.listener.Addr().String()
 
 	return nil
+}
+
+func (s *Server) Serve() {
+	err := s.server.Serve(s.listener)
+	if !errors.Is(err, http.ErrServerClosed) {
+		log.Error("signals server closed with error: %w", err)
+	}
 }
 
 func (s *Server) Stop(ctx context.Context) {
@@ -114,4 +122,69 @@ func (s *Server) signals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.connections[connection] = struct{}{}
+}
+
+func (s *Server) addEndpointWithResponse(handler func(string) string) {
+	endpoint := endpointName(functionName(handler))
+	log.Info("adding endpoint", "name", endpoint)
+	s.mux.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
+		request, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Error("failed to read request: %w", err)
+			return
+		}
+
+		response := handler(string(request))
+
+		_, err = w.Write([]byte(response))
+		if err != nil {
+			log.Error("failed to write response: %w", err)
+		}
+	})
+}
+
+func (s *Server) addEndpointNoRequest(handler func() string) {
+	endpoint := endpointName(functionName(handler))
+	log.Info("adding endpoint", "name", endpoint)
+	s.mux.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
+		response := handler()
+
+		_, err := w.Write([]byte(response))
+		if err != nil {
+			log.Error("failed to write response: %w", err)
+		}
+	})
+}
+
+func (s *Server) addUnsupportedEndpoint(name string) {
+	endpoint := endpointName(name)
+	log.Info("marking unsupported endpoint", "name", endpoint)
+	s.mux.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotImplemented)
+	})
+}
+
+func (s *Server) RegisterMobileAPI() {
+	for _, endpoint := range EndpointsWithResponse {
+		s.addEndpointWithResponse(endpoint)
+	}
+	for _, endpoint := range EndpointsNoRequest {
+		s.addEndpointNoRequest(endpoint)
+	}
+	for _, endpoint := range EndpointsUnsupported {
+		s.addUnsupportedEndpoint(endpoint)
+	}
+}
+
+func functionName(fn any) string {
+	fullName := runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
+	parts := strings.Split(fullName, "/")
+	lastPart := parts[len(parts)-1]
+	nameParts := strings.Split(lastPart, ".")
+	return nameParts[len(nameParts)-1]
+}
+
+func endpointName(functionName string) string {
+	const base = "statusgo"
+	return fmt.Sprintf("/%s/%s", base, functionName)
 }

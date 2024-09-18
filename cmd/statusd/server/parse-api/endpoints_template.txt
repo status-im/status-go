@@ -1,0 +1,21 @@
+package server
+
+import "github.com/status-im/status-go/mobile"
+
+var EndpointsWithResponse = []func(string) string {
+    {{- range .FunctionsWithResp }}
+    {{ $.PackageName }}.{{ . }},
+{{- end }}
+}
+
+var EndpointsNoRequest = []func() string {
+    {{- range .FunctionsNoArgs }}
+    {{ $.PackageName }}.{{ . }},
+{{- end }}
+}
+
+var EndpointsUnsupported = []string {
+    {{- range .UnsupportedEndpoints }}
+    "{{ . }}",
+{{- end }}
+}
