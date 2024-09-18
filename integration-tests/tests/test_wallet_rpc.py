@@ -15,17 +15,16 @@ class TestTransactionRpc(TransactionTestCase):
         "method, params",
         [
             (
-                "wallet_checkRecentHistoryForChainIDs",
-                [[31337], ["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"]],
+                    "wallet_checkRecentHistoryForChainIDs",
+                    [[31337], ["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"]],
             ),
             (
-                "wallet_getPendingTransactionsForIdentities",
-                [[{"chainId": None, "hash": None}]],
+                    "wallet_getPendingTransactionsForIdentities",
+                    [[{"chainId": None, "hash": None}]],
             ),
         ],
     )
     def test_tx_(self, method, params):
-
         _id = str(random.randint(1, 9999))
 
         if method in ["wallet_getPendingTransactionsForIdentities"]:
@@ -39,11 +38,11 @@ class TestTransactionRpc(TransactionTestCase):
 
     def test_create_multi_transaction(self):
         response = self.wallet_create_multi_transaction()
-        
+
         # how to create schema:
         # from schema_builder import CustomSchemaBuilder
         # CustomSchemaBuilder(method).create_schema(response.json())
-        
+
         with open(f"{option.base_dir}/schemas/wallet_createMultiTransaction", "r") as schema:
             jsonschema.validate(instance=response.json(), schema=json.load(schema))
 
@@ -54,12 +53,13 @@ class TestRpc(RpcTestCase):
 
     @pytest.mark.parametrize(
         "method, params",
-        [   
+        [
             ("wallet_startWallet", []),
             ("wallet_getEthereumChains", []),
-            ("wallet_startWallet", []),
             ("wallet_getTokenList", []),
             ("wallet_getCryptoOnRamps", []),
+            ("wallet_getCachedCurrencyFormats", []),
+            ("wallet_fetchAllCurrencyFormats", [])
         ],
     )
     def test_(self, method, params):
