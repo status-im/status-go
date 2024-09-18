@@ -30,23 +30,23 @@ jobs:
           output=$(./_assets/scripts/commit_check.sh 2>&1)
           exit_code=$?
           
-          echo "$output" | sed '$d'
-          echo "has_breaking_changes=$has_breaking_changes"
+          echo "${output}" | sed '$d'
+          echo "has_breaking_changes=${has_breaking_changes}"
           
-          echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
+          echo "exit_code=${exit_code}" >> $GITHUB_OUTPUT
           
-          has_breaking_changes=$(echo "$output" | tail -n 1)
-          echo "has_breaking_changes=$has_breaking_changes" >> $GITHUB_OUTPUT
+          has_breaking_changes=$(echo "${output}" | tail -n 1)
+          echo "has_breaking_changes=${has_breaking_changes}" >> $GITHUB_OUTPUT
           
-          invalid_commit_messages=$(echo "$output" | sed '1d;$d')
-          invalid_commit_messages=$(echo "$output" | sed '1d;$d')
-          invalid_commit_messages=$(echo "$invalid_commit_messages" | sed 's/\x1b\[[0-9;]*m//g') # Remove color codes
-          invalid_commit_messages=$(echo "$invalid_commit_messages" | sed 's/^Commit message is ill-formed: //') # Remove prefix
+          invalid_commit_messages=$(echo "${output}" | sed '1d;$d')
+          invalid_commit_messages=$(echo "${output}" | sed '1d;$d')
+          invalid_commit_messages=$(echo "${invalid_commit_messages}" | sed 's/\x1b\[[0-9;]*m//g') # Remove color codes
+          invalid_commit_messages=$(echo "${invalid_commit_messages}" | sed 's/^Commit message is ill-formed: //') # Remove prefix
           
           if [[ $exit_code -ne 0 ]]; then
             EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
             echo "error_message<<$EOF" >> "$GITHUB_ENV"
-            echo "$invalid_commit_messages" >> "$GITHUB_ENV"
+            echo "${invalid_commit_messages}" >> "$GITHUB_ENV"
             echo "$EOF" >> "$GITHUB_ENV"
           
           fi
