@@ -264,12 +264,10 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
         
            case protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_RESPONSE:
 		return m.handleCommunitySharedAddressesResponseProtobuf(messageState, protoBytes, msg, filter)
-        
-	default:
-		m.logger.Info("protobuf type not found", zap.String("type", string(msg.ApplicationLayer.Type)))
-                return errors.New("protobuf type not found")
+        	
 	}
-	return nil
+	m.logger.Info("protobuf type not found", zap.String("type", string(msg.ApplicationLayer.Type)))
+	return errors.New("protobuf type not found")
 }
 
 
