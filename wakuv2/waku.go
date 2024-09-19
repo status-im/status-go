@@ -112,6 +112,7 @@ type ITelemetryClient interface {
 	PushMessageCheckFailure(ctx context.Context, messageHash string)
 	PushPeerCountByShard(ctx context.Context, peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin map[wps.Origin]uint)
+	PushDialFailure(ctx context.Context, dialFailure common.DialError)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -1104,12 +1105,24 @@ func (w *Waku) Start() error {
 			peerTelemetryTicker := time.NewTicker(peerTelemetryTickerInterval)
 			defer peerTelemetryTicker.Stop()
 
+			sub, err := w.node.Host().EventBus().Subscribe(new(utils.DialError))
+			if err != nil {
+				w.logger.Error("failed to subscribe to dial errors", zap.Error(err))
+				return
+			}
+			defer sub.Close()
+
 			for {
 				select {
 				case <-w.ctx.Done():
 					return
 				case <-peerTelemetryTicker.C:
 					w.reportPeerMetrics()
+				case dialErr := <-sub.Out():
+					errors := common.ParseDialErrors(dialErr.(utils.DialError).Err.Error())
+					for _, dialError := range errors {
+						w.statusTelemetryClient.PushDialFailure(w.ctx, common.DialError{ErrType: dialError.ErrType, ErrMsg: dialError.ErrMsg, Protocols: dialError.Protocols})
+					}
 				}
 			}
 		}()
