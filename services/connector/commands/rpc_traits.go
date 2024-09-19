@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,17 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
+)
+
+const (
+	Method_EthAccounts         = "eth_accounts"
+	Method_EthRequestAccounts  = "eth_requestAccounts"
+	Method_EthChainId          = "eth_chainId"
+	Method_PersonalSign        = "personal_sign"
+	Method_EthSendTransaction  = "eth_sendTransaction"
+	Method_RequestPermissions  = "wallet_requestPermissions"
+	Method_RevokePermissions   = "wallet_revokePermissions"
+	Method_SwitchEthereumChain = "wallet_switchEthereumChain"
 )
 
 // errors
@@ -26,10 +38,11 @@ type RPCRequest struct {
 	URL     string        `json:"url"`
 	Name    string        `json:"name"`
 	IconURL string        `json:"iconUrl"`
+	ChainID uint64        `json:"chainId"`
 }
 
 type RPCCommand interface {
-	Execute(request RPCRequest) (interface{}, error)
+	Execute(ctx context.Context, request RPCRequest) (interface{}, error)
 }
 
 type RequestAccountsAcceptedArgs struct {

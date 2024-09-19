@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -51,7 +52,7 @@ func (c *RequestPermissionsCommand) getPermissionResponse(methodName string) Per
 	return response
 }
 
-func (c *RequestPermissionsCommand) Execute(request RPCRequest) (interface{}, error) {
+func (c *RequestPermissionsCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err

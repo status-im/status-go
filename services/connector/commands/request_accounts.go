@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 
@@ -26,7 +27,7 @@ type RawAccountsResponse struct {
 	Result  []accounts.Account `json:"result"`
 }
 
-func (c *RequestAccountsCommand) Execute(request RPCRequest) (interface{}, error) {
+func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err

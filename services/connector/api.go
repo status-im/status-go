@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +26,7 @@ func NewAPI(s *Service) *API {
 
 	// Transactions and signing
 	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{
+		RpcClient:     s.rpc,
 		Db:            s.db,
 		ClientHandler: c,
 	})
@@ -65,7 +67,7 @@ func NewAPI(s *Service) *API {
 	}
 }
 
-func (api *API) forwardRPC(URL string, inputJSON string) (interface{}, error) {
+func (api *API) forwardRPC(URL string, request commands.RPCRequest) (interface{}, error) {
 	dApp, err := persistence.SelectDAppByUrl(api.s.db, URL)
 	if err != nil {
 		return "", err
@@ -75,8 +77,17 @@ func (api *API) forwardRPC(URL string, inputJSON string) (interface{}, error) {
 		return "", commands.ErrDAppIsNotPermittedByUser
 	}
 
+	if request.ChainID != dApp.ChainID {
+		request.ChainID = dApp.ChainID
+	}
+
 	var response map[string]interface{}
-	rawResponse := api.s.rpc.CallRaw(inputJSON)
+	byteRequest, err := json.Marshal(request)
+	if err != nil {
+		return "", err
+	}
+
+	rawResponse := api.s.rpc.CallRaw(string(byteRequest))
 	if err := json.Unmarshal([]byte(rawResponse), &response); err != nil {
 		return "", err
 	}
@@ -95,17 +106,17 @@ func (api *API) forwardRPC(URL string, inputJSON string) (interface{}, error) {
 	return nil, ErrInvalidResponseFromForwardedRpc
 }
 
-func (api *API) CallRPC(inputJSON string) (interface{}, error) {
+func (api *API) CallRPC(ctx context.Context, inputJSON string) (interface{}, error) {
 	request, err := commands.RPCRequestFromJSON(inputJSON)
 	if err != nil {
 		return "", err
 	}
 
 	if command, exists := api.r.GetCommand(request.Method); exists {
-		return command.Execute(request)
+		return command.Execute(ctx, request)
 	}
 
-	return api.forwardRPC(request.URL, inputJSON)
+	return api.forwardRPC(request.URL, request)
 }
 
 func (api *API) RecallDAppPermission(origin string) error {
