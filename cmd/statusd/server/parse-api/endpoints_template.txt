@@ -19,6 +19,6 @@ var EndpointsNoRequest = map[string]func() string{
 
 var EndpointsUnsupported = []string{
 	{{- range .UnsupportedEndpoints }}
-	"{{ . }}",
+	"/{{ $.PackageName }}/{{ . }}",
 {{- end }}
 }
