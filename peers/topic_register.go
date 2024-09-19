@@ -33,7 +33,7 @@ func (r *Register) Start() error {
 	for _, topic := range r.topics {
 		r.wg.Add(1)
 		t := topic
-		common.SafeGo(func() {
+		common.Go(func() {
 			log.Debug("v5 register topic", "topic", t)
 			if err := r.discovery.Register(string(t), r.quit); err != nil {
 				log.Error("error registering topic", "topic", t, "error", err)

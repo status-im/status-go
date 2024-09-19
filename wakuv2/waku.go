@@ -396,7 +396,7 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) 
 			// Use DNS Discovery
 			wg.Add(1)
 			addr := addrString
-			gocommon.SafeGo(func() {
+			gocommon.Go(func() {
 				defer wg.Done()
 				if err := w.dnsDiscover(ctx, addr, retrieveENR); err != nil {
 					mu.Lock()
@@ -475,7 +475,7 @@ func (w *Waku) discoverAndConnectPeers() {
 		addrString := addrString
 		if strings.HasPrefix(addrString, "enrtree://") {
 			// Use DNS Discovery
-			gocommon.SafeGo(func() {
+			gocommon.Go(func() {
 				if err := w.dnsDiscover(w.ctx, addrString, fnApply); err != nil {
 					w.logger.Error("could not obtain dns discovery peers for ClusterConfig.WakuNodes", zap.Error(err), zap.String("dnsDiscURL", addrString))
 				}
@@ -637,7 +637,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 	}
 
 	w.wg.Add(1)
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		defer w.wg.Done()
 		for {
 			select {
@@ -1078,7 +1078,7 @@ func (w *Waku) Start() error {
 	}
 
 	w.wg.Add(1)
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		defer w.wg.Done()
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -1137,7 +1137,7 @@ func (w *Waku) Start() error {
 		w.missingMsgVerifier.Start(w.ctx)
 
 		w.wg.Add(1)
-		gocommon.SafeGo(func() {
+		gocommon.Go(func() {
 			w.wg.Done()
 			for {
 				select {
@@ -1286,7 +1286,7 @@ func (w *Waku) startMessageSender() error {
 		sender.WithMessageSentCheck(messageSentCheck)
 
 		w.wg.Add(1)
-		gocommon.SafeGo(func() {
+		gocommon.Go(func() {
 			defer w.wg.Done()
 			for {
 				select {

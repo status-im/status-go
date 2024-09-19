@@ -100,7 +100,7 @@ func (s *Scheduler) Enqueue(taskType TaskType, taskFn taskFunction, resFn result
 						s.cancelFn = nil
 					} else {
 						// In case of multiple tasks of the same type, the previous one is overwritten
-						common.SafeGo(func() {
+						common.Go(func() {
 							existingTask.resFn(nil, existingTask.taskType, ErrTaskOverwritten)
 						})
 					}
@@ -118,7 +118,7 @@ func (s *Scheduler) Enqueue(taskType TaskType, taskFn taskFunction, resFn result
 				// notify the queued one that it is overwritten or ignored
 				if existingTask.policy == ReplacementPolicyCancelOld {
 					oldResFn := existingTask.resFn
-					common.SafeGo(func() {
+					common.Go(func() {
 						oldResFn(nil, existingTask.taskType, ErrTaskOverwritten)
 					})
 					// Overwrite the queued one of the same type
@@ -149,7 +149,7 @@ func (s *Scheduler) runTask(tc *taskContext, taskFn taskFunction, resFn func(int
 	s.cancelFn = thisCancelFn
 	s.context = thisContext
 
-	common.SafeGo(func() {
+	common.Go(func() {
 		res, err := taskFn(thisContext)
 
 		// Release context resources
@@ -208,7 +208,7 @@ func (s *Scheduler) Stop() {
 		// Notify the queued one that they are canceled
 		if pair.Value.policy == ReplacementPolicyCancelOld {
 			val := pair.Value
-			common.SafeGo(func() {
+			common.Go(func() {
 				val.resFn(nil, val.taskType, context.Canceled)
 			})
 		}

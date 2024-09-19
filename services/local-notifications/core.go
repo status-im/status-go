@@ -171,7 +171,7 @@ func (s *Service) Start() error {
 	sub := s.transmitter.publisher.Subscribe(events)
 
 	s.transmitter.wg.Add(1)
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		defer s.transmitter.wg.Done()
 		for {
 			select {

@@ -876,7 +876,7 @@ func (c *findBlocksCommand) fastIndexErc20(ctx context.Context, fromBlockNumber 
 func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) {
 	c.incLoops()
 
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		defer func() {
 			c.decLoops()
 		}()
@@ -897,7 +897,7 @@ func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) 
 					blocksByAddress[dbHeader.Address] = append(blocksByAddress[dbHeader.Address], dbHeader.Number)
 				}
 
-				gocommon.SafeGo(func() {
+				gocommon.Go(func() {
 					_ = loadTransfers(ctx, c.blockDAO, c.db, c.chainClient, noBlockLimit,
 						blocksByAddress, c.transactionManager, c.pendingTxManager, c.tokenManager, c.feed)
 				})
@@ -1160,7 +1160,7 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(ctx context.Conte
 	log.Debug("startFetchingNewBlocks start", "chainID", c.chainClient.NetworkID(), "accounts", addresses)
 
 	c.incLoops()
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		defer func() {
 			c.decLoops()
 		}()
@@ -1228,7 +1228,7 @@ func (c *loadBlocksAndTransfersCommand) startFetchingTransfersForLoadedBlocks(gr
 		return err
 	}
 
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		txCommand := &loadTransfersCommand{
 			accounts:           c.accounts,
 			db:                 c.db,

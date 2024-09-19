@@ -68,7 +68,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 		return false, nil
 	}
 
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		ms := m.getActiveMailserver(chat.CommunityID)
 		_, err = m.performMailserverRequest(ms, func(mailServer mailservers.Mailserver) (*MessengerResponse, error) {
 			response, err := m.syncChatWithFilters(mailServer, chat.ID)
@@ -162,7 +162,7 @@ func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, erro
 		return false, nil
 	}
 
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		// split filters by community store node so we can request the filters to the correct mailserver
 		filtersByMs := m.SplitFiltersByStoreNode(filters)
 		for communityID, filtersForMs := range filtersByMs {
@@ -773,7 +773,7 @@ func processMailserverBatch(
 
 	// Producer
 	wg.Add(1)
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		defer func() {
 			logger.Debug("mailserver batch producer complete")
 			wg.Done()
@@ -803,7 +803,7 @@ func processMailserverBatch(
 			}
 		}
 
-		gocommon.SafeGo(func() {
+		gocommon.Go(func() {
 			workWg.Wait()
 			workCompleteCh <- struct{}{}
 		})
@@ -831,7 +831,7 @@ loop:
 			logger.Debug("processBatch - received work")
 			semaphore <- 1
 			w2 := w
-			gocommon.SafeGo(func() {
+			gocommon.Go(func() {
 				defer func() {
 					workWg.Done()
 					<-semaphore

@@ -710,7 +710,7 @@ func (c *Client) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
 
 // subscribeForMessageEvents subscribes for newly sent/scheduled messages so we can check if we need to send a push notification
 func (c *Client) subscribeForMessageEvents() {
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		c.config.Logger.Debug("subscribing for message events")
 		messageEventsSubscription := c.messageSender.SubscribeToMessageEvents()
 		for {
@@ -778,7 +778,7 @@ func (c *Client) stopResendingLoop() {
 func (c *Client) startRegistrationLoop() {
 	c.stopRegistrationLoop()
 	c.registrationLoopQuitChan = make(chan struct{})
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		err := c.registrationLoop()
 		if err != nil {
 			c.config.Logger.Error("registration loop exited with an error", zap.Error(err))
@@ -789,7 +789,7 @@ func (c *Client) startRegistrationLoop() {
 func (c *Client) startResendingLoop() {
 	c.stopResendingLoop()
 	c.resendingLoopQuitChan = make(chan struct{})
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		err := c.resendingLoop()
 		if err != nil {
 			c.config.Logger.Error("resending loop exited with an error", zap.Error(err))

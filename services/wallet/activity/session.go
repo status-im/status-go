@@ -406,7 +406,7 @@ func (s *Service) detectNew(changeCount int) {
 		s.sessionsRWMutex.Unlock()
 
 		if len(session.new) > 0 || len(mixed) > 0 {
-			gocommon.SafeGo(func() {
+			gocommon.Go(func() {
 				notify(s.eventFeed, sessionID, len(session.new) > 0, mixed)
 			})
 		}
@@ -453,7 +453,7 @@ func (s *Service) getActivityDetailsAsync(requestID int32, entries []Entry) {
 	}
 
 	ctx := context.Background()
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		activityData, err := s.getActivityDetails(ctx, entries)
 		if len(activityData) != 0 {
 			sendResponseEvent(s.eventFeed, &requestID, EventActivityFilteringUpdate, activityData, err)

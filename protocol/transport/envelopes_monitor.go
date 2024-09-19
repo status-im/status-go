@@ -110,11 +110,11 @@ type EnvelopesMonitor struct {
 func (m *EnvelopesMonitor) Start() {
 	m.quit = make(chan struct{})
 	m.wg.Add(2)
-	common.SafeGo(func() {
+	common.Go(func() {
 		m.handleEnvelopeEvents()
 		m.wg.Done()
 	})
-	common.SafeGo(func() {
+	common.Go(func() {
 		defer m.wg.Done()
 		m.retryLoop()
 	})

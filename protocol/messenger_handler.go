@@ -1366,7 +1366,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 			m.archiveManager.UnseedHistoryArchiveTorrent(id)
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
 			communityID := id
-			utils.SafeGo(func() {
+			utils.Go(func() {
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
 					currentTask.Cancel()
@@ -1739,7 +1739,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		if m.archiveManager.IsReady() && communitySettings != nil && communitySettings.HistoryArchiveSupportEnabled && magnetlink != "" {
 
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
-			utils.SafeGo(func() {
+			utils.Go(func() {
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
 					currentTask.Cancel()

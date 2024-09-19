@@ -30,7 +30,7 @@ type API struct {
 }
 
 func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVersion string) {
-	common.SafeGo(func() {
+	common.Go(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer cancel()
 

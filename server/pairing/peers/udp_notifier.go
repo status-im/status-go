@@ -96,7 +96,7 @@ func Search(deviceName, deviceType string, notify NotifyHandler, stop chan struc
 	settings.TimeLimit = searchLimit
 	settings.StopChan = stop
 
-	common.SafeGo(func() {
+	common.Go(func() {
 		_, err = udpp2p.Discover(*settings)
 		logger.Error("error while discovering udp peers", zap.Error(err))
 	})

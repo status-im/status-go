@@ -117,7 +117,7 @@ func (api *PublicAPI) NewFilter(crit filters.FilterCriteria) (getrpc.ID, error) 
 	api.filtersMu.Lock()
 	api.filters[id] = f
 	api.filtersMu.Unlock()
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		pollLogs(api.client(), api.chainID(), f, defaultLogsQueryTimeout, defaultLogsPeriod)
 	})
 	return id, nil
@@ -133,7 +133,7 @@ func (api *PublicAPI) NewBlockFilter() getrpc.ID {
 	id := getrpc.ID(uuid.New())
 
 	api.filters[id] = f
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		id, si := api.latestBlockChangedEvent.Subscribe()
 		s, ok := si.(chan common.Hash)
 		if !ok {
@@ -168,7 +168,7 @@ func (api *PublicAPI) NewPendingTransactionFilter() getrpc.ID {
 
 	api.filters[id] = f
 
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		id, si := api.transactionSentToUpstreamEvent.Subscribe()
 		s, ok := si.(chan *PendingTxInfo)
 		if !ok {

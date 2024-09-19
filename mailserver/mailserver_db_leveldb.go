@@ -97,7 +97,7 @@ func NewLevelDB(dataDir string) (*LevelDB, error) {
 	// initialize the metric value
 	instance.updateArchivedEnvelopesCount()
 	// checking count on every insert is inefficient
-	common.SafeGo(func() {
+	common.Go(func() {
 		for {
 			select {
 			case <-instance.done:

@@ -47,7 +47,7 @@ func NewMailRequestMonitor(eventSub mailservers.EnvelopeEventSubscriber, h Envel
 func (m *MailRequestMonitor) Start() {
 	m.quit = make(chan struct{})
 	m.wg.Add(1)
-	common.SafeGo(func() {
+	common.Go(func() {
 		m.handleEnvelopeEvents()
 		m.wg.Done()
 	})

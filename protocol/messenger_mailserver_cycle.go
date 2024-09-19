@@ -212,7 +212,7 @@ func (m *Messenger) getAvailableMailserversSortedByRTT(allMailservers []mailserv
 	for _, mailserver := range allMailservers {
 		availableMailserversWg.Add(1)
 		mailserver := mailserver
-		common.SafeGo(func() {
+		common.Go(func() {
 			defer availableMailserversWg.Done()
 
 			peerID, err := mailserver.PeerID()
@@ -418,7 +418,7 @@ func (m *Messenger) asyncRequestAllHistoricMessages() {
 
 	m.logger.Debug("asyncRequestAllHistoricMessages")
 
-	common.SafeGo(func() {
+	common.Go(func() {
 		_, err := m.RequestAllHistoricMessages(false, true)
 		if err != nil {
 			m.logger.Error("failed to request historic messages", zap.Error(err))
@@ -518,7 +518,7 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	common.SafeGo(func() {
+	common.Go(func() {
 		defer func() {
 			wg.Done()
 		}()
@@ -531,7 +531,7 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 		}
 	})
 
-	common.SafeGo(func() {
+	common.Go(func() {
 		defer func() {
 			close(finish)
 		}()

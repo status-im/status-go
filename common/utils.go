@@ -91,7 +91,7 @@ func IsNil(i interface{}) bool {
 	return false
 }
 
-func SafeGo(f func(), panicHandlers ...func(interface{})) {
+func Go(f func(), panicHandlers ...func(interface{})) {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {

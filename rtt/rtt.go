@@ -73,7 +73,7 @@ func CheckHosts(addresses []string, timeout time.Duration) ([]Result, error) {
 	defer stopChecker()
 
 	// loop that queries Epoll and pipes events to CheckAddr() calls
-	common.SafeGo(func() {
+	common.Go(func() {
 		errCh <- c.CheckingLoop(ctx)
 	})
 	// wait for CheckingLoop to prepare the epoll/kqueue
@@ -86,7 +86,7 @@ func CheckHosts(addresses []string, timeout time.Duration) ([]Result, error) {
 	for i := 0; i < len(addresses); i++ {
 		wg.Add(1)
 		address := addresses[i]
-		common.SafeGo(func() {
+		common.Go(func() {
 			defer wg.Done()
 			resCh <- runCheck(c, address, timeout)
 		})

@@ -71,7 +71,7 @@ func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 		// which means the next discovery.summary is not going to include
 		// the peer.
 		// We leave some time so that we ensure the signal is propagated
-		common.SafeGo(func() {
+		common.Go(func() {
 			time.Sleep(200)
 			t.removeServerPeer(server, peer)
 		})
@@ -88,7 +88,7 @@ func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 		// which means the next discovery.summary is not going to include
 		// the peer.
 		// We leave some time so that we ensure the signal is propagated
-		common.SafeGo(func() {
+		common.Go(func() {
 			time.Sleep(200)
 			t.removeServerPeer(server, peer.peerInfo)
 		})

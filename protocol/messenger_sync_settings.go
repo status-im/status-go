@@ -123,7 +123,7 @@ func (m *Messenger) extractAndSaveSyncSetting(syncSetting *protobuf.SyncSetting)
 
 // startSyncSettingsLoop watches the m.settings.SyncQueue and sends a sync message in response to a settings update
 func (m *Messenger) startSyncSettingsLoop() {
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		logger := m.logger.Named("SyncSettingsLoop")
 
 		for {
@@ -163,7 +163,7 @@ func (m *Messenger) startSyncSettingsLoop() {
 
 func (m *Messenger) startSettingsChangesLoop() {
 	channel := m.settings.SubscribeToChanges()
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		for {
 			select {
 			case s := <-channel:

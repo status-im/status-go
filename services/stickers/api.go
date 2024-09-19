@@ -174,7 +174,7 @@ func (api *API) execTokenPackID(chainID uint64, tokenIDs []*big.Int, resultChan 
 	for _, tokenID := range tokenIDs {
 		c.Wait()
 		tokenID := tokenID
-		gocommon.SafeGo(func() {
+		gocommon.Go(func() {
 			defer c.Done()
 			packID, err := stickerPack.TokenPackId(callOpts, tokenID)
 			if err != nil {
@@ -273,7 +273,7 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 	for i := uint64(0); i < numPacks.Uint64(); i++ {
 		c.Wait()
 		ii := i
-		gocommon.SafeGo(func() {
+		gocommon.Go(func() {
 			defer c.Done()
 
 			packID := new(big.Int).SetUint64(ii)
@@ -411,7 +411,7 @@ func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accounts.Accoun
 	for _, account := range accs {
 		c.Wait()
 		acc := account
-		gocommon.SafeGo(func() {
+		gocommon.Go(func() {
 			defer c.Done()
 			packs, err := api.getPurchasedPackIDs(chainID, acc.Address)
 			if err != nil {
@@ -448,7 +448,7 @@ func (api *API) execTokenOwnerOfIndex(chainID uint64, account types.Address, bal
 	for i := uint64(0); i < balance.Uint64(); i++ {
 		c.Wait()
 		ii := i
-		gocommon.SafeGo(func() {
+		gocommon.Go(func() {
 			defer c.Done()
 			tokenID, err := stickerPack.TokenOfOwnerByIndex(callOpts, common.Address(account), new(big.Int).SetUint64(ii))
 			if err != nil {

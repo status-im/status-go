@@ -225,7 +225,7 @@ func (w *Waku) SetMinimumPoW(val float64, tolerate bool) error {
 	w.notifyPeersAboutPowRequirementChange(val)
 
 	if tolerate {
-		gocommon.SafeGo(func() {
+		gocommon.Go(func() {
 			// allow some time before all the peers have processed the notification
 			select {
 			case <-w.quit:
@@ -305,7 +305,7 @@ func (w *Waku) SetBloomFilter(bloom []byte) error {
 	w.settingsMu.Unlock()
 	w.notifyPeersAboutBloomFilterChange(b)
 
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		// allow some time before all the peers have processed the notification
 		select {
 		case <-w.quit:
@@ -374,7 +374,7 @@ func (w *Waku) SetTopicInterest(topicInterest []common.TopicType) error {
 	w.settingsMu.Unlock()
 	w.notifyPeersAboutTopicInterestChange(topicInterest)
 
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		// allow some time before all the peers have processed the notification
 		select {
 		case <-w.quit:

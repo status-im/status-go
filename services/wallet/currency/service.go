@@ -47,7 +47,7 @@ func (s *Service) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancelFn = cancel
 
-	common.SafeGo(func() {
+	common.Go(func() {
 		ticker := time.NewTicker(currencyFormatUpdateInterval)
 		defer ticker.Stop()
 		for {

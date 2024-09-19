@@ -13,7 +13,7 @@ import (
 // RunAsync runs the specified function asynchronously.
 func RunAsync(f func() error) <-chan error {
 	resp := make(chan error, 1)
-	common.SafeGo(func() {
+	common.Go(func() {
 		err := f()
 		resp <- err
 		close(resp)

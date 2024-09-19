@@ -87,7 +87,7 @@ func (cm *Manager) FetchCommunityInfo(communityID string) (*thirdparty.Community
 }
 
 func (cm *Manager) FetchCommunityMetadataAsync(communityID string) {
-	common.SafeGo(func() {
+	common.Go(func() {
 		communityInfo, err := cm.FetchCommunityMetadata(communityID)
 		if err != nil {
 			log.Error("FetchCommunityInfo failed", "communityID", communityID, "err", err)

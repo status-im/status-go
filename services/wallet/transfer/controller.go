@@ -62,7 +62,7 @@ func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcC
 }
 
 func (c *Controller) Start() {
-	gocommon.SafeGo(func() { _ = c.cleanupAccountsLeftovers() })
+	gocommon.Go(func() { _ = c.cleanupAccountsLeftovers() })
 }
 
 func (c *Controller) Stop() {

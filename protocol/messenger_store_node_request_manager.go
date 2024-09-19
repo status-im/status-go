@@ -105,7 +105,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 		}
 
 		if !cfg.WaitForResponse {
-			common.SafeGo(func() {
+			common.Go(func() {
 				shardResult := <-fetchedShard
 				communityShard = shardResult.shard
 

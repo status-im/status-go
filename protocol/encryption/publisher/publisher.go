@@ -75,7 +75,7 @@ func (p *Publisher) Stop() {
 func (p *Publisher) tickerLoop() {
 	ticker := time.NewTicker(tickerInterval * time.Second)
 
-	common.SafeGo(func() {
+	common.Go(func() {
 		logger := p.logger.With(zap.String("site", "tickerLoop"))
 
 		for {

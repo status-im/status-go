@@ -218,7 +218,7 @@ func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities
 }
 
 func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communities.Subscription) {
-	utils.SafeGo(func() {
+	utils.Go(func() {
 		for {
 			select {
 			case sub, more := <-c:
@@ -380,7 +380,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 		recentlyPublishedOrgs[community.IDString()] = community.CreateDeepCopy()
 	}
 
-	utils.SafeGo(func() {
+	utils.Go(func() {
 		for {
 			select {
 			case sub, more := <-c:
@@ -502,7 +502,7 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 	// We check every 5 minutes if we need to update
 	ticker := time.NewTicker(5 * time.Minute)
 
-	utils.SafeGo(func() {
+	utils.Go(func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -820,7 +820,7 @@ func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
 
 	ticker := time.NewTicker(grantUpdateInterval)
 
-	utils.SafeGo(func() {
+	utils.Go(func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -1546,7 +1546,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	response.AddCommunity(community)
 
 	// We send a push notification in the background
-	utils.SafeGo(func() {
+	utils.Go(func() {
 		if m.pushNotificationClient != nil {
 			pks, err := community.CanManageUsersPublicKeys()
 			if err != nil {
@@ -4019,7 +4019,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 }
 
 func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
-	utils.SafeGo(func() {
+	utils.Go(func() {
 		time.Sleep(importInitialDelay)
 		m.importDelayer.once.Do(func() {
 			close(m.importDelayer.wait)
@@ -4075,7 +4075,7 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 	// this wait groups tracks the ongoing task for a particular community
 	task.Waiter.Add(1)
 
-	utils.SafeGo(func() {
+	utils.Go(func() {
 		defer task.Waiter.Done()
 		err := m.importHistoryArchives(communityID, task.CancelChan)
 		if err != nil {
@@ -4099,7 +4099,7 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 	defer importTicker.Stop()
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	utils.SafeGo(func() {
+	utils.Go(func() {
 		<-cancel
 		cancelFunc()
 	})
@@ -4660,7 +4660,7 @@ func (m *Messenger) startCommunityRekeyLoop() {
 	}
 
 	ticker := time.NewTicker(d)
-	utils.SafeGo(func() {
+	utils.Go(func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -5106,7 +5106,7 @@ func (m *Messenger) requestCommunityEncryptionKeys(community *communities.Commun
 func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 	logger := m.logger.Named("requestMissingCommunityChannelsHRKeysLoop")
 
-	utils.SafeGo(func() {
+	utils.Go(func() {
 		for {
 			select {
 			case <-time.After(5 * time.Minute):

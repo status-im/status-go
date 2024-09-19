@@ -65,7 +65,7 @@ func (m *Messenger) watchWalletBalances() {
 		m.logger.Warn("wallet service not enabled")
 		return
 	}
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		for {
 			select {
 			case <-time.After(checkBalancesInterval):

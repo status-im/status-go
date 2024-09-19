@@ -194,13 +194,13 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 func (m *Messenger) broadcastLatestUserStatus() {
 	m.logger.Debug("broadcasting user status")
 	ctx := context.Background()
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		// Ensure that we are connected before sending a message
 		time.Sleep(5 * time.Second)
 		m.sendCurrentUserStatus(ctx)
 	})
 
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		for {
 			select {
 			case <-time.After(5 * time.Minute):
@@ -319,7 +319,7 @@ func (m *Messenger) timeoutAutomaticStatusUpdates() {
 	fiveMinutes := uint64(5 * 60)
 	referenceClock := uint64(time.Now().Unix()) - fiveMinutes
 
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		for {
 			select {
 			case <-time.After(time.Duration(waitDuration) * time.Second):

@@ -34,7 +34,7 @@ type LastUsedConnectionMonitor struct {
 func (mon *LastUsedConnectionMonitor) Start() {
 	mon.quit = make(chan struct{})
 	mon.wg.Add(1)
-	common.SafeGo(func() {
+	common.Go(func() {
 		events := make(chan types.EnvelopeEvent, whisperEventsBuffer)
 		sub := mon.eventSub.SubscribeEnvelopeEvents(events)
 		defer sub.Unsubscribe()

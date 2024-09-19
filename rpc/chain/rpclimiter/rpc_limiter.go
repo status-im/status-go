@@ -257,7 +257,7 @@ func (rl *RPCRpsLimiter) ReduceLimit() {
 
 func (rl *RPCRpsLimiter) start() {
 	ticker := time.NewTicker(tickerInterval)
-	common.SafeGo(func() {
+	common.Go(func() {
 		for {
 			select {
 			case <-ticker.C:

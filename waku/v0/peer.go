@@ -398,7 +398,7 @@ func (p *Peer) handshake() error {
 	// Send the handshake status message asynchronously
 	errc := make(chan error, 1)
 	opts := StatusOptionsFromHost(p.host)
-	gocommon.SafeGo(func() {
+	gocommon.Go(func() {
 		errc <- p2p.SendItems(p.rw, statusCode, Version, opts)
 	})
 

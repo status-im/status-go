@@ -68,7 +68,7 @@ type ConnectionManager struct {
 // Notify sends a non-blocking notification about new nodes.
 func (ps *ConnectionManager) Notify(nodes []*enode.Node) {
 	ps.wg.Add(1)
-	common.SafeGo(func() {
+	common.Go(func() {
 		select {
 		case ps.notifications <- nodes:
 		case <-ps.quit:
@@ -81,7 +81,7 @@ func (ps *ConnectionManager) Notify(nodes []*enode.Node) {
 func (ps *ConnectionManager) Start() {
 	ps.quit = make(chan struct{})
 	ps.wg.Add(1)
-	common.SafeGo(func() {
+	common.Go(func() {
 		state := newInternalState(ps.server, ps.connectedTarget, ps.timeoutWaitAdded)
 		events := make(chan *p2p.PeerEvent, peerEventsBuffer)
 		sub := ps.server.SubscribeEvents(events)
