@@ -27,7 +27,6 @@ require (
 	github.com/deckarep/golang-set v1.8.0
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/forPelevin/gomoji v1.1.2
-	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.4.0
 	github.com/hashicorp/go-version v1.2.0
