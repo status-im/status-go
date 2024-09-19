@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/beevik/ntp"
+
 	"github.com/status-im/status-go/common"
 
 	"github.com/ethereum/go-ethereum/log"

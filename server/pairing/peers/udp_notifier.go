@@ -7,8 +7,9 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	udpp2p "github.com/schollz/peerdiscovery"
-	"github.com/status-im/status-go/common"
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/common"
 )
 
 const (

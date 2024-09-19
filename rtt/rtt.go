@@ -6,8 +6,9 @@ import (
 	"time"
 
 	errors "github.com/pkg/errors"
-	"github.com/status-im/status-go/common"
 	tcp "github.com/status-im/tcp-shaker"
+
+	"github.com/status-im/status-go/common"
 )
 
 type Result struct {
