@@ -8,7 +8,17 @@ import (
 )
 
 // Result represents a valid response from a store node
-type Result struct {
+type Result interface {
+	Cursor() []byte
+	IsComplete() bool
+	PeerID() peer.ID
+	Query() *pb.StoreQueryRequest
+	Response() *pb.StoreQueryResponse
+	Next(ctx context.Context, opts ...RequestOption) error
+	Messages() []*pb.WakuMessageKeyValue
+}
+
+type resultImpl struct {
 	done bool
 
 	messages      []*pb.WakuMessageKeyValue
@@ -19,27 +29,27 @@ type Result struct {
 	peerID        peer.ID
 }
 
-func (r *Result) Cursor() []byte {
+func (r *resultImpl) Cursor() []byte {
 	return r.cursor
 }
 
-func (r *Result) IsComplete() bool {
+func (r *resultImpl) IsComplete() bool {
 	return r.done
 }
 
-func (r *Result) PeerID() peer.ID {
+func (r *resultImpl) PeerID() peer.ID {
 	return r.peerID
 }
 
-func (r *Result) Query() *pb.StoreQueryRequest {
+func (r *resultImpl) Query() *pb.StoreQueryRequest {
 	return r.storeRequest
 }
 
-func (r *Result) Response() *pb.StoreQueryResponse {
+func (r *resultImpl) Response() *pb.StoreQueryResponse {
 	return r.storeResponse
 }
 
-func (r *Result) Next(ctx context.Context, opts ...RequestOption) error {
+func (r *resultImpl) Next(ctx context.Context, opts ...RequestOption) error {
 	if r.cursor == nil {
 		r.done = true
 		r.messages = nil
@@ -57,6 +67,6 @@ func (r *Result) Next(ctx context.Context, opts ...RequestOption) error {
 	return nil
 }
 
-func (r *Result) Messages() []*pb.WakuMessageKeyValue {
+func (r *resultImpl) Messages() []*pb.WakuMessageKeyValue {
 	return r.messages
 }

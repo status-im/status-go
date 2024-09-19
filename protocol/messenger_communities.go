@@ -16,6 +16,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -40,6 +41,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -3970,8 +3972,8 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			}
 
 			// Request possibly missed waku messages for community
-			ms := m.getActiveMailserver(c.ID().String())
-			_, err = m.syncFiltersFrom(*ms, filters, uint32(latestWakuMessageTimestamp))
+			ms := m.getCommunityMailserver(c.ID().String())
+			_, err = m.syncFiltersFrom(ms, filters, uint32(latestWakuMessageTimestamp))
 			if err != nil {
 				m.logger.Error("failed to request missing messages", zap.Error(err))
 				continue
@@ -5154,4 +5156,29 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 			}
 		}
 	}()
+}
+
+// getCommunityMailserver returns the active mailserver if a communityID is present then it'll return the mailserver
+// for that community if it has a mailserver setup otherwise it'll return the global mailserver
+func (m *Messenger) getCommunityMailserver(communityID ...string) peer.ID {
+	if m.transport.WakuVersion() != 2 {
+		return ""
+	}
+
+	if len(communityID) == 0 || communityID[0] == "" {
+		return m.transport.GetActiveStorenode()
+	}
+
+	ms, err := m.communityStorenodes.GetStorenodeByCommunityID(communityID[0])
+	if err != nil {
+		if !errors.Is(err, storenodes.ErrNotFound) {
+			m.logger.Error("getting storenode for community, using global", zap.String("communityID", communityID[0]), zap.Error(err))
+		}
+		// if we don't find a specific mailserver for the community, we just use the regular mailserverCycle's one
+		return m.transport.GetActiveStorenode()
+	}
+
+	peerID, _ := ms.PeerID()
+
+	return peerID
 }

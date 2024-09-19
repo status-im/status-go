@@ -235,7 +235,7 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 }
 
 func (s *MessengerStoreNodeRequestSuite) createCommunity(m *Messenger) *communities.Community {
-	s.waitForAvailableStoreNode(m)
+	s.WaitForAvailableStoreNode(m)
 
 	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(nil)
 
@@ -309,7 +309,7 @@ func (s *MessengerStoreNodeRequestSuite) fetchProfile(m *Messenger, contactID st
 	}
 }
 
-func (s *MessengerStoreNodeRequestSuite) waitForAvailableStoreNode(messenger *Messenger) {
+func (s *MessengerStoreNodeRequestSuite) WaitForAvailableStoreNode(messenger *Messenger) {
 	WaitForAvailableStoreNode(&s.Suite, messenger, storeNodeConnectTimeout)
 }
 
@@ -419,11 +419,11 @@ func (s *MessengerStoreNodeRequestSuite) TestSimultaneousCommunityInfoRequests()
 	community := s.createCommunity(s.owner)
 
 	storeNodeRequestsCount := 0
-	s.bob.storeNodeRequestsManager.onPerformingBatch = func(batch MailserverBatch) {
+	s.bob.storeNodeRequestsManager.onPerformingBatch = func(batch types.MailserverBatch) {
 		storeNodeRequestsCount++
 	}
 
-	s.waitForAvailableStoreNode(s.bob)
+	s.WaitForAvailableStoreNode(s.bob)
 
 	wg := sync.WaitGroup{}
 
@@ -453,7 +453,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestNonExistentCommunity() {
 
 	s.createBob()
 
-	s.waitForAvailableStoreNode(s.bob)
+	s.WaitForAvailableStoreNode(s.bob)
 	fetchedCommunity, err := s.bob.FetchCommunity(&request)
 
 	s.Require().NoError(err)
@@ -722,7 +722,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestShardAndCommunityInfo() {
 
 	s.waitForEnvelopes(storeNodeSubscription, 1)
 
-	s.waitForAvailableStoreNode(s.bob)
+	s.WaitForAvailableStoreNode(s.bob)
 
 	communityShard := community.CommunityShard()
 
@@ -1195,7 +1195,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingCommunityWithOwnerToken() {
 	s.createOwner()
 	s.createBob()
 
-	s.waitForAvailableStoreNode(s.owner)
+	s.WaitForAvailableStoreNode(s.owner)
 	community := s.createCommunity(s.owner)
 
 	// owner mints owner token
@@ -1228,7 +1228,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingCommunityWithOwnerToken() {
 	s.Require().NoError(err)
 	s.Require().Len(community.TokenPermissions(), 1)
 
-	s.waitForAvailableStoreNode(s.bob)
+	s.WaitForAvailableStoreNode(s.bob)
 
 	s.fetchCommunity(s.bob, community.CommunityShard(), community)
 }

@@ -1386,10 +1386,6 @@ func (api *PublicAPI) RequestAllHistoricMessagesWithRetries(forceFetchingBackup 
 	return api.service.messenger.RequestAllHistoricMessages(forceFetchingBackup, true)
 }
 
-func (api *PublicAPI) DisconnectActiveMailserver() {
-	api.service.messenger.DisconnectActiveMailserver()
-}
-
 // Echo is a method for testing purposes.
 func (api *PublicAPI) Echo(ctx context.Context, message string) (string, error) {
 	return message, nil
