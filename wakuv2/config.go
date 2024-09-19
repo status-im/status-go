@@ -58,6 +58,7 @@ type Config struct {
 	StoreSeconds                           int              `toml:",omitempty"`
 	TelemetryServerURL                     string           `toml:",omitempty"`
 	TelemetrySendPeriodMs                  int              `toml:",omitempty"` // Number of milliseconds to wait between sending requests to telemetry service
+	TelemetryPeerCountSendPeriod           int              `toml:",omitempty"` // Number of milliseconds to wait between checking peer count
 	DefaultShardPubsubTopic                string           `toml:",omitempty"` // Pubsub topic to be used by default for messages that do not have a topic assigned (depending whether sharding is used or not)
 	DefaultShardedPubsubTopics             []string         `toml:", omitempty"`
 	ClusterID                              uint16           `toml:",omitempty"`
