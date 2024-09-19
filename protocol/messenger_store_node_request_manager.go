@@ -10,13 +10,13 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/transport"
-	"github.com/status-im/status-go/services/mailservers"
 )
 
 const (
@@ -57,7 +57,7 @@ type StoreNodeRequestManager struct {
 	// activeRequestsLock should be locked each time activeRequests is being accessed or changed.
 	activeRequestsLock sync.RWMutex
 
-	onPerformingBatch func(MailserverBatch)
+	onPerformingBatch func(types.MailserverBatch)
 }
 
 func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
@@ -374,7 +374,7 @@ func (r *storeNodeRequest) finalize() {
 	}
 }
 
-func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32) {
+func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64) {
 	logger := r.manager.logger.With(
 		zap.Any("requestID", r.requestID),
 		zap.Int("envelopesCount", envelopesCount))
@@ -524,13 +524,13 @@ func (r *storeNodeRequest) routine() {
 	communityID := r.requestID.getCommunityID()
 
 	if r.requestID.RequestType != storeNodeCommunityRequest || !r.manager.messenger.communityStorenodes.HasStorenodeSetup(communityID) {
-		if !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
+		if !r.manager.messenger.transport.WaitForAvailableStoreNode(storeNodeAvailableTimeout) {
 			r.result.err = fmt.Errorf("store node is not available")
 			return
 		}
 	}
 
-	storeNode := r.manager.messenger.getActiveMailserver(communityID)
+	storeNode := r.manager.messenger.getCommunityMailserver(communityID)
 
 	// Check if community already exists locally and get Clock.
 	if r.requestID.RequestType == storeNodeCommunityRequest {
@@ -543,8 +543,8 @@ func (r *storeNodeRequest) routine() {
 	// Start store node request
 	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
 
-	_, err := r.manager.messenger.performMailserverRequest(storeNode, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
-		batch := MailserverBatch{
+	_, err := r.manager.messenger.performStorenodeTask(func() (*MessengerResponse, error) {
+		batch := types.MailserverBatch{
 			From:        from,
 			To:          to,
 			PubsubTopic: r.pubsubTopic,
@@ -555,8 +555,8 @@ func (r *storeNodeRequest) routine() {
 			r.manager.onPerformingBatch(batch)
 		}
 
-		return nil, r.manager.messenger.processMailserverBatchWithOptions(ms, batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
-	})
+		return nil, r.manager.messenger.processMailserverBatchWithOptions(storeNode, batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
+	}, history.WithPeerID(storeNode))
 
 	r.result.err = err
 }
