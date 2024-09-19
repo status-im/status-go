@@ -8,8 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/libp2p/go-libp2p/core/peer"
 	apicommon "github.com/waku-org/go-waku/waku/v2/api/common"
+	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
@@ -29,7 +29,6 @@ type ISentCheck interface {
 	Start()
 	Add(topic string, messageID common.Hash, sentTime uint32)
 	DeleteByMessageIDs(messageIDs []common.Hash)
-	SetStorePeerID(peerID peer.ID)
 }
 
 // MessageSentCheck tracks the outgoing messages and check against store node
@@ -38,11 +37,11 @@ type ISentCheck interface {
 type MessageSentCheck struct {
 	messageIDs          map[string]map[common.Hash]uint32
 	messageIDsMu        sync.RWMutex
-	storePeerID         peer.ID
 	messageStoredChan   chan common.Hash
 	messageExpiredChan  chan common.Hash
 	ctx                 context.Context
 	store               *store.WakuStore
+	storenodeCycle      *history.StorenodeCycle
 	timesource          timesource.Timesource
 	logger              *zap.Logger
 	maxHashQueryLength  uint64
@@ -53,7 +52,7 @@ type MessageSentCheck struct {
 }
 
 // NewMessageSentCheck creates a new instance of MessageSentCheck with default parameters
-func NewMessageSentCheck(ctx context.Context, store *store.WakuStore, timesource timesource.Timesource, msgStoredChan chan common.Hash, msgExpiredChan chan common.Hash, logger *zap.Logger) *MessageSentCheck {
+func NewMessageSentCheck(ctx context.Context, store *store.WakuStore, cycle *history.StorenodeCycle, timesource timesource.Timesource, msgStoredChan chan common.Hash, msgExpiredChan chan common.Hash, logger *zap.Logger) *MessageSentCheck {
 	return &MessageSentCheck{
 		messageIDs:          make(map[string]map[common.Hash]uint32),
 		messageIDsMu:        sync.RWMutex{},
@@ -61,6 +60,7 @@ func NewMessageSentCheck(ctx context.Context, store *store.WakuStore, timesource
 		messageExpiredChan:  msgExpiredChan,
 		ctx:                 ctx,
 		store:               store,
+		storenodeCycle:      cycle,
 		timesource:          timesource,
 		logger:              logger,
 		maxHashQueryLength:  DefaultMaxHashQueryLength,
@@ -139,11 +139,6 @@ func (m *MessageSentCheck) DeleteByMessageIDs(messageIDs []common.Hash) {
 	}
 }
 
-// SetStorePeerID sets the peer id of store node
-func (m *MessageSentCheck) SetStorePeerID(peerID peer.ID) {
-	m.storePeerID = peerID
-}
-
 // Start checks if the tracked outgoing messages are stored periodically
 func (m *MessageSentCheck) Start() {
 	defer utils.LogOnPanic()
@@ -211,7 +206,7 @@ func (m *MessageSentCheck) Start() {
 }
 
 func (m *MessageSentCheck) messageHashBasedQuery(ctx context.Context, hashes []common.Hash, relayTime []uint32, pubsubTopic string) []common.Hash {
-	selectedPeer := m.storePeerID
+	selectedPeer := m.storenodeCycle.GetActiveStorenode()
 	if selectedPeer == "" {
 		m.logger.Error("no store peer id available", zap.String("pubsubTopic", pubsubTopic))
 		return []common.Hash{}

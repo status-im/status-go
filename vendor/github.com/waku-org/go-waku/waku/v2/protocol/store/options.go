@@ -22,6 +22,10 @@ type Parameters struct {
 	skipRatelimit     bool
 }
 
+func (p *Parameters) Cursor() []byte {
+	return p.cursor
+}
+
 type RequestOption func(*Parameters) error
 
 // WithPeer is an option used to specify the peerID to request the message history.
