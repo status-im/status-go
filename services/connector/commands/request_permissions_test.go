@@ -7,19 +7,21 @@ import (
 )
 
 func TestFailToRequestPermissionsWithMissingDAppFields(t *testing.T) {
-	cmd := &RequestPermissionsCommand{}
+	state, close := setupCommand(t, Method_RequestPermissions)
+	t.Cleanup(close)
 
 	// Missing DApp fields
 	request, err := ConstructRPCRequest("wallet_requestPermissions", []interface{}{}, nil)
 	assert.NoError(t, err)
 
-	result, err := cmd.Execute(request)
+	result, err := state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrRequestMissingDAppData, err)
 	assert.Empty(t, result)
 }
 
 func TestRequestPermissionsResponse(t *testing.T) {
-	cmd := &RequestPermissionsCommand{}
+	state, close := setupCommand(t, Method_RequestPermissions)
+	t.Cleanup(close)
 
 	testCases := []struct {
 		name               string
@@ -87,7 +89,7 @@ func TestRequestPermissionsResponse(t *testing.T) {
 			request, err := ConstructRPCRequest("wallet_requestPermissions", tc.params, &testDAppData)
 			assert.NoError(t, err)
 
-			response, err := cmd.Execute(request)
+			response, err := state.cmd.Execute(state.ctx, request)
 			if tc.expectedError != nil {
 				assert.Error(t, err)
 				assert.Equal(t, err, tc.expectedError)

@@ -9,50 +9,44 @@ import (
 )
 
 func TestFailToGetAccountWithMissingDAppFields(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	cmd := &AccountsCommand{Db: db}
+	state, close := setupCommand(t, Method_EthAccounts)
+	t.Cleanup(close)
 
 	// Missing DApp fields
 	request, err := ConstructRPCRequest("eth_accounts", []interface{}{}, nil)
 	assert.NoError(t, err)
 
-	result, err := cmd.Execute(request)
+	result, err := state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrRequestMissingDAppData, err)
 	assert.Empty(t, result)
 }
 
 func TestFailToGetAccountForUnpermittedDApp(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	cmd := &AccountsCommand{Db: db}
+	state, close := setupCommand(t, Method_EthAccounts)
+	t.Cleanup(close)
 
 	request, err := ConstructRPCRequest("eth_accounts", []interface{}{}, &testDAppData)
 	assert.NoError(t, err)
 
-	result, err := cmd.Execute(request)
+	result, err := state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrDAppIsNotPermittedByUser, err)
 	assert.Empty(t, result)
 }
 
 func TestGetAccountForPermittedDApp(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	cmd := &AccountsCommand{Db: db}
+	state, close := setupCommand(t, Method_EthAccounts)
+	t.Cleanup(close)
 
 	sharedAccount := types.HexToAddress("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg")
 
-	err := PersistDAppData(db, testDAppData, sharedAccount, 0x123)
+	err := PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
 	assert.NoError(t, err)
 
 	request, err := ConstructRPCRequest("eth_accounts", []interface{}{}, &testDAppData)
 	assert.NoError(t, err)
 
 	expectedResponse := FormatAccountAddressToResponse(sharedAccount)
-	response, err := cmd.Execute(request)
+	response, err := state.cmd.Execute(state.ctx, request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 }
