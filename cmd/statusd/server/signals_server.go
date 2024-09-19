@@ -3,13 +3,10 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"reflect"
-	"runtime"
-	"strings"
+	"strconv"
 	"sync"
 	"time"
 
@@ -37,6 +34,14 @@ func NewServer() *Server {
 
 func (s *Server) Address() string {
 	return s.address
+}
+
+func (s *Server) Port() (int, error) {
+	_, portString, err := net.SplitHostPort(s.address)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(portString)
 }
 
 func (s *Server) Setup() {
@@ -124,10 +129,9 @@ func (s *Server) signals(w http.ResponseWriter, r *http.Request) {
 	s.connections[connection] = struct{}{}
 }
 
-func (s *Server) addEndpointWithResponse(handler func(string) string) {
-	endpoint := endpointName(functionName(handler))
-	log.Debug("adding endpoint", "name", endpoint)
-	s.mux.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) addEndpointWithResponse(name string, handler func(string) string) {
+	log.Info("adding endpoint", "name", name)
+	s.mux.HandleFunc(name, func(w http.ResponseWriter, r *http.Request) {
 		request, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Error("failed to read request: %w", err)
@@ -143,10 +147,9 @@ func (s *Server) addEndpointWithResponse(handler func(string) string) {
 	})
 }
 
-func (s *Server) addEndpointNoRequest(handler func() string) {
-	endpoint := endpointName(functionName(handler))
-	log.Debug("adding endpoint", "name", endpoint)
-	s.mux.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) addEndpointNoRequest(name string, handler func() string) {
+	log.Debug("adding endpoint", "name", name)
+	s.mux.HandleFunc(name, func(w http.ResponseWriter, r *http.Request) {
 		response := handler()
 
 		_, err := w.Write([]byte(response))
@@ -157,34 +160,20 @@ func (s *Server) addEndpointNoRequest(handler func() string) {
 }
 
 func (s *Server) addUnsupportedEndpoint(name string) {
-	endpoint := endpointName(name)
-	log.Debug("marking unsupported endpoint", "name", endpoint)
-	s.mux.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
+	log.Debug("marking unsupported endpoint", "name", name)
+	s.mux.HandleFunc(name, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotImplemented)
 	})
 }
 
 func (s *Server) RegisterMobileAPI() {
-	for _, endpoint := range EndpointsWithResponse {
-		s.addEndpointWithResponse(endpoint)
+	for name, endpoint := range EndpointsWithResponse {
+		s.addEndpointWithResponse(name, endpoint)
 	}
-	for _, endpoint := range EndpointsNoRequest {
-		s.addEndpointNoRequest(endpoint)
+	for name, endpoint := range EndpointsNoRequest {
+		s.addEndpointNoRequest(name, endpoint)
 	}
-	for _, endpoint := range EndpointsUnsupported {
-		s.addUnsupportedEndpoint(endpoint)
+	for _, name := range EndpointsUnsupported {
+		s.addUnsupportedEndpoint(name)
 	}
-}
-
-func functionName(fn any) string {
-	fullName := runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
-	parts := strings.Split(fullName, "/")
-	lastPart := parts[len(parts)-1]
-	nameParts := strings.Split(lastPart, ".")
-	return nameParts[len(nameParts)-1]
-}
-
-func endpointName(functionName string) string {
-	const base = "statusgo"
-	return fmt.Sprintf("/%s/%s", base, functionName)
 }
