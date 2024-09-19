@@ -280,19 +280,16 @@ func TestBasicWakuV2(t *testing.T) {
 		b.InitialInterval = 500 * time.Millisecond
 	}
 	err = tt.RetryWithBackOff(func() error {
-		_, envelopeCount, err := w.Query(
+		result, err := w.node.Store().Query(
 			context.Background(),
-			storeNode.PeerID,
 			store.FilterCriteria{
 				ContentFilter: protocol.NewContentFilter(config.DefaultShardPubsubTopic, contentTopic.ContentTopic()),
 				TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
 				TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
 			},
-			nil,
-			nil,
-			false,
+			store.WithPeer(storeNode.PeerID),
 		)
-		if err != nil || envelopeCount == 0 {
+		if err != nil || len(result.Messages()) == 0 {
 			// in case of failure extend timestamp margin up to 40secs
 			if marginInSeconds < 40 {
 				marginInSeconds += 5
@@ -586,20 +583,17 @@ func TestWakuV2Store(t *testing.T) {
 	timestampInSeconds := msgTimestamp / int64(time.Second)
 	marginInSeconds := 5
 	// Query the second node's store for the message
-	_, envelopeCount, err := w1.Query(
+	result, err := w1.node.Store().Query(
 		context.Background(),
-		w2.node.Host().ID(),
 		store.FilterCriteria{
 			TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
 			TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
 			ContentFilter: protocol.NewContentFilter(config1.DefaultShardPubsubTopic, contentTopic.ContentTopic()),
 		},
-		nil,
-		nil,
-		false,
+		store.WithPeer(w2.node.Host().ID()),
 	)
 	require.NoError(t, err)
-	require.True(t, envelopeCount > 0, "no messages received from store node")
+	require.True(t, len(result.Messages()) > 0, "no messages received from store node")
 }
 
 func waitForPeerConnection(t *testing.T, peerID peer.ID, peerCh chan peer.IDSlice) {
