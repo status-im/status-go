@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/pkg/errors"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -65,6 +65,11 @@ func (s *Server) Listen(address string) error {
 		return errors.New("server already started")
 	}
 
+	_, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return errors.Wrap(err, "invalid address")
+	}
+
 	s.server = &http.Server{
 		Addr:              address,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -74,7 +79,6 @@ func (s *Server) Listen(address string) error {
 	s.mux.HandleFunc("/signals", s.signals)
 	s.server.Handler = s.mux
 
-	var err error
 	s.listener, err = net.Listen("tcp", address)
 	if err != nil {
 		return err
@@ -140,6 +144,7 @@ func (s *Server) addEndpointWithResponse(name string, handler func(string) strin
 
 		response := handler(string(request))
 
+		w.Header().Set("Content-Type", "application/json")
 		_, err = w.Write([]byte(response))
 		if err != nil {
 			log.Error("failed to write response: %w", err)

@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/status-im/status-go/cmd/statusd/server"
+	"github.com/status-im/status-go/cmd/status-backend/server"
 )
 
 var (
@@ -14,6 +14,8 @@ var (
 )
 
 func main() {
+	flag.Parse()
+
 	srv := server.NewServer()
 	srv.Setup()
 

@@ -1,5 +1,14 @@
 //go:generate go run main.go
 
+/*
+This script generates a Go file with a list of supported endpoints based on the public functions in `mobile/status.go`.
+The output has 3 sections:
+- Endpoints with a response of type `string`
+- Endpoints with no arguments and a response of type `string`
+- Unsupported endpoints: those have non-standard signatures
+Deprecated functions are ignored.
+*/
+
 package main
 
 import (
