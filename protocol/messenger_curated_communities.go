@@ -24,6 +24,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 
 	if m.contractMaker == nil {
 		logger.Warn("not starting curated communities loop: contract maker not initialized")
+		logger.Info("------ parvesh not starting curated communities loop: contract maker not initialized")
 		return
 	}
 
@@ -41,12 +42,14 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 			select {
 			case <-time.After(interval):
 				// Immediate execution on first run, then set to regular interval
+				logger.Info("------ parvesh inside loop")
 				interval = curatedCommunitiesUpdateInterval
 
 				curatedCommunities, err := m.getCuratedCommunitiesFromContract()
 				if err != nil {
 					interval = communitiesUpdateFailureInterval
 					logger.Error("failed to get curated communities from contract", zap.Error(err))
+					logger.Info("------ parvesh 1", zap.Error(err))
 					continue
 				}
 
@@ -80,6 +83,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 }
 
 func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCommunities, error) {
+	logger := m.logger.Named("getCuratedcommunitiesfromcontract")
 	if m.contractMaker == nil {
 		return nil, errors.New("contract maker not initialized")
 	}
@@ -93,6 +97,8 @@ func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCom
 	if testNetworksEnabled {
 		chainID = 420 // Optimism Goerli
 	}
+
+	logger.Info("------ parvesh 2", zap.Any("chainID", chainID))
 
 	directory, err := m.contractMaker.NewDirectory(chainID)
 	if err != nil {
@@ -114,10 +120,13 @@ func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCom
 	if err != nil {
 		return nil, err
 	}
+	logger.Info("------ parvesh 3", zap.Any("featuredContractCommunities", featuredContractCommunities))
 	var contractFeaturedCommunityIDs []string
 	for _, c := range featuredContractCommunities {
 		contractFeaturedCommunityIDs = append(contractFeaturedCommunityIDs, types.HexBytes(c).String())
 	}
+	logger.Info("------ parvesh 3", zap.Any("contractCommunityIDs", contractCommunityIDs))
+	logger.Info("------ parvesh 4", zap.Any("contractFeaturedCommunityIDs", contractFeaturedCommunityIDs))
 
 	return &communities.CuratedCommunities{
 		ContractCommunities:         contractCommunityIDs,
@@ -126,9 +135,11 @@ func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCom
 }
 
 func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.CuratedCommunities) (*communities.KnownCommunitiesResponse, error) {
+	logger := m.logger.Named("fetchCuratedcommunities")
 	response, err := m.communitiesManager.GetStoredDescriptionForCommunities(curatedCommunities.ContractCommunities)
 	if err != nil {
 		return nil, err
+		logger.Info("------ parvesh fetch curated error", zap.Error(err))
 	}
 	response.ContractFeaturedCommunities = curatedCommunities.ContractFeaturedCommunities
 
@@ -144,13 +155,18 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 		_ = m.fetchCommunities(unknownCommunities)
 	}()
 
+	logger.Info("------ parvesh fetch respone", zap.Any("response", response))
+
 	return response, nil
 }
 
 func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
+	logger := m.logger.Named("CuratedCommunities")
 	curatedCommunities, err := m.communitiesManager.GetCuratedCommunities()
+	logger.Info("------ parvesh currated communities access", zap.Any("curatedCommunities", curatedCommunities))
 	if err != nil {
 		return nil, err
+		logger.Info("------ parvesh currated communities access error", zap.Error(err))
 	}
 	return m.fetchCuratedCommunities(curatedCommunities)
 }
