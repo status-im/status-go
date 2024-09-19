@@ -878,10 +878,19 @@ func (api *API) getVerifiedWalletAccount(address, password string) (*account.Sel
 	}, nil
 }
 
+type InjectedMessenger interface {
+	NewWalletConnectV2SessionCreatedNotification(session walletconnect.Session) error
+}
+
 // AddWalletConnectSession adds or updates a session wallet connect session
 func (api *API) AddWalletConnectSession(ctx context.Context, session_json string) error {
 	log.Debug("wallet.api.AddWalletConnectSession", "rpcURL", len(session_json))
-	return walletconnect.AddSession(api.s.db, api.s.config.Networks, session_json)
+	session, err := walletconnect.AddSession(api.s.db, api.s.config.Networks, session_json)
+	if err != nil {
+		return err
+	}
+
+	return api.s.injectedMessenger.NewWalletConnectV2SessionCreatedNotification(session)
 }
 
 // DisconnectWalletConnectSession removes a wallet connect session

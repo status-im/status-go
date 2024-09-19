@@ -1,7 +1,9 @@
 package protocol
 
 import (
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/services/wallet/walletconnect"
 )
 
 type WalletConnectSession struct {
@@ -28,6 +30,33 @@ func (m *Messenger) AddWalletConnectSession(request *requests.AddWalletConnectSe
 	}
 
 	return m.persistence.InsertWalletConnectSession(session)
+}
+
+func (m *Messenger) NewWalletConnectV2SessionCreatedNotification(session walletconnect.Session) error {
+	now := m.GetCurrentTimeInMillis()
+
+	notification := &ActivityCenterNotification{
+		ID:                         types.FromHex(string(session.Topic) + "_dapp_connected"),
+		Type:                       ActivityCenterNotificationTypeDAppConnected,
+		DAppURL:                    session.Peer.Metadata.URL,
+		DAppName:                   session.Peer.Metadata.Name,
+		WalletProviderSessionTopic: string(session.Topic),
+		Timestamp:                  now,
+		UpdatedAt:                  now,
+	}
+
+	if len(session.Peer.Metadata.Icons) > 0 {
+		notification.DAppIconURL = session.Peer.Metadata.Icons[0]
+	}
+
+	response := &MessengerResponse{}
+	err := m.addActivityCenterNotification(response, notification, nil)
+
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.MessengerResponse(response)
+	}
+
+	return err
 }
 
 func (m *Messenger) GetWalletConnectSession() ([]WalletConnectSession, error) {
