@@ -85,9 +85,7 @@ func TestSignals(t *testing.T) {
 }
 
 func TestMobileAPI(t *testing.T) {
-	const method = "/echo"
-	randomResponsePostfix := randomAlphabeticalString(t, 5)
-
+	// Setup fake endpoints
 	endpointsWithResponse := EndpointsWithResponse
 	endpointsNoRequest := EndpointsNoRequest
 	endpointsUnsupported := EndpointsUnsupported
@@ -97,33 +95,67 @@ func TestMobileAPI(t *testing.T) {
 		EndpointsUnsupported = endpointsUnsupported
 	})
 
+	endpointWithResponse := "/" + randomAlphabeticalString(t, 5)
+	endpointNoRequest := "/" + randomAlphabeticalString(t, 5)
+	endpointUnsupported := "/" + randomAlphabeticalString(t, 5)
+
+	request1 := randomAlphabeticalString(t, 5)
+	response1 := randomAlphabeticalString(t, 5)
+	response2 := randomAlphabeticalString(t, 5)
+
 	EndpointsWithResponse = map[string]func(string) string{
-		method: func(request string) string {
-			return request + randomResponsePostfix
+		endpointWithResponse: func(request string) string {
+			require.Equal(t, request1, request)
+			return response1
 		},
 	}
+	EndpointsNoRequest = map[string]func() string{
+		endpointNoRequest: func() string {
+			return response2
+		},
+	}
+	EndpointsUnsupported = []string{endpointUnsupported}
 
+	// Setup server
 	srv, _ := setupServer(t)
 	defer shutdownServer(srv)
 	go srv.Serve()
 	srv.RegisterMobileAPI()
 
-	requestBody := []byte(randomAlphabeticalString(t, 5))
+	requestBody := []byte(request1)
 	bodyReader := bytes.NewReader(requestBody)
 
 	port, err := srv.Port()
 	require.NoError(t, err)
 
-	requestURL := fmt.Sprintf("http://127.0.0.1:%d%s", port, method)
+	serverURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 
-	resp, err := http.Post(requestURL, "application/text", bodyReader)
+	// Test endpoints with response
+	resp, err := http.Post(serverURL+endpointWithResponse, "application/text", bodyReader)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	responseBody, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	require.Equal(t, 200, resp.StatusCode)
-	require.Equal(t, string(requestBody)+randomResponsePostfix, string(responseBody))
+	require.Equal(t, response1, string(responseBody))
+
+	// Test endpoints with no request
+	resp, err = http.Get(serverURL + endpointNoRequest)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	responseBody, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, response2, string(responseBody))
+
+	// Test unsupported endpoint
+	resp, err = http.Get(serverURL + endpointUnsupported)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, http.StatusNotImplemented, resp.StatusCode)
+
 }
 
 func randomAlphabeticalString(t *testing.T, n int) string {
