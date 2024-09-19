@@ -3,19 +3,19 @@ package server
 import statusgo "github.com/status-im/status-go/mobile"
 
 var EndpointsWithResponse = []func(string) string{
-    {{- range .FunctionsWithResp }}
-    {{ $.PackageName }}.{{ . }},
+	{{- range .FunctionsWithResp }}
+	{{ $.PackageName }}.{{ . }},
 {{- end }}
 }
 
 var EndpointsNoRequest = []func() string{
-    {{- range .FunctionsNoArgs }}
-    {{ $.PackageName }}.{{ . }},
+	{{- range .FunctionsNoArgs }}
+	{{ $.PackageName }}.{{ . }},
 {{- end }}
 }
 
 var EndpointsUnsupported = []string{
-    {{- range .UnsupportedEndpoints }}
-    "{{ . }}",
+	{{- range .UnsupportedEndpoints }}
+	"{{ . }}",
 {{- end }}
 }
