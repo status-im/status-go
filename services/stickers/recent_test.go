@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	mock_settings "github.com/status-im/status-go/multiaccounts/settings/mocks"

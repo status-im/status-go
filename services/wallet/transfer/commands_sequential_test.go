@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/mock/gomock"
 	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
 
 	"github.com/stretchr/testify/require"

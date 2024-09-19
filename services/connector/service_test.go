@@ -3,9 +3,9 @@ package connector
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/params"
