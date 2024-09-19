@@ -130,7 +130,7 @@ func (s *Server) signals(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) addEndpointWithResponse(name string, handler func(string) string) {
-	log.Info("adding endpoint", "name", name)
+	log.Debug("adding endpoint", "name", name)
 	s.mux.HandleFunc(name, func(w http.ResponseWriter, r *http.Request) {
 		request, err := io.ReadAll(r.Body)
 		if err != nil {
