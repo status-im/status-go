@@ -4,15 +4,15 @@ import (
 	"errors"
 )
 
-var ErrEnableAndSyncInstallationInvalidID = errors.New("enable and sync installation: invalid installation id")
+var ErrEnableInstallationAndSyncInvalidID = errors.New("enable installation and sync : invalid installation id")
 
-type EnableAndSyncInstallation struct {
+type EnableInstallationAndSync struct {
 	InstallationID string `json:"installationId"`
 }
 
-func (j *EnableAndSyncInstallation) Validate() error {
+func (j *EnableInstallationAndSync) Validate() error {
 	if len(j.InstallationID) == 0 {
-		return ErrEnableAndSyncInstallationInvalidID
+		return ErrEnableInstallationAndSyncInvalidID
 	}
 
 	return nil

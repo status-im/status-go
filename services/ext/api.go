@@ -1063,8 +1063,13 @@ func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) err
 	return api.service.messenger.SyncDevices(ctx, name, picture, nil)
 }
 
-func (api *PublicAPI) EnableAndSyncInstallation(request *requests.EnableAndSyncInstallation) error {
-	return api.service.messenger.EnableAndSyncInstallation(request)
+// Deprecated: Use EnableInstallationAndSync instead
+func (api *PublicAPI) EnableAndSyncInstallation(request *requests.EnableInstallationAndSync) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EnableInstallationAndSync(request)
+}
+
+func (api *PublicAPI) EnableInstallationAndSync(request *requests.EnableInstallationAndSync) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EnableInstallationAndSync(request)
 }
 
 func (api *PublicAPI) EnableInstallationAndPair(request *requests.EnableInstallationAndPair) (*protocol.MessengerResponse, error) {

@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -16,15 +17,30 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 )
 
-func (m *Messenger) EnableAndSyncInstallation(request *requests.EnableAndSyncInstallation) error {
+func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallationAndSync) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
-		return err
+		return nil, err
 	}
 	err := m.EnableInstallation(request.InstallationID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return m.SyncDevices(context.Background(), "", "", nil)
+	response, err := m.SendPairInstallation(context.Background(), nil)
+	if err != nil {
+		return nil, err
+	}
+	err = m.SyncDevices(context.Background(), "", "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Delete AC notif
+	err = m.deleteNotification(response, request.InstallationID)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (m *Messenger) EnableInstallationAndPair(request *requests.EnableInstallationAndPair) (*MessengerResponse, error) {
@@ -53,7 +69,26 @@ func (m *Messenger) EnableInstallationAndPair(request *requests.EnableInstallati
 		i.Enabled = true
 	}
 	m.allInstallations.Store(request.InstallationID, i)
-	return m.SendPairInstallation(context.Background(), nil)
+	response, err := m.SendPairInstallation(context.Background(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	notification := &ActivityCenterNotification{
+		ID:             types.FromHex(request.InstallationID),
+		Type:           ActivityCenterNotificationTypeNewInstallationCreated,
+		InstallationID: m.installationID, // Put our own installation ID, as we're the initiator of the pairing
+		Timestamp:      m.getTimesource().GetCurrentTime(),
+		Read:           false,
+		Deleted:        false,
+		UpdatedAt:      m.GetCurrentTimeInMillis(),
+	}
+
+	err = m.addActivityCenterNotification(response, notification, nil)
+	if err != nil {
+		return nil, err
+	}
+	return response, err
 }
 
 // SendPairInstallation sends a pair installation message
