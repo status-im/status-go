@@ -191,6 +191,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 		-target=android -ldflags="-s -w" \
 		-tags '$(BUILD_TAGS) disable_torrent' \
 		$(BUILD_FLAGS_MOBILE) \
+		--androidapi="23" \
 		-o build/bin/statusgo.aar \
 		github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
