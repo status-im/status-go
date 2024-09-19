@@ -1356,6 +1356,7 @@ func StartSearchForLocalPairingPeers() string {
 func startSearchForLocalPairingPeers() string {
 	pn := pairing.NewPeerNotifier()
 	err := pn.Search()
+
 	return makeJSONResponse(err)
 }
 
