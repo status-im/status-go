@@ -20,7 +20,7 @@ jobs:
       - name: Fetch tags
         run: |
           git fetch --tags --quiet
-          git checkout origin/${GITHUB_HEAD_REF}
+          git checkout ${{ github.event.pull_request.head.ref }}
 
       - name: Check commit message
         id: check_commit_message
