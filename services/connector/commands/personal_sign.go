@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -51,7 +52,7 @@ func (r *RPCRequest) getPersonalSignParams() (*PersonalSignParams, error) {
 	}, nil
 }
 
-func (c *PersonalSignCommand) Execute(request RPCRequest) (interface{}, error) {
+func (c *PersonalSignCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err

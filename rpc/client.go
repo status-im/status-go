@@ -76,6 +76,9 @@ type ClientInterface interface {
 	EthClient(chainID uint64) (chain.ClientInterface, error)
 	EthClients(chainIDs []uint64) (map[uint64]chain.ClientInterface, error)
 	CallContext(context context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error
+	Call(result interface{}, chainID uint64, method string, args ...interface{}) error
+	CallRaw(body string) string
+	GetNetworkManager() *network.Manager
 }
 
 // Client represents RPC client with custom routing
@@ -175,6 +178,10 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 	}
 
 	return &c, nil
+}
+
+func (c *Client) GetNetworkManager() *network.Manager {
+	return c.NetworkManager
 }
 
 func (c *Client) SetWalletNotifier(notifier func(chainID uint64, message string)) {

@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"strings"
 
@@ -16,7 +17,7 @@ func FormatAccountAddressToResponse(address types.Address) []string {
 	return []string{strings.ToLower(address.Hex())}
 }
 
-func (c *AccountsCommand) Execute(request RPCRequest) (interface{}, error) {
+func (c *AccountsCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err
