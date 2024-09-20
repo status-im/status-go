@@ -19,6 +19,7 @@ import (
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/utils"
 )
 
 type TelemetryType string
@@ -161,8 +162,19 @@ func (c *Client) SetDeviceType(deviceType string) {
 	c.deviceType = deviceType
 }
 
+func (c *Client) Foo() {
+
+}
+
+func Bar() {
+	defer utils.LogOnPanic()
+}
+
 func (c *Client) Start(ctx context.Context) {
+	go c.Foo()
+	go Bar()
 	go func() {
+		defer utils.LogOnPanic()
 		for {
 			select {
 			case telemetryRequest := <-c.telemetryCh:
