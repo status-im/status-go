@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bigint"

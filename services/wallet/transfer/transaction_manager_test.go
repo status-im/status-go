@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/eth-node/types"
