@@ -49,13 +49,14 @@ func (s SendType) FetchPrices(marketManager *market.Manager, tokenIDs []string) 
 		symbols = []string{"ETH"}
 	}
 
-	pricesMap, err := marketManager.FetchPrices(symbols, []string{"USD"})
+	pricesMap, err := marketManager.GetOrFetchPrices(symbols, []string{"USD"}, market.MaxAgeInSecondsForFresh)
+
 	if err != nil {
 		return nil, err
 	}
 	prices := make(map[string]float64, 0)
 	for symbol, pricePerCurrency := range pricesMap {
-		prices[symbol] = pricePerCurrency["USD"]
+		prices[symbol] = pricePerCurrency["USD"].Price
 	}
 	if s.IsCollectiblesTransfer() {
 		for _, tokenID := range tokenIDs {
