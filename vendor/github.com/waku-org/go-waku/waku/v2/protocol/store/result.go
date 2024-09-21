@@ -39,14 +39,14 @@ func (r *Result) Response() *pb.StoreQueryResponse {
 	return r.storeResponse
 }
 
-func (r *Result) Next(ctx context.Context) error {
+func (r *Result) Next(ctx context.Context, opts ...RequestOption) error {
 	if r.cursor == nil {
 		r.done = true
 		r.messages = nil
 		return nil
 	}
 
-	newResult, err := r.store.next(ctx, r)
+	newResult, err := r.store.next(ctx, r, opts...)
 	if err != nil {
 		return err
 	}

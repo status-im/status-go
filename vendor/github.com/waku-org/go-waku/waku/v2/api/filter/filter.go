@@ -27,6 +27,8 @@ func (fc FilterConfig) String() string {
 	return string(jsonStr)
 }
 
+const filterSubLoopInterval = 5 * time.Second
+
 type Sub struct {
 	ContentFilter         protocol.ContentFilter
 	DataCh                chan *protocol.Envelope
@@ -69,13 +71,7 @@ func defaultOptions() []SubscribeOptions {
 }
 
 // Subscribe
-func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilter protocol.ContentFilter, config FilterConfig, log *zap.Logger, opts ...SubscribeOptions) (*Sub, error) {
-	optList := append(defaultOptions(), opts...)
-	params := new(subscribeParameters)
-	for _, opt := range optList {
-		opt(params)
-	}
-
+func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilter protocol.ContentFilter, config FilterConfig, log *zap.Logger, params *subscribeParameters) (*Sub, error) {
 	sub := new(Sub)
 	sub.id = uuid.NewString()
 	sub.wf = wf
@@ -95,8 +91,9 @@ func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilte
 			sub.multiplex(subs)
 		}
 	}
-
-	go sub.subscriptionLoop(params.batchInterval)
+	// filter subscription loop is to check if target subscriptions for a filter are active and if not
+	// trigger resubscribe.
+	go sub.subscriptionLoop(filterSubLoopInterval)
 	return sub, nil
 }
 

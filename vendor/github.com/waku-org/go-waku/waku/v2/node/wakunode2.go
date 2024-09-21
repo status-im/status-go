@@ -292,7 +292,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.filterLightNode = filter.NewWakuFilterLightNode(w.bcaster, w.peermanager, w.timesource, w.opts.onlineChecker, w.opts.prometheusReg, w.log)
 	w.lightPush = lightpush.NewWakuLightPush(w.Relay(), w.peermanager, w.opts.prometheusReg, w.log, w.opts.lightpushOpts...)
 
-	w.store = store.NewWakuStore(w.peermanager, w.timesource, w.log)
+	w.store = store.NewWakuStore(w.peermanager, w.timesource, w.log, w.opts.storeRateLimit)
 
 	if params.storeFactory != nil {
 		w.storeFactory = params.storeFactory
