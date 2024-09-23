@@ -44,6 +44,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/waku/common"
@@ -225,6 +226,7 @@ func (w *Waku) SetMinimumPoW(val float64, tolerate bool) error {
 
 	if tolerate {
 		go func() {
+			defer gocommon.LogOnPanicAndRethrow()
 			// allow some time before all the peers have processed the notification
 			select {
 			case <-w.quit:
@@ -305,6 +307,7 @@ func (w *Waku) SetBloomFilter(bloom []byte) error {
 	w.notifyPeersAboutBloomFilterChange(b)
 
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		// allow some time before all the peers have processed the notification
 		select {
 		case <-w.quit:
@@ -375,6 +378,7 @@ func (w *Waku) SetTopicInterest(topicInterest []common.TopicType) error {
 	w.notifyPeersAboutTopicInterestChange(topicInterest)
 
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		// allow some time before all the peers have processed the notification
 		select {
 		case <-w.quit:

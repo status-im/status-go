@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/migrate/v4/database/postgres"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/mailserver/migrations"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -52,6 +53,7 @@ func NewPostgresDB(uri string) (*PostgresDB, error) {
 	instance.updateArchivedEnvelopesCount()
 	// checking count on every insert is inefficient
 	go func() {
+		defer common.LogOnPanicAndRethrow()
 		for {
 			select {
 			case <-instance.done:

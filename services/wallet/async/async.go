@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/common"
 )
 
 type Command func(context.Context) error
@@ -104,6 +105,7 @@ type Group struct {
 func (g *Group) Add(cmd Command) {
 	g.wg.Add(1)
 	go func() {
+		defer common.LogOnPanicAndRethrow()
 		_ = cmd(g.ctx)
 		g.wg.Done()
 	}()
@@ -120,6 +122,7 @@ func (g *Group) Wait() {
 func (g *Group) WaitAsync() <-chan struct{} {
 	ch := make(chan struct{})
 	go func() {
+		defer common.LogOnPanicAndRethrow()
 		g.Wait()
 		close(ch)
 	}()
@@ -162,6 +165,7 @@ func (d *AtomicGroup) Name() string {
 func (d *AtomicGroup) Add(cmd Command) {
 	d.wg.Add(1)
 	go func() {
+		defer common.LogOnPanicAndRethrow()
 		defer d.done()
 		err := cmd(d.ctx)
 		d.mu.Lock()
@@ -192,6 +196,7 @@ func (d *AtomicGroup) Wait() {
 func (d *AtomicGroup) WaitAsync() <-chan struct{} {
 	ch := make(chan struct{})
 	go func() {
+		defer common.LogOnPanicAndRethrow()
 		d.Wait()
 		close(ch)
 	}()

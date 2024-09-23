@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 )
@@ -100,7 +101,10 @@ func (m *Verifier) CheckBatch(ensDetails []enstypes.ENSDetails, rpcEndpoint, con
 	}
 
 	for _, ensInfo := range ensDetails {
-		go func(info enstypes.ENSDetails) { ch <- m.verifyENSName(info, ethclient) }(ensInfo)
+		go func(info enstypes.ENSDetails) {
+			defer gocommon.LogOnPanicAndRethrow()
+			ch <- m.verifyENSName(info, ethclient)
+		}(ensInfo)
 	}
 
 	for range ensDetails {

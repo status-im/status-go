@@ -25,6 +25,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/status-im/status-go/common"
 	"github.com/tsenart/tb"
 
 	"github.com/ethereum/go-ethereum/p2p"
@@ -176,6 +177,7 @@ func (r *PeerRateLimiter) Decorate(p RateLimiterPeer, rw p2p.MsgReadWriter, runL
 
 	// Read from the original reader and write to the message pipe.
 	go func() {
+		defer common.LogOnPanicAndRethrow()
 		for {
 			packet, err := rw.ReadMsg()
 			if err != nil {
@@ -243,6 +245,7 @@ func (r *PeerRateLimiter) Decorate(p RateLimiterPeer, rw p2p.MsgReadWriter, runL
 
 	// Read from the message pipe and write to the original writer.
 	go func() {
+		defer common.LogOnPanicAndRethrow()
 		for {
 			packet, err := in.ReadMsg()
 			if err != nil {
@@ -267,6 +270,7 @@ func (r *PeerRateLimiter) Decorate(p RateLimiterPeer, rw p2p.MsgReadWriter, runL
 	}()
 
 	go func() {
+		defer common.LogOnPanicAndRethrow()
 		// Don't block as otherwise we might leak go routines
 		select {
 		case errC <- runLoop(out):

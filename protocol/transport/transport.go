@@ -17,6 +17,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -433,6 +434,7 @@ func (t *Transport) cleanFiltersLoop() {
 
 	ticker := time.NewTicker(5 * time.Minute)
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		for {
 			select {
 			case <-t.quit:
@@ -481,6 +483,7 @@ func (t *Transport) createMessagesRequest(
 		})
 
 		go func() {
+			defer gocommon.LogOnPanicAndRethrow()
 			storeCursor, envelopesCount, err = t.waku.RequestStoreMessages(ctx, peerID, r, processEnvelopes)
 			resultCh <- struct {
 				storeCursor    types.StoreRequestCursor
@@ -497,6 +500,7 @@ func (t *Transport) createMessagesRequest(
 		}
 	} else {
 		go func() {
+			defer gocommon.LogOnPanicAndRethrow()
 			_, _, err = t.waku.RequestStoreMessages(ctx, peerID, r, false)
 			if err != nil {
 				t.logger.Error("failed to request store messages", zap.Error(err))

@@ -29,6 +29,7 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appmetrics"
+	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/contracts"
@@ -907,6 +908,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if m.archiveManager.IsReady() {
 		available := m.mailserverCycle.availabilitySubscriptions.Subscribe()
 		go func() {
+			defer gocommon.LogOnPanicAndRethrow()
 			<-available
 			m.InitHistoryArchiveTasks(controlledCommunities)
 		}()
@@ -1459,6 +1461,7 @@ func (m *Messenger) handleInstallations(installations []*multidevice.Installatio
 // handleEncryptionLayerSubscriptions handles events from the encryption layer
 func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption.Subscriptions) {
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		for {
 			select {
 			case <-subscriptions.SendContactCode:
@@ -1513,6 +1516,7 @@ func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 
 func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.VerificationRecord) {
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		for {
 			select {
 			case records, more := <-c:
@@ -1552,6 +1556,7 @@ func (m *Messenger) watchConnectionChange() {
 	}
 
 	pollConnectionStatus := func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		func() {
 			for {
 				select {
@@ -1565,6 +1570,7 @@ func (m *Messenger) watchConnectionChange() {
 	}
 
 	subscribedConnectionStatus := func(subscription *types.ConnStatusSubscription) {
+		defer gocommon.LogOnPanicAndRethrow()
 		defer subscription.Unsubscribe()
 		ticker := time.NewTicker(keepAlivePeriod)
 		defer ticker.Stop()
@@ -1603,6 +1609,7 @@ func (m *Messenger) watchConnectionChange() {
 func (m *Messenger) watchChatsToUnmute() {
 	m.logger.Debug("Checking for chats to unmute every minute")
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		for {
 			// Execute the check immediately upon starting
 			response := &MessengerResponse{}
@@ -1646,6 +1653,7 @@ func (m *Messenger) watchChatsToUnmute() {
 func (m *Messenger) watchCommunitiesToUnmute() {
 	m.logger.Debug("Checking for communities to unmute every minute")
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		for {
 			// Execute the check immediately upon starting
 			response, err := m.CheckCommunitiesToUnmute()
@@ -1680,6 +1688,7 @@ func (m *Messenger) watchIdentityImageChanges() {
 	channel := m.multiAccounts.SubscribeToIdentityImageChanges()
 
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		for {
 			select {
 			case change := <-channel:
@@ -1717,6 +1726,7 @@ func (m *Messenger) watchPendingCommunityRequestToJoin() {
 	m.logger.Debug("watching community request to join")
 
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		for {
 			select {
 			case <-time.After(time.Minute * 10):
@@ -1751,6 +1761,7 @@ func (m *Messenger) PublishIdentityImage() error {
 // handlePushNotificationClientRegistration handles registration events
 func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		for {
 			_, more := <-c
 			if !more {
@@ -3067,6 +3078,7 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		defer m.shutdownWaitGroup.Done()
 		ticker := time.NewTicker(tick)
 		defer ticker.Stop()
@@ -5748,6 +5760,7 @@ func (m *Messenger) startCleanupLoop(name string, cleanupFunc func() error) {
 	logger := m.logger.Named(name)
 
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		// Delay by a few minutes to minimize messenger's startup time
 		var interval time.Duration = 5 * time.Minute
 		for {

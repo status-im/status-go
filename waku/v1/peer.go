@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku/common"
 )
@@ -437,6 +438,7 @@ func (p *Peer) handshake() error {
 	errc := make(chan error, 1)
 	opts := StatusOptionsFromHost(p.host)
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		err := p2p.Send(p.rw, statusCode, opts)
 		if err != nil {
 			p.stats.AddUpload(statusCode)

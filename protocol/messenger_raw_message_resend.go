@@ -6,6 +6,7 @@ import (
 	"math"
 	"time"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 
 	"github.com/pkg/errors"
@@ -18,6 +19,7 @@ import (
 func (m *Messenger) watchExpiredMessages() {
 	m.logger.Debug("watching expired messages")
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		for {
 			select {
 			case <-time.After(time.Second):

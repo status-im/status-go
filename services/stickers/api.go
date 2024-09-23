@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
@@ -172,6 +173,7 @@ func (api *API) execTokenPackID(chainID uint64, tokenIDs []*big.Int, resultChan 
 	for _, tokenID := range tokenIDs {
 		c.Wait()
 		go func(tokenID *big.Int) {
+			defer gocommon.LogOnPanicAndRethrow()
 			defer c.Done()
 			packID, err := stickerPack.TokenPackId(callOpts, tokenID)
 			if err != nil {
@@ -270,6 +272,7 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 	for i := uint64(0); i < numPacks.Uint64(); i++ {
 		c.Wait()
 		go func(i uint64) {
+			defer gocommon.LogOnPanicAndRethrow()
 			defer c.Done()
 
 			packID := new(big.Int).SetUint64(i)
@@ -407,6 +410,7 @@ func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accounts.Accoun
 	for _, account := range accs {
 		c.Wait()
 		go func(acc *accounts.Account) {
+			defer gocommon.LogOnPanicAndRethrow()
 			defer c.Done()
 			packs, err := api.getPurchasedPackIDs(chainID, acc.Address)
 			if err != nil {
@@ -443,6 +447,7 @@ func (api *API) execTokenOwnerOfIndex(chainID uint64, account types.Address, bal
 	for i := uint64(0); i < balance.Uint64(); i++ {
 		c.Wait()
 		go func(i uint64) {
+			defer gocommon.LogOnPanicAndRethrow()
 			defer c.Done()
 			tokenID, err := stickerPack.TokenOfOwnerByIndex(callOpts, common.Address(account), new(big.Int).SetUint64(i))
 			if err != nil {

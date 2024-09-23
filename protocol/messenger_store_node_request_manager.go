@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common/shard"
 
@@ -106,6 +107,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 
 		if !cfg.WaitForResponse {
 			go func() {
+				defer gocommon.LogOnPanicAndRethrow()
 				shardResult := <-fetchedShard
 				communityShard = shardResult.shard
 

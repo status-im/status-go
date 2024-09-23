@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/market"
@@ -107,6 +108,7 @@ func (s *Service) Start() {
 	s.startAccountWatcher()
 
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		s.serviceContext, s.cancelFn = context.WithCancel(context.Background())
 
 		err := s.updateBalanceHistory(s.serviceContext)

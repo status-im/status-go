@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 )
 
@@ -110,10 +111,12 @@ func (m *EnvelopesMonitor) Start() {
 	m.quit = make(chan struct{})
 	m.wg.Add(2)
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		m.handleEnvelopeEvents()
 		m.wg.Done()
 	}()
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		defer m.wg.Done()
 		m.retryLoop()
 	}()

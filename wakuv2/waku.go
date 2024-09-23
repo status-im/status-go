@@ -72,6 +72,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
@@ -395,6 +396,7 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) 
 			// Use DNS Discovery
 			wg.Add(1)
 			go func(addr string) {
+				defer gocommon.LogOnPanicAndRethrow()
 				defer wg.Done()
 				if err := w.dnsDiscover(ctx, addr, retrieveENR); err != nil {
 					mu.Lock()
@@ -474,6 +476,7 @@ func (w *Waku) discoverAndConnectPeers() {
 		if strings.HasPrefix(addrString, "enrtree://") {
 			// Use DNS Discovery
 			go func() {
+				defer gocommon.LogOnPanicAndRethrow()
 				if err := w.dnsDiscover(w.ctx, addrString, fnApply); err != nil {
 					w.logger.Error("could not obtain dns discovery peers for ClusterConfig.WakuNodes", zap.Error(err), zap.String("dnsDiscURL", addrString))
 				}
@@ -636,6 +639,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 
 	w.wg.Add(1)
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		defer w.wg.Done()
 		for {
 			select {
@@ -1077,6 +1081,7 @@ func (w *Waku) Start() error {
 
 	w.wg.Add(1)
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		defer w.wg.Done()
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -1097,6 +1102,7 @@ func (w *Waku) Start() error {
 	if w.cfg.TelemetryServerURL != "" {
 		w.wg.Add(1)
 		go func() {
+			defer gocommon.LogOnPanicAndRethrow()
 			defer w.wg.Done()
 			peerTelemetryTickerInterval := time.Duration(w.cfg.TelemetryPeerCountSendPeriod) * time.Millisecond
 			if peerTelemetryTickerInterval == 0 {
@@ -1136,6 +1142,7 @@ func (w *Waku) Start() error {
 
 		w.wg.Add(1)
 		go func() {
+			defer gocommon.LogOnPanicAndRethrow()
 			w.wg.Done()
 			for {
 				select {
@@ -1285,6 +1292,7 @@ func (w *Waku) startMessageSender() error {
 
 		w.wg.Add(1)
 		go func() {
+			defer gocommon.LogOnPanicAndRethrow()
 			defer w.wg.Done()
 			for {
 				select {

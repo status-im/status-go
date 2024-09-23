@@ -11,6 +11,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/signal"
@@ -1367,7 +1368,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
 
 			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
-
+				defer gocommon.LogOnPanicAndRethrow()
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
 					currentTask.Cancel()
@@ -1742,7 +1743,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
 			go func(currentTask *communities.HistoryArchiveDownloadTask) {
-
+				defer gocommon.LogOnPanicAndRethrow()
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
 					currentTask.Cancel()

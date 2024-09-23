@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 )
 
@@ -34,6 +35,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 	mon.quit = make(chan struct{})
 	mon.wg.Add(1)
 	go func() {
+		defer common.LogOnPanicAndRethrow()
 		events := make(chan types.EnvelopeEvent, whisperEventsBuffer)
 		sub := mon.eventSub.SubscribeEnvelopeEvents(events)
 		defer sub.Unsubscribe()

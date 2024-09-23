@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 )
 
@@ -13,6 +14,7 @@ import (
 func RunAsync(f func() error) <-chan error {
 	resp := make(chan error, 1)
 	go func() {
+		defer common.LogOnPanicAndRethrow()
 		err := f()
 		resp <- err
 		close(resp)

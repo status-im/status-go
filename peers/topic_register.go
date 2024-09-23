@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/discovery"
 )
 
@@ -32,6 +33,7 @@ func (r *Register) Start() error {
 	for _, topic := range r.topics {
 		r.wg.Add(1)
 		go func(t discv5.Topic) {
+			defer common.LogOnPanicAndRethrow()
 			log.Debug("v5 register topic", "topic", t)
 			if err := r.discovery.Register(string(t), r.quit); err != nil {
 				log.Error("error registering topic", "topic", t, "error", err)

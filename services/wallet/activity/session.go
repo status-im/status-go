@@ -9,6 +9,7 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -411,6 +412,7 @@ func (s *Service) detectNew(changeCount int) {
 }
 
 func notify(eventFeed *event.Feed, id SessionID, hasNewOnTop bool, mixed []*EntryUpdate) {
+	defer gocommon.LogOnPanicAndRethrow()
 	payload := SessionUpdate{
 		New: mixed,
 	}
@@ -452,6 +454,7 @@ func (s *Service) getActivityDetailsAsync(requestID int32, entries []Entry) {
 	ctx := context.Background()
 
 	go func() {
+		defer gocommon.LogOnPanicAndRethrow()
 		activityData, err := s.getActivityDetails(ctx, entries)
 		if len(activityData) != 0 {
 			sendResponseEvent(s.eventFeed, &requestID, EventActivityFilteringUpdate, activityData, err)
