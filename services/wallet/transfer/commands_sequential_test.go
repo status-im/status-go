@@ -1325,7 +1325,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
-	tm := &TransactionManager{NewMultiTransactionDB(db), nil, nil, nil, nil, nil, nil, nil, nil, nil}
+	tm := &TransactionManager{NewMultiTransactionDB(db), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 
 	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
 	require.NoError(t, err)
