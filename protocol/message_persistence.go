@@ -1580,11 +1580,6 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 			if err != nil {
 				return
 			}
-			// handle replies
-			err = db.findAndUpdateReplies(tx, msg.GetBridgeMessage().MessageID, msg.ID)
-			if err != nil {
-				return
-			}
 			parentMessageID := msg.GetBridgeMessage().ParentMessageID
 			if parentMessageID != "" {
 				err = db.findAndUpdateRepliedTo(tx, parentMessageID, msg.ID)
@@ -2972,26 +2967,6 @@ func (db sqlitePersistence) GetCommunityMemberMessagesToDelete(member string, co
 	return result, nil
 }
 
-// Finds status messages id which are replies for bridgeMessageID
-func (db sqlitePersistence) findStatusMessageIdsReplies(tx *sql.Tx, bridgeMessageID string) ([]string, error) {
-	rows, err := tx.Query(`SELECT user_messages_id FROM bridge_messages WHERE parent_message_id = ?`, bridgeMessageID)
-	if err != nil {
-		return []string{}, err
-	}
-	defer rows.Close()
-
-	var statusMessageIDs []string
-	for rows.Next() {
-		var statusMessageID string
-		err = rows.Scan(&statusMessageID)
-		if err != nil {
-			return []string{}, err
-		}
-		statusMessageIDs = append(statusMessageIDs, statusMessageID)
-	}
-	return statusMessageIDs, nil
-}
-
 func (db sqlitePersistence) FindStatusMessageIDForBridgeMessageID(messageID string) (string, error) {
 	rows, err := db.db.Query(`SELECT user_messages_id FROM bridge_messages WHERE message_id = ?`, messageID)
 	if err != nil {
@@ -3042,18 +3017,6 @@ func (db sqlitePersistence) updateBridgeMessageContent(tx *sql.Tx, bridgeMessage
 
 	_, err = stmt.Exec(content, bridgeMessageID)
 	return err
-}
-
-// Finds if there are any messages that are replies to that message (in case replies were received earlier)
-func (db sqlitePersistence) findAndUpdateReplies(tx *sql.Tx, bridgeMessageID string, statusMessageID string) error {
-	replyMessageIds, err := db.findStatusMessageIdsReplies(tx, bridgeMessageID)
-	if err != nil {
-		return err
-	}
-	if len(replyMessageIds) == 0 {
-		return nil
-	}
-	return db.updateStatusMessagesWithResponse(tx, replyMessageIds, statusMessageID)
 }
 
 func (db sqlitePersistence) findAndUpdateRepliedTo(tx *sql.Tx, discordParentMessageID string, statusMessageID string) error {

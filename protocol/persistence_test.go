@@ -1983,43 +1983,43 @@ func TestBridgeMessageReplies(t *testing.T) {
 
 	require.NoError(t, err)
 
-	err = insertMinimalBridgeMessage(p, "111", "1", "")
+	err = insertMinimalBridgeMessage(p, "message1", "discordId1", "")
 	require.NoError(t, err)
 
-	err = insertMinimalBridgeMessage(p, "222", "2", "1")
+	err = insertMinimalBridgeMessage(p, "message2", "discordId2", "message1")
 	require.NoError(t, err)
 
-	// "333 is not delivered yet"
+	// "message3 is not delivered yet"
 
 	// this is a reply to a message which was not delivered yet
-	err = insertMinimalBridgeMessage(p, "444", "4", "3")
+	err = insertMinimalBridgeMessage(p, "message4", "discordId4", "message3")
 	require.NoError(t, err)
 
-	// status message "222" should have reply_to = "111"
-	responseTo, err := messageResponseTo(p, "222")
+	// status message "message2" should have reply_to ="message1" because it's a discord message to another discord message
+	responseTo, err := messageResponseTo(p, "message2")
 	require.NoError(t, err)
-	require.Equal(t, "111", responseTo)
+	require.Equal(t, "message1", responseTo)
 
-	responseTo, err = messageResponseTo(p, "111")
+	responseTo, err = messageResponseTo(p, "message1")
 	require.NoError(t, err)
 	require.Equal(t, "", responseTo)
 
-	responseTo, err = messageResponseTo(p, "444")
+	responseTo, err = messageResponseTo(p, "message4")
+	require.NoError(t, err)
+	require.Equal(t, "message3", responseTo)
+
+	// receiving message for which "message4" is replied to
+	err = insertMinimalBridgeMessage(p, "message3", "discordId3", "")
+	require.NoError(t, err)
+
+	responseTo, err = messageResponseTo(p, "message3")
 	require.NoError(t, err)
 	require.Equal(t, "", responseTo)
 
-	// receiving message for which "444" is replied to
-	err = insertMinimalBridgeMessage(p, "333", "3", "")
+	// message4 is still replied to message3
+	responseTo, err = messageResponseTo(p, "message4")
 	require.NoError(t, err)
-
-	responseTo, err = messageResponseTo(p, "333")
-	require.NoError(t, err)
-	require.Equal(t, "", responseTo)
-
-	// now 444 is replied to 333
-	responseTo, err = messageResponseTo(p, "444")
-	require.NoError(t, err)
-	require.Equal(t, "333", responseTo)
+	require.Equal(t, "message3", responseTo)
 }
 
 func createAndSaveMessage(p *sqlitePersistence, id string, from string, deleted bool, communityID string) error {
