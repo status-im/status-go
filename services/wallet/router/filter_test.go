@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 
 	"github.com/stretchr/testify/assert"
@@ -94,9 +94,9 @@ func TestSetupRouteValidationMaps(t *testing.T) {
 		{
 			name: "Mixed zero and non-zero amounts",
 			fromLockedAmount: map[uint64]*hexutil.Big{
-				1: (*hexutil.Big)(pathprocessor.ZeroBigIntValue),
+				1: (*hexutil.Big)(walletCommon.ZeroBigIntValue()),
 				2: (*hexutil.Big)(big.NewInt(200)),
-				3: (*hexutil.Big)(pathprocessor.ZeroBigIntValue),
+				3: (*hexutil.Big)(walletCommon.ZeroBigIntValue()),
 				4: (*hexutil.Big)(big.NewInt(400)),
 			},
 			expectedIncluded: map[uint64]bool{
@@ -123,8 +123,8 @@ func TestSetupRouteValidationMaps(t *testing.T) {
 		{
 			name: "All zero amounts",
 			fromLockedAmount: map[uint64]*hexutil.Big{
-				1: (*hexutil.Big)(pathprocessor.ZeroBigIntValue),
-				2: (*hexutil.Big)(pathprocessor.ZeroBigIntValue),
+				1: (*hexutil.Big)(walletCommon.ZeroBigIntValue()),
+				2: (*hexutil.Big)(walletCommon.ZeroBigIntValue()),
 			},
 			expectedIncluded: map[uint64]bool{},
 			expectedExcluded: map[uint64]bool{
@@ -145,7 +145,7 @@ func TestSetupRouteValidationMaps(t *testing.T) {
 		{
 			name: "Single zero amount",
 			fromLockedAmount: map[uint64]*hexutil.Big{
-				1: (*hexutil.Big)(pathprocessor.ZeroBigIntValue),
+				1: (*hexutil.Big)(walletCommon.ZeroBigIntValue()),
 			},
 			expectedIncluded: map[uint64]bool{},
 			expectedExcluded: map[uint64]bool{

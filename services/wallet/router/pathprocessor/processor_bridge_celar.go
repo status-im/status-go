@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 
 	"github.com/status-im/status-go/params"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor/cbridge"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -203,7 +204,7 @@ func (s *CelerBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.
 		return nil, nil, ErrFailedToParsePercentageFee
 	}
 
-	return ZeroBigIntValue, new(big.Int).Add(baseFee, percFee), nil
+	return walletCommon.ZeroBigIntValue(), new(big.Int).Add(baseFee, percFee), nil
 }
 
 func (c *CelerBridgeProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {

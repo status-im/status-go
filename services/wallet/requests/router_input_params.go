@@ -123,8 +123,8 @@ func (i *RouteInputParams) Validate() error {
 
 		if i.AmountIn != nil &&
 			i.AmountOut != nil &&
-			i.AmountIn.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 &&
-			i.AmountOut.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+			i.AmountIn.ToInt().Cmp(walletCommon.ZeroBigIntValue()) > 0 &&
+			i.AmountOut.ToInt().Cmp(walletCommon.ZeroBigIntValue()) > 0 {
 			return ErrSwapAmountInAmountOutMustBeExclusive
 		}
 

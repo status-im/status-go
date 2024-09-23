@@ -50,7 +50,7 @@ func (c *ClientV5) BuildTransaction(ctx context.Context, srcTokenAddress common.
 		params["destAmount"] = destAmountWei.String()
 	}
 	params["partner"] = c.partnerID
-	if c.partnerAddress != walletCommon.ZeroAddress && c.partnerFeePcnt > 0 {
+	if c.partnerAddress != walletCommon.ZeroAddress() && c.partnerFeePcnt > 0 {
 		params["partnerAddress"] = c.partnerAddress.Hex()
 		params["partnerFeeBps"] = uint(c.partnerFeePcnt * 100)
 	}

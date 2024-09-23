@@ -1,16 +1,5 @@
 package pathprocessor
 
-import (
-	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
-)
-
-var (
-	ZeroAddress     = common.Address{}
-	ZeroBigIntValue = big.NewInt(0)
-)
-
 const (
 	IncreaseEstimatedGasFactor = 1.1
 	SevenDaysInSeconds         = 60 * 60 * 24 * 7

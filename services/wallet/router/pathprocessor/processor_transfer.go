@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -47,7 +48,7 @@ func (s *TransferProcessor) AvailableFor(params ProcessorInputParams) (bool, err
 }
 
 func (s *TransferProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
 }
 
 func (s *TransferProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
