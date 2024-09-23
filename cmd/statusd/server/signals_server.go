@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-	
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/gorilla/websocket"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/pkg/errors"
 
 	"github.com/status-im/status-go/signal"
 )
