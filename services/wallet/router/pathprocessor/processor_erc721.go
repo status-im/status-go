@@ -2,7 +2,6 @@ package pathprocessor
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -65,9 +64,9 @@ func (s *ERC721Processor) packTxInputDataInternally(params ProcessorInputParams,
 		return []byte{}, createERC721ErrorResponse(err)
 	}
 
-	id, success := big.NewInt(0).SetString(params.FromToken.Symbol, 0)
-	if !success {
-		return []byte{}, createERC721ErrorResponse(fmt.Errorf("failed to convert %s to big.Int", params.FromToken.Symbol))
+	id, err := walletCommon.GetTokenIdFromSymbol(params.FromToken.Symbol)
+	if err != nil {
+		return []byte{}, createERC721ErrorResponse(err)
 	}
 
 	return abi.Pack(functionName,

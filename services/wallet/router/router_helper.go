@@ -4,16 +4,13 @@ import (
 	"context"
 	"errors"
 	"math/big"
-	"strings"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/contracts"
 	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
-	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -67,21 +64,8 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 	return true, params.AmountIn, nil
 }
 
-func (r *Router) packApprovalInputData(amountIn *big.Int, approvalContractAddress *common.Address) ([]byte, error) {
-	if approvalContractAddress == nil || *approvalContractAddress == walletCommon.ZeroAddress {
-		return []byte{}, nil
-	}
-
-	erc20ABI, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return erc20ABI.Pack("approve", approvalContractAddress, amountIn)
-}
-
 func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParams, approvalContractAddress *common.Address) (uint64, error) {
-	data, err := r.packApprovalInputData(params.AmountIn, approvalContractAddress)
+	data, err := walletCommon.PackApprovalInputData(params.AmountIn, approvalContractAddress)
 	if err != nil {
 		return 0, err
 	}
@@ -100,7 +84,7 @@ func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParam
 }
 
 func (r *Router) calculateApprovalL1Fee(amountIn *big.Int, chainID uint64, approvalContractAddress *common.Address) (uint64, error) {
-	data, err := r.packApprovalInputData(amountIn, approvalContractAddress)
+	data, err := walletCommon.PackApprovalInputData(amountIn, approvalContractAddress)
 	if err != nil {
 		return 0, err
 	}
