@@ -44,7 +44,7 @@ const (
 var (
 	paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet, pathEncryption}
 
-	DefaultFleet = params.FleetStatusProd
+	DefaultFleet = params.FleetStatusStaging
 
 	overrideApiConfig = overrideApiConfigProd
 )
