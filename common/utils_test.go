@@ -12,9 +12,9 @@ func TestGo(t *testing.T) {
 	paniced := false
 	panicErr := "test panic"
 	oldDefaultPanicFunc := defaultPanicFunc
-	t.Cleanup(func() {
+	defer func() {
 		defaultPanicFunc = oldDefaultPanicFunc
-	})
+	}()
 	defaultPanicFunc = func(err any) {
 		require.NotNil(t, err)
 		paniced = true
