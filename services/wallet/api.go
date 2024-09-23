@@ -18,6 +18,7 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/account"
+	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -30,13 +31,16 @@ import (
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/requests"
+	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
+	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -712,6 +716,15 @@ func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64
 	return api.s.transactionManager.SendTransactionWithSignature(chainID, params, sig)
 }
 
+// @deprecated `CreateMultiTransaction`
+//
+// The flow that should be used instead:
+// - call `BuildTransactionsFromRoute`
+// - wait for the `wallet.router.sign-transactions` signal
+// - sign received hashes using `SignMessage` call or sign on keycard
+// - call `SendRouterTransactionsWithSignatures` with the signatures of signed hashes from the previous step
+//
+// TODO: remove this struct once mobile switches to the new approach
 func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionCommand *transfer.MultiTransactionCommand, data []*pathprocessor.MultipathProcessorTxArgs, password string) (*transfer.MultiTransactionCommandResult, error) {
 	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
 
@@ -742,9 +755,183 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionComm
 	return nil, api.s.transactionManager.SendTransactionForSigningToKeycard(ctx, cmd, data, api.router.GetPathProcessors())
 }
 
+func updateFields(sd *responses.SendDetails, inputParams requests.RouteInputParams) {
+	sd.SendType = int(inputParams.SendType)
+	sd.FromAddress = types.Address(inputParams.AddrFrom)
+	sd.ToAddress = types.Address(inputParams.AddrTo)
+	sd.FromToken = inputParams.TokenID
+	sd.ToToken = inputParams.ToTokenID
+	if inputParams.AmountIn != nil {
+		sd.FromAmount = inputParams.AmountIn.String()
+	}
+	if inputParams.AmountOut != nil {
+		sd.ToAmount = inputParams.AmountOut.String()
+	}
+	sd.OwnerTokenBeingSent = inputParams.TokenIDIsOwnerToken
+	sd.Username = inputParams.Username
+	sd.PublicKey = inputParams.PublicKey
+	if inputParams.PackID != nil {
+		sd.PackID = inputParams.PackID.String()
+	}
+}
+
+func (api *API) BuildTransactionsFromRoute(ctx context.Context, buildInputParams *requests.RouterBuildTransactionsParams) {
+	log.Debug("[WalletAPI::BuildTransactionsFromRoute] builds transactions from the generated best route", "uuid", buildInputParams.Uuid)
+
+	go func() {
+		api.router.StopSuggestedRoutesAsyncCalculation()
+
+		var err error
+		response := &responses.RouterTransactionsForSigning{
+			SendDetails: &responses.SendDetails{
+				Uuid: buildInputParams.Uuid,
+			},
+		}
+
+		defer func() {
+			if err != nil {
+				api.s.transactionManager.ClearLocalRouterTransactionsData()
+				err = statusErrors.CreateErrorResponseFromError(err)
+				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
+			}
+			signal.SendWalletEvent(signal.SignRouterTransactions, response)
+		}()
+
+		route, routeInputParams := api.router.GetBestRouteAndAssociatedInputParams()
+		if routeInputParams.Uuid != buildInputParams.Uuid {
+			// should never be here
+			err = ErrCannotResolveRouteId
+			return
+		}
+
+		updateFields(response.SendDetails, routeInputParams)
+
+		// notify clinet that sending transactions started (has 3 steps, building txs, signing txs, sending txs)
+		signal.SendWalletEvent(signal.RouterSendingTransactionsStarted, response.SendDetails)
+
+		response.SigningDetails, err = api.s.transactionManager.BuildTransactionsFromRoute(
+			route,
+			routeInputParams.AddrFrom,
+			routeInputParams.AddrTo,
+			api.router.GetPathProcessors(),
+			routeInputParams.Username,
+			routeInputParams.PublicKey,
+			routeInputParams.PackID.ToInt(),
+			buildInputParams.SlippagePercentage)
+	}()
+}
+
+// @deprecated `ProceedWithTransactionsSignatures`
+//
+// The flow that should be used instead:
+// - call `BuildTransactionsFromRoute`
+// - wait for the `wallet.router.sign-transactions` signal
+// - sign received hashes using `SignMessage` call or sign on keycard
+// - call `SendRouterTransactionsWithSignatures` with the signatures of signed hashes from the previous step
+//
+// TODO: remove this struct once mobile switches to the new approach
 func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signatures map[string]transfer.SignatureDetails) (*transfer.MultiTransactionCommandResult, error) {
 	log.Debug("[WalletAPI:: ProceedWithTransactionsSignatures] sign with signatures and send multi transaction")
 	return api.s.transactionManager.ProceedWithTransactionsSignatures(ctx, signatures)
+}
+
+func (api *API) SendRouterTransactionsWithSignatures(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
+	log.Debug("[WalletAPI:: SendRouterTransactionsWithSignatures] sign with signatures and send")
+	go func() {
+
+		var (
+			err              error
+			routeInputParams requests.RouteInputParams
+		)
+		response := &responses.RouterSentTransactions{
+			SendDetails: &responses.SendDetails{
+				Uuid: sendInputParams.Uuid,
+			},
+		}
+
+		defer func() {
+			clearLocalData := true
+			if routeInputParams.SendType == sendtype.Swap {
+				// in case of swap don't clear local data if an approval is placed, but swap tx is not sent yet
+				if api.s.transactionManager.ApprovalRequiredForPath(pathprocessor.ProcessorSwapParaswapName) &&
+					api.s.transactionManager.ApprovalPlacedForPath(pathprocessor.ProcessorSwapParaswapName) &&
+					!api.s.transactionManager.TxPlacedForPath(pathprocessor.ProcessorSwapParaswapName) {
+					clearLocalData = false
+				}
+			}
+
+			if clearLocalData {
+				api.s.transactionManager.ClearLocalRouterTransactionsData()
+			}
+
+			if err != nil {
+				err = statusErrors.CreateErrorResponseFromError(err)
+				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
+			}
+			signal.SendWalletEvent(signal.RouterTransactionsSent, response)
+		}()
+
+		_, routeInputParams = api.router.GetBestRouteAndAssociatedInputParams()
+		if routeInputParams.Uuid != sendInputParams.Uuid {
+			err = ErrCannotResolveRouteId
+			return
+		}
+
+		updateFields(response.SendDetails, routeInputParams)
+
+		err = api.s.transactionManager.ValidateAndAddSignaturesToRouterTransactions(sendInputParams.Signatures)
+		if err != nil {
+			return
+		}
+
+		//////////////////////////////////////////////////////////////////////////////
+		// prepare multitx
+		var mtType transfer.MultiTransactionType = transfer.MultiTransactionSend
+		if routeInputParams.SendType == sendtype.Bridge {
+			mtType = transfer.MultiTransactionBridge
+		} else if routeInputParams.SendType == sendtype.Swap {
+			mtType = transfer.MultiTransactionSwap
+		}
+
+		multiTx := transfer.NewMultiTransaction(
+			/* Timestamp:     */ uint64(time.Now().Unix()),
+			/* FromNetworkID: */ 0,
+			/* ToNetworkID:	  */ 0,
+			/* FromTxHash:    */ common.Hash{},
+			/* ToTxHash:      */ common.Hash{},
+			/* FromAddress:   */ routeInputParams.AddrFrom,
+			/* ToAddress:     */ routeInputParams.AddrTo,
+			/* FromAsset:     */ routeInputParams.TokenID,
+			/* ToAsset:       */ routeInputParams.ToTokenID,
+			/* FromAmount:    */ routeInputParams.AmountIn,
+			/* ToAmount:      */ routeInputParams.AmountOut,
+			/* Type:		  */ mtType,
+			/* CrossTxID:	  */ "",
+		)
+
+		_, err = api.s.transactionManager.InsertMultiTransaction(multiTx)
+		if err != nil {
+			return
+		}
+		//////////////////////////////////////////////////////////////////////////////
+
+		response.SentTransactions, err = api.s.transactionManager.SendRouterTransactions(ctx, multiTx)
+		var (
+			chainIDs  []uint64
+			addresses []common.Address
+		)
+		for _, tx := range response.SentTransactions {
+			chainIDs = append(chainIDs, tx.FromChain)
+			addresses = append(addresses, common.Address(tx.FromAddress))
+			go func(chainId uint64, txHash common.Hash) {
+				err = api.s.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
+				if err != nil {
+					return
+				}
+			}(tx.FromChain, common.Hash(tx.Hash))
+		}
+		err = api.s.transferController.CheckRecentHistory(chainIDs, addresses)
+	}()
 }
 
 func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []wcommon.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {
