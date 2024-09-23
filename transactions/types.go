@@ -15,6 +15,13 @@ import (
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 )
 
+type SendTxArgsVersion uint
+
+const (
+	SendTxArgsVersion0 SendTxArgsVersion = 0
+	SendTxArgsVersion1 SendTxArgsVersion = 1
+)
+
 var (
 	// ErrInvalidSendTxArgs is returned when the structure of SendTxArgs is ambigious.
 	ErrInvalidSendTxArgs = errors.New("transaction arguments are invalid")
@@ -41,6 +48,8 @@ type GasCalculator interface {
 // This struct is based on go-ethereum's type in internal/ethapi/api.go, but we have freedom
 // over the exact layout of this struct.
 type SendTxArgs struct {
+	Version SendTxArgsVersion `json:"version"`
+
 	From                 types.Address   `json:"from"`
 	To                   *types.Address  `json:"to"`
 	Gas                  *hexutil.Uint64 `json:"gas"`
@@ -55,9 +64,17 @@ type SendTxArgs struct {
 	Input types.HexBytes `json:"input"`
 	Data  types.HexBytes `json:"data"`
 
-	// additional data
+	// additional data - version SendTxArgsVersion0
 	MultiTransactionID wallet_common.MultiTransactionIDType
 	Symbol             string
+	// additional data - version SendTxArgsVersion1
+	ValueOut           *hexutil.Big
+	FromChainID        uint64
+	ToChainID          uint64
+	FromTokenID        string
+	ToTokenID          string
+	ToContractAddress  types.Address // represents address of the contract that needs to be used in order to send assets, like ERC721 or ERC1155 tx
+	SlippagePercentage float32
 }
 
 // Valid checks whether this structure is filled in correctly.
