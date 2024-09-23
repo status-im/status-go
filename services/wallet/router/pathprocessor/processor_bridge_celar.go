@@ -302,6 +302,7 @@ func (s *CelerBridgeProcessor) GetContractAddress(params ProcessorInputParams) (
 	return common.Address{}, ErrContractNotFound
 }
 
+// TODO: remove this struct once mobile switches to the new approach
 func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (*ethTypes.Transaction, error) {
 	fromChain := s.rpcClient.NetworkManager.Find(sendArgs.ChainID)
 	if fromChain == nil {
@@ -364,6 +365,68 @@ func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, s
 	return tx, nil
 }
 
+func (s *CelerBridgeProcessor) sendOrBuildV2(sendArgs *transactions.SendTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (*ethTypes.Transaction, error) {
+	fromChain := s.rpcClient.NetworkManager.Find(sendArgs.FromChainID)
+	if fromChain == nil {
+		return nil, ErrNetworkNotFound
+	}
+	token := s.tokenManager.FindToken(fromChain, sendArgs.FromTokenID)
+	if token == nil {
+		return nil, ErrTokenNotFound
+	}
+	addrs, err := s.GetContractAddress(ProcessorInputParams{
+		FromChain: fromChain,
+	})
+	if err != nil {
+		return nil, createBridgeCellerErrorResponse(err)
+	}
+
+	backend, err := s.rpcClient.EthClient(sendArgs.FromChainID)
+	if err != nil {
+		return nil, createBridgeCellerErrorResponse(err)
+	}
+	contract, err := celer.NewCeler(addrs, backend)
+	if err != nil {
+		return nil, createBridgeCellerErrorResponse(err)
+	}
+
+	if lastUsedNonce >= 0 {
+		lastUsedNonceHexUtil := hexutil.Uint64(uint64(lastUsedNonce) + 1)
+		sendArgs.Nonce = &lastUsedNonceHexUtil
+	}
+
+	var tx *ethTypes.Transaction
+	txOpts := sendArgs.ToTransactOpts(signerFn)
+	if token.IsNative() {
+		tx, err = contract.SendNative(
+			txOpts,
+			common.Address(*sendArgs.To),
+			(*big.Int)(sendArgs.Value),
+			sendArgs.FromChainID,
+			uint64(time.Now().UnixMilli()),
+			maxSlippage,
+		)
+	} else {
+		tx, err = contract.Send(
+			txOpts,
+			common.Address(*sendArgs.To),
+			token.Address,
+			(*big.Int)(sendArgs.Value),
+			sendArgs.FromChainID,
+			uint64(time.Now().UnixMilli()),
+			maxSlippage,
+		)
+	}
+	if err != nil {
+		return tx, createBridgeCellerErrorResponse(err)
+	}
+	err = s.transactor.StoreAndTrackPendingTx(txOpts.From, sendArgs.FromTokenID, sendArgs.FromChainID, sendArgs.MultiTransactionID, tx)
+	if err != nil {
+		return tx, createBridgeCellerErrorResponse(err)
+	}
+	return tx, nil
+}
+
 func (s *CelerBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types.Hash, uint64, error) {
 	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.CbridgeTx.From, verifiedAccount), lastUsedNonce)
 	if err != nil {
@@ -375,6 +438,11 @@ func (s *CelerBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsed
 
 func (s *CelerBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	tx, err := s.sendOrBuild(sendArgs, nil, lastUsedNonce)
+	return tx, tx.Nonce(), err
+}
+
+func (s *CelerBridgeProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	tx, err := s.sendOrBuildV2(sendArgs, nil, lastUsedNonce)
 	return tx, tx.Nonce(), err
 }
 

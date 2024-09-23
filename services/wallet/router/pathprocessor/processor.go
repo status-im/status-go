@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/transactions"
 )
 
 type PathProcessor interface {
@@ -31,6 +32,8 @@ type PathProcessor interface {
 	GetContractAddress(params ProcessorInputParams) (common.Address, error)
 	// BuildTransaction builds the transaction based on MultipathProcessorTxArgs, returns the transaction and the used nonce (lastUsedNonce is -1 if it's the first tx)
 	BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error)
+	// BuildTransactionV2 builds the transaction based on SendTxArgs, returns the transaction and the used nonce (lastUsedNonce is -1 if it's the first tx)
+	BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error)
 }
 
 type PathProcessorClearable interface {

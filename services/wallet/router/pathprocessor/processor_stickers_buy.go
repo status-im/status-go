@@ -139,6 +139,10 @@ func (s *StickersBuyProcessor) BuildTransaction(sendArgs *MultipathProcessorTxAr
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce)
 }
 
+func (s *StickersBuyProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
+}
+
 func (s *StickersBuyProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	return params.AmountIn, nil
 }
