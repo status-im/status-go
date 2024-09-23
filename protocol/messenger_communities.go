@@ -221,7 +221,7 @@ func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities
 func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communities.Subscription) {
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case sub, more := <-c:
@@ -384,7 +384,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	}
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case sub, more := <-c:
@@ -507,7 +507,7 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 	ticker := time.NewTicker(5 * time.Minute)
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:
@@ -826,7 +826,7 @@ func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
 	ticker := time.NewTicker(grantUpdateInterval)
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:
@@ -1553,7 +1553,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 
 	// We send a push notification in the background
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		if m.pushNotificationClient != nil {
 			pks, err := community.CanManageUsersPublicKeys()
 			if err != nil {
@@ -4027,7 +4027,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 
 func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		time.Sleep(importInitialDelay)
 		m.importDelayer.once.Do(func() {
 			close(m.importDelayer.wait)
@@ -4084,7 +4084,7 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 	task.Waiter.Add(1)
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		defer task.Waiter.Done()
 		err := m.importHistoryArchives(communityID, task.CancelChan)
 		if err != nil {
@@ -4109,7 +4109,7 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		<-cancel
 		cancelFunc()
 	}()
@@ -4671,7 +4671,7 @@ func (m *Messenger) startCommunityRekeyLoop() {
 
 	ticker := time.NewTicker(d)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:
@@ -5118,7 +5118,7 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 	logger := m.logger.Named("requestMissingCommunityChannelsHRKeysLoop")
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-time.After(5 * time.Minute):

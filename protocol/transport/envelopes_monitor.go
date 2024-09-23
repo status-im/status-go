@@ -111,12 +111,12 @@ func (m *EnvelopesMonitor) Start() {
 	m.quit = make(chan struct{})
 	m.wg.Add(2)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		m.handleEnvelopeEvents()
 		m.wg.Done()
 	}()
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		defer m.wg.Done()
 		m.retryLoop()
 	}()

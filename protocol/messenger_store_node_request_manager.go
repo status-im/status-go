@@ -107,7 +107,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 
 		if !cfg.WaitForResponse {
 			go func() {
-				defer gocommon.LogOnPanicAndRethrow()
+				defer gocommon.LogOnPanic()
 				shardResult := <-fetchedShard
 				communityShard = shardResult.shard
 

@@ -48,7 +48,7 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 				// processing peer added events, therefore the server will not lock and
 				// keep processing requests.
 				go func() {
-					defer common.LogOnPanicAndRethrow()
+					defer common.LogOnPanic()
 					if err := updateNodeMetrics(node, event.Type); err != nil {
 						logger.Error("failed to update node metrics", "err", err)
 					}

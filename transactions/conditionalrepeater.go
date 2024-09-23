@@ -59,7 +59,7 @@ func (t *ConditionalRepeater) RunUntilDone() {
 	t.ctx, t.cancel = context.WithCancel(context.Background())
 
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		defer func() {
 			t.ctxMu.Lock()
 			defer t.ctxMu.Unlock()

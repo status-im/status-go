@@ -102,7 +102,7 @@ func (m *Verifier) CheckBatch(ensDetails []enstypes.ENSDetails, rpcEndpoint, con
 
 	for _, ensInfo := range ensDetails {
 		go func(info enstypes.ENSDetails) {
-			defer gocommon.LogOnPanicAndRethrow()
+			defer gocommon.LogOnPanic()
 			ch <- m.verifyENSName(info, ethclient)
 		}(ensInfo)
 	}

@@ -72,7 +72,7 @@ func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 		// the peer.
 		// We leave some time so that we ensure the signal is propagated
 		go func() {
-			defer common.LogOnPanicAndRethrow()
+			defer common.LogOnPanic()
 			time.Sleep(200)
 			t.removeServerPeer(server, peer)
 		}()
@@ -90,7 +90,7 @@ func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 		// the peer.
 		// We leave some time so that we ensure the signal is propagated
 		go func() {
-			defer common.LogOnPanicAndRethrow()
+			defer common.LogOnPanic()
 			time.Sleep(200)
 			t.removeServerPeer(server, peer.peerInfo)
 		}()

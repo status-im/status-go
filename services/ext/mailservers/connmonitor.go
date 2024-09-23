@@ -35,7 +35,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 	mon.quit = make(chan struct{})
 	mon.wg.Add(1)
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		events := make(chan types.EnvelopeEvent, whisperEventsBuffer)
 		sub := mon.eventSub.SubscribeEnvelopeEvents(events)
 		defer sub.Unsubscribe()

@@ -258,7 +258,7 @@ func (rl *RPCRpsLimiter) ReduceLimit() {
 func (rl *RPCRpsLimiter) start() {
 	ticker := time.NewTicker(tickerInterval)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:

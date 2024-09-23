@@ -85,7 +85,7 @@ func call(fn any, params ...any) any {
 	return resp
 }
 
-func callString(fn any, params ...any) string {
+func callWithResponse(fn any, params ...any) string {
 	resp := call(fn, params...)
 	if resp == nil {
 		return ""

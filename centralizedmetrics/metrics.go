@@ -60,7 +60,7 @@ func (s *MetricService) Start() {
 	s.wg.Add(1)
 	s.started = true
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		defer s.wg.Done()
 		for {
 			select {

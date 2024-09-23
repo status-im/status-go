@@ -31,7 +31,7 @@ func (s *Subscriptions) Create(namespace string, filter filter) (SubscriptionID,
 	newSub := NewSubscription(namespace, filter)
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		err := newSub.Start(s.checkPeriod)
 		if err != nil {
 			s.log.Error("error while starting subscription", "err", err)

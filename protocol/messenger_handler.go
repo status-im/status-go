@@ -1368,7 +1368,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(id.String())
 
 			go func(currentTask *communities.HistoryArchiveDownloadTask, communityID types.HexBytes) {
-				defer gocommon.LogOnPanicAndRethrow()
+				defer gocommon.LogOnPanic()
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
 					currentTask.Cancel()
@@ -1743,7 +1743,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 
 			currentTask := m.archiveManager.GetHistoryArchiveDownloadTask(community.IDString())
 			go func(currentTask *communities.HistoryArchiveDownloadTask) {
-				defer gocommon.LogOnPanicAndRethrow()
+				defer gocommon.LogOnPanic()
 				// Cancel ongoing download/import task
 				if currentTask != nil && !currentTask.IsCancelled() {
 					currentTask.Cancel()

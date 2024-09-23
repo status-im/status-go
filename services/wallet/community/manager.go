@@ -88,7 +88,7 @@ func (cm *Manager) FetchCommunityInfo(communityID string) (*thirdparty.Community
 
 func (cm *Manager) FetchCommunityMetadataAsync(communityID string) {
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		communityInfo, err := cm.FetchCommunityMetadata(communityID)
 		if err != nil {
 			log.Error("FetchCommunityInfo failed", "communityID", communityID, "err", err)

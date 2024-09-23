@@ -76,7 +76,7 @@ func (p *Publisher) tickerLoop() {
 	ticker := time.NewTicker(tickerInterval * time.Second)
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		logger := p.logger.With(zap.String("site", "tickerLoop"))
 
 		for {

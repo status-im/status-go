@@ -43,7 +43,7 @@ func (m *Messenger) lastBackup() (uint64, error) {
 func (m *Messenger) startBackupLoop() {
 	ticker := time.NewTicker(backupTickerInterval)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:

@@ -48,7 +48,7 @@ func (m *MailRequestMonitor) Start() {
 	m.quit = make(chan struct{})
 	m.wg.Add(1)
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		m.handleEnvelopeEvents()
 		m.wg.Done()
 	}()

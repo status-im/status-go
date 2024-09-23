@@ -118,7 +118,7 @@ func (r *Reader) Start() error {
 	r.startWalletEventsWatcher()
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		ticker := time.NewTicker(walletTickReloadPeriod)
 		defer ticker.Stop()
 		for {

@@ -132,7 +132,7 @@ func (api *PublicAPI) NewBlockFilter() getrpc.ID {
 	api.filters[id] = f
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		id, si := api.latestBlockChangedEvent.Subscribe()
 		s, ok := si.(chan common.Hash)
 		if !ok {
@@ -169,7 +169,7 @@ func (api *PublicAPI) NewPendingTransactionFilter() getrpc.ID {
 	api.filters[id] = f
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		id, si := api.transactionSentToUpstreamEvent.Subscribe()
 		s, ok := si.(chan *PendingTxInfo)
 		if !ok {

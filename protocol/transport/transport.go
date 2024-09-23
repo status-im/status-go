@@ -434,7 +434,7 @@ func (t *Transport) cleanFiltersLoop() {
 
 	ticker := time.NewTicker(5 * time.Minute)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-t.quit:
@@ -483,7 +483,7 @@ func (t *Transport) createMessagesRequest(
 		})
 
 		go func() {
-			defer gocommon.LogOnPanicAndRethrow()
+			defer gocommon.LogOnPanic()
 			storeCursor, envelopesCount, err = t.waku.RequestStoreMessages(ctx, peerID, r, processEnvelopes)
 			resultCh <- struct {
 				storeCursor    types.StoreRequestCursor
@@ -500,7 +500,7 @@ func (t *Transport) createMessagesRequest(
 		}
 	} else {
 		go func() {
-			defer gocommon.LogOnPanicAndRethrow()
+			defer gocommon.LogOnPanic()
 			_, _, err = t.waku.RequestStoreMessages(ctx, peerID, r, false)
 			if err != nil {
 				t.logger.Error("failed to request store messages", zap.Error(err))

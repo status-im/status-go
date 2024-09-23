@@ -87,7 +87,7 @@ func IsNil(i interface{}) bool {
 	return false
 }
 
-func LogOnPanicAndRethrow() {
+func LogOnPanic() {
 	if err := recover(); err != nil {
 		log.Error("panic in goroutine", "error", err, "stacktrace", string(debug.Stack()))
 		panic(err)

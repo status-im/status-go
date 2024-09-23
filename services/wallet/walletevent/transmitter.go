@@ -34,7 +34,7 @@ func (tmr *SignalsTransmitter) Start() error {
 
 	tmr.wg.Add(1)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		defer tmr.wg.Done()
 		for {
 			select {

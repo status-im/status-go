@@ -146,7 +146,7 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	p.serverSubscription = server.SubscribeEvents(p.events)
 	p.wg.Add(1)
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		p.handleServerPeers(server, p.events)
 		p.wg.Done()
 	}()
@@ -249,7 +249,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 
 	queueRetry := func(d time.Duration) {
 		go func() {
-			defer common.LogOnPanicAndRethrow()
+			defer common.LogOnPanic()
 			time.Sleep(d)
 			select {
 			case retryDiscv5 <- struct{}{}:
@@ -261,7 +261,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 
 	queueStop := func() {
 		go func() {
-			defer common.LogOnPanicAndRethrow()
+			defer common.LogOnPanic()
 			select {
 			case stopDiscv5 <- struct{}{}:
 			default:

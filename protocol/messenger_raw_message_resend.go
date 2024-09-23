@@ -19,7 +19,7 @@ import (
 func (m *Messenger) watchExpiredMessages() {
 	m.logger.Debug("watching expired messages")
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-time.After(time.Second):

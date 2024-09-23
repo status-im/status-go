@@ -79,7 +79,7 @@ func TestCall(t *testing.T) {
 	testParam := "test input"
 	expectedResult := "test result: test input"
 
-	result := callString(testFunc, testParam)
+	result := callWithResponse(testFunc, testParam)
 
 	// Check the result
 	if result != expectedResult {

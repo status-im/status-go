@@ -19,7 +19,7 @@ type ContextCaller interface {
 }
 
 func pollLogs(client ContextCaller, chainID uint64, f *logsFilter, timeout, period time.Duration) {
-	defer gocommon.LogOnPanicAndRethrow()
+	defer gocommon.LogOnPanic()
 	query := func() {
 		ctx, cancel := context.WithTimeout(f.ctx, timeout)
 		defer cancel()

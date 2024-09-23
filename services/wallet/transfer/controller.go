@@ -63,7 +63,7 @@ func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcC
 
 func (c *Controller) Start() {
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		_ = c.cleanupAccountsLeftovers()
 	}()
 }

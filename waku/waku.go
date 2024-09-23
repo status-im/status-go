@@ -226,7 +226,7 @@ func (w *Waku) SetMinimumPoW(val float64, tolerate bool) error {
 
 	if tolerate {
 		go func() {
-			defer gocommon.LogOnPanicAndRethrow()
+			defer gocommon.LogOnPanic()
 			// allow some time before all the peers have processed the notification
 			select {
 			case <-w.quit:
@@ -307,7 +307,7 @@ func (w *Waku) SetBloomFilter(bloom []byte) error {
 	w.notifyPeersAboutBloomFilterChange(b)
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		// allow some time before all the peers have processed the notification
 		select {
 		case <-w.quit:
@@ -378,7 +378,7 @@ func (w *Waku) SetTopicInterest(topicInterest []common.TopicType) error {
 	w.notifyPeersAboutTopicInterestChange(topicInterest)
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		// allow some time before all the peers have processed the notification
 		select {
 		case <-w.quit:

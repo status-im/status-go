@@ -263,7 +263,7 @@ func (api *API) usernameRegistrarAddr(ctx context.Context, chainID uint64) (comm
 	api.addrPerChain[chainID] = *registryAddr
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		registry, err := api.contractMaker.NewRegistry(chainID)
 		if err != nil {
 			return

@@ -29,7 +29,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 	}
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		// Initialize interval to 0 for immediate execution
 		var interval time.Duration = 0
 
@@ -143,7 +143,7 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 	}
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		_ = m.fetchCommunities(unknownCommunities)
 	}()
 

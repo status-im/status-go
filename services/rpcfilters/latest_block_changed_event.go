@@ -79,7 +79,7 @@ func (e *latestBlockChangedEvent) Start() error {
 	e.quit = make(chan struct{})
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		ticker := time.NewTicker(e.tickerPeriod)
 		for {
 			select {

@@ -126,7 +126,7 @@ func (m *Messenger) ExtractDiscordChannelsAndCategories(filesToImport []string) 
 
 func (m *Messenger) RequestExtractDiscordChannelsAndCategories(filesToImport []string) {
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		response, errors := m.ExtractDiscordChannelsAndCategories(filesToImport)
 		m.config.messengerSignalsHandler.DiscordCategoriesAndChannelsExtracted(
 			response.DiscordCategories,
@@ -414,7 +414,7 @@ func (m *Messenger) startPublishImportProgressInterval(c chan *discord.ImportPro
 	var currentProgress *discord.ImportProgress
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 
@@ -454,7 +454,7 @@ func (m *Messenger) startPublishImportChannelProgressInterval(c chan *discord.Im
 	var currentProgress *discord.ImportProgress
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 
@@ -511,7 +511,7 @@ func createCommunityChannelForImport(request *requests.ImportDiscordChannel) *pr
 
 func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordChannel) {
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		totalImportChunkCount := len(request.FilesToImport)
 
 		progressUpdates := make(chan *discord.ImportProgress)
@@ -794,7 +794,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			for id, author := range authorProfilesToSave {
 				wg.Add(1)
 				go func(id string, author *protobuf.DiscordMessageAuthor) {
-					defer gocommon.LogOnPanicAndRethrow()
+					defer gocommon.LogOnPanic()
 					defer wg.Done()
 
 					m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
@@ -848,7 +848,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 				attachments := messageAttachmentsToDownload[idxRange.Low:idxRange.High]
 				wg.Add(1)
 				go func(attachments []*protobuf.DiscordMessageAttachment) {
-					defer gocommon.LogOnPanicAndRethrow()
+					defer gocommon.LogOnPanic()
 					defer wg.Done()
 					for ii, attachment := range attachments {
 
@@ -1025,7 +1025,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 
 func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscordCommunity) {
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		totalImportChunkCount := len(request.FilesToImport)
 
 		progressUpdates := make(chan *discord.ImportProgress)
@@ -1568,7 +1568,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			for id, author := range authorProfilesToSave {
 				wg.Add(1)
 				go func(id string, author *protobuf.DiscordMessageAuthor) {
-					defer gocommon.LogOnPanicAndRethrow()
+					defer gocommon.LogOnPanic()
 					defer wg.Done()
 
 					m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
@@ -1620,7 +1620,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				attachments := messageAttachmentsToDownload[idxRange.Low:idxRange.High]
 				wg.Add(1)
 				go func(attachments []*protobuf.DiscordMessageAttachment) {
-					defer gocommon.LogOnPanicAndRethrow()
+					defer gocommon.LogOnPanic()
 					defer wg.Done()
 					for ii, attachment := range attachments {
 

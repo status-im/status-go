@@ -438,7 +438,7 @@ func (p *Peer) handshake() error {
 	errc := make(chan error, 1)
 	opts := StatusOptionsFromHost(p.host)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		err := p2p.Send(p.rw, statusCode, opts)
 		if err != nil {
 			p.stats.AddUpload(statusCode)

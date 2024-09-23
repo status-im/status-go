@@ -69,7 +69,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 	}
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		ms := m.getActiveMailserver(chat.CommunityID)
 		_, err = m.performMailserverRequest(ms, func(mailServer mailservers.Mailserver) (*MessengerResponse, error) {
 			response, err := m.syncChatWithFilters(mailServer, chat.ID)
@@ -164,7 +164,7 @@ func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, erro
 	}
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		// split filters by community store node so we can request the filters to the correct mailserver
 		filtersByMs := m.SplitFiltersByStoreNode(filters)
 		for communityID, filtersForMs := range filtersByMs {
@@ -777,7 +777,7 @@ func processMailserverBatch(
 	// Producer
 	wg.Add(1)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		defer func() {
 			logger.Debug("mailserver batch producer complete")
 			wg.Done()
@@ -808,7 +808,7 @@ func processMailserverBatch(
 		}
 
 		go func() {
-			defer gocommon.LogOnPanicAndRethrow()
+			defer gocommon.LogOnPanic()
 			workWg.Wait()
 			workCompleteCh <- struct{}{}
 		}()
@@ -836,7 +836,7 @@ loop:
 			logger.Debug("processBatch - received work")
 			semaphore <- 1
 			go func(w work) { // Consumer
-				defer gocommon.LogOnPanicAndRethrow()
+				defer gocommon.LogOnPanic()
 				defer func() {
 					workWg.Done()
 					<-semaphore

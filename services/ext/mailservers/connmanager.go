@@ -69,7 +69,7 @@ type ConnectionManager struct {
 func (ps *ConnectionManager) Notify(nodes []*enode.Node) {
 	ps.wg.Add(1)
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		select {
 		case ps.notifications <- nodes:
 		case <-ps.quit:
@@ -84,7 +84,7 @@ func (ps *ConnectionManager) Start() {
 	ps.quit = make(chan struct{})
 	ps.wg.Add(1)
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		state := newInternalState(ps.server, ps.connectedTarget, ps.timeoutWaitAdded)
 		events := make(chan *p2p.PeerEvent, peerEventsBuffer)
 		sub := ps.server.SubscribeEvents(events)

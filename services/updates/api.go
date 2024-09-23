@@ -31,7 +31,7 @@ type API struct {
 
 func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVersion string) {
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer cancel()
 

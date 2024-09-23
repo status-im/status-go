@@ -65,7 +65,7 @@ func (m Multiplexer) Register(topic string, stop chan struct{}) error {
 	for i := range m.discoveries {
 		i := i
 		go func() {
-			defer common.LogOnPanicAndRethrow()
+			defer common.LogOnPanic()
 			errors <- m.discoveries[i].Register(topic, stop)
 		}()
 	}
@@ -99,7 +99,7 @@ func (m Multiplexer) Discover(topic string, period <-chan time.Duration, found c
 		i := i
 		periods[i] = make(chan time.Duration, 2)
 		go func() {
-			defer common.LogOnPanicAndRethrow()
+			defer common.LogOnPanic()
 			err := m.discoveries[i].Discover(topic, periods[i], found, lookup)
 			if err != nil {
 				mu.Lock()
@@ -110,7 +110,7 @@ func (m Multiplexer) Discover(topic string, period <-chan time.Duration, found c
 		}()
 	}
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		for {
 			newPeriod, ok := <-period
 			for i := range periods {

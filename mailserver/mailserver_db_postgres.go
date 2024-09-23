@@ -53,7 +53,7 @@ func NewPostgresDB(uri string) (*PostgresDB, error) {
 	instance.updateArchivedEnvelopesCount()
 	// checking count on every insert is inefficient
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		for {
 			select {
 			case <-instance.done:

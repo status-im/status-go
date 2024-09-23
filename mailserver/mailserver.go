@@ -513,7 +513,7 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 	cancelProcessing := make(chan struct{})
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		counter := 0
 		for bundle := range bundles {
 			if err := s.sendRawEnvelopes(peerID, bundle, req.Batch); err != nil {
@@ -613,7 +613,7 @@ func (s *mailServer) SyncMail(peerID types.Hash, req MessagesRequestPayload) err
 	cancelProcessing := make(chan struct{})
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for bundle := range bundles {
 			resp := s.adapter.CreateRawSyncResponse(bundle, nil, false, "")
 			if err := s.service.SendRawSyncResponse(peerID.Bytes(), resp); err != nil {

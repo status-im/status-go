@@ -60,7 +60,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:
@@ -126,7 +126,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 func (r *Router) startTimeoutForUpdates(closeCh chan struct{}) {
 	dedlineTicker := time.NewTicker(feeRecalculationTimeout)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-dedlineTicker.C:

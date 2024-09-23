@@ -814,7 +814,7 @@ func (o *Manager) fetchCommunityAssetsAsync(_ context.Context, communityID strin
 	}
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		err := o.fetchCommunityAssets(communityID, communityAssets)
 		if err != nil {
 			log.Error("fetchCommunityAssets failed", "communityID", communityID, "err", err)
@@ -1062,7 +1062,7 @@ func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.Ch
 
 func (o *Manager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) error {
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		defer o.checkConnectionStatus(contractID.ChainID)
 
 		socials, err := o.getOrFetchSocialsForCollection(context.Background(), contractID)

@@ -166,7 +166,7 @@ func (w *GethWakuWrapper) GetCurrentTime() time.Time {
 func (w *GethWakuWrapper) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) types.Subscription {
 	events := make(chan wakucommon.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for e := range events {
 			eventsProxy <- *NewWakuEnvelopeEventWrapper(&e)
 		}

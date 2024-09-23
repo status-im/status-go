@@ -98,7 +98,7 @@ func (m *Messenger) startPeerSyncingLoop() {
 
 	ticker := time.NewTicker(peerSyncingLoopInterval)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:

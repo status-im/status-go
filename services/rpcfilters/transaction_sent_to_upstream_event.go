@@ -39,7 +39,7 @@ func (e *transactionSentToUpstreamEvent) Start() error {
 	e.quit = make(chan struct{})
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case transactionInfo := <-e.listener:

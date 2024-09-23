@@ -75,7 +75,7 @@ func CheckHosts(addresses []string, timeout time.Duration) ([]Result, error) {
 
 	// loop that queries Epoll and pipes events to CheckAddr() calls
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		errCh <- c.CheckingLoop(ctx)
 	}()
 	// wait for CheckingLoop to prepare the epoll/kqueue
@@ -88,7 +88,7 @@ func CheckHosts(addresses []string, timeout time.Duration) ([]Result, error) {
 	for i := 0; i < len(addresses); i++ {
 		wg.Add(1)
 		go func(address string, resCh chan<- Result) {
-			defer gocommon.LogOnPanicAndRethrow()
+			defer gocommon.LogOnPanic()
 			defer wg.Done()
 			resCh <- runCheck(c, address, timeout)
 		}(addresses[i], resCh)

@@ -66,7 +66,7 @@ func (m *Messenger) watchWalletBalances() {
 		return
 	}
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-time.After(checkBalancesInterval):

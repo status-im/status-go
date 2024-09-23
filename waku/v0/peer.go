@@ -399,7 +399,7 @@ func (p *Peer) handshake() error {
 	errc := make(chan error, 1)
 	opts := StatusOptionsFromHost(p.host)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		errc <- p2p.SendItems(p.rw, statusCode, Version, opts)
 	}()
 

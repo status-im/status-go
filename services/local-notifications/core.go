@@ -172,7 +172,7 @@ func (s *Service) Start() error {
 
 	s.transmitter.wg.Add(1)
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		defer s.transmitter.wg.Done()
 		for {
 			select {

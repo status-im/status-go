@@ -37,7 +37,7 @@ func (m *Messenger) startAutoMessageLoop() error {
 	ticker := time.NewTicker(autoMessageInterval)
 	count := 0
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:

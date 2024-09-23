@@ -14,7 +14,7 @@ import (
 func RunAsync(f func() error) <-chan error {
 	resp := make(chan error, 1)
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		err := f()
 		resp <- err
 		close(resp)

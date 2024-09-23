@@ -48,7 +48,7 @@ func (s *Service) Start() {
 	s.cancelFn = cancel
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		ticker := time.NewTicker(currencyFormatUpdateInterval)
 		defer ticker.Stop()
 		for {

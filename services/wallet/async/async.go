@@ -105,7 +105,7 @@ type Group struct {
 func (g *Group) Add(cmd Command) {
 	g.wg.Add(1)
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		_ = cmd(g.ctx)
 		g.wg.Done()
 	}()
@@ -122,7 +122,7 @@ func (g *Group) Wait() {
 func (g *Group) WaitAsync() <-chan struct{} {
 	ch := make(chan struct{})
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		g.Wait()
 		close(ch)
 	}()
@@ -165,7 +165,7 @@ func (d *AtomicGroup) Name() string {
 func (d *AtomicGroup) Add(cmd Command) {
 	d.wg.Add(1)
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		defer d.done()
 		err := cmd(d.ctx)
 		d.mu.Lock()
@@ -196,7 +196,7 @@ func (d *AtomicGroup) Wait() {
 func (d *AtomicGroup) WaitAsync() <-chan struct{} {
 	ch := make(chan struct{})
 	go func() {
-		defer common.LogOnPanicAndRethrow()
+		defer common.LogOnPanic()
 		d.Wait()
 		close(ch)
 	}()

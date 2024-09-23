@@ -108,7 +108,7 @@ func (s *Service) Start() {
 	s.startAccountWatcher()
 
 	go func() {
-		defer gocommon.LogOnPanicAndRethrow()
+		defer gocommon.LogOnPanic()
 		s.serviceContext, s.cancelFn = context.WithCancel(context.Background())
 
 		err := s.updateBalanceHistory(s.serviceContext)
