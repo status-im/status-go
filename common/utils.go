@@ -20,10 +20,6 @@ var ErrInvalidDisplayNameNotAllowed = errors.New("name is not allowed")
 
 var DISPLAY_NAME_EXT = []string{"_eth", ".eth", "-eth"}
 
-var defaultPanicFunc func(any) = func(err any) {
-	panic(err)
-}
-
 func RecoverKey(m *protobuf.ApplicationMetadataMessage) (*ecdsa.PublicKey, error) {
 	if m.Signature == nil {
 		return nil, nil
@@ -99,7 +95,7 @@ func SafeGo(f func(), panicHandlers ...func(interface{})) {
 				for _, handler := range panicHandlers {
 					handler(err)
 				}
-				defaultPanicFunc(err)
+				panic(err)
 			}
 		}()
 		f()
