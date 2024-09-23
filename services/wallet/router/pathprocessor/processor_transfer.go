@@ -53,7 +53,7 @@ func (s *TransferProcessor) CalculateFees(params ProcessorInputParams) (*big.Int
 
 func (s *TransferProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
 	if params.FromToken.IsNative() {
-		return []byte("eth_sendRawTransaction"), nil
+		return []byte{}, nil
 	} else {
 		abi, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
 		if err != nil {
@@ -120,6 +120,10 @@ func (s *TransferProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNon
 
 func (s *TransferProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce)
+}
+
+func (s *TransferProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
 }
 
 func (s *TransferProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
