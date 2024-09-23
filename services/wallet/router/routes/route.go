@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 )
 
 type Route []*Path
@@ -25,19 +24,19 @@ func FindBestRoute(routes []Route, tokenPrice float64, nativeTokenPrice float64)
 			txFeeInEth := common.GweiToEth(common.WeiToGwei(path.TxFee.ToInt()))
 			pathCost := new(big.Float).Mul(txFeeInEth, nativeTokenPrice)
 
-			if path.TxL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+			if path.TxL1Fee.ToInt().Cmp(common.ZeroBigIntValue()) > 0 {
 				txL1FeeInEth := common.GweiToEth(common.WeiToGwei(path.TxL1Fee.ToInt()))
 				pathCost.Add(pathCost, new(big.Float).Mul(txL1FeeInEth, nativeTokenPrice))
 			}
 
-			if path.TxBonderFees != nil && path.TxBonderFees.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+			if path.TxBonderFees != nil && path.TxBonderFees.ToInt().Cmp(common.ZeroBigIntValue()) > 0 {
 				pathCost.Add(pathCost, new(big.Float).Mul(
 					new(big.Float).Quo(new(big.Float).SetInt(path.TxBonderFees.ToInt()), tokenDenominator),
 					new(big.Float).SetFloat64(tokenPrice)))
 
 			}
 
-			if path.TxTokenFees != nil && path.TxTokenFees.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 && path.FromToken != nil {
+			if path.TxTokenFees != nil && path.TxTokenFees.ToInt().Cmp(common.ZeroBigIntValue()) > 0 && path.FromToken != nil {
 				pathCost.Add(pathCost, new(big.Float).Mul(
 					new(big.Float).Quo(new(big.Float).SetInt(path.TxTokenFees.ToInt()), tokenDenominator),
 					new(big.Float).SetFloat64(tokenPrice)))
@@ -48,7 +47,7 @@ func FindBestRoute(routes []Route, tokenPrice float64, nativeTokenPrice float64)
 				approvalFeeInEth := common.GweiToEth(common.WeiToGwei(path.ApprovalFee.ToInt()))
 				pathCost.Add(pathCost, new(big.Float).Mul(approvalFeeInEth, nativeTokenPrice))
 
-				if path.ApprovalL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+				if path.ApprovalL1Fee.ToInt().Cmp(common.ZeroBigIntValue()) > 0 {
 					approvalL1FeeInEth := common.GweiToEth(common.WeiToGwei(path.ApprovalL1Fee.ToInt()))
 					pathCost.Add(pathCost, new(big.Float).Mul(approvalL1FeeInEth, nativeTokenPrice))
 				}

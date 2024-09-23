@@ -50,7 +50,7 @@ func (s *StickersBuyProcessor) AvailableFor(params ProcessorInputParams) (bool, 
 }
 
 func (s *StickersBuyProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
 }
 
 func (s *StickersBuyProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
@@ -117,7 +117,7 @@ func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 	msg := ethereum.CallMsg{
 		From:  params.FromAddr,
 		To:    &contractAddress,
-		Value: ZeroBigIntValue,
+		Value: walletCommon.ZeroBigIntValue(),
 		Data:  input,
 	}
 

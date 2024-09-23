@@ -109,8 +109,8 @@ func (s *SwapParaswapProcessor) AvailableFor(params ProcessorInputParams) (bool,
 	s.paraswapClient.SetPartnerAddress(partnerAddress)
 	s.paraswapClient.SetPartnerFeePcnt(partnerFeePcnt)
 
-	searchForToken := params.FromToken.Address == ZeroAddress
-	searchForToToken := params.ToToken.Address == ZeroAddress
+	searchForToken := params.FromToken.Address == walletCommon.ZeroAddress()
+	searchForToToken := params.ToToken.Address == walletCommon.ZeroAddress()
 	if searchForToToken || searchForToken {
 		tokensList, err := s.paraswapClient.FetchTokensList(context.Background())
 		if err != nil {
@@ -136,7 +136,7 @@ func (s *SwapParaswapProcessor) AvailableFor(params ProcessorInputParams) (bool,
 		}
 	}
 
-	if params.FromToken.Address == ZeroAddress || params.ToToken.Address == ZeroAddress {
+	if params.FromToken.Address == walletCommon.ZeroAddress() || params.ToToken.Address == walletCommon.ZeroAddress() {
 		return false, ErrCannotResolveTokens
 	}
 
@@ -161,7 +161,7 @@ func calcReceivedAmountAndFee(baseDestAmount *big.Int, feePcnt float64) (destAmo
 }
 
 func (s *SwapParaswapProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
 }
 
 func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
@@ -180,7 +180,7 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams) (uint64
 	}
 
 	swapSide := paraswap.SellSide
-	if params.AmountOut != nil && params.AmountOut.Cmp(ZeroBigIntValue) > 0 {
+	if params.AmountOut != nil && params.AmountOut.Cmp(walletCommon.ZeroBigIntValue()) > 0 {
 		swapSide = paraswap.BuySide
 	}
 

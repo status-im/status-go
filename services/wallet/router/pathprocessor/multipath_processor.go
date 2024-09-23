@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/status-im/status-go/eth-node/types"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -31,7 +32,7 @@ func (t *MultipathProcessorTxArgs) Value() *big.Int {
 		return t.ERC1155TransferTx.Amount.ToInt()
 	}
 
-	return ZeroBigIntValue
+	return walletCommon.ZeroBigIntValue()
 }
 
 func (t *MultipathProcessorTxArgs) From() types.Address {
