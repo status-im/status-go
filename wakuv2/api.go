@@ -36,8 +36,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	gocommon "github.com/status-im/status-go/common"
 	"google.golang.org/protobuf/proto"
+
+	gocommon "github.com/status-im/status-go/common"
 )
 
 // List of errors

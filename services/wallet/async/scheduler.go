@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/status-im/status-go/common"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
+
+	"github.com/status-im/status-go/common"
 )
 
 var ErrTaskOverwritten = errors.New("task overwritten")

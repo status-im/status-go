@@ -25,8 +25,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/status-im/status-go/common"
 	"github.com/tsenart/tb"
+
+	"github.com/status-im/status-go/common"
 
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
