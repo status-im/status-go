@@ -205,7 +205,7 @@ func (c *Client) SetDeviceType(deviceType string) {
 }
 
 func (c *Client) Start(ctx context.Context) {
-	common.Go(func() {
+	common.SafeGo(func() {
 		for {
 			select {
 			case telemetryRequest := <-c.telemetryCh:
@@ -217,7 +217,7 @@ func (c *Client) Start(ctx context.Context) {
 			}
 		}
 	})
-	common.Go(func() {
+	common.SafeGo(func() {
 		sendPeriod := c.sendPeriod
 		timer := time.NewTimer(sendPeriod)
 		defer timer.Stop()

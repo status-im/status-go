@@ -318,7 +318,7 @@ func SetSettingsAndWaitForChange(s *suite.Suite, messenger *Messenger, timeout t
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		defer wg.Done()
 		for !allEventsReceived {
 			select {
@@ -343,7 +343,7 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, tim
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		defer wg.Done()
 		select {
 		case event := <-channel:

@@ -47,7 +47,7 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 				// Calling it in a different go-routine will allow this code to keep
 				// processing peer added events, therefore the server will not lock and
 				// keep processing requests.
-				common.Go(func() {
+				common.SafeGo(func() {
 					if err := updateNodeMetrics(node, event.Type); err != nil {
 						logger.Error("failed to update node metrics", "err", err)
 					}

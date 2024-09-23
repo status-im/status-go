@@ -150,7 +150,7 @@ func (c *Client) startMainLoop() {
 
 	c.stopMainLoop()
 	c.mainLoopQuit = make(chan struct{})
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		c.Logger.Debug("startMainLoop() anonymous go routine triggered")
 		err := c.mainLoop()
 		if err != nil {
@@ -188,7 +188,7 @@ func (c *Client) deleteLoop() error {
 func (c *Client) startDeleteLoop() {
 	c.stopDeleteLoop()
 	c.deleteLoopQuit = make(chan struct{})
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		err := c.deleteLoop()
 		if err != nil {
 			c.Logger.Error("delete loop exited with an error", zap.Error(err))

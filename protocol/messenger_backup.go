@@ -42,7 +42,7 @@ func (m *Messenger) lastBackup() (uint64, error) {
 
 func (m *Messenger) startBackupLoop() {
 	ticker := time.NewTicker(backupTickerInterval)
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		for {
 			select {
 			case <-ticker.C:

@@ -437,7 +437,7 @@ func (p *Peer) handshake() error {
 	// Send the handshake status message asynchronously
 	errc := make(chan error, 1)
 	opts := StatusOptionsFromHost(p.host)
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		err := p2p.Send(p.rw, statusCode, opts)
 		if err != nil {
 			p.stats.AddUpload(statusCode)

@@ -118,7 +118,7 @@ func (r *Reader) Start() error {
 
 	r.startWalletEventsWatcher()
 
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		ticker := time.NewTicker(walletTickReloadPeriod)
 		defer ticker.Stop()
 		for {

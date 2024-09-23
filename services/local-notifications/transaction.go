@@ -166,7 +166,7 @@ func (s *Service) StartWalletWatcher() {
 	s.walletTransmitter.wg.Add(1)
 
 	maxKnownBlocks := map[common.Address]*big.Int{}
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		defer s.walletTransmitter.wg.Done()
 		historyReady := false
 		for {

@@ -433,7 +433,7 @@ func (t *Transport) Stop() error {
 func (t *Transport) cleanFiltersLoop() {
 
 	ticker := time.NewTicker(5 * time.Minute)
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		for {
 			select {
 			case <-t.quit:
@@ -481,7 +481,7 @@ func (t *Transport) createMessagesRequest(
 			err            error
 		})
 
-		gocommon.Go(func() {
+		gocommon.SafeGo(func() {
 			storeCursor, envelopesCount, err = t.waku.RequestStoreMessages(ctx, peerID, r, processEnvelopes)
 			resultCh <- struct {
 				storeCursor    types.StoreRequestCursor
@@ -497,7 +497,7 @@ func (t *Transport) createMessagesRequest(
 			return nil, 0, ctx.Err()
 		}
 	} else {
-		gocommon.Go(func() {
+		gocommon.SafeGo(func() {
 			_, _, err = t.waku.RequestStoreMessages(ctx, peerID, r, false)
 			if err != nil {
 				t.logger.Error("failed to request store messages", zap.Error(err))

@@ -349,7 +349,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 
 	// create subscription and start waiting for message events
 	rpcSub := notifier.CreateSubscription()
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		// for now poll internally, refactor waku internal for channel support
 		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()

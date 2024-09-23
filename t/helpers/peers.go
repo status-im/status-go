@@ -54,7 +54,7 @@ func waitForPeer(p *p2p.Server, u string, e p2p.PeerEventType, t time.Duration, 
 func WaitForPeerAsync(p *p2p.Server, u string, e p2p.PeerEventType, t time.Duration) <-chan error {
 	subscribed := make(chan struct{})
 	errCh := make(chan error)
-	common.Go(func() {
+	common.SafeGo(func() {
 		errCh <- waitForPeer(p, u, e, t, subscribed)
 	})
 	<-subscribed

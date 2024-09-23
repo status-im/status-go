@@ -28,7 +28,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 		return
 	}
 
-	common.Go(func() {
+	common.SafeGo(func() {
 		// Initialize interval to 0 for immediate execution
 		var interval time.Duration = 0
 
@@ -141,7 +141,7 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 		})
 	}
 
-	common.Go(func() {
+	common.SafeGo(func() {
 		_ = m.fetchCommunities(unknownCommunities)
 	})
 

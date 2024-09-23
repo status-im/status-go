@@ -39,7 +39,7 @@ func (e *transactionSentToUpstreamEvent) Start() error {
 
 	e.quit = make(chan struct{})
 
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		for {
 			select {
 			case transactionInfo := <-e.listener:

@@ -36,7 +36,7 @@ func measure(input interface{}) (*Measure, error) {
 }
 
 func (s *StatsTracker) AddUpload(input interface{}) {
-	common.Go(func() {
+	common.SafeGo(func() {
 		m, err := measure(input)
 		if err != nil {
 			return
@@ -49,7 +49,7 @@ func (s *StatsTracker) AddUpload(input interface{}) {
 }
 
 func (s *StatsTracker) AddDownload(input interface{}) {
-	common.Go(func() {
+	common.SafeGo(func() {
 		m, err := measure(input)
 		if err != nil {
 			return
@@ -62,7 +62,7 @@ func (s *StatsTracker) AddDownload(input interface{}) {
 }
 
 func (s *StatsTracker) AddUploadBytes(size uint64) {
-	common.Go(func() {
+	common.SafeGo(func() {
 		m := Measure{
 			Timestamp: time.Now().UnixNano(),
 			Size:      size,
@@ -75,7 +75,7 @@ func (s *StatsTracker) AddUploadBytes(size uint64) {
 }
 
 func (s *StatsTracker) AddDownloadBytes(size uint64) {
-	common.Go(func() {
+	common.SafeGo(func() {
 		m := Measure{
 			Timestamp: time.Now().UnixNano(),
 			Size:      size,

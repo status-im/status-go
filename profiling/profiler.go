@@ -36,7 +36,7 @@ func NewProfiler(port int) *Profiler {
 
 // Go starts the HTTP pprof in the background.
 func (p *Profiler) Go() {
-	common.Go(func() {
+	common.SafeGo(func() {
 		log.Info("debug server stopped", "err", p.server.ListenAndServe())
 	})
 	log.Info("debug server started")

@@ -7,20 +7,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGo(t *testing.T) {
-	// Test that Go recovers from panic
+func TestSafeGo(t *testing.T) {
+	// Test that SafeGo recovers from panic
 	paniced := false
 	panicErr := "test panic"
-	oldDefaultPanicFunc := defaultPanicFunc
-	defer func() {
-		defaultPanicFunc = oldDefaultPanicFunc
-	}()
 	defaultPanicFunc = func(err any) {
 		require.NotNil(t, err)
 		paniced = true
 	}
 	recovered := make(chan bool, 1)
-	Go(func() {
+	SafeGo(func() {
 		panic(panicErr)
 	}, func(err any) {
 		recovered <- true
@@ -34,14 +30,14 @@ func TestGo(t *testing.T) {
 	case <-recovered:
 		// Panic was recovered successfully
 	case <-time.After(timeout):
-		t.Error("Go did not recover from panic within the timeout")
+		t.Error("SafeGo did not recover from panic within the timeout")
 	}
 
 	require.True(t, paniced)
 
-	// Test that Go executes normally when no panic occurs
+	// Test that SafeGo executes normally when no panic occurs
 	executed := make(chan bool, 1)
-	Go(func() {
+	SafeGo(func() {
 		executed <- true
 	})
 
@@ -49,6 +45,6 @@ func TestGo(t *testing.T) {
 	case <-executed:
 		// Function executed successfully
 	case <-time.After(timeout):
-		t.Error("Go did not execute the function within the timeout")
+		t.Error("SafeGo did not execute the function within the timeout")
 	}
 }

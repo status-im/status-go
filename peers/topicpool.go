@@ -284,7 +284,7 @@ func (t *TopicPool) limitFastMode(timeout time.Duration) chan struct{} {
 	cancel := make(chan struct{})
 
 	t.poolWG.Add(1)
-	common.Go(func() {
+	common.SafeGo(func() {
 		defer t.poolWG.Done()
 
 		select {
@@ -441,14 +441,14 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 	}
 
 	t.discWG.Add(1)
-	common.Go(func() {
+	common.SafeGo(func() {
 		if err := t.discovery.Discover(string(t.topic), t.period, found, lookup); err != nil {
 			log.Error("error searching foro", "topic", t.topic, "err", err)
 		}
 		t.discWG.Done()
 	})
 	t.poolWG.Add(1)
-	common.Go(func() {
+	common.SafeGo(func() {
 		t.handleFoundPeers(server, found, lookup)
 		t.poolWG.Done()
 	})

@@ -33,7 +33,7 @@ func (tmr *SignalsTransmitter) Start() error {
 	sub := tmr.Publisher.Subscribe(events)
 
 	tmr.wg.Add(1)
-	common.Go(func() {
+	common.SafeGo(func() {
 		defer tmr.wg.Done()
 		for {
 			select {

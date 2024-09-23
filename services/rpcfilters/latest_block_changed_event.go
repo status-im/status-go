@@ -79,7 +79,7 @@ func (e *latestBlockChangedEvent) Start() error {
 
 	e.quit = make(chan struct{})
 
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		ticker := time.NewTicker(e.tickerPeriod)
 		for {
 			select {

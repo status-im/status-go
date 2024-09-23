@@ -59,7 +59,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -124,7 +124,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 
 func (r *Router) startTimeoutForUpdates(closeCh chan struct{}) {
 	dedlineTicker := time.NewTicker(feeRecalculationTimeout)
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		for {
 			select {
 			case <-dedlineTicker.C:

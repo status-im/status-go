@@ -58,7 +58,7 @@ func (t *ConditionalRepeater) RunUntilDone() {
 	}
 	t.ctx, t.cancel = context.WithCancel(context.Background())
 
-	common.Go(func() {
+	common.SafeGo(func() {
 		defer func() {
 			t.ctxMu.Lock()
 			defer t.ctxMu.Unlock()

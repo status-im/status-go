@@ -36,7 +36,7 @@ func (m *Messenger) startAutoMessageLoop() error {
 	m.logger.Info("[auto message] starting auto message loop")
 	ticker := time.NewTicker(autoMessageInterval)
 	count := 0
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		for {
 			select {
 			case <-ticker.C:

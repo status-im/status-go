@@ -59,7 +59,7 @@ func findServerCert(c *ConnectionParams, reachableIPs []net.IP) (*url.URL, *x509
 
 	for _, ip := range reachableIPs {
 		ip := ip
-		common.Go(func() {
+		common.SafeGo(func() {
 			u := c.BuildURL(ip)
 			cert, err := getServerCert(u)
 			if err != nil {

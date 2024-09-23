@@ -104,7 +104,7 @@ type Group struct {
 
 func (g *Group) Add(cmd Command) {
 	g.wg.Add(1)
-	common.Go(func() {
+	common.SafeGo(func() {
 		_ = cmd(g.ctx)
 		g.wg.Done()
 	})
@@ -120,7 +120,7 @@ func (g *Group) Wait() {
 
 func (g *Group) WaitAsync() <-chan struct{} {
 	ch := make(chan struct{})
-	common.Go(func() {
+	common.SafeGo(func() {
 		g.Wait()
 		close(ch)
 	})
@@ -162,7 +162,7 @@ func (d *AtomicGroup) Name() string {
 // Go spawns function in a goroutine and stores results or errors.
 func (d *AtomicGroup) Add(cmd Command) {
 	d.wg.Add(1)
-	common.Go(func() {
+	common.SafeGo(func() {
 		defer d.done()
 		err := cmd(d.ctx)
 		d.mu.Lock()
@@ -192,7 +192,7 @@ func (d *AtomicGroup) Wait() {
 
 func (d *AtomicGroup) WaitAsync() <-chan struct{} {
 	ch := make(chan struct{})
-	common.Go(func() {
+	common.SafeGo(func() {
 		d.Wait()
 		close(ch)
 	})

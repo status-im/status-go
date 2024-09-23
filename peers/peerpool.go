@@ -145,7 +145,7 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	p.events = make(chan *p2p.PeerEvent, 20)
 	p.serverSubscription = server.SubscribeEvents(p.events)
 	p.wg.Add(1)
-	common.Go(func() {
+	common.SafeGo(func() {
 		p.handleServerPeers(server, p.events)
 		p.wg.Done()
 	})
@@ -247,7 +247,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 	stopDiscv5 := make(chan struct{}, 1)
 
 	queueRetry := func(d time.Duration) {
-		common.Go(func() {
+		common.SafeGo(func() {
 			time.Sleep(d)
 			select {
 			case retryDiscv5 <- struct{}{}:
@@ -257,7 +257,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 	}
 
 	queueStop := func() {
-		common.Go(func() {
+		common.SafeGo(func() {
 			select {
 			case stopDiscv5 <- struct{}{}:
 			default:

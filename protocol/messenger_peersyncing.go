@@ -97,7 +97,7 @@ func (m *Messenger) startPeerSyncingLoop() {
 	logger := m.logger.Named("PeerSyncingLoop")
 
 	ticker := time.NewTicker(peerSyncingLoopInterval)
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		for {
 			select {
 			case <-ticker.C:

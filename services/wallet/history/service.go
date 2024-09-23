@@ -107,7 +107,7 @@ func (s *Service) Start() {
 	s.startTransfersWatcher()
 	s.startAccountWatcher()
 
-	gocommon.Go(func() {
+	gocommon.SafeGo(func() {
 		s.serviceContext, s.cancelFn = context.WithCancel(context.Background())
 
 		err := s.updateBalanceHistory(s.serviceContext)

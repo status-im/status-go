@@ -74,7 +74,7 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 	responses := make(chan queryResponse, len(servers))
 	for _, server := range servers {
 		server := server
-		common.Go(func() {
+		common.SafeGo(func() {
 			response, err := timeQuery(server, ntp.QueryOptions{
 				Timeout: DefaultRPCTimeout,
 			})
@@ -184,7 +184,7 @@ func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod 
 		period = s.slowNTPSyncPeriod
 	}
 	s.quit = make(chan struct{})
-	common.Go(func() {
+	common.SafeGo(func() {
 		for {
 			select {
 			case <-time.After(period):

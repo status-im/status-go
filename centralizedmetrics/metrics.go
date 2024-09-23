@@ -58,7 +58,7 @@ func (s *MetricService) Start() {
 	s.ticker = time.NewTicker(s.interval)
 	s.wg.Add(1)
 	s.started = true
-	commons.Go(func() {
+	commons.SafeGo(func() {
 		defer s.wg.Done()
 		for {
 			select {
