@@ -1,0 +1,13 @@
+### Acceot Contact Request
+# @name AceptContactRequest
+POST {{address}}/statusgo/CallRPC
+
+{
+    "jsonrpc": "2.0",
+    "method": "wakuext_acceptContactRequest",
+    "params": [
+        {
+            "id": "0x0495811d8ac62e240e9ae7f05fa097938032066ff65764d97dc93a73d83262d884a75696520543899b047005f6fb91af42dcb04f635be760313cc4d26fa27f1ff7"
+        }
+    ]
+}

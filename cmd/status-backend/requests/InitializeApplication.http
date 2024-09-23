@@ -1,0 +1,7 @@
+### Initialize Application
+POST {{address}}/statusgo/InitializeApplication
+Content-Type: application/json
+
+{
+    "dataDir": "{{rootDataDir}}"
+}
