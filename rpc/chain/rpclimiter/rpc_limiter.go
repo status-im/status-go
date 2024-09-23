@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
 	"github.com/status-im/status-go/common"
 
 	"github.com/ethereum/go-ethereum/log"
