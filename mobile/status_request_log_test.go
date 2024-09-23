@@ -59,7 +59,7 @@ func TestRemoveSensitiveInfo(t *testing.T) {
 	}
 }
 
-func TestCall(t *testing.T) {
+func TestLogAndCall(t *testing.T) {
 	// Enable request logging
 	requestlog.EnableRequestLogging(true)
 
@@ -79,7 +79,7 @@ func TestCall(t *testing.T) {
 	testParam := "test input"
 	expectedResult := "test result: test input"
 
-	result := callString(testFunc, testParam)
+	result := logAndCallString(testFunc, testParam)
 
 	// Check the result
 	if result != expectedResult {
@@ -106,11 +106,11 @@ func TestCall(t *testing.T) {
 	}
 
 	require.PanicsWithValue(t, e, func() {
-		call(panicFunc)
+		logAndCall(panicFunc)
 	})
 
 	// Check if the panic was logged
-	if !strings.Contains(logOutput, "panic found in call") {
+	if !strings.Contains(logOutput, "panic found in logAndCall") {
 		t.Errorf("Log output doesn't contain panic information")
 	}
 	if !strings.Contains(logOutput, e) {
