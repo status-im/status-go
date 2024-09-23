@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 )
 
@@ -68,20 +67,21 @@ type ConnectionManager struct {
 // Notify sends a non-blocking notification about new nodes.
 func (ps *ConnectionManager) Notify(nodes []*enode.Node) {
 	ps.wg.Add(1)
-	common.SafeGo(func() {
+	go func() {
 		select {
 		case ps.notifications <- nodes:
 		case <-ps.quit:
 		}
 		ps.wg.Done()
-	})
+	}()
+
 }
 
 // Start subscribes to a p2p server and handles new peers and state updates for those peers.
 func (ps *ConnectionManager) Start() {
 	ps.quit = make(chan struct{})
 	ps.wg.Add(1)
-	common.SafeGo(func() {
+	go func() {
 		state := newInternalState(ps.server, ps.connectedTarget, ps.timeoutWaitAdded)
 		events := make(chan *p2p.PeerEvent, peerEventsBuffer)
 		sub := ps.server.SubscribeEvents(events)
@@ -129,7 +129,7 @@ func (ps *ConnectionManager) Start() {
 				}
 			}
 		}
-	})
+	}()
 }
 
 // Stop gracefully closes all background goroutines and waits until they finish.

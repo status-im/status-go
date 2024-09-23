@@ -6,8 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-
-	gocommon "github.com/status-im/status-go/common"
 )
 
 type PendingTxInfo struct {
@@ -39,7 +37,7 @@ func (e *transactionSentToUpstreamEvent) Start() error {
 
 	e.quit = make(chan struct{})
 
-	gocommon.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case transactionInfo := <-e.listener:
@@ -51,7 +49,7 @@ func (e *transactionSentToUpstreamEvent) Start() error {
 				return
 			}
 		}
-	})
+	}()
 
 	return nil
 }

@@ -9,7 +9,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 )
 
@@ -110,14 +109,14 @@ type EnvelopesMonitor struct {
 func (m *EnvelopesMonitor) Start() {
 	m.quit = make(chan struct{})
 	m.wg.Add(2)
-	common.SafeGo(func() {
+	go func() {
 		m.handleEnvelopeEvents()
 		m.wg.Done()
-	})
-	common.SafeGo(func() {
+	}()
+	go func() {
 		defer m.wg.Done()
 		m.retryLoop()
-	})
+	}()
 }
 
 // Stop process events.

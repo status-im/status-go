@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/common"
 )
 
 type Command func(context.Context) error
@@ -104,10 +103,10 @@ type Group struct {
 
 func (g *Group) Add(cmd Command) {
 	g.wg.Add(1)
-	common.SafeGo(func() {
+	go func() {
 		_ = cmd(g.ctx)
 		g.wg.Done()
-	})
+	}()
 }
 
 func (g *Group) Stop() {
@@ -120,10 +119,10 @@ func (g *Group) Wait() {
 
 func (g *Group) WaitAsync() <-chan struct{} {
 	ch := make(chan struct{})
-	common.SafeGo(func() {
+	go func() {
 		g.Wait()
 		close(ch)
-	})
+	}()
 	return ch
 }
 
@@ -162,7 +161,7 @@ func (d *AtomicGroup) Name() string {
 // Go spawns function in a goroutine and stores results or errors.
 func (d *AtomicGroup) Add(cmd Command) {
 	d.wg.Add(1)
-	common.SafeGo(func() {
+	go func() {
 		defer d.done()
 		err := cmd(d.ctx)
 		d.mu.Lock()
@@ -177,7 +176,7 @@ func (d *AtomicGroup) Add(cmd Command) {
 			d.cancel()
 			return
 		}
-	})
+	}()
 }
 
 // Wait for all downloaders to finish.
@@ -192,10 +191,10 @@ func (d *AtomicGroup) Wait() {
 
 func (d *AtomicGroup) WaitAsync() <-chan struct{} {
 	ch := make(chan struct{})
-	common.SafeGo(func() {
+	go func() {
 		d.Wait()
 		close(ch)
-	})
+	}()
 	return ch
 }
 

@@ -15,9 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/status-im/status-go/circuitbreaker"
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/contracts/ierc1155"
 	"github.com/status-im/status-go/rpc"
@@ -814,7 +812,7 @@ func (o *Manager) fetchCommunityAssetsAsync(_ context.Context, communityID strin
 		return
 	}
 
-	gocommon.SafeGo(func() {
+	go func() {
 		err := o.fetchCommunityAssets(communityID, communityAssets)
 		if err != nil {
 			log.Error("fetchCommunityAssets failed", "communityID", communityID, "err", err)
@@ -827,7 +825,7 @@ func (o *Manager) fetchCommunityAssetsAsync(_ context.Context, communityID strin
 			ids = append(ids, asset.CollectibleData.ID)
 		}
 		o.signalUpdatedCollectiblesData(ids)
-	})
+	}()
 }
 
 func (o *Manager) fillAnimationMediatype(ctx context.Context, asset *thirdparty.FullCollectibleData) error {
@@ -1061,7 +1059,7 @@ func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.Ch
 }
 
 func (o *Manager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) error {
-	gocommon.SafeGo(func() {
+	go func() {
 		defer o.checkConnectionStatus(contractID.ChainID)
 
 		socials, err := o.getOrFetchSocialsForCollection(context.Background(), contractID)
@@ -1087,7 +1085,7 @@ func (o *Manager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) 
 		}
 
 		o.feed.Send(event)
-	})
+	}()
 
 	return nil
 }

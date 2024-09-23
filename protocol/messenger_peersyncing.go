@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -97,7 +96,7 @@ func (m *Messenger) startPeerSyncingLoop() {
 	logger := m.logger.Named("PeerSyncingLoop")
 
 	ticker := time.NewTicker(peerSyncingLoopInterval)
-	gocommon.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -112,7 +111,7 @@ func (m *Messenger) startPeerSyncingLoop() {
 				return
 			}
 		}
-	})
+	}()
 }
 
 func (m *Messenger) sendDatasyncOffers() error {

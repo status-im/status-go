@@ -12,7 +12,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
@@ -205,7 +204,7 @@ func (c *Client) SetDeviceType(deviceType string) {
 }
 
 func (c *Client) Start(ctx context.Context) {
-	common.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case telemetryRequest := <-c.telemetryCh:
@@ -216,8 +215,8 @@ func (c *Client) Start(ctx context.Context) {
 				return
 			}
 		}
-	})
-	common.SafeGo(func() {
+	}()
+	go func() {
 		sendPeriod := c.sendPeriod
 		timer := time.NewTimer(sendPeriod)
 		defer timer.Stop()
@@ -246,7 +245,8 @@ func (c *Client) Start(ctx context.Context) {
 				return
 			}
 		}
-	})
+
+	}()
 }
 
 func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) {

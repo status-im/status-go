@@ -526,15 +526,15 @@ func (m *Manager) Start() error {
 		m.runOwnerVerificationLoop()
 	}
 
-	utils.SafeGo(func() {
+	go func() {
 		_ = m.fillMissingCommunityTokens()
-	})
+	}()
 
 	return nil
 }
 
 func (m *Manager) runENSVerificationLoop() {
-	utils.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case <-m.quit:
@@ -548,7 +548,7 @@ func (m *Manager) runENSVerificationLoop() {
 				m.logger.Info("received records", zap.Any("records", records))
 			}
 		}
-	})
+	}()
 }
 
 // This function is mostly a way to fix any community that is missing tokens in its description
@@ -614,7 +614,7 @@ func (m *Manager) CommunitiesToValidate() (map[string][]communityToValidate, err
 
 func (m *Manager) runOwnerVerificationLoop() {
 	m.logger.Info("starting owner verification loop")
-	utils.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case <-m.quit:
@@ -639,7 +639,7 @@ func (m *Manager) runOwnerVerificationLoop() {
 				}
 			}
 		}
-	})
+	}()
 }
 
 func (m *Manager) ValidateCommunityByID(communityID types.HexBytes) (*CommunityResponse, error) {

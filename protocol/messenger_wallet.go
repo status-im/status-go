@@ -10,7 +10,6 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/constants"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -65,7 +64,7 @@ func (m *Messenger) watchWalletBalances() {
 		m.logger.Warn("wallet service not enabled")
 		return
 	}
-	gocommon.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case <-time.After(checkBalancesInterval):
@@ -78,7 +77,7 @@ func (m *Messenger) watchWalletBalances() {
 				return
 			}
 		}
-	})
+	}()
 }
 
 func (m *Messenger) UpdateKeypairName(keyUID string, name string) error {

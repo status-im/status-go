@@ -12,7 +12,6 @@ import (
 
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -194,13 +193,13 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 func (m *Messenger) broadcastLatestUserStatus() {
 	m.logger.Debug("broadcasting user status")
 	ctx := context.Background()
-	gocommon.SafeGo(func() {
+	go func() {
 		// Ensure that we are connected before sending a message
 		time.Sleep(5 * time.Second)
 		m.sendCurrentUserStatus(ctx)
-	})
+	}()
 
-	gocommon.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case <-time.After(5 * time.Minute):
@@ -209,7 +208,7 @@ func (m *Messenger) broadcastLatestUserStatus() {
 				return
 			}
 		}
-	})
+	}()
 }
 
 func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomText string) error {
@@ -319,7 +318,7 @@ func (m *Messenger) timeoutAutomaticStatusUpdates() {
 	fiveMinutes := uint64(5 * 60)
 	referenceClock := uint64(time.Now().Unix()) - fiveMinutes
 
-	gocommon.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case <-time.After(time.Duration(waitDuration) * time.Second):
@@ -346,5 +345,5 @@ func (m *Messenger) timeoutAutomaticStatusUpdates() {
 				return
 			}
 		}
-	})
+	}()
 }

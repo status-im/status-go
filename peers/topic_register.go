@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/discovery"
 )
 
@@ -32,14 +31,13 @@ func (r *Register) Start() error {
 	r.quit = make(chan struct{})
 	for _, topic := range r.topics {
 		r.wg.Add(1)
-		t := topic
-		common.SafeGo(func() {
+		go func(t discv5.Topic) {
 			log.Debug("v5 register topic", "topic", t)
 			if err := r.discovery.Register(string(t), r.quit); err != nil {
 				log.Error("error registering topic", "topic", t, "error", err)
 			}
 			r.wg.Done()
-		})
+		}(topic)
 	}
 	return nil
 }

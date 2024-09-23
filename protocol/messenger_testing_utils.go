@@ -21,7 +21,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -318,7 +317,7 @@ func SetSettingsAndWaitForChange(s *suite.Suite, messenger *Messenger, timeout t
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	gocommon.SafeGo(func() {
+	go func() {
 		defer wg.Done()
 		for !allEventsReceived {
 			select {
@@ -328,7 +327,7 @@ func SetSettingsAndWaitForChange(s *suite.Suite, messenger *Messenger, timeout t
 				return
 			}
 		}
-	})
+	}()
 
 	actionCallback()
 
@@ -343,7 +342,7 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, tim
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	gocommon.SafeGo(func() {
+	go func() {
 		defer wg.Done()
 		select {
 		case event := <-channel:
@@ -353,7 +352,7 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, tim
 		case <-time.After(timeout):
 			return
 		}
-	})
+	}()
 
 	actionCallback()
 

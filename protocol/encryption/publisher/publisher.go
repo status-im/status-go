@@ -7,7 +7,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
 )
@@ -75,7 +74,7 @@ func (p *Publisher) Stop() {
 func (p *Publisher) tickerLoop() {
 	ticker := time.NewTicker(tickerInterval * time.Second)
 
-	common.SafeGo(func() {
+	go func() {
 		logger := p.logger.With(zap.String("site", "tickerLoop"))
 
 		for {
@@ -95,7 +94,7 @@ func (p *Publisher) tickerLoop() {
 				return
 			}
 		}
-	})
+	}()
 }
 
 func (p *Publisher) notify() error {

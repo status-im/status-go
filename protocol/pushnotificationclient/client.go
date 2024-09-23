@@ -19,7 +19,6 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/eth-node/types"
@@ -710,7 +709,7 @@ func (c *Client) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
 
 // subscribeForMessageEvents subscribes for newly sent/scheduled messages so we can check if we need to send a push notification
 func (c *Client) subscribeForMessageEvents() {
-	gocommon.SafeGo(func() {
+	go func() {
 		c.config.Logger.Debug("subscribing for message events")
 		messageEventsSubscription := c.messageSender.SubscribeToMessageEvents()
 		for {
@@ -739,7 +738,7 @@ func (c *Client) subscribeForMessageEvents() {
 			}
 
 		}
-	})
+	}()
 }
 
 // loadLastPushNotificationRegistration loads from the database the last registration
@@ -778,23 +777,23 @@ func (c *Client) stopResendingLoop() {
 func (c *Client) startRegistrationLoop() {
 	c.stopRegistrationLoop()
 	c.registrationLoopQuitChan = make(chan struct{})
-	gocommon.SafeGo(func() {
+	go func() {
 		err := c.registrationLoop()
 		if err != nil {
 			c.config.Logger.Error("registration loop exited with an error", zap.Error(err))
 		}
-	})
+	}()
 }
 
 func (c *Client) startResendingLoop() {
 	c.stopResendingLoop()
 	c.resendingLoopQuitChan = make(chan struct{})
-	gocommon.SafeGo(func() {
+	go func() {
 		err := c.resendingLoop()
 		if err != nil {
 			c.config.Logger.Error("resending loop exited with an error", zap.Error(err))
 		}
-	})
+	}()
 }
 
 // queryNotificationInfo will block and query for the client token, if force is set it

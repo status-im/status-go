@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/status-im/status-go/common"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
@@ -100,9 +99,9 @@ func (s *Scheduler) Enqueue(taskType TaskType, taskFn taskFunction, resFn result
 						s.cancelFn = nil
 					} else {
 						// In case of multiple tasks of the same type, the previous one is overwritten
-						common.SafeGo(func() {
+						go func() {
 							existingTask.resFn(nil, existingTask.taskType, ErrTaskOverwritten)
-						})
+						}()
 					}
 
 					s.doNotDeleteCurrentTask = true
@@ -118,9 +117,9 @@ func (s *Scheduler) Enqueue(taskType TaskType, taskFn taskFunction, resFn result
 				// notify the queued one that it is overwritten or ignored
 				if existingTask.policy == ReplacementPolicyCancelOld {
 					oldResFn := existingTask.resFn
-					common.SafeGo(func() {
+					go func() {
 						oldResFn(nil, existingTask.taskType, ErrTaskOverwritten)
-					})
+					}()
 					// Overwrite the queued one of the same type
 					existingTask.taskFn = taskFn
 					existingTask.resFn = onceResFn
@@ -149,7 +148,7 @@ func (s *Scheduler) runTask(tc *taskContext, taskFn taskFunction, resFn func(int
 	s.cancelFn = thisCancelFn
 	s.context = thisContext
 
-	common.SafeGo(func() {
+	go func() {
 		res, err := taskFn(thisContext)
 
 		// Release context resources
@@ -160,7 +159,7 @@ func (s *Scheduler) runTask(tc *taskContext, taskFn taskFunction, resFn func(int
 		} else {
 			resFn(res, tc, err)
 		}
-	})
+	}()
 }
 
 // finishedTask is the only one that can remove a task from the queue
@@ -207,10 +206,9 @@ func (s *Scheduler) Stop() {
 	for pair := s.queue.Oldest(); pair != nil; pair = pair.Next() {
 		// Notify the queued one that they are canceled
 		if pair.Value.policy == ReplacementPolicyCancelOld {
-			val := pair.Value
-			common.SafeGo(func() {
+			go func(val *taskContext) {
 				val.resFn(nil, val.taskType, context.Canceled)
-			})
+			}(pair.Value)
 		}
 		s.queue.Delete(pair.Value.taskType)
 	}

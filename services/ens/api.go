@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/contracts/resolver"
@@ -262,7 +261,7 @@ func (api *API) usernameRegistrarAddr(ctx context.Context, chainID uint64) (comm
 
 	api.addrPerChain[chainID] = *registryAddr
 
-	gocommon.SafeGo(func() {
+	go func() {
 		registry, err := api.contractMaker.NewRegistry(chainID)
 		if err != nil {
 			return
@@ -292,7 +291,7 @@ func (api *API) usernameRegistrarAddr(ctx context.Context, chainID uint64) (comm
 				api.addrPerChainMutex.Unlock()
 			}
 		}
-	})
+	}()
 
 	return *registryAddr, nil
 }

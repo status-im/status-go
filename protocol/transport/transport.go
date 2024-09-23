@@ -17,7 +17,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -433,7 +432,7 @@ func (t *Transport) Stop() error {
 func (t *Transport) cleanFiltersLoop() {
 
 	ticker := time.NewTicker(5 * time.Minute)
-	gocommon.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case <-t.quit:
@@ -446,7 +445,7 @@ func (t *Transport) cleanFiltersLoop() {
 				}
 			}
 		}
-	})
+	}()
 }
 
 func (t *Transport) WakuVersion() uint {
@@ -481,14 +480,14 @@ func (t *Transport) createMessagesRequest(
 			err            error
 		})
 
-		gocommon.SafeGo(func() {
+		go func() {
 			storeCursor, envelopesCount, err = t.waku.RequestStoreMessages(ctx, peerID, r, processEnvelopes)
 			resultCh <- struct {
 				storeCursor    types.StoreRequestCursor
 				envelopesCount int
 				err            error
 			}{storeCursor, envelopesCount, err}
-		})
+		}()
 
 		select {
 		case result := <-resultCh:
@@ -497,12 +496,12 @@ func (t *Transport) createMessagesRequest(
 			return nil, 0, ctx.Err()
 		}
 	} else {
-		gocommon.SafeGo(func() {
+		go func() {
 			_, _, err = t.waku.RequestStoreMessages(ctx, peerID, r, false)
 			if err != nil {
 				t.logger.Error("failed to request store messages", zap.Error(err))
 			}
-		})
+		}()
 	}
 
 	return

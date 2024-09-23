@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers/verifier"
@@ -145,10 +144,10 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	p.events = make(chan *p2p.PeerEvent, 20)
 	p.serverSubscription = server.SubscribeEvents(p.events)
 	p.wg.Add(1)
-	common.SafeGo(func() {
+	go func() {
 		p.handleServerPeers(server, p.events)
 		p.wg.Done()
-	})
+	}()
 
 	// collect topics and start searching for nodes
 	p.topics = make([]TopicPoolInterface, 0, len(p.config))
@@ -247,22 +246,24 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 	stopDiscv5 := make(chan struct{}, 1)
 
 	queueRetry := func(d time.Duration) {
-		common.SafeGo(func() {
+		go func() {
 			time.Sleep(d)
 			select {
 			case retryDiscv5 <- struct{}{}:
 			default:
 			}
-		})
+		}()
+
 	}
 
 	queueStop := func() {
-		common.SafeGo(func() {
+		go func() {
 			select {
 			case stopDiscv5 <- struct{}{}:
 			default:
 			}
-		})
+		}()
+
 	}
 
 	for {

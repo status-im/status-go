@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/ext/mailservers"
 )
@@ -47,10 +46,10 @@ func NewMailRequestMonitor(eventSub mailservers.EnvelopeEventSubscriber, h Envel
 func (m *MailRequestMonitor) Start() {
 	m.quit = make(chan struct{})
 	m.wg.Add(1)
-	common.SafeGo(func() {
+	go func() {
 		m.handleEnvelopeEvents()
 		m.wg.Done()
-	})
+	}()
 }
 
 // Stop process events.

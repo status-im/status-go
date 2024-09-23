@@ -6,18 +6,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 // RunAsync runs the specified function asynchronously.
 func RunAsync(f func() error) <-chan error {
 	resp := make(chan error, 1)
-	common.SafeGo(func() {
+	go func() {
 		err := f()
 		resp <- err
 		close(resp)
-	})
+	}()
 	return resp
 }
 

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/discv5"
-	"github.com/status-im/status-go/common"
 )
 
 // NewMultiplexer creates Multiplexer instance.
@@ -64,9 +63,9 @@ func (m Multiplexer) Register(topic string, stop chan struct{}) error {
 	errors := make(chan error, len(m.discoveries))
 	for i := range m.discoveries {
 		i := i
-		common.SafeGo(func() {
+		go func() {
 			errors <- m.discoveries[i].Register(topic, stop)
-		})
+		}()
 	}
 	total := 0
 	messages := []string{}
@@ -97,7 +96,7 @@ func (m Multiplexer) Discover(topic string, period <-chan time.Duration, found c
 	for i := range m.discoveries {
 		i := i
 		periods[i] = make(chan time.Duration, 2)
-		common.SafeGo(func() {
+		go func() {
 			err := m.discoveries[i].Discover(topic, periods[i], found, lookup)
 			if err != nil {
 				mu.Lock()
@@ -105,9 +104,9 @@ func (m Multiplexer) Discover(topic string, period <-chan time.Duration, found c
 				mu.Unlock()
 			}
 			wg.Done()
-		})
+		}()
 	}
-	common.SafeGo(func() {
+	go func() {
 		for {
 			newPeriod, ok := <-period
 			for i := range periods {
@@ -122,7 +121,7 @@ func (m Multiplexer) Discover(topic string, period <-chan time.Duration, found c
 				return
 			}
 		}
-	})
+	}()
 	wg.Wait()
 	if len(messages) != 0 {
 		return fmt.Errorf("failed to discover topic %s: %s", topic, strings.Join(messages, "; "))

@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/centralizedmetrics/common"
 	"github.com/status-im/status-go/centralizedmetrics/providers"
-	commons "github.com/status-im/status-go/common"
 )
 
 const defaultPollInterval = 10 * time.Second
@@ -58,7 +58,7 @@ func (s *MetricService) Start() {
 	s.ticker = time.NewTicker(s.interval)
 	s.wg.Add(1)
 	s.started = true
-	commons.SafeGo(func() {
+	go func() {
 		defer s.wg.Done()
 		for {
 			select {
@@ -68,7 +68,7 @@ func (s *MetricService) Start() {
 				s.processMetrics()
 			}
 		}
-	})
+	}()
 }
 
 func (s *MetricService) Stop() {

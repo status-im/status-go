@@ -29,7 +29,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/wakuv2/common"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -349,7 +348,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 
 	// create subscription and start waiting for message events
 	rpcSub := notifier.CreateSubscription()
-	gocommon.SafeGo(func() {
+	go func() {
 		// for now poll internally, refactor waku internal for channel support
 		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()
@@ -369,7 +368,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 				return
 			}
 		}
-	})
+	}()
 
 	return rpcSub, nil
 }

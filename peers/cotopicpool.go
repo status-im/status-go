@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 )
@@ -71,10 +70,10 @@ func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 		// which means the next discovery.summary is not going to include
 		// the peer.
 		// We leave some time so that we ensure the signal is propagated
-		common.SafeGo(func() {
+		go func() {
 			time.Sleep(200)
 			t.removeServerPeer(server, peer)
-		})
+		}()
 		// Delete it from `connectedPeers` immediately to
 		// prevent removing it from the cache which logic is
 		// implemented in TopicPool.
@@ -88,10 +87,10 @@ func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 		// which means the next discovery.summary is not going to include
 		// the peer.
 		// We leave some time so that we ensure the signal is propagated
-		common.SafeGo(func() {
+		go func() {
 			time.Sleep(200)
 			t.removeServerPeer(server, peer.peerInfo)
-		})
+		}()
 
 		// Delete it from `connectedPeers` immediately to
 		// prevent removing it from the cache which logic is

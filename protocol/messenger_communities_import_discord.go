@@ -13,7 +13,6 @@ import (
 	"github.com/meirf/gopart"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -125,14 +124,14 @@ func (m *Messenger) ExtractDiscordChannelsAndCategories(filesToImport []string) 
 }
 
 func (m *Messenger) RequestExtractDiscordChannelsAndCategories(filesToImport []string) {
-	gocommon.SafeGo(func() {
+	go func() {
 		response, errors := m.ExtractDiscordChannelsAndCategories(filesToImport)
 		m.config.messengerSignalsHandler.DiscordCategoriesAndChannelsExtracted(
 			response.DiscordCategories,
 			response.DiscordChannels,
 			int64(response.DiscordOldestMessageTimestamp),
 			errors)
-	})
+	}()
 }
 func (m *Messenger) saveDiscordAuthorIfNotExists(discordAuthor *protobuf.DiscordMessageAuthor) *discord.ImportError {
 	exists, err := m.persistence.HasDiscordMessageAuthor(discordAuthor.GetId())
@@ -412,7 +411,7 @@ func (m *Messenger) startPublishImportProgressInterval(c chan *discord.ImportPro
 
 	var currentProgress *discord.ImportProgress
 
-	gocommon.SafeGo(func() {
+	go func() {
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 
@@ -444,14 +443,14 @@ func (m *Messenger) startPublishImportProgressInterval(c chan *discord.ImportPro
 				return
 			}
 		}
-	})
+	}()
 }
 
 func (m *Messenger) startPublishImportChannelProgressInterval(c chan *discord.ImportProgress, cancel chan []string, done chan struct{}) {
 
 	var currentProgress *discord.ImportProgress
 
-	gocommon.SafeGo(func() {
+	go func() {
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 
@@ -488,7 +487,7 @@ func (m *Messenger) startPublishImportChannelProgressInterval(c chan *discord.Im
 				return
 			}
 		}
-	})
+	}()
 }
 func createCommunityChannelForImport(request *requests.ImportDiscordChannel) *protobuf.CommunityChat {
 	return &protobuf.CommunityChat{
@@ -507,7 +506,7 @@ func createCommunityChannelForImport(request *requests.ImportDiscordChannel) *pr
 }
 
 func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordChannel) {
-	gocommon.SafeGo(func() {
+	go func() {
 		totalImportChunkCount := len(request.FilesToImport)
 
 		progressUpdates := make(chan *discord.ImportProgress)
@@ -789,9 +788,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 
 			for id, author := range authorProfilesToSave {
 				wg.Add(1)
-				id := id
-				author := author
-				gocommon.SafeGo(func() {
+				go func(id string, author *protobuf.DiscordMessageAuthor) {
 					defer wg.Done()
 
 					m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
@@ -829,7 +826,8 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 					progressValue := calculateProgress(i+1, totalImportChunkCount, (float32(assetCounter.Value())/float32(totalAssetsCount))*0.5)
 					importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
 					progressUpdates <- importProgress
-				})
+
+				}(id, author)
 			}
 			wg.Wait()
 
@@ -843,7 +841,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 			for idxRange := range gopart.Partition(len(messageAttachmentsToDownload), 100) {
 				attachments := messageAttachmentsToDownload[idxRange.Low:idxRange.High]
 				wg.Add(1)
-				gocommon.SafeGo(func() {
+				go func(attachments []*protobuf.DiscordMessageAttachment) {
 					defer wg.Done()
 					for ii, attachment := range attachments {
 
@@ -876,7 +874,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 						importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
 						progressUpdates <- importProgress
 					}
-				})
+				}(attachments)
 			}
 			wg.Wait()
 
@@ -1015,11 +1013,12 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 
 		m.config.messengerSignalsHandler.DiscordChannelImportFinished(request.CommunityID.String(), newChat.ID)
 		close(done)
-	})
+	}()
 }
 
 func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscordCommunity) {
-	gocommon.SafeGo(func() {
+	go func() {
+
 		totalImportChunkCount := len(request.FilesToImport)
 
 		progressUpdates := make(chan *discord.ImportProgress)
@@ -1561,8 +1560,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 			for id, author := range authorProfilesToSave {
 				wg.Add(1)
-				id, author := id, author
-				gocommon.SafeGo(func() {
+				go func(id string, author *protobuf.DiscordMessageAuthor) {
 					defer wg.Done()
 
 					m.logger.Debug(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
@@ -1598,7 +1596,8 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 					progressValue := calculateProgress(i+1, totalImportChunkCount, (float32(assetCounter.Value())/float32(totalAssetsCount))*0.5)
 					importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
 					progressUpdates <- importProgress
-				})
+
+				}(id, author)
 			}
 			wg.Wait()
 
@@ -1612,7 +1611,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			for idxRange := range gopart.Partition(len(messageAttachmentsToDownload), 100) {
 				attachments := messageAttachmentsToDownload[idxRange.Low:idxRange.High]
 				wg.Add(1)
-				gocommon.SafeGo(func() {
+				go func(attachments []*protobuf.DiscordMessageAttachment) {
 					defer wg.Done()
 					for ii, attachment := range attachments {
 
@@ -1645,7 +1644,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 						importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
 						progressUpdates <- importProgress
 					}
-				})
+				}(attachments)
 			}
 			wg.Wait()
 
@@ -1865,5 +1864,5 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 		m.config.messengerSignalsHandler.DiscordCommunityImportFinished(communityID)
 		close(done)
-	})
+	}()
 }

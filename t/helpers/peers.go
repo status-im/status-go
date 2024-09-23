@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/status-im/status-go/common"
 )
 
 var (
@@ -54,9 +53,9 @@ func waitForPeer(p *p2p.Server, u string, e p2p.PeerEventType, t time.Duration, 
 func WaitForPeerAsync(p *p2p.Server, u string, e p2p.PeerEventType, t time.Duration) <-chan error {
 	subscribed := make(chan struct{})
 	errCh := make(chan error)
-	common.SafeGo(func() {
+	go func() {
 		errCh <- waitForPeer(p, u, e, t, subscribed)
-	})
+	}()
 	<-subscribed
 	return errCh
 }

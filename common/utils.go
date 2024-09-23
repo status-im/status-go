@@ -5,10 +5,8 @@ import (
 	"errors"
 	"reflect"
 	"regexp"
-	"runtime/debug"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -85,19 +83,4 @@ func IsNil(i interface{}) bool {
 		return reflect.ValueOf(i).IsNil()
 	}
 	return false
-}
-
-func SafeGo(f func(), panicHandlers ...func(interface{})) {
-	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				log.Error("panic in goroutine", "error", err, "stacktrace", string(debug.Stack()))
-				for _, handler := range panicHandlers {
-					handler(err)
-				}
-				panic(err)
-			}
-		}()
-		f()
-	}()
 }

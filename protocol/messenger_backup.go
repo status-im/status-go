@@ -7,7 +7,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -42,7 +41,7 @@ func (m *Messenger) lastBackup() (uint64, error) {
 
 func (m *Messenger) startBackupLoop() {
 	ticker := time.NewTicker(backupTickerInterval)
-	gocommon.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -84,7 +83,7 @@ func (m *Messenger) startBackupLoop() {
 				return
 			}
 		}
-	})
+	}()
 }
 
 func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {

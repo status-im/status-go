@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/appmetrics"
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -150,13 +149,13 @@ func (c *Client) startMainLoop() {
 
 	c.stopMainLoop()
 	c.mainLoopQuit = make(chan struct{})
-	gocommon.SafeGo(func() {
+	go func() {
 		c.Logger.Debug("startMainLoop() anonymous go routine triggered")
 		err := c.mainLoop()
 		if err != nil {
 			c.Logger.Error("main loop exited with an error", zap.Error(err))
 		}
-	})
+	}()
 }
 
 func (c *Client) deleteLoop() error {
@@ -188,12 +187,12 @@ func (c *Client) deleteLoop() error {
 func (c *Client) startDeleteLoop() {
 	c.stopDeleteLoop()
 	c.deleteLoopQuit = make(chan struct{})
-	gocommon.SafeGo(func() {
+	go func() {
 		err := c.deleteLoop()
 		if err != nil {
 			c.Logger.Error("delete loop exited with an error", zap.Error(err))
 		}
-	})
+	}()
 }
 
 func (c *Client) Start() error {

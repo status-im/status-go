@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	gocommon "github.com/status-im/status-go/common"
 	statusaccounts "github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
@@ -62,7 +61,7 @@ func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcC
 }
 
 func (c *Controller) Start() {
-	gocommon.SafeGo(func() { _ = c.cleanupAccountsLeftovers() })
+	go func() { _ = c.cleanupAccountsLeftovers() }()
 }
 
 func (c *Controller) Stop() {

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/rpc/chain"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
@@ -59,7 +58,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	gocommon.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case <-ticker.C:
@@ -118,13 +117,13 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 				return
 			}
 		}
-	})
+	}()
 	return nil
 }
 
 func (r *Router) startTimeoutForUpdates(closeCh chan struct{}) {
 	dedlineTicker := time.NewTicker(feeRecalculationTimeout)
-	gocommon.SafeGo(func() {
+	go func() {
 		for {
 			select {
 			case <-dedlineTicker.C:
@@ -135,7 +134,7 @@ func (r *Router) startTimeoutForUpdates(closeCh chan struct{}) {
 				return
 			}
 		}
-	})
+	}()
 }
 
 func (r *Router) unsubscribeFeesUpdateAccrossAllChains() {

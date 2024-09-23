@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/common"
 )
 
 // Profiler runs and controls a HTTP pprof interface.
@@ -36,8 +35,8 @@ func NewProfiler(port int) *Profiler {
 
 // Go starts the HTTP pprof in the background.
 func (p *Profiler) Go() {
-	common.SafeGo(func() {
+	go func() {
 		log.Info("debug server stopped", "err", p.server.ListenAndServe())
-	})
+	}()
 	log.Info("debug server started")
 }
