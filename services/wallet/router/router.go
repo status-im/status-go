@@ -120,6 +120,20 @@ func (r *Router) GetPathProcessors() map[string]pathprocessor.PathProcessor {
 	return r.pathProcessors
 }
 
+func (r *Router) GetBestRouteAndAssociatedInputParams() (routes.Route, requests.RouteInputParams) {
+	r.activeRoutesMutex.Lock()
+	defer r.activeRoutesMutex.Unlock()
+	if r.activeRoutes == nil {
+		return nil, requests.RouteInputParams{}
+	}
+
+	r.lastInputParamsMutex.Lock()
+	defer r.lastInputParamsMutex.Unlock()
+	ip := *r.lastInputParams
+
+	return r.activeRoutes.Best.Copy(), ip
+}
+
 func (r *Router) SetTestBalanceMap(balanceMap map[string]*big.Int) {
 	for k, v := range balanceMap {
 		r.activeBalanceMap.Store(k, v)

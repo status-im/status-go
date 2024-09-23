@@ -443,6 +443,11 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 }
 
 func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccount *account.SelectedExtKey, args SendTxArgs, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error) {
+	symbol := args.Symbol
+	if args.Version == SendTxArgsVersion1 {
+		symbol = args.FromTokenID
+	}
+
 	if err = t.validateAccount(args, selectedAccount); err != nil {
 		return hash, nonce, err
 	}
@@ -458,7 +463,7 @@ func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccoun
 		return hash, nonce, err
 	}
 
-	hash, err = t.sendTransaction(rpcWrapper, common.Address(args.From), args.Symbol, args.MultiTransactionID, signedTx)
+	hash, err = t.sendTransaction(rpcWrapper, common.Address(args.From), symbol, args.MultiTransactionID, signedTx)
 	return hash, tx.Nonce(), err
 }
 

@@ -9,6 +9,14 @@ import (
 
 type Route []*Path
 
+func (r Route) Copy() Route {
+	newRoute := make(Route, len(r))
+	for i, path := range r {
+		newRoute[i] = path.Copy()
+	}
+	return newRoute
+}
+
 func FindBestRoute(routes []Route, tokenPrice float64, nativeTokenPrice float64) Route {
 	var best Route
 	bestCost := big.NewFloat(math.Inf(1))

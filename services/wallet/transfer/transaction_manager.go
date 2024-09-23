@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/params"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -26,11 +27,34 @@ type SignatureDetails struct {
 	V string `json:"v"`
 }
 
+func (sd *SignatureDetails) Validate() error {
+	if len(sd.R) != 64 || len(sd.S) != 64 || len(sd.V) != 2 {
+		return ErrInvalidSignatureDetails
+	}
+
+	return nil
+}
+
+// TODO: remove this struct once mobile switches to the new approach
 type TransactionDescription struct {
 	chainID   uint64
 	from      common.Address
 	builtTx   *ethTypes.Transaction
 	signature []byte
+}
+
+type RouterTransactionDetails struct {
+	routerPath         *routes.Path
+	txArgs             *transactions.SendTxArgs
+	tx                 *ethTypes.Transaction
+	txHashToSign       types.Hash
+	txSignature        []byte
+	txSentHash         types.Hash
+	approvalTxArgs     *transactions.SendTxArgs
+	approvalTx         *ethTypes.Transaction
+	approvalHashToSign types.Hash
+	approvalSignature  []byte
+	approvalTxSentHash types.Hash
 }
 
 type TransactionManager struct {
@@ -42,9 +66,13 @@ type TransactionManager struct {
 	pendingTracker *transactions.PendingTxTracker
 	eventFeed      *event.Feed
 
+	// TODO: remove this struct once mobile switches to the new approach
 	multiTransactionForKeycardSigning *MultiTransaction
 	multipathTransactionsData         []*pathprocessor.MultipathProcessorTxArgs
 	transactionsForKeycardSigning     map[common.Hash]*TransactionDescription
+
+	// used in a new approach
+	routerTransactions []*RouterTransactionDetails
 }
 
 type MultiTransactionStorage interface {

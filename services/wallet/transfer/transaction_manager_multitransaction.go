@@ -198,6 +198,7 @@ func (tm *TransactionManager) WatchTransaction(ctx context.Context, chainID uint
 					return err
 				}
 				if p.ChainID == wallet_common.ChainID(chainID) && p.Hash == transactionHash {
+					signal.SendWalletEvent(signal.TransactionStatusChanged, p)
 					return nil
 				}
 			}

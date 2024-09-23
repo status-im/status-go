@@ -44,6 +44,7 @@ type RouteInputParams struct {
 	AmountIn             *hexutil.Big            `json:"amountIn" validate:"required"`
 	AmountOut            *hexutil.Big            `json:"amountOut"`
 	TokenID              string                  `json:"tokenID" validate:"required"`
+	TokenIDIsOwnerToken  bool                    `json:"tokenIDIsOwnerToken"`
 	ToTokenID            string                  `json:"toTokenID"`
 	DisabledFromChainIDs []uint64                `json:"disabledFromChainIDs"`
 	DisabledToChainIDs   []uint64                `json:"disabledToChainIDs"`
