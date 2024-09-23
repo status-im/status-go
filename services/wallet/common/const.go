@@ -1,6 +1,7 @@
 package common
 
 import (
+	"math/big"
 	"strconv"
 	"time"
 
@@ -32,7 +33,8 @@ const (
 )
 
 var (
-	ZeroAddress = ethCommon.HexToAddress("0x0000000000000000000000000000000000000000")
+	ZeroAddress     = ethCommon.Address{}
+	ZeroBigIntValue = big.NewInt(0)
 
 	SupportedNetworks = map[uint64]bool{
 		EthereumMainnet: true,

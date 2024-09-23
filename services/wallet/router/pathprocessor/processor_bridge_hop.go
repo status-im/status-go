@@ -377,7 +377,7 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 				Deadline:                time.Now().Add(SevenDaysInSeconds).Unix(),
 			}
 			h.bonderFee.Store(bonderKey, bonderFee)
-			return val, ZeroBigIntValue, nil
+			return val, walletCommon.ZeroBigIntValue, nil
 		}
 		return nil, nil, ErrNoBonderFeeFound
 	}
@@ -471,7 +471,7 @@ func (h *HopBridgeProcessor) packL1BridgeTx(abi abi.ABI, toChainID uint64, to co
 		bonderFee.AmountOutMin.Int,
 		big.NewInt(bonderFee.Deadline),
 		common.Address{},
-		ZeroBigIntValue)
+		walletCommon.ZeroBigIntValue)
 }
 
 func (h *HopBridgeProcessor) sendL1BridgeTx(contractAddress common.Address, ethClient chain.ClientInterface, toChainID uint64,
@@ -493,7 +493,7 @@ func (h *HopBridgeProcessor) sendL1BridgeTx(contractAddress common.Address, ethC
 			bonderFee.AmountOutMin.Int,
 			big.NewInt(bonderFee.Deadline),
 			common.Address{},
-			ZeroBigIntValue)
+			walletCommon.ZeroBigIntValue)
 	}
 
 	if token.Symbol == HopSymbol {
@@ -513,7 +513,7 @@ func (h *HopBridgeProcessor) sendL1BridgeTx(contractAddress common.Address, ethC
 			bonderFee.AmountOutMin.Int,
 			big.NewInt(bonderFee.Deadline),
 			common.Address{},
-			ZeroBigIntValue)
+			walletCommon.ZeroBigIntValue)
 	}
 
 	contractInstance, err := hopL1Erc20Bridge.NewHopL1Erc20Bridge(
@@ -532,7 +532,7 @@ func (h *HopBridgeProcessor) sendL1BridgeTx(contractAddress common.Address, ethC
 		bonderFee.AmountOutMin.Int,
 		big.NewInt(bonderFee.Deadline),
 		common.Address{},
-		ZeroBigIntValue)
+		walletCommon.ZeroBigIntValue)
 
 }
 

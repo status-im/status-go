@@ -48,7 +48,7 @@ func (s *ENSPublicKeyProcessor) AvailableFor(params ProcessorInputParams) (bool,
 }
 
 func (s *ENSPublicKeyProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+	return walletCommon.ZeroBigIntValue, walletCommon.ZeroBigIntValue, nil
 }
 
 func (s *ENSPublicKeyProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
@@ -89,7 +89,7 @@ func (s *ENSPublicKeyProcessor) EstimateGas(params ProcessorInputParams) (uint64
 	msg := ethereum.CallMsg{
 		From:  params.FromAddr,
 		To:    &contractAddress,
-		Value: ZeroBigIntValue,
+		Value: walletCommon.ZeroBigIntValue,
 		Data:  input,
 	}
 
@@ -120,7 +120,7 @@ func (s *ENSPublicKeyProcessor) GetContractAddress(params ProcessorInputParams) 
 	if err != nil {
 		return common.Address{}, createENSPublicKeyErrorResponse(err)
 	}
-	if *addr == ZeroAddress {
+	if *addr == walletCommon.ZeroAddress {
 		return common.Address{}, ErrENSResolverNotFound
 	}
 	return *addr, nil

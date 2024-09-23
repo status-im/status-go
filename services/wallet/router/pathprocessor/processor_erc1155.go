@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/contracts/ierc1155"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -48,7 +49,7 @@ func (s *ERC1155Processor) AvailableFor(params ProcessorInputParams) (bool, erro
 }
 
 func (s *ERC1155Processor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+	return walletCommon.ZeroBigIntValue, walletCommon.ZeroBigIntValue, nil
 }
 
 func (s *ERC1155Processor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {

@@ -44,7 +44,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 		return false, nil, err
 	}
 
-	if approvalContractAddress == nil || *approvalContractAddress == pathprocessor.ZeroAddress {
+	if approvalContractAddress == nil || *approvalContractAddress == walletCommon.ZeroAddress {
 		return false, nil, nil
 	}
 
@@ -68,7 +68,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 }
 
 func (r *Router) packApprovalInputData(amountIn *big.Int, approvalContractAddress *common.Address) ([]byte, error) {
-	if approvalContractAddress == nil || *approvalContractAddress == pathprocessor.ZeroAddress {
+	if approvalContractAddress == nil || *approvalContractAddress == walletCommon.ZeroAddress {
 		return []byte{}, nil
 	}
 
@@ -94,7 +94,7 @@ func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParam
 	return ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
 		From:  params.FromAddr,
 		To:    &params.FromToken.Address,
-		Value: pathprocessor.ZeroBigIntValue,
+		Value: walletCommon.ZeroBigIntValue,
 		Data:  data,
 	})
 }

@@ -242,7 +242,7 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 	// return only if there are no balances, otherwise try to resolve the candidates for chains we know the balances for
 	noBalanceOnAnyChain := true
 	r.activeBalanceMap.Range(func(key, value interface{}) bool {
-		if value.(*big.Int).Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+		if value.(*big.Int).Cmp(walletCommon.ZeroBigIntValue) > 0 {
 			noBalanceOnAnyChain = false
 			return false
 		}
@@ -406,7 +406,7 @@ func (r *Router) getOptionsForAmoutToSplitAccrossChainsForProcessingChain(input 
 			continue
 		}
 
-		if tokenBalance.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+		if tokenBalance.Cmp(walletCommon.ZeroBigIntValue) > 0 {
 			if tokenBalance.Cmp(amountToSplit) <= 0 {
 				crossChainAmountOptions[chain.ChainID] = append(crossChainAmountOptions[chain.ChainID], amountOption{
 					amount:       tokenBalance,
@@ -414,7 +414,7 @@ func (r *Router) getOptionsForAmoutToSplitAccrossChainsForProcessingChain(input 
 					subtractFees: true, // for chains where we're taking the full balance, we want to subtract the fees
 				})
 				amountToSplit = new(big.Int).Sub(amountToSplit, tokenBalance)
-			} else if amountToSplit.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+			} else if amountToSplit.Cmp(walletCommon.ZeroBigIntValue) > 0 {
 				crossChainAmountOptions[chain.ChainID] = append(crossChainAmountOptions[chain.ChainID], amountOption{
 					amount: amountToSplit,
 					locked: false,
@@ -438,7 +438,7 @@ func (r *Router) getCrossChainsOptionsForSendingAmount(input *requests.RouteInpu
 		amountLocked := false
 		amountToSend := input.AmountIn.ToInt()
 
-		if amountToSend.Cmp(pathprocessor.ZeroBigIntValue) == 0 {
+		if amountToSend.Cmp(walletCommon.ZeroBigIntValue) == 0 {
 			finalCrossChainAmountOptions[selectedFromChain.ChainID] = append(finalCrossChainAmountOptions[selectedFromChain.ChainID], amountOption{
 				amount: amountToSend,
 				locked: false,
@@ -459,7 +459,7 @@ func (r *Router) getCrossChainsOptionsForSendingAmount(input *requests.RouteInpu
 			}
 		}
 
-		if amountToSend.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+		if amountToSend.Cmp(walletCommon.ZeroBigIntValue) > 0 {
 			// add full amount always, cause we want to check for balance errors at the end of the routing algorithm
 			// TODO: once we introduce bettwer error handling and start checking for the balance at the beginning of the routing algorithm
 			// we can remove this line and optimize the routing algorithm more
@@ -796,7 +796,7 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute rou
 	for _, path := range bestRoute {
 		tokenKey := makeBalanceKey(path.FromChain.ChainID, path.FromToken.Symbol)
 		if tokenBalance, ok := balanceMapCopy[tokenKey]; ok {
-			if tokenBalance.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+			if tokenBalance.Cmp(walletCommon.ZeroBigIntValue) > 0 {
 				hasPositiveBalance = true
 			}
 		}
@@ -807,7 +807,7 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute rou
 			}
 		}
 
-		if path.RequiredTokenBalance != nil && path.RequiredTokenBalance.Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+		if path.RequiredTokenBalance != nil && path.RequiredTokenBalance.Cmp(walletCommon.ZeroBigIntValue) > 0 {
 			if tokenBalance, ok := balanceMapCopy[tokenKey]; ok {
 				if tokenBalance.Cmp(path.RequiredTokenBalance) == -1 {
 					err := &errors.ErrorResponse{
@@ -911,12 +911,12 @@ func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputPa
 		for _, path := range bestRoute {
 			if path.SubtractFees && path.FromToken.IsNative() {
 				path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxFee.ToInt())
-				if path.TxL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+				if path.TxL1Fee.ToInt().Cmp(walletCommon.ZeroBigIntValue) > 0 {
 					path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxL1Fee.ToInt())
 				}
 				if path.ApprovalRequired {
 					path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.ApprovalFee.ToInt())
-					if path.ApprovalL1Fee.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+					if path.ApprovalL1Fee.ToInt().Cmp(walletCommon.ZeroBigIntValue) > 0 {
 						path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.ApprovalL1Fee.ToInt())
 					}
 				}

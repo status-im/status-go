@@ -119,13 +119,13 @@ func (s SendType) CanUseProcessor(p pathprocessor.PathProcessor) bool {
 }
 
 func (s SendType) ProcessZeroAmountInProcessor(amountIn *big.Int, amountOut *big.Int, processorName string) bool {
-	if amountIn.Cmp(pathprocessor.ZeroBigIntValue) == 0 {
+	if amountIn.Cmp(walletCommon.ZeroBigIntValue) == 0 {
 		if s == Transfer {
 			if processorName != pathprocessor.ProcessorTransferName {
 				return false
 			}
 		} else if s == Swap {
-			if amountOut.Cmp(pathprocessor.ZeroBigIntValue) == 0 {
+			if amountOut.Cmp(walletCommon.ZeroBigIntValue) == 0 {
 				return false
 			}
 		} else {
