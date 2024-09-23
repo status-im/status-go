@@ -208,6 +208,7 @@ func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) 
 	return priceRoute.TokenTransferProxy, nil
 }
 
+// TODO: remove this struct once mobile switches to the new approach
 func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {
 	slippageBP := uint(sendArgs.SwapTx.SlippagePercentage * 100) // convert to basis points
 
@@ -254,12 +255,65 @@ func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorT
 	return nil
 }
 
+func (s *SwapParaswapProcessor) prepareTransactionV2(sendArgs *transactions.SendTxArgs) error {
+	slippageBP := uint(sendArgs.SlippagePercentage * 100) // convert to basis points
+
+	key := makeKey(sendArgs.FromChainID, sendArgs.ToChainID, sendArgs.FromTokenID, sendArgs.ToTokenID)
+	priceRouteIns, ok := s.priceRoute.Load(key)
+	if !ok {
+		return ErrPriceRouteNotFound
+	}
+	priceRoute := priceRouteIns.(*paraswap.Route)
+
+	tx, err := s.paraswapClient.BuildTransaction(context.Background(), priceRoute.SrcTokenAddress, priceRoute.SrcTokenDecimals, priceRoute.SrcAmount.Int,
+		priceRoute.DestTokenAddress, priceRoute.DestTokenDecimals, priceRoute.DestAmount.Int, slippageBP,
+		common.Address(sendArgs.From), common.Address(*sendArgs.To),
+		priceRoute.RawPriceRoute, priceRoute.Side)
+	if err != nil {
+		return createSwapParaswapErrorResponse(err)
+	}
+
+	value, ok := new(big.Int).SetString(tx.Value, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
+
+	gas, err := strconv.ParseUint(tx.Gas, 10, 64)
+	if err != nil {
+		return createSwapParaswapErrorResponse(err)
+	}
+
+	gasPrice, ok := new(big.Int).SetString(tx.GasPrice, 10)
+	if !ok {
+		return ErrConvertingAmountToBigInt
+	}
+
+	sendArgs.FromChainID = tx.ChainID
+	toAddr := types.HexToAddress(tx.To)
+	sendArgs.From = types.HexToAddress(tx.From)
+	sendArgs.To = &toAddr
+	sendArgs.Value = (*hexutil.Big)(value)
+	sendArgs.Gas = (*hexutil.Uint64)(&gas)
+	sendArgs.GasPrice = (*hexutil.Big)(gasPrice)
+	sendArgs.Data = types.Hex2Bytes(tx.Data)
+
+	return nil
+}
+
 func (s *SwapParaswapProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	err := s.prepareTransaction(sendArgs)
 	if err != nil {
 		return nil, 0, createSwapParaswapErrorResponse(err)
 	}
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs, lastUsedNonce)
+}
+
+func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	err := s.prepareTransactionV2(sendArgs)
+	if err != nil {
+		return nil, 0, createSwapParaswapErrorResponse(err)
+	}
+	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
 }
 
 func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types.Hash, uint64, error) {

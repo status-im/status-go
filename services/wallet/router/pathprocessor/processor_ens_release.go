@@ -110,6 +110,10 @@ func (s *ENSReleaseProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArg
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce)
 }
 
+func (s *ENSReleaseProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
+}
+
 func (s *ENSReleaseProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	return params.AmountIn, nil
 }
