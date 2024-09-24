@@ -15,6 +15,7 @@ import (
 	nodetypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
@@ -1120,8 +1121,8 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 	}
 
 	if len(ranges) > 0 {
-		storage := chain.NewLimitsDBStorage(c.db.client)
-		limiter := chain.NewRequestLimiter(storage)
+		storage := rpclimiter.NewLimitsDBStorage(c.db.client)
+		limiter := rpclimiter.NewRequestLimiter(storage)
 		chainClient, _ := createChainClientWithLimiter(c.chainClient, account, limiter)
 		if chainClient == nil {
 			chainClient = c.chainClient
@@ -1310,7 +1311,7 @@ func accountLimiterTag(account common.Address) string {
 	return transferHistoryTag + "_" + account.String()
 }
 
-func createChainClientWithLimiter(client chain.ClientInterface, account common.Address, limiter chain.RequestLimiter) (chain.ClientInterface, error) {
+func createChainClientWithLimiter(client chain.ClientInterface, account common.Address, limiter rpclimiter.RequestLimiter) (chain.ClientInterface, error) {
 	// Each account has its own limit and a global limit for all accounts
 	accountTag := accountLimiterTag(account)
 	chainClient := chain.ClientWithTag(client, accountTag, transferHistoryTag)
@@ -1328,7 +1329,7 @@ func createChainClientWithLimiter(client chain.ClientInterface, account common.A
 
 	limit, _ := limiter.GetLimit(accountTag)
 	if limit == nil {
-		err := limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, chain.LimitInfinitely)
+		err := limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, rpclimiter.LimitInfinitely)
 		if err != nil {
 			log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "accountTag", accountTag)
 		}

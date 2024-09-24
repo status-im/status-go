@@ -1,0 +1,112 @@
+package ethclient
+
+import (
+	"context"
+	"math/big"
+
+	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
+)
+
+type ChainReader interface {
+	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
+	BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error)
+	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
+	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
+}
+
+type CallClient interface {
+	CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error
+}
+
+type BatchCallClient interface {
+	BatchCallContext(ctx context.Context, b []rpc.BatchElem) error
+}
+
+// Interface for rpc.Client
+type RPCClientInterface interface {
+	CallClient
+	BatchCallClient
+}
+
+// Interface for ethclient.Client
+type BaseEthClientInterface interface {
+	// External calls
+	ChainReader
+	ethereum.TransactionReader
+	ethereum.ChainStateReader
+	ethereum.ChainSyncReader
+	ethereum.ContractCaller
+	ethereum.LogFilterer
+	ethereum.TransactionSender
+	ethereum.GasPricer
+	ethereum.PendingStateReader
+	ethereum.PendingContractCaller
+	ethereum.GasEstimator
+	FeeHistory(ctx context.Context, blockCount uint64, lastBlock *big.Int, rewardPercentiles []float64) (*ethereum.FeeHistory, error)
+	BlockNumber(ctx context.Context) (uint64, error)
+	TransactionSender(ctx context.Context, tx *types.Transaction, block common.Hash, index uint) (common.Address, error)
+	// Internal calls
+	Close()
+}
+
+// EthClientInterface extends BaseEthClientInterface with additional capabilities
+type EthClientInterface interface {
+	BaseEthClientInterface
+	// Additional external calls
+	RPCClientInterface
+	GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error)
+	bind.ContractCaller
+	bind.ContractBackend
+	CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error)
+}
+
+// EthClient implements EthClientInterface
+type EthClient struct {
+	*ethclient.Client
+	rpcClient *rpc.Client
+}
+
+func NewEthClient(rpcClient *rpc.Client) *EthClient {
+	return &EthClient{
+		Client:    ethclient.NewClient(rpcClient),
+		rpcClient: rpcClient,
+	}
+}
+
+func (ec *EthClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
+	return ec.rpcClient.BatchCallContext(ctx, b)
+}
+
+// go-ethereum's `Transaction` items drop the blkHash obtained during the RPC call.
+// This function preserves the additional data. This is the cheapest way to obtain
+// the block hash for a given block number.
+func (ec *EthClient) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
+	return callBlockHashByTransaction(ctx, ec.rpcClient, blockNumber, index)
+}
+
+func (ec *EthClient) GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error) {
+	feeHistory, err := ec.FeeHistory(ctx, 1, blockNumber, nil)
+
+	if err != nil {
+		if err.Error() == "the method eth_feeHistory does not exist/is not available" {
+			return "", nil
+		}
+		return "", err
+	}
+
+	var baseGasFee string = ""
+	if len(feeHistory.BaseFee) > 0 {
+		baseGasFee = feeHistory.BaseFee[0].String()
+	}
+
+	return baseGasFee, err
+}
+
+func (ec *EthClient) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+	return ec.rpcClient.CallContext(ctx, result, method, args...)
+}

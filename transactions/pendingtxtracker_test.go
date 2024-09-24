@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 
 	"github.com/status-im/status-go/services/wallet/common"
@@ -43,7 +43,7 @@ func setupTestTransactionDB(t *testing.T, checkInterval *time.Duration) (*Pendin
 	rpcClient.EXPECT().EthClient(common.EthereumMainnet).Return(chainClient, nil).AnyTimes()
 
 	// Delegate the call to the fake implementation
-	rpcClient.EXPECT().AbstractEthClient(gomock.Any()).DoAndReturn(func(chainID common.ChainID) (chain.BatchCallClient, error) {
+	rpcClient.EXPECT().AbstractEthClient(gomock.Any()).DoAndReturn(func(chainID common.ChainID) (ethclient.BatchCallClient, error) {
 		return chainClient.AbstractEthClient(chainID)
 	}).AnyTimes()
 	return NewPendingTxTracker(db, rpcClient, nil, eventFeed, pendingCheckInterval), func() {

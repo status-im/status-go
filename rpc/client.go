@@ -14,13 +14,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	appCommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
+	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/wallet/common"
@@ -72,7 +73,7 @@ func init() {
 type Handler func(context.Context, uint64, ...interface{}) (interface{}, error)
 
 type ClientInterface interface {
-	AbstractEthClient(chainID common.ChainID) (chain.BatchCallClient, error)
+	AbstractEthClient(chainID common.ChainID) (ethclient.BatchCallClient, error)
 	EthClient(chainID uint64) (chain.ClientInterface, error)
 	EthClients(chainIDs []uint64) (map[uint64]chain.ClientInterface, error)
 	CallContext(context context.Context, result interface{}, chainID uint64, method string, args ...interface{}) error
@@ -96,7 +97,7 @@ type Client struct {
 	rpcClientsMutex    sync.RWMutex
 	rpcClients         map[uint64]chain.ClientInterface
 	rpsLimiterMutex    sync.RWMutex
-	limiterPerProvider map[string]*chain.RPCRpsLimiter
+	limiterPerProvider map[string]*rpclimiter.RPCRpsLimiter
 
 	router         *router
 	NetworkManager *network.Manager
@@ -136,7 +137,7 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		NetworkManager:     networkManager,
 		handlers:           make(map[string]Handler),
 		rpcClients:         make(map[uint64]chain.ClientInterface),
-		limiterPerProvider: make(map[string]*chain.RPCRpsLimiter),
+		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		log:                log,
 		providerConfigs:    providerConfigs,
 	}
@@ -168,7 +169,10 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		// Include the chain-id in the rpc client
 		rpcName := fmt.Sprintf("%s-chain-id-%d", hostPortUpstream, upstreamChainID)
 
-		c.upstream = chain.NewSimpleClient(*chain.NewEthClient(ethclient.NewClient(upstreamClient), limiter, upstreamClient, rpcName), upstreamChainID)
+		ethClients := []ethclient.RPSLimitedEthClientInterface{
+			ethclient.NewRPSLimitedEthClient(upstreamClient, limiter, rpcName),
+		}
+		c.upstream = chain.NewClient(ethClients, upstreamChainID)
 	}
 
 	c.router = newRouter(c.upstreamEnabled)
@@ -197,13 +201,13 @@ func extractHostFromURL(inputURL string) (string, error) {
 	return parsedURL.Host, nil
 }
 
-func (c *Client) getRPCRpsLimiter(key string) (*chain.RPCRpsLimiter, error) {
+func (c *Client) getRPCRpsLimiter(key string) (*rpclimiter.RPCRpsLimiter, error) {
 	c.rpsLimiterMutex.Lock()
 	defer c.rpsLimiterMutex.Unlock()
 	if limiter, ok := c.limiterPerProvider[key]; ok {
 		return limiter, nil
 	}
-	limiter := chain.NewRPCRpsLimiter()
+	limiter := rpclimiter.NewRPCRpsLimiter()
 	c.limiterPerProvider[key] = limiter
 	return limiter, nil
 }
@@ -241,12 +245,12 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 	}
 
 	client := chain.NewClient(ethClients, chainID)
-	client.WalletNotifier = c.walletNotifier
+	client.SetWalletNotifier(c.walletNotifier)
 	c.rpcClients[chainID] = client
 	return client, nil
 }
 
-func (c *Client) getEthClients(network *params.Network) []*chain.EthClient {
+func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEthClientInterface {
 	urls := make(map[string]string)
 	keys := make([]string, 0)
 	authMap := make(map[string]string)
@@ -270,10 +274,10 @@ func (c *Client) getEthClients(network *params.Network) []*chain.EthClient {
 	urls["main"] = network.RPCURL
 	urls["fallback"] = network.FallbackURL
 
-	ethClients := make([]*chain.EthClient, 0)
+	ethClients := make([]ethclient.RPSLimitedEthClientInterface, 0)
 	for index, key := range keys {
 		var rpcClient *gethrpc.Client
-		var rpcLimiter *chain.RPCRpsLimiter
+		var rpcLimiter *rpclimiter.RPCRpsLimiter
 		var err error
 		var hostPort string
 		url := urls[key]
@@ -312,7 +316,7 @@ func (c *Client) getEthClients(network *params.Network) []*chain.EthClient {
 				c.log.Error("get RPC limiter "+key, "error", err)
 			}
 
-			ethClients = append(ethClients, chain.NewEthClient(ethclient.NewClient(rpcClient), rpcLimiter, rpcClient, circuitKey))
+			ethClients = append(ethClients, ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, circuitKey))
 		}
 	}
 
@@ -330,7 +334,7 @@ func (c *Client) EthClient(chainID uint64) (chain.ClientInterface, error) {
 }
 
 // AbstractEthClient returns a partial abstraction used by new components for testing purposes
-func (c *Client) AbstractEthClient(chainID common.ChainID) (chain.BatchCallClient, error) {
+func (c *Client) AbstractEthClient(chainID common.ChainID) (ethclient.BatchCallClient, error) {
 	client, err := c.getClientUsingCache(uint64(chainID))
 	if err != nil {
 		return nil, err
@@ -378,7 +382,11 @@ func (c *Client) UpdateUpstreamURL(url string) error {
 	if err != nil {
 		hostPortUpstream = "upstream"
 	}
-	c.upstream = chain.NewSimpleClient(*chain.NewEthClient(ethclient.NewClient(rpcClient), rpsLimiter, rpcClient, hostPortUpstream), c.UpstreamChainID)
+
+	ethClients := []ethclient.RPSLimitedEthClientInterface{
+		ethclient.NewRPSLimitedEthClient(rpcClient, rpsLimiter, hostPortUpstream),
+	}
+	c.upstream = chain.NewClient(ethClients, c.UpstreamChainID)
 	c.upstreamURL = url
 	c.Unlock()
 

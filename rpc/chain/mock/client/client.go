@@ -19,341 +19,9 @@ import (
 	types "github.com/ethereum/go-ethereum/core/types"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	circuitbreaker "github.com/status-im/status-go/circuitbreaker"
-	chain "github.com/status-im/status-go/rpc/chain"
+	rpclimiter "github.com/status-im/status-go/rpc/chain/rpclimiter"
 	gomock "go.uber.org/mock/gomock"
 )
-
-// MockBatchCallClient is a mock of BatchCallClient interface.
-type MockBatchCallClient struct {
-	ctrl     *gomock.Controller
-	recorder *MockBatchCallClientMockRecorder
-}
-
-// MockBatchCallClientMockRecorder is the mock recorder for MockBatchCallClient.
-type MockBatchCallClientMockRecorder struct {
-	mock *MockBatchCallClient
-}
-
-// NewMockBatchCallClient creates a new mock instance.
-func NewMockBatchCallClient(ctrl *gomock.Controller) *MockBatchCallClient {
-	mock := &MockBatchCallClient{ctrl: ctrl}
-	mock.recorder = &MockBatchCallClientMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockBatchCallClient) EXPECT() *MockBatchCallClientMockRecorder {
-	return m.recorder
-}
-
-// BatchCallContext mocks base method.
-func (m *MockBatchCallClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchCallContext", ctx, b)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// BatchCallContext indicates an expected call of BatchCallContext.
-func (mr *MockBatchCallClientMockRecorder) BatchCallContext(ctx, b any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchCallContext", reflect.TypeOf((*MockBatchCallClient)(nil).BatchCallContext), ctx, b)
-}
-
-// MockChainInterface is a mock of ChainInterface interface.
-type MockChainInterface struct {
-	ctrl     *gomock.Controller
-	recorder *MockChainInterfaceMockRecorder
-}
-
-// MockChainInterfaceMockRecorder is the mock recorder for MockChainInterface.
-type MockChainInterfaceMockRecorder struct {
-	mock *MockChainInterface
-}
-
-// NewMockChainInterface creates a new mock instance.
-func NewMockChainInterface(ctrl *gomock.Controller) *MockChainInterface {
-	mock := &MockChainInterface{ctrl: ctrl}
-	mock.recorder = &MockChainInterfaceMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockChainInterface) EXPECT() *MockChainInterfaceMockRecorder {
-	return m.recorder
-}
-
-// BalanceAt mocks base method.
-func (m *MockChainInterface) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BalanceAt", ctx, account, blockNumber)
-	ret0, _ := ret[0].(*big.Int)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// BalanceAt indicates an expected call of BalanceAt.
-func (mr *MockChainInterfaceMockRecorder) BalanceAt(ctx, account, blockNumber any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BalanceAt", reflect.TypeOf((*MockChainInterface)(nil).BalanceAt), ctx, account, blockNumber)
-}
-
-// BatchCallContext mocks base method.
-func (m *MockChainInterface) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchCallContext", ctx, b)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// BatchCallContext indicates an expected call of BatchCallContext.
-func (mr *MockChainInterfaceMockRecorder) BatchCallContext(ctx, b any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchCallContext", reflect.TypeOf((*MockChainInterface)(nil).BatchCallContext), ctx, b)
-}
-
-// BlockByHash mocks base method.
-func (m *MockChainInterface) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BlockByHash", ctx, hash)
-	ret0, _ := ret[0].(*types.Block)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// BlockByHash indicates an expected call of BlockByHash.
-func (mr *MockChainInterfaceMockRecorder) BlockByHash(ctx, hash any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockByHash", reflect.TypeOf((*MockChainInterface)(nil).BlockByHash), ctx, hash)
-}
-
-// BlockByNumber mocks base method.
-func (m *MockChainInterface) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BlockByNumber", ctx, number)
-	ret0, _ := ret[0].(*types.Block)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// BlockByNumber indicates an expected call of BlockByNumber.
-func (mr *MockChainInterfaceMockRecorder) BlockByNumber(ctx, number any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockByNumber", reflect.TypeOf((*MockChainInterface)(nil).BlockByNumber), ctx, number)
-}
-
-// BlockNumber mocks base method.
-func (m *MockChainInterface) BlockNumber(ctx context.Context) (uint64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BlockNumber", ctx)
-	ret0, _ := ret[0].(uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// BlockNumber indicates an expected call of BlockNumber.
-func (mr *MockChainInterfaceMockRecorder) BlockNumber(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockNumber", reflect.TypeOf((*MockChainInterface)(nil).BlockNumber), ctx)
-}
-
-// CallBlockHashByTransaction mocks base method.
-func (m *MockChainInterface) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CallBlockHashByTransaction", ctx, blockNumber, index)
-	ret0, _ := ret[0].(common.Hash)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CallBlockHashByTransaction indicates an expected call of CallBlockHashByTransaction.
-func (mr *MockChainInterfaceMockRecorder) CallBlockHashByTransaction(ctx, blockNumber, index any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CallBlockHashByTransaction", reflect.TypeOf((*MockChainInterface)(nil).CallBlockHashByTransaction), ctx, blockNumber, index)
-}
-
-// CallContext mocks base method.
-func (m *MockChainInterface) CallContext(ctx context.Context, result any, method string, args ...any) error {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, result, method}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "CallContext", varargs...)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CallContext indicates an expected call of CallContext.
-func (mr *MockChainInterfaceMockRecorder) CallContext(ctx, result, method any, args ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, result, method}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CallContext", reflect.TypeOf((*MockChainInterface)(nil).CallContext), varargs...)
-}
-
-// CallContract mocks base method.
-func (m *MockChainInterface) CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CallContract", ctx, call, blockNumber)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CallContract indicates an expected call of CallContract.
-func (mr *MockChainInterfaceMockRecorder) CallContract(ctx, call, blockNumber any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CallContract", reflect.TypeOf((*MockChainInterface)(nil).CallContract), ctx, call, blockNumber)
-}
-
-// CodeAt mocks base method.
-func (m *MockChainInterface) CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CodeAt", ctx, contract, blockNumber)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CodeAt indicates an expected call of CodeAt.
-func (mr *MockChainInterfaceMockRecorder) CodeAt(ctx, contract, blockNumber any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CodeAt", reflect.TypeOf((*MockChainInterface)(nil).CodeAt), ctx, contract, blockNumber)
-}
-
-// FilterLogs mocks base method.
-func (m *MockChainInterface) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FilterLogs", ctx, q)
-	ret0, _ := ret[0].([]types.Log)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FilterLogs indicates an expected call of FilterLogs.
-func (mr *MockChainInterfaceMockRecorder) FilterLogs(ctx, q any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FilterLogs", reflect.TypeOf((*MockChainInterface)(nil).FilterLogs), ctx, q)
-}
-
-// GetBaseFeeFromBlock mocks base method.
-func (m *MockChainInterface) GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBaseFeeFromBlock", ctx, blockNumber)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetBaseFeeFromBlock indicates an expected call of GetBaseFeeFromBlock.
-func (mr *MockChainInterfaceMockRecorder) GetBaseFeeFromBlock(ctx, blockNumber any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBaseFeeFromBlock", reflect.TypeOf((*MockChainInterface)(nil).GetBaseFeeFromBlock), ctx, blockNumber)
-}
-
-// HeaderByHash mocks base method.
-func (m *MockChainInterface) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HeaderByHash", ctx, hash)
-	ret0, _ := ret[0].(*types.Header)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// HeaderByHash indicates an expected call of HeaderByHash.
-func (mr *MockChainInterfaceMockRecorder) HeaderByHash(ctx, hash any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HeaderByHash", reflect.TypeOf((*MockChainInterface)(nil).HeaderByHash), ctx, hash)
-}
-
-// HeaderByNumber mocks base method.
-func (m *MockChainInterface) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HeaderByNumber", ctx, number)
-	ret0, _ := ret[0].(*types.Header)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// HeaderByNumber indicates an expected call of HeaderByNumber.
-func (mr *MockChainInterfaceMockRecorder) HeaderByNumber(ctx, number any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HeaderByNumber", reflect.TypeOf((*MockChainInterface)(nil).HeaderByNumber), ctx, number)
-}
-
-// NetworkID mocks base method.
-func (m *MockChainInterface) NetworkID() uint64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NetworkID")
-	ret0, _ := ret[0].(uint64)
-	return ret0
-}
-
-// NetworkID indicates an expected call of NetworkID.
-func (mr *MockChainInterfaceMockRecorder) NetworkID() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NetworkID", reflect.TypeOf((*MockChainInterface)(nil).NetworkID))
-}
-
-// NonceAt mocks base method.
-func (m *MockChainInterface) NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NonceAt", ctx, account, blockNumber)
-	ret0, _ := ret[0].(uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// NonceAt indicates an expected call of NonceAt.
-func (mr *MockChainInterfaceMockRecorder) NonceAt(ctx, account, blockNumber any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NonceAt", reflect.TypeOf((*MockChainInterface)(nil).NonceAt), ctx, account, blockNumber)
-}
-
-// ToBigInt mocks base method.
-func (m *MockChainInterface) ToBigInt() *big.Int {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ToBigInt")
-	ret0, _ := ret[0].(*big.Int)
-	return ret0
-}
-
-// ToBigInt indicates an expected call of ToBigInt.
-func (mr *MockChainInterfaceMockRecorder) ToBigInt() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToBigInt", reflect.TypeOf((*MockChainInterface)(nil).ToBigInt))
-}
-
-// TransactionByHash mocks base method.
-func (m *MockChainInterface) TransactionByHash(ctx context.Context, hash common.Hash) (*types.Transaction, bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TransactionByHash", ctx, hash)
-	ret0, _ := ret[0].(*types.Transaction)
-	ret1, _ := ret[1].(bool)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// TransactionByHash indicates an expected call of TransactionByHash.
-func (mr *MockChainInterfaceMockRecorder) TransactionByHash(ctx, hash any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionByHash", reflect.TypeOf((*MockChainInterface)(nil).TransactionByHash), ctx, hash)
-}
-
-// TransactionReceipt mocks base method.
-func (m *MockChainInterface) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TransactionReceipt", ctx, txHash)
-	ret0, _ := ret[0].(*types.Receipt)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// TransactionReceipt indicates an expected call of TransactionReceipt.
-func (mr *MockChainInterfaceMockRecorder) TransactionReceipt(ctx, txHash any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionReceipt", reflect.TypeOf((*MockChainInterface)(nil).TransactionReceipt), ctx, txHash)
-}
 
 // MockClientInterface is a mock of ClientInterface interface.
 type MockClientInterface struct {
@@ -501,19 +169,31 @@ func (mr *MockClientInterfaceMockRecorder) CallContract(ctx, call, blockNumber a
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CallContract", reflect.TypeOf((*MockClientInterface)(nil).CallContract), ctx, call, blockNumber)
 }
 
-// CodeAt mocks base method.
-func (m *MockClientInterface) CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error) {
+// Close mocks base method.
+func (m *MockClientInterface) Close() {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CodeAt", ctx, contract, blockNumber)
+	m.ctrl.Call(m, "Close")
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockClientInterfaceMockRecorder) Close() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockClientInterface)(nil).Close))
+}
+
+// CodeAt mocks base method.
+func (m *MockClientInterface) CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CodeAt", ctx, account, blockNumber)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CodeAt indicates an expected call of CodeAt.
-func (mr *MockClientInterfaceMockRecorder) CodeAt(ctx, contract, blockNumber any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) CodeAt(ctx, account, blockNumber any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CodeAt", reflect.TypeOf((*MockClientInterface)(nil).CodeAt), ctx, contract, blockNumber)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CodeAt", reflect.TypeOf((*MockClientInterface)(nil).CodeAt), ctx, account, blockNumber)
 }
 
 // EstimateGas mocks base method.
@@ -529,6 +209,21 @@ func (m *MockClientInterface) EstimateGas(ctx context.Context, call ethereum.Cal
 func (mr *MockClientInterfaceMockRecorder) EstimateGas(ctx, call any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EstimateGas", reflect.TypeOf((*MockClientInterface)(nil).EstimateGas), ctx, call)
+}
+
+// FeeHistory mocks base method.
+func (m *MockClientInterface) FeeHistory(ctx context.Context, blockCount uint64, lastBlock *big.Int, rewardPercentiles []float64) (*ethereum.FeeHistory, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FeeHistory", ctx, blockCount, lastBlock, rewardPercentiles)
+	ret0, _ := ret[0].(*ethereum.FeeHistory)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FeeHistory indicates an expected call of FeeHistory.
+func (mr *MockClientInterfaceMockRecorder) FeeHistory(ctx, blockCount, lastBlock, rewardPercentiles any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FeeHistory", reflect.TypeOf((*MockClientInterface)(nil).FeeHistory), ctx, blockCount, lastBlock, rewardPercentiles)
 }
 
 // FilterLogs mocks base method.
@@ -562,10 +257,10 @@ func (mr *MockClientInterfaceMockRecorder) GetBaseFeeFromBlock(ctx, blockNumber 
 }
 
 // GetLimiter mocks base method.
-func (m *MockClientInterface) GetLimiter() chain.RequestLimiter {
+func (m *MockClientInterface) GetLimiter() rpclimiter.RequestLimiter {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLimiter")
-	ret0, _ := ret[0].(chain.RequestLimiter)
+	ret0, _ := ret[0].(rpclimiter.RequestLimiter)
 	return ret0
 }
 
@@ -662,6 +357,36 @@ func (mr *MockClientInterfaceMockRecorder) NonceAt(ctx, account, blockNumber any
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NonceAt", reflect.TypeOf((*MockClientInterface)(nil).NonceAt), ctx, account, blockNumber)
 }
 
+// PendingBalanceAt mocks base method.
+func (m *MockClientInterface) PendingBalanceAt(ctx context.Context, account common.Address) (*big.Int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PendingBalanceAt", ctx, account)
+	ret0, _ := ret[0].(*big.Int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PendingBalanceAt indicates an expected call of PendingBalanceAt.
+func (mr *MockClientInterfaceMockRecorder) PendingBalanceAt(ctx, account any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingBalanceAt", reflect.TypeOf((*MockClientInterface)(nil).PendingBalanceAt), ctx, account)
+}
+
+// PendingCallContract mocks base method.
+func (m *MockClientInterface) PendingCallContract(ctx context.Context, call ethereum.CallMsg) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PendingCallContract", ctx, call)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PendingCallContract indicates an expected call of PendingCallContract.
+func (mr *MockClientInterfaceMockRecorder) PendingCallContract(ctx, call any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingCallContract", reflect.TypeOf((*MockClientInterface)(nil).PendingCallContract), ctx, call)
+}
+
 // PendingCodeAt mocks base method.
 func (m *MockClientInterface) PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error) {
 	m.ctrl.T.Helper()
@@ -692,6 +417,36 @@ func (mr *MockClientInterfaceMockRecorder) PendingNonceAt(ctx, account any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingNonceAt", reflect.TypeOf((*MockClientInterface)(nil).PendingNonceAt), ctx, account)
 }
 
+// PendingStorageAt mocks base method.
+func (m *MockClientInterface) PendingStorageAt(ctx context.Context, account common.Address, key common.Hash) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PendingStorageAt", ctx, account, key)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PendingStorageAt indicates an expected call of PendingStorageAt.
+func (mr *MockClientInterfaceMockRecorder) PendingStorageAt(ctx, account, key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingStorageAt", reflect.TypeOf((*MockClientInterface)(nil).PendingStorageAt), ctx, account, key)
+}
+
+// PendingTransactionCount mocks base method.
+func (m *MockClientInterface) PendingTransactionCount(ctx context.Context) (uint, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PendingTransactionCount", ctx)
+	ret0, _ := ret[0].(uint)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PendingTransactionCount indicates an expected call of PendingTransactionCount.
+func (mr *MockClientInterfaceMockRecorder) PendingTransactionCount(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingTransactionCount", reflect.TypeOf((*MockClientInterface)(nil).PendingTransactionCount), ctx)
+}
+
 // SendTransaction mocks base method.
 func (m *MockClientInterface) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	m.ctrl.T.Helper()
@@ -719,7 +474,7 @@ func (mr *MockClientInterfaceMockRecorder) SetIsConnected(arg0 any) *gomock.Call
 }
 
 // SetLimiter mocks base method.
-func (m *MockClientInterface) SetLimiter(arg0 chain.RequestLimiter) {
+func (m *MockClientInterface) SetLimiter(arg0 rpclimiter.RequestLimiter) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetLimiter", arg0)
 }
@@ -742,19 +497,34 @@ func (mr *MockClientInterfaceMockRecorder) SetWalletNotifier(notifier any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetWalletNotifier", reflect.TypeOf((*MockClientInterface)(nil).SetWalletNotifier), notifier)
 }
 
-// SubscribeFilterLogs mocks base method.
-func (m *MockClientInterface) SubscribeFilterLogs(ctx context.Context, query ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
+// StorageAt mocks base method.
+func (m *MockClientInterface) StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubscribeFilterLogs", ctx, query, ch)
+	ret := m.ctrl.Call(m, "StorageAt", ctx, account, key, blockNumber)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StorageAt indicates an expected call of StorageAt.
+func (mr *MockClientInterfaceMockRecorder) StorageAt(ctx, account, key, blockNumber any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StorageAt", reflect.TypeOf((*MockClientInterface)(nil).StorageAt), ctx, account, key, blockNumber)
+}
+
+// SubscribeFilterLogs mocks base method.
+func (m *MockClientInterface) SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubscribeFilterLogs", ctx, q, ch)
 	ret0, _ := ret[0].(ethereum.Subscription)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SubscribeFilterLogs indicates an expected call of SubscribeFilterLogs.
-func (mr *MockClientInterfaceMockRecorder) SubscribeFilterLogs(ctx, query, ch any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) SubscribeFilterLogs(ctx, q, ch any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeFilterLogs", reflect.TypeOf((*MockClientInterface)(nil).SubscribeFilterLogs), ctx, query, ch)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeFilterLogs", reflect.TypeOf((*MockClientInterface)(nil).SubscribeFilterLogs), ctx, q, ch)
 }
 
 // SuggestGasPrice mocks base method.
@@ -787,6 +557,21 @@ func (mr *MockClientInterfaceMockRecorder) SuggestGasTipCap(ctx any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SuggestGasTipCap", reflect.TypeOf((*MockClientInterface)(nil).SuggestGasTipCap), ctx)
 }
 
+// SyncProgress mocks base method.
+func (m *MockClientInterface) SyncProgress(ctx context.Context) (*ethereum.SyncProgress, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SyncProgress", ctx)
+	ret0, _ := ret[0].(*ethereum.SyncProgress)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SyncProgress indicates an expected call of SyncProgress.
+func (mr *MockClientInterfaceMockRecorder) SyncProgress(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncProgress", reflect.TypeOf((*MockClientInterface)(nil).SyncProgress), ctx)
+}
+
 // ToBigInt mocks base method.
 func (m *MockClientInterface) ToBigInt() *big.Int {
 	m.ctrl.T.Helper()
@@ -802,9 +587,9 @@ func (mr *MockClientInterfaceMockRecorder) ToBigInt() *gomock.Call {
 }
 
 // TransactionByHash mocks base method.
-func (m *MockClientInterface) TransactionByHash(ctx context.Context, hash common.Hash) (*types.Transaction, bool, error) {
+func (m *MockClientInterface) TransactionByHash(ctx context.Context, txHash common.Hash) (*types.Transaction, bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TransactionByHash", ctx, hash)
+	ret := m.ctrl.Call(m, "TransactionByHash", ctx, txHash)
 	ret0, _ := ret[0].(*types.Transaction)
 	ret1, _ := ret[1].(bool)
 	ret2, _ := ret[2].(error)
@@ -812,9 +597,9 @@ func (m *MockClientInterface) TransactionByHash(ctx context.Context, hash common
 }
 
 // TransactionByHash indicates an expected call of TransactionByHash.
-func (mr *MockClientInterfaceMockRecorder) TransactionByHash(ctx, hash any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) TransactionByHash(ctx, txHash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionByHash", reflect.TypeOf((*MockClientInterface)(nil).TransactionByHash), ctx, hash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionByHash", reflect.TypeOf((*MockClientInterface)(nil).TransactionByHash), ctx, txHash)
 }
 
 // TransactionReceipt mocks base method.
@@ -832,93 +617,19 @@ func (mr *MockClientInterfaceMockRecorder) TransactionReceipt(ctx, txHash any) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionReceipt", reflect.TypeOf((*MockClientInterface)(nil).TransactionReceipt), ctx, txHash)
 }
 
-// MockTagger is a mock of Tagger interface.
-type MockTagger struct {
-	ctrl     *gomock.Controller
-	recorder *MockTaggerMockRecorder
-}
-
-// MockTaggerMockRecorder is the mock recorder for MockTagger.
-type MockTaggerMockRecorder struct {
-	mock *MockTagger
-}
-
-// NewMockTagger creates a new mock instance.
-func NewMockTagger(ctrl *gomock.Controller) *MockTagger {
-	mock := &MockTagger{ctrl: ctrl}
-	mock.recorder = &MockTaggerMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockTagger) EXPECT() *MockTaggerMockRecorder {
-	return m.recorder
-}
-
-// DeepCopyTag mocks base method.
-func (m *MockTagger) DeepCopyTag() chain.Tagger {
+// TransactionSender mocks base method.
+func (m *MockClientInterface) TransactionSender(ctx context.Context, tx *types.Transaction, block common.Hash, index uint) (common.Address, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeepCopyTag")
-	ret0, _ := ret[0].(chain.Tagger)
-	return ret0
+	ret := m.ctrl.Call(m, "TransactionSender", ctx, tx, block, index)
+	ret0, _ := ret[0].(common.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// DeepCopyTag indicates an expected call of DeepCopyTag.
-func (mr *MockTaggerMockRecorder) DeepCopyTag() *gomock.Call {
+// TransactionSender indicates an expected call of TransactionSender.
+func (mr *MockClientInterfaceMockRecorder) TransactionSender(ctx, tx, block, index any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeepCopyTag", reflect.TypeOf((*MockTagger)(nil).DeepCopyTag))
-}
-
-// GroupTag mocks base method.
-func (m *MockTagger) GroupTag() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GroupTag")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// GroupTag indicates an expected call of GroupTag.
-func (mr *MockTaggerMockRecorder) GroupTag() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GroupTag", reflect.TypeOf((*MockTagger)(nil).GroupTag))
-}
-
-// SetGroupTag mocks base method.
-func (m *MockTagger) SetGroupTag(tag string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetGroupTag", tag)
-}
-
-// SetGroupTag indicates an expected call of SetGroupTag.
-func (mr *MockTaggerMockRecorder) SetGroupTag(tag any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetGroupTag", reflect.TypeOf((*MockTagger)(nil).SetGroupTag), tag)
-}
-
-// SetTag mocks base method.
-func (m *MockTagger) SetTag(tag string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetTag", tag)
-}
-
-// SetTag indicates an expected call of SetTag.
-func (mr *MockTaggerMockRecorder) SetTag(tag any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTag", reflect.TypeOf((*MockTagger)(nil).SetTag), tag)
-}
-
-// Tag mocks base method.
-func (m *MockTagger) Tag() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Tag")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// Tag indicates an expected call of Tag.
-func (mr *MockTaggerMockRecorder) Tag() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Tag", reflect.TypeOf((*MockTagger)(nil).Tag))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionSender", reflect.TypeOf((*MockClientInterface)(nil).TransactionSender), ctx, tx, block, index)
 }
 
 // MockHealthMonitor is a mock of HealthMonitor interface.
