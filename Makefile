@@ -318,6 +318,9 @@ generate:
 	#go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./_assets/generate_handlers/...
 	#go generate ./appdatabase/...
 
+download-uniswap-tokens:
+	go run ./services/wallet/token/downloader/main.go
+
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
 	mv build/bin/statusgo.aar $(RELEASE_DIR)/status-go-android.aar
