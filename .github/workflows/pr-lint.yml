@@ -1,0 +1,21 @@
+name: "Conventional Commits"
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+jobs:
+  lint_pr_title:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Keep regex in sync with ./_assets/scripts/parse_commits.sh#L25
+          headerPattern: '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\(.*\))?(\_|!): (.*)$'
+          headerPatternCorrespondence: type, scope, breaking, subject

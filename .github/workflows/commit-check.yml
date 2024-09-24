@@ -9,8 +9,8 @@ on:
       - labeled
       - unlabeled
 jobs:
-  main:
-    name: Validate format
+  lint_pr_commits:
+    name: Validate commit messages
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -23,6 +23,7 @@ jobs:
 
       - name: Check commit message
         id: check_commit_message
+        if: always()
         run: |
           set +e
           
@@ -50,7 +51,6 @@ jobs:
             echo "error_message<<$EOF" >> "$GITHUB_ENV"
             echo "${invalid_commit_messages}" >> "$GITHUB_ENV"
             echo "$EOF" >> "$GITHUB_ENV"
-          
           fi
 
       - name: "Publish failed commit messages"
