@@ -1,13 +1,46 @@
+# When modifying this file, please validate using:
+#  make codecov-validate
+
+codecov:
+  require_ci_to_pass: false
+  notify:
+    wait_for_ci: true
+
 coverage:
-  require_ci_to_pass: no
-  wait_for_ci: no
   status:
     project:
       default:
         informational: true
+      unit-tests:
+        target: auto
+        flags:
+          - unit
+      functional-tests:
+        target: auto
+        flags:
+          - functional
     patch:
       default:
         informational: true
+      unit-tests:
+        target: auto
+        flags:
+          - unit
+      functional-tests:
+        target: auto
+        flags:
+          - functional
 
-# When modifying this file, please validate using:
-# make codecov-validate
+flags:
+  unit-tests:
+    paths:
+      - ".*"
+    carryforward: false
+  functional-tests:
+    paths:
+      - ".*"
+    carryforward: true
+
+comment:
+  behavior: default
+  layout: diff,flags,tree

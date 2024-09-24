@@ -108,3 +108,6 @@ __pycache__/
 .pytest_cache/
 .envrc
 report/results.xml
+integration-tests/coverage
+integration-tests/reports
+integration-tests/*.log
