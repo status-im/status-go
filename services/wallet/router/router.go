@@ -78,6 +78,9 @@ type Router struct {
 	activeRoutesMutex sync.Mutex
 	activeRoutes      *SuggestedRoutes
 
+	routeCanceledMutex sync.Mutex
+	routeCanceled      bool
+
 	lastInputParamsMutex sync.Mutex
 	lastInputParams      *requests.RouteInputParams
 
@@ -199,7 +202,14 @@ func (r *Router) SuggestedRoutesAsync(input *requests.RouteInputParams) {
 	})
 }
 
+func (r *Router) markRouteCanceled(value bool) {
+	r.routeCanceledMutex.Lock()
+	r.routeCanceled = value
+	r.routeCanceledMutex.Unlock()
+}
+
 func (r *Router) StopSuggestedRoutesAsyncCalculation() {
+	r.markRouteCanceled(true)
 	r.unsubscribeFeesUpdateAccrossAllChains()
 	r.scheduler.Stop()
 }
@@ -211,6 +221,7 @@ func (r *Router) StopSuggestedRoutesCalculation() {
 func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInputParams) (suggestedRoutes *SuggestedRoutes, err error) {
 	// unsubscribe from updates
 	r.unsubscribeFeesUpdateAccrossAllChains()
+	r.markRouteCanceled(false)
 
 	// clear all processors
 	for _, processor := range r.pathProcessors {
@@ -227,12 +238,14 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 		r.activeRoutesMutex.Lock()
 		r.activeRoutes = suggestedRoutes
 		r.activeRoutesMutex.Unlock()
-		if suggestedRoutes != nil && err == nil {
+		r.routeCanceledMutex.Lock()
+		if suggestedRoutes != nil && err == nil && !r.routeCanceled {
 			// subscribe for updates
 			for _, path := range suggestedRoutes.Best {
 				err = r.subscribeForUdates(path.FromChain.ChainID)
 			}
 		}
+		r.routeCanceledMutex.Unlock()
 	}()
 
 	testnetMode, err := r.rpcClient.NetworkManager.GetTestNetworksEnabled()
