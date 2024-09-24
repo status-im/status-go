@@ -14,13 +14,14 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	ethereum "github.com/ethereum/go-ethereum"
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	circuitbreaker "github.com/status-im/status-go/circuitbreaker"
 	rpclimiter "github.com/status-im/status-go/rpc/chain/rpclimiter"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockClientInterface is a mock of ClientInterface interface.

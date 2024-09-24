@@ -14,10 +14,11 @@ import (
 	json "encoding/json"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	types "github.com/status-im/status-go/eth-node/types"
 	settings "github.com/status-im/status-go/multiaccounts/settings"
 	params "github.com/status-im/status-go/params"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockDatabaseSettingsManager is a mock of DatabaseSettingsManager interface.

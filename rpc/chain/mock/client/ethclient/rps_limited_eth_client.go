@@ -14,13 +14,14 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	ethereum "github.com/ethereum/go-ethereum"
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	ethclient "github.com/status-im/status-go/rpc/chain/ethclient"
 	rpclimiter "github.com/status-im/status-go/rpc/chain/rpclimiter"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockRPSLimitedEthClientInterface is a mock of RPSLimitedEthClientInterface interface.

@@ -15,9 +15,10 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	paraswap "github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockClientInterface is a mock of ClientInterface interface.

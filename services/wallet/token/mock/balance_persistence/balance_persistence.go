@@ -12,9 +12,10 @@ package mock_balance_persistence
 import (
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	token "github.com/status-im/status-go/services/wallet/token"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockTokenBalancesStorage is a mock of TokenBalancesStorage interface.

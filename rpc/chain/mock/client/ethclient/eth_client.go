@@ -14,11 +14,12 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	ethereum "github.com/ethereum/go-ethereum"
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
 	rpc "github.com/ethereum/go-ethereum/rpc"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockChainReader is a mock of ChainReader interface.

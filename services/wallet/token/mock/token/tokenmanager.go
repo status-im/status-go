@@ -14,11 +14,12 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	chain "github.com/status-im/status-go/rpc/chain"
 	token "github.com/status-im/status-go/services/wallet/token"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockManagerInterface is a mock of ManagerInterface interface.

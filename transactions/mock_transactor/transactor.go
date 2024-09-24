@@ -13,6 +13,8 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
 	account "github.com/status-im/status-go/account"
@@ -21,7 +23,6 @@ import (
 	rpc "github.com/status-im/status-go/rpc"
 	common0 "github.com/status-im/status-go/services/wallet/common"
 	transactions "github.com/status-im/status-go/transactions"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockTransactorIface is a mock of TransactorIface interface.

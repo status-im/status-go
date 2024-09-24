@@ -12,8 +12,9 @@ package mock_collectibles
 import (
 	reflect "reflect"
 
-	thirdparty "github.com/status-im/status-go/services/wallet/thirdparty"
 	gomock "go.uber.org/mock/gomock"
+
+	thirdparty "github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 // MockCollectibleDataStorage is a mock of CollectibleDataStorage interface.
