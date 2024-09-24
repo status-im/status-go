@@ -17,20 +17,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.GITHUB_HEAD_REF }}
-          fetch-tags: true
-
-      - name: Fetch tags
-        run: |
-          git fetch --tags --quiet
-          git checkout ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          ref: ${{github.event.pull_request.head.ref}}
+          repository: ${{github.event.pull_request.head.repo.full_name}}
 
       - name: Check commit message
         id: check_commit_message
         run: |
           set +e
+          
+          base_sha=${{ github.event.pull_request.base.sha }} 
+          head_sha=${{ github.event.pull_request.head.sha }}
 
-          output=$(./_assets/scripts/commit_check.sh 2>&1)
+          output=$(./_assets/scripts/commit_check.sh "${base_sha}" "${head_sha}" 2>&1)
           exit_code=$?
           
           echo "${output}" | sed '$d'
