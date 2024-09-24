@@ -1,6 +1,6 @@
 package pathprocessor
 
-//go:generate mockgen -source=processor.go -destination=mock_pathprocessor/processor.go
+//go:generate mockgen -package=mock_pathprocessor -source=processor.go -destination=mock_pathprocessor/processor.go
 
 import (
 	"math/big"

@@ -1,6 +1,6 @@
 package onramp
 
-//go:generate mockgen -source=types.go -destination=mock/types.go
+//go:generate mockgen -package=mock_onramp -source=types.go -destination=mock/types.go
 
 import (
 	"context"

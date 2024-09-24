@@ -1,6 +1,6 @@
 package thirdparty
 
-//go:generate mockgen -source=services/wallet/thirdparty/types.go -destination=services/wallet/thirdparty/mock/types.go
+//go:generate mockgen -package=mock_thirdparty -source=services/wallet/thirdparty/types.go -destination=services/wallet/thirdparty/mock/types.go
 
 type HistoricalPrice struct {
 	Timestamp int64   `json:"time"`

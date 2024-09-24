@@ -1,6 +1,6 @@
 package thirdparty
 
-//go:generate mockgen -source=collectible_types.go -destination=mock/collectible_types.go
+//go:generate mockgen -package=mock_thirdparty -source=collectible_types.go -destination=mock/collectible_types.go
 
 import (
 	"context"

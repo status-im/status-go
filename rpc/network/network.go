@@ -1,6 +1,6 @@
 package network
 
-//go:generate mockgen -source=network.go -destination=mock/network.go
+//go:generate mockgen -package=mock_network  -source=network.go -destination=mock/network.go
 
 import (
 	"bytes"

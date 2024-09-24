@@ -1,6 +1,6 @@
 package chain
 
-//go:generate mockgen -package=mock_client -source=client.go -destination=mock/client/client.go
+//go:generate mockgen -package=mock_client -package=mock_client -source=client.go -destination=mock/client/client.go
 
 import (
 	"context"
