@@ -313,8 +313,8 @@ setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
 generate:
-	@packages=$(shell go list ./... | grep -v "./contracts")
-	@go generate "${packages}"
+	packages=$(call sh, go list ./... | grep -v "./contracts")
+	go generate $packages
 	#go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./_assets/generate_handlers/...
 	#go generate ./appdatabase/...
 
