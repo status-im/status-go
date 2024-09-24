@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -239,7 +239,7 @@ func TestWatchTransaction(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	rpcClient := mock_rpcclient.NewMockClientInterface(ctrl)
-	rpcClient.EXPECT().AbstractEthClient(wallet_common.ChainID(chainID)).DoAndReturn(func(chainID wallet_common.ChainID) (chain.BatchCallClient, error) {
+	rpcClient.EXPECT().AbstractEthClient(wallet_common.ChainID(chainID)).DoAndReturn(func(chainID wallet_common.ChainID) (ethclient.BatchCallClient, error) {
 		return chainClient.AbstractEthClient(chainID)
 	}).AnyTimes()
 	eventFeed := &event.Feed{}
@@ -291,7 +291,7 @@ func TestWatchTransaction_Timeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	rpcClient := mock_rpcclient.NewMockClientInterface(gomock.NewController(t))
-	rpcClient.EXPECT().AbstractEthClient(wallet_common.ChainID(chainID)).DoAndReturn(func(chainID wallet_common.ChainID) (chain.BatchCallClient, error) {
+	rpcClient.EXPECT().AbstractEthClient(wallet_common.ChainID(chainID)).DoAndReturn(func(chainID wallet_common.ChainID) (ethclient.BatchCallClient, error) {
 		return chainClient.AbstractEthClient(chainID)
 	}).AnyTimes()
 	eventFeed := &event.Feed{}
