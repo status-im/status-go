@@ -232,9 +232,10 @@ func (tc *TestClient) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([
 	logs := []types.Log{}
 	for _, transfer := range allTransfers {
 		if transfer.block.Cmp(q.FromBlock) >= 0 && transfer.block.Cmp(q.ToBlock) <= 0 {
+			header := getTestHeader(transfer.block)
 			log := types.Log{
-				BlockNumber: transfer.block.Uint64(),
-				BlockHash:   common.BigToHash(transfer.block),
+				BlockNumber: header.Number.Uint64(),
+				BlockHash:   header.Hash(),
 			}
 
 			// Use the address at least in one any(from/to) topic to trick the implementation
@@ -287,6 +288,18 @@ func (tc *TestClient) tokenBalanceAt(account common.Address, token common.Addres
 	return balance
 }
 
+func getTestHeader(number *big.Int) *types.Header {
+	return &types.Header{
+		Number:     big.NewInt(0).Set(number),
+		Time:       0,
+		Difficulty: big.NewInt(0),
+		ParentHash: common.Hash{},
+		Nonce:      types.BlockNonce{},
+		MixDigest:  common.Hash{},
+		Extra:      make([]byte, 0),
+	}
+}
+
 func (tc *TestClient) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
 	if number == nil {
 		number = big.NewInt(int64(tc.currentBlock))
@@ -297,20 +310,9 @@ func (tc *TestClient) HeaderByNumber(ctx context.Context, number *big.Int) (*typ
 		return nil, err
 	}
 
-	header := &types.Header{
-		Number: number,
-		Time:   0,
-	}
+	header := getTestHeader(number)
 
 	return header, nil
-}
-
-func (tc *TestClient) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
-	err := tc.countAndlog("CallBlockHashByTransaction")
-	if err != nil {
-		return common.Hash{}, err
-	}
-	return common.BigToHash(blockNumber), nil
 }
 
 func (tc *TestClient) GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error) {

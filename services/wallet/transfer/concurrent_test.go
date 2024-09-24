@@ -81,10 +81,6 @@ func (f balancesFixture) NetworkID() uint64 {
 	return 0
 }
 
-func (f balancesFixture) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
-	return common.HexToHash("0x0"), nil
-}
-
 type batchesFixture [][]Transfer
 
 func (f batchesFixture) GetTransfersByNumber(ctx context.Context, number *big.Int) (rst []Transfer, err error) {

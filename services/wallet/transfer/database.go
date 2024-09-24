@@ -33,9 +33,9 @@ type DBHeader struct {
 	Loaded bool
 }
 
-func toDBHeader(header *types.Header, blockHash common.Hash, account common.Address) *DBHeader {
+func toDBHeader(header *types.Header, account common.Address) *DBHeader {
 	return &DBHeader{
-		Hash:      blockHash,
+		Hash:      header.Hash(),
 		Number:    header.Number,
 		Timestamp: header.Time,
 		Loaded:    false,

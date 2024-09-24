@@ -783,24 +783,6 @@ func (c *ClientWithFallback) GetBaseFeeFromBlock(ctx context.Context, blockNumbe
 	return baseGasFee, err
 }
 
-func (c *ClientWithFallback) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
-	rpcstats.CountCallWithTag("eth_FullTransactionByBlockNumberAndIndex", c.tag)
-
-	res, err := c.makeCall(
-		ctx, c.ethClients, func(client ethclient.RPSLimitedEthClientInterface) (interface{}, error) {
-			return client.CallBlockHashByTransaction(ctx, blockNumber, index)
-		},
-	)
-
-	c.toggleConnectionState(err)
-
-	if err != nil {
-		return common.HexToHash(""), err
-	}
-
-	return res.(common.Hash), nil
-}
-
 func (c *ClientWithFallback) GetWalletNotifier() func(chainId uint64, message string) {
 	return c.WalletNotifier
 }
