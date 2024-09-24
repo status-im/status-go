@@ -9,13 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/common"
 	gowakuPersistence "github.com/waku-org/go-waku/waku/persistence"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/legacy_store/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
+
+	"github.com/status-im/status-go/common"
 
 	"go.uber.org/zap"
 )

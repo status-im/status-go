@@ -8,8 +8,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/status-im/status-go/common"
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/common"
 )
 
 type Server struct {
