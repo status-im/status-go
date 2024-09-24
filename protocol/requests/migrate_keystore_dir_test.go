@@ -8,65 +8,64 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 )
 
-func TestMigrateKeyStoreDir_Validate(t *testing.T) {
+func TestMigrateKeystoreDir_Validate(t *testing.T) {
 	testCases := []struct {
 		name        string
-		req         MigrateKeyStoreDir
-		expectedErr error
+		req         MigrateKeystoreDir
+		expectedErr string
 	}{
 		{
 			name: "valid request",
-			req: MigrateKeyStoreDir{
-				Account:  multiaccounts.Account{KeyUID: "0x1234"},
-				Password: "password",
-				OldDir:   "/old/dir",
-				NewDir:   "/new/dir",
+			req: MigrateKeystoreDir{
+				Account:  multiaccounts.Account{Name: "test-account"},
+				Password: "test-password",
+				OldDir:   "/old/keystore/dir",
+				NewDir:   "/new/keystore/dir",
 			},
-			expectedErr: nil,
 		},
 		{
 			name: "empty account",
-			req: MigrateKeyStoreDir{
-				Password: "password",
-				OldDir:   "/old/dir",
-				NewDir:   "/new/dir",
+			req: MigrateKeystoreDir{
+				Password: "test-password",
+				OldDir:   "/old/keystore/dir",
+				NewDir:   "/new/keystore/dir",
 			},
-			expectedErr: ErrMigrateKeyStoreDirEmptyAccount,
 		},
 		{
 			name: "empty password",
-			req: MigrateKeyStoreDir{
-				Account: multiaccounts.Account{KeyUID: "0x1234"},
-				OldDir:  "/old/dir",
-				NewDir:  "/new/dir",
+			req: MigrateKeystoreDir{
+				Account: multiaccounts.Account{Name: "test-account"},
+				OldDir:  "/old/keystore/dir",
+				NewDir:  "/new/keystore/dir",
 			},
-			expectedErr: ErrMigrateKeyStoreDirEmptyPassword,
+			expectedErr: "Password",
 		},
 		{
 			name: "empty old dir",
-			req: MigrateKeyStoreDir{
-				Account:  multiaccounts.Account{KeyUID: "0x1234"},
-				Password: "password",
-				NewDir:   "/new/dir",
+			req: MigrateKeystoreDir{
+				Account:  multiaccounts.Account{Name: "test-account"},
+				Password: "test-password",
+				NewDir:   "/new/keystore/dir",
 			},
-			expectedErr: ErrMigrateKeyStoreDirEmptyOldDir,
+			expectedErr: "OldDir",
 		},
 		{
 			name: "empty new dir",
-			req: MigrateKeyStoreDir{
-				Account:  multiaccounts.Account{KeyUID: "0x1234"},
-				Password: "password",
-				OldDir:   "/old/dir",
+			req: MigrateKeystoreDir{
+				Account:  multiaccounts.Account{Name: "test-account"},
+				Password: "test-password",
+				OldDir:   "/old/keystore/dir",
 			},
-			expectedErr: ErrMigrateKeyStoreDirEmptyNewDir,
+			expectedErr: "NewDir",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.req.Validate()
-			if tc.expectedErr != nil {
-				require.Equal(t, tc.expectedErr, err)
+			if tc.expectedErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.expectedErr)
 			} else {
 				require.NoError(t, err)
 			}

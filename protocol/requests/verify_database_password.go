@@ -1,30 +1,19 @@
 package requests
 
 import (
-	"errors"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 // VerifyDatabasePassword represents a request to verify the database password.
 type VerifyDatabasePassword struct {
 	// KeyUID identifies the specific key in the database.
-	KeyUID string `json:"keyUID"`
+	KeyUID string `json:"keyUID" validate:"required"`
 
 	// Password is the password to verify against the database entry.
-	Password string `json:"password"`
+	Password string `json:"password" validate:"required"`
 }
 
-// Validate checks the validity of the VerifyDatabasePasswordV2 request.
-var (
-	ErrVerifyDatabasePasswordEmptyKeyUID   = errors.New("verify-database-password: KeyUID cannot be empty")
-	ErrVerifyDatabasePasswordEmptyPassword = errors.New("verify-database-password: Password cannot be empty")
-)
-
+// Validate checks the validity of the VerifyDatabasePassword request.
 func (v *VerifyDatabasePassword) Validate() error {
-	if v.KeyUID == "" {
-		return ErrVerifyDatabasePasswordEmptyKeyUID
-	}
-	if v.Password == "" {
-		return ErrVerifyDatabasePasswordEmptyPassword
-	}
-	return nil
+	return validator.New().Struct(v)
 }

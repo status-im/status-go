@@ -10,7 +10,7 @@ func TestDeleteImportedKey_Validate(t *testing.T) {
 	testCases := []struct {
 		name        string
 		req         DeleteImportedKey
-		expectedErr error
+		expectedErr string
 	}{
 		{
 			name: "valid request",
@@ -19,7 +19,6 @@ func TestDeleteImportedKey_Validate(t *testing.T) {
 				Password:    "password",
 				KeyStoreDir: "/keystore/dir",
 			},
-			expectedErr: nil,
 		},
 		{
 			name: "empty address",
@@ -27,7 +26,7 @@ func TestDeleteImportedKey_Validate(t *testing.T) {
 				Password:    "password",
 				KeyStoreDir: "/keystore/dir",
 			},
-			expectedErr: ErrDeleteImportedKeyEmptyAddress,
+			expectedErr: "Address",
 		},
 		{
 			name: "empty password",
@@ -35,7 +34,7 @@ func TestDeleteImportedKey_Validate(t *testing.T) {
 				Address:     "0x1234567890123456789012345678901234567890",
 				KeyStoreDir: "/keystore/dir",
 			},
-			expectedErr: ErrDeleteImportedKeyEmptyPassword,
+			expectedErr: "Password",
 		},
 		{
 			name: "empty keystore dir",
@@ -43,15 +42,16 @@ func TestDeleteImportedKey_Validate(t *testing.T) {
 				Address:  "0x1234567890123456789012345678901234567890",
 				Password: "password",
 			},
-			expectedErr: ErrDeleteImportedKeyEmptyKeyStoreDir,
+			expectedErr: "KeyStoreDir",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.req.Validate()
-			if tc.expectedErr != nil {
-				require.Equal(t, tc.expectedErr, err)
+			if tc.expectedErr != "" {
+				t.Log("err", err.Error())
+				require.Contains(t, err.Error(), tc.expectedErr)
 			} else {
 				require.NoError(t, err)
 			}

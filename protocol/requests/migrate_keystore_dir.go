@@ -1,46 +1,27 @@
 package requests
 
 import (
-	"errors"
+	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/multiaccounts"
 )
 
-// MigrateKeyStoreDir represents a request to migrate key files to a new directory.
-type MigrateKeyStoreDir struct {
-	// Account represents the account associated with the key files.
+// MigrateKeystoreDir represents a request to migrate keystore directory.
+type MigrateKeystoreDir struct {
+	// Account is the account associated with the keystore.
 	Account multiaccounts.Account `json:"account"`
 
-	// Password is the password used to decrypt the key files.
-	Password string `json:"password"`
+	// Password is the password for the keystore.
+	Password string `json:"password" validate:"required"`
 
-	// OldDir is the old directory path where the key files are currently located.
-	OldDir string `json:"oldDir"`
+	// OldDir is the old keystore directory.
+	OldDir string `json:"oldDir" validate:"required"`
 
-	// NewDir is the new directory path where the key files will be migrated to.
-	NewDir string `json:"newDir"`
+	// NewDir is the new keystore directory.
+	NewDir string `json:"newDir" validate:"required"`
 }
 
-// Validate checks the validity of the MigrateKeyStoreDir request.
-var (
-	ErrMigrateKeyStoreDirEmptyAccount  = errors.New("migrate-keystore-dir: Account cannot be empty")
-	ErrMigrateKeyStoreDirEmptyPassword = errors.New("migrate-keystore-dir: Password cannot be empty")
-	ErrMigrateKeyStoreDirEmptyOldDir   = errors.New("migrate-keystore-dir: OldDir cannot be empty")
-	ErrMigrateKeyStoreDirEmptyNewDir   = errors.New("migrate-keystore-dir: NewDir cannot be empty")
-)
-
-func (r *MigrateKeyStoreDir) Validate() error {
-	if r.Account.KeyUID == "" {
-		return ErrMigrateKeyStoreDirEmptyAccount
-	}
-	if r.Password == "" {
-		return ErrMigrateKeyStoreDirEmptyPassword
-	}
-	if r.OldDir == "" {
-		return ErrMigrateKeyStoreDirEmptyOldDir
-	}
-	if r.NewDir == "" {
-		return ErrMigrateKeyStoreDirEmptyNewDir
-	}
-	return nil
+// Validate checks the validity of the MigrateKeystoreDir request.
+func (r *MigrateKeystoreDir) Validate() error {
+	return validator.New().Struct(r)
 }

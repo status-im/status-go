@@ -316,7 +316,7 @@ func MigrateKeyStoreDirV2(requestJSON string) string {
 }
 
 func migrateKeyStoreDirV2(requestJSON string) string {
-	var request requests.MigrateKeyStoreDir
+	var request requests.MigrateKeystoreDir
 	err := json.Unmarshal([]byte(requestJSON), &request)
 	if err != nil {
 		return makeJSONResponse(err)

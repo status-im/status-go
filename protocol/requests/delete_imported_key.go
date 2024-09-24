@@ -1,37 +1,22 @@
 package requests
 
 import (
-	"errors"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 // DeleteImportedKey represents a request to delete an imported key.
 type DeleteImportedKey struct {
 	// Address is the address of the imported key to delete.
-	Address string `json:"address"`
+	Address string `json:"address" validate:"required"`
 
 	// Password is the password used to decrypt the key.
-	Password string `json:"password"`
+	Password string `json:"password" validate:"required"`
 
 	// KeyStoreDir is the directory where the key is stored.
-	KeyStoreDir string `json:"keyStoreDir"`
+	KeyStoreDir string `json:"keyStoreDir" validate:"required"`
 }
 
 // Validate checks the validity of the DeleteImportedKey request.
-var (
-	ErrDeleteImportedKeyEmptyAddress     = errors.New("delete-imported-key: Address cannot be empty")
-	ErrDeleteImportedKeyEmptyPassword    = errors.New("delete-imported-key: Password cannot be empty")
-	ErrDeleteImportedKeyEmptyKeyStoreDir = errors.New("delete-imported-key: KeyStoreDir cannot be empty")
-)
-
 func (r *DeleteImportedKey) Validate() error {
-	if r.Address == "" {
-		return ErrDeleteImportedKeyEmptyAddress
-	}
-	if r.Password == "" {
-		return ErrDeleteImportedKeyEmptyPassword
-	}
-	if r.KeyStoreDir == "" {
-		return ErrDeleteImportedKeyEmptyKeyStoreDir
-	}
-	return nil
+	return validator.New().Struct(r)
 }

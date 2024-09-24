@@ -1,7 +1,7 @@
 package requests
 
 import (
-	"errors"
+	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/services/typeddata"
 )
@@ -9,31 +9,26 @@ import (
 // SignTypedData represents a request to sign typed data.
 type SignTypedData struct {
 	// TypedData is the typed data to sign.
-	TypedData typeddata.TypedData `json:"typedData"`
+	TypedData typeddata.TypedData `json:"typedData" validate:"required"`
 
 	// Address is the address of the account to sign with.
-	Address string `json:"address"`
+	Address string `json:"address" validate:"required"`
 
 	// Password is the password of the account to sign with.
-	Password string `json:"password"`
+	Password string `json:"password" validate:"required"`
 }
 
 // Validate checks the validity of the SignTypedData request.
-var (
-	ErrSignTypedDataEmptyTypedData = errors.New("sign-typed-data: TypedData cannot be empty")
-	ErrSignTypedDataEmptyAddress   = errors.New("sign-typed-data: Address cannot be empty")
-	ErrSignTypedDataEmptyPassword  = errors.New("sign-typed-data: Password cannot be empty")
-)
-
 func (r *SignTypedData) Validate() error {
+	// Use the validator package to validate the struct fields
+	if err := validator.New().Struct(r); err != nil {
+		return err
+	}
+
+	// Additional validation logic from the old signTypedData function
 	if err := r.TypedData.Validate(); err != nil {
-		return ErrSignTypedDataEmptyTypedData
+		return err
 	}
-	if r.Address == "" {
-		return ErrSignTypedDataEmptyAddress
-	}
-	if r.Password == "" {
-		return ErrSignTypedDataEmptyPassword
-	}
+
 	return nil
 }
