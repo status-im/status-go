@@ -19,6 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/circuitbreaker"
+	"github.com/status-im/status-go/rpc/chain/rpclimiter"
+	"github.com/status-im/status-go/rpc/chain/tagger"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/wallet/connection"
 )
@@ -56,20 +58,8 @@ type ClientInterface interface {
 	bind.ContractCaller
 	bind.ContractTransactor
 	bind.ContractFilterer
-	GetLimiter() RequestLimiter
-	SetLimiter(RequestLimiter)
-}
-
-type Tagger interface {
-	Tag() string
-	SetTag(tag string)
-	GroupTag() string
-	SetGroupTag(tag string)
-	DeepCopyTag() Tagger
-}
-
-func DeepCopyTagger(t Tagger) Tagger {
-	return t.DeepCopyTag()
+	GetLimiter() rpclimiter.RequestLimiter
+	SetLimiter(rpclimiter.RequestLimiter)
 }
 
 type HealthMonitor interface {
@@ -86,8 +76,8 @@ type Copyable interface {
 // to set the tag and group tag once on the client
 func ClientWithTag(chainClient ClientInterface, tag, groupTag string) ClientInterface {
 	newClient := chainClient
-	if tagIface, ok := chainClient.(Tagger); ok {
-		tagIface = DeepCopyTagger(tagIface)
+	if tagIface, ok := chainClient.(tagger.Tagger); ok {
+		tagIface = tagger.DeepCopyTagger(tagIface)
 		tagIface.SetTag(tag)
 		tagIface.SetGroupTag(groupTag)
 		newClient = tagIface.(ClientInterface)
@@ -98,12 +88,12 @@ func ClientWithTag(chainClient ClientInterface, tag, groupTag string) ClientInte
 
 type EthClient struct {
 	ethClient *ethclient.Client
-	limiter   *RPCRpsLimiter
+	limiter   *rpclimiter.RPCRpsLimiter
 	rpcClient *rpc.Client
 	name      string
 }
 
-func NewEthClient(ethClient *ethclient.Client, limiter *RPCRpsLimiter, rpcClient *rpc.Client, name string) *EthClient {
+func NewEthClient(ethClient *ethclient.Client, limiter *rpclimiter.RPCRpsLimiter, rpcClient *rpc.Client, name string) *EthClient {
 	return &EthClient{
 		ethClient: ethClient,
 		limiter:   limiter,
@@ -115,7 +105,7 @@ func NewEthClient(ethClient *ethclient.Client, limiter *RPCRpsLimiter, rpcClient
 type ClientWithFallback struct {
 	ChainID        uint64
 	ethClients     []*EthClient
-	commonLimiter  RequestLimiter
+	commonLimiter  rpclimiter.RequestLimiter
 	circuitbreaker *circuitbreaker.CircuitBreaker
 
 	WalletNotifier func(chainId uint64, message string)
@@ -978,7 +968,7 @@ func (c *ClientWithFallback) SetWalletNotifier(notifier func(chainId uint64, mes
 func (c *ClientWithFallback) toggleConnectionState(err error) {
 	connected := true
 	if err != nil {
-		if !isNotFoundError(err) && !isVMError(err) && !errors.Is(err, ErrRequestsOverLimit) && !errors.Is(err, context.Canceled) {
+		if !isNotFoundError(err) && !isVMError(err) && !errors.Is(err, rpclimiter.ErrRequestsOverLimit) && !errors.Is(err, context.Canceled) {
 			log.Warn("Error not in chain call", "error", err, "chain", c.ChainID)
 			connected = false
 		} else {
@@ -1004,16 +994,16 @@ func (c *ClientWithFallback) SetGroupTag(tag string) {
 	c.groupTag = tag
 }
 
-func (c *ClientWithFallback) DeepCopyTag() Tagger {
+func (c *ClientWithFallback) DeepCopyTag() tagger.Tagger {
 	copy := *c
 	return &copy
 }
 
-func (c *ClientWithFallback) GetLimiter() RequestLimiter {
+func (c *ClientWithFallback) GetLimiter() rpclimiter.RequestLimiter {
 	return c.commonLimiter
 }
 
-func (c *ClientWithFallback) SetLimiter(limiter RequestLimiter) {
+func (c *ClientWithFallback) SetLimiter(limiter rpclimiter.RequestLimiter) {
 	c.commonLimiter = limiter
 }
 

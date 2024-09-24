@@ -19,7 +19,7 @@ import (
 	types "github.com/ethereum/go-ethereum/core/types"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	circuitbreaker "github.com/status-im/status-go/circuitbreaker"
-	chain "github.com/status-im/status-go/rpc/chain"
+	rpclimiter "github.com/status-im/status-go/rpc/chain/rpclimiter"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -562,10 +562,10 @@ func (mr *MockClientInterfaceMockRecorder) GetBaseFeeFromBlock(ctx, blockNumber 
 }
 
 // GetLimiter mocks base method.
-func (m *MockClientInterface) GetLimiter() chain.RequestLimiter {
+func (m *MockClientInterface) GetLimiter() rpclimiter.RequestLimiter {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLimiter")
-	ret0, _ := ret[0].(chain.RequestLimiter)
+	ret0, _ := ret[0].(rpclimiter.RequestLimiter)
 	return ret0
 }
 
@@ -719,7 +719,7 @@ func (mr *MockClientInterfaceMockRecorder) SetIsConnected(arg0 any) *gomock.Call
 }
 
 // SetLimiter mocks base method.
-func (m *MockClientInterface) SetLimiter(arg0 chain.RequestLimiter) {
+func (m *MockClientInterface) SetLimiter(arg0 rpclimiter.RequestLimiter) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetLimiter", arg0)
 }
@@ -830,95 +830,6 @@ func (m *MockClientInterface) TransactionReceipt(ctx context.Context, txHash com
 func (mr *MockClientInterfaceMockRecorder) TransactionReceipt(ctx, txHash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionReceipt", reflect.TypeOf((*MockClientInterface)(nil).TransactionReceipt), ctx, txHash)
-}
-
-// MockTagger is a mock of Tagger interface.
-type MockTagger struct {
-	ctrl     *gomock.Controller
-	recorder *MockTaggerMockRecorder
-}
-
-// MockTaggerMockRecorder is the mock recorder for MockTagger.
-type MockTaggerMockRecorder struct {
-	mock *MockTagger
-}
-
-// NewMockTagger creates a new mock instance.
-func NewMockTagger(ctrl *gomock.Controller) *MockTagger {
-	mock := &MockTagger{ctrl: ctrl}
-	mock.recorder = &MockTaggerMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockTagger) EXPECT() *MockTaggerMockRecorder {
-	return m.recorder
-}
-
-// DeepCopyTag mocks base method.
-func (m *MockTagger) DeepCopyTag() chain.Tagger {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeepCopyTag")
-	ret0, _ := ret[0].(chain.Tagger)
-	return ret0
-}
-
-// DeepCopyTag indicates an expected call of DeepCopyTag.
-func (mr *MockTaggerMockRecorder) DeepCopyTag() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeepCopyTag", reflect.TypeOf((*MockTagger)(nil).DeepCopyTag))
-}
-
-// GroupTag mocks base method.
-func (m *MockTagger) GroupTag() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GroupTag")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// GroupTag indicates an expected call of GroupTag.
-func (mr *MockTaggerMockRecorder) GroupTag() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GroupTag", reflect.TypeOf((*MockTagger)(nil).GroupTag))
-}
-
-// SetGroupTag mocks base method.
-func (m *MockTagger) SetGroupTag(tag string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetGroupTag", tag)
-}
-
-// SetGroupTag indicates an expected call of SetGroupTag.
-func (mr *MockTaggerMockRecorder) SetGroupTag(tag any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetGroupTag", reflect.TypeOf((*MockTagger)(nil).SetGroupTag), tag)
-}
-
-// SetTag mocks base method.
-func (m *MockTagger) SetTag(tag string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetTag", tag)
-}
-
-// SetTag indicates an expected call of SetTag.
-func (mr *MockTaggerMockRecorder) SetTag(tag any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTag", reflect.TypeOf((*MockTagger)(nil).SetTag), tag)
-}
-
-// Tag mocks base method.
-func (m *MockTagger) Tag() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Tag")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// Tag indicates an expected call of Tag.
-func (mr *MockTaggerMockRecorder) Tag() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Tag", reflect.TypeOf((*MockTagger)(nil).Tag))
 }
 
 // MockHealthMonitor is a mock of HealthMonitor interface.

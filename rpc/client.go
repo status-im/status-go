@@ -21,6 +21,7 @@ import (
 	appCommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/wallet/common"
@@ -96,7 +97,7 @@ type Client struct {
 	rpcClientsMutex    sync.RWMutex
 	rpcClients         map[uint64]chain.ClientInterface
 	rpsLimiterMutex    sync.RWMutex
-	limiterPerProvider map[string]*chain.RPCRpsLimiter
+	limiterPerProvider map[string]*rpclimiter.RPCRpsLimiter
 
 	router         *router
 	NetworkManager *network.Manager
@@ -136,7 +137,7 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		NetworkManager:     networkManager,
 		handlers:           make(map[string]Handler),
 		rpcClients:         make(map[uint64]chain.ClientInterface),
-		limiterPerProvider: make(map[string]*chain.RPCRpsLimiter),
+		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		log:                log,
 		providerConfigs:    providerConfigs,
 	}
@@ -197,13 +198,13 @@ func extractHostFromURL(inputURL string) (string, error) {
 	return parsedURL.Host, nil
 }
 
-func (c *Client) getRPCRpsLimiter(key string) (*chain.RPCRpsLimiter, error) {
+func (c *Client) getRPCRpsLimiter(key string) (*rpclimiter.RPCRpsLimiter, error) {
 	c.rpsLimiterMutex.Lock()
 	defer c.rpsLimiterMutex.Unlock()
 	if limiter, ok := c.limiterPerProvider[key]; ok {
 		return limiter, nil
 	}
-	limiter := chain.NewRPCRpsLimiter()
+	limiter := rpclimiter.NewRPCRpsLimiter()
 	c.limiterPerProvider[key] = limiter
 	return limiter, nil
 }
@@ -273,7 +274,7 @@ func (c *Client) getEthClients(network *params.Network) []*chain.EthClient {
 	ethClients := make([]*chain.EthClient, 0)
 	for index, key := range keys {
 		var rpcClient *gethrpc.Client
-		var rpcLimiter *chain.RPCRpsLimiter
+		var rpcLimiter *rpclimiter.RPCRpsLimiter
 		var err error
 		var hostPort string
 		url := urls[key]

@@ -1,4 +1,4 @@
-package chain
+package rpclimiter
 
 import (
 	"testing"

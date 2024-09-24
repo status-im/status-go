@@ -31,6 +31,7 @@ import (
 	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc/chain"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
+	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -67,7 +68,7 @@ type TestClient struct {
 	rw                             sync.RWMutex
 	callsCounter                   map[string]int
 	currentBlock                   uint64
-	limiter                        chain.RequestLimiter
+	limiter                        rpclimiter.RequestLimiter
 	tag                            string
 	groupTag                       string
 }
@@ -727,11 +728,11 @@ func (tc *TestClient) IsConnected() bool {
 	return true
 }
 
-func (tc *TestClient) GetLimiter() chain.RequestLimiter {
+func (tc *TestClient) GetLimiter() rpclimiter.RequestLimiter {
 	return tc.limiter
 }
 
-func (tc *TestClient) SetLimiter(limiter chain.RequestLimiter) {
+func (tc *TestClient) SetLimiter(limiter rpclimiter.RequestLimiter) {
 	tc.limiter = limiter
 }
 
@@ -1057,11 +1058,11 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 		if tc.GetLimiter() != nil {
 			if allow, _ := tc.GetLimiter().Allow(tc.tag); !allow {
 				t.Log("ERROR: requests over limit")
-				return chain.ErrRequestsOverLimit
+				return rpclimiter.ErrRequestsOverLimit
 			}
 			if allow, _ := tc.GetLimiter().Allow(tc.groupTag); !allow {
 				t.Log("ERROR: requests over limit for group tag")
-				return chain.ErrRequestsOverLimit
+				return rpclimiter.ErrRequestsOverLimit
 			}
 		}
 
@@ -1187,7 +1188,7 @@ func TestFindBlocksCommandWithLimiter(t *testing.T) {
 	balances := map[common.Address][][]int{accountAddress: {{5, 1, 0}, {20, 2, 0}, {45, 1, 1}, {46, 50, 0}, {75, 0, 1}}}
 	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, nil, nil, nil, nil)
 
-	limiter := chain.NewRequestLimiter(chain.NewInMemRequestsMapStorage())
+	limiter := rpclimiter.NewRequestLimiter(rpclimiter.NewInMemRequestsMapStorage())
 	err := limiter.SetLimit(transferHistoryTag, maxRequests, time.Hour)
 	require.NoError(t, err)
 	tc.SetLimiter(limiter)
@@ -1202,7 +1203,7 @@ func TestFindBlocksCommandWithLimiter(t *testing.T) {
 		t.Log("ERROR")
 	case <-group.WaitAsync():
 		close(blockChannel)
-		require.Error(t, chain.ErrRequestsOverLimit, group.Error())
+		require.Error(t, rpclimiter.ErrRequestsOverLimit, group.Error())
 		require.Equal(t, maxRequests, tc.getCounter())
 	}
 }
@@ -1216,7 +1217,7 @@ func TestFindBlocksCommandWithLimiterTagDifferentThanTransfers(t *testing.T) {
 	incomingERC20Transfers := map[common.Address][]testERC20Transfer{accountAddress: {{big.NewInt(6), tokenTXXAddress, big.NewInt(1), walletcommon.Erc20TransferEventType}}}
 
 	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, outgoingERC20Transfers, incomingERC20Transfers, nil, nil)
-	limiter := chain.NewRequestLimiter(chain.NewInMemRequestsMapStorage())
+	limiter := rpclimiter.NewRequestLimiter(rpclimiter.NewInMemRequestsMapStorage())
 	err := limiter.SetLimit("some-other-tag-than-transfer-history", maxRequests, time.Hour)
 	require.NoError(t, err)
 	tc.SetLimiter(limiter)
@@ -1247,14 +1248,14 @@ func TestFindBlocksCommandWithLimiterForMultipleAccountsSameGroup(t *testing.T) 
 	incomingERC20Transfers := map[common.Address][]testERC20Transfer{account2: {{big.NewInt(6), tokenTXXAddress, big.NewInt(1), walletcommon.Erc20TransferEventType}}}
 
 	// Limiters share the same storage
-	storage := chain.NewInMemRequestsMapStorage()
+	storage := rpclimiter.NewInMemRequestsMapStorage()
 
 	// Set up the first account
 	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, account1, big.NewInt(0), big.NewInt(20), rangeSize, balances, outgoingERC20Transfers, nil, nil, nil)
 	tc.tag = transferHistoryTag + account1.String()
 	tc.groupTag = transferHistoryTag
 
-	limiter1 := chain.NewRequestLimiter(storage)
+	limiter1 := rpclimiter.NewRequestLimiter(storage)
 	err := limiter1.SetLimit(transferHistoryTag, maxRequestsTotal, time.Hour)
 	require.NoError(t, err)
 	err = limiter1.SetLimit(transferHistoryTag+account1.String(), limit1, time.Hour)
@@ -1265,7 +1266,7 @@ func TestFindBlocksCommandWithLimiterForMultipleAccountsSameGroup(t *testing.T) 
 	fbc2, tc2, _, _ := setupFindBlocksCommand(t, account2, big.NewInt(0), big.NewInt(20), rangeSize, balances, nil, incomingERC20Transfers, nil, nil)
 	tc2.tag = transferHistoryTag + account2.String()
 	tc2.groupTag = transferHistoryTag
-	limiter2 := chain.NewRequestLimiter(storage)
+	limiter2 := rpclimiter.NewRequestLimiter(storage)
 	err = limiter2.SetLimit(transferHistoryTag, maxRequestsTotal, time.Hour)
 	require.NoError(t, err)
 	err = limiter2.SetLimit(transferHistoryTag+account2.String(), limit2, time.Hour)
