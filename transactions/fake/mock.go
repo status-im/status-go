@@ -13,10 +13,11 @@ import (
 	context "context"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	rpc "github.com/ethereum/go-ethereum/rpc"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockPublicTransactionPoolAPI is a mock of PublicTransactionPoolAPI interface.

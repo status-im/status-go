@@ -13,10 +13,11 @@ import (
 	context "context"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	common0 "github.com/status-im/status-go/services/wallet/common"
 	thirdparty "github.com/status-im/status-go/services/wallet/thirdparty"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockCollectibleProvider is a mock of CollectibleProvider interface.

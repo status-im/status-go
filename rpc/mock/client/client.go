@@ -13,11 +13,12 @@ import (
 	context "context"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	chain "github.com/status-im/status-go/rpc/chain"
 	ethclient "github.com/status-im/status-go/rpc/chain/ethclient"
 	network "github.com/status-im/status-go/rpc/network"
 	common "github.com/status-im/status-go/services/wallet/common"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockClientInterface is a mock of ClientInterface interface.

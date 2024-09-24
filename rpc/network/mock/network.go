@@ -12,8 +12,9 @@ package mock_network
 import (
 	reflect "reflect"
 
-	params "github.com/status-im/status-go/params"
 	gomock "go.uber.org/mock/gomock"
+
+	params "github.com/status-im/status-go/params"
 )
 
 // MockManagerInterface is a mock of ManagerInterface interface.

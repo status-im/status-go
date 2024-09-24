@@ -13,12 +13,13 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	types "github.com/ethereum/go-ethereum/core/types"
 	account "github.com/status-im/status-go/account"
 	types0 "github.com/status-im/status-go/eth-node/types"
 	pathprocessor "github.com/status-im/status-go/services/wallet/router/pathprocessor"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockPathProcessor is a mock of PathProcessor interface.
