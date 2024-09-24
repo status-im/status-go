@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
+	mock_fake "github.com/status-im/status-go/transactions/fake/mock"
 )
 
 func TestTransactorSuite(t *testing.T) {
@@ -39,7 +40,7 @@ type TransactorSuite struct {
 	server            *gethrpc.Server
 	client            *gethrpc.Client
 	txServiceMockCtrl *gomock.Controller
-	txServiceMock     *fake.MockPublicTransactionPoolAPI
+	txServiceMock     *mock_fake.MockPublicTransactionPoolAPI
 	nodeConfig        *params.NodeConfig
 
 	manager *Transactor

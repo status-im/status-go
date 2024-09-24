@@ -114,3 +114,4 @@ integration-tests/*.log
 
 # generated files
 mock
+mock.go

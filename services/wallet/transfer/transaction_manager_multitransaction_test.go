@@ -24,7 +24,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/transactions/mock_transactor"
 	"github.com/status-im/status-go/walletdatabase"
 )
 

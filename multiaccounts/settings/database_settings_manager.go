@@ -1,6 +1,6 @@
 package settings
 
-//go:generate mockgen -package=mocksettings -source=database_settings_manager.go -destination=mocks/database_settings_manager_mock.go
+//go:generate mockgen -package=mock_settings -source=database_settings_manager.go -destination=mock/database_settings_manager.go
 
 import (
 	"database/sql"
