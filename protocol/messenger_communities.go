@@ -3906,7 +3906,7 @@ func (m *Messenger) HandleSyncCommunitySettings(messageState *ReceivedMessageSta
 }
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {
-
+	defer utils.LogOnPanic()
 	m.logger.Debug("initializing history archive tasks")
 
 	for _, c := range communities {

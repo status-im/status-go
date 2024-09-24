@@ -415,6 +415,7 @@ func (p *Peer) handleP2PRequestCompleteCode(packet p2p.Msg) error {
 
 // sendConfirmation sends messageResponseCode and batchAcknowledgedCode messages.
 func (p *Peer) sendConfirmation(data []byte, envelopeErrors []common.EnvelopeError) (err error) {
+	defer gocommon.LogOnPanic()
 	batchHash := crypto.Keccak256Hash(data)
 	msg := NewMessagesResponse(batchHash, envelopeErrors)
 	err = p2p.Send(p.rw, messageResponseCode, msg)

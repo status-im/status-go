@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/common"
 	gowakuPersistence "github.com/waku-org/go-waku/waku/persistence"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/legacy_store/pb"
@@ -141,6 +142,7 @@ func (d *DBStore) cleanOlderRecords() error {
 }
 
 func (d *DBStore) checkForOlderRecords(ctx context.Context, t time.Duration) {
+	defer common.LogOnPanic()
 	defer d.wg.Done()
 
 	ticker := time.NewTicker(t)

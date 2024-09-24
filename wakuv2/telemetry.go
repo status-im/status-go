@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	gocommon "github.com/status-im/status-go/common"
 	"go.uber.org/zap"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
@@ -55,6 +56,7 @@ func (c *BandwidthTelemetryClient) getTelemetryRequestBody(stats map[protocol.ID
 }
 
 func (c *BandwidthTelemetryClient) PushProtocolStats(stats map[protocol.ID]metrics.Stats) {
+	defer gocommon.LogOnPanic()
 	url := fmt.Sprintf("%s/protocol-stats", c.serverURL)
 	body, _ := json.Marshal(c.getTelemetryRequestBody(stats))
 	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))

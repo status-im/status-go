@@ -153,6 +153,7 @@ func (api *API) Market(chainID uint64) ([]StickerPack, error) {
 }
 
 func (api *API) execTokenPackID(chainID uint64, tokenIDs []*big.Int, resultChan chan<- *big.Int, errChan chan<- error, doneChan chan<- struct{}) {
+	defer gocommon.LogOnPanic()
 	defer close(doneChan)
 	defer close(errChan)
 	defer close(resultChan)
@@ -234,6 +235,7 @@ func (api *API) getPurchasedPackIDs(chainID uint64, account types.Address) ([]*b
 }
 
 func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack, errChan chan<- error, doneChan chan<- struct{}) {
+	defer gocommon.LogOnPanic()
 	defer close(doneChan)
 	defer close(errChan)
 	defer close(resultChan)
@@ -398,6 +400,7 @@ func (api *API) getContractPacks(chainID uint64) ([]StickerPack, error) {
 }
 
 func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accounts.Account, resultChan chan<- *big.Int, errChan chan<- error, doneChan chan<- struct{}) {
+	defer gocommon.LogOnPanic()
 	defer close(doneChan)
 	defer close(errChan)
 	defer close(resultChan)
@@ -427,6 +430,7 @@ func (api *API) getAccountsPurchasedPack(chainID uint64, accs []*accounts.Accoun
 }
 
 func (api *API) execTokenOwnerOfIndex(chainID uint64, account types.Address, balance *big.Int, resultChan chan<- *big.Int, errChan chan<- error, doneChan chan<- struct{}) {
+	defer gocommon.LogOnPanic()
 	defer close(doneChan)
 	defer close(errChan)
 	defer close(resultChan)

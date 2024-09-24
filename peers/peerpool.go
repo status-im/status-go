@@ -312,6 +312,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 }
 
 func (p *PeerPool) handlePeerEventType(server *p2p.Server, event *p2p.PeerEvent, queueRetry func(time.Duration), queueStop func()) {
+	defer common.LogOnPanic()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

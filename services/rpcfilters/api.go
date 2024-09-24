@@ -76,6 +76,7 @@ func NewPublicAPI(s *Service) *PublicAPI {
 }
 
 func (api *PublicAPI) timeoutLoop(quit chan struct{}) {
+	defer gocommon.LogOnPanic()
 	for {
 		select {
 		case <-quit:

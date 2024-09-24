@@ -401,6 +401,7 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 const missingMessageCheckPeriod = 30 * time.Second
 
 func (m *Messenger) checkForMissingMessagesLoop() {
+	defer gocommon.LogOnPanic()
 	t := time.NewTicker(missingMessageCheckPeriod)
 	defer t.Stop()
 

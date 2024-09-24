@@ -1354,7 +1354,7 @@ func (m *Manager) StartMembersReevaluationLoop(communityID types.HexBytes, reeva
 }
 
 func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOnStart bool) {
-
+	defer utils.LogOnPanic()
 	if _, exists := m.membersReevaluationTasks.Load(communityID.String()); exists {
 		return
 	}

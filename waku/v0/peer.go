@@ -383,6 +383,7 @@ func (p *Peer) handleP2PRequestCompleteCode(packet p2p.Msg) error {
 
 // sendConfirmation sends messageResponseCode and batchAcknowledgedCode messages.
 func (p *Peer) sendConfirmation(data []byte, envelopeErrors []common.EnvelopeError) (err error) {
+	defer gocommon.LogOnPanic()
 	batchHash := crypto.Keccak256Hash(data)
 	err = p2p.Send(p.rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors))
 	if err != nil {
@@ -446,6 +447,7 @@ func (p *Peer) handshake() error {
 // update executes periodic operations on the peer, including message transmission
 // and expiration.
 func (p *Peer) update() {
+	defer gocommon.LogOnPanic()
 	// Start the tickers for the updates
 	expire := time.NewTicker(common.ExpirationCycle)
 	transmit := time.NewTicker(common.TransmissionCycle)

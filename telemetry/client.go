@@ -487,6 +487,7 @@ func (c *Client) ProcessPeerCountByOrigin(peerCountByOrigin PeerCountByOrigin) *
 }
 
 func (c *Client) UpdateEnvelopeProcessingError(shhMessage *types.Message, processingError error) {
+	defer common.LogOnPanic()
 	c.logger.Debug("Pushing envelope update to telemetry server", zap.String("hash", types.EncodeHex(shhMessage.Hash)))
 	url := fmt.Sprintf("%s/update-envelope", c.serverURL)
 	var errorString = ""

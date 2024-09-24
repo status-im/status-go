@@ -334,6 +334,7 @@ func (s *Service) subscribeToEvents() {
 
 // processEvents runs only if more than one session is active
 func (s *Service) processEvents() {
+	defer gocommon.LogOnPanic()
 	eventCount := 0
 	lastUpdate := time.Now().UnixMilli()
 	for event := range s.ch {

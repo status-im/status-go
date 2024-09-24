@@ -16,6 +16,7 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
+	"github.com/status-im/status-go/common"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/storenodes"
@@ -428,6 +429,7 @@ func (m *Messenger) asyncRequestAllHistoricMessages() {
 }
 
 func (m *Messenger) verifyStorenodeStatus() {
+	defer common.LogOnPanic()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
