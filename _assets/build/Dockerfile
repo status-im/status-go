@@ -1,8 +1,11 @@
 # Build status-go in a Go builder container
 FROM golang:1.21-alpine3.18 as builder
 
+# Set environment variables to use Clang
+ENV CC=clang
+ENV CXX=clang++
 
-RUN apk add --no-cache make gcc g++ musl-dev linux-headers
+RUN apk add --no-cache make llvm clang musl-dev linux-headers
 
 ARG build_tags
 ARG build_flags
