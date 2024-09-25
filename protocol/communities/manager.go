@@ -5259,3 +5259,38 @@ func (m *Manager) updateEncryptionKeysRequests(communityID types.HexBytes, chann
 func (m *Manager) UpdateEncryptionKeysRequests(communityID types.HexBytes, channelIDs []string) error {
 	return m.updateEncryptionKeysRequests(communityID, channelIDs, time.Now().UnixMilli())
 }
+
+func unmarshalCommunityDescriptionMessage(signedDescription []byte, signerPubkey *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
+	metadata := &protobuf.ApplicationMetadataMessage{}
+
+	err := proto.Unmarshal(signedDescription, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	if metadata.Type != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+		return nil, ErrInvalidMessage
+	}
+
+	signer, err := utils.RecoverKey(metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	if signer == nil {
+		return nil, errors.New("CommunityDescription does not contain the control node signature")
+	}
+
+	if !signer.Equal(signerPubkey) {
+		return nil, errors.New("CommunityDescription was not signed by an owner")
+	}
+
+	description := &protobuf.CommunityDescription{}
+
+	err = proto.Unmarshal(metadata.Payload, description)
+	if err != nil {
+		return nil, err
+	}
+
+	return description, nil
+}
