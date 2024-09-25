@@ -30,6 +30,7 @@ const (
 	ArbitrumSepolia    uint64 = 421614
 	BinanceChainID     uint64 = 56 // obsolete?
 	BinanceTestChainID uint64 = 97 // obsolete?
+	AnvilMainnet       uint64 = 31337
 )
 
 var (
