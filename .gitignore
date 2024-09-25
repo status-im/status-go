@@ -115,3 +115,6 @@ integration-tests/*.log
 # generated files
 mock
 mock.go
+*.pb.go
+bindata.go
+migrations.go
