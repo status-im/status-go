@@ -21,7 +21,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 )
 
@@ -172,6 +171,7 @@ func (d *DiscoveryV5) listen(ctx context.Context) error {
 	if d.NAT != nil && !d.udpAddr.IP.IsLoopback() {
 		d.WaitGroup().Add(1)
 		go func() {
+			defer utils.LogOnPanic()
 			defer d.WaitGroup().Done()
 			nat.Map(d.NAT, ctx.Done(), "udp", d.udpAddr.Port, d.udpAddr.Port, "go-waku discv5 discovery")
 		}()
@@ -217,6 +217,7 @@ func (d *DiscoveryV5) start() error {
 	if d.params.autoFindPeers {
 		d.WaitGroup().Add(1)
 		go func() {
+			defer utils.LogOnPanic()
 			defer d.WaitGroup().Done()
 			d.runDiscoveryV5Loop(d.Context())
 		}()
@@ -253,19 +254,13 @@ func (d *DiscoveryV5) Stop() {
 }
 
 func isWakuNode(node *enode.Node) bool {
-	enrField := new(wenr.WakuEnrBitfield)
-	if err := node.Record().Load(enr.WithEntry(wenr.WakuENRField, &enrField)); err != nil {
-		if !enr.IsNotFound(err) {
-			utils.Logger().Named("discv5").Error("could not retrieve waku2 ENR field for enr ", zap.Any("node", node))
-		}
+	enrField, err := wenr.GetWakuEnrBitField(node)
+	if err != nil {
+		utils.Logger().Named("discv5").Error("could not retrieve waku2 ENR field for enr ", zap.Error(err))
 		return false
 	}
 
-	if enrField != nil {
-		return *enrField != uint8(0) // #RFC 31 requirement
-	}
-
-	return false
+	return enrField != uint8(0) // #RFC 31 requirement
 }
 
 func (d *DiscoveryV5) evaluateNode() func(node *enode.Node) bool {
