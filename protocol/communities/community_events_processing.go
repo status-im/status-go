@@ -1,14 +1,12 @@
 package communities
 
 import (
-	"crypto/ecdsa"
 	"errors"
 	"sort"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -312,39 +310,4 @@ func (o *Community) toCommunityEventsMessage() *CommunityEventsMessage {
 		EventsBaseCommunityDescription: o.config.EventsData.EventsBaseCommunityDescription,
 		Events:                         o.config.EventsData.Events,
 	}
-}
-
-func unmarshalCommunityDescriptionMessage(signedDescription []byte, signerPubkey *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
-	metadata := &protobuf.ApplicationMetadataMessage{}
-
-	err := proto.Unmarshal(signedDescription, metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	if metadata.Type != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		return nil, ErrInvalidMessage
-	}
-
-	signer, err := utils.RecoverKey(metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	if signer == nil {
-		return nil, errors.New("CommunityDescription does not contain the control node signature")
-	}
-
-	if !signer.Equal(signerPubkey) {
-		return nil, errors.New("CommunityDescription was not signed by an owner")
-	}
-
-	description := &protobuf.CommunityDescription{}
-
-	err = proto.Unmarshal(metadata.Payload, description)
-	if err != nil {
-		return nil, err
-	}
-
-	return description, nil
 }
