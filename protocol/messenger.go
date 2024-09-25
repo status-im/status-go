@@ -3636,7 +3636,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					err := m.dispatchToHandler(messageState, msg.ApplicationLayer.Payload, msg, filter, fromArchive)
 					if err != nil {
 						allMessagesProcessed = false
-						logger.Warn("failed to process protobuf", zap.Error(err))
+						logger.Warn("failed to process protobuf", zap.String("type", msg.ApplicationLayer.Type.String()), zap.Error(err))
 						if m.unhandledMessagesTracker != nil {
 							m.unhandledMessagesTracker(msg, err)
 						}
