@@ -4,7 +4,6 @@ package peermanager
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -277,11 +276,10 @@ func (c *PeerConnectionStrategy) dialPeer(pi peer.AddrInfo, sem chan struct{}) {
 	ctx, cancel := context.WithTimeout(c.Context(), c.dialTimeout)
 	defer cancel()
 	err := c.host.Connect(ctx, pi)
-	if err != nil && !errors.Is(err, context.Canceled) {
-		c.addConnectionBackoff(pi.ID)
-		c.host.Peerstore().(wps.WakuPeerstore).AddConnFailure(pi.ID)
-		c.logger.Warn("connecting to peer", logging.HostID("peerID", pi.ID), zap.Error(err))
+	if err != nil {
+		c.pm.HandleDialError(err, pi.ID)
+	} else {
+		c.host.Peerstore().(wps.WakuPeerstore).ResetConnFailures(pi.ID)
 	}
-	c.host.Peerstore().(wps.WakuPeerstore).ResetConnFailures(pi.ID)
 	<-sem
 }

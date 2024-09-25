@@ -14,7 +14,7 @@ import (
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/logging"
-	"github.com/waku-org/go-waku/waku/v2/peerstore"
+	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
@@ -38,6 +38,7 @@ type (
 		log     *zap.Logger
 		*service.CommonService
 		subscriptions *SubscribersMap
+		pm            *peermanager.PeerManager
 
 		maxSubscriptions int
 	}
@@ -61,6 +62,7 @@ func NewWakuFilterFullNode(timesource timesource.Timesource, reg prometheus.Regi
 	wf.maxSubscriptions = params.MaxSubscribers
 	if params.pm != nil {
 		params.pm.RegisterWakuProtocol(FilterSubscribeID_v20beta1, FilterSubscribeENRField)
+		wf.pm = params.pm
 	}
 	return wf
 }
@@ -274,8 +276,8 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, logger *zap.Logge
 			wf.metrics.RecordError(pushTimeoutFailure)
 		} else {
 			wf.metrics.RecordError(dialFailure)
-			if ps, ok := wf.h.Peerstore().(peerstore.WakuPeerstore); ok {
-				ps.AddConnFailure(peerID)
+			if wf.pm != nil {
+				wf.pm.HandleDialError(err, peerID)
 			}
 		}
 		logger.Error("opening peer stream", zap.Error(err))

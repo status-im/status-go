@@ -23,6 +23,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/metadata"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/service"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"go.uber.org/zap"
 )
@@ -87,6 +88,7 @@ type PeerManager struct {
 	TopicHealthNotifCh     chan<- TopicHealthStatus
 	rttCache               *FastestPeerSelector
 	RelayEnabled           bool
+	evtDialError           event.Emitter
 }
 
 // PeerSelection provides various options based on which Peer is selected from a list of peers.
@@ -249,6 +251,14 @@ func (pm *PeerManager) Start(ctx context.Context) {
 		go pm.connectivityLoop(ctx)
 	}
 	go pm.peerStoreLoop(ctx)
+
+	if pm.host != nil {
+		var err error
+		pm.evtDialError, err = pm.host.EventBus().Emitter(new(utils.DialError))
+		if err != nil {
+			pm.logger.Error("failed to create dial error emitter", zap.Error(err))
+		}
+	}
 }
 
 func (pm *PeerManager) peerStoreLoop(ctx context.Context) {
@@ -718,4 +728,23 @@ func (pm *PeerManager) addPeerToServiceSlot(proto protocol.ID, peerID peer.ID) {
 		zap.String("service", string(proto)))
 	// getPeers returns nil for WakuRelayIDv200 protocol, but we don't run this ServiceSlot code for WakuRelayIDv200 protocol
 	pm.serviceSlots.getPeers(proto).add(peerID)
+}
+
+func (pm *PeerManager) HandleDialError(err error, peerID peer.ID) {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return
+	}
+	if pm.peerConnector != nil {
+		pm.peerConnector.addConnectionBackoff(peerID)
+	}
+	if pm.host != nil {
+		pm.host.Peerstore().(wps.WakuPeerstore).AddConnFailure(peerID)
+	}
+	pm.logger.Warn("connecting to peer", logging.HostID("peerID", peerID), zap.Error(err))
+	if pm.evtDialError != nil {
+		emitterErr := pm.evtDialError.Emit(utils.DialError{Err: err, PeerID: peerID})
+		if emitterErr != nil {
+			pm.logger.Error("failed to emit DialError", zap.Error(emitterErr))
+		}
+	}
 }

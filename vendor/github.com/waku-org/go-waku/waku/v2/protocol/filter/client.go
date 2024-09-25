@@ -245,8 +245,8 @@ func (wf *WakuFilterLightNode) request(ctx context.Context, requestID []byte,
 	stream, err := wf.h.NewStream(ctx, peerID, FilterSubscribeID_v20beta1)
 	if err != nil {
 		wf.metrics.RecordError(dialFailure)
-		if ps, ok := wf.h.Peerstore().(peerstore.WakuPeerstore); ok {
-			ps.AddConnFailure(peerID)
+		if wf.pm != nil {
+			wf.pm.HandleDialError(err, peerID)
 		}
 		return err
 	}

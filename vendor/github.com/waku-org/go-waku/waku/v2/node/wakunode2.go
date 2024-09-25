@@ -292,7 +292,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.filterLightNode = filter.NewWakuFilterLightNode(w.bcaster, w.peermanager, w.timesource, w.opts.onlineChecker, w.opts.prometheusReg, w.log)
 	w.lightPush = lightpush.NewWakuLightPush(w.Relay(), w.peermanager, w.opts.prometheusReg, w.log, w.opts.lightpushOpts...)
 
-	w.store = store.NewWakuStore(w.peermanager, w.timesource, w.log)
+	w.store = store.NewWakuStore(w.peermanager, w.timesource, w.log, w.opts.storeRateLimit)
 
 	if params.storeFactory != nil {
 		w.storeFactory = params.storeFactory
@@ -752,7 +752,9 @@ func (w *WakuNode) DialPeerWithInfo(ctx context.Context, peerInfo peer.AddrInfo)
 func (w *WakuNode) connect(ctx context.Context, info peer.AddrInfo) error {
 	err := w.host.Connect(ctx, info)
 	if err != nil {
-		w.host.Peerstore().(wps.WakuPeerstore).AddConnFailure(info.ID)
+		if w.peermanager != nil {
+			w.peermanager.HandleDialError(err, info.ID)
+		}
 		return err
 	}
 
