@@ -4707,17 +4707,17 @@ func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityReque
 		s.Require().NoError(err)
 	}
 
-	encryptedDescription, err := community.EncryptedDescription()
+	descriptionMessage, err := community.ToProtocolMessageBytes()
 	s.Require().NoError(err)
 
 	requestToJoinResponse := &protobuf.CommunityRequestToJoinResponse{
-		Clock:                    community.Clock(),
-		Accepted:                 true,
-		CommunityId:              community.ID(),
-		Community:                encryptedDescription,
-		Grant:                    grant,
-		ProtectedTopicPrivateKey: crypto.FromECDSA(key),
-		Shard:                    community.Shard().Protobuffer(),
+		Clock:                       community.Clock(),
+		Accepted:                    true,
+		CommunityId:                 community.ID(),
+		Grant:                       grant,
+		ProtectedTopicPrivateKey:    crypto.FromECDSA(key),
+		Shard:                       community.Shard().Protobuffer(),
+		CommunityDescriptionMessage: descriptionMessage,
 	}
 
 	// alice handle duplicated request to join response
