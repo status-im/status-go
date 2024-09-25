@@ -2917,6 +2917,26 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Equal(aRtj.CustomizationColor, bobRtj.CustomizationColor)
 }
 
+func (s *MessengerCommunitiesSuite) TestSyncCommunity_Join() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+
+	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
+
+	s.joinCommunity(community, s.owner, s.alice)
+
+	_, err := WaitOnMessengerResponse(alicesOtherDevice, func(response *MessengerResponse) bool {
+		if len(response.Communities()) != 1 {
+			return false
+		}
+		c := response.Communities()[0]
+		return c.IDString() == community.IDString() && c.Joined()
+	}, "community not synced")
+	s.Require().NoError(err)
+}
+
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	// Set Alice's installation metadata
 	aim := &multidevice.InstallationMetadata{
@@ -4661,17 +4681,17 @@ func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityReque
 		s.Require().NoError(err)
 	}
 
-	encryptedDescription, err := community.EncryptedDescription()
+	descriptionMessage, err := community.ToProtocolMessageBytes()
 	s.Require().NoError(err)
 
 	requestToJoinResponse := &protobuf.CommunityRequestToJoinResponse{
-		Clock:                    community.Clock(),
-		Accepted:                 true,
-		CommunityId:              community.ID(),
-		Community:                encryptedDescription,
-		Grant:                    grant,
-		ProtectedTopicPrivateKey: crypto.FromECDSA(key),
-		Shard:                    community.Shard().Protobuffer(),
+		Clock:                               community.Clock(),
+		Accepted:                            true,
+		CommunityId:                         community.ID(),
+		Grant:                               grant,
+		ProtectedTopicPrivateKey:            crypto.FromECDSA(key),
+		Shard:                               community.Shard().Protobuffer(),
+		CommunityDescriptionProtocolMessage: descriptionMessage,
 	}
 
 	// alice handle duplicated request to join response
