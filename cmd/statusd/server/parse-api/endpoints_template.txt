@@ -5,13 +5,13 @@ package server
 
 import statusgo "github.com/status-im/status-go/mobile"
 
-var EndpointsWithResponse = map[string]func(string) string{
+var EndpointsWithRequest = map[string]func(string) string{
 	{{- range .FunctionsWithResp }}
 	"/{{ $.PackageName }}/{{ . }}": {{ $.PackageName }}.{{ . }},
 {{- end }}
 }
 
-var EndpointsNoRequest = map[string]func() string{
+var EndpointsWithoutRequest = map[string]func() string{
 	{{- range .FunctionsNoArgs }}
 	"/{{ $.PackageName }}/{{ . }}": {{ $.PackageName }}.{{ . }},
 {{- end }}

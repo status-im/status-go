@@ -5,7 +5,7 @@ package server
 
 import statusgo "github.com/status-im/status-go/mobile"
 
-var EndpointsWithResponse = map[string]func(string) string{
+var EndpointsWithRequest = map[string]func(string) string{
 	"/statusgo/InitializeApplication": statusgo.InitializeApplication,
 	"/statusgo/ExtractGroupMembershipSignatures": statusgo.ExtractGroupMembershipSignatures,
 	"/statusgo/SignGroupMembership": statusgo.SignGroupMembership,
@@ -57,7 +57,7 @@ var EndpointsWithResponse = map[string]func(string) string{
 	"/statusgo/AddCentralizedMetric": statusgo.AddCentralizedMetric,
 }
 
-var EndpointsNoRequest = map[string]func() string{
+var EndpointsWithoutRequest = map[string]func() string{
 	"/statusgo/GetNodeConfig": statusgo.GetNodeConfig,
 	"/statusgo/ResetChainData": statusgo.ResetChainData,
 	"/statusgo/Logout": statusgo.Logout,

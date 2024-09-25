@@ -174,10 +174,10 @@ func (s *Server) addUnsupportedEndpoint(name string) {
 }
 
 func (s *Server) RegisterMobileAPI() {
-	for name, endpoint := range EndpointsWithResponse {
+	for name, endpoint := range EndpointsWithRequest {
 		s.addEndpointWithResponse(name, endpoint)
 	}
-	for name, endpoint := range EndpointsNoRequest {
+	for name, endpoint := range EndpointsWithoutRequest {
 		s.addEndpointNoRequest(name, endpoint)
 	}
 	for _, name := range EndpointsUnsupported {

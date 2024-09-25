@@ -28,10 +28,10 @@ const (
 
 var (
 	// Regular expressions extracted as global variables
-	publicFunc                = regexp.MustCompile(`func\s+([A-Z]\w+)\(.*\).*\{`)
-	publicFuncWithRespPattern = regexp.MustCompile(`^func\s+([A-Z]\w*)\((\w|\s)+\)\s+string\s+\{$`)
-	publicFuncNoArgsPattern   = regexp.MustCompile(`^func\s+([A-Z]\w*)\(\)\s+string\s+\{$`)
-	funcNamePattern           = regexp.MustCompile(`^func\s+([A-Z]\w*)\(`)
+	publicFunc                   = regexp.MustCompile(`func\s+([A-Z]\w+)\(.*\).*\{`)
+	publicFuncWithArgsPattern    = regexp.MustCompile(`^func\s+([A-Z]\w*)\((\w|\s)+\)\s+string\s+\{$`)
+	publicFuncWithoutArgsPattern = regexp.MustCompile(`^func\s+([A-Z]\w*)\(\)\s+string\s+\{$`)
+	funcNamePattern              = regexp.MustCompile(`^func\s+([A-Z]\w*)\(`)
 )
 
 type TemplateData struct {
@@ -51,8 +51,8 @@ func main() {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	var publicFunctionsWithResp []string
-	var publicFunctionsNoArgs []string
+	var publicFunctionsWithArgs []string
+	var publicFunctionsWithoutArgs []string
 	var unsupportedFunctions []string
 	var isDeprecated bool
 	var packageName string
@@ -83,12 +83,10 @@ func main() {
 		functionName := extractFunctionName(line)
 
 		switch {
-		case isPublicFunctionWithResp(line):
-			publicFunctionsWithResp = append(publicFunctionsWithResp, functionName)
-			continue
-		case isPublicFunctionNoArgs(line):
-			publicFunctionsNoArgs = append(publicFunctionsNoArgs, functionName)
-			continue
+		case isPublicFunctionWithArgs(line):
+			publicFunctionsWithArgs = append(publicFunctionsWithArgs, functionName)
+		case isPublicFunctionWithoutArgs(line):
+			publicFunctionsWithoutArgs = append(publicFunctionsWithoutArgs, functionName)
 		default:
 			unsupportedFunctions = append(unsupportedFunctions, functionName)
 		}
@@ -102,8 +100,8 @@ func main() {
 	// Prepare the template data
 	data := TemplateData{
 		PackageName:          packageName,
-		FunctionsWithResp:    publicFunctionsWithResp,
-		FunctionsNoArgs:      publicFunctionsNoArgs,
+		FunctionsWithResp:    publicFunctionsWithArgs,
+		FunctionsNoArgs:      publicFunctionsWithoutArgs,
 		UnsupportedEndpoints: unsupportedFunctions,
 	}
 
@@ -133,13 +131,13 @@ func main() {
 }
 
 // Function to check if a line contains a public function with a response of string
-func isPublicFunctionWithResp(line string) bool {
-	return publicFuncWithRespPattern.MatchString(line)
+func isPublicFunctionWithArgs(line string) bool {
+	return publicFuncWithArgsPattern.MatchString(line)
 }
 
 // Function to check if a line contains a public function with not arguments and a response of string
-func isPublicFunctionNoArgs(line string) bool {
-	return publicFuncNoArgsPattern.MatchString(line)
+func isPublicFunctionWithoutArgs(line string) bool {
+	return publicFuncWithoutArgsPattern.MatchString(line)
 }
 
 // Function to extract the public function name from a line

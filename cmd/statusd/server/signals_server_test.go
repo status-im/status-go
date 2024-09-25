@@ -86,12 +86,12 @@ func TestSignals(t *testing.T) {
 
 func TestMobileAPI(t *testing.T) {
 	// Setup fake endpoints
-	endpointsWithResponse := EndpointsWithResponse
-	endpointsNoRequest := EndpointsNoRequest
+	endpointsWithResponse := EndpointsWithRequest
+	endpointsNoRequest := EndpointsWithoutRequest
 	endpointsUnsupported := EndpointsUnsupported
 	t.Cleanup(func() {
-		EndpointsWithResponse = endpointsWithResponse
-		EndpointsNoRequest = endpointsNoRequest
+		EndpointsWithRequest = endpointsWithResponse
+		EndpointsWithoutRequest = endpointsNoRequest
 		EndpointsUnsupported = endpointsUnsupported
 	})
 
@@ -103,13 +103,13 @@ func TestMobileAPI(t *testing.T) {
 	response1 := randomAlphabeticalString(t, 5)
 	response2 := randomAlphabeticalString(t, 5)
 
-	EndpointsWithResponse = map[string]func(string) string{
+	EndpointsWithRequest = map[string]func(string) string{
 		endpointWithResponse: func(request string) string {
 			require.Equal(t, request1, request)
 			return response1
 		},
 	}
-	EndpointsNoRequest = map[string]func() string{
+	EndpointsWithoutRequest = map[string]func() string{
 		endpointNoRequest: func() string {
 			return response2
 		},
