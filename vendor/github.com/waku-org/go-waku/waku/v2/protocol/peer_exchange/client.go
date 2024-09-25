@@ -123,13 +123,11 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 		}
 
 		if params.clusterID != 0 {
-			wakuPX.log.Debug("clusterID is non zero, filtering by shard")
 			rs, err := wenr.RelaySharding(enrRecord)
 			if err != nil || rs == nil || !rs.Contains(uint16(params.clusterID), uint16(params.shard)) {
 				wakuPX.log.Debug("peer doesn't matches filter", zap.Int("shard", params.shard))
 				continue
 			}
-			wakuPX.log.Debug("peer matches filter", zap.Int("shard", params.shard))
 		}
 
 		enodeRecord, err := enode.New(enode.ValidSchemes, enrRecord)
