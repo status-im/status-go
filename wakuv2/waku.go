@@ -400,7 +400,10 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, 
 				defer gocommon.LogOnPanic()
 				defer wg.Done()
 				if err := w.dnsDiscover(ctx, addr, retrieveENR, useOnlyDnsDiscCache); err != nil {
-					go w.retryDnsDiscoveryWithBackoff(ctx, addr, w.dnsDiscAsyncRetrievedSignal)
+					go func() {
+						defer gocommon.LogOnPanic()
+						w.retryDnsDiscoveryWithBackoff(ctx, addr, w.dnsDiscAsyncRetrievedSignal)
+					}()
 				}
 			}(addrString)
 		} else {
@@ -483,6 +486,10 @@ func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, su
 
 		retries++
 		backoff := time.Second * time.Duration(math.Exp2(float64(retries)))
+		if backoff > time.Minute {
+			backoff = time.Minute
+		}
+
 		t := time.NewTimer(backoff)
 		select {
 		case <-w.ctx.Done():
@@ -1763,48 +1770,52 @@ func (w *Waku) seedBootnodesForDiscV5() {
 	for {
 		select {
 		case <-w.dnsDiscAsyncRetrievedSignal:
-			if canQuery() {
-				err := w.restartDiscV5(true)
-				if err != nil {
-					w.logger.Warn("failed to restart discv5", zap.Error(err))
-				}
-				retries = 0
-				lastTry = now()
+			if !canQuery() {
+				continue
 			}
 
+			err := w.restartDiscV5(true)
+			if err != nil {
+				w.logger.Warn("failed to restart discv5", zap.Error(err))
+			}
+			retries = 0
+			lastTry = now()
 		case <-ticker.C:
 			if w.seededBootnodesForDiscV5 && len(w.node.Host().Network().Peers()) > 3 {
 				w.logger.Debug("not querying bootnodes", zap.Bool("seeded", w.seededBootnodesForDiscV5), zap.Int("peer-count", len(w.node.Host().Network().Peers())))
 				continue
 			}
-			if canQuery() {
-				w.logger.Info("querying bootnodes to restore connectivity", zap.Int("peer-count", len(w.node.Host().Network().Peers())))
-				err := w.restartDiscV5(false)
-				if err != nil {
-					w.logger.Warn("failed to restart discv5", zap.Error(err))
-				}
 
-				lastTry = now()
-				retries++
-				// We reset the retries after a while and restart
-				if retries > bootnodesMaxRetries {
-					retries = 0
-				}
-
-			} else {
+			if !canQuery() {
 				w.logger.Info("can't query bootnodes", zap.Int("peer-count", len(w.node.Host().Network().Peers())), zap.Int64("lastTry", lastTry), zap.Int64("now", now()), zap.Int64("backoff", bootnodesQueryBackoffMs*int64(math.Exp2(float64(retries)))), zap.Int("retries", retries))
-
+				continue
 			}
+
+			w.logger.Info("querying bootnodes to restore connectivity", zap.Int("peer-count", len(w.node.Host().Network().Peers())))
+			err := w.restartDiscV5(false)
+			if err != nil {
+				w.logger.Warn("failed to restart discv5", zap.Error(err))
+			}
+
+			lastTry = now()
+			retries++
+			// We reset the retries after a while and restart
+			if retries > bootnodesMaxRetries {
+				retries = 0
+			}
+
 		// If we go online, trigger immediately
 		case <-w.goingOnline:
-			if canQuery() {
-				err := w.restartDiscV5(false)
-				if err != nil {
-					w.logger.Warn("failed to restart discv5", zap.Error(err))
-				}
-				retries = 0
-				lastTry = now()
+			if !canQuery() {
+				continue
 			}
+
+			err := w.restartDiscV5(false)
+			if err != nil {
+				w.logger.Warn("failed to restart discv5", zap.Error(err))
+			}
+			retries = 0
+			lastTry = now()
 
 		case <-w.ctx.Done():
 			w.logger.Debug("bootnode seeding stopped")
