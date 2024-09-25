@@ -3491,6 +3491,17 @@ type CheckAllChannelsPermissionsResponse struct {
 }
 
 func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) (*RequestToJoin, error) {
+	if len(request.CommunityDescriptionProtocolMessage) > 0 {
+		description, err := unmarshalCommunityDescriptionMessage(request.CommunityDescriptionProtocolMessage, signer)
+		if err != nil {
+			return nil, err
+		}
+		_, err = m.HandleCommunityDescriptionMessage(signer, description, request.CommunityDescriptionProtocolMessage, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	m.communityLock.Lock(request.CommunityId)
 	defer m.communityLock.Unlock(request.CommunityId)
 
@@ -3501,57 +3512,11 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	communityDescriptionBytes, err := proto.Marshal(request.Community)
-	if err != nil {
-		return nil, err
-	}
-
-	// We need to wrap `request.Community` in an `ApplicationMetadataMessage`
-	// of type `CommunityDescription` because `UpdateCommunityDescription` expects this.
-	//
-	// This is merely for marsheling/unmarsheling, hence we attaching a `Signature`
-	// is not needed.
-	metadataMessage := &protobuf.ApplicationMetadataMessage{
-		Payload: communityDescriptionBytes,
-		Type:    protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
-	}
-
-	appMetadataMsg, err := proto.Marshal(metadataMessage)
-	if err != nil {
-		return nil, err
-	}
-
-	isControlNodeSigner := common.IsPubKeyEqual(community.ControlNode(), signer)
-	if !isControlNodeSigner {
-		m.logger.Debug("signer is not control node", zap.String("signer", common.PubkeyToHex(signer)), zap.String("controlNode", common.PubkeyToHex(community.ControlNode())))
-		return nil, ErrNotAuthorized
-	}
-
-	_, processedDescription, err := m.preprocessDescription(community.ID(), request.Community)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = community.UpdateCommunityDescription(processedDescription, appMetadataMsg, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = m.handleCommunityTokensMetadata(community); err != nil {
-		return nil, err
-	}
-
 	if community.Encrypted() && len(request.Grant) > 0 {
 		_, err = m.HandleCommunityGrant(community, request.Grant, request.Clock)
 		if err != nil && err != ErrGrantOlder && err != ErrGrantExpired {
 			m.logger.Error("Error handling a community grant", zap.Error(err))
 		}
-	}
-
-	err = m.persistence.SaveCommunity(community)
-
-	if err != nil {
-		return nil, err
 	}
 
 	if request.Accepted {
@@ -3560,7 +3525,6 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 			return nil, err
 		}
 	} else {
-
 		err = m.persistence.SetRequestToJoinState(pkString, community.ID(), RequestToJoinStateDeclined)
 		if err != nil {
 			return nil, err

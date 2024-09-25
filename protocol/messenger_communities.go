@@ -1989,14 +1989,20 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			return nil, err
 		}
 
+		descriptionMessage, err := community.ToProtocolMessageBytes()
+		if err != nil {
+			return nil, err
+		}
+
 		requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
-			Clock:                    community.Clock(),
-			Accepted:                 true,
-			CommunityId:              community.ID(),
-			Community:                encryptedDescription,
-			Grant:                    grant,
-			ProtectedTopicPrivateKey: crypto.FromECDSA(key),
-			Shard:                    community.Shard().Protobuffer(),
+			Clock:                               community.Clock(),
+			Accepted:                            true,
+			CommunityId:                         community.ID(),
+			Community:                           encryptedDescription, // Deprecated but kept for backward compatibility, to be removed in future
+			Grant:                               grant,
+			ProtectedTopicPrivateKey:            crypto.FromECDSA(key),
+			Shard:                               community.Shard().Protobuffer(),
+			CommunityDescriptionProtocolMessage: descriptionMessage,
 		}
 
 		// The purpose of this torrent code is to get the 'magnetlink' to populate 'requestToJoinResponseProto.MagnetUri'
@@ -3807,7 +3813,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 	// This is good to do so that we don't have to queue all the actions done after the handled community description.
 	// `signer` is `communityID` for a community with no owner token and `owner public key` otherwise
 	signer, err := utils.RecoverKey(&amm)
-	if err != nil {
+	if signer == nil || err != nil {
 		logger.Debug("failed to recover community description signer", zap.Error(err))
 		return err
 	}

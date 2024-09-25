@@ -1702,7 +1702,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		communityShardKey := &protobuf.CommunityShardKey{
 			CommunityId: requestToJoinResponseProto.CommunityId,
 			PrivateKey:  requestToJoinResponseProto.ProtectedTopicPrivateKey,
-			Clock:       requestToJoinResponseProto.Community.Clock,
+			Clock:       community.Clock(),
 			Shard:       requestToJoinResponseProto.Shard,
 		}
 
@@ -1767,9 +1767,6 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 
 				m.downloadAndImportHistoryArchives(community.ID(), magnetlink, task.CancelChan)
 			}(currentTask)
-
-			clock := requestToJoinResponseProto.Community.ArchiveMagnetlinkClock
-			return m.communitiesManager.UpdateMagnetlinkMessageClock(community.ID(), clock)
 		}
 	}
 
