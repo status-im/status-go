@@ -3,6 +3,7 @@ import websocket
 import threading
 import logging
 import jsonschema
+import time
 import requests
 from conftest import option, user_1, user_2
 
@@ -16,9 +17,11 @@ class RpcTestCase:
         try:
             return response.json()[key]
         except json.JSONDecodeError:
-            raise AssertionError(f"Invalid JSON in response: {response.content}")
+            raise AssertionError(
+                f"Invalid JSON in response: {response.content}")
         except KeyError:
-            raise AssertionError(f"Key '{key}' not found in the JSON response.")
+            raise AssertionError(
+                f"Key '{key}' not found in the JSON response: {response.content}")
 
     def verify_is_valid_json_rpc_response(self, response, _id=None):
         assert response.status_code == 200
@@ -40,7 +43,6 @@ class RpcTestCase:
         assert response.content
         self._try_except_JSONDecodeError_KeyError(response, "error")
 
-
     def rpc_request(self, method, params=[], _id=None, client=None, url=None):
         client = client if client else requests.Session()
         url = url if url else option.rpc_url
@@ -60,28 +62,27 @@ class RpcTestCase:
                                 schema=json.load(schema))
 
 
-
 class TransactionTestCase(RpcTestCase):
-
 
     def wallet_create_multi_transaction(self, **kwargs):
         method = "wallet_createMultiTransaction"
         transferTx_data = {
-                        "data": "",
-                        "from": user_1.address,
-                        "gas": "0x5BBF",
-                        "input": "",
-                        "maxFeePerGas": "0xbcc0f04fd",
-                        "maxPriorityFeePerGas": "0xbcc0f04fd",
-                        "to": user_2.address,
-                        "type": "0x02",
-                        "value": "0x5af3107a4000",
-                    }
+            "data": "",
+            "from": user_1.address,
+            "gas": "0x5BBF",
+            "input": "",
+            "maxFeePerGas": "0xbcc0f04fd",
+            "maxPriorityFeePerGas": "0xbcc0f04fd",
+            "to": user_2.address,
+            "type": "0x02",
+            "value": "0x5af3107a4000",
+        }
         for key, new_value in kwargs.items():
             if key in transferTx_data:
                 transferTx_data[key] = new_value
             else:
-                print(f"Warning: The key '{key}' does not exist in the transferTx parameters and will be ignored.")
+                print(
+                    f"Warning: The key '{key}' does not exist in the transferTx parameters and will be ignored.")
         params = [
             {
                 "fromAddress": user_1.address,
@@ -116,10 +117,23 @@ class TransactionTestCase(RpcTestCase):
 
 class SignalTestCase(RpcTestCase):
 
-    received_signals = []
+    await_signals = []
+    received_signals = {}
 
-    def _on_message(self, ws, signal):
-        self.received_signals.append(signal)
+    def on_message(self, ws, signal):
+        signal = json.loads(signal)
+        if signal.get("type") in self.await_signals:
+            self.received_signals[signal["type"]] = signal
+
+    def wait_for_signal(self, signal_type, timeout=10):
+        start_time = time.time()
+        while signal_type not in self.received_signals:
+            time_passed = time.time() - start_time
+            if time_passed >= timeout:
+                raise TimeoutError(
+                    f"Signal {signal_type} is not  received in {timeout} seconds")
+            time.sleep(0.5)
+        return self.received_signals[signal_type]
 
     def _on_error(self, ws, error):
         logging.info(f"Error: {error}")
@@ -134,7 +148,7 @@ class SignalTestCase(RpcTestCase):
         self.url = f"{option.ws_url}/signals"
 
         ws = websocket.WebSocketApp(self.url,
-                                    on_message=self._on_message,
+                                    on_message=self.on_message,
                                     on_error=self._on_error,
                                     on_close=self._on_close)
 

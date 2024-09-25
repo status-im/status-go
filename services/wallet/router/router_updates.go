@@ -11,11 +11,13 @@ import (
 )
 
 var (
-	newBlockCheckIntervalMainnet  = 3 * time.Second
-	newBlockCheckIntervalOptimism = 1 * time.Second
-	newBlockCheckIntervalArbitrum = 200 * time.Millisecond
+	newBlockCheckIntervalMainnet      = 3 * time.Second
+	newBlockCheckIntervalOptimism     = 1 * time.Second
+	newBlockCheckIntervalArbitrum     = 200 * time.Millisecond
+	newBlockCheckIntervalAnvilMainnet = 2 * time.Second
 
-	feeRecalculationTimeout = 5 * time.Minute
+	feeRecalculationTimeout      = 5 * time.Minute
+	feeRecalculationAnvilTimeout = 5 * time.Second
 )
 
 type fetchingLastBlock struct {
@@ -42,7 +44,11 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 	}
 	r.clientsForUpdatesPerChains.Store(chainID, flb)
 
-	r.startTimeoutForUpdates(flb.closeCh)
+	timeout := feeRecalculationTimeout
+	if chainID == walletCommon.AnvilMainnet {
+		timeout = feeRecalculationAnvilTimeout
+	}
+	r.startTimeoutForUpdates(flb.closeCh, timeout)
 
 	var ticker *time.Ticker
 	switch chainID {
@@ -55,6 +61,8 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 	case walletCommon.ArbitrumMainnet,
 		walletCommon.ArbitrumSepolia:
 		ticker = time.NewTicker(newBlockCheckIntervalArbitrum)
+	case walletCommon.AnvilMainnet:
+		ticker = time.NewTicker(newBlockCheckIntervalAnvilMainnet)
 	}
 
 	ctx, cancelCtx := context.WithCancel(context.Background())
@@ -123,8 +131,8 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 	return nil
 }
 
-func (r *Router) startTimeoutForUpdates(closeCh chan struct{}) {
-	dedlineTicker := time.NewTicker(feeRecalculationTimeout)
+func (r *Router) startTimeoutForUpdates(closeCh chan struct{}, timeout time.Duration) {
+	dedlineTicker := time.NewTicker(timeout)
 	go func() {
 		defer gocommon.LogOnPanic()
 		for {

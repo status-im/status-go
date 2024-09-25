@@ -84,8 +84,7 @@ class TestRpc(RpcTestCase):
             ("wallet_getEthereumChains", []),
             ("wallet_getTokenList", []),
             ("wallet_getCryptoOnRamps", []),
-            ("wallet_getCachedCurrencyFormats", []),
-            ("wallet_fetchAllCurrencyFormats", [])
+            ("wallet_getCachedCurrencyFormats", [])
         ],
     )
     def test_(self, method, params):
