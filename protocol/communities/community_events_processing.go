@@ -53,7 +53,7 @@ func (e *eventsProcessor) exec() error {
 }
 
 func (e *eventsProcessor) validateDescription() error {
-	description, err := validateAndGetEventsMessageCommunityDescription(e.message.EventsBaseCommunityDescription, e.community.ControlNode())
+	description, err := unmarshalCommunityDescriptionMessage(e.message.EventsBaseCommunityDescription, e.community.ControlNode())
 	if err != nil {
 		return err
 	}
@@ -285,7 +285,7 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 	// If there were no events before, extract CommunityDescription from CommunityDescriptionProtocolMessage
 	// and check the signature
 	if o.config.EventsData == nil || len(o.config.EventsData.EventsBaseCommunityDescription) == 0 {
-		_, err := validateAndGetEventsMessageCommunityDescription(o.config.CommunityDescriptionProtocolMessage, o.ControlNode())
+		_, err := unmarshalCommunityDescriptionMessage(o.config.CommunityDescriptionProtocolMessage, o.ControlNode())
 		if err != nil {
 			return err
 		}
@@ -314,7 +314,7 @@ func (o *Community) toCommunityEventsMessage() *CommunityEventsMessage {
 	}
 }
 
-func validateAndGetEventsMessageCommunityDescription(signedDescription []byte, signerPubkey *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
+func unmarshalCommunityDescriptionMessage(signedDescription []byte, signerPubkey *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
 	metadata := &protobuf.ApplicationMetadataMessage{}
 
 	err := proto.Unmarshal(signedDescription, metadata)
