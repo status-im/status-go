@@ -17,8 +17,17 @@
     },
     "Networks": [
         {
-            "ChainID": 31337,
-            "RPCURL": "http://anvil:8545"
-        }
+			"ChainID":                31337,
+			"ChainName":              "Anvil",
+			"DefaultRPCURL":          "http://anvil:8545",
+			"RPCURL":                 "http://anvil:8545",
+			"ShortName":              "eth",
+			"NativeCurrencyName":     "Ether",
+			"NativeCurrencySymbol":   "ETH",
+			"NativeCurrencyDecimals": 18,
+			"IsTest":                 false,
+			"Layer":                  1,
+			"Enabled":                true
+		}
     ]
 }
