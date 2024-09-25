@@ -3921,7 +3921,7 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 		community.config.CommunityDescription = description
 
 		if community.config.EventsData != nil {
-			eventsDescription, err := validateAndGetEventsMessageCommunityDescription(community.config.EventsData.EventsBaseCommunityDescription, community.ControlNode())
+			eventsDescription, err := unmarshalCommunityDescriptionMessage(community.config.EventsData.EventsBaseCommunityDescription, community.ControlNode())
 			if err != nil {
 				m.logger.Error("invalid EventsBaseCommunityDescription", zap.Error(err))
 			}
