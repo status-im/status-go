@@ -316,6 +316,13 @@ generate:
 	@packages=$$(go list ./... | grep -v "./contracts"); \
 	go generate $$packages
 
+clean-generated: SHELL := /bin/sh
+clean-generated:
+	# Remove anything generated, excluding ./vendor and ./contracts directories
+	find . -type d -name "mock" ! -path "./vendor/*" ! -path "./contracts/*" -exec rm -rf {} +
+	# In theory this is only ./transactions/fake/mock.go
+	find . -type f -name "mock.go" ! -path "./vendor/*" -exec echo {} +
+
 download-uniswap-tokens:
 	go run ./services/wallet/token/downloader/main.go
 
