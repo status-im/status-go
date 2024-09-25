@@ -145,22 +145,6 @@ func TestClient_ProcessReceivedMessages(t *testing.T) {
 	})
 }
 
-func TestClient_ProcessReceivedEnvelope(t *testing.T) {
-	withMockServer(t, ReceivedEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
-		// Create a telemetry request to send
-		envelope := v2protocol.NewEnvelope(&pb.WakuMessage{
-			Payload:      []byte{1, 2, 3, 4, 5},
-			ContentTopic: testContentTopic,
-			Version:      proto.Uint32(0),
-			Timestamp:    proto.Int64(time.Now().Unix()),
-		}, 0, "")
-
-		// Send the telemetry request
-		client.Start(ctx)
-		client.PushReceivedEnvelope(ctx, envelope)
-	})
-}
-
 func TestClient_ProcessSentEnvelope(t *testing.T) {
 	withMockServer(t, SentEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		// Create a telemetry request to send
@@ -408,15 +392,22 @@ func TestPeerId(t *testing.T) {
 		require.True(t, ok)
 		return ok, false
 	}
-	withMockServer(t, ReceivedEnvelopeMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, SentEnvelopeMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		client.Start(ctx)
+		// Create a telemetry request to send
+		sentEnvelope := wakuv2.SentEnvelope{
+			Envelope: v2protocol.NewEnvelope(&pb.WakuMessage{
+				Payload:      []byte{1, 2, 3, 4, 5},
+				ContentTopic: testContentTopic,
+				Version:      proto.Uint32(0),
+				Timestamp:    proto.Int64(time.Now().Unix()),
+			}, 0, ""),
+			PublishMethod: publish.LightPush,
+		}
 
-		client.PushReceivedEnvelope(ctx, v2protocol.NewEnvelope(&pb.WakuMessage{
-			Payload:      []byte{1, 2, 3, 4, 5},
-			ContentTopic: testContentTopic,
-			Version:      proto.Uint32(0),
-			Timestamp:    proto.Int64(time.Now().Unix()),
-		}, 0, ""))
+		// Send the telemetry request
+		client.Start(ctx)
+		client.PushSentEnvelope(ctx, sentEnvelope)
 
 	})
 

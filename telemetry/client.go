@@ -26,7 +26,6 @@ type TelemetryType string
 
 const (
 	ProtocolStatsMetric        TelemetryType = "ProtocolStats"
-	ReceivedEnvelopeMetric     TelemetryType = "ReceivedEnvelope"
 	SentEnvelopeMetric         TelemetryType = "SentEnvelope"
 	UpdateEnvelopeMetric       TelemetryType = "UpdateEnvelope"
 	ReceivedMessagesMetric     TelemetryType = "ReceivedMessages"
@@ -258,12 +257,6 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			TelemetryType: ReceivedMessagesMetric,
 			TelemetryData: c.ProcessReceivedMessages(v),
 		}
-	case *v2protocol.Envelope:
-		telemetryRequest = TelemetryRequest{
-			Id:            c.nextId,
-			TelemetryType: ReceivedEnvelopeMetric,
-			TelemetryData: c.ProcessReceivedEnvelope(v),
-		}
 	case wakuv2.SentEnvelope:
 		telemetryRequest = TelemetryRequest{
 			Id:            c.nextId,
@@ -387,18 +380,6 @@ func (c *Client) ProcessReceivedMessages(receivedMessages ReceivedMessages) *jso
 		messageBody["messageSize"] = len(receivedMessages.SSHMessage.Payload)
 		postBody = append(postBody, messageBody)
 	}
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
-}
-
-func (c *Client) ProcessReceivedEnvelope(envelope *v2protocol.Envelope) *json.RawMessage {
-	postBody := c.commonPostBody()
-	postBody["messageHash"] = envelope.Hash().String()
-	postBody["sentAt"] = uint32(envelope.Message().GetTimestamp() / int64(time.Second))
-	postBody["pubsubTopic"] = envelope.PubsubTopic()
-	postBody["topic"] = envelope.Message().ContentTopic
-	postBody["receiverKeyUID"] = c.keyUID
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage
