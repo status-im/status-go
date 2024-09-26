@@ -104,7 +104,6 @@ type ErrorSendingEnvelope struct {
 
 type ITelemetryClient interface {
 	SetDeviceType(deviceType string)
-	PushReceivedEnvelope(ctx context.Context, receivedEnvelope *protocol.Envelope)
 	PushSentEnvelope(ctx context.Context, sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(ctx context.Context, errorSendingEnvelope ErrorSendingEnvelope)
 	PushPeerCount(ctx context.Context, peerCount int)
@@ -1399,10 +1398,6 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	recvMessage := common.NewReceivedMessage(envelope, msgType)
 	if recvMessage == nil {
 		return nil
-	}
-
-	if w.statusTelemetryClient != nil {
-		w.statusTelemetryClient.PushReceivedEnvelope(w.ctx, envelope)
 	}
 
 	logger := w.logger.With(
