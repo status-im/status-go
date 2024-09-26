@@ -14,6 +14,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/wakuv2"
@@ -75,6 +77,7 @@ func (w *gethWakuV2Wrapper) GetCurrentTime() time.Time {
 func (w *gethWakuV2Wrapper) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) types.Subscription {
 	events := make(chan wakucommon.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
 	go func() {
+		defer gocommon.LogOnPanic()
 		for e := range events {
 			eventsProxy <- *NewWakuV2EnvelopeEventWrapper(&e)
 		}

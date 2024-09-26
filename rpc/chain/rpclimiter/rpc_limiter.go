@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ethereum/go-ethereum/log"
+	gocommon "github.com/status-im/status-go/common"
 )
 
 const (
@@ -257,6 +258,7 @@ func (rl *RPCRpsLimiter) ReduceLimit() {
 func (rl *RPCRpsLimiter) start() {
 	ticker := time.NewTicker(tickerInterval)
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:

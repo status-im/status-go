@@ -16,6 +16,8 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
+	"github.com/status-im/status-go/common"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/services/mailservers"
@@ -211,6 +213,7 @@ func (m *Messenger) getAvailableMailserversSortedByRTT(allMailservers []mailserv
 	for _, mailserver := range allMailservers {
 		availableMailserversWg.Add(1)
 		go func(mailserver mailservers.Mailserver) {
+			defer gocommon.LogOnPanic()
 			defer availableMailserversWg.Done()
 
 			peerID, err := mailserver.PeerID()
@@ -417,6 +420,7 @@ func (m *Messenger) asyncRequestAllHistoricMessages() {
 	m.logger.Debug("asyncRequestAllHistoricMessages")
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		_, err := m.RequestAllHistoricMessages(false, true)
 		if err != nil {
 			m.logger.Error("failed to request historic messages", zap.Error(err))
@@ -425,6 +429,7 @@ func (m *Messenger) asyncRequestAllHistoricMessages() {
 }
 
 func (m *Messenger) verifyStorenodeStatus() {
+	defer common.LogOnPanic()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -517,6 +522,7 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 	wg.Add(1)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer func() {
 			wg.Done()
 		}()
@@ -530,6 +536,7 @@ func (m *Messenger) waitForAvailableStoreNode(timeout time.Duration) bool {
 	}()
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer func() {
 			close(finish)
 		}()

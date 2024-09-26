@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 )
@@ -71,6 +72,7 @@ func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 		// the peer.
 		// We leave some time so that we ensure the signal is propagated
 		go func() {
+			defer common.LogOnPanic()
 			time.Sleep(200)
 			t.removeServerPeer(server, peer)
 		}()
@@ -88,6 +90,7 @@ func (t *cacheOnlyTopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 		// the peer.
 		// We leave some time so that we ensure the signal is propagated
 		go func() {
+			defer common.LogOnPanic()
 			time.Sleep(200)
 			t.removeServerPeer(server, peer.peerInfo)
 		}()

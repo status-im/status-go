@@ -16,6 +16,8 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
+	"github.com/status-im/status-go/common"
+
 	"go.uber.org/zap"
 )
 
@@ -141,6 +143,7 @@ func (d *DBStore) cleanOlderRecords() error {
 }
 
 func (d *DBStore) checkForOlderRecords(ctx context.Context, t time.Duration) {
+	defer common.LogOnPanic()
 	defer d.wg.Done()
 
 	ticker := time.NewTicker(t)

@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/protocol/common"
@@ -90,7 +91,7 @@ func (v *Verifier) SetOnline(online bool) {
 }
 
 func (v *Verifier) verifyLoop() {
-
+	defer gocommon.LogOnPanic()
 	ticker := time.NewTicker(30 * time.Second)
 	for {
 		select {

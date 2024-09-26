@@ -12,6 +12,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
@@ -204,6 +205,7 @@ func (c *Client) SetDeviceType(deviceType string) {
 
 func (c *Client) Start(ctx context.Context) {
 	go func() {
+		defer common.LogOnPanic()
 		for {
 			select {
 			case telemetryRequest := <-c.telemetryCh:
@@ -216,6 +218,7 @@ func (c *Client) Start(ctx context.Context) {
 		}
 	}()
 	go func() {
+		defer common.LogOnPanic()
 		sendPeriod := c.sendPeriod
 		timer := time.NewTimer(sendPeriod)
 		defer timer.Stop()
@@ -465,6 +468,7 @@ func (c *Client) ProcessPeerCountByOrigin(peerCountByOrigin PeerCountByOrigin) *
 }
 
 func (c *Client) UpdateEnvelopeProcessingError(shhMessage *types.Message, processingError error) {
+	defer common.LogOnPanic()
 	c.logger.Debug("Pushing envelope update to telemetry server", zap.String("hash", types.EncodeHex(shhMessage.Hash)))
 	url := fmt.Sprintf("%s/update-envelope", c.serverURL)
 	var errorString = ""

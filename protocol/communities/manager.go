@@ -527,6 +527,7 @@ func (m *Manager) Start() error {
 	}
 
 	go func() {
+		defer utils.LogOnPanic()
 		_ = m.fillMissingCommunityTokens()
 	}()
 
@@ -535,6 +536,7 @@ func (m *Manager) Start() error {
 
 func (m *Manager) runENSVerificationLoop() {
 	go func() {
+		defer utils.LogOnPanic()
 		for {
 			select {
 			case <-m.quit:
@@ -615,6 +617,7 @@ func (m *Manager) CommunitiesToValidate() (map[string][]communityToValidate, err
 func (m *Manager) runOwnerVerificationLoop() {
 	m.logger.Info("starting owner verification loop")
 	go func() {
+		defer utils.LogOnPanic()
 		for {
 			select {
 			case <-m.quit:
@@ -1351,7 +1354,7 @@ func (m *Manager) StartMembersReevaluationLoop(communityID types.HexBytes, reeva
 }
 
 func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOnStart bool) {
-
+	defer utils.LogOnPanic()
 	if _, exists := m.membersReevaluationTasks.Load(communityID.String()); exists {
 		return
 	}

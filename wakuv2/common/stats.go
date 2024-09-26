@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 )
 
@@ -36,6 +37,7 @@ func measure(input interface{}) (*Measure, error) {
 
 func (s *StatsTracker) AddUpload(input interface{}) {
 	go func(input interface{}) {
+		defer common.LogOnPanic()
 		m, err := measure(input)
 		if err != nil {
 			return
@@ -49,6 +51,7 @@ func (s *StatsTracker) AddUpload(input interface{}) {
 
 func (s *StatsTracker) AddDownload(input interface{}) {
 	go func(input interface{}) {
+		defer common.LogOnPanic()
 		m, err := measure(input)
 		if err != nil {
 			return
@@ -62,6 +65,7 @@ func (s *StatsTracker) AddDownload(input interface{}) {
 
 func (s *StatsTracker) AddUploadBytes(size uint64) {
 	go func(size uint64) {
+		defer common.LogOnPanic()
 		m := Measure{
 			Timestamp: time.Now().UnixNano(),
 			Size:      size,
@@ -75,6 +79,7 @@ func (s *StatsTracker) AddUploadBytes(size uint64) {
 
 func (s *StatsTracker) AddDownloadBytes(size uint64) {
 	go func(size uint64) {
+		defer common.LogOnPanic()
 		m := Measure{
 			Timestamp: time.Now().UnixNano(),
 			Size:      size,

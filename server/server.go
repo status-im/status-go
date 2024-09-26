@@ -9,6 +9,8 @@ import (
 	"net/url"
 
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/common"
 )
 
 type Server struct {
@@ -54,6 +56,7 @@ func (s *Server) mustGetHost() string {
 }
 
 func (s *Server) listenAndServe() {
+	defer common.LogOnPanic()
 	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: s.hostname, MinVersion: tls.VersionTLS12}
 
 	// in case of restart, we should use the same port as the first start in order not to break existing links

@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	nodetypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -874,6 +875,7 @@ func (c *findBlocksCommand) fastIndexErc20(ctx context.Context, fromBlockNumber 
 func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) {
 	c.incLoops()
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer func() {
 			c.decLoops()
 		}()
@@ -895,6 +897,7 @@ func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) 
 				}
 
 				go func() {
+					defer gocommon.LogOnPanic()
 					_ = loadTransfers(ctx, c.blockDAO, c.db, c.chainClient, noBlockLimit,
 						blocksByAddress, c.transactionManager, c.pendingTxManager, c.tokenManager, c.feed)
 				}()
@@ -1158,6 +1161,7 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(ctx context.Conte
 
 	c.incLoops()
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer func() {
 			c.decLoops()
 		}()
@@ -1226,6 +1230,7 @@ func (c *loadBlocksAndTransfersCommand) startFetchingTransfersForLoadedBlocks(gr
 	}
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		txCommand := &loadTransfersCommand{
 			accounts:           c.accounts,
 			db:                 c.db,

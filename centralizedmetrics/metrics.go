@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/centralizedmetrics/common"
 	"github.com/status-im/status-go/centralizedmetrics/providers"
+	gocommon "github.com/status-im/status-go/common"
 )
 
 const defaultPollInterval = 10 * time.Second
@@ -59,6 +60,7 @@ func (s *MetricService) Start() {
 	s.wg.Add(1)
 	s.started = true
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer s.wg.Done()
 		for {
 			select {

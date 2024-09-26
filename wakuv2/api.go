@@ -37,6 +37,8 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"google.golang.org/protobuf/proto"
+
+	gocommon "github.com/status-im/status-go/common"
 )
 
 // List of errors
@@ -349,6 +351,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 	// create subscription and start waiting for message events
 	rpcSub := notifier.CreateSubscription()
 	go func() {
+		defer gocommon.LogOnPanic()
 		// for now poll internally, refactor waku internal for channel support
 		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()

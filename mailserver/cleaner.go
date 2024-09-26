@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/common"
 )
 
 const (
@@ -61,6 +62,7 @@ func (c *dbCleaner) Stop() {
 }
 
 func (c *dbCleaner) schedule(period time.Duration, cancel <-chan struct{}) {
+	defer common.LogOnPanic()
 	t := time.NewTicker(period)
 	defer t.Stop()
 

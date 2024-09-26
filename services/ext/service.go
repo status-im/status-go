@@ -28,6 +28,7 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/api/multiformat"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
@@ -211,6 +212,7 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 }
 
 func (s *Service) retrieveStats(tick time.Duration, cancel <-chan struct{}) {
+	defer gocommon.LogOnPanic()
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 
@@ -290,6 +292,7 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 }
 
 func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct{}) {
+	defer gocommon.LogOnPanic()
 	if s.config.ShhextConfig.VerifyTransactionURL == "" {
 		log.Warn("not starting transaction loop")
 		return

@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -68,6 +69,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 	}
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		ms := m.getActiveMailserver(chat.CommunityID)
 		_, err = m.performMailserverRequest(ms, func(mailServer mailservers.Mailserver) (*MessengerResponse, error) {
 			response, err := m.syncChatWithFilters(mailServer, chat.ID)
@@ -162,6 +164,7 @@ func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, erro
 	}
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		// split filters by community store node so we can request the filters to the correct mailserver
 		filtersByMs := m.SplitFiltersByStoreNode(filters)
 		for communityID, filtersForMs := range filtersByMs {
@@ -398,6 +401,7 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 const missingMessageCheckPeriod = 30 * time.Second
 
 func (m *Messenger) checkForMissingMessagesLoop() {
+	defer gocommon.LogOnPanic()
 	t := time.NewTicker(missingMessageCheckPeriod)
 	defer t.Stop()
 
@@ -774,6 +778,7 @@ func processMailserverBatch(
 	// Producer
 	wg.Add(1)
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer func() {
 			logger.Debug("mailserver batch producer complete")
 			wg.Done()
@@ -804,6 +809,7 @@ func processMailserverBatch(
 		}
 
 		go func() {
+			defer gocommon.LogOnPanic()
 			workWg.Wait()
 			workCompleteCh <- struct{}{}
 		}()
@@ -831,6 +837,7 @@ loop:
 			logger.Debug("processBatch - received work")
 			semaphore <- 1
 			go func(w work) { // Consumer
+				defer gocommon.LogOnPanic()
 				defer func() {
 					workWg.Done()
 					<-semaphore

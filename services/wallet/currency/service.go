@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/event"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -47,6 +48,7 @@ func (s *Service) Start() {
 	s.cancelFn = cancel
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		ticker := time.NewTicker(currencyFormatUpdateInterval)
 		defer ticker.Stop()
 		for {

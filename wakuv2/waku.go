@@ -72,6 +72,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
@@ -394,6 +395,7 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) 
 			// Use DNS Discovery
 			wg.Add(1)
 			go func(addr string) {
+				defer gocommon.LogOnPanic()
 				defer wg.Done()
 				if err := w.dnsDiscover(ctx, addr, retrieveENR); err != nil {
 					mu.Lock()
@@ -473,6 +475,7 @@ func (w *Waku) discoverAndConnectPeers() {
 		if strings.HasPrefix(addrString, "enrtree://") {
 			// Use DNS Discovery
 			go func() {
+				defer gocommon.LogOnPanic()
 				if err := w.dnsDiscover(w.ctx, addrString, fnApply); err != nil {
 					w.logger.Error("could not obtain dns discovery peers for ClusterConfig.WakuNodes", zap.Error(err), zap.String("dnsDiscURL", addrString))
 				}
@@ -497,12 +500,14 @@ func (w *Waku) discoverAndConnectPeers() {
 }
 
 func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origin) {
+	defer gocommon.LogOnPanic()
 	// Connection will be prunned eventually by the connection manager if needed
 	// The peer connector in go-waku uses Connect, so it will execute identify as part of its
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
 func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
+	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
 
 	if telemetryServerURL == "" {
@@ -541,6 +546,7 @@ func (w *Waku) GetStats() types.StatsSummary {
 }
 
 func (w *Waku) runPeerExchangeLoop() {
+	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
 
 	if !w.cfg.EnablePeerExchangeClient {
@@ -635,6 +641,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 
 	w.wg.Add(1)
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer w.wg.Done()
 		for {
 			select {
@@ -1076,6 +1083,7 @@ func (w *Waku) Start() error {
 
 	w.wg.Add(1)
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer w.wg.Done()
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -1096,6 +1104,7 @@ func (w *Waku) Start() error {
 	if w.cfg.TelemetryServerURL != "" {
 		w.wg.Add(1)
 		go func() {
+			defer gocommon.LogOnPanic()
 			defer w.wg.Done()
 			peerTelemetryTickerInterval := time.Duration(w.cfg.TelemetryPeerCountSendPeriod) * time.Millisecond
 			if peerTelemetryTickerInterval == 0 {
@@ -1135,6 +1144,7 @@ func (w *Waku) Start() error {
 
 		w.wg.Add(1)
 		go func() {
+			defer gocommon.LogOnPanic()
 			w.wg.Done()
 			for {
 				select {
@@ -1284,6 +1294,7 @@ func (w *Waku) startMessageSender() error {
 
 		w.wg.Add(1)
 		go func() {
+			defer gocommon.LogOnPanic()
 			defer w.wg.Done()
 			for {
 				select {
@@ -1477,6 +1488,7 @@ func (w *Waku) postEvent(envelope *common.ReceivedMessage) {
 
 // processQueueLoop delivers the messages to the watchers during the lifetime of the waku node.
 func (w *Waku) processQueueLoop() {
+	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
 	if w.ctx == nil {
 		return
@@ -1698,6 +1710,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 // It backs off exponentially until maxRetries, at which point it restarts from 0
 // It also restarts if there's a connection change signalled from the client
 func (w *Waku) seedBootnodesForDiscV5() {
+	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
 
 	if !w.cfg.EnableDiscV5 || w.node.DiscV5() == nil {

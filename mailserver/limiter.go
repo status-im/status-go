@@ -3,6 +3,8 @@ package mailserver
 import (
 	"sync"
 	"time"
+
+	"github.com/status-im/status-go/common"
 )
 
 type rateLimiter struct {
@@ -62,6 +64,7 @@ func (l *rateLimiter) IsAllowed(id string) bool {
 }
 
 func (l *rateLimiter) cleanUp(period time.Duration, cancel <-chan struct{}) {
+	defer common.LogOnPanic()
 	t := time.NewTicker(period)
 	defer t.Stop()
 

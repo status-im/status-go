@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/status-im/status-go/common"
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -47,6 +48,7 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 				// processing peer added events, therefore the server will not lock and
 				// keep processing requests.
 				go func() {
+					defer common.LogOnPanic()
 					if err := updateNodeMetrics(node, event.Type); err != nil {
 						logger.Error("failed to update node metrics", "err", err)
 					}

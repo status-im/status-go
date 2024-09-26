@@ -12,6 +12,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/protocol/wakusync"
 
 	"github.com/status-im/status-go/protocol/identity"
@@ -318,6 +319,7 @@ func SetSettingsAndWaitForChange(s *suite.Suite, messenger *Messenger, timeout t
 	wg.Add(1)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer wg.Done()
 		for !allEventsReceived {
 			select {
@@ -343,6 +345,7 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, tim
 	wg.Add(1)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer wg.Done()
 		select {
 		case event := <-channel:

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/rpc/chain"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
@@ -59,6 +60,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:
@@ -124,6 +126,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 func (r *Router) startTimeoutForUpdates(closeCh chan struct{}) {
 	dedlineTicker := time.NewTicker(feeRecalculationTimeout)
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-dedlineTicker.C:

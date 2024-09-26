@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	gocommon "github.com/status-im/status-go/common"
 )
 
 type Subscriptions struct {
@@ -30,6 +31,7 @@ func (s *Subscriptions) Create(namespace string, filter filter) (SubscriptionID,
 	newSub := NewSubscription(namespace, filter)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		err := newSub.Start(s.checkPeriod)
 		if err != nil {
 			s.log.Error("error while starting subscription", "err", err)

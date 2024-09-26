@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/log"
 	getrpc "github.com/ethereum/go-ethereum/rpc"
+	gocommon "github.com/status-im/status-go/common"
 )
 
 const (
@@ -75,6 +76,7 @@ func NewPublicAPI(s *Service) *PublicAPI {
 }
 
 func (api *PublicAPI) timeoutLoop(quit chan struct{}) {
+	defer gocommon.LogOnPanic()
 	for {
 		select {
 		case <-quit:
@@ -131,6 +133,7 @@ func (api *PublicAPI) NewBlockFilter() getrpc.ID {
 	api.filters[id] = f
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		id, si := api.latestBlockChangedEvent.Subscribe()
 		s, ok := si.(chan common.Hash)
 		if !ok {
@@ -167,6 +170,7 @@ func (api *PublicAPI) NewPendingTransactionFilter() getrpc.ID {
 	api.filters[id] = f
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		id, si := api.transactionSentToUpstreamEvent.Subscribe()
 		s, ok := si.(chan *PendingTxInfo)
 		if !ok {

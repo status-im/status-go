@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
 	eth_node_types "github.com/status-im/status-go/eth-node/types"
@@ -690,6 +691,7 @@ func (tm *Manager) DeleteCustom(chainID uint64, address common.Address) error {
 }
 
 func (tm *Manager) SignalCommunityTokenReceived(address common.Address, txHash common.Hash, value *big.Int, t *Token, isFirst bool) {
+	defer gocommon.LogOnPanic()
 	if tm.walletFeed == nil || t == nil || t.CommunityData == nil {
 		return
 	}
