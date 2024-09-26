@@ -210,9 +210,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, name string, extraOptions []Option) *Messenger {
-	communityManagerOptions := []communities.ManagerOption{
-		communities.WithAllowForcingCommunityMembersReevaluation(true),
-	}
+	communityManagerOptions := []communities.ManagerOption{}
 	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
 
 	messenger := newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{
@@ -1310,7 +1308,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	response, err = s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.CommunityChanges[0].TokenPermissionsAdded, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissions.Added, 1)
 	s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
 
 	err = <-waitOnBobToBeKickedFromChannel
@@ -1401,7 +1399,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestMemberRoleGetUpdatedWhen
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
-	s.Require().Len(response.CommunityChanges[0].TokenPermissionsModified, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissions.Modified, 1)
 
 	waitOnBobAddedToChannelAsPoster := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		channel, ok := sub.Community.Chats()[chat.CommunityChatID()]
@@ -2061,7 +2059,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberPermissi
 	// force owner to reevaluate channel members
 	// in production it will happen automatically, by periodic check
 	start := time.Now()
-	_, _, err = s.owner.communitiesManager.ReevaluateMembers(community.ID())
+	err = s.owner.communitiesManager.ForceMembersReevaluation(community.ID())
 	s.Require().NoError(err)
 
 	elapsed := time.Since(start)

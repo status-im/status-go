@@ -27,9 +27,7 @@ type CommunityChanges struct {
 	MembersBanned   map[string]bool                      `json:"membersBanned"`
 	MembersUnbanned map[string]bool                      `json:"membersUnbanned"`
 
-	TokenPermissionsAdded    map[string]*CommunityTokenPermission `json:"tokenPermissionsAdded"`
-	TokenPermissionsModified map[string]*CommunityTokenPermission `json:"tokenPermissionsModified"`
-	TokenPermissionsRemoved  map[string]*CommunityTokenPermission `json:"tokenPermissionsRemoved"`
+	TokenPermissions TokenPermissionChanges `json:"tokenPermissions"`
 
 	ChatsRemoved  map[string]*protobuf.CommunityChat `json:"chatsRemoved"`
 	ChatsAdded    map[string]*protobuf.CommunityChat `json:"chatsAdded"`
@@ -55,6 +53,20 @@ type CommunityChanges struct {
 	MemberSoftKicked bool `json:"memberSoftRemoved"`
 }
 
+type TokenPermissionChanges struct {
+	Added    TokenPermissions `json:"added"`
+	Modified TokenPermissions `json:"modified"`
+	Removed  TokenPermissions `json:"removed"`
+}
+
+func NewTokenPermissionChanges() TokenPermissionChanges {
+	return TokenPermissionChanges{
+		Added:    TokenPermissions{},
+		Modified: TokenPermissions{},
+		Removed:  TokenPermissions{},
+	}
+}
+
 func EmptyCommunityChanges() *CommunityChanges {
 	return &CommunityChanges{
 		MembersAdded:    make(map[string]*protobuf.CommunityMember),
@@ -62,9 +74,11 @@ func EmptyCommunityChanges() *CommunityChanges {
 		MembersBanned:   make(map[string]bool),
 		MembersUnbanned: make(map[string]bool),
 
-		TokenPermissionsAdded:    make(map[string]*CommunityTokenPermission),
-		TokenPermissionsModified: make(map[string]*CommunityTokenPermission),
-		TokenPermissionsRemoved:  make(map[string]*CommunityTokenPermission),
+		TokenPermissions: TokenPermissionChanges{
+			Added:    TokenPermissions{},
+			Modified: TokenPermissions{},
+			Removed:  TokenPermissions{},
+		},
 
 		ChatsRemoved:  make(map[string]*protobuf.CommunityChat),
 		ChatsAdded:    make(map[string]*protobuf.CommunityChat),
@@ -92,15 +106,16 @@ func (c *CommunityChanges) Merge(other *CommunityChanges) {
 	for memberID, unbanned := range other.MembersUnbanned {
 		c.MembersUnbanned[memberID] = unbanned
 	}
-	for permissionID, permission := range other.TokenPermissionsAdded {
-		c.TokenPermissionsAdded[permissionID] = permission
+	for permissionID, permission := range other.TokenPermissions.Added {
+		c.TokenPermissions.Added[permissionID] = permission
 	}
-	for permissionID, permission := range other.TokenPermissionsModified {
-		c.TokenPermissionsModified[permissionID] = permission
+	for permissionID, permission := range other.TokenPermissions.Modified {
+		c.TokenPermissions.Modified[permissionID] = permission
 	}
-	for permissionID, permission := range other.TokenPermissionsRemoved {
-		c.TokenPermissionsRemoved[permissionID] = permission
+	for permissionID, permission := range other.TokenPermissions.Removed {
+		c.TokenPermissions.Removed[permissionID] = permission
 	}
+
 	for chatID, chat := range other.ChatsRemoved {
 		c.ChatsRemoved[chatID] = chat
 	}
@@ -166,28 +181,9 @@ func EvaluateCommunityChanges(origin, modified *Community) *CommunityChanges {
 		changes.ControlNodeChanged = modified.ControlNode()
 	}
 
-	originTokenPermissions := origin.tokenPermissions()
-	modifiedTokenPermissions := modified.tokenPermissions()
-
-	// Check for modified or removed token permissions
-	for id, originPermission := range originTokenPermissions {
-		if modifiedPermission := modifiedTokenPermissions[id]; modifiedPermission != nil {
-			if !modifiedPermission.Equals(originPermission) {
-				changes.TokenPermissionsModified[id] = modifiedPermission
-			}
-		} else {
-			changes.TokenPermissionsRemoved[id] = originPermission
-		}
-	}
-
-	// Check for added token permissions
-	for id, permission := range modifiedTokenPermissions {
-		if _, ok := originTokenPermissions[id]; !ok {
-			changes.TokenPermissionsAdded[id] = permission
-		}
-	}
-
+	changes.TokenPermissions = evaluatePermissionsChanges(origin.tokenPermissions(), modified.tokenPermissions())
 	changes.Community = modified
+
 	return changes
 }
 
@@ -333,6 +329,32 @@ func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityD
 	}
 
 	return changes
+}
+
+func evaluatePermissionsChanges(origin, modified TokenPermissions) TokenPermissionChanges {
+	result := TokenPermissionChanges{
+		Added:    TokenPermissions{},
+		Modified: TokenPermissions{},
+		Removed:  TokenPermissions{},
+	}
+
+	for id, originPermission := range origin {
+		if modifiedPermission := modified[id]; modifiedPermission != nil {
+			if !modifiedPermission.Equals(originPermission) {
+				result.Modified[id] = modifiedPermission
+			}
+		} else {
+			result.Removed[id] = originPermission
+		}
+	}
+
+	for id, permission := range modified {
+		if _, ok := origin[id]; !ok {
+			result.Added[id] = permission
+		}
+	}
+
+	return result
 }
 
 func findDiffInBanList(searchFrom []string, searchIn []string, storeTo map[string]bool) {

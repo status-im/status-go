@@ -99,9 +99,7 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesSharedMemberAddressSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, name string, extraOptions []Option) *Messenger {
-	communityManagerOptions := []communities.ManagerOption{
-		communities.WithAllowForcingCommunityMembersReevaluation(true),
-	}
+	communityManagerOptions := []communities.ManagerOption{}
 	extraOptions = append(extraOptions, WithCommunityManagerOptions(communityManagerOptions))
 
 	return newTestCommunitiesMessenger(&s.Suite, waku, testCommunitiesMessengerConfig{

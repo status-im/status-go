@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -1780,7 +1781,9 @@ func (o *Community) Categories() map[string]*protobuf.CommunityCategory {
 	return response
 }
 
-func (o *Community) tokenPermissions() map[string]*CommunityTokenPermission {
+type TokenPermissions = map[string]*CommunityTokenPermission
+
+func (o *Community) tokenPermissions() TokenPermissions {
 	result := make(map[string]*CommunityTokenPermission, len(o.config.CommunityDescription.TokenPermissions))
 	for _, tokenPermission := range o.config.CommunityDescription.TokenPermissions {
 		result[tokenPermission.Id] = NewCommunityTokenPermission(tokenPermission)
@@ -1865,7 +1868,7 @@ func (o *Community) PendingAndBannedMembers() map[string]CommunityMemberState {
 	return result
 }
 
-func (o *Community) TokenPermissions() map[string]*CommunityTokenPermission {
+func (o *Community) TokenPermissions() TokenPermissions {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 	return o.tokenPermissions()
@@ -1999,10 +2002,10 @@ func (o *Community) UpsertTokenPermission(tokenPermission *protobuf.CommunityTok
 		changes := o.emptyCommunityChanges()
 		if existed {
 			permission.State = TokenPermissionUpdatePending
-			changes.TokenPermissionsModified[tokenPermission.Id] = permission
+			changes.TokenPermissions.Modified[tokenPermission.Id] = permission
 		} else {
 			permission.State = TokenPermissionAdditionPending
-			changes.TokenPermissionsAdded[tokenPermission.Id] = permission
+			changes.TokenPermissions.Added[tokenPermission.Id] = permission
 		}
 
 		return changes, nil
@@ -2041,7 +2044,7 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 		permission.State = TokenPermissionRemovalPending
 
 		changes := o.emptyCommunityChanges()
-		changes.TokenPermissionsModified[permission.Id] = permission
+		changes.TokenPermissions.Modified[permission.Id] = permission
 
 		return changes, nil
 	}
@@ -2397,6 +2400,10 @@ func ChatID(communityID, channelID string) string {
 	return communityID + channelID
 }
 
+func ChannelID(communityID, chatID string) string {
+	return strings.TrimPrefix(chatID, communityID)
+}
+
 func (o *Community) ChatID(channelID string) string {
 	return ChatID(o.IDString(), channelID)
 }
@@ -2621,9 +2628,9 @@ func (o *Community) upsertTokenPermission(permission *protobuf.CommunityTokenPer
 
 	changes := o.emptyCommunityChanges()
 	if existed {
-		changes.TokenPermissionsModified[permission.Id] = NewCommunityTokenPermission(permission)
+		changes.TokenPermissions.Modified[permission.Id] = NewCommunityTokenPermission(permission)
 	} else {
-		changes.TokenPermissionsAdded[permission.Id] = NewCommunityTokenPermission(permission)
+		changes.TokenPermissions.Added[permission.Id] = NewCommunityTokenPermission(permission)
 	}
 
 	return changes, nil
@@ -2639,7 +2646,7 @@ func (o *Community) deleteTokenPermission(permissionID string) (*CommunityChange
 
 	changes := o.emptyCommunityChanges()
 
-	changes.TokenPermissionsRemoved[permissionID] = NewCommunityTokenPermission(permission)
+	changes.TokenPermissions.Removed[permissionID] = NewCommunityTokenPermission(permission)
 
 	return changes, nil
 }

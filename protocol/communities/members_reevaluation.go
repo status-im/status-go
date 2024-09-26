@@ -1,0 +1,648 @@
+package communities
+
+import (
+	"crypto/ecdsa"
+	"errors"
+	"sync"
+	"time"
+
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
+)
+
+var membersReevaluationTick = 10 * time.Second
+var membersReevaluationInterval = 8 * time.Hour
+var membersReevaluationCooldown = 5 * time.Minute
+
+type reevaluationExecutionType int
+
+const (
+	reevaluationExecutionRegular reevaluationExecutionType = iota
+	reevaluationExecutionOnDemand
+	reevaluationExecutionForced
+)
+
+type reevaluationFunc = func(reevaluationExecutionType) (stop bool, err error)
+
+type membersReevaluationTask struct {
+	startedAt  time.Time
+	endedAt    time.Time
+	demandedAt time.Time
+	execute    reevaluationFunc
+	mutex      sync.Mutex
+}
+
+type membersReevaluationScheduler struct {
+	tasks  sync.Map // stores `membersReevaluationTask`
+	forces sync.Map // stores `chan struct{}`
+	quit   chan struct{}
+	logger *zap.Logger
+}
+
+func (t *membersReevaluationTask) shouldExecute(force bool) *reevaluationExecutionType {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	if force {
+		result := reevaluationExecutionForced
+		return &result
+	}
+
+	now := time.Now()
+
+	if !t.endedAt.After(now.Add(-membersReevaluationCooldown)) {
+		return nil
+	}
+
+	if t.endedAt.After(now.Add(-membersReevaluationInterval)) {
+		result := reevaluationExecutionRegular
+		return &result
+	}
+
+	if t.startedAt.Before(t.demandedAt) {
+		result := reevaluationExecutionOnDemand
+		return &result
+	}
+
+	return nil
+}
+
+func (t *membersReevaluationTask) setStartTime(time time.Time) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.startedAt = time
+}
+
+func (t *membersReevaluationTask) setEndTime(time time.Time) (elapsed time.Duration) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.endedAt = time
+	return t.endedAt.Sub(t.startedAt)
+}
+
+func (t *membersReevaluationTask) setDemandTime(time time.Time) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.demandedAt = time
+}
+
+func (s *membersReevaluationScheduler) getTask(communityID string) (*membersReevaluationTask, error) {
+	t, exists := s.tasks.Load(communityID)
+	if !exists {
+		return nil, errors.New("task doesn't exist")
+	}
+
+	task, ok := t.(*membersReevaluationTask)
+	if !ok {
+		return nil, errors.New("invalid task type")
+	}
+
+	return task, nil
+}
+
+func (s *membersReevaluationScheduler) iterate(communityID string, force bool) (stop bool) {
+	task, err := s.getTask(communityID)
+	if err != nil {
+		return true
+	}
+
+	executionType := task.shouldExecute(force)
+	if executionType == nil {
+		return false
+	}
+
+	task.setStartTime(time.Now())
+
+	stop, err = task.execute(*executionType)
+	if err != nil {
+		s.logger.Error("can't reevaluate members", zap.Error(err))
+		return stop
+	}
+
+	elapsed := task.setEndTime(time.Now())
+
+	s.logger.Info("reevaluation finished",
+		zap.String("communityID", communityID),
+		zap.Duration("elapsed", elapsed),
+	)
+
+	return stop
+}
+
+func (s *membersReevaluationScheduler) loop(communityID string, reevaluator reevaluationFunc, setupDone chan struct{}) {
+	_, exists := s.tasks.Load(communityID)
+	if exists {
+		setupDone <- struct{}{}
+		return
+	}
+
+	s.tasks.Store(communityID, &membersReevaluationTask{execute: reevaluator})
+	defer s.tasks.Delete(communityID)
+
+	force := make(chan struct{}, 10)
+	s.forces.Store(communityID, force)
+	defer s.forces.Delete(communityID)
+
+	ticker := time.NewTicker(membersReevaluationTick)
+	defer ticker.Stop()
+
+	setupDone <- struct{}{}
+
+	// Perform the first iteration immediately
+	stop := s.iterate(communityID, true)
+	if stop {
+		return
+	}
+
+	for {
+		select {
+		case <-ticker.C:
+			stop := s.iterate(communityID, false)
+			if stop {
+				return
+			}
+
+		case <-force:
+			stop := s.iterate(communityID, true)
+			if stop {
+				return
+			}
+
+		case <-s.quit:
+			return
+		}
+	}
+}
+
+func (s *membersReevaluationScheduler) Start(communityID string, reevaluator reevaluationFunc) {
+	setupDone := make(chan struct{})
+	go s.loop(communityID, reevaluator, setupDone)
+	<-setupDone
+}
+
+func (s *membersReevaluationScheduler) Push(communityID string) error {
+	task, err := s.getTask(communityID)
+	if err != nil {
+		return err
+	}
+	task.setDemandTime(time.Now())
+	return nil
+}
+
+func (s *membersReevaluationScheduler) Force(communityID string) error {
+	t, exists := s.forces.Load(communityID)
+	if !exists {
+		return errors.New("scheduler not started yet")
+	}
+
+	force, ok := t.(chan struct{})
+	if !ok {
+		return errors.New("invalid cast")
+	}
+
+	force <- struct{}{}
+	return nil
+}
+
+type reevaluationScopeController struct {
+	evaluatedPermissions map[string]TokenPermissions
+}
+
+func newReevaluationScopeController() *reevaluationScopeController {
+	return &reevaluationScopeController{
+		evaluatedPermissions: map[string]TokenPermissions{},
+	}
+}
+
+func (r *reevaluationScopeController) setAsEvaluated(communityID string, permissions TokenPermissions) {
+	r.evaluatedPermissions[communityID] = permissions
+}
+
+func (r *reevaluationScopeController) permissionsToEvaluate(communityID string, permissions TokenPermissions, t reevaluationExecutionType) TokenPermissions {
+	switch t {
+	case reevaluationExecutionRegular, reevaluationExecutionForced:
+		return permissions // evaluate all permissions
+	case reevaluationExecutionOnDemand:
+		previouslyEvaluated, ok := r.evaluatedPermissions[communityID]
+		if !ok {
+			return permissions
+		}
+		return permissionsToEvaluate(previouslyEvaluated, permissions)
+	}
+	return nil
+}
+
+func permissionsToEvaluate(prev, current TokenPermissions) TokenPermissions {
+	result := TokenPermissions{}
+
+	changes := evaluatePermissionsChanges(prev, current)
+
+	// Evaluate all newly added permissions
+	maps.Copy(result, changes.Added)
+
+	return nil
+}
+
+// if token master permission is added, then check it for all members who are not token-masters yet, and nominate them if satisfied
+// if admin permission is added, then check it for all members who are not admins or token-masters yet, and nominate them if satisfied
+// if become member is permission added, then do nothing
+// if view and post channel permission is added, then check it for all members who are not view&post yet for given channel, and add/nominate them if satisfied
+// if view channel permission is added, then check it for all members who are not view&post or view yet, and add/nominate them if satisfied
+
+// if token master permission is modified, then check it for all members, if it is not satisfied for a member, then check all other token-master permissions and nominate/drop them if needed
+// if admin permission is added, then check it for all members (except token-masters), if it is not satisfied, then check all other admin permissions and nominate/drop them if satisfied
+// if become member permission is modified, then check it for all members (except token-masters and admins), if it is not satisfied, check all other permissions and drop members not satisfied
+
+// if token-master permission is removed, then check remaining token-master permissions for token-masters, if not satisfied, then check admin permission, then become member permissions
+// if admin permission is removed, then check remaining admin permissions for admins, if not satisfied, then check  become member permissions
+// if become member permission is removed, then check remaining become member permissions for members, if not satisfied, remove them
+
+type tokenPermissionChangesByType struct {
+	BecomeTokenMaster     TokenPermissionChanges
+	BecomeAdmin           TokenPermissionChanges
+	BecomeMember          TokenPermissionChanges
+	CanViewAndPostChannel TokenPermissionChanges
+	CanViewChannel        TokenPermissionChanges
+}
+
+func NewTokenPermissionChangesByType(all TokenPermissionChanges) (*tokenPermissionChangesByType, error) {
+	result := &tokenPermissionChangesByType{
+		BecomeTokenMaster:     NewTokenPermissionChanges(),
+		BecomeAdmin:           NewTokenPermissionChanges(),
+		BecomeMember:          NewTokenPermissionChanges(),
+		CanViewAndPostChannel: NewTokenPermissionChanges(),
+		CanViewChannel:        NewTokenPermissionChanges(),
+	}
+
+	resultElementByType := func(t protobuf.CommunityTokenPermission_Type) (*TokenPermissionChanges, error) {
+		switch t {
+		case protobuf.CommunityTokenPermission_BECOME_ADMIN:
+			return &result.BecomeAdmin, nil
+		case protobuf.CommunityTokenPermission_BECOME_MEMBER:
+			return &result.BecomeMember, nil
+		case protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER:
+			return &result.BecomeTokenMaster, nil
+		case protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL:
+			return &result.CanViewAndPostChannel, nil
+		case protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL:
+			return &result.CanViewChannel, nil
+		}
+		return nil, errors.New("unexpected permission type")
+	}
+
+	for id, permission := range all.Added {
+		r, err := resultElementByType(permission.Type)
+		if err != nil {
+			return nil, err
+		}
+		r.Added[id] = permission
+	}
+
+	for id, permission := range all.Modified {
+		r, err := resultElementByType(permission.Type)
+		if err != nil {
+			return nil, err
+		}
+		r.Modified[id] = permission
+	}
+
+	for id, permission := range all.Removed {
+		r, err := resultElementByType(permission.Type)
+		if err != nil {
+			return nil, err
+		}
+		r.Removed[id] = permission
+	}
+
+	return result, nil
+}
+
+func (t *tokenPermissionChangesByType) byChannel(communityID string) map[string]*tokenPermissionChangesByType {
+	result := map[string]*tokenPermissionChangesByType{}
+
+	populate := func(changes TokenPermissions, append func(channelID string, id string, p *CommunityTokenPermission)) {
+		for id, p := range changes {
+			for _, chatID := range p.ChatIds {
+				channelID := ChannelID(communityID, chatID)
+				_, ok := result[channelID]
+				if !ok {
+					result[channelID] = &tokenPermissionChangesByType{
+						CanViewAndPostChannel: NewTokenPermissionChanges(),
+						CanViewChannel:        NewTokenPermissionChanges(),
+					}
+				}
+				append(channelID, id, p)
+			}
+		}
+	}
+
+	populate(t.CanViewAndPostChannel.Added, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewAndPostChannel.Added[id] = p
+	})
+	populate(t.CanViewAndPostChannel.Modified, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewAndPostChannel.Modified[id] = p
+	})
+	populate(t.CanViewAndPostChannel.Removed, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewAndPostChannel.Removed[id] = p
+	})
+	populate(t.CanViewChannel.Added, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewChannel.Added[id] = p
+	})
+	populate(t.CanViewChannel.Modified, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewChannel.Modified[id] = p
+	})
+	populate(t.CanViewChannel.Removed, func(channelID, id string, p *CommunityTokenPermission) {
+		result[channelID].CanViewChannel.Removed[id] = p
+	})
+
+	return result
+}
+
+type membersReevaluationState struct {
+	community               *Community
+	permissionChangesByType *tokenPermissionChangesByType
+	collectiblesOwners      CollectiblesOwners
+	membersAccounts         map[string][]*protobuf.RevealedAccount
+
+	result reevaluateMembersResult
+}
+
+func (m *Manager) buildMembersReevaluationState(communityID types.HexBytes, changes TokenPermissionChanges) (*membersReevaluationState, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !community.IsControlNode() {
+		return nil, ErrNotEnoughPermissions
+	}
+
+	permissionChangesByType, err := NewTokenPermissionChangesByType(changes)
+	if err != nil {
+		return nil, err
+	}
+
+	membersAccounts, err := m.persistence.GetCommunityRequestsToJoinRevealedAddresses(community.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	return &membersReevaluationState{
+		community:               community,
+		permissionChangesByType: permissionChangesByType,
+		collectiblesOwners:      CollectiblesOwners{},
+		membersAccounts:         membersAccounts,
+		result: reevaluateMembersResult{
+			membersToRemove:             map[string]struct{}{},
+			membersRoles:                map[string]*reevaluateMemberRole{},
+			membersToRemoveFromChannels: map[string]map[string]struct{}{},
+			membersToAddToChannels:      map[string]map[string]protobuf.CommunityMember_ChannelRole{},
+		},
+	}, nil
+}
+
+func (m *Manager) fetchCollectiblesIfNeeded(state *membersReevaluationState, communityData map[protobuf.CommunityTokenPermission_Type]*PreParsedCommunityPermissionsData, channelData map[string]*PreParsedCommunityPermissionsData) error {
+	collectiblesToFetch := map[walletcommon.ChainID]map[gethcommon.Address]struct{}{}
+
+	for chainID, addresses := range CollectibleAddressesFromPreParsedPermissionsData(communityData, channelData) {
+		_, ok := state.collectiblesOwners[chainID]
+		if !ok {
+			collectiblesToFetch[chainID] = addresses
+			continue
+		}
+
+		for address := range addresses {
+			_, ok := state.collectiblesOwners[chainID][address]
+			if !ok {
+				collectiblesToFetch[chainID][address] = struct{}{}
+			}
+		}
+	}
+
+	if len(collectiblesToFetch) == 0 {
+		return nil
+	}
+
+	fetchedCollectibles, err := m.fetchCollectiblesOwners(collectiblesToFetch)
+	if err != nil {
+		return err
+	}
+
+	// Merge fetched collectibles
+	for chainID, ownersRhs := range fetchedCollectibles {
+		ownersLhs, ok := state.collectiblesOwners[chainID]
+		if !ok {
+			state.collectiblesOwners[chainID] = ownersRhs
+			continue
+		}
+		for address, ownership := range ownersRhs {
+			ownersLhs[address] = ownership
+		}
+	}
+
+	return nil
+}
+
+func (m *Manager) reevaluateMemberRole(
+	state *membersReevaluationState,
+	memberKey string,
+	accountsAndChainIDs []*AccountChainIDsCombination,
+	role protobuf.CommunityMember_Roles) (bool, error) {
+
+	permissions, permissionType := func() (*TokenPermissionChanges, protobuf.CommunityTokenPermission_Type) {
+		switch role {
+		case protobuf.CommunityMember_ROLE_TOKEN_MASTER:
+			return &state.permissionChangesByType.BecomeTokenMaster, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER
+		case protobuf.CommunityMember_ROLE_ADMIN:
+			return &state.permissionChangesByType.BecomeAdmin, protobuf.CommunityTokenPermission_BECOME_ADMIN
+		case protobuf.CommunityMember_ROLE_NONE:
+			return &state.permissionChangesByType.BecomeMember, protobuf.CommunityTokenPermission_BECOME_MEMBER
+		}
+		return nil, protobuf.CommunityTokenPermission_UNKNOWN_TOKEN_PERMISSION
+	}()
+
+	reprocessAll := len(permissions.Modified) > 0 || len(permissions.Removed) > 0
+	if reprocessAll {
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(state.community.tokenPermissions(), permissionType)
+		err := m.fetchCollectiblesIfNeeded(state, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
+		if err != nil {
+			return false, err
+		}
+
+		preParsedData := communityPermissionsPreParsedData[permissionType]
+		if preParsedData != nil {
+			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(preParsedData, accountsAndChainIDs, true, state.collectiblesOwners)
+			if err != nil {
+				return false, err
+			}
+
+			return permissionResponse.Satisfied, nil
+		}
+	} else if len(permissions.Added) > 0 {
+		if role == protobuf.CommunityMember_ROLE_NONE || state.result.membersRoles[memberKey].old == role {
+			// There is no need to check the permissions, it was already satisfied before
+			return true, nil
+		}
+
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(permissions.Added, permissionType)
+		err := m.fetchCollectiblesIfNeeded(state, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
+		if err != nil {
+			return false, err
+		}
+
+		preParsedData := communityPermissionsPreParsedData[permissionType]
+		permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(preParsedData, accountsAndChainIDs, true, state.collectiblesOwners)
+		if err != nil {
+			return false, err
+		}
+
+		if permissionResponse.Satisfied {
+			return true, nil
+		}
+	}
+
+	return state.result.membersRoles[memberKey].old == role, nil
+}
+
+func (m *Manager) reevaluateMemberChannelRole(
+	state *membersReevaluationState,
+	channelID string,
+	memberKey string,
+	accountsAndChainIDs []*AccountChainIDsCombination,
+	changes *tokenPermissionChangesByType,
+	role protobuf.CommunityMember_ChannelRole) (bool, error) {
+
+	permissions, permissionType := func() (*TokenPermissionChanges, protobuf.CommunityTokenPermission_Type) {
+		switch role {
+		case protobuf.CommunityMember_CHANNEL_ROLE_POSTER:
+			return &changes.CanViewAndPostChannel, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL
+		case protobuf.CommunityMember_CHANNEL_ROLE_VIEWER:
+			return &changes.CanViewChannel, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL
+		}
+		return nil, 0
+	}()
+
+	reprocessAll := len(permissions.Modified) > 0 || len(permissions.Removed) > 0
+	if reprocessAll {
+		channelTokenPermissionsByType := func() map[string]*CommunityTokenPermission {
+			result := map[string]*CommunityTokenPermission{}
+			for _, p := range state.community.ChannelTokenPermissionsByType(channelID, permissionType) {
+				result[p.Id] = p
+			}
+			return result
+		}()
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(channelTokenPermissionsByType, permissionType)
+		err := m.fetchCollectiblesIfNeeded(state, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
+		if err != nil {
+			return false, err
+		}
+
+		preParsedData := communityPermissionsPreParsedData[permissionType]
+		if preParsedData != nil {
+			permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(preParsedData, accountsAndChainIDs, true, state.collectiblesOwners)
+			if err != nil {
+				return false, err
+			}
+
+			return permissionResponse.Satisfied, nil
+		}
+	} else if len(permissions.Added) > 0 {
+		if state.result.membersRoles[memberKey].old == role {
+			// There is no need to check the permissions, it was already satisfied before
+			return true, nil
+		}
+
+		communityPermissionsPreParsedData, channelPermissionsPreParsedData := PreParsePermissionsDataByType(permissions.Added, permissionType)
+		err := m.fetchCollectiblesIfNeeded(state, communityPermissionsPreParsedData, channelPermissionsPreParsedData)
+		if err != nil {
+			return false, err
+		}
+
+		preParsedData := communityPermissionsPreParsedData[permissionType]
+		permissionResponse, err := m.PermissionChecker.CheckPermissionsWithPreFetchedData(preParsedData, accountsAndChainIDs, true, state.collectiblesOwners)
+		if err != nil {
+			return false, err
+		}
+
+		if permissionResponse.Satisfied {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (m *Manager) reevaluateMember(state *membersReevaluationState, memberKey string) error {
+	memberPubKey, err := common.HexToPubkey(memberKey)
+	if err != nil {
+		return err
+	}
+
+	if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || state.community.IsMemberOwner(memberPubKey) {
+		return nil
+	}
+
+	revealedAccount, memberHasWallet := state.membersAccounts[memberKey]
+	if !memberHasWallet {
+		state.result.membersToRemove[memberKey] = struct{}{}
+		return nil
+	}
+
+	accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccount)
+
+	state.result.membersRoles[memberKey] = &reevaluateMemberRole{
+		old: state.community.MemberRole(memberPubKey),
+		new: protobuf.CommunityMember_ROLE_NONE,
+	}
+
+	rolesOrder := []protobuf.CommunityMember_Roles{
+		protobuf.CommunityMember_ROLE_TOKEN_MASTER,
+		protobuf.CommunityMember_ROLE_ADMIN,
+		protobuf.CommunityMember_ROLE_NONE,
+	}
+
+	satisfied := false
+	for _, role := range rolesOrder {
+		satisfied, err = m.reevaluateMemberRole(state, memberKey, accountsAndChainIDs, role)
+		if err != nil {
+			return err
+		}
+		if satisfied {
+			state.result.membersRoles[memberKey].new = role
+			break
+		}
+	}
+
+	if state.result.membersRoles[memberKey].isPrivileged() {
+		return nil
+	}
+
+	if !satisfied {
+		state.result.membersToRemove[memberKey] = struct{}{}
+		return nil
+	}
+
+	changesByChannel := state.permissionChangesByType.byChannel(state.community.IDString())
+	for channelID, changes := range changesByChannel {
+	}
+
+	return nil
+}
+
+func (m *Manager) reevaluateMembers2(communityID types.HexBytes, changes TokenPermissionChanges) (*Community, map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+	state, err := m.buildMembersReevaluationState(communityID, changes)
+
+	for memberKey := range state.community.Members() {
+		err := m.reevaluateMember(state, memberKey)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return nil, nil, err
+}

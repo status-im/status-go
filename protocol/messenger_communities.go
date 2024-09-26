@@ -4841,7 +4841,7 @@ func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*Messe
 		m.config.messengerSignalsHandler.MessengerResponse(&response)
 	}
 
-	m.communitiesManager.StartMembersReevaluationLoop(community.ID(), false)
+	m.communitiesManager.StartMembersReevaluationLoop(community.ID())
 
 	return &response, nil
 }

@@ -276,10 +276,10 @@ func createTokenPermission(base CommunityEventsTestsInterface, community *commun
 	s := base.GetSuite()
 	s.Require().NoError(err)
 	s.Require().Len(response.CommunityChanges, 1)
-	s.Require().Len(response.CommunityChanges[0].TokenPermissionsAdded, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissions.Added, 1)
 
 	addedPermission := func() *communities.CommunityTokenPermission {
-		for _, permission := range response.CommunityChanges[0].TokenPermissionsAdded {
+		for _, permission := range response.CommunityChanges[0].TokenPermissions.Added {
 			return permission
 		}
 		return nil
@@ -323,9 +323,9 @@ func editTokenPermission(base CommunityEventsTestsInterface, community *communit
 	response, err := base.GetEventSender().EditCommunityTokenPermission(request)
 	s.Require().NoError(err)
 	s.Require().Len(response.CommunityChanges, 1)
-	s.Require().Len(response.CommunityChanges[0].TokenPermissionsModified, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissions.Modified, 1)
 
-	editedPermission := response.CommunityChanges[0].TokenPermissionsModified[request.PermissionID]
+	editedPermission := response.CommunityChanges[0].TokenPermissions.Modified[request.PermissionID]
 	s.Require().NotNil(editedPermission)
 	// Permission edited by event must be in pending state
 	s.Require().Equal(communities.TokenPermissionUpdatePending, editedPermission.State)
@@ -366,9 +366,9 @@ func deleteTokenPermission(base CommunityEventsTestsInterface, community *commun
 	s := base.GetSuite()
 	s.Require().NoError(err)
 	s.Require().Len(response.CommunityChanges, 1)
-	s.Require().Len(response.CommunityChanges[0].TokenPermissionsModified, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissions.Modified, 1)
 
-	removedPermission := response.CommunityChanges[0].TokenPermissionsModified[request.PermissionID]
+	removedPermission := response.CommunityChanges[0].TokenPermissions.Modified[request.PermissionID]
 	s.Require().NotNil(removedPermission)
 	// Permission removed by event must be in pending state
 	s.Require().Equal(communities.TokenPermissionRemovalPending, removedPermission.State)
@@ -968,7 +968,7 @@ func controlNodeCreatesCommunityPermission(base CommunityEventsTestsInterface, c
 	s.Require().NoError(err)
 
 	var tokenPermissionID string
-	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
+	for id := range response.CommunityChanges[0].TokenPermissions.Added {
 		tokenPermissionID = id
 	}
 	s.Require().NotEqual(tokenPermissionID, "")
@@ -2120,7 +2120,7 @@ func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTest
 	s.Require().NoError(err)
 
 	var tokenPermissionID string
-	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
+	for id := range response.CommunityChanges[0].TokenPermissions.Added {
 		tokenPermissionID = id
 	}
 	s.Require().NotEqual(tokenPermissionID, "")
