@@ -121,21 +121,6 @@ func (mr *MockRPSLimitedEthClientInterfaceMockRecorder) BlockNumber(ctx any) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockNumber", reflect.TypeOf((*MockRPSLimitedEthClientInterface)(nil).BlockNumber), ctx)
 }
 
-// CallBlockHashByTransaction mocks base method.
-func (m *MockRPSLimitedEthClientInterface) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CallBlockHashByTransaction", ctx, blockNumber, index)
-	ret0, _ := ret[0].(common.Hash)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CallBlockHashByTransaction indicates an expected call of CallBlockHashByTransaction.
-func (mr *MockRPSLimitedEthClientInterfaceMockRecorder) CallBlockHashByTransaction(ctx, blockNumber, index any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CallBlockHashByTransaction", reflect.TypeOf((*MockRPSLimitedEthClientInterface)(nil).CallBlockHashByTransaction), ctx, blockNumber, index)
-}
-
 // CallContext mocks base method.
 func (m *MockRPSLimitedEthClientInterface) CallContext(ctx context.Context, result any, method string, args ...any) error {
 	m.ctrl.T.Helper()

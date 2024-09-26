@@ -62,7 +62,6 @@ type EthClientInterface interface {
 	GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error)
 	bind.ContractCaller
 	bind.ContractBackend
-	CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error)
 }
 
 // EthClient implements EthClientInterface
@@ -80,13 +79,6 @@ func NewEthClient(rpcClient *rpc.Client) *EthClient {
 
 func (ec *EthClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
 	return ec.rpcClient.BatchCallContext(ctx, b)
-}
-
-// go-ethereum's `Transaction` items drop the blkHash obtained during the RPC call.
-// This function preserves the additional data. This is the cheapest way to obtain
-// the block hash for a given block number.
-func (ec *EthClient) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
-	return callBlockHashByTransaction(ctx, ec.rpcClient, blockNumber, index)
 }
 
 func (ec *EthClient) GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error) {
