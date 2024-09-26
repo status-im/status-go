@@ -11,6 +11,7 @@ var (
 
 type RestoreAccount struct {
 	Mnemonic string `json:"mnemonic"`
+	BIP39Passphrase string `json:"BIP39Passphrase"`
 
 	// Keycard info can be set instead of Mnemonic.
 	// This is to log in using a keycard with existing account.

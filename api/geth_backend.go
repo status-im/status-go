@@ -567,7 +567,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	}
 
 	if request.Mnemonic != "" {
-		info, err := b.generateAccountInfo(request.Mnemonic)
+		info, err := b.generateAccountInfo(request.Mnemonic, request.BIP39Passphrase)
 		if err != nil {
 			return errors.Wrap(err, "failed to generate account info")
 		}
@@ -1312,7 +1312,7 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 		return nil, err
 	}
 
-	response, err := b.generateOrImportAccount(request.Mnemonic, 0, request.FetchBackup, &request.CreateAccount)
+	response, err := b.generateOrImportAccount(request.Mnemonic, request.BIP39Passphrase, 0, request.FetchBackup, &request.CreateAccount)
 	if err != nil {
 		return nil, err
 	}
@@ -1399,10 +1399,10 @@ func (b *GethStatusBackend) RestoreKeycardAccountAndLogin(request *requests.Rest
 	return response.account, nil
 }
 
-func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
+func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic, passphrase string) (string, error) {
 	accountGenerator := b.accountManager.AccountsGenerator()
 
-	info, err := accountGenerator.ImportMnemonic(mnemonic, "")
+	info, err := accountGenerator.ImportMnemonic(mnemonic, passphrase)
 	if err != nil {
 		return "", err
 	}
@@ -1431,8 +1431,8 @@ type accountBundle struct {
 	chatPrivateKey *ecdsa.PrivateKey
 }
 
-func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount, opts ...params.Option) (*accountBundle, error) {
-	info, err := b.generateAccountInfo(mnemonic)
+func (b *GethStatusBackend) generateOrImportAccount(mnemonic, passphrase string, customizationColorClock uint64, fetchBackup bool, request *requests.CreateAccount, opts ...params.Option) (*accountBundle, error) {
+	info, err := b.generateAccountInfo(mnemonic, passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -1517,7 +1517,7 @@ func (b *GethStatusBackend) InitKeyStoreDirWithAccount(rootDataDir, keyUID strin
 	return keyStoreRelativePath, b.accountManager.InitKeystore(keystoreAbsolutePath)
 }
 
-func (b *GethStatusBackend) generateAccountInfo(mnemonic string) (*generator.GeneratedAccountInfo, error) {
+func (b *GethStatusBackend) generateAccountInfo(mnemonic, BIP39Passphrase string) (*generator.GeneratedAccountInfo, error) {
 	accountGenerator := b.accountManager.AccountsGenerator()
 
 	var info generator.GeneratedAccountInfo
@@ -1532,7 +1532,7 @@ func (b *GethStatusBackend) generateAccountInfo(mnemonic string) (*generator.Gen
 		}
 	} else {
 
-		info, err = accountGenerator.ImportMnemonic(mnemonic, "")
+		info, err = accountGenerator.ImportMnemonic(mnemonic, BIP39Passphrase)
 		if err != nil {
 			return nil, err
 		}
@@ -1717,7 +1717,7 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 		return nil, err
 	}
 
-	response, err := b.generateOrImportAccount("", 1, false, request, opts...)
+	response, err := b.generateOrImportAccount("", "", 1, false, request, opts...)
 	if err != nil {
 		return nil, err
 	}
