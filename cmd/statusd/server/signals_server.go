@@ -145,7 +145,8 @@ func (s *Server) addEndpointWithResponse(name string, handler func(string) strin
 
 		response := handler(string(request))
 
-		w.Header().Set("Content-Type", "application/json")
+		s.setHeaders(name, w)
+
 		_, err = w.Write([]byte(response))
 		if err != nil {
 			log.Error("failed to write response: %w", err)
@@ -158,7 +159,8 @@ func (s *Server) addEndpointNoRequest(name string, handler func() string) {
 	s.mux.HandleFunc(name, func(w http.ResponseWriter, r *http.Request) {
 		response := handler()
 
-		w.Header().Set("Content-Type", "application/json")
+		s.setHeaders(name, w)
+
 		_, err := w.Write([]byte(response))
 		if err != nil {
 			log.Error("failed to write response: %w", err)
@@ -183,4 +185,11 @@ func (s *Server) RegisterMobileAPI() {
 	for _, name := range EndpointsUnsupported {
 		s.addUnsupportedEndpoint(name)
 	}
+}
+
+func (s *Server) setHeaders(name string, w http.ResponseWriter) {
+	if _, ok := EndpointsDeprecated[name]; ok {
+		w.Header().Set("Deprecation", "true")
+	}
+	w.Header().Set("Content-Type", "application/json")
 }

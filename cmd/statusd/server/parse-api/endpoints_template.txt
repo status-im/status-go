@@ -22,3 +22,9 @@ var EndpointsUnsupported = []string{
 	"/{{ $.PackageName }}/{{ . }}",
 {{- end }}
 }
+
+var EndpointsDeprecated = map[string]struct{}{
+  {{- range .DeprecatedEndpoints }}
+  "/{{ $.PackageName }}/{{ . }}": {},
+{{- end }}
+}

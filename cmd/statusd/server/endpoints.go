@@ -7,6 +7,7 @@ import statusgo "github.com/status-im/status-go/mobile"
 
 var EndpointsWithRequest = map[string]func(string) string{
 	"/statusgo/InitializeApplication": statusgo.InitializeApplication,
+	"/statusgo/OpenAccounts": statusgo.OpenAccounts,
 	"/statusgo/ExtractGroupMembershipSignatures": statusgo.ExtractGroupMembershipSignatures,
 	"/statusgo/SignGroupMembership": statusgo.SignGroupMembership,
 	"/statusgo/ValidateNodeConfig": statusgo.ValidateNodeConfig,
@@ -77,8 +78,13 @@ var EndpointsUnsupported = []string{
 	"/statusgo/VerifyAccountPassword",
 	"/statusgo/VerifyDatabasePassword",
 	"/statusgo/MigrateKeyStoreDir",
+	"/statusgo/Login",
+	"/statusgo/LoginWithConfig",
+	"/statusgo/SaveAccountAndLogin",
 	"/statusgo/DeleteMultiaccount",
 	"/statusgo/DeleteImportedKey",
+	"/statusgo/SaveAccountAndLoginWithKeycard",
+	"/statusgo/LoginWithKeycard",
 	"/statusgo/SignTypedData",
 	"/statusgo/SignTypedDataV4",
 	"/statusgo/SendTransactionWithChainID",
@@ -102,4 +108,13 @@ var EndpointsUnsupported = []string{
 	"/statusgo/InputConnectionStringForImportingKeypairsKeystores",
 	"/statusgo/EncodeTransfer",
 	"/statusgo/EncodeFunctionCall",
+}
+
+var EndpointsDeprecated = map[string]struct{}{
+  "/statusgo/OpenAccounts": {},
+  "/statusgo/Login": {},
+  "/statusgo/LoginWithConfig": {},
+  "/statusgo/SaveAccountAndLogin": {},
+  "/statusgo/SaveAccountAndLoginWithKeycard": {},
+  "/statusgo/LoginWithKeycard": {},
 }

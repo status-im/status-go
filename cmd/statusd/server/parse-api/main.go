@@ -39,6 +39,7 @@ type TemplateData struct {
 	FunctionsWithResp    []string
 	FunctionsNoArgs      []string
 	UnsupportedEndpoints []string
+	DeprecatedEndpoints  []string
 }
 
 func main() {
@@ -54,6 +55,7 @@ func main() {
 	var publicFunctionsWithArgs []string
 	var publicFunctionsWithoutArgs []string
 	var unsupportedFunctions []string
+	var deprecatedFucntions []string
 	var isDeprecated bool
 	var packageName string
 
@@ -75,12 +77,12 @@ func main() {
 			continue
 		}
 
+		functionName := extractFunctionName(line)
+
 		if isDeprecated {
 			isDeprecated = false
-			continue
+			deprecatedFucntions = append(deprecatedFucntions, functionName)
 		}
-
-		functionName := extractFunctionName(line)
 
 		switch {
 		case isPublicFunctionWithArgs(line):
@@ -103,6 +105,7 @@ func main() {
 		FunctionsWithResp:    publicFunctionsWithArgs,
 		FunctionsNoArgs:      publicFunctionsWithoutArgs,
 		UnsupportedEndpoints: unsupportedFunctions,
+		DeprecatedEndpoints:  deprecatedFucntions,
 	}
 
 	// Load and parse the template
