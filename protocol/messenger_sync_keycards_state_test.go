@@ -70,7 +70,7 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	)
 	s.Require().NoError(err)
 
-	err = s.main.EnableInstallation(s.other.installationID)
+	_, err = s.main.EnableInstallation(s.other.installationID)
 	s.Require().NoError(err)
 
 	// Pre-condition - both sides have to know about keypairs migrated to a keycards

@@ -101,7 +101,7 @@ func (s *MessengerDeleteMessageForMeSuite) Pair() {
 	s.Require().Equal("alice2", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("alice2", actualInstallation.InstallationMetadata.DeviceType)
 
-	err = s.alice1.EnableInstallation(s.alice2.installationID)
+	_, err = s.alice1.EnableInstallation(s.alice2.installationID)
 	s.Require().NoError(err)
 }
 

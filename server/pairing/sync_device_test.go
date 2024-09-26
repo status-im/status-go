@@ -940,7 +940,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	}
 	s.Require().True(found)
 
-	err = serverMessenger.EnableInstallation(settings.InstallationID)
+	_, err = serverMessenger.EnableInstallation(settings.InstallationID)
 	s.Require().NoError(err)
 
 	// Check if the logged in account is the same on server and client
