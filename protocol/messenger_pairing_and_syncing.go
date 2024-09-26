@@ -25,7 +25,8 @@ func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallati
 	if err != nil {
 		return nil, err
 	}
-	response, err := m.SendPairInstallation(context.Background(), nil)
+
+	response, err := m.SendPairInstallation(context.Background(), request.InstallationID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +70,7 @@ func (m *Messenger) EnableInstallationAndPair(request *requests.EnableInstallati
 		i.Enabled = true
 	}
 	m.allInstallations.Store(request.InstallationID, i)
-	response, err := m.SendPairInstallation(context.Background(), nil)
+	response, err := m.SendPairInstallation(context.Background(), request.InstallationID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,7 @@ func (m *Messenger) EnableInstallationAndPair(request *requests.EnableInstallati
 }
 
 // SendPairInstallation sends a pair installation message
-func (m *Messenger) SendPairInstallation(ctx context.Context, rawMessageHandler RawMessageHandler) (*MessengerResponse, error) {
+func (m *Messenger) SendPairInstallation(ctx context.Context, targetInstallationID string, rawMessageHandler RawMessageHandler) (*MessengerResponse, error) {
 	var err error
 	var response MessengerResponse
 
@@ -108,11 +109,13 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, rawMessageHandler 
 	clock, chat := m.getLastClockWithRelatedChat()
 
 	pairMessage := &protobuf.SyncPairInstallation{
-		Clock:          clock,
-		Name:           installation.InstallationMetadata.Name,
-		InstallationId: installation.ID,
-		DeviceType:     installation.InstallationMetadata.DeviceType,
-		Version:        installation.Version}
+		Clock:                clock,
+		Name:                 installation.InstallationMetadata.Name,
+		InstallationId:       installation.ID,
+		DeviceType:           installation.InstallationMetadata.DeviceType,
+		Version:              installation.Version,
+		TargetInstallationId: targetInstallationID,
+	}
 	encodedMessage, err := proto.Marshal(pairMessage)
 	if err != nil {
 		return nil, err

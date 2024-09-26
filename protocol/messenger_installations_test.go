@@ -43,7 +43,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 		DeviceType: "their-device-type",
 	})
 	s.Require().NoError(err)
-	response, err := theirMessenger.SendPairInstallation(context.Background(), nil)
+	response, err := theirMessenger.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
@@ -242,7 +242,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 		DeviceType: "their-device-type",
 	})
 	s.Require().NoError(err)
-	response, err = theirMessenger.SendPairInstallation(context.Background(), nil)
+	response, err = theirMessenger.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
@@ -366,7 +366,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 		DeviceType: "their-device-type",
 	})
 	s.Require().NoError(err)
-	response, err := bob2.SendPairInstallation(context.Background(), nil)
+	response, err := bob2.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
