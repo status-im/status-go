@@ -63,7 +63,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	s.Require().Equal("their-name", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("their-device-type", actualInstallation.InstallationMetadata.DeviceType)
 
-	err = s.m.EnableInstallation(theirMessenger.installationID)
+	_, err = s.m.EnableInstallation(theirMessenger.installationID)
 	s.Require().NoError(err)
 
 	contactKey, err := crypto.GenerateKey()
@@ -262,7 +262,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().Equal("their-name", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("their-device-type", actualInstallation.InstallationMetadata.DeviceType)
 
-	err = s.m.EnableInstallation(theirMessenger.installationID)
+	_, err = s.m.EnableInstallation(theirMessenger.installationID)
 	s.Require().NoError(err)
 
 	// sync
@@ -382,7 +382,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 	s.Require().NoError(err)
 	actualInstallation := response.Installations()[0]
 	s.Require().Equal(bob2.installationID, actualInstallation.ID)
-	err = bob1.EnableInstallation(bob2.installationID)
+	_, err = bob1.EnableInstallation(bob2.installationID)
 	s.Require().NoError(err)
 
 	// send a message from bob1 to alice, it should be received on both bob1 and bob2

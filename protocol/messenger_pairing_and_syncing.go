@@ -22,7 +22,7 @@ func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallati
 		return nil, err
 	}
 
-	installation, err := m.EnableInstallationV2(request.InstallationID)
+	installation, err := m.EnableInstallation(request.InstallationID)
 	if err != nil {
 		return nil, err
 	}
@@ -503,25 +503,8 @@ func (m *Messenger) SetInstallationName(id string, name string) error {
 	return m.encryptor.SetInstallationName(m.IdentityPublicKey(), id, name)
 }
 
-// Deprecated: use EnableInstallationV2 instead
-func (m *Messenger) EnableInstallation(id string) error {
-	installation, ok := m.allInstallations.Load(id)
-	if !ok {
-		return errors.New("no installation found")
-	}
-
-	err := m.encryptor.EnableInstallation(&m.identity.PublicKey, id)
-	if err != nil {
-		return err
-	}
-	installation.Enabled = true
-	// TODO(samyoul) remove storing of an updated reference pointer?
-	m.allInstallations.Store(id, installation)
-	return nil
-}
-
-// EnableInstallationV2 enables an installation and returns the installation
-func (m *Messenger) EnableInstallationV2(id string) (*multidevice.Installation, error) {
+// EnableInstallation enables an installation and returns the installation
+func (m *Messenger) EnableInstallation(id string) (*multidevice.Installation, error) {
 	installation, ok := m.allInstallations.Load(id)
 	if !ok {
 		return nil, errors.New("no installation found")

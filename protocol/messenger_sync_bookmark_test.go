@@ -60,7 +60,7 @@ func (s *MessengerSyncBookmarkSuite) TestSyncBookmark() {
 	s.Require().Equal("their-name", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("their-device-type", actualInstallation.InstallationMetadata.DeviceType)
 
-	err = s.m.EnableInstallation(theirMessenger.installationID)
+	_, err = s.m.EnableInstallation(theirMessenger.installationID)
 	s.Require().NoError(err)
 
 	// sync

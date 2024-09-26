@@ -306,7 +306,7 @@ func PairDevices(s *suite.Suite, device1, device2 *Messenger) {
 	s.Require().NotNil(response)
 
 	// Ensure installation is enabled
-	err = device2.EnableInstallation(device1.installationID)
+	_, err = device2.EnableInstallation(device1.installationID)
 	s.Require().NoError(err)
 }
 

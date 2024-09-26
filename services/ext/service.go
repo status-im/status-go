@@ -332,7 +332,8 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 }
 
 func (s *Service) EnableInstallation(installationID string) error {
-	return s.messenger.EnableInstallation(installationID)
+	_, err := s.messenger.EnableInstallation(installationID)
+	return err
 }
 
 // DisableInstallation disables an installation for multi-device sync.
