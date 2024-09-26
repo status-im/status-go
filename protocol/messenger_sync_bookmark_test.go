@@ -40,7 +40,7 @@ func (s *MessengerSyncBookmarkSuite) TestSyncBookmark() {
 		DeviceType: "their-device-type",
 	})
 	s.Require().NoError(err)
-	response, err := theirMessenger.SendPairInstallation(context.Background(), nil)
+	response, err := theirMessenger.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)

@@ -58,12 +58,41 @@ func (s *MessengerPairingSuite) TestEnableNonExistingInstallation() {
 
 }
 
-// TestMessengerPairAfterSeedPhrase tests the scenario where alice2 wants to sync with alice1
+func (s *MessengerPairingSuite) TestWrongTargetInstallationID() {
+	alice1 := s.m
+	alice2, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
+	s.Require().NoError(err)
+	defer TearDownMessenger(&s.Suite, alice2)
+
+	wrongTargetInstallationID := uuid.New().String()
+	mockRequest := requests.NewMockEnableInstallationAndPair(alice1.installationID, func() string {
+		return wrongTargetInstallationID
+	})
+	_, err = alice2.EnableInstallationAndPair(mockRequest)
+	s.Require().NoError(err)
+
+	_, err = WaitOnMessengerResponse(
+		alice1,
+		func(r *MessengerResponse) bool {
+			for _, i := range r.Installations() {
+				// We expect the installation to be added but no activity center notification
+				if i.ID == alice2.installationID && len(r.ActivityCenterNotifications()) == 0 {
+					return true
+				}
+			}
+			return false
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+}
+
+// TestMessengerSyncFallback tests the scenario where alice2 wants to sync with alice1
 // alice1 generated the connection string for bootstraping alice2
 // alice2 failed to connect to alice1 and restored from seed phrase
 // alice2 get the installationID1 from alice1 via parsing the connection string
 // alice2 should get the display name from alice1 after pairing
-func (s *MessengerPairingSuite) TestMessengerPairAfterSeedPhrase() {
+func (s *MessengerPairingSuite) TestMessengerSyncFallback() {
 	alice1 := s.m
 	alice2, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
 	s.Require().NoError(err)
@@ -92,7 +121,7 @@ func (s *MessengerPairingSuite) TestMessengerPairAfterSeedPhrase() {
 		alice1,
 		func(r *MessengerResponse) bool {
 			for _, i := range r.Installations() {
-				if i.ID == installationID2 {
+				if i.ID == installationID2 && len(r.ActivityCenterNotifications()) == 1 && r.ActivityCenterNotifications()[0].Type == ActivityCenterNotificationTypeNewInstallationReceived {
 					return true
 				}
 			}

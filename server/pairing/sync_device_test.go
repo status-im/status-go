@@ -907,7 +907,7 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	s.Require().NoError(err)
 	err = clientMessenger.SetInstallationMetadata(settings.InstallationID, im1)
 	s.Require().NoError(err)
-	response, err := clientMessenger.SendPairInstallation(context.Background(), nil)
+	response, err := clientMessenger.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)

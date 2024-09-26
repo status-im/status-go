@@ -1321,6 +1321,8 @@ func (m *Messenger) HandleSyncPairInstallation(state *ReceivedMessageState, mess
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	state.AllInstallations.Store(message.InstallationId, installation)
 	state.ModifiedInstallations.Store(message.InstallationId, true)
+	targeted := message.TargetInstallationId == m.installationID
+	state.ModifiedInstallationsTargetedToThisDevice.Store(message.InstallationId, targeted)
 
 	return nil
 }
