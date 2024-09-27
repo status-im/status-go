@@ -282,7 +282,7 @@ func verifyAccountPassword(keyStoreDir, address, password string) string {
 }
 
 func VerifyDatabasePasswordV2(requestJSON string) string {
-	return logAndCallString(verifyDatabasePasswordV2, requestJSON)
+	return callWithResponse(verifyDatabasePasswordV2, requestJSON)
 }
 
 func verifyDatabasePasswordV2(requestJSON string) string {
@@ -559,7 +559,7 @@ func deleteMultiaccount(keyUID, keyStoreDir string) string {
 }
 
 func DeleteImportedKeyV2(requestJSON string) string {
-	return logAndCallString(deleteImportedKeyV2, requestJSON)
+	return callWithResponse(deleteImportedKeyV2, requestJSON)
 }
 
 func deleteImportedKeyV2(requestJSON string) string {
