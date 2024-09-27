@@ -934,11 +934,7 @@ func (m *Messenger) CommunityUpdateLastOpenedAt(communityID string) (int64, erro
 		return 0, err
 	}
 	currentTime := time.Now().Unix()
-	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(id, currentTime)
-	if err != nil {
-		return 0, err
-	}
-	err = m.syncCommunity(context.Background(), updatedCommunity, m.dispatchMessage)
+	_, err = m.communitiesManager.CommunityUpdateLastOpenedAt(id, currentTime)
 	if err != nil {
 		return 0, err
 	}
