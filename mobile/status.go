@@ -281,8 +281,28 @@ func verifyAccountPassword(keyStoreDir, address, password string) string {
 	return makeJSONResponse(err)
 }
 
+func VerifyDatabasePasswordV2(requestJSON string) string {
+	return callWithResponse(verifyDatabasePasswordV2, requestJSON)
+}
+
+func verifyDatabasePasswordV2(requestJSON string) string {
+	var request requests.VerifyDatabasePassword
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = statusBackend.VerifyDatabasePassword(request.KeyUID, request.Password)
+	return makeJSONResponse(err)
+}
+
+// Deprecated: use VerifyDatabasePasswordV2 instead
 func VerifyDatabasePassword(keyUID, password string) string {
-	return callWithResponse(verifyDatabasePassword, keyUID, password)
+	return verifyDatabasePassword(keyUID, password)
 }
 
 // verifyDatabasePassword verifies database password.
@@ -291,8 +311,29 @@ func verifyDatabasePassword(keyUID, password string) string {
 	return makeJSONResponse(err)
 }
 
+func MigrateKeyStoreDirV2(requestJSON string) string {
+	return callWithResponse(migrateKeyStoreDirV2, requestJSON)
+}
+
+func migrateKeyStoreDirV2(requestJSON string) string {
+	var request requests.MigrateKeystoreDir
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.MigrateKeyStoreDir(request.Account, request.Password, request.OldDir, request.NewDir)
+	return makeJSONResponse(err)
+}
+
+// Deprecated: Use MigrateKeyStoreDirV2 instead
 func MigrateKeyStoreDir(accountData, password, oldDir, newDir string) string {
-	return callWithResponse(migrateKeyStoreDir, accountData, password, oldDir, newDir)
+	return migrateKeyStoreDir(accountData, password, oldDir, newDir)
 }
 
 // migrateKeyStoreDir migrates key files to a new directory
@@ -517,8 +558,29 @@ func deleteMultiaccount(keyUID, keyStoreDir string) string {
 	return makeJSONResponse(err)
 }
 
+func DeleteImportedKeyV2(requestJSON string) string {
+	return callWithResponse(deleteImportedKeyV2, requestJSON)
+}
+
+func deleteImportedKeyV2(requestJSON string) string {
+	var request requests.DeleteImportedKey
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.DeleteImportedKey(request.Address, request.Password, request.KeyStoreDir)
+	return makeJSONResponse(err)
+}
+
+// Deprecated: Use DeleteImportedKeyV2 instead
 func DeleteImportedKey(address, password, keyStoreDir string) string {
-	return callWithResponse(deleteImportedKey, address, password, keyStoreDir)
+	return deleteImportedKey(address, password, keyStoreDir)
 }
 
 // deleteImportedKey
@@ -629,9 +691,9 @@ func signMessage(rpcParams string) string {
 // SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
 // if password matches selected account.
 //
-//export SignTypedData
+// Deprecated: Use SignTypedDataV2 instead.
 func SignTypedData(data, address, password string) string {
-	return callWithResponse(signTypedData, data, address, password)
+	return signTypedData(data, address, password)
 }
 
 func signTypedData(data, address, password string) string {
@@ -644,6 +706,26 @@ func signTypedData(data, address, password string) string {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
 	}
 	result, err := statusBackend.SignTypedData(typed, address, password)
+	return prepareJSONResponse(result.String(), err)
+}
+
+func SignTypedDataV2(requestJSON string) string {
+	return callWithResponse(signTypedDataV2, requestJSON)
+}
+
+func signTypedDataV2(requestJSON string) string {
+	var request requests.SignTypedData
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+
+	result, err := statusBackend.SignTypedData(request.TypedData, request.Address, request.Password)
 	return prepareJSONResponse(result.String(), err)
 }
 
@@ -672,7 +754,7 @@ func hashTypedData(data string) string {
 //
 //export SignTypedDataV4
 func SignTypedDataV4(data, address, password string) string {
-	return callWithResponse(signTypedDataV4, data, address, password)
+	return signTypedDataV4(data, address, password)
 }
 
 func signTypedDataV4(data, address, password string) string {
@@ -718,8 +800,9 @@ func recoverWithRPCParams(rpcParams string) string {
 	return prepareJSONResponse(addr.String(), err)
 }
 
+// SendTransactionWithChainID converts RPC args and calls backend.SendTransactionWithChainID.
 func SendTransactionWithChainID(chainID int, txArgsJSON, password string) string {
-	return callWithResponse(sendTransactionWithChainID, chainID, txArgsJSON, password)
+	return sendTransactionWithChainID(chainID, txArgsJSON, password)
 }
 
 // sendTransactionWithChainID converts RPC args and calls backend.SendTransactionWithChainID.
@@ -738,7 +821,7 @@ func sendTransactionWithChainID(chainID int, txArgsJSON, password string) string
 }
 
 func SendTransaction(txArgsJSON, password string) string {
-	return callWithResponse(sendTransaction, txArgsJSON, password)
+	return sendTransaction(txArgsJSON, password)
 }
 
 // sendTransaction converts RPC args and calls backend.SendTransaction.
@@ -1035,7 +1118,7 @@ func colorID(pk string) string {
 }
 
 func ValidateMnemonic(mnemonic string) string {
-	return callWithResponse(validateMnemonic, mnemonic)
+	return validateMnemonic(mnemonic)
 }
 
 func validateMnemonic(mnemonic string) string {
@@ -1134,7 +1217,7 @@ func multiformatDeserializePublicKey(key, outBase string) string {
 }
 
 func ExportUnencryptedDatabase(accountData, password, databasePath string) string {
-	return callWithResponse(exportUnencryptedDatabase, accountData, password, databasePath)
+	return exportUnencryptedDatabase(accountData, password, databasePath)
 }
 
 // exportUnencryptedDatabase exports the database unencrypted to the given path
@@ -1149,7 +1232,7 @@ func exportUnencryptedDatabase(accountData, password, databasePath string) strin
 }
 
 func ImportUnencryptedDatabase(accountData, password, databasePath string) string {
-	return callWithResponse(importUnencryptedDatabase, accountData, password, databasePath)
+	return importUnencryptedDatabase(accountData, password, databasePath)
 }
 
 // importUnencryptedDatabase imports the database unencrypted to the given directory
@@ -1163,18 +1246,18 @@ func importUnencryptedDatabase(accountData, password, databasePath string) strin
 	return makeJSONResponse(err)
 }
 
-func ChangeDatabasePassword(KeyUID, password, newPassword string) string {
-	return callWithResponse(changeDatabasePassword, KeyUID, password, newPassword)
+func ChangeDatabasePassword(keyUID, password, newPassword string) string {
+	return changeDatabasePassword(keyUID, password, newPassword)
 }
 
 // changeDatabasePassword changes the password of the database
-func changeDatabasePassword(KeyUID, password, newPassword string) string {
-	err := statusBackend.ChangeDatabasePassword(KeyUID, password, newPassword)
+func changeDatabasePassword(keyUID, password, newPassword string) string {
+	err := statusBackend.ChangeDatabasePassword(keyUID, password, newPassword)
 	return makeJSONResponse(err)
 }
 
 func ConvertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword string) string {
-	return callWithResponse(convertToKeycardAccount, accountData, settingsJSON, keycardUID, password, newPassword)
+	return convertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword)
 }
 
 // convertToKeycardAccount converts the account to a keycard account
@@ -1195,7 +1278,7 @@ func convertToKeycardAccount(accountData, settingsJSON, keycardUID, password, ne
 }
 
 func ConvertToRegularAccount(mnemonic, currPassword, newPassword string) string {
-	return callWithResponse(convertToRegularAccount, mnemonic, currPassword, newPassword)
+	return convertToRegularAccount(mnemonic, currPassword, newPassword)
 }
 
 // convertToRegularAccount converts the account to a regular account

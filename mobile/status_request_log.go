@@ -13,7 +13,28 @@ import (
 	"github.com/status-im/status-go/logutils/requestlog"
 )
 
-var sensitiveRegex = regexp.MustCompile(`(?i)(".*?(password|mnemonic|openseaAPIKey|poktToken|alchemyArbitrumMainnetToken|raribleTestnetAPIKey|alchemyOptimismMainnetToken|statusProxyBlockchainUser|alchemyEthereumSepoliaToken|alchemyArbitrumSepoliaToken|infuraToken|raribleMainnetAPIKey|alchemyEthereumMainnetToken).*?")\s*:\s*("[^"]*")`)
+var sensitiveKeys = []string{
+	"password",
+	"mnemonic",
+	"openseaAPIKey",
+	"poktToken",
+	"alchemyArbitrumMainnetToken",
+	"raribleTestnetAPIKey",
+	"alchemyOptimismMainnetToken",
+	"statusProxyBlockchainUser",
+	"alchemyEthereumSepoliaToken",
+	"alchemyArbitrumSepoliaToken",
+	"infuraToken",
+	"raribleMainnetAPIKey",
+	"alchemyEthereumMainnetToken",
+	"alchemyOptimismSepoliaToken",
+	"verifyENSURL",
+	"verifyTransactionURL",
+}
+
+var sensitiveRegexString = fmt.Sprintf(`(?i)(".*?(%s).*?")\s*:\s*("[^"]*")`, strings.Join(sensitiveKeys, "|"))
+
+var sensitiveRegex = regexp.MustCompile(sensitiveRegexString)
 
 func getFunctionName(fn any) string {
 	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
