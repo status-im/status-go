@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+	"unicode"
 )
 
 const (
@@ -28,10 +29,10 @@ const (
 
 var (
 	// Regular expressions extracted as global variables
-	publicFunc                   = regexp.MustCompile(`func\s+([A-Z]\w+)\(.*\).*\{`)
 	publicFuncWithArgsPattern    = regexp.MustCompile(`^func\s+([A-Z]\w*)\((\w|\s)+\)\s+string\s+\{$`)
 	publicFuncWithoutArgsPattern = regexp.MustCompile(`^func\s+([A-Z]\w*)\(\)\s+string\s+\{$`)
-	funcNamePattern              = regexp.MustCompile(`^func\s+([A-Z]\w*)\(`)
+	funcNamePattern              = regexp.MustCompile(`^func\s+(\w*)\(`)
+	deprecatedRegex              = regexp.MustCompile(`(?i)//\s*Deprecated`)
 )
 
 type TemplateData struct {
@@ -73,11 +74,15 @@ func main() {
 			continue
 		}
 
-		if !publicFunc.MatchString(line) {
+		functionName := extractFunctionName(line)
+		if functionName == "" {
 			continue
 		}
 
-		functionName := extractFunctionName(line)
+		if !isPublicFunc(functionName) {
+			isDeprecated = false
+			continue
+		}
 
 		if isDeprecated {
 			isDeprecated = false
@@ -154,5 +159,9 @@ func extractFunctionName(line string) string {
 
 // Function to check if a comment indicates a deprecated function
 func isDeprecatedComment(line string) bool {
-	return strings.Contains(line, "// Deprecated:")
+	return deprecatedRegex.MatchString(line)
+}
+
+func isPublicFunc(name string) bool {
+	return name != "" && unicode.IsUpper(rune(name[0]))
 }
