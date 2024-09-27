@@ -288,22 +288,37 @@ func TestRetryCacheCleanup(t *testing.T) {
 	ctx := context.Background()
 
 	client := createClient(t, "")
-	client.Start(ctx)
 
 	for i := 0; i < 6000; i++ {
-		sendEnvelope(ctx, client)
+		go sendEnvelope(ctx, client)
+		telemetryRequest := <-client.telemetryCh
+		client.telemetryCache = append(client.telemetryCache, telemetryRequest)
 	}
 
-	time.Sleep(110 * time.Millisecond)
+	err := client.pushTelemetryRequest(client.telemetryCache)
+	// For this test case an error when pushing to the server is fine
+	require.Error(t, err)
 
+	client.telemetryCache = nil
 	require.Equal(t, 6000, len(client.telemetryRetryCache))
 
-	sendEnvelope(ctx, client)
+	go sendEnvelope(ctx, client)
+	telemetryRequest := <-client.telemetryCh
+	client.telemetryCache = append(client.telemetryCache, telemetryRequest)
 
-	time.Sleep(210 * time.Millisecond)
+	err = client.pushTelemetryRequest(client.telemetryCache)
+	require.Error(t, err)
+
+	telemetryRequests := make([]TelemetryRequest, len(client.telemetryCache))
+	copy(telemetryRequests, client.telemetryCache)
+	client.telemetryCache = nil
+
+	err = client.pushTelemetryRequest(telemetryRequests)
+	require.Error(t, err)
 
 	require.Equal(t, 5001, len(client.telemetryRetryCache))
 }
+
 func setDefaultConfig(config *wakuv2.Config, lightMode bool) {
 	config.ClusterID = 16
 
