@@ -178,6 +178,7 @@ func main() {
 			logger.Error("failed to start server", "error", err)
 			return
 		}
+		go srv.Serve()
 		log.Info("server started", "address", srv.Address())
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

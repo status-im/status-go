@@ -99,6 +99,7 @@ func initializeApplication(requestJSON string) string {
 	return string(data)
 }
 
+// Deprecated: Use InitializeApplication instead.
 func OpenAccounts(datadir string) string {
 	return callWithResponse(openAccounts, datadir)
 }

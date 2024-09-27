@@ -170,6 +170,13 @@ spiff-workflow: build/bin/spiff-workflow
 status-cli: ##@build Build status-cli to send messages
 status-cli: build/bin/status-cli
 
+status-backend: ##@build Build status-backend to run status-go as HTTP server
+status-backend: build/bin/status-backend
+
+run-status-backend: PORT ?= 0
+run-status-backend: ##@run Start status-backend server listening to localhost:PORT
+	go run ./cmd/status-backend --address localhost:${PORT}
+
 statusd-prune-docker-image: SHELL := /bin/sh
 statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 	@echo "Building docker image for ststusd-prune..."
