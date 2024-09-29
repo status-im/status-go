@@ -111,3 +111,12 @@ report/results.xml
 tests-functional/coverage
 tests-functional/reports
 tests-functional/*.log
+
+# generated files
+mock
+mock.go
+*.pb.go
+bindata.go
+migrations.go
+cmd/statusd/server/endpoints.go
+protocol/messenger_handlers.go
