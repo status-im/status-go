@@ -1,5 +1,7 @@
 package ethclient
 
+//go:generate mockgen -package=mock_ethclient -source=eth_client.go -destination=mock/client/ethclient/eth_client.go
+
 import (
 	"context"
 	"math/big"

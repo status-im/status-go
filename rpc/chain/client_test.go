@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/rpc/chain/ethclient"
-	mock_ethclient "github.com/status-im/status-go/rpc/chain/mock/client/ethclient"
+	mock_ethclient "github.com/status-im/status-go/rpc/chain/ethclient/mock/client/ethclient"
 
 	"github.com/stretchr/testify/require"
 
