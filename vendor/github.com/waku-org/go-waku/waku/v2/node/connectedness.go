@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 // PeerStatis is a map of peer IDs to supported protocols
@@ -101,6 +102,7 @@ func (c ConnectionNotifier) Close() {
 }
 
 func (w *WakuNode) connectednessListener(ctx context.Context) {
+	defer utils.LogOnPanic()
 	defer w.wg.Done()
 
 	for {

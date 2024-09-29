@@ -9,15 +9,19 @@ import (
 
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/quic-go/quic-go"
 	quiclogging "github.com/quic-go/quic-go/logging"
+	quicmetrics "github.com/quic-go/quic-go/metrics"
 )
 
 type ConnManager struct {
 	reuseUDP4       *reuse
 	reuseUDP6       *reuse
 	enableReuseport bool
-	enableMetrics   bool
+
+	enableMetrics bool
+	registerer    prometheus.Registerer
 
 	serverConfig *quic.Config
 	clientConfig *quic.Config
@@ -40,6 +44,7 @@ func NewConnManager(statelessResetKey quic.StatelessResetKey, tokenKey quic.Toke
 		quicListeners:   make(map[string]quicListenerEntry),
 		srk:             statelessResetKey,
 		tokenKey:        tokenKey,
+		registerer:      prometheus.DefaultRegisterer,
 	}
 	for _, o := range opts {
 		if err := o(cm); err != nil {
@@ -48,14 +53,7 @@ func NewConnManager(statelessResetKey quic.StatelessResetKey, tokenKey quic.Toke
 	}
 
 	quicConf := quicConfig.Clone()
-
-	quicConf.Tracer = func(ctx context.Context, p quiclogging.Perspective, ci quic.ConnectionID) *quiclogging.ConnectionTracer {
-		var tracer *quiclogging.ConnectionTracer
-		if qlogTracerDir != "" {
-			tracer = qloggerForDir(qlogTracerDir, p, ci)
-		}
-		return tracer
-	}
+	quicConf.Tracer = cm.getTracer()
 	serverConfig := quicConf.Clone()
 
 	cm.clientConfig = quicConf
@@ -65,6 +63,31 @@ func NewConnManager(statelessResetKey quic.StatelessResetKey, tokenKey quic.Toke
 		cm.reuseUDP6 = newReuse(&statelessResetKey, &tokenKey)
 	}
 	return cm, nil
+}
+
+func (c *ConnManager) getTracer() func(context.Context, quiclogging.Perspective, quic.ConnectionID) *quiclogging.ConnectionTracer {
+	return func(ctx context.Context, p quiclogging.Perspective, ci quic.ConnectionID) *quiclogging.ConnectionTracer {
+		var promTracer *quiclogging.ConnectionTracer
+		if c.enableMetrics {
+			switch p {
+			case quiclogging.PerspectiveClient:
+				promTracer = quicmetrics.NewClientConnectionTracerWithRegisterer(c.registerer)
+			case quiclogging.PerspectiveServer:
+				promTracer = quicmetrics.NewServerConnectionTracerWithRegisterer(c.registerer)
+			default:
+				log.Error("invalid logging perspective: %s", p)
+			}
+		}
+		var tracer *quiclogging.ConnectionTracer
+		if qlogTracerDir != "" {
+			tracer = qloggerForDir(qlogTracerDir, p, ci)
+			if promTracer != nil {
+				tracer = quiclogging.NewMultiplexedConnectionTracer(promTracer,
+					tracer)
+			}
+		}
+		return tracer
+	}
 }
 
 func (c *ConnManager) getReuse(network string) (*reuse, error) {
@@ -129,6 +152,28 @@ func (c *ConnManager) onListenerClosed(key string) {
 	} else {
 		c.quicListeners[key] = entry
 	}
+}
+
+func (c *ConnManager) SharedNonQUICPacketConn(network string, laddr *net.UDPAddr) (net.PacketConn, error) {
+	c.quicListenersMu.Lock()
+	defer c.quicListenersMu.Unlock()
+	key := laddr.String()
+	entry, ok := c.quicListeners[key]
+	if !ok {
+		return nil, errors.New("expected to be able to share with a QUIC listener, but no QUIC listener found. The QUIC listener should start first")
+	}
+	t := entry.ln.transport
+	if t, ok := t.(*refcountedTransport); ok {
+		t.IncreaseCount()
+		ctx, cancel := context.WithCancel(context.Background())
+		return &nonQUICPacketConn{
+			ctx:             ctx,
+			ctxCancel:       cancel,
+			owningTransport: t,
+			tr:              &t.Transport,
+		}, nil
+	}
+	return nil, errors.New("expected to be able to share with a QUIC listener, but the QUIC listener is not using a refcountedTransport. `DisableReuseport` should not be set")
 }
 
 func (c *ConnManager) transportForListen(network string, laddr *net.UDPAddr) (refCountedQuicTransport, error) {

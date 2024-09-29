@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 
+	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/p2p/metricshelper"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -33,11 +34,20 @@ var peerStoreSize = prometheus.NewGauge(
 		Help: "Size of Peer Store",
 	})
 
+var bandwidthTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "libp2p_network_bytes_total",
+		Help: "Bandwidth usage total",
+	},
+	[]string{"direction"},
+)
+
 var collectors = []prometheus.Collector{
 	gitVersion,
 	peerDials,
 	connectedPeers,
 	peerStoreSize,
+	bandwidthTotal,
 }
 
 // Metrics exposes the functions required to update prometheus metrics for the waku node
@@ -47,6 +57,7 @@ type Metrics interface {
 	RecordPeerConnected()
 	RecordPeerDisconnected()
 	SetPeerStoreSize(int)
+	RecordBandwidth(metrics.Stats)
 }
 
 type metricsImpl struct {
@@ -83,4 +94,10 @@ func (m *metricsImpl) RecordPeerDisconnected() {
 
 func (m *metricsImpl) SetPeerStoreSize(size int) {
 	peerStoreSize.Set(float64(size))
+}
+
+func (m *metricsImpl) RecordBandwidth(stats metrics.Stats) {
+	bandwidthTotal.WithLabelValues("in").Add(float64(stats.TotalIn))
+	bandwidthTotal.WithLabelValues("out").Add(float64(stats.TotalOut))
+
 }

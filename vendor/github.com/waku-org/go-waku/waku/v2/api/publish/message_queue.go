@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 // MessagePriority determines the ordering for the message priority queue
@@ -182,6 +183,7 @@ func (m *MessageQueue) Pop(ctx context.Context) <-chan *protocol.Envelope {
 	ch := make(chan *protocol.Envelope)
 
 	go func() {
+		defer utils.LogOnPanic()
 		defer close(ch)
 
 		select {

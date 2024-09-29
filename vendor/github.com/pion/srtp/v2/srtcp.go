@@ -12,23 +12,22 @@ import (
 
 const maxSRTCPIndex = 0x7FFFFFFF
 
+const srtcpHeaderSize = 8
+
 func (c *Context) decryptRTCP(dst, encrypted []byte) ([]byte, error) {
-	out := allocateIfMismatch(dst, encrypted)
-
-	authTagLen, err := c.cipher.rtcpAuthTagLen()
+	authTagLen, err := c.cipher.AuthTagRTCPLen()
 	if err != nil {
 		return nil, err
 	}
-	aeadAuthTagLen, err := c.cipher.aeadAuthTagLen()
+	aeadAuthTagLen, err := c.cipher.AEADAuthTagLen()
 	if err != nil {
 		return nil, err
 	}
-	tailOffset := len(encrypted) - (authTagLen + srtcpIndexSize)
+	mkiLen := len(c.sendMKI)
 
-	if tailOffset < aeadAuthTagLen {
+	// Verify that encrypted packet is long enough
+	if len(encrypted) < (srtcpHeaderSize + aeadAuthTagLen + srtcpIndexSize + mkiLen + authTagLen) {
 		return nil, fmt.Errorf("%w: %d", errTooShortRTCP, len(encrypted))
-	} else if isEncrypted := encrypted[tailOffset] >> 7; isEncrypted == 0 {
-		return out, nil
 	}
 
 	index := c.cipher.getRTCPIndex(encrypted)
@@ -40,7 +39,19 @@ func (c *Context) decryptRTCP(dst, encrypted []byte) ([]byte, error) {
 		return nil, &duplicatedError{Proto: "srtcp", SSRC: ssrc, Index: index}
 	}
 
-	out, err = c.cipher.decryptRTCP(out, encrypted, index, ssrc)
+	cipher := c.cipher
+	if len(c.mkis) > 0 {
+		// Find cipher for MKI
+		actualMKI := c.cipher.getMKI(encrypted, false)
+		cipher, ok = c.mkis[string(actualMKI)]
+		if !ok {
+			return nil, ErrMKINotFound
+		}
+	}
+
+	out := allocateIfMismatch(dst, encrypted)
+
+	out, err = cipher.decryptRTCP(out, encrypted, index, ssrc)
 	if err != nil {
 		return nil, err
 	}
@@ -63,6 +74,10 @@ func (c *Context) DecryptRTCP(dst, encrypted []byte, header *rtcp.Header) ([]byt
 }
 
 func (c *Context) encryptRTCP(dst, decrypted []byte) ([]byte, error) {
+	if len(decrypted) < srtcpHeaderSize {
+		return nil, fmt.Errorf("%w: %d", errTooShortRTCP, len(decrypted))
+	}
+
 	ssrc := binary.BigEndian.Uint32(decrypted[4:])
 	s := c.getSRTCPSSRCState(ssrc)
 

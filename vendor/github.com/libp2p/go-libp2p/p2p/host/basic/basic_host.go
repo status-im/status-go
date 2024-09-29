@@ -24,6 +24,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	"github.com/libp2p/go-libp2p/p2p/host/pstoremanager"
 	"github.com/libp2p/go-libp2p/p2p/host/relaysvc"
+	"github.com/libp2p/go-libp2p/p2p/protocol/autonatv2"
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
@@ -105,6 +106,8 @@ type BasicHost struct {
 	caBook                  peerstore.CertifiedAddrBook
 
 	autoNat autonat.AutoNAT
+
+	autonatv2 *autonatv2.AutoNAT
 }
 
 var _ host.Host = (*BasicHost)(nil)
@@ -167,6 +170,8 @@ type HostOpts struct {
 
 	// DisableIdentifyAddressDiscovery disables address discovery using peer provided observed addresses in identify
 	DisableIdentifyAddressDiscovery bool
+	EnableAutoNATv2                 bool
+	AutoNATv2Dialer                 host.Host
 }
 
 // NewHost constructs a new *BasicHost and activates it by attaching its stream and connection handlers to the given inet.Network.
@@ -279,6 +284,20 @@ func NewHost(n network.Network, opts *HostOpts) (*BasicHost, error) {
 	if opts.AddrsFactory != nil {
 		h.AddrsFactory = opts.AddrsFactory
 	}
+	// This is a terrible hack.
+	// We want to use this AddrsFactory for autonat. Wrapping AddrsFactory here ensures
+	// that autonat receives addresses with the correct certhashes.
+	//
+	// This logic cannot be in Addrs method as autonat cannot use the Addrs method directly.
+	// The autorelay package updates AddrsFactory to only provide p2p-circuit addresses when
+	// reachability is Private.
+	//
+	// Wrapping it here allows us to provide the wrapped AddrsFactory to autonat before
+	// autorelay updates it.
+	addrFactory := h.AddrsFactory
+	h.AddrsFactory = func(addrs []ma.Multiaddr) []ma.Multiaddr {
+		return h.addCertHashes(addrFactory(addrs))
+	}
 
 	if opts.NATManager != nil {
 		h.natmgr = opts.NATManager(n)
@@ -308,6 +327,17 @@ func NewHost(n network.Network, opts *HostOpts) (*BasicHost, error) {
 
 	if opts.EnablePing {
 		h.pings = ping.NewPingService(h)
+	}
+
+	if opts.EnableAutoNATv2 {
+		var mt autonatv2.MetricsTracer
+		if opts.EnableMetrics {
+			mt = autonatv2.NewMetricsTracer(opts.PrometheusRegisterer)
+		}
+		h.autonatv2, err = autonatv2.New(h, opts.AutoNATv2Dialer, autonatv2.WithMetricsTracer(mt))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create autonatv2: %w", err)
+		}
 	}
 
 	n.SetStreamHandler(h.newStreamHandler)
@@ -398,6 +428,12 @@ func (h *BasicHost) Start() {
 	h.psManager.Start()
 	h.refCount.Add(1)
 	h.ids.Start()
+	if h.autonatv2 != nil {
+		err := h.autonatv2.Start()
+		if err != nil {
+			log.Errorf("autonat v2 failed to start: %s", err)
+		}
+	}
 	go h.background()
 }
 
@@ -640,7 +676,7 @@ func (h *BasicHost) RemoveStreamHandler(pid protocol.ID) {
 // header with given protocol.ID. If there is no connection to p, attempts
 // to create one. If ProtocolID is "", writes no header.
 // (Thread-safe)
-func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.ID) (network.Stream, error) {
+func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.ID) (str network.Stream, strErr error) {
 	// If the caller wants to prevent the host from dialing, it should use the NoDial option.
 	if nodial, _ := network.GetNoDial(ctx); !nodial {
 		err := h.Connect(ctx, peer.AddrInfo{ID: p})
@@ -658,6 +694,11 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 		}
 		return nil, fmt.Errorf("failed to open stream: %w", err)
 	}
+	defer func() {
+		if strErr != nil && s != nil {
+			s.Reset()
+		}
+	}()
 
 	// Wait for any in-progress identifies on the connection to finish. This
 	// is faster than negotiating.
@@ -667,13 +708,11 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 	select {
 	case <-h.ids.IdentifyWait(s.Conn()):
 	case <-ctx.Done():
-		_ = s.Reset()
 		return nil, fmt.Errorf("identify failed to complete: %w", ctx.Err())
 	}
 
 	pref, err := h.preferredProtocol(p, pids)
 	if err != nil {
-		_ = s.Reset()
 		return nil, err
 	}
 
@@ -698,7 +737,6 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 	select {
 	case err = <-errCh:
 		if err != nil {
-			s.Reset()
 			return nil, fmt.Errorf("failed to negotiate protocol: %w", err)
 		}
 	case <-ctx.Done():
@@ -708,8 +746,10 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 		return nil, fmt.Errorf("failed to negotiate protocol: %w", ctx.Err())
 	}
 
-	s.SetProtocol(selected)
-	h.Peerstore().AddProtocols(p, selected)
+	if err := s.SetProtocol(selected); err != nil {
+		return nil, err
+	}
+	_ = h.Peerstore().AddProtocols(p, selected) // adding the protocol to the peerstore isn't critical
 	return s, nil
 }
 
@@ -778,47 +818,13 @@ func (h *BasicHost) ConnManager() connmgr.ConnManager {
 // Addrs returns listening addresses that are safe to announce to the network.
 // The output is the same as AllAddrs, but processed by AddrsFactory.
 func (h *BasicHost) Addrs() []ma.Multiaddr {
-	// This is a temporary workaround/hack that fixes #2233. Once we have a
-	// proper address pipeline, rework this. See the issue for more context.
-	type transportForListeninger interface {
-		TransportForListening(a ma.Multiaddr) transport.Transport
-	}
-
-	type addCertHasher interface {
-		AddCertHashes(m ma.Multiaddr) (ma.Multiaddr, bool)
-	}
-
+	// We don't need to append certhashes here, the user provided addrsFactory was
+	// wrapped with addCertHashes in the constructor.
 	addrs := h.AddrsFactory(h.AllAddrs())
-
-	s, ok := h.Network().(transportForListeninger)
-	if !ok {
-		return addrs
-	}
-
-	// Copy addrs slice since we'll be modifying it.
-	addrsOld := addrs
-	addrs = make([]ma.Multiaddr, len(addrsOld))
-	copy(addrs, addrsOld)
-
-	for i, addr := range addrs {
-		wtOK, wtN := libp2pwebtransport.IsWebtransportMultiaddr(addr)
-		webrtcOK, webrtcN := libp2pwebrtc.IsWebRTCDirectMultiaddr(addr)
-		if (wtOK && wtN == 0) || (webrtcOK && webrtcN == 0) {
-			t := s.TransportForListening(addr)
-			tpt, ok := t.(addCertHasher)
-			if !ok {
-				continue
-			}
-			addrWithCerthash, added := tpt.AddCertHashes(addr)
-			if !added {
-				log.Debugf("Couldn't add certhashes to multiaddr: %s", addr)
-				continue
-			}
-			addrs[i] = addrWithCerthash
-		}
-	}
-
-	return addrs
+	// Make a copy. Consumers can modify the slice elements
+	res := make([]ma.Multiaddr, len(addrs))
+	copy(res, addrs)
+	return res
 }
 
 // NormalizeMultiaddr returns a multiaddr suitable for equality checks.
@@ -838,8 +844,9 @@ func (h *BasicHost) NormalizeMultiaddr(addr ma.Multiaddr) ma.Multiaddr {
 	return addr
 }
 
-// AllAddrs returns all the addresses of BasicHost at this moment in time.
-// It's ok to not include addresses if they're not available to be used now.
+// AllAddrs returns all the addresses the host is listening on except circuit addresses.
+// The output has webtransport addresses inferred from quic addresses.
+// All the addresses have the correct
 func (h *BasicHost) AllAddrs() []ma.Multiaddr {
 	listenAddrs := h.Network().ListenAddresses()
 	if len(listenAddrs) == 0 {
@@ -932,82 +939,48 @@ func (h *BasicHost) AllAddrs() []ma.Multiaddr {
 		finalAddrs = append(finalAddrs, observedAddrs...)
 	}
 	finalAddrs = ma.Unique(finalAddrs)
-	finalAddrs = inferWebtransportAddrsFromQuic(finalAddrs)
-
 	return finalAddrs
 }
 
-var wtComponent = ma.StringCast("/webtransport")
-
-// inferWebtransportAddrsFromQuic infers more webtransport addresses from QUIC addresses.
-// This is useful when we discover our public QUIC address, but haven't discovered our public WebTransport addrs.
-// If we see that we are listening on the same port for QUIC and WebTransport,
-// we can be pretty sure that the WebTransport addr will be reachable if the
-// QUIC one is.
-// We assume the input is deduped.
-func inferWebtransportAddrsFromQuic(in []ma.Multiaddr) []ma.Multiaddr {
-	// We need to check if we are listening on the same ip+port for QUIC and WebTransport.
-	// If not, there's nothing to do since we can't infer anything.
-
-	// Count the number of QUIC addrs, this will let us allocate just once at the beginning.
-	quicAddrCount := 0
-	for _, addr := range in {
-		if _, lastComponent := ma.SplitLast(addr); lastComponent.Protocol().Code == ma.P_QUIC_V1 {
-			quicAddrCount++
-		}
-	}
-	quicOrWebtransportAddrs := make(map[string]struct{}, quicAddrCount)
-	webtransportAddrs := make(map[string]struct{}, quicAddrCount)
-	foundSameListeningAddr := false
-	for _, addr := range in {
-		isWebtransport, numCertHashes := libp2pwebtransport.IsWebtransportMultiaddr(addr)
-		if isWebtransport {
-			for i := 0; i < numCertHashes; i++ {
-				// Remove certhashes
-				addr, _ = ma.SplitLast(addr)
-			}
-			webtransportAddrs[string(addr.Bytes())] = struct{}{}
-			// Remove webtransport component, now it's a multiaddr that ends in /quic-v1
-			addr, _ = ma.SplitLast(addr)
-		}
-
-		if _, lastComponent := ma.SplitLast(addr); lastComponent.Protocol().Code == ma.P_QUIC_V1 {
-			bytes := addr.Bytes()
-			if _, ok := quicOrWebtransportAddrs[string(bytes)]; ok {
-				foundSameListeningAddr = true
-			} else {
-				quicOrWebtransportAddrs[string(bytes)] = struct{}{}
-			}
-		}
+func (h *BasicHost) addCertHashes(addrs []ma.Multiaddr) []ma.Multiaddr {
+	// This is a temporary workaround/hack that fixes #2233. Once we have a
+	// proper address pipeline, rework this. See the issue for more context.
+	type transportForListeninger interface {
+		TransportForListening(a ma.Multiaddr) transport.Transport
 	}
 
-	if !foundSameListeningAddr {
-		return in
+	type addCertHasher interface {
+		AddCertHashes(m ma.Multiaddr) (ma.Multiaddr, bool)
 	}
 
-	if len(webtransportAddrs) == 0 {
-		// No webtransport addresses, we aren't listening on any webtransport
-		// address, so we shouldn't add any.
-		return in
+	s, ok := h.Network().(transportForListeninger)
+	if !ok {
+		return addrs
 	}
 
-	out := make([]ma.Multiaddr, 0, len(in)+(quicAddrCount-len(webtransportAddrs)))
-	for _, addr := range in {
-		// Add all the original addresses
-		out = append(out, addr)
-		if _, lastComponent := ma.SplitLast(addr); lastComponent.Protocol().Code == ma.P_QUIC_V1 {
-			// Convert quic to webtransport
-			addr = addr.Encapsulate(wtComponent)
-			if _, ok := webtransportAddrs[string(addr.Bytes())]; ok {
-				// We already have this address
+	// Copy addrs slice since we'll be modifying it.
+	addrsOld := addrs
+	addrs = make([]ma.Multiaddr, len(addrsOld))
+	copy(addrs, addrsOld)
+
+	for i, addr := range addrs {
+		wtOK, wtN := libp2pwebtransport.IsWebtransportMultiaddr(addr)
+		webrtcOK, webrtcN := libp2pwebrtc.IsWebRTCDirectMultiaddr(addr)
+		if (wtOK && wtN == 0) || (webrtcOK && webrtcN == 0) {
+			t := s.TransportForListening(addr)
+			tpt, ok := t.(addCertHasher)
+			if !ok {
 				continue
 			}
-			// Add the new inferred address
-			out = append(out, addr)
+			addrWithCerthash, added := tpt.AddCertHashes(addr)
+			if !added {
+				log.Debugf("Couldn't add certhashes to multiaddr: %s", addr)
+				continue
+			}
+			addrs[i] = addrWithCerthash
 		}
 	}
-
-	return out
+	return addrs
 }
 
 func trimHostAddrList(addrs []ma.Multiaddr, maxSize int) []ma.Multiaddr {
@@ -1100,9 +1073,16 @@ func (h *BasicHost) Close() error {
 		if h.hps != nil {
 			h.hps.Close()
 		}
+		if h.autonatv2 != nil {
+			h.autonatv2.Close()
+		}
 
 		_ = h.emitters.evtLocalProtocolsUpdated.Close()
 		_ = h.emitters.evtLocalAddrsUpdated.Close()
+
+		if err := h.network.Close(); err != nil {
+			log.Errorf("swarm close failed: %v", err)
+		}
 
 		h.psManager.Close()
 		if h.Peerstore() != nil {

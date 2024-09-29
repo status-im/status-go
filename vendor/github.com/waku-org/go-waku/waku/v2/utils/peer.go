@@ -5,6 +5,11 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+type DialError struct {
+	Err    error
+	PeerID peer.ID
+}
+
 // GetPeerID is used to extract the peerID from a multiaddress
 func GetPeerID(m multiaddr.Multiaddr) (peer.ID, error) {
 	peerIDStr, err := m.ValueForProtocol(multiaddr.P_P2P)

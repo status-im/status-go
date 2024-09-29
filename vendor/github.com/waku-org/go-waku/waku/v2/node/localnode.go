@@ -15,6 +15,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -358,6 +359,7 @@ func (w *WakuNode) watchTopicShards(ctx context.Context) error {
 	}
 
 	go func() {
+		defer utils.LogOnPanic()
 		defer evtRelaySubscribed.Close()
 		defer evtRelayUnsubscribed.Close()
 
@@ -411,6 +413,7 @@ func (w *WakuNode) registerAndMonitorReachability(ctx context.Context) {
 	}
 	w.wg.Add(1)
 	go func() {
+		defer utils.LogOnPanic()
 		defer myEventSub.Close()
 		defer w.wg.Done()
 

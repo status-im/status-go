@@ -75,3 +75,18 @@ func parseExpectDataChannelOpen(raw []byte) (*channelOpen, error) {
 
 	return msg, nil
 }
+
+// TryMarshalUnmarshal attempts to marshal and unmarshal a message. Added for fuzzing.
+func TryMarshalUnmarshal(msg []byte) int {
+	message, err := parse(msg)
+	if err != nil {
+		return 0
+	}
+
+	_, err = message.Marshal()
+	if err != nil {
+		return 0
+	}
+
+	return 1
+}

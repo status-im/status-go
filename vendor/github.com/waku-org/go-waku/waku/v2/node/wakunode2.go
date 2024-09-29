@@ -18,6 +18,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -84,11 +85,12 @@ type RLNRelay interface {
 }
 
 type WakuNode struct {
-	host       host.Host
-	opts       *WakuNodeParameters
-	log        *zap.Logger
-	timesource timesource.Timesource
-	metrics    Metrics
+	host             host.Host
+	opts             *WakuNodeParameters
+	log              *zap.Logger
+	timesource       timesource.Timesource
+	metrics          Metrics
+	bandwidthCounter *metrics.BandwidthCounter
 
 	peerstore     peerstore.Peerstore
 	peerConnector *peermanager.PeerConnectionStrategy
@@ -193,8 +195,10 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.wakuFlag = enr.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableFilterFullNode, w.opts.enableStore, w.opts.enableRelay)
 	w.circuitRelayNodes = make(chan peer.AddrInfo)
 	w.metrics = newMetrics(params.prometheusReg)
-
 	w.metrics.RecordVersion(Version, GitCommit)
+
+	w.bandwidthCounter = metrics.NewBandwidthCounter()
+	params.libP2POpts = append(params.libP2POpts, libp2p.BandwidthReporter(w.bandwidthCounter))
 
 	// Setup peerstore wrapper
 	if params.peerstore != nil {
@@ -214,6 +218,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
 			r := make(chan peer.AddrInfo)
 			go func() {
+				defer utils.LogOnPanic()
 				defer close(r)
 				for ; numPeers != 0; numPeers-- {
 					select {
@@ -292,7 +297,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.filterLightNode = filter.NewWakuFilterLightNode(w.bcaster, w.peermanager, w.timesource, w.opts.onlineChecker, w.opts.prometheusReg, w.log)
 	w.lightPush = lightpush.NewWakuLightPush(w.Relay(), w.peermanager, w.opts.prometheusReg, w.log, w.opts.lightpushOpts...)
 
-	w.store = store.NewWakuStore(w.peermanager, w.timesource, w.log)
+	w.store = store.NewWakuStore(w.peermanager, w.timesource, w.log, w.opts.storeRateLimit)
 
 	if params.storeFactory != nil {
 		w.storeFactory = params.storeFactory
@@ -308,6 +313,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 }
 
 func (w *WakuNode) watchMultiaddressChanges(ctx context.Context) {
+	defer utils.LogOnPanic()
 	defer w.wg.Done()
 
 	addrsSet := utils.MultiAddrSet(w.ListenAddresses()...)
@@ -357,6 +363,23 @@ func (w *WakuNode) Start(ctx context.Context) error {
 	})
 
 	w.host = host
+
+	// Bandwidth reporter created for comparing IDONTWANT performance
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				totals := w.bandwidthCounter.GetBandwidthTotals()
+				w.bandwidthCounter.Reset()
+				w.metrics.RecordBandwidth(totals)
+			}
+		}
+	}()
 
 	if w.addressChangesSub, err = host.EventBus().Subscribe(new(event.EvtLocalAddressesUpdated)); err != nil {
 		return err
@@ -550,6 +573,7 @@ func (w *WakuNode) ID() string {
 }
 
 func (w *WakuNode) watchENRChanges(ctx context.Context) {
+	defer utils.LogOnPanic()
 	defer w.wg.Done()
 
 	var prevNodeVal string
@@ -752,7 +776,9 @@ func (w *WakuNode) DialPeerWithInfo(ctx context.Context, peerInfo peer.AddrInfo)
 func (w *WakuNode) connect(ctx context.Context, info peer.AddrInfo) error {
 	err := w.host.Connect(ctx, info)
 	if err != nil {
-		w.host.Peerstore().(wps.WakuPeerstore).AddConnFailure(info.ID)
+		if w.peermanager != nil {
+			w.peermanager.HandleDialError(err, info.ID)
+		}
 		return err
 	}
 
@@ -885,6 +911,7 @@ func (w *WakuNode) PeersByContentTopic(contentTopic string) peer.IDSlice {
 }
 
 func (w *WakuNode) findRelayNodes(ctx context.Context) {
+	defer utils.LogOnPanic()
 	defer w.wg.Done()
 
 	// Feed peers more often right after the bootstrap, then backoff
