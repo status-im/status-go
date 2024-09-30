@@ -171,8 +171,6 @@ func (api *PublicWakuAPI) BloomFilter() []byte {
 	return nil
 }
 
-//go:generate gencodec -type NewMessage -field-override newMessageOverride -out gen_newmessage_json.go
-
 // NewMessage represents a new waku message that is posted through the RPC.
 type NewMessage struct {
 	SymKeyID     string           `json:"symKeyID"`
@@ -375,8 +373,6 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 
 	return rpcSub, nil
 }
-
-//go:generate gencodec -type Message -field-override messageOverride -out gen_message_json.go
 
 // Message is the RPC representation of a waku message.
 type Message struct {
