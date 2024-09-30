@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	uniswapTokensURL   = "https://ipfs.io/ipns/tokens.uniswap.org"
-	tokenListSchemaURL = "https://uniswap.org/tokenlist.schema.json"
+	uniswapTokensURL   = "https://ipfs.io/ipns/tokens.uniswap.org"   // nolint:gosec
+	tokenListSchemaURL = "https://uniswap.org/tokenlist.schema.json" // nolint:gosec
 	outputFile         = "services/wallet/token/uniswap.go"
 )
 
