@@ -24,7 +24,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -34,6 +33,7 @@ import (
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/wakuv2"
 	waku2 "github.com/status-im/status-go/wakuv2"
 	wakuV2common "github.com/status-im/status-go/wakuv2/common"
 )
@@ -160,7 +160,7 @@ func (s *MessengerStoreNodeRequestSuite) createStore() {
 	cfg := testWakuV2Config{
 		logger:      s.logger.Named("store-waku"),
 		enableStore: true,
-		clusterID:   shard.MainStatusShardCluster,
+		clusterID:   wakuv2.MainStatusShardCluster,
 	}
 
 	s.wakuStoreNode = NewTestWakuV2(&s.Suite, cfg)
@@ -178,7 +178,7 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 	cfg := testWakuV2Config{
 		logger:      s.logger.Named("owner-waku"),
 		enableStore: false,
-		clusterID:   shard.MainStatusShardCluster,
+		clusterID:   wakuv2.MainStatusShardCluster,
 	}
 
 	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
@@ -199,7 +199,7 @@ func (s *MessengerStoreNodeRequestSuite) createBob() {
 	cfg := testWakuV2Config{
 		logger:      s.logger.Named("bob-waku"),
 		enableStore: false,
-		clusterID:   shard.MainStatusShardCluster,
+		clusterID:   wakuv2.MainStatusShardCluster,
 	}
 	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 	s.bobWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
@@ -366,7 +366,8 @@ func (s *MessengerStoreNodeRequestSuite) waitForEnvelopes(subscription <-chan st
 }
 
 func (s *MessengerStoreNodeRequestSuite) wakuListenAddress(waku *waku2.Waku) multiaddr.Multiaddr {
-	addresses := waku.ListenAddresses()
+	addresses, err := waku.ListenAddresses()
+	s.Require().NoError(err)
 	s.Require().LessOrEqual(1, len(addresses))
 	return addresses[0]
 }
@@ -696,8 +697,8 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestShardAndCommunityInfo() {
 	topicPrivKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	expectedShard := &shard.Shard{
-		Cluster: shard.MainStatusShardCluster,
+	expectedShard := &wakuv2.Shard{
+		Cluster: wakuv2.MainStatusShardCluster,
 		Index:   23,
 	}
 
@@ -841,8 +842,8 @@ type testFetchRealCommunityExampleTokenInfo struct {
 
 var testFetchRealCommunityExample = []struct {
 	CommunityID          string
-	CommunityURL         string       // If set, takes precedence over CommunityID
-	CommunityShard       *shard.Shard // WARNING: I didn't test a sharded community
+	CommunityURL         string        // If set, takes precedence over CommunityID
+	CommunityShard       *wakuv2.Shard // WARNING: I didn't test a sharded community
 	Fleet                string
 	ClusterID            uint16
 	UserPrivateKeyString string // When empty a new user will be created
@@ -863,14 +864,14 @@ var testFetchRealCommunityExample = []struct {
 		CommunityID:    "0x03073514d4c14a7d10ae9fc9b0f05abc904d84166a6ac80add58bf6a3542a4e50a",
 		CommunityShard: nil,
 		Fleet:          params.FleetStatusProd,
-		ClusterID:      shard.MainStatusShardCluster,
+		ClusterID:      wakuv2.MainStatusShardCluster,
 	},
 	{
 		// Example 3,
 		// https://status.app/c/CxiACi8KFGFwIHJlcSAxIHN0dCBiZWMgbWVtEgdkc2Fkc2FkGAMiByM0MzYwREYqAxkrHAM=#zQ3shwDYZHtrLE7NqoTGjTWzWUu6hom5D4qxfskLZfgfyGRyL
 		CommunityID: "0x03f64be95ed5c925022265f9250f538f65ed3dcf6e4ef6c139803dc02a3487ae7b",
 		Fleet:       params.FleetStatusProd,
-		ClusterID:   shard.MainStatusShardCluster,
+		ClusterID:   wakuv2.MainStatusShardCluster,
 
 		CheckExpectedEnvelopes: true,
 		ExpectedShardEnvelopes: []string{
@@ -973,7 +974,7 @@ var testFetchRealCommunityExample = []struct {
 		//Example 1,
 		CommunityID:            "0x02471dd922756a3a50b623e59cf3b99355d6587e43d5c517eb55f9aea9d3fe9fe9",
 		Fleet:                  params.FleetStatusProd,
-		ClusterID:              shard.MainStatusShardCluster,
+		ClusterID:              wakuv2.MainStatusShardCluster,
 		CheckExpectedEnvelopes: true,
 		ExpectedShardEnvelopes: []string{
 			"0xc3e68e838d09e0117b3f3fd27aabe5f5a509d13e9045263c78e6890953d43547",
@@ -1013,7 +1014,7 @@ var testFetchRealCommunityExample = []struct {
 				ContractAddress: "0x21F6F5Cb75E81e5104D890D750270eD6538C50cb",
 			},
 		},
-		ClusterID:              shard.MainStatusShardCluster,
+		ClusterID:              wakuv2.MainStatusShardCluster,
 		CheckExpectedEnvelopes: false,
 		CustomOptions: []StoreNodeRequestOption{
 			WithInitialPageSize(1),

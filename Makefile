@@ -1,5 +1,6 @@
 .PHONY: statusgo statusd-prune all test clean help
 .PHONY: statusgo-android statusgo-ios
+.PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
 
 # Clear any GOROOT set outside of the Nix shell
 export GOROOT=
@@ -355,8 +356,27 @@ mock: ##@other Regenerate mocks
 	mockgen -package=mock_paraswap -destination=services/wallet/thirdparty/paraswap/mock/types.go -source=services/wallet/thirdparty/paraswap/types.go
 	mockgen -package=mock_onramp -destination=services/wallet/onramp/mock/types.go -source=services/wallet/onramp/types.go
 
+LIBWAKU := third_party/nwaku/build/libwaku.$(GOBIN_SHARED_LIB_EXT)
+$(LIBWAKU):
+	echo "Building libwaku"
+	$(MAKE) -C third_party/nwaku update || { echo "nwaku make update failed"; exit 1; }
+	$(MAKE) -C ./third_party/nwaku libwaku
+
+build-libwaku: $(LIBWAKU)
+
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
+
+test-libwaku: | $(LIBWAKU)
+	// chequear nwaku
+	// sino lanzarlo
+	go test -tags '$(BUILD_TAGS) use_nwaku' -run TestBasicWakuV2 ./wakuv2/... -count 1 -v -json | jq -r '.Output'
+
+clean-libwaku:
+	echo "Removing libwaku"
+	rm $(LIBWAKU)
+
+rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
 test: test-unit ##@tests Run basic, short tests during development
 

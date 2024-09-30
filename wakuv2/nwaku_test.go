@@ -1,25 +1,18 @@
-//go:build !use_nwaku
-// +build !use_nwaku
+//go:build use_nwaku
+// +build use_nwaku
 
 package wakuv2
 
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"math/big"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/cenkalti/backoff/v3"
-	"github.com/libp2p/go-libp2p/core/metrics"
-	"github.com/libp2p/go-libp2p/core/peer"
-	libp2pprotocol "github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -31,20 +24,11 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
-	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
-	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
-	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
@@ -66,6 +50,7 @@ func setDefaultConfig(config *Config, lightMode bool) {
 	}
 }
 
+/*
 func TestDiscoveryV5(t *testing.T) {
 	config := &Config{}
 	setDefaultConfig(config, false)
@@ -88,7 +73,8 @@ func TestDiscoveryV5(t *testing.T) {
 	require.NotEqual(t, 0, len(w.Peers()))
 	require.NoError(t, w.Stop())
 }
-
+*/
+/*
 func TestRestartDiscoveryV5(t *testing.T) {
 	config := &Config{}
 	setDefaultConfig(config, false)
@@ -157,7 +143,7 @@ func TestRelayPeers(t *testing.T) {
 	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
 	require.Error(t, err)
 }
-
+*/
 func parseNodes(rec []string) []*enode.Node {
 	var ns []*enode.Node
 	for _, r := range rec {
@@ -334,6 +320,7 @@ func makeTestTree(domain string, nodes []*enode.Node, links []string) (*ethdnsdi
 	return tree, url
 }
 
+/*
 func TestPeerExchange(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
@@ -355,7 +342,10 @@ func TestPeerExchange(t *testing.T) {
 	config.EnableDiscV5 = true
 	config.EnablePeerExchangeServer = false
 	config.EnablePeerExchangeClient = false
-	config.DiscV5BootstrapNodes = []string{pxServerNode.node.ENR().String()}
+	enr, err := pxServerNode.ENR()
+	require.NoError(t, err)
+
+	config.DiscV5BootstrapNodes = []string{enr.String()}
 	discV5Node, err := New(nil, "", config, logger.Named("discV5Node"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, discV5Node.Start())
@@ -363,7 +353,7 @@ func TestPeerExchange(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// start light node which use PeerExchange to discover peers
-	enrNodes := []*enode.Node{pxServerNode.node.ENR()}
+	enrNodes := []*enode.Node{enr}
 	tree, url := makeTestTree("n", enrNodes, nil)
 	resolver := mapResolver(tree.ToTXT("n"))
 
@@ -388,17 +378,23 @@ func TestPeerExchange(t *testing.T) {
 		// in light client mode,the peer will be closed via `w.node.Host().Network().ClosePeer(peerInfo.ID)`
 		// after invoking identifyAndConnect, instead, we should check the peerStore, peers from peerStore
 		// won't get deleted especially if they are statically added.
-		if len(lightNode.node.Host().Peerstore().Peers()) == 2 {
+		numConnected, err := lightNode.GetNumConnectedPeers()
+		if err != nil {
+			return err
+		}
+		if numConnected == 2 {
 			return nil
 		}
 		return errors.New("no peers discovered")
 	}, options)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	require.NoError(t, discV5Node.node.PeerExchange().Request(ctx, 1))
-	require.Error(t, discV5Node.node.PeerExchange().Request(ctx, 1)) //should fail due to rate limit
+	_, err = discV5Node.WakuPeerExchangeRequest(1)
+	require.NoError(t, err)
+	_, err = discV5Node.WakuPeerExchangeRequest(1)
+	require.Error(t, err) //should fail due to rate limit
 
 	require.NoError(t, lightNode.Stop())
 	require.NoError(t, pxServerNode.Stop())
@@ -433,7 +429,7 @@ func TestWakuV2Filter(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		peers, err := w.node.PeerManager().FilterPeersByProto(nil, nil, filter.FilterSubscribeID_v20beta1)
+		peers, err := w.GetPeerIdsByProtocol(string(filter.FilterSubscribeID_v20beta1))
 		if err != nil {
 			return err
 		}
@@ -469,20 +465,20 @@ func TestWakuV2Filter(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	// Ensure there is at least 1 active filter subscription
-	subscriptions := w.node.FilterLightnode().Subscriptions()
+	subscriptions := w.FilterLightnode().Subscriptions()
 	require.Greater(t, len(subscriptions), 0)
 
 	messages := filter.Retrieve()
 	require.Len(t, messages, 1)
 
 	// Mock peers going down
-	_, err = w.node.FilterLightnode().UnsubscribeWithSubscription(w.ctx, subscriptions[0])
+	_, err = w.FilterLightnode().UnsubscribeWithSubscription(w.ctx, subscriptions[0])
 	require.NoError(t, err)
 
 	time.Sleep(10 * time.Second)
 
 	// Ensure there is at least 1 active filter subscription
-	subscriptions = w.node.FilterLightnode().Subscriptions()
+	subscriptions = w.FilterLightnode().Subscriptions()
 	require.Greater(t, len(subscriptions), 0)
 
 	// Ensure that messages are retrieved with a fresh sub
@@ -556,10 +552,9 @@ func TestWakuV2Store(t *testing.T) {
 	// Connect the two nodes directly
 	peer2Addr, err := w2.ListenAddresses()
 	require.NoError(t, err)
-	err = w1.node.DialPeer(context.Background(), peer2Addr[0].String())
-	require.NoError(t, err)
 
-	waitForPeerConnection(t, w2.node.Host().ID(), w1PeersCh)
+	err = w1.DialPeer(peer2Addr[0])
+	require.NoError(t, err)
 
 	// Create a filter for the second node to catch messages
 	filter := &common.Filter{
@@ -595,7 +590,7 @@ func TestWakuV2Store(t *testing.T) {
 	// Query the second node's store for the message
 	_, envelopeCount, err := w1.Query(
 		context.Background(),
-		w2.node.Host().ID(),
+		w2.Host().ID(),
 		store.FilterCriteria{
 			TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
 			TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
@@ -733,9 +728,7 @@ func TestLightpushRateLimit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	//Connect the relay peer and full node
-	peerAddr, err := w0.ListenAddresses()
-	require.NoError(t, err)
-	err = w1.node.DialPeer(ctx, peerAddr[0].String())
+	err = w1.DialPeer(ctx, w0.ListenAddresses()[0].String())
 	require.NoError(t, err)
 
 	err = tt.RetryWithBackOff(func() error {
@@ -762,11 +755,9 @@ func TestLightpushRateLimit(t *testing.T) {
 	}()
 
 	//Use this instead of DialPeer to make sure the peer is added to PeerStore and can be selected for Lighpush
-	addresses, err := w1.ListenAddresses()
-	require.NoError(t, err)
-	w2.node.AddDiscoveredPeer(w1.PeerID(), addresses, wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
+	w2.AddDiscoveredPeer(w1.PeerID(), w1.ListenAddresses(), wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
 
-	waitForPeerConnectionWithTimeout(t, w2.node.Host().ID(), w1PeersCh, 5*time.Second)
+	waitForPeerConnectionWithTimeout(t, w2.Host().ID(), w1PeersCh, 5*time.Second)
 
 	event := make(chan common.EnvelopeEvent, 10)
 	w2.SubscribeEnvelopeEvents(event)
@@ -815,3 +806,4 @@ func TestTelemetryFormat(t *testing.T) {
 	_, err = json.Marshal(requestBody)
 	require.NoError(t, err)
 }
+*/

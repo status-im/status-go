@@ -263,7 +263,7 @@ func (b *StatusNode) WakuExtService() *wakuext.Service {
 func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
 	return b.wakuV2ExtSrvc
 }
-func (b *StatusNode) WakuV2Service() *wakuv2.NWaku {
+func (b *StatusNode) WakuV2Service() *wakuv2.Waku {
 	return b.wakuV2Srvc
 }
 
@@ -315,7 +315,7 @@ func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.
 
 }
 
-func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.NWaku, error) {
+func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku, error) {
 	if b.wakuV2Srvc == nil {
 		cfg := &wakuv2.Config{
 			MaxMessageSize:                         wakucommon.DefaultMaxMessageSize,
