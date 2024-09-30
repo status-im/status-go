@@ -15,8 +15,11 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-const uniswapTokensURL = "https://gateway.ipfs.io/ipns/tokens.uniswap.org" // nolint:gosec
-const tokenListSchemaURL = "https://uniswap.org/tokenlist.schema.json"     // nolint:gosec
+const (
+	uniswapTokensURL   = "https://ipfs.io/ipns/tokens.uniswap.org"
+	tokenListSchemaURL = "https://uniswap.org/tokenlist.schema.json"
+	outputFile         = "services/wallet/token/uniswap.go"
+)
 
 const templateText = `
 package token
@@ -100,7 +103,7 @@ func main() {
 	tmpl := template.Must(template.New("tokens").Parse(templateText))
 
 	// Create the output Go file
-	file, err := os.Create("uniswap.go")
+	file, err := os.Create(outputFile)
 	if err != nil {
 		fmt.Printf("Failed to create go file: %v\n", err)
 		return
