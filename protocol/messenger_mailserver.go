@@ -2,6 +2,8 @@ package protocol
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"sort"
@@ -756,14 +758,14 @@ func processMailserverBatch(
 	for _, t := range batch.Topics {
 		topicStrings = append(topicStrings, t.String())
 	}
-	logger = logger.With(zap.Any("chatIDs", batch.ChatIDs),
+	logger = logger.With(zap.String("batch hash", batch.Hash()))
+	logger.Info("syncing topic",
+		zap.Any("chatIDs", batch.ChatIDs),
 		zap.String("fromString", time.Unix(int64(batch.From), 0).Format(time.RFC3339)),
 		zap.String("toString", time.Unix(int64(batch.To), 0).Format(time.RFC3339)),
 		zap.Any("topic", topicStrings),
 		zap.Int64("from", int64(batch.From)),
 		zap.Int64("to", int64(batch.To)))
-
-	logger.Info("syncing topic")
 
 	wg := sync.WaitGroup{}
 	workWg := sync.WaitGroup{}
@@ -957,6 +959,12 @@ type MailserverBatch struct {
 	PubsubTopic string
 	Topics      []types.TopicType
 	ChatIDs     []string
+}
+
+func (mb *MailserverBatch) Hash() string {
+	data := fmt.Sprintf("%d%d%s%s%v%v", mb.From, mb.To, mb.Cursor, mb.PubsubTopic, mb.Topics, mb.ChatIDs)
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:4])
 }
 
 func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
