@@ -17,6 +17,11 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 )
 
+type InstallationIDProvider interface {
+	GetInstallationID() string
+	Validate() error
+}
+
 func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallationAndSync) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -50,16 +55,17 @@ func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallati
 	return pairResponse, nil
 }
 
-func (m *Messenger) EnableInstallationAndPair(request *requests.EnableInstallationAndPair) (*MessengerResponse, error) {
+func (m *Messenger) EnableInstallationAndPair(request InstallationIDProvider) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
 
 	myIdentity := crypto.CompressPubkey(&m.identity.PublicKey)
 	timestamp := time.Now().UnixNano()
+	installationID := request.GetInstallationID()
 
 	installation := &multidevice.Installation{
-		ID:        request.InstallationID,
+		ID:        installationID,
 		Enabled:   true,
 		Version:   2,
 		Timestamp: timestamp,
@@ -69,20 +75,20 @@ func (m *Messenger) EnableInstallationAndPair(request *requests.EnableInstallati
 	if err != nil {
 		return nil, err
 	}
-	i, ok := m.allInstallations.Load(request.InstallationID)
+	i, ok := m.allInstallations.Load(installationID)
 	if !ok {
 		i = installation
 	} else {
 		i.Enabled = true
 	}
-	m.allInstallations.Store(request.InstallationID, i)
-	response, err := m.SendPairInstallation(context.Background(), request.GetInstallationId(), nil)
+	m.allInstallations.Store(installationID, i)
+	response, err := m.SendPairInstallation(context.Background(), request.GetInstallationID(), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	notification := &ActivityCenterNotification{
-		ID:             types.FromHex(request.InstallationID),
+		ID:             types.FromHex(installationID),
 		Type:           ActivityCenterNotificationTypeNewInstallationCreated,
 		InstallationID: m.installationID, // Put our own installation ID, as we're the initiator of the pairing
 		Timestamp:      m.getTimesource().GetCurrentTime(),

@@ -3147,11 +3147,10 @@ type ReceivedMessageState struct {
 	// List of contacts modified
 	ModifiedContacts *stringBoolMap
 	// All installations in memory
-	AllInstallations *installationMap
-	// List of communities modified
+	AllInstallations      *installationMap
 	ModifiedInstallations *stringBoolMap
 	// List of installations targeted to this device modified
-	ModifiedInstallationsTargetedToThisDevice *stringBoolMap
+	TargetedInstallations *stringBoolMap
 	// Map of existing messages
 	ExistingMessagesMap map[string]bool
 	// EmojiReactions is a list of emoji reactions for the current batch
@@ -3324,15 +3323,15 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 		ModifiedContacts:      new(stringBoolMap),
 		AllInstallations:      m.allInstallations,
 		ModifiedInstallations: m.modifiedInstallations,
-		ModifiedInstallationsTargetedToThisDevice: new(stringBoolMap),
-		ExistingMessagesMap:                       make(map[string]bool),
-		EmojiReactions:                            make(map[string]*EmojiReaction),
-		GroupChatInvitations:                      make(map[string]*GroupChatInvitation),
-		Response:                                  &MessengerResponse{},
-		Timesource:                                m.getTimesource(),
-		ResolvePrimaryName:                        m.ResolvePrimaryName,
-		AllBookmarks:                              make(map[string]*browsers.Bookmark),
-		AllTrustStatus:                            make(map[string]verification.TrustStatus),
+		TargetedInstallations: new(stringBoolMap),
+		ExistingMessagesMap:   make(map[string]bool),
+		EmojiReactions:        make(map[string]*EmojiReaction),
+		GroupChatInvitations:  make(map[string]*GroupChatInvitation),
+		Response:              &MessengerResponse{},
+		Timesource:            m.getTimesource(),
+		ResolvePrimaryName:    m.ResolvePrimaryName,
+		AllBookmarks:          make(map[string]*browsers.Bookmark),
+		AllTrustStatus:        make(map[string]verification.TrustStatus),
 	}
 }
 
@@ -3738,7 +3737,7 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 			}
 		}
 
-		targeted, _ := messageState.ModifiedInstallationsTargetedToThisDevice.Load(id)
+		targeted, _ := messageState.TargetedInstallations.Load(id)
 		if targeted {
 			if installation.Enabled {
 				// Delete AC notif since the installation is now enabled
