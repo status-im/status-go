@@ -16,6 +16,10 @@ let
     inherit xcodeWrapper;
     withAndroidPkgs = !isMacM1;
   };
+
+  /* Include the XPC library */
+  appleLibXPC = pkgs.darwin.apple_sdk.libs.xpc;
+
 in pkgs.mkShell {
   name = "status-go-shell";
 
@@ -23,7 +27,7 @@ in pkgs.mkShell {
     git jq which
     go golangci-lint go-junit-report gopls go-bindata gomobileMod codecov-cli
     mockgen protobuf3_20 protoc-gen-go gotestsum go-modvendor openjdk cc-test-reporter
-   ] ++ lib.optionals (stdenv.isDarwin) [ xcodeWrapper ];
+   ] ++ lib.optionals (stdenv.isDarwin) [ xcodeWrapper appleLibXPC ];
 
    shellHook = lib.optionalString (!isMacM1) ''
      ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk
