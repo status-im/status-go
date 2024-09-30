@@ -313,9 +313,9 @@ setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
 generate-handlers:
-	go generate ./_assets/generate_handlers/
+	go generate ./cmd/generate_handlers/
 generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./_assets/generate_handlers
+	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./cmd/generate_handlers
 
 generate-appdatabase:
 	go generate ./appdatabase/...
