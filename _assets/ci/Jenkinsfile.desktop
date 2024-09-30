@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@s5cmd-windows'
+library 'status-jenkins-lib@v1.9.12'
 
 pipeline {
   /* This way we run the same Jenkinsfile on different platforms. */
@@ -8,7 +8,7 @@ pipeline {
   parameters {
     string(
       name: 'BRANCH',
-      defaultValue: 'ci/develop',
+      defaultValue: 'develop',
       description: 'Name of branch to build.'
     )
     string(
@@ -51,6 +51,8 @@ pipeline {
       version: env.VERSION,
       ext:     'zip',
     )
+    /* prevent sharing cache dir across different jobs */
+    GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
   }
 
   stages {
