@@ -1062,6 +1062,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 
 	results := map[string]singleResult{}
 	wg := sync.WaitGroup{}
+	wakuCreationMutex := sync.Mutex{}
 
 	// We run a separate request for each node in the fleet.
 	for i, mailserver := range nodesList {
@@ -1088,8 +1089,10 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 				enableStore: false,
 				clusterID:   clusterID,
 			}
+			wakuCreationMutex.Lock()
 			wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 			userWaku := gethbridge.NewGethWakuV2Wrapper(wakuV2)
+			wakuCreationMutex.Unlock()
 
 			//
 			// Create a messenger to process envelopes
