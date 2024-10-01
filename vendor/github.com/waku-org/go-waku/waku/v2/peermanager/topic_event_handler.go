@@ -12,7 +12,6 @@ import (
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 )
@@ -163,7 +162,6 @@ func (pm *PeerManager) handlerPeerTopicEvent(peerEvt relay.EvtPeerTopic) {
 }
 
 func (pm *PeerManager) peerEventLoop(ctx context.Context) {
-	defer utils.LogOnPanic()
 	defer pm.sub.Close()
 	for {
 		select {

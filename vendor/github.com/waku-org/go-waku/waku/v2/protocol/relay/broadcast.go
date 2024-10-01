@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 type BroadcasterParameters struct {
@@ -175,7 +174,6 @@ func (b *broadcaster) Start(ctx context.Context) error {
 }
 
 func (b *broadcaster) run(ctx context.Context) {
-	defer utils.LogOnPanic()
 	for {
 		select {
 		case <-ctx.Done():

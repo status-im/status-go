@@ -12,7 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/waku-org/go-waku/logging"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 )
@@ -41,7 +40,6 @@ func disconnectAllPeers(host host.Host, logger *zap.Logger) {
 // This is necessary because TCP connections are automatically closed due to inactivity,
 // and doing a ping will avoid this (with a small bandwidth cost)
 func (w *WakuNode) startKeepAlive(ctx context.Context, randomPeersPingDuration time.Duration, allPeersPingDuration time.Duration) {
-	defer utils.LogOnPanic()
 	defer w.wg.Done()
 
 	if !w.opts.enableRelay {
@@ -170,7 +168,6 @@ func (w *WakuNode) startKeepAlive(ctx context.Context, randomPeersPingDuration t
 }
 
 func (w *WakuNode) pingPeer(ctx context.Context, wg *sync.WaitGroup, peerID peer.ID, resultChan chan bool) {
-	defer utils.LogOnPanic()
 	defer wg.Done()
 
 	logger := w.log.With(logging.HostID("peer", peerID))

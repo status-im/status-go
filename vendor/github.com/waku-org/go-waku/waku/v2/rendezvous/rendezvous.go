@@ -11,7 +11,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/service"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -143,7 +142,6 @@ func (r *Rendezvous) Register(ctx context.Context, rendezvousPoints []*Rendezvou
 
 // RegisterShard registers the node in the rendezvous points using a shard as namespace
 func (r *Rendezvous) RegisterShard(ctx context.Context, cluster uint16, shard uint16, rendezvousPoints []*RendezvousPoint) {
-	defer utils.LogOnPanic()
 	namespace := ShardToNamespace(cluster, shard)
 	r.RegisterWithNamespace(ctx, namespace, rendezvousPoints)
 }
@@ -160,7 +158,6 @@ func (r *Rendezvous) RegisterWithNamespace(ctx context.Context, namespace string
 	for _, m := range rendezvousPoints {
 		r.WaitGroup().Add(1)
 		go func(m *RendezvousPoint) {
-			defer utils.LogOnPanic()
 			r.WaitGroup().Done()
 
 			rendezvousClient := rvs.NewRendezvousClient(r.host, m.id)

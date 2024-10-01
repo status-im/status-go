@@ -18,7 +18,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/service"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"go.uber.org/zap"
 
@@ -104,7 +103,6 @@ func (c *PeerConnectionStrategy) Subscribe(ctx context.Context, ch <-chan servic
 	// if running start a goroutine to consume the subscription
 	c.WaitGroup().Add(1)
 	go func() {
-		defer utils.LogOnPanic()
 		defer c.WaitGroup().Done()
 		c.consumeSubscription(subscription{ctx, ch})
 	}()
@@ -188,7 +186,6 @@ func (c *PeerConnectionStrategy) consumeSubscriptions() {
 	for _, subs := range c.subscriptions {
 		c.WaitGroup().Add(1)
 		go func(s subscription) {
-			defer utils.LogOnPanic()
 			defer c.WaitGroup().Done()
 			c.consumeSubscription(s)
 		}(subs)
@@ -236,7 +233,6 @@ func (c *PeerConnectionStrategy) addConnectionBackoff(peerID peer.ID) {
 }
 
 func (c *PeerConnectionStrategy) dialPeers() {
-	defer utils.LogOnPanic()
 	defer c.WaitGroup().Done()
 
 	maxGoRoutines := c.pm.OutPeersTarget
@@ -276,7 +272,6 @@ func (c *PeerConnectionStrategy) dialPeers() {
 }
 
 func (c *PeerConnectionStrategy) dialPeer(pi peer.AddrInfo, sem chan struct{}) {
-	defer utils.LogOnPanic()
 	defer c.WaitGroup().Done()
 	ctx, cancel := context.WithTimeout(c.Context(), c.dialTimeout)
 	defer cancel()

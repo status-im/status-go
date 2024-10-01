@@ -14,7 +14,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store/pb"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -187,7 +186,6 @@ func (d *DBStore) Start(ctx context.Context, timesource timesource.Timesource) e
 }
 
 func (d *DBStore) updateMetrics(ctx context.Context) {
-	defer utils.LogOnPanic()
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	defer d.wg.Done()
@@ -253,7 +251,6 @@ func (d *DBStore) getDeleteOldRowsQuery() string {
 }
 
 func (d *DBStore) checkForOlderRecords(ctx context.Context, t time.Duration) {
-	defer utils.LogOnPanic()
 	defer d.wg.Done()
 
 	ticker := time.NewTicker(t)

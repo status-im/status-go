@@ -334,7 +334,6 @@ func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessa
 	for i, peerID := range params.selectedPeers {
 		wg.Add(1)
 		go func(index int, id peer.ID) {
-			defer utils.LogOnPanic()
 			paramsValue := *params
 			paramsValue.requestID = protocol.GenerateRequestID()
 			defer wg.Done()

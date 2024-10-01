@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/beevik/ntp"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -70,7 +69,6 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 	responses := make(chan queryResponse, len(servers))
 	for _, server := range servers {
 		go func(server string) {
-			defer utils.LogOnPanic()
 			response, err := timeQuery(server, ntp.QueryOptions{
 				Timeout: DefaultRPCTimeout,
 			})
@@ -174,7 +172,6 @@ func (s *NTPTimeSource) runPeriodically(ctx context.Context, fn func() error) er
 	// we try to do it synchronously so that user can have reliable messages right away
 	s.wg.Add(1)
 	go func() {
-		defer utils.LogOnPanic()
 		for {
 			select {
 			case <-time.After(period):

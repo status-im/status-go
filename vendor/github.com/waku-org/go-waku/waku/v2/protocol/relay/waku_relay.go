@@ -439,7 +439,6 @@ func (w *WakuRelay) subscribe(ctx context.Context, contentFilter waku_proto.Cont
 
 		subscriptions = append(subscriptions, subscription)
 		go func() {
-			defer utils.LogOnPanic()
 			<-ctx.Done()
 			subscription.Unsubscribe()
 		}()
@@ -534,7 +533,6 @@ func (w *WakuRelay) unsubscribeFromPubsubTopic(topicData *pubsubTopicSubscriptio
 }
 
 func (w *WakuRelay) pubsubTopicMsgHandler(sub *pubsub.Subscription) {
-	defer utils.LogOnPanic()
 	defer w.WaitGroup().Done()
 
 	for {

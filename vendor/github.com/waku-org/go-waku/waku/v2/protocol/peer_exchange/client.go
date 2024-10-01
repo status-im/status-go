@@ -16,7 +16,6 @@ import (
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange/pb"
 	"github.com/waku-org/go-waku/waku/v2/service"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -155,7 +154,6 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 		wakuPX.log.Info("connecting to newly discovered peers", zap.Int("count", len(discoveredPeers)))
 		wakuPX.WaitGroup().Add(1)
 		go func() {
-			defer utils.LogOnPanic()
 			defer wakuPX.WaitGroup().Done()
 
 			peerCh := make(chan service.PeerData)

@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"runtime/debug"
 	"strings"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -81,11 +80,4 @@ func InitLogger(encoding string, output string, name string, level zapcore.Level
 	logging.SetupLogging(cfg)
 
 	log = logging.Logger(name).Desugar()
-}
-
-func LogOnPanic() {
-	if err := recover(); err != nil {
-		Logger().Error("panic in goroutine", zap.Any("error", err), zap.String("stacktrace", string(debug.Stack())))
-		panic(err)
-	}
 }

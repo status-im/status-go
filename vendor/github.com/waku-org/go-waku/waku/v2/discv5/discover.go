@@ -172,7 +172,6 @@ func (d *DiscoveryV5) listen(ctx context.Context) error {
 	if d.NAT != nil && !d.udpAddr.IP.IsLoopback() {
 		d.WaitGroup().Add(1)
 		go func() {
-			defer utils.LogOnPanic()
 			defer d.WaitGroup().Done()
 			nat.Map(d.NAT, ctx.Done(), "udp", d.udpAddr.Port, d.udpAddr.Port, "go-waku discv5 discovery")
 		}()
@@ -218,7 +217,6 @@ func (d *DiscoveryV5) start() error {
 	if d.params.autoFindPeers {
 		d.WaitGroup().Add(1)
 		go func() {
-			defer utils.LogOnPanic()
 			defer d.WaitGroup().Done()
 			d.runDiscoveryV5Loop(d.Context())
 		}()

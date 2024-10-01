@@ -21,7 +21,6 @@ import (
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 func findMessages(query *pb.HistoryQuery, msgProvider MessageProvider) ([]*wpb.WakuMessage, *pb.PagingInfo, error) {
@@ -160,11 +159,9 @@ func (store *WakuStore) storeMessage(env *protocol.Envelope) error {
 }
 
 func (store *WakuStore) storeIncomingMessages(ctx context.Context) {
-	defer utils.LogOnPanic()
 	defer store.wg.Done()
 	for envelope := range store.MsgC.Ch {
 		go func(env *protocol.Envelope) {
-			defer utils.LogOnPanic()
 			_ = store.storeMessage(env)
 		}(envelope)
 	}

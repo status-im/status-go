@@ -13,7 +13,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 // Methods on FilterManager just aggregate filters from application and subscribe to them
@@ -88,7 +87,6 @@ func NewFilterManager(ctx context.Context, logger *zap.Logger, minPeersPerFilter
 }
 
 func (mgr *FilterManager) startFilterSubLoop() {
-	defer utils.LogOnPanic()
 	ticker := time.NewTicker(mgr.filterSubBatchDuration)
 	defer ticker.Stop()
 	for {
@@ -159,7 +157,6 @@ func (mgr *FilterManager) SubscribeFilter(filterID string, cf protocol.ContentFi
 }
 
 func (mgr *FilterManager) subscribeAndRunLoop(f filterConfig) {
-	defer utils.LogOnPanic()
 	ctx, cancel := context.WithCancel(mgr.ctx)
 	config := FilterConfig{MaxPeers: mgr.minPeersPerFilter}
 	sub, err := Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger, mgr.params)

@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 type PeerSet map[peer.ID]struct{}
@@ -189,7 +188,6 @@ func (sub *SubscribersMap) Items(pubsubTopic string, contentTopic string) <-chan
 	key := getKey(pubsubTopic, contentTopic)
 
 	f := func() {
-		defer utils.LogOnPanic()
 		sub.RLock()
 		defer sub.RUnlock()
 
@@ -238,7 +236,6 @@ func (sub *SubscribersMap) Refresh(peerID peer.ID) {
 }
 
 func (sub *SubscribersMap) cleanUp(ctx context.Context, cleanupInterval time.Duration) {
-	defer utils.LogOnPanic()
 	t := time.NewTicker(cleanupInterval)
 	defer t.Stop()
 

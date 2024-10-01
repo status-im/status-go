@@ -1015,7 +1015,7 @@ github.com/waku-org/go-discover/discover/v5wire
 github.com/waku-org/go-libp2p-rendezvous
 github.com/waku-org/go-libp2p-rendezvous/db
 github.com/waku-org/go-libp2p-rendezvous/pb
-# github.com/waku-org/go-waku v0.8.1-0.20240926162117-12abd041d699
+# github.com/waku-org/go-waku v0.8.1-0.20240926162117-12abd041d699 => github.com/waku-org/go-waku v0.8.1-0.20240923214107-798c9c5d819a
 ## explicit; go 1.21
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/tests
@@ -1424,3 +1424,4 @@ zombiezen.com/go/sqlite/sqlitex
 # github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
 # github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
 # github.com/forPelevin/gomoji => github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4
+# github.com/waku-org/go-waku => github.com/waku-org/go-waku v0.8.1-0.20240923214107-798c9c5d819a

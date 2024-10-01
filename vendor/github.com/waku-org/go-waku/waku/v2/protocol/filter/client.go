@@ -28,7 +28,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 	"github.com/waku-org/go-waku/waku/v2/service"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -128,7 +127,6 @@ func (wf *WakuFilterLightNode) Stop() {
 		wf.h.RemoveStreamHandler(FilterPushID_v20beta1)
 		if wf.subscriptions.Count() > 0 {
 			go func() {
-				defer utils.LogOnPanic()
 				defer func() {
 					_ = recover()
 				}()
@@ -416,7 +414,6 @@ func (wf *WakuFilterLightNode) Subscribe(ctx context.Context, contentFilter prot
 		for i, peerID := range selectedPeers {
 			wg.Add(1)
 			go func(index int, ID peer.ID) {
-				defer utils.LogOnPanic()
 				defer wg.Done()
 				err := wf.request(
 					reqCtx,
@@ -568,7 +565,6 @@ func (wf *WakuFilterLightNode) Unsubscribe(ctx context.Context, contentFilter pr
 		// send unsubscribe request to all the peers
 		for peerID := range peers {
 			go func(peerID peer.ID) {
-				defer utils.LogOnPanic()
 				defer func() {
 					if params.wg != nil {
 						params.wg.Done()
@@ -691,7 +687,6 @@ func (wf *WakuFilterLightNode) unsubscribeAll(ctx context.Context, opts ...Filte
 	}
 	for peerId := range peers {
 		go func(peerID peer.ID) {
-			defer utils.LogOnPanic()
 			defer func() {
 				if params.wg != nil {
 					params.wg.Done()

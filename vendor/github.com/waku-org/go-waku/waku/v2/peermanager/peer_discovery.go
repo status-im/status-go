@@ -11,7 +11,6 @@ import (
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/service"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -104,7 +103,6 @@ func (pm *PeerManager) discoverOnDemand(cluster uint16,
 }
 
 func (pm *PeerManager) discoverPeersByPubsubTopics(pubsubTopics []string, proto protocol.ID, ctx context.Context, maxCount int) {
-	defer utils.LogOnPanic()
 	shardsInfo, err := waku_proto.TopicsToRelayShards(pubsubTopics...)
 	if err != nil {
 		pm.logger.Error("failed to convert pubsub topic to shard", zap.Strings("topics", pubsubTopics), zap.Error(err))

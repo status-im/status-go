@@ -218,7 +218,6 @@ func (wf *WakuFilterFullNode) unsubscribeAll(ctx context.Context, stream network
 }
 
 func (wf *WakuFilterFullNode) filterListener(ctx context.Context) {
-	defer utils.LogOnPanic()
 	defer wf.WaitGroup().Done()
 
 	// This function is invoked for each message received
@@ -240,7 +239,6 @@ func (wf *WakuFilterFullNode) filterListener(ctx context.Context) {
 			logger.Debug("pushing message to light node")
 			wf.WaitGroup().Add(1)
 			go func(subscriber peer.ID) {
-				defer utils.LogOnPanic()
 				defer wf.WaitGroup().Done()
 				start := time.Now()
 				err := wf.pushMessage(ctx, logger, subscriber, envelope)

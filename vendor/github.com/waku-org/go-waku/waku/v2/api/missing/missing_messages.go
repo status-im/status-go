@@ -15,7 +15,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -103,7 +102,6 @@ func (m *MissingMessageVerifier) Start(ctx context.Context) {
 	m.C = c
 
 	go func() {
-		defer utils.LogOnPanic()
 		t := time.NewTicker(m.params.interval)
 		defer t.Stop()
 
@@ -125,7 +123,6 @@ func (m *MissingMessageVerifier) Start(ctx context.Context) {
 					default:
 						semaphore <- struct{}{}
 						go func(interest criteriaInterest) {
-							defer utils.LogOnPanic()
 							m.fetchHistory(c, interest)
 							<-semaphore
 						}(interest)
@@ -279,7 +276,6 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 
 		wg.Add(1)
 		go func(messageHashes []pb.MessageHash) {
-			defer utils.LogOnPanic()
 			defer wg.Wait()
 
 			result, err := m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (*store.Result, error) {

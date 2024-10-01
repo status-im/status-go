@@ -291,3 +291,5 @@ require (
 	modernc.org/sqlite v1.14.2-0.20211125151325-d4ed92c0a70f // indirect
 	zombiezen.com/go/sqlite v0.8.0 // indirect
 )
+
+replace github.com/waku-org/go-waku => github.com/waku-org/go-waku v0.8.1-0.20240923214107-798c9c5d819a
