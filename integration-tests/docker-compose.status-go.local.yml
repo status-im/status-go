@@ -1,0 +1,11 @@
+services:
+  anvil:
+    ports:
+      - 8545:8545
+  status-go:
+    ports:
+      - 3333:3333
+      - 8354:8354
+  status-go-no-funds:
+    ports:
+      - 3334:3333
