@@ -320,6 +320,9 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 generate-appdatabase:
 	go generate ./appdatabase/...
 
+download-uniswap-tokens:
+	go run ./services/wallet/token/downloader/main.go
+
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
 	mv build/bin/statusgo.aar $(RELEASE_DIR)/status-go-android.aar
