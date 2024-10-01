@@ -4897,8 +4897,8 @@ func (m *Manager) ShareRequestsToJoinWithPrivilegedMembers(community *Community,
 	return nil
 }
 
-func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Community, requestsToJoin *RequestToJoin) error {
-	pk, err := common.HexToPubkey(requestsToJoin.PublicKey)
+func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Community, requestToJoin *RequestToJoin) error {
+	pk, err := common.HexToPubkey(requestToJoin.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -4906,9 +4906,13 @@ func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Com
 	acceptedRequestsToJoinWithoutRevealedAccounts := make(map[string]*protobuf.CommunityRequestToJoin)
 	acceptedRequestsToJoinWithRevealedAccounts := make(map[string]*protobuf.CommunityRequestToJoin)
 
-	acceptedRequestsToJoinWithRevealedAccounts[requestsToJoin.PublicKey] = requestsToJoin.ToCommunityRequestToJoinProtobuf()
-	requestsToJoin.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
-	acceptedRequestsToJoinWithoutRevealedAccounts[requestsToJoin.PublicKey] = requestsToJoin.ToCommunityRequestToJoinProtobuf()
+	acceptedRequestsToJoinWithRevealedAccounts[requestToJoin.PublicKey] = requestToJoin.ToCommunityRequestToJoinProtobuf()
+
+	revealedAccounts := requestToJoin.RevealedAccounts
+	requestToJoin.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
+	acceptedRequestsToJoinWithoutRevealedAccounts[requestToJoin.PublicKey] = requestToJoin.ToCommunityRequestToJoinProtobuf()
+	// Set back the revealed accounts
+	requestToJoin.RevealedAccounts = revealedAccounts
 
 	msgWithRevealedAccounts := &protobuf.CommunityPrivilegedUserSyncMessage{
 		Type:          protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN,

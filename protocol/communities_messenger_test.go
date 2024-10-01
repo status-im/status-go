@@ -922,6 +922,8 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	response, err = s.bob.AcceptRequestToJoinCommunity(acceptRequestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
+	s.Require().NotEmpty(response.RequestsToJoinCommunity())
+	s.Require().Len(response.RequestsToJoinCommunity()[0].RevealedAccounts, 1)
 
 	s.Require().Len(response.Communities(), 1)
 
