@@ -1,5 +1,5 @@
-### Acceot Contact Request
-# @name AceptContactRequest
+### Accept Contact Request
+# @name AcceptContactRequest
 POST {{address}}/statusgo/CallRPC
 
 {
