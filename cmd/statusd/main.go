@@ -23,6 +23,7 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/cmd/status-backend/server"
 	"github.com/status-im/status-go/common/dbsetup"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -36,7 +37,6 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/walletdatabase"
-	"github.com/status-im/status-go/cmd/status-backend/server"
 )
 
 const (
