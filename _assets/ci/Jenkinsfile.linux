@@ -55,6 +55,16 @@ pipeline {
       }
     }
 
+    stage('Generate') {
+      environment {
+          /* Regenerate at least once */
+          GO_GENERATE_FAST_RECACHE = "true"
+      }
+      steps { script {
+        nix.shell('make generate', pure: false)
+      } }
+    }
+
     /* Sanity-check C bindings */
     stage('Build Static Lib') {
       steps { script {

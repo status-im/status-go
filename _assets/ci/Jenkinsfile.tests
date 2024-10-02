@@ -94,6 +94,16 @@ pipeline {
       }
     }
 
+    stage('Generate') {
+      environment {
+          /* Regenerate at least once */
+          GO_GENERATE_FAST_RECACHE = "true"
+      }
+      steps { script {
+        nix.shell('make generate', pure: false)
+      } }
+    }
+
     stage('Vendor Check') {
       steps { script {
         nix.shell('make vendor', pure: false)
@@ -166,7 +176,6 @@ pipeline {
             "--filter",
             "--lightpush"
           ].join(' ')) { c2 ->
-            nix.shell('make generate-handlers', pure: true)
             withCredentials([
               string(
                 credentialsId: 'codeclimate-test-reporter-id',
