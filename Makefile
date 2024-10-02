@@ -312,14 +312,20 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
-generate-handlers:
-	go generate ./cmd/generate_handlers/
-generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./cmd/generate_handlers
+generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
+generate: GO_GENERATE_FAST ?= $(if $(shell which go-generate-fast),"true")
+generate: export GO_GENERATE_FAST_DEBUG ?= false
+generate: export GO_GENERATE_FAST_RECACHE ?= false
+generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
+	@GOROOT=$$(go env GOROOT); \
+	if [ "$(GO_GENERATE_FAST)" = "true" ]; then \
+		go-generate-fast -x $(PACKAGES); \
+	else \
+		go generate -x $(PACKAGES); \
+	fi
 
-generate-appdatabase:
-	go generate ./appdatabase/...
-
+generate-contracts:
+	go generate ./contracts
 download-uniswap-tokens:
 	go run ./services/wallet/token/downloader/main.go
 
@@ -346,27 +352,6 @@ lint-fix:
 		-local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go,github.com/status-im/markdown' \
 		-w {} \;
 	$(MAKE) vendor
-
-mock: ##@other Regenerate mocks
-	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
-	mockgen -package=peer         -destination=services/peer/discoverer_mock.go      -source=services/peer/service.go
-	mockgen -package=mock_contracts         -destination=contracts/mock/contracts.go         -source=contracts/contracts.go
-	mockgen -package=mocksettings         -destination=multiaccounts/settings/mocks/database_settings_manager_mock.go         -source=multiaccounts/settings/database_settings_manager.go
-	mockgen -package=mock_transactor         -destination=transactions/mock_transactor/transactor.go         -source=transactions/transactor.go
-	mockgen -package=mock_rpcclient         -destination=rpc/mock/client/client.go         -source=rpc/client.go
-	mockgen -package=mock_network         -destination=rpc/network/mock/network.go         -source=rpc/network/network.go
-	mockgen -package=mock_ethclient     -destination=rpc/chain/mock/client/ethclient/eth_client.go     -source=rpc/chain/ethclient/eth_client.go
-	mockgen -package=mock_ethclient         -destination=rpc/chain/mock/client/ethclient/rps_limited_eth_client.go         -source=rpc/chain/ethclient/rps_limited_eth_client.go
-	mockgen -package=mock_client         -destination=rpc/chain/mock/client/client.go         -source=rpc/chain/client.go
-	mockgen -package=mock_token         -destination=services/wallet/token/mock/token/tokenmanager.go         -source=services/wallet/token/token.go
-	mockgen -package=mock_balance_persistence         -destination=services/wallet/token/mock/balance_persistence/balance_persistence.go         -source=services/wallet/token/balance_persistence.go
-	mockgen -package=mock_collectibles         -destination=services/wallet/collectibles/mock/collectible_data_db.go         -source=services/wallet/collectibles/collectible_data_db.go
-	mockgen -package=mock_collectibles         -destination=services/wallet/collectibles/mock/collection_data_db.go         -source=services/wallet/collectibles/collection_data_db.go
-	mockgen -package=mock_thirdparty         -destination=services/wallet/thirdparty/mock/types.go         -source=services/wallet/thirdparty/types.go
-	mockgen -package=mock_thirdparty         -destination=services/wallet/thirdparty/mock/collectible_types.go         -source=services/wallet/thirdparty/collectible_types.go
-	mockgen -package=mock_paraswap         -destination=services/wallet/thirdparty/paraswap/mock/types.go         -source=services/wallet/thirdparty/paraswap/types.go
-	mockgen -package=mock_pathprocessor         -destination=services/wallet/router/pathprocessor/mock_pathprocessor/processor.go         -source=services/wallet/router/pathprocessor/processor.go
-	mockgen -package=mock_onramp -destination=services/wallet/onramp/mock/types.go -source=services/wallet/onramp/types.go
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
