@@ -539,8 +539,9 @@ type TokenOverride struct {
 type Network struct {
 	ChainID                uint64          `json:"chainId"`
 	ChainName              string          `json:"chainName"`
-	DefaultRPCURL          string          `json:"defaultRpcUrl"`      // proxy rpc url
-	DefaultFallbackURL     string          `json:"defaultFallbackURL"` // proxy fallback url
+	DefaultRPCURL          string          `json:"defaultRpcUrl"`       // proxy rpc url
+	DefaultFallbackURL     string          `json:"defaultFallbackURL"`  // proxy fallback url
+	DefaultFallbackURL2    string          `json:"defaultFallbackURL2"` // second proxy fallback url
 	RPCURL                 string          `json:"rpcUrl"`
 	OriginalRPCURL         string          `json:"originalRpcUrl"`
 	FallbackURL            string          `json:"fallbackURL"`

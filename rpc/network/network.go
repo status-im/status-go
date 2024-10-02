@@ -378,6 +378,7 @@ func findNetwork(networks []params.Network, chainID uint64) (params.Network, err
 func addDefaultRPCURL(target *params.Network, source params.Network) {
 	target.DefaultRPCURL = source.DefaultRPCURL
 	target.DefaultFallbackURL = source.DefaultFallbackURL
+	target.DefaultFallbackURL2 = source.DefaultFallbackURL2
 }
 
 func setDefaultRPCURL(target []*params.Network, source []params.Network) {
