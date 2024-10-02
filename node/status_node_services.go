@@ -40,6 +40,7 @@ import (
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -173,6 +174,8 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		return err
 	}
 	services = append(services, lns)
+
+	services = append(services, b.ethService())
 
 	b.peerSrvc.SetDiscoverer(b)
 
@@ -615,6 +618,13 @@ func (b *StatusNode) peerService() *peer.Service {
 		b.peerSrvc = peer.New()
 	}
 	return b.peerSrvc
+}
+
+func (b *StatusNode) ethService() *eth.Service {
+	if b.ethSrvc == nil {
+		b.ethSrvc = eth.NewService(b.rpcClient)
+	}
+	return b.ethSrvc
 }
 
 func registerWakuMailServer(wakuService *waku.Waku, config *params.WakuConfig) (err error) {

@@ -5,7 +5,7 @@ services:
       context: ../
       dockerfile: _assets/build/Dockerfile
       args:
-        build_tags: gowaku_no_rln
+        build_tags: gowaku_no_rln,enable_private_api
         build_target: statusd
         build_flags: -cover
     entrypoint: [
@@ -37,7 +37,7 @@ services:
       context: ../
       dockerfile: _assets/build/Dockerfile
       args:
-        build_tags: gowaku_no_rln
+        build_tags: gowaku_no_rln,enable_private_api
         build_target: statusd
         build_flags: -cover
     entrypoint: [
@@ -72,7 +72,7 @@ services:
       dockerfile: Dockerfile.tests-rpc
     entrypoint: [
       "pytest",
-      "-m", "wallet",
+      "-m", "wallet or ethclient",
       "--rpc_url=http://status-go:3333",
       "--rpc_url_2=http://status-go-no-funds:3333",
       "--anvil_url=http://anvil:8545",
