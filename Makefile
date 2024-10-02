@@ -144,6 +144,7 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
+$(GO_CMD_BUILDS): generate
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
@@ -155,6 +156,7 @@ bootnode: ##@build Build discovery v5 bootnode using status-go deps
 bootnode: build/bin/bootnode
 
 node-canary: ##@build Build P2P node canary using status-go deps
+node-canary: generate
 node-canary: build/bin/node-canary
 
 statusgo: ##@build Build status-go as statusd server
@@ -190,6 +192,7 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld build/bin/statusgo-*
 
+statusgo-android: generate
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
 	export GO111MODULE=off; \
@@ -203,6 +206,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 		github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
+statusgo-ios: generate
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
 	export GO111MODULE=off; \
@@ -215,6 +219,7 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 		github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
+statusgo-library: generate
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
@@ -229,6 +234,7 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la build/bin/libstatus.*
 
+statusgo-shared-library: generate
 statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
@@ -347,6 +353,8 @@ lint-fix:
 		-and -not -name 'bindata*' \
 		-and -not -name 'migrations.go' \
 		-and -not -name 'messenger_handlers.go' \
+		-and -not -name '*/mock/*' \
+		-and -not -name 'mock.go' \
 		-and -not -wholename '*/vendor/*' \
 		-exec goimports \
 		-local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go,github.com/status-im/markdown' \
@@ -358,6 +366,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit ##@tests Run basic, short tests during development
 
+test-unit: generate
 test-unit: export BUILD_TAGS ?=
 test-unit: export UNIT_TEST_DRY_RUN ?= false
 test-unit: export UNIT_TEST_COUNT ?= 1
@@ -393,12 +402,12 @@ canary-test: node-canary
 	# TODO: uncomment that!
 	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
 
-lint:
+lint: generate
 	golangci-lint run ./...
 
-ci: lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
+ci: generate lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
-ci-race: lint canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
+ci-race: generate lint canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
 
 clean: clean-generated-files
 clean: ##@other Cleanup
