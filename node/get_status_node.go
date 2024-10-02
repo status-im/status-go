@@ -122,7 +122,7 @@ type StatusNode struct {
 	// nwakuSrvc              *
 	wakuSrvc            *waku.Waku
 	wakuExtSrvc         *wakuext.Service
-	wakuV2Srvc          *wakuv2.NWaku
+	wakuV2Srvc          *wakuv2.Waku
 	wakuV2ExtSrvc       *wakuv2ext.Service
 	ensSrvc             *ens.Service
 	communityTokensSrvc *communitytokens.Service

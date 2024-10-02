@@ -1,7 +1,6 @@
 package wakuv2
 
 import (
-	"encoding/json"
 	"errors"
 
 	"go.uber.org/zap"
@@ -35,7 +34,7 @@ func (pm PublishMethod) String() string {
 
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
-func (w *NWaku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]byte, error) {
+func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]byte, error) {
 	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
 	if w.protectedTopicStore != nil {
 		privKey, err := w.protectedTopicStore.FetchPrivateKey(pubsubTopic)
@@ -77,7 +76,7 @@ func (w *NWaku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]
 	return envelope.Hash().Bytes(), nil
 }
 
-func (w *NWaku) broadcast() {
+func (w *Waku) broadcast() {
 	for {
 		var envelope *protocol.Envelope
 
@@ -103,11 +102,7 @@ func (w *NWaku) broadcast() {
 			publishMethod = LightPush
 			fn = func(env *protocol.Envelope, logger *zap.Logger) error {
 				logger.Info("publishing message via lightpush")
-				jsonMsg, err := json.Marshal(env.Message())
-				if err != nil {
-					return err
-				}
-				_, err = w.WakuLightpushPublish(string(jsonMsg), env.PubsubTopic())
+				_, err := w.WakuLightpushPublish(env.Message(), env.PubsubTopic())
 				return err
 			}
 		} else {
@@ -119,14 +114,8 @@ func (w *NWaku) broadcast() {
 				}
 
 				logger.Info("publishing message via relay", zap.Int("peerCnt", peerCnt))
-				timeoutMs := 1000
-				msg, err := json.Marshal(env.Message())
 
-				if err != nil {
-					return err
-				}
-
-				_, err = w.WakuRelayPublish(env.PubsubTopic(), string(msg), timeoutMs)
+				_, err = w.WakuRelayPublish(env.Message(), env.PubsubTopic())
 				return err
 			}
 		}
@@ -153,7 +142,7 @@ func (w *NWaku) broadcast() {
 	}
 }
 
-func (w *NWaku) publishEnvelope(envelope *protocol.Envelope, publishFn publish.PublishFn, logger *zap.Logger) {
+func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publish.PublishFn, logger *zap.Logger) {
 	defer w.wg.Done()
 
 	if err := publishFn(envelope, logger); err != nil {

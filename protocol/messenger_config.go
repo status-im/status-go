@@ -114,7 +114,7 @@ type config struct {
 
 	telemetryServerURL  string
 	telemetrySendPeriod time.Duration
-	wakuService         *wakuv2.NWaku
+	wakuService         *wakuv2.Waku
 
 	messageResendMinDelay time.Duration
 	messageResendMaxCount int
@@ -387,7 +387,7 @@ func WithCommunityTokensService(s communities.CommunityTokensServiceInterface) O
 	}
 }
 
-func WithWakuService(s *wakuv2.NWaku) Option {
+func WithWakuService(s *wakuv2.Waku) Option {
 	return func(c *config) error {
 		c.wakuService = s
 		return nil

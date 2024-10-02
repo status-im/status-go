@@ -22,11 +22,11 @@ import (
 )
 
 type gethWakuV2Wrapper struct {
-	waku *wakuv2.NWaku
+	waku *wakuv2.Waku
 }
 
 // NewGethWakuWrapper returns an object that wraps Geth's Waku in a types interface
-func NewGethWakuV2Wrapper(w *wakuv2.NWaku) types.Waku {
+func NewGethWakuV2Wrapper(w *wakuv2.Waku) types.Waku {
 	if w == nil {
 		panic("waku cannot be nil")
 	}
@@ -37,7 +37,7 @@ func NewGethWakuV2Wrapper(w *wakuv2.NWaku) types.Waku {
 }
 
 // GetGethWhisperFrom retrieves the underlying whisper Whisper struct from a wrapped Whisper interface
-func GetGethWakuV2From(m types.Waku) *wakuv2.NWaku {
+func GetGethWakuV2From(m types.Waku) *wakuv2.Waku {
 	return m.(*gethWakuV2Wrapper).waku
 }
 

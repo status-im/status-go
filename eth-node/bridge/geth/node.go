@@ -19,10 +19,10 @@ import (
 type gethNodeWrapper struct {
 	stack *node.Node
 	waku1 *waku.Waku
-	waku2 *wakuv2.NWaku
+	waku2 *wakuv2.Waku
 }
 
-func NewNodeBridge(stack *node.Node, waku1 *waku.Waku, waku2 *wakuv2.NWaku) types.Node {
+func NewNodeBridge(stack *node.Node, waku1 *waku.Waku, waku2 *wakuv2.Waku) types.Node {
 	return &gethNodeWrapper{stack: stack, waku1: waku1, waku2: waku2}
 }
 
@@ -38,7 +38,7 @@ func (w *gethNodeWrapper) SetWaku1(waku *waku.Waku) {
 	w.waku1 = waku
 }
 
-func (w *gethNodeWrapper) SetWaku2(waku *wakuv2.NWaku) {
+func (w *gethNodeWrapper) SetWaku2(waku *wakuv2.Waku) {
 	w.waku2 = waku
 }
 
