@@ -519,20 +519,14 @@ func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
 	ticker := time.NewTicker(time.Second * 20)
 	defer ticker.Stop()
 
-	today := time.Now()
-
 	for {
 		select {
 		case <-w.ctx.Done():
 			return
-		case now := <-ticker.C:
-			// Reset totals when day changes
-			if now.Day() != today.Day() {
-				today = now
-				w.bandwidthCounter.Reset()
-			}
-
-			go telemetry.PushProtocolStats(w.bandwidthCounter.GetBandwidthByProtocol())
+		case <-ticker.C:
+			bandwidthPerProtocol := w.bandwidthCounter.GetBandwidthByProtocol()
+			w.bandwidthCounter.Reset()
+			go telemetry.PushProtocolStats(bandwidthPerProtocol)
 		}
 	}
 }
