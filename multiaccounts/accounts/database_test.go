@@ -662,4 +662,16 @@ func TestResolvingSuggestedDerivationPath(t *testing.T) {
 	suggestedPath, err = db.ResolveSuggestedPathForKeypair(kp.KeyUID)
 	require.NoError(t, err)
 	require.Equal(t, fmt.Sprintf("%s%d", statusWalletRootPath, expectedLastUsedDerivationIndex+1), suggestedPath)
+
+	// remove kaypair
+	err = db.RemoveKeypair(kp.KeyUID, 0)
+	require.NoError(t, err)
+	_, err = db.GetKeypairByKeyUID(kp.KeyUID)
+	require.Error(t, err)
+	require.True(t, err == ErrDbKeypairNotFound)
+
+	// check suggested path after removing keypair when adding the same keypair again
+	suggestedPath, err = db.ResolveSuggestedPathForKeypair(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("%s%d", statusWalletRootPath, 0), suggestedPath)
 }
