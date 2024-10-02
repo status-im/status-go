@@ -319,16 +319,11 @@ setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
 generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
-generate: GO_GENERATE_FAST ?= $(if $(shell which go-generate-fast),"true")
+generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
-	@GOROOT=$$(go env GOROOT); \
-	if [ "$(GO_GENERATE_FAST)" = "true" ]; then \
-		go-generate-fast -x $(PACKAGES); \
-	else \
-		go generate -x $(PACKAGES); \
-	fi
+	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) -x $(PACKAGES)
 
 generate-contracts:
 	go generate ./contracts

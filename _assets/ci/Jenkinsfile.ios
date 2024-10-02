@@ -47,9 +47,8 @@ pipeline {
     )
     /* fix for gomobile complaining about missing packages */
     CGO_ENABLED = "1"
-    /* Use `go generate`, ignore cache on CI. 
-    Also, `go-generate-fast` was struggling with some paths access and didn't work anyway */
-    GO_GENERATE_FAST = "false"
+    /* Generate files without cache to avoid weird bugs. */
+    GO_GENERATE_CMD = 'go generate'
   }
 
   stages {
