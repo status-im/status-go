@@ -31,6 +31,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	require.True(t, strings.Contains(actualNetworks[0].FallbackURL, infuraToken))
 	require.True(t, strings.Contains(actualNetworks[0].DefaultRPCURL, stageName))
 	require.True(t, strings.Contains(actualNetworks[0].DefaultFallbackURL, stageName))
+	require.True(t, strings.Contains(actualNetworks[0].DefaultFallbackURL2, stageName))
 
 	require.Equal(t, goerliChainID, actualNetworks[1].ChainID)
 
@@ -42,6 +43,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	require.True(t, strings.Contains(actualNetworks[2].FallbackURL, infuraToken))
 	require.True(t, strings.Contains(actualNetworks[2].DefaultRPCURL, stageName))
 	require.True(t, strings.Contains(actualNetworks[2].DefaultFallbackURL, stageName))
+	require.True(t, strings.Contains(actualNetworks[2].DefaultFallbackURL2, stageName))
 
 	require.Equal(t, optimismChainID, actualNetworks[3].ChainID)
 
@@ -49,6 +51,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	require.True(t, strings.Contains(actualNetworks[3].FallbackURL, infuraToken))
 	require.True(t, strings.Contains(actualNetworks[3].DefaultRPCURL, stageName))
 	require.True(t, strings.Contains(actualNetworks[3].DefaultFallbackURL, stageName))
+	require.True(t, strings.Contains(actualNetworks[3].DefaultFallbackURL2, stageName))
 
 	require.Equal(t, optimismGoerliChainID, actualNetworks[4].ChainID)
 
@@ -61,6 +64,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	require.True(t, strings.Contains(actualNetworks[5].FallbackURL, infuraToken))
 	require.True(t, strings.Contains(actualNetworks[5].DefaultRPCURL, stageName))
 	require.True(t, strings.Contains(actualNetworks[5].DefaultFallbackURL, stageName))
+	require.True(t, strings.Contains(actualNetworks[5].DefaultFallbackURL2, stageName))
 
 	require.Equal(t, arbitrumChainID, actualNetworks[6].ChainID)
 
@@ -68,6 +72,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	require.True(t, strings.Contains(actualNetworks[6].FallbackURL, infuraToken))
 	require.True(t, strings.Contains(actualNetworks[6].DefaultRPCURL, stageName))
 	require.True(t, strings.Contains(actualNetworks[6].DefaultFallbackURL, stageName))
+	require.True(t, strings.Contains(actualNetworks[6].DefaultFallbackURL2, stageName))
 
 	require.Equal(t, arbitrumGoerliChainID, actualNetworks[7].ChainID)
 
@@ -80,6 +85,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	require.True(t, strings.Contains(actualNetworks[8].FallbackURL, infuraToken))
 	require.True(t, strings.Contains(actualNetworks[8].DefaultRPCURL, stageName))
 	require.True(t, strings.Contains(actualNetworks[8].DefaultFallbackURL, stageName))
+	require.True(t, strings.Contains(actualNetworks[8].DefaultFallbackURL2, stageName))
 
 }
 

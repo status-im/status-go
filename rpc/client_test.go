@@ -151,25 +151,25 @@ func TestGetClientsUsingCache(t *testing.T) {
 	providerConfigs := []params.ProviderConfig{providerConfig}
 
 	var wg sync.WaitGroup
-	wg.Add(2) // 2 providers
+	wg.Add(3) // 3 providers
 
 	// Create a new ServeMux
 	mux := http.NewServeMux()
 
 	path1 := "/foo"
 	path2 := "/bar"
-	// Register handlers for different URL paths
-	mux.HandleFunc(path1, func(w http.ResponseWriter, r *http.Request) {
-		authToken := base64.StdEncoding.EncodeToString([]byte(providerConfig.User + ":" + providerConfig.Password))
-		require.Equal(t, fmt.Sprintf("Basic %s", authToken), r.Header.Get("Authorization"))
-		wg.Done()
-	})
+	path3 := "/baz"
 
-	mux.HandleFunc(path2, func(w http.ResponseWriter, r *http.Request) {
+	authHandler := func(w http.ResponseWriter, r *http.Request) {
 		authToken := base64.StdEncoding.EncodeToString([]byte(providerConfig.User + ":" + providerConfig.Password))
 		require.Equal(t, fmt.Sprintf("Basic %s", authToken), r.Header.Get("Authorization"))
 		wg.Done()
-	})
+	}
+
+	// Register handlers for different URL paths
+	mux.HandleFunc(path1, authHandler)
+	mux.HandleFunc(path2, authHandler)
+	mux.HandleFunc(path3, authHandler)
 
 	// Create a new server with the mux as the handler
 	server := httptest.NewServer(mux)
@@ -177,15 +177,16 @@ func TestGetClientsUsingCache(t *testing.T) {
 
 	networks := []params.Network{
 		{
-			ChainID:            1,
-			DefaultRPCURL:      server.URL + path1,
-			DefaultFallbackURL: server.URL + path2,
+			ChainID:             1,
+			DefaultRPCURL:       server.URL + path1,
+			DefaultFallbackURL:  server.URL + path2,
+			DefaultFallbackURL2: server.URL + path3,
 		},
 	}
 	c, err := NewClient(nil, 1, params.UpstreamRPCConfig{}, networks, db, providerConfigs)
 	require.NoError(t, err)
 
-	// Networks from DB must pick up DefaultRPCURL and DefaultFallbackURL
+	// Networks from DB must pick up DefaultRPCURL, DefaultFallbackURL, DefaultFallbackURL2
 	chainClient, err := c.getClientUsingCache(networks[0].ChainID)
 	require.NoError(t, err)
 	require.NotNil(t, chainClient)

@@ -264,11 +264,14 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 	if proxyProvider.Enabled {
 		key := ProviderStatusProxy
 		keyFallback := ProviderStatusProxy + "-fallback"
+		keyFallback2 := ProviderStatusProxy + "-fallback2"
 		urls[key] = network.DefaultRPCURL
 		urls[keyFallback] = network.DefaultFallbackURL
-		keys = []string{key, keyFallback}
+		urls[keyFallback2] = network.DefaultFallbackURL2
+		keys = []string{key, keyFallback, keyFallback2}
 		authMap[key] = proxyProvider.User + ":" + proxyProvider.Password
 		authMap[keyFallback] = authMap[key]
+		authMap[keyFallback2] = authMap[key]
 	}
 	keys = append(keys, []string{"main", "fallback"}...)
 	urls["main"] = network.RPCURL
