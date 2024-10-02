@@ -409,7 +409,6 @@ ci: generate lint canary-test test-unit test-e2e ##@tests Run all linters and te
 
 ci-race: generate lint canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
 
-clean: clean-generated-files
 clean: ##@other Cleanup
 	rm -fr build/bin/* mailserver-config.json
 
@@ -418,10 +417,6 @@ git-clean:
 
 deep-clean: clean git-clean
 	rm -Rdf .ethereumtest/StatusChain
-
-clean-generated-files: SHELL := /bin/sh
-clean-generated-files:
-	./_assets/scripts/clean_generated_files.sh
 
 tidy:
 	go mod tidy
