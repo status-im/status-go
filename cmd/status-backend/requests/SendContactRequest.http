@@ -1,0 +1,14 @@
+### Send Contact Request
+# @name SendContactRequest
+POST {{address}}/statusgo/CallRPC
+
+{
+    "jsonrpc": "2.0",
+    "method": "wakuext_sendContactRequest",
+    "params": [
+        {
+            "id": "0x048f0b885010783429c2298b916e24b3c01f165e55fe8f98fce63df0a55ade80089f512943d4fde5f8c7211f1a87b267a85cbcb3932eb2e4f88aa4ca3918f97541",
+            "message": "Hi, Alice!"
+        }
+    ]
+}

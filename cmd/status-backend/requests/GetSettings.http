@@ -1,0 +1,9 @@
+### Get account settings
+# @name GetSettings
+POST {{address}}/statusgo/CallRPC
+
+{
+    "jsonrpc": "2.0",
+    "method": "settings_getSettings",
+    "params": []
+}

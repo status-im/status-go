@@ -1,0 +1,29 @@
+### Start Messenger
+# @name StartMessenger
+POST {{address}}/statusgo/CallRPC
+
+{
+    "jsonrpc": "2.0",
+    "method": "wakuext_startMessenger",
+    "params": []
+}
+
+### Start Wallet
+# @name StartWallet
+POST {{address}}/statusgo/CallRPC
+
+{
+    "jsonrpc": "2.0",
+    "method": "wallet_startWallet",
+    "params": []
+}
+
+###
+# @name GetSettings
+POST {{address}}/statusgo/CallRPC
+
+{
+    "jsonrpc": "2.0",
+    "method": "settings_getSettings",
+    "params": []
+}

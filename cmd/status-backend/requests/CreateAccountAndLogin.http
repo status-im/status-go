@@ -1,0 +1,15 @@
+@displayName = "alice"
+@password = "1234567890"
+@kdfIterations = 256000
+
+### Create a new account and login
+POST {{address}}/statusgo/CreateAccountAndLogin
+Content-Type: application/json
+
+{
+    "rootDataDir": "{{rootDataDir}}",
+    "kdfIterations": {{kdfIterations}},
+    "displayName": {{displayName}},
+    "password": {{password}},
+    "customizationColor": "primary"
+}
