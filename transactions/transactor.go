@@ -1,5 +1,7 @@
 package transactions
 
+//go:generate mockgen -package=mock_transactor -source=transactor.go -destination=mock/transactor.go
+
 import (
 	"bytes"
 	"context"

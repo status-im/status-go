@@ -20,11 +20,11 @@ import (
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor/mock_pathprocessor"
+	mock_pathprocessor "github.com/status-im/status-go/services/wallet/router/pathprocessor/mock"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/transactions/mock_transactor"
+	mock_transactor "github.com/status-im/status-go/transactions/mock"
 	"github.com/status-im/status-go/walletdatabase"
 )
 

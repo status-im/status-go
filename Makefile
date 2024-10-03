@@ -144,6 +144,7 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
+$(GO_CMD_BUILDS): generate
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
@@ -155,6 +156,7 @@ bootnode: ##@build Build discovery v5 bootnode using status-go deps
 bootnode: build/bin/bootnode
 
 node-canary: ##@build Build P2P node canary using status-go deps
+node-canary: generate
 node-canary: build/bin/node-canary
 
 statusgo: ##@build Build status-go as statusd server
@@ -190,6 +192,7 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld build/bin/statusgo-*
 
+statusgo-android: generate
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
 	export GO111MODULE=off; \
@@ -203,6 +206,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 		github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
+statusgo-ios: generate
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
 	export GO111MODULE=off; \
@@ -215,6 +219,7 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 		github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
+statusgo-library: generate
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
@@ -229,6 +234,7 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la build/bin/libstatus.*
 
+statusgo-shared-library: generate
 statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
@@ -312,14 +318,15 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
-generate-handlers:
-	go generate ./cmd/generate_handlers/
-generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./cmd/generate_handlers
+generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
+generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
+generate: export GO_GENERATE_FAST_DEBUG ?= false
+generate: export GO_GENERATE_FAST_RECACHE ?= false
+generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
+	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) -x $(PACKAGES)
 
-generate-appdatabase:
-	go generate ./appdatabase/...
-
+generate-contracts:
+	go generate ./contracts
 download-uniswap-tokens:
 	go run ./services/wallet/token/downloader/main.go
 
@@ -341,38 +348,20 @@ lint-fix:
 		-and -not -name 'bindata*' \
 		-and -not -name 'migrations.go' \
 		-and -not -name 'messenger_handlers.go' \
+		-and -not -name '*/mock/*' \
+		-and -not -name 'mock.go' \
 		-and -not -wholename '*/vendor/*' \
 		-exec goimports \
 		-local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go,github.com/status-im/markdown' \
 		-w {} \;
 	$(MAKE) vendor
 
-mock: ##@other Regenerate mocks
-	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
-	mockgen -package=peer         -destination=services/peer/discoverer_mock.go      -source=services/peer/service.go
-	mockgen -package=mock_contracts         -destination=contracts/mock/contracts.go         -source=contracts/contracts.go
-	mockgen -package=mocksettings         -destination=multiaccounts/settings/mocks/database_settings_manager_mock.go         -source=multiaccounts/settings/database_settings_manager.go
-	mockgen -package=mock_transactor         -destination=transactions/mock_transactor/transactor.go         -source=transactions/transactor.go
-	mockgen -package=mock_rpcclient         -destination=rpc/mock/client/client.go         -source=rpc/client.go
-	mockgen -package=mock_network         -destination=rpc/network/mock/network.go         -source=rpc/network/network.go
-	mockgen -package=mock_ethclient     -destination=rpc/chain/mock/client/ethclient/eth_client.go     -source=rpc/chain/ethclient/eth_client.go
-	mockgen -package=mock_ethclient         -destination=rpc/chain/mock/client/ethclient/rps_limited_eth_client.go         -source=rpc/chain/ethclient/rps_limited_eth_client.go
-	mockgen -package=mock_client         -destination=rpc/chain/mock/client/client.go         -source=rpc/chain/client.go
-	mockgen -package=mock_token         -destination=services/wallet/token/mock/token/tokenmanager.go         -source=services/wallet/token/token.go
-	mockgen -package=mock_balance_persistence         -destination=services/wallet/token/mock/balance_persistence/balance_persistence.go         -source=services/wallet/token/balance_persistence.go
-	mockgen -package=mock_collectibles         -destination=services/wallet/collectibles/mock/collectible_data_db.go         -source=services/wallet/collectibles/collectible_data_db.go
-	mockgen -package=mock_collectibles         -destination=services/wallet/collectibles/mock/collection_data_db.go         -source=services/wallet/collectibles/collection_data_db.go
-	mockgen -package=mock_thirdparty         -destination=services/wallet/thirdparty/mock/types.go         -source=services/wallet/thirdparty/types.go
-	mockgen -package=mock_thirdparty         -destination=services/wallet/thirdparty/mock/collectible_types.go         -source=services/wallet/thirdparty/collectible_types.go
-	mockgen -package=mock_paraswap         -destination=services/wallet/thirdparty/paraswap/mock/types.go         -source=services/wallet/thirdparty/paraswap/types.go
-	mockgen -package=mock_pathprocessor         -destination=services/wallet/router/pathprocessor/mock_pathprocessor/processor.go         -source=services/wallet/router/pathprocessor/processor.go
-	mockgen -package=mock_onramp -destination=services/wallet/onramp/mock/types.go -source=services/wallet/onramp/types.go
-
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
 
 test: test-unit ##@tests Run basic, short tests during development
 
+test-unit: generate
 test-unit: export BUILD_TAGS ?=
 test-unit: export UNIT_TEST_DRY_RUN ?= false
 test-unit: export UNIT_TEST_COUNT ?= 1
@@ -408,12 +397,12 @@ canary-test: node-canary
 	# TODO: uncomment that!
 	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
 
-lint:
+lint: generate
 	golangci-lint run ./...
 
-ci: lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
+ci: generate lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
-ci-race: lint canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
+ci-race: generate lint canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
 
 clean: ##@other Cleanup
 	rm -fr build/bin/* mailserver-config.json

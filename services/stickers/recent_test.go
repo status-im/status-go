@@ -11,7 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	mock_settings "github.com/status-im/status-go/multiaccounts/settings/mocks"
+	mock_settings "github.com/status-im/status-go/multiaccounts/settings/mock"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 

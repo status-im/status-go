@@ -5,7 +5,7 @@ FROM golang:1.21-alpine3.18 as builder
 ENV CC=clang
 ENV CXX=clang++
 
-RUN apk add --no-cache make llvm clang musl-dev linux-headers
+RUN apk add --no-cache git make llvm clang musl-dev linux-headers protobuf-dev~3.21
 
 ARG build_tags
 ARG build_flags
@@ -14,6 +14,10 @@ ARG build_target=statusgo
 RUN mkdir -p /go/src/github.com/status-im/status-go
 WORKDIR /go/src/github.com/status-im/status-go
 ADD . .
+
+RUN go install go.uber.org/mock/mockgen@v0.4.0
+RUN go install github.com/kevinburke/go-bindata/v4/...@v4.0.2
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
 RUN make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" SHELL="/bin/sh"
 
 # Copy the binary to the second image

@@ -1,5 +1,7 @@
 package rpc
 
+//go:generate mockgen -package=mock_rpcclient -source=client.go -destination=mock/client/client.go
+
 import (
 	"context"
 	"database/sql"

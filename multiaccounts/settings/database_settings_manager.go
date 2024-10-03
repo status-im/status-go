@@ -1,5 +1,7 @@
 package settings
 
+//go:generate mockgen -package=mock_settings -source=database_settings_manager.go -destination=mock/database_settings_manager.go
+
 import (
 	"database/sql"
 	"encoding/json"

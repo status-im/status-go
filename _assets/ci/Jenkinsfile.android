@@ -45,6 +45,8 @@ pipeline {
       version: env.VERSION,
       ext:     'aar',
     )
+    /* prevent sharing cache dir across different jobs */
+    GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
   }
 
   stages {
@@ -53,6 +55,12 @@ pipeline {
         sh "mkdir -p \$(dirname ${REPO_SRC})"
         sh "ln -s ${WORKSPACE} ${REPO_SRC}"
       }
+    }
+
+    stage('Generate') {
+      steps { script {
+        nix.shell('make generate', pure: false)
+      } }
     }
 
     stage('Compile') {

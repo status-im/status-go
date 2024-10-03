@@ -1,5 +1,7 @@
 package token
 
+//go:generate mockgen -package=mock_balance_persistence -source=balance_persistence.go -destination=mock/balance_persistence/balance_persistence.go
+
 import (
 	"context"
 	"database/sql"
