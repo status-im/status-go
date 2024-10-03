@@ -1,6 +1,6 @@
 services:
   status-go:
-    user: ${INTEGRATION_TESTS_DOCKER_UID}
+    user: ${FUNCTIONAL_TESTS_DOCKER_UID}
     build:
       context: ../
       dockerfile: _assets/build/Dockerfile
@@ -32,7 +32,7 @@ services:
 
   # TODO: Remove this duplication when implemented: https://github.com/status-im/status-go/issues/5803
   status-go-no-funds:
-    user: ${INTEGRATION_TESTS_DOCKER_UID}
+    user: ${FUNCTIONAL_TESTS_DOCKER_UID}
     build:
       context: ../
       dockerfile: _assets/build/Dockerfile
@@ -59,7 +59,7 @@ services:
     stop_signal: SIGINT
 
   tests-rpc:
-    user: ${INTEGRATION_TESTS_DOCKER_UID}
+    user: ${FUNCTIONAL_TESTS_DOCKER_UID}
     depends_on:
       status-go:
         condition: service_healthy

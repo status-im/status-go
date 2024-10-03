@@ -101,13 +101,13 @@ test-bob/
 # Nix
 /.nix-gcroots/
 
-# integration-tests
+# functional tests
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
 .envrc
 report/results.xml
-integration-tests/coverage
-integration-tests/reports
-integration-tests/*.log
+tests-functional/coverage
+tests-functional/reports
+tests-functional/*.log
