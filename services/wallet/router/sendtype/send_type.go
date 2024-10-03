@@ -128,7 +128,7 @@ func (s SendType) ProcessZeroAmountInProcessor(amountIn *big.Int, amountOut *big
 			if amountOut.Cmp(walletCommon.ZeroBigIntValue()) == 0 {
 				return false
 			}
-		} else {
+		} else if s != ENSRelease {
 			return false
 		}
 	}

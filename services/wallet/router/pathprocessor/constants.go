@@ -4,6 +4,9 @@ const (
 	IncreaseEstimatedGasFactor = 1.1
 	SevenDaysInSeconds         = 60 * 60 * 24 * 7
 
+	StatusDomain = ".stateofus.eth"
+	EthDomain    = ".eth"
+
 	EthSymbol  = "ETH"
 	SntSymbol  = "SNT"
 	SttSymbol  = "STT"

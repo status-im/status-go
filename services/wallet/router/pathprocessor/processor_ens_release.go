@@ -57,7 +57,8 @@ func (s *ENSReleaseProcessor) PackTxInputData(params ProcessorInputParams) ([]by
 		return []byte{}, createENSReleaseErrorResponse(err)
 	}
 
-	return registrarABI.Pack("release", ens.UsernameToLabel(params.Username))
+	name := getNameFromEnsUsername(params.Username)
+	return registrarABI.Pack("release", ens.UsernameToLabel(name))
 }
 
 func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
