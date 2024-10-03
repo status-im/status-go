@@ -71,7 +71,7 @@ Once a feature has undergone testing and is ready for production use, the featur
 Test coverage is vital for ensuring the stability and reliability of our project. Follow these guidelines:
 
 1. Before submitting a PR, check the existing test coverage for the modified or new code.
-2. Ensure that the new code is covered by relevant unit tests, integration tests, or other appropriate testing methods.
+2. Ensure that the new code is covered by relevant unit, integration and/or functional tests, or other appropriate testing methods.
 3. If modifying existing code, update or add tests to cover the changes.
 4. If adding new features, include tests that demonstrate the correct functionality and handle edge cases.
 

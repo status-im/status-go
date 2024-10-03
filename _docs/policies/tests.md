@@ -9,10 +9,10 @@
   - Prove that the functionality performs as described
   - Can be falsified
   - Are resistant to fuzzing
-- All new `integration tests` MUST BE validated via a minimum of 1000 tests.
+- All new `functional tests` MUST BE validated via a minimum of 1000 tests.
   - This can be achieved using the `-count` or `-test.count` flag with the test command eg: `-count 1000` / `-test.count 1000`
   - Where the CI can not support this work flow automatically, the developer MUST perform validation tests via local testing.
-    - `TODO` Add link to issue for CI automation of validation test runs of new `integration tests`.
+    - `TODO` Add link to issue for CI automation of validation test runs of new `functional tests`.
   - Ensuring that the test passes consistently every time gives confidence that the test is not flaky.
 
 ## Flaky Tests
