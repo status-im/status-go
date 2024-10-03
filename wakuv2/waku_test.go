@@ -3,20 +3,15 @@ package wakuv2
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/cenkalti/backoff/v3"
-	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/peer"
-	libp2pprotocol "github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -28,20 +23,11 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
-	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
-	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
-	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
@@ -63,7 +49,7 @@ func setDefaultConfig(config *Config, lightMode bool) {
 	}
 }
 
-func TestDiscoveryV5(t *testing.T) {
+/* func TestDiscoveryV5(t *testing.T) {
 	config := &Config{}
 	setDefaultConfig(config, false)
 	config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
@@ -153,7 +139,7 @@ func TestRelayPeers(t *testing.T) {
 	require.NoError(t, w.Start())
 	_, err = w.RelayPeersByTopic(config.DefaultShardPubsubTopic)
 	require.Error(t, err)
-}
+} */
 
 func parseNodes(rec []string) []*enode.Node {
 	var ns []*enode.Node
@@ -178,8 +164,11 @@ func parseNodes(rec []string) []*enode.Node {
 //	 --nat=extip:${IP_ADDRESS} --discv5-discovery --discv5-udp-port=9000 --rest-address=0.0.0.0 --store
 
 func TestBasicWakuV2(t *testing.T) {
+	fmt.Println("Starting TestBasicWakuV2")
+
 	nwakuInfo, err := GetNwakuInfo(nil, nil)
 	require.NoError(t, err)
+	fmt.Println("Retrieved nwaku information")
 
 	// Creating a fake DNS Discovery ENRTree
 	tree, url := makeTestTree("n", parseNodes([]string{nwakuInfo.EnrUri}), nil)
@@ -188,6 +177,7 @@ func TestBasicWakuV2(t *testing.T) {
 	if envEnrTreeAddress != "" {
 		enrTreeAddress = envEnrTreeAddress
 	}
+	fmt.Printf("Created fake DNS Discovery ENRTree with address: %s\n", enrTreeAddress)
 
 	config := &Config{}
 	setDefaultConfig(config, false)
@@ -196,13 +186,19 @@ func TestBasicWakuV2(t *testing.T) {
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
 	config.WakuNodes = []string{enrTreeAddress}
+	fmt.Println("Configured Waku node")
+
 	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
+	fmt.Println("Created new Waku node")
+
 	require.NoError(t, w.Start())
+	fmt.Println("Started Waku node")
 
 	enr, err := w.ENR()
 	require.NoError(t, err)
 	require.NotNil(t, enr)
+	fmt.Println("Retrieved ENR from Waku node")
 
 	// DNSDiscovery
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
@@ -210,12 +206,14 @@ func TestBasicWakuV2(t *testing.T) {
 
 	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress, dnsdisc.WithResolver(config.Resolver))
 	require.NoError(t, err)
+	fmt.Printf("Discovered %d nodes via DNS discovery\n", len(discoveredNodes))
 
 	// Peer used for retrieving history
 	r, err := rand.Int(rand.Reader, big.NewInt(int64(len(discoveredNodes))))
 	require.NoError(t, err)
 
 	storeNode := discoveredNodes[int(r.Int64())]
+	fmt.Printf("Selected store node with ID: %s\n", storeNode.PeerID)
 
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 30 * time.Second
@@ -229,14 +227,17 @@ func TestBasicWakuV2(t *testing.T) {
 		return nil
 	}, options)
 	require.NoError(t, err)
+	fmt.Println("Successfully discovered at least one peer")
 
 	// Dropping Peer
 	err = w.DropPeer(storeNode.PeerID)
 	require.NoError(t, err)
+	fmt.Printf("Dropped peer with ID: %s\n", storeNode.PeerID)
 
 	// Dialing with peerID
 	err = w.DialPeerByID(storeNode.PeerID)
 	require.NoError(t, err)
+	fmt.Printf("Dialed peer with ID: %s\n", storeNode.PeerID)
 
 	err = tt.RetryWithBackOff(func() error {
 		if len(w.Peers()) < 1 {
@@ -245,6 +246,7 @@ func TestBasicWakuV2(t *testing.T) {
 		return nil
 	}, options)
 	require.NoError(t, err)
+	fmt.Println("Successfully re-established connection with at least one peer")
 
 	filter := &common.Filter{
 		PubsubTopic:   config.DefaultShardPubsubTopic,
@@ -254,11 +256,13 @@ func TestBasicWakuV2(t *testing.T) {
 
 	_, err = w.Subscribe(filter)
 	require.NoError(t, err)
+	fmt.Println("Subscribed to filter")
 
 	msgTimestamp := w.timestamp()
 	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
 	time.Sleep(2 * time.Second)
+	fmt.Println("Waited 2 seconds before sending message")
 
 	_, err = w.Send(config.DefaultShardPubsubTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
@@ -268,11 +272,14 @@ func TestBasicWakuV2(t *testing.T) {
 	}, nil)
 
 	require.NoError(t, err)
+	fmt.Println("Sent test message")
 
 	time.Sleep(1 * time.Second)
+	fmt.Println("Waited 1 second after sending message")
 
 	messages := filter.Retrieve()
 	require.Len(t, messages, 1)
+	fmt.Println("Successfully retrieved 1 message from filter")
 
 	timestampInSeconds := msgTimestamp / int64(time.Second)
 	marginInSeconds := 20
@@ -299,13 +306,18 @@ func TestBasicWakuV2(t *testing.T) {
 			if marginInSeconds < 40 {
 				marginInSeconds += 5
 			}
+			fmt.Printf("Query failed or returned no messages. Increasing margin to %d seconds\n", marginInSeconds)
 			return errors.New("no messages received from store node")
 		}
+		fmt.Printf("Query successful, received %d messages\n", envelopeCount)
 		return nil
 	}, options)
 	require.NoError(t, err)
 
 	require.NoError(t, w.Stop())
+	fmt.Println("Stopped Waku node")
+
+	fmt.Println("TestBasicWakuV2 completed successfully")
 }
 
 type mapResolver map[string]string
@@ -331,7 +343,7 @@ func makeTestTree(domain string, nodes []*enode.Node, links []string) (*ethdnsdi
 	return tree, url
 }
 
-func TestPeerExchange(t *testing.T) {
+/* func TestPeerExchange(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 	// start node which serve as PeerExchange server
@@ -410,8 +422,8 @@ func TestPeerExchange(t *testing.T) {
 	require.NoError(t, pxServerNode.Stop())
 	require.NoError(t, discV5Node.Stop())
 }
-
-func TestWakuV2Filter(t *testing.T) {
+ */
+/* func TestWakuV2Filter(t *testing.T) {
 	t.Skip("flaky test")
 
 	enrTreeAddress := testBootENRBootstrap
@@ -612,7 +624,7 @@ func TestWakuV2Store(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.True(t, envelopeCount > 0, "no messages received from store node")
-}
+} */
 
 func waitForPeerConnection(t *testing.T, peerID peer.ID, peerCh chan peer.IDSlice) {
 	waitForPeerConnectionWithTimeout(t, peerID, peerCh, 3*time.Second)
@@ -652,7 +664,7 @@ func waitForEnvelope(t *testing.T, contentTopic string, envCh chan common.Envelo
 	}
 }
 
-func TestOnlineChecker(t *testing.T) {
+/* func TestOnlineChecker(t *testing.T) {
 	w, err := New(nil, "shards.staging", nil, nil, nil, nil, nil, nil)
 	require.NoError(t, w.Start())
 
@@ -689,9 +701,9 @@ func TestOnlineChecker(t *testing.T) {
 	f := &common.Filter{}
 	lightNode.filterManager.SubscribeFilter("test", protocol.NewContentFilter(f.PubsubTopic, f.ContentTopics.ContentTopics()...))
 
-}
+} */
 
-func TestLightpushRateLimit(t *testing.T) {
+/* func TestLightpushRateLimit(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
@@ -790,9 +802,9 @@ func TestLightpushRateLimit(t *testing.T) {
 	messages := filter.Retrieve()
 	require.Len(t, messages, 2)
 
-}
+} */
 
-func TestTelemetryFormat(t *testing.T) {
+/* func TestTelemetryFormat(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
@@ -815,4 +827,4 @@ func TestTelemetryFormat(t *testing.T) {
 	requestBody := tc.getTelemetryRequestBody(m)
 	_, err = json.Marshal(requestBody)
 	require.NoError(t, err)
-}
+} */

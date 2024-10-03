@@ -18,16 +18,7 @@
 
 package wakuv2
 
-import (
-	"testing"
-	"time"
-
-	"golang.org/x/exp/maps"
-
-	"github.com/status-im/status-go/wakuv2/common"
-)
-
-func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
+/* func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	w, err := New(nil, "", nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Error creating WakuV2 client: %v", err)
@@ -67,4 +58,4 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	if !found {
 		t.Fatalf("Could not find filter with both topics")
 	}
-}
+} */

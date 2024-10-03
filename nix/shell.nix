@@ -1,5 +1,6 @@
 { config ? {}
-, pkgs ? import ./pkgs.nix { inherit config; } }:
+, pkgs ? import ./pkgs.nix { inherit config; }
+}:
 
 let
   inherit (pkgs) lib stdenv callPackage;
@@ -16,6 +17,10 @@ let
     inherit xcodeWrapper;
     withAndroidPkgs = !isMacM1;
   };
+
+  # Hardcoded macOS deployment target
+  macosx-deployment-target = "14.4";
+
 in pkgs.mkShell {
   name = "status-go-shell";
 
@@ -25,14 +30,20 @@ in pkgs.mkShell {
     mockgen protobuf3_20 protoc-gen-go gotestsum go-modvendor openjdk cc-test-reporter
    ] ++ lib.optionals (stdenv.isDarwin) [ xcodeWrapper ];
 
-   shellHook = lib.optionalString (!isMacM1) ''
-     ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk
-     ANDROID_NDK=$ANDROID_HOME/ndk-bundle
-     ANDROID_SDK_ROOT=$ANDROID_HOME
-     ANDROID_NDK_HOME=$ANDROID_NDK
-  '';
+   shellHook = ''
+     ${lib.optionalString (!isMacM1) ''
+       ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk
+       ANDROID_NDK=$ANDROID_HOME/ndk-bundle
+       ANDROID_SDK_ROOT=$ANDROID_HOME
+       ANDROID_NDK_HOME=$ANDROID_NDK
+     ''}
+     ${lib.optionalString stdenv.isDarwin ''
+       export MACOSX_DEPLOYMENT_TARGET="${macosx-deployment-target}"
+       export NIX_CFLAGS_COMPILE="-mmacosx-version-min=${macosx-deployment-target} $NIX_CFLAGS_COMPILE"
+     ''}
+   '';
+
   # Sandbox causes Xcode issues on MacOS. Requires sandbox=relaxed.
   # https://github.com/status-im/status-mobile/pull/13912
   __noChroot = stdenv.isDarwin;
 }
-

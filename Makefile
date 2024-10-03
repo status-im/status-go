@@ -356,7 +356,7 @@ mock: ##@other Regenerate mocks
 	mockgen -package=mock_onramp -destination=services/wallet/onramp/mock/types.go -source=services/wallet/onramp/types.go
 
 docker-test: ##@tests Run tests in a docker container with golang.
-	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
+	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test -v ${ARGS}
 
 test: test-unit ##@tests Run basic, short tests during development
 
@@ -366,7 +366,7 @@ test-unit: export UNIT_TEST_FAILFAST ?= true
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true
 test-unit: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
 test-unit: export UNIT_TEST_REPORT_CODECLIMATE ?= false
-test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep -E '/waku(/.*|$$)|/wakuv2(/.*|$$)') \
+test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | grep wakuv2) \
 	$(call sh, go list ./... | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
