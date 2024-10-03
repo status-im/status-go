@@ -1,4 +1,4 @@
-name: PR Review Workflow for Breaking Changes
+name: PR Review Workflow
 
 on:
   pull_request:
@@ -11,8 +11,12 @@ on:
 
 jobs:
   check_breaking_change:
+    name: Require QA review
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
       - name: Check for breaking change label
         id: check_label
         uses: actions/github-script@v6
@@ -28,12 +32,21 @@ jobs:
             console.log(`Has breaking change label: ${hasBreakingChange}`);
             return hasBreakingChange;
 
-      - name: Set QA reviewers
+      - name: Set random QA reviewers
         if: steps.check_label.outputs.result == 'true'
         id: set_reviewers
         run: |
-          echo "mobile_qa=churik,yevh-berdnyk,VolodLytvynenko,pavloburykh,mariia-skrypnyk,Horupa-Olena" >> $GITHUB_OUTPUT
-          echo "desktop_qa=anastasiyaig,virginiabalducci,glitchminer,antdanchenko" >> $GITHUB_OUTPUT
+          mobile_qa_required=$(yq eval '.mobile_qa.reviewers_required' .github/qa-teams.yml)
+          desktop_qa_required=$(yq eval '.desktop_qa.reviewers_required' .github/qa-teams.yml)
+          
+          mobile_qa_members=$(yq eval '.mobile_qa.members[]' .github/qa-teams.yml | tr '\n' ' ')
+          desktop_qa_members=$(yq eval '.desktop_qa.members[]' .github/qa-teams.yml | tr '\n' ' ')
+          
+          mobile_qa=$(echo $mobile_qa_members | tr ' ' '\n' | shuf -n $mobile_qa_required | tr '\n' ',' | sed 's/,$//')
+          desktop_qa=$(echo $desktop_qa_members | tr ' ' '\n' | shuf -n $desktop_qa_required | tr '\n' ',' | sed 's/,$//')
+          
+          echo "mobile_qa=$mobile_qa" >> $GITHUB_OUTPUT
+          echo "desktop_qa=$desktop_qa" >> $GITHUB_OUTPUT
 
       - name: Request QA reviews
         if: steps.check_label.outputs.result == 'true'
@@ -44,6 +57,8 @@ jobs:
             const mobileQA = '${{ steps.set_reviewers.outputs.mobile_qa }}'.split(',');
             const desktopQA = '${{ steps.set_reviewers.outputs.desktop_qa }}'.split(',');
             const reviewers = [...mobileQA, ...desktopQA];
+            
+            console.log('Requesting reviews from:', reviewers);
             
             await github.rest.pulls.requestReviewers({
               owner: context.repo.owner,
@@ -94,13 +109,9 @@ jobs:
             
             let message = 'This PR has the breaking change label and requires approval from both mobile-qa and desktop-qa teams before it can be merged.\n\n';
             
-            if (!mobileQAApproved && !desktopQAApproved) {
-              message += 'Both mobile-qa and desktop-qa teams have not approved this PR yet.';
-            } else if (!mobileQAApproved) {
-              message += 'The mobile-qa team has not approved this PR yet.';
-            } else if (!desktopQAApproved) {
-              message += 'The desktop-qa team has not approved this PR yet.';
-            }
+            message += `- ${mobileQAApproved ? '[ ]' : '[x]'} Mobile QA team review\n`
+            message += `- ${desktopQAApproved ? '[ ]' : '[x]'} Desktop QA team review`
+            
             
             await github.rest.checks.create({
               owner: context.repo.owner,
@@ -121,7 +132,6 @@ jobs:
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
-            
             const { data: reviews } = await github.rest.pulls.listReviews({
              owner: context.repo.owner,
              repo: context.repo.repo,
