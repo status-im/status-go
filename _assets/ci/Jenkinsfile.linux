@@ -45,6 +45,8 @@ pipeline {
       version: env.VERSION,
       ext:     'zip',
     )
+    /* prevent sharing cache dir across different jobs */
+    GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
   }
 
   stages {
@@ -56,10 +58,6 @@ pipeline {
     }
 
     stage('Generate') {
-      environment {
-          /* Regenerate at least once */
-          GO_GENERATE_FAST_RECACHE = "true"
-      }
       steps { script {
         nix.shell('make generate', pure: false)
       } }

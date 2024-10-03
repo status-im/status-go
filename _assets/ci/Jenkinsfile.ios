@@ -47,8 +47,8 @@ pipeline {
     )
     /* fix for gomobile complaining about missing packages */
     CGO_ENABLED = "1"
-    /* Generate files without cache to avoid weird bugs. */
-    GO_GENERATE_CMD = 'go generate'
+    /* prevent sharing cache dir across different jobs */
+    GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
   }
 
   stages {

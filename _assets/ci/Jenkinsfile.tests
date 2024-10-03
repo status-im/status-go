@@ -84,6 +84,9 @@ pipeline {
     UNIT_TEST_REPORT_CODECLIMATE =     "${params.UNIT_TEST_REPORT_CODECLIMATE}"
     UNIT_TEST_REPORT_CODECOV =         "${params.UNIT_TEST_REPORT_CODECOV}"
     UNIT_TEST_DRY_RUN =                "${params.UNIT_TEST_DRY_RUN}"
+
+    /* prevent sharing cache dir across different jobs */
+    GO_GENERATE_FAST_DIR = "${env.WORKSPACE_TMP}/go-generate-fast"
   }
 
   stages {
@@ -95,10 +98,6 @@ pipeline {
     }
 
     stage('Generate') {
-      environment {
-          /* Regenerate at least once */
-          GO_GENERATE_FAST_RECACHE = "true"
-      }
       steps { script {
         nix.shell('make generate', pure: false)
       } }
