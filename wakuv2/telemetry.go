@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"go.uber.org/zap"
@@ -21,15 +20,15 @@ import (
 type BandwidthTelemetryClient struct {
 	serverURL  string
 	httpClient *http.Client
-	hostID     string
+	peerId     string
 	logger     *zap.Logger
 }
 
-func NewBandwidthTelemetryClient(logger *zap.Logger, serverURL string) *BandwidthTelemetryClient {
+func NewBandwidthTelemetryClient(logger *zap.Logger, serverURL string, peerId string) *BandwidthTelemetryClient {
 	return &BandwidthTelemetryClient{
 		serverURL:  serverURL,
 		httpClient: &http.Client{Timeout: time.Minute},
-		hostID:     uuid.NewString(),
+		peerId:     peerId,
 		logger:     logger.Named("bandwidth-telemetry"),
 	}
 }
@@ -45,7 +44,7 @@ func getStatsPerProtocol(protocolID protocol.ID, stats map[protocol.ID]metrics.S
 
 func (c *BandwidthTelemetryClient) getTelemetryRequestBody(stats map[protocol.ID]metrics.Stats) map[string]interface{} {
 	return map[string]interface{}{
-		"hostID":           c.hostID,
+		"hostID":           c.peerId,
 		"relay":            getStatsPerProtocol(relay.WakuRelayID_v200, stats),
 		"store":            getStatsPerProtocol(legacy_store.StoreID_v20beta4, stats),
 		"filter-push":      getStatsPerProtocol(filter.FilterPushID_v20beta1, stats),

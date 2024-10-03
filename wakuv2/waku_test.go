@@ -787,7 +787,7 @@ func TestTelemetryFormat(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
-	tc := NewBandwidthTelemetryClient(logger, "#")
+	tc := NewBandwidthTelemetryClient(logger, "#", "peerId")
 
 	s := metrics.Stats{
 		TotalIn:  10,
