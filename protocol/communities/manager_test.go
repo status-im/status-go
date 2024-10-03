@@ -2145,3 +2145,27 @@ func (s *ManagerSuite) TestDetermineChannelsForHRKeysRequest() {
 	s.Require().Len(channels, 1)
 	s.Require().Equal("channel-id", channels[0])
 }
+
+// Covers solution for: https://github.com/status-im/status-desktop/issues/16226
+func (s *ManagerSuite) TestCommunityIDIsHydratedWhenMarshaling() {
+	request := &requests.CreateCommunity{
+		Name:        "status",
+		Description: "description",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}
+
+	community, err := s.manager.CreateCommunity(request, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(community)
+
+	// Simulate legacy community that wasn't aware of ID field in `CommunityDescription` protobuf
+	community.config.CommunityDescription.ID = ""
+
+	// The fix is applied when community is marshaled, effectively hydrating empty ID
+	err = s.manager.SaveCommunity(community)
+	s.Require().NoError(err)
+
+	community, err = s.manager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Equal(community.IDString(), community.config.CommunityDescription.ID)
+}
