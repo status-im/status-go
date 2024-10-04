@@ -20,6 +20,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/metadata/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -225,6 +226,7 @@ func (wakuM *WakuMetadata) disconnectPeer(peerID peer.ID, reason error) {
 // Connected is called when a connection is opened
 func (wakuM *WakuMetadata) Connected(n network.Network, cc network.Conn) {
 	go func() {
+		defer utils.LogOnPanic()
 		wakuM.log.Debug("peer connected", zap.Stringer("peer", cc.RemotePeer()))
 		// Metadata verification is done only if a clusterID is specified
 		if wakuM.clusterID == 0 {

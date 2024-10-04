@@ -38,6 +38,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/time/rate"
 )
 
 // Default UserAgent
@@ -94,6 +95,8 @@ type WakuNodeParameters struct {
 	enableStore     bool
 	messageProvider legacy_store.MessageProvider
 
+	storeRateLimit rate.Limit
+
 	enableRendezvousPoint bool
 	rendezvousDB          *rendezvous.DB
 
@@ -139,6 +142,7 @@ var DefaultWakuNodeOptions = []WakuNodeOption{
 	WithCircuitRelayParams(2*time.Second, 3*time.Minute),
 	WithPeerStoreCapacity(DefaultMaxPeerStoreCapacity),
 	WithOnlineChecker(onlinechecker.NewDefaultOnlineChecker(true)),
+	WithWakuStoreRateLimit(8), // Value currently set in status.staging
 }
 
 // MultiAddresses return the list of multiaddresses configured in the node
@@ -315,6 +319,11 @@ func WithPrivateKey(privKey *ecdsa.PrivateKey) WakuNodeOption {
 func WithClusterID(clusterID uint16) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.clusterID = clusterID
+		if params.shards == nil {
+			var pshards protocol.RelayShards
+			pshards.ClusterID = params.clusterID
+			params.shards = &pshards
+		}
 		return nil
 	}
 }
@@ -332,6 +341,18 @@ func WithPubSubTopics(topics []string) WakuNodeOption {
 			return errors.New("pubsubtopics have different clusterID than configured clusterID")
 		}
 		params.shards = &rs[0] //Only consider 0 as a node can only support 1 cluster as of now
+		return nil
+	}
+}
+
+func WithShards(shards []uint16) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		if params.shards == nil {
+			var pshards protocol.RelayShards
+			pshards.ClusterID = params.clusterID
+			params.shards = &pshards
+		}
+		params.shards.ShardIDs = shards
 		return nil
 	}
 }
@@ -454,6 +475,16 @@ func WithWakuFilterFullNode(filterOpts ...filter.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableFilterFullNode = true
 		params.filterOpts = filterOpts
+		return nil
+	}
+}
+
+// WithWakuStoreRateLimit is used to set a default rate limit on which storenodes will
+// be sent per peerID to avoid running into a TOO_MANY_REQUESTS (429) error when consuming
+// the store protocol from a storenode
+func WithWakuStoreRateLimit(value rate.Limit) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.storeRateLimit = value
 		return nil
 	}
 }

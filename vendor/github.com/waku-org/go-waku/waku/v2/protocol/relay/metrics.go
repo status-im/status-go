@@ -5,6 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/logging"
 	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -56,6 +57,7 @@ func newMetrics(reg prometheus.Registerer, logger *zap.Logger) Metrics {
 // RecordMessage is used to increase the counter for the number of messages received via waku relay
 func (m *metricsImpl) RecordMessage(envelope *waku_proto.Envelope) {
 	go func() {
+		defer utils.LogOnPanic()
 		payloadSizeInBytes := len(envelope.Message().Payload)
 		payloadSizeInKb := float64(payloadSizeInBytes) / 1000
 		messageSize.Observe(payloadSizeInKb)

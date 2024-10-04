@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 )
@@ -59,7 +60,7 @@ func (pm *PeerManager) SelectRandom(criteria PeerSelectionCriteria) (peer.IDSlic
 	peerIDs, err := pm.selectServicePeer(criteria)
 	if err == nil && len(peerIDs) == criteria.MaxPeers {
 		return maps.Keys(peerIDs), nil
-	} else if !errors.Is(err, ErrNoPeersAvailable) {
+	} else if !errors.Is(err, utils.ErrNoPeersAvailable) {
 		pm.logger.Debug("could not retrieve random peer from slot", zap.String("protocol", string(criteria.Proto)),
 			zap.Strings("pubsubTopics", criteria.PubsubTopics), zap.Error(err))
 		return nil, err
@@ -101,7 +102,7 @@ func getRandom(filter PeerSet, count int, excludePeers PeerSet) (PeerSet, error)
 		}
 	}
 	if len(selectedPeers) == 0 {
-		return nil, ErrNoPeersAvailable
+		return nil, utils.ErrNoPeersAvailable
 	}
 	return selectedPeers, nil
 }
@@ -157,7 +158,7 @@ func (pm *PeerManager) selectServicePeer(criteria PeerSelectionCriteria) (PeerSe
 	if len(peers) == 0 {
 		pm.logger.Debug("could not retrieve random peer from slot", zap.Error(err))
 	}
-	return peers, ErrNoPeersAvailable
+	return peers, utils.ErrNoPeersAvailable
 }
 
 // PeerSelectionCriteria is the selection Criteria that is used by PeerManager to select peers.

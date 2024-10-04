@@ -19,7 +19,6 @@ func aesCmKeyDerivation(label byte, masterKey, masterSalt []byte, indexOverKdr i
 	// concatenation of the encryption key label 0x00 with (index DIV kdr),
 	// - index is 'rollover count' and DIV is 'divided by'
 
-	nMasterKey := len(masterKey)
 	nMasterSalt := len(masterSalt)
 
 	prfIn := make([]byte, 16)
@@ -33,11 +32,12 @@ func aesCmKeyDerivation(label byte, masterKey, masterSalt []byte, indexOverKdr i
 		return nil, err
 	}
 
-	out := make([]byte, ((outLen+nMasterKey)/nMasterKey)*nMasterKey)
+	nBlockSize := block.BlockSize()
+	out := make([]byte, ((outLen+nBlockSize-1)/nBlockSize)*nBlockSize)
 	var i uint16
-	for n := 0; n < outLen; n += block.BlockSize() {
+	for n := 0; n < outLen; n += nBlockSize {
 		binary.BigEndian.PutUint16(prfIn[len(prfIn)-2:], i)
-		block.Encrypt(out[n:n+nMasterKey], prfIn)
+		block.Encrypt(out[n:n+nBlockSize], prfIn)
 		i++
 	}
 	return out[:outLen], nil

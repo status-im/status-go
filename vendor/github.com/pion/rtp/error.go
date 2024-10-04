@@ -21,4 +21,6 @@ var (
 	errRFC8285TwoByteHeaderSize    = errors.New("header extension payload must be 255bytes or less for RFC 5285 two byte extensions")
 
 	errRFC3550HeaderIDRange = errors.New("header extension id must be 0 for non-RFC 5285 extensions")
+
+	errInvalidRTPPadding = errors.New("invalid RTP padding")
 )
