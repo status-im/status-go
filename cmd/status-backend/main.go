@@ -9,7 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/status-im/status-go/cmd/statusd/server"
+	"github.com/status-im/status-go/cmd/status-backend/server"
 	"github.com/status-im/status-go/logutils"
 )
 
