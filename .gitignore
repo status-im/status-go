@@ -120,3 +120,7 @@ bindata.go
 migrations.go
 cmd/statusd/server/endpoints.go
 protocol/messenger_handlers.go
+
+# Don't ignore generated files in the vendor/ directory
+!vendor/**/*.pb.go
+!vendor/**/migrations.go
