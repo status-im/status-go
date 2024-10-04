@@ -416,7 +416,7 @@ deep-clean: clean git-clean
 tidy:
 	go mod tidy
 
-vendor:
+vendor: generate
 	go mod tidy
 	go mod vendor
 	modvendor -copy="**/*.c **/*.h" -v
