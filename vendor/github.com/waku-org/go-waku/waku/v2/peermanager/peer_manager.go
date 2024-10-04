@@ -98,10 +98,6 @@ const (
 	LowestRTT
 )
 
-// ErrNoPeersAvailable is emitted when no suitable peers are found for
-// some protocol
-var ErrNoPeersAvailable = errors.New("no suitable peers found")
-
 const maxFailedAttempts = 5
 const prunePeerStoreInterval = 10 * time.Minute
 const peerConnectivityLoopSecs = 15

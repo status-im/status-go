@@ -193,7 +193,6 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.wakuFlag = enr.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableFilterFullNode, w.opts.enableStore, w.opts.enableRelay)
 	w.circuitRelayNodes = make(chan peer.AddrInfo)
 	w.metrics = newMetrics(params.prometheusReg)
-
 	w.metrics.RecordVersion(Version, GitCommit)
 
 	// Setup peerstore wrapper
