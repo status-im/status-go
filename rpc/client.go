@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	eth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
@@ -110,6 +111,8 @@ type Client struct {
 
 	walletNotifier  func(chainID uint64, message string)
 	providerConfigs []params.ProviderConfig
+
+	db *sql.DB
 }
 
 // Is initialized in a build-tag-dependent module
@@ -142,6 +145,7 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		log:                log,
 		providerConfigs:    providerConfigs,
+		db:                 db,
 	}
 
 	var opts []gethrpc.ClientOption
@@ -172,7 +176,7 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		rpcName := fmt.Sprintf("%s-chain-id-%d", hostPortUpstream, upstreamChainID)
 
 		ethClients := []ethclient.RPSLimitedEthClientInterface{
-			ethclient.NewRPSLimitedEthClient(upstreamClient, limiter, rpcName),
+			buildEthClient(upstreamClient, limiter, rpcName, c.UpstreamChainID, c.db),
 		}
 		c.upstream = chain.NewClient(ethClients, upstreamChainID)
 	}
@@ -321,7 +325,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 				c.log.Error("get RPC limiter "+key, "error", err)
 			}
 
-			ethClients = append(ethClients, ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, circuitKey))
+			ethClients = append(ethClients, buildEthClient(rpcClient, rpcLimiter, circuitKey, network.ChainID, c.db))
 		}
 	}
 
@@ -389,7 +393,7 @@ func (c *Client) UpdateUpstreamURL(url string) error {
 	}
 
 	ethClients := []ethclient.RPSLimitedEthClientInterface{
-		ethclient.NewRPSLimitedEthClient(rpcClient, rpsLimiter, hostPortUpstream),
+		buildEthClient(rpcClient, rpsLimiter, hostPortUpstream, c.UpstreamChainID, c.db),
 	}
 	c.upstream = chain.NewClient(ethClients, c.UpstreamChainID)
 	c.upstreamURL = url
@@ -540,4 +544,17 @@ func setResultFromRPCResponse(result, response interface{}) (err error) {
 	value.Set(responseValue)
 
 	return nil
+}
+
+func buildEthClient(rpcClient *gethrpc.Client, limiter *rpclimiter.RPCRpsLimiter, name string, chainID uint64, db *sql.DB) ethclient.RPSLimitedEthClientInterface {
+	ethClient := ethclient.NewRPSLimitedEthClient(rpcClient, limiter, name)
+	//return ethclient.NewCachedEthClient(ethClient, ethClientStorage)
+
+	// Test
+	ethClientStorage := ethclient.NewDBChain(ethclient.NewDB(db), chainID)
+	_, err := ethClientStorage.GetTransactionJSONByHash(eth_common.HexToHash("0x1"))
+	if err != nil {
+		log.Error("GetTransactionJSONByHash", "error", err)
+	}
+	return ethClient
 }
