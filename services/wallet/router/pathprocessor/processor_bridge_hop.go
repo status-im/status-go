@@ -544,7 +544,7 @@ func (h *HopBridgeProcessor) packL1BridgeTx(abi abi.ABI, toChainID uint64, to co
 		bonderFee.AmountOutMin.Int,
 		big.NewInt(bonderFee.Deadline),
 		common.Address{},
-		walletCommon.ZeroBigIntValue)
+		walletCommon.ZeroBigIntValue())
 }
 
 func (h *HopBridgeProcessor) sendL1BridgeTx(contractAddress common.Address, ethClient chain.ClientInterface, toChainID uint64,
