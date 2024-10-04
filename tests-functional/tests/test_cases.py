@@ -6,12 +6,14 @@ import jsonschema
 import time
 import requests
 from conftest import option, user_1, user_2
-
+import pytest
+from collections import namedtuple
 
 class RpcTestCase:
+    network_id = 31337
 
     def setup_method(self):
-        self.network_id = 31337
+        pass
 
     def _try_except_JSONDecodeError_KeyError(self, response, key: str):
         try:
@@ -56,13 +58,19 @@ class RpcTestCase:
 
         return response
 
+    def rpc_valid_request(self, method, params=[], _id=None, client=None, url=None):
+        response = self.rpc_request(method, params, _id, client, url)
+        self.verify_is_valid_json_rpc_response(response, _id)
+        return response
+
     def verify_json_schema(self, response, method):
         with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
             jsonschema.validate(instance=response.json(),
                                 schema=json.load(schema))
 
-
-class TransactionTestCase(RpcTestCase):
+class WalletTestCase(RpcTestCase):
+    def setup_method(self):
+        super().setup_method()
 
     def wallet_create_multi_transaction(self, **kwargs):
         method = "wallet_createMultiTransaction"
@@ -88,7 +96,7 @@ class TransactionTestCase(RpcTestCase):
                 "fromAddress": user_1.address,
                 "fromAmount": "0x5af3107a4000",
                 "fromAsset": "ETH",
-                "multiTxType": "MultiTransactionSend",
+                "type": 0, # MultiTransactionSend
                 "toAddress": user_2.address,
                 "toAsset": "ETH",
             },
@@ -101,19 +109,66 @@ class TransactionTestCase(RpcTestCase):
             ],
             f"{option.password}",
         ]
-        response = self.rpc_request(method, params, 13)
-        return response
+        return self.rpc_request(method, params)
 
+    def send_valid_multi_transaction(self, **kwargs):
+        response = self.wallet_create_multi_transaction(**kwargs)
+
+        tx_hash = None
+        self.verify_is_valid_json_rpc_response(response)
+        try:
+            tx_hash = response.json(
+        )["result"]["hashes"][str(self.network_id)][0]
+        except (KeyError, json.JSONDecodeError):
+            raise Exception(response.content)
+        return tx_hash
+
+class TransactionTestCase(WalletTestCase):
     def setup_method(self):
         super().setup_method()
 
-        response = self.wallet_create_multi_transaction()
-        try:
-            self.tx_hash = response.json(
-            )["result"]["hashes"][str(self.network_id)][0]
-        except (KeyError, json.JSONDecodeError):
-            raise Exception(response.content)
+        self.tx_hash = self.send_valid_multi_transaction()
 
+class EthApiTestCase(WalletTestCase):
+    @pytest.fixture(autouse=True, scope='class')
+    def tx_data(self):
+        tx_hash = self.send_valid_multi_transaction()
+        self.wait_until_tx_not_pending(tx_hash)
+
+        receipt = self.get_transaction_receipt(tx_hash)
+        try:
+            block_number = receipt.json()["result"]["blockNumber"]
+            block_hash = receipt.json()["result"]["blockHash"]
+        except (KeyError, json.JSONDecodeError):
+            raise Exception(receipt.content)
+        
+        TxData = namedtuple("TxData", ["tx_hash", "block_number", "block_hash"])
+        return TxData(tx_hash, block_number, block_hash)
+
+    def get_block_header(self, block_number):
+        method = "ethclient_headerByNumber"
+        params = [self.network_id, block_number]
+        return self.rpc_valid_request(method, params)
+
+    def get_transaction_receipt(self, tx_hash):
+        method = "ethclient_transactionReceipt"
+        params = [self.network_id, tx_hash]
+        return self.rpc_valid_request(method, params)
+
+    def wait_until_tx_not_pending(self, tx_hash, timeout=10):
+        method = "ethclient_transactionByHash"
+        params = [self.network_id, tx_hash]
+        response = self.rpc_valid_request(method, params)
+
+        start_time = time.time()
+        while response.json()["result"]["isPending"] == True:
+            time_passed = time.time() - start_time
+            if time_passed >= timeout:
+                raise TimeoutError(
+                    f"Tx {tx_hash} is still pending after {timeout} seconds")
+            time.sleep(0.5)
+            response = self.rpc_valid_request(method, params)
+        return response.json()["result"]["tx"]
 
 class SignalTestCase(RpcTestCase):
 
