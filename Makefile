@@ -29,9 +29,9 @@ help: SHELL := /bin/sh
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
-RELEASE_TAG:=$(shell ./_assets/scripts/version.sh)
-RELEASE_DIR := /tmp/release-$(RELEASE_TAG)
-GOLANGCI_BINARY=golangci-lint
+RELEASE_TAG ?= $(shell ./_assets/scripts/version.sh)
+RELEASE_DIR ?= /tmp/release-$(RELEASE_TAG)
+GOLANGCI_BINARY = golangci-lint
 IPFS_GATEWAY_URL ?= https://ipfs.status.im/
 
 ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
@@ -54,9 +54,9 @@ endif
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 export GOPATH ?= $(HOME)/go
 
-GIT_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-GIT_COMMIT := $(shell git rev-parse --short HEAD)
-GIT_AUTHOR := $(shell git config user.email || echo $$USER)
+GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
+GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
