@@ -251,15 +251,9 @@ func main() {
 			return
 		}
 
-		appDB, walletDB, err := openDatabases(config.DataDir + "/" + installationID.String())
-		if err != nil {
-			log.Error("failed to open databases")
-			return
-		}
-
 		options := []protocol.Option{
-			protocol.WithDatabase(appDB),
-			protocol.WithWalletDatabase(walletDB),
+			protocol.WithDatabase(backend.StatusNode().GetAppDB()),
+			protocol.WithWalletDatabase(backend.StatusNode().GetWalletDB()),
 			protocol.WithTorrentConfig(&config.TorrentConfig),
 			protocol.WithWalletConfig(&config.WalletConfig),
 			protocol.WithAccountManager(backend.AccountManager()),
