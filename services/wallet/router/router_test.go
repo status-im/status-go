@@ -80,7 +80,7 @@ func assertPathsEqual(t *testing.T, expected, actual routes.Route) {
 }
 
 func setupRouter(t *testing.T) (*Router, func()) {
-	appDB, walletDB, cleanTmpDb := helpers.SetupTestMemorySQLAppDBs(t)
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
 
 	config := rpc.ClientConfig{
 		Client:          nil,
@@ -122,7 +122,7 @@ func setupRouter(t *testing.T) (*Router, func()) {
 	buyStickers := pathprocessor.NewStickersBuyProcessor(nil, nil, nil)
 	router.AddPathProcessor(buyStickers)
 
-	return router, cleanTmpDb
+	return router, cleanup
 }
 
 type routerSuggestedRoutesEnvelope struct {

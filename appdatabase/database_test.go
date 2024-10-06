@@ -1,4 +1,4 @@
-package appdatabase
+package appdatabase_test
 
 import (
 	"database/sql"
@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/appdatabase/migrations"
 	migrationsprevnodecfg "github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
 	"github.com/status-im/status-go/common/dbsetup"
@@ -26,7 +27,7 @@ import (
 
 func Test_GetDBFilename(t *testing.T) {
 	// Test with a temp file instance
-	db, stop, err := helpers.SetupTestSQLDB(DbInitializer{}, "test")
+	db, stop, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "test")
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, stop())
@@ -37,7 +38,7 @@ func Test_GetDBFilename(t *testing.T) {
 	require.True(t, len(fn) > 0)
 
 	// Test with in memory instance
-	mdb, err := helpers.SetupTestMemorySQLDB(DbInitializer{})
+	mdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, mdb.Close())
@@ -113,7 +114,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Migrate until 1682393575_sync_ens_name.up
-	err = migrations.MigrateTo(db, customSteps, 1682393575)
+	err = migrations.MigrateTo(db, appdatabase.GetCustomSteps(), 1682393575)
 	require.NoError(t, err)
 
 	// Validate that transfers table has no status column
@@ -186,16 +187,16 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 
 	failMigrationSteps := []*sqlite.PostStep{
 		{
-			Version: customSteps[1].Version,
+			Version: appdatabase.GetCustomSteps()[1].Version,
 			CustomMigration: func(sqlTx *sql.Tx) error {
 				return errors.New("failed to run custom migration")
 			},
-			RollBackVersion: customSteps[1].RollBackVersion,
+			RollBackVersion: appdatabase.GetCustomSteps()[1].RollBackVersion,
 		},
 	}
 
 	// Attempt to run test migration 1686048341 and fail in custom step
-	err = migrations.MigrateTo(db, failMigrationSteps, customSteps[1].Version)
+	err = migrations.MigrateTo(db, failMigrationSteps, appdatabase.GetCustomSteps()[1].Version)
 	require.Error(t, err)
 
 	exists, err = helpers.ColumnExists(db, "transfers", "status")
@@ -203,7 +204,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	require.False(t, exists)
 
 	// Run test migration 1686048341_transfers_receipt_json_blob_out.<up/down>.sql
-	err = migrations.MigrateTo(db, customSteps, customSteps[2].Version)
+	err = migrations.MigrateTo(db, appdatabase.GetCustomSteps(), appdatabase.GetCustomSteps()[2].Version)
 	require.NoError(t, err)
 
 	// Validate that the migration was run and transfers table has now status column
@@ -212,7 +213,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	require.True(t, exists)
 
 	// Run test migration 1687193315.<up/down>.sql
-	err = migrations.MigrateTo(db, customSteps, customSteps[1].Version)
+	err = migrations.MigrateTo(db, appdatabase.GetCustomSteps(), appdatabase.GetCustomSteps()[1].Version)
 	require.NoError(t, err)
 
 	// Validate that the migration was run and transfers table has now txFrom column

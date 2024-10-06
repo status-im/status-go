@@ -27,7 +27,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/appdatabase"
+
+	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
@@ -49,7 +50,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 type TestClient struct {
@@ -1336,17 +1336,15 @@ func (m *MockChainClient) AbstractEthClient(chainID walletcommon.ChainID) (ethcl
 }
 
 func TestFetchTransfersForLoadedBlocks(t *testing.T) {
-	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
+
+	tm := &TransactionManager{NewMultiTransactionDB(walletDB), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
+
+	mediaServer, err := server.NewMediaServer(appDB, nil, nil, walletDB)
 	require.NoError(t, err)
 
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-	tm := &TransactionManager{NewMultiTransactionDB(db), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
-
-	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
-	require.NoError(t, err)
-
-	wdb := NewDB(db)
+	wdb := NewDB(walletDB)
 	blockChannel := make(chan []*DBHeader, 100)
 
 	tc := &TestClient{
@@ -1362,14 +1360,15 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(walletDB, client, community.NewManager(appDB, nil, nil), network.NewManager(appDB), appDB, mediaServer, nil, nil, nil, token.NewPersistence(walletDB))
 
 	tokenManager.SetTokens([]*token.Token{
 		{
@@ -1396,15 +1395,15 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	defer ctrl.Finish()
 	rpcClient := mock_rpcclient.NewMockClientInterface(ctrl)
 	rpcClient.EXPECT().AbstractEthClient(tc.NetworkID()).Return(chainClient, nil).AnyTimes()
-	tracker := transactions.NewPendingTxTracker(db, rpcClient, nil, &event.Feed{}, transactions.PendingCheckInterval)
-	accDB, err := accounts.NewDB(appdb)
+	tracker := transactions.NewPendingTxTracker(walletDB, rpcClient, nil, &event.Feed{}, transactions.PendingCheckInterval)
+	accDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 
 	cmd := &loadBlocksAndTransfersCommand{
 		accounts:           []common.Address{address},
 		db:                 wdb,
 		blockRangeDAO:      &BlockRangeSequentialDAO{wdb.client},
-		blockDAO:           &BlockDAO{db},
+		blockDAO:           &BlockDAO{walletDB},
 		accountsDB:         accDB,
 		chainClient:        tc,
 		feed:               &event.Feed{},
@@ -1464,20 +1463,17 @@ func getNewBlocksCases() []findBlockCase {
 }
 
 func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
-	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
+
+	mediaServer, err := server.NewMediaServer(appDB, nil, nil, walletDB)
 	require.NoError(t, err)
 
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
-	require.NoError(t, err)
-
-	wdb := NewDB(db)
+	wdb := NewDB(walletDB)
 	blockChannel := make(chan []*DBHeader, 10)
 
 	address := common.HexToAddress("0x1234")
-	accDB, err := accounts.NewDB(appdb)
+	accDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 
 	for idx, testCase := range getNewBlocksCases() {
@@ -1495,14 +1491,15 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 			Client:          nil,
 			UpstreamChainID: 1,
 			Networks:        []params.Network{},
-			DB:              db,
+			AppDB:           appDB,
+			WalletDB:        walletDB,
 			WalletFeed:      nil,
 			ProviderConfigs: nil,
 		}
 		client, _ := statusRpc.NewClient(config)
 
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+		tokenManager := token.NewTokenManager(walletDB, client, community.NewManager(appDB, nil, nil), network.NewManager(appDB), appDB, mediaServer, nil, nil, nil, token.NewPersistence(walletDB))
 
 		tokenManager.SetTokens([]*token.Token{
 			{
@@ -1571,13 +1568,10 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 	//tc.printPreparedData = true
 	tc.prepareBalanceHistory(20)
 
-	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
+	mediaServer, err := server.NewMediaServer(appDB, nil, nil, walletDB)
 	require.NoError(t, err)
 
 	config := statusRpc.ClientConfig{
@@ -1591,12 +1585,12 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 	client, _ := statusRpc.NewClient(config)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(walletDB, client, community.NewManager(appDB, nil, nil), network.NewManager(appDB), appDB, mediaServer, nil, nil, nil, token.NewPersistence(walletDB))
 
-	wdb := NewDB(db)
+	wdb := NewDB(walletDB)
 	blockChannel := make(chan []*DBHeader, 10)
 
-	accDB, err := accounts.NewDB(appdb)
+	accDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 
 	maker, _ := contracts.NewContractMaker(client)
@@ -1664,21 +1658,18 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 }
 
 func TestFetchNewBlocksCommand(t *testing.T) {
-	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
+
+	mediaServer, err := server.NewMediaServer(appDB, nil, nil, walletDB)
 	require.NoError(t, err)
 
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
-	require.NoError(t, err)
-
-	wdb := NewDB(db)
+	wdb := NewDB(walletDB)
 	blockChannel := make(chan []*DBHeader, 10)
 
 	address1 := common.HexToAddress("0x1234")
 	address2 := common.HexToAddress("0x5678")
-	accDB, err := accounts.NewDB(appdb)
+	accDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 
 	for _, address := range []*common.Address{&address1, &address2} {
@@ -1707,7 +1698,8 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
@@ -1715,7 +1707,7 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 
 	client.SetClient(tc.NetworkID(), tc)
 
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(walletDB, client, community.NewManager(appDB, nil, nil), network.NewManager(appDB), appDB, mediaServer, nil, nil, nil, token.NewPersistence(walletDB))
 
 	tokenManager.SetTokens([]*token.Token{
 		{
@@ -1845,17 +1837,15 @@ func (b *BlockRangeSequentialDAOMockSuccess) getBlockRange(chainID uint64, addre
 }
 
 func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.T) {
-	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
 	config := statusRpc.ClientConfig{
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
@@ -1863,18 +1853,18 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 
 	maker, _ := contracts.NewContractMaker(client)
 
-	wdb := NewDB(db)
+	wdb := NewDB(walletDB)
 	tc := &TestClient{
 		t:            t,
 		callsCounter: map[string]int{},
 	}
-	accDB, err := accounts.NewDB(appdb)
+	accDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 
 	cmd := &loadBlocksAndTransfersCommand{
 		accounts:    []common.Address{common.HexToAddress("0x1234")},
 		chainClient: tc,
-		blockDAO:    &BlockDAO{db},
+		blockDAO:    &BlockDAO{walletDB},
 		blockRangeDAO: &BlockRangeSequentialDAOMockSuccess{
 			&BlockRangeSequentialDAO{
 				wdb.client,

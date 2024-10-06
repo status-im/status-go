@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
 	statusRPC "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
@@ -17,7 +18,7 @@ import (
 )
 
 func setupTestAPI(t *testing.T) (*API, func()) {
-	appDB, walletDB, cancel := helpers.SetupTestMemorySQLAppDBs(t)
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
 
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
@@ -41,7 +42,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	utils.Init()
 	require.NoError(t, utils.ImportTestAccount(t.TempDir(), utils.GetAccount1PKFile()))
 
-	return NewAPI(rpcClient, nil, nil, nil, db, time.Now, nil), cancel
+	return NewAPI(rpcClient, nil, nil, nil, appDB, time.Now, nil), cleanup
 }
 
 func TestResolver(t *testing.T) {
