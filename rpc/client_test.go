@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"fmt"
 	"math/big"
@@ -14,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
 
@@ -22,15 +20,9 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
-func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "rpc-network-tests")
-	require.NoError(t, err)
-	return db, func() { require.NoError(t, cleanup()) }
-}
-
 func TestBlockedRoutesCall(t *testing.T) {
-	db, close := setupTestNetworkDB(t)
-	defer close()
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{
@@ -44,7 +36,7 @@ func TestBlockedRoutesCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, []params.Network{}, db, nil)
+	c, err := NewClient(gethRPCClient, 1, []params.Network{}, appDB, walletDB, nil)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -68,8 +60,8 @@ func TestBlockedRoutesCall(t *testing.T) {
 }
 
 func TestBlockedRoutesRawCall(t *testing.T) {
-	db, close := setupTestNetworkDB(t)
-	defer close()
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{
@@ -83,7 +75,7 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, []params.Network{}, db, nil)
+	c, err := NewClient(gethRPCClient, 1, []params.Network{}, appDB, walletDB, nil)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -98,8 +90,8 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 }
 
 func TestGetClientsUsingCache(t *testing.T) {
-	db, close := setupTestNetworkDB(t)
-	defer close()
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
 	providerConfig := params.ProviderConfig{
 		Enabled:  true,
@@ -142,7 +134,8 @@ func TestGetClientsUsingCache(t *testing.T) {
 			DefaultFallbackURL2: server.URL + path3,
 		},
 	}
-	c, err := NewClient(nil, 1, networks, db, providerConfigs)
+
+	c, err := NewClient(nil, 1, networks, appDB, walletDB, providerConfigs)
 	require.NoError(t, err)
 
 	// Networks from DB must pick up DefaultRPCURL, DefaultFallbackURL, DefaultFallbackURL2

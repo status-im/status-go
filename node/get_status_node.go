@@ -331,7 +331,7 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		},
 	}
 
-	n.rpcClient, err = rpc.NewClient(gethNodeClient, n.config.NetworkID, n.config.Networks, n.appDB, providerConfigs)
+	n.rpcClient, err = rpc.NewClient(gethNodeClient, n.config.NetworkID, n.config.Networks, n.appDB, n.walletDB, providerConfigs)
 	if err != nil {
 		return
 	}
