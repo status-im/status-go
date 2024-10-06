@@ -111,6 +111,9 @@ type Client struct {
 
 	walletNotifier  func(chainID uint64, message string)
 	providerConfigs []params.ProviderConfig
+
+	appDB    *sql.DB
+	walletDB *sql.DB
 }
 
 // Is initialized in a build-tag-dependent module
@@ -121,7 +124,8 @@ type ClientConfig struct {
 	Client          *gethrpc.Client
 	UpstreamChainID uint64
 	Networks        []params.Network
-	DB              *sql.DB
+	AppDB           *sql.DB
+	WalletDB        *sql.DB
 	WalletFeed      *event.Feed
 	ProviderConfigs []params.ProviderConfig
 }
@@ -134,7 +138,7 @@ func NewClient(config ClientConfig) (*Client, error) {
 	var err error
 
 	log := log.New("package", "status-go/rpc.Client")
-	networkManager := network.NewManager(config.DB)
+	networkManager := network.NewManager(config.AppDB)
 	if networkManager == nil {
 		return nil, errors.New("failed to create network manager")
 	}
@@ -154,6 +158,8 @@ func NewClient(config ClientConfig) (*Client, error) {
 		providerConfigs:    config.ProviderConfigs,
 		healthMgr:          healthmanager.NewBlockchainHealthManager(),
 		walletFeed:         config.WalletFeed,
+		appDB:              config.AppDB,
+		walletDB:           config.WalletDB,
 	}
 
 	c.UpstreamChainID = config.UpstreamChainID
@@ -320,7 +326,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 				c.log.Error("get RPC limiter "+provider.Key, "error", err)
 			}
 
-			ethClients = append(ethClients, ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, circuitKey))
+			ethClients = append(ethClients, buildEthClient(rpcClient, rpcLimiter, circuitKey, network.ChainID, c.walletDB))
 		}
 	}
 
@@ -509,4 +515,10 @@ func setResultFromRPCResponse(result, response interface{}) (err error) {
 	value.Set(responseValue)
 
 	return nil
+}
+
+func buildEthClient(rpcClient *gethrpc.Client, limiter *rpclimiter.RPCRpsLimiter, name string, chainID uint64, walletDB *sql.DB) ethclient.RPSLimitedEthClientInterface {
+	ethClient := ethclient.NewRPSLimitedEthClient(rpcClient, limiter, name)
+	ethClientStorage := ethclient.NewDBChain(ethclient.NewDB(walletDB), chainID)
+	return ethclient.NewCachedEthClient(ethClient, ethClientStorage)
 }

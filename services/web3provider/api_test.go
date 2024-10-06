@@ -31,7 +31,7 @@ func createDB(t *testing.T) (*sql.DB, func()) {
 
 func setupTestAPI(t *testing.T) (*API, func()) {
 	t.Skip("skip test using infura")
-	db, cancel := createDB(t)
+	appDB, walletDB, cancel := helpers.SetupTestMemorySQLAppDBs(t)
 
 	keyStoreDir := t.TempDir()
 
@@ -43,7 +43,8 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 		Client:          client,
 		UpstreamChainID: 1,
 		Networks:        nil,
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
@@ -61,10 +62,10 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 		NetworkID:   1,
 	}
 
-	accDB, err := accounts.NewDB(db)
+	accDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 
-	service := NewService(db, accDB, rpcClient, nodeConfig, accManager, nil, nil)
+	service := NewService(appDB, accDB, rpcClient, nodeConfig, accManager, nil, nil)
 
 	networks := json.RawMessage("{}")
 	settings := settings.Settings{

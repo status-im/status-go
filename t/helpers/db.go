@@ -4,9 +4,14 @@ import (
 	"database/sql"
 	"io/ioutil"
 	"os"
+	"testing"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/walletdatabase"
+
+	"github.com/stretchr/testify/require"
 )
 
 const kdfIterationsNumberForTests = 1
@@ -48,6 +53,21 @@ func SetupTestMemorySQLAccountsDB(dbInit dbsetup.DatabaseInitializer) (*sql.DB, 
 	}
 
 	return db.DB(), nil
+}
+
+func SetupTestMemorySQLAppDBs(t testing.TB) (appDB *sql.DB, walletDB *sql.DB, cleanup func()) {
+	appDB, err := SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	walletDB, err = SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	cleanup = func() {
+		require.NoError(t, appDB.Close())
+		require.NoError(t, walletDB.Close())
+	}
+
+	return appDB, walletDB, cleanup
 }
 
 func ColumnExists(db *sql.DB, tableName string, columnName string) (bool, error) {

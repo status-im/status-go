@@ -336,7 +336,8 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 		Client:          client,
 		UpstreamChainID: chainID,
 		Networks:        nil,
-		DB:              appDB,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}

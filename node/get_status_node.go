@@ -336,7 +336,8 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		Client:          gethNodeClient,
 		UpstreamChainID: n.config.NetworkID,
 		Networks:        n.config.Networks,
-		DB:              n.appDB,
+		AppDB:           n.appDB,
+		WalletDB:        n.walletDB,
 		WalletFeed:      &n.walletFeed,
 		ProviderConfigs: providerConfigs,
 	}

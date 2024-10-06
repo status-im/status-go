@@ -2,7 +2,6 @@ package ens
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
@@ -11,21 +10,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/appdatabase"
 	statusRPC "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
 )
 
-func createDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "service-ens-tests-")
-	require.NoError(t, err)
-	return db, func() { require.NoError(t, cleanup()) }
-}
-
 func setupTestAPI(t *testing.T) (*API, func()) {
-	db, cancel := createDB(t)
+	appDB, walletDB, cancel := helpers.SetupTestMemorySQLAppDBs(t)
 
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
@@ -37,7 +29,8 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        nil,
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}

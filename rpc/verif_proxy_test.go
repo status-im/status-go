@@ -23,6 +23,7 @@ import (
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 type ProxySuite struct {
@@ -33,7 +34,7 @@ func TestProxySuite(t *testing.T) {
 	suite.Run(t, new(ProxySuite))
 }
 
-func (s *ProxySuite) startRpcClient(infuraURL string) *Client {
+func (s *ProxySuite) startRpcClient(infuraURL string) (*Client, func()) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{
 			"id": 1,
@@ -41,32 +42,37 @@ func (s *ProxySuite) startRpcClient(infuraURL string) *Client {
 			"result": "0x234234e22b9ffc2387e18636e0534534a3d0c56b0243567432453264c16e78a2adc"
 		}`)
 	}))
-	defer ts.Close()
 
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(s.T(), err)
 
-	db, close := setupTestNetworkDB(s.T())
-	defer close()
+	appDB, walletDB, dbCleanup := helpers.SetupTestMemorySQLAppDBs(s.T())
 
 	config := ClientConfig{
 		Client:          gethRPCClient,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
 	c, err := NewClient(config)
 	require.NoError(s.T(), err)
 
-	return c
+	closeFn := func() {
+		ts.Close()
+		dbCleanup()
+	}
+
+	return c, closeFn
 }
 
 func (s *ProxySuite) TestRun() {
 	s.T().Skip("skip test using infura")
 	infuraURL := "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938"
-	client := s.startRpcClient(infuraURL)
+	client, cleanup := s.startRpcClient(infuraURL)
+	defer cleanup()
 
 	// Run light client proxy
 	ctx, cancel := context.WithCancel(context.Background())

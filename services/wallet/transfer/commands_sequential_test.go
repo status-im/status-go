@@ -1029,17 +1029,13 @@ func getCases() []findBlockCase {
 var tokenTXXAddress = common.HexToAddress("0x53211")
 var tokenTXYAddress = common.HexToAddress("0x73211")
 
-func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlock, toBlock *big.Int, rangeSize int, balances map[common.Address][][]int, outgoingERC20Transfers, incomingERC20Transfers, outgoingERC1155SingleTransfers, incomingERC1155SingleTransfers map[common.Address][]testERC20Transfer) (*findBlocksCommand, *TestClient, chan []*DBHeader, *BlockRangeSequentialDAO) {
-	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlock, toBlock *big.Int, rangeSize int, balances map[common.Address][][]int, outgoingERC20Transfers, incomingERC20Transfers, outgoingERC1155SingleTransfers, incomingERC1155SingleTransfers map[common.Address][]testERC20Transfer) (*findBlocksCommand, *TestClient, chan []*DBHeader, *BlockRangeSequentialDAO, func()) {
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+
+	mediaServer, err := server.NewMediaServer(appDB, nil, nil, walletDB)
 	require.NoError(t, err)
 
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
-	require.NoError(t, err)
-
-	wdb := NewDB(db)
+	wdb := NewDB(walletDB)
 	tc := &TestClient{
 		t:                              t,
 		balances:                       balances,
@@ -1084,14 +1080,15 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
+	tokenManager := token.NewTokenManager(walletDB, client, community.NewManager(appDB, nil, nil), network.NewManager(appDB), appDB, mediaServer, nil, nil, nil, token.NewPersistence(walletDB))
 	tokenManager.SetTokens([]*token.Token{
 		{
 			Address:  tokenTXXAddress,
@@ -1110,7 +1107,7 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 			Verified: true,
 		},
 	})
-	accDB, err := accounts.NewDB(appdb)
+	accDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 	blockRangeDAO := &BlockRangeSequentialDAO{wdb.client}
 	fbc := &findBlocksCommand{
@@ -1128,7 +1125,7 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 		defaultNodeBlockChunkSize: rangeSize,
 		tokenManager:              tokenManager,
 	}
-	return fbc, tc, blockChannel, blockRangeDAO
+	return fbc, tc, blockChannel, blockRangeDAO, cleanup
 }
 
 func TestFindBlocksCommand(t *testing.T) {
@@ -1147,7 +1144,9 @@ func TestFindBlocksCommand(t *testing.T) {
 		outgoingERC1155SingleTransfers := map[common.Address][]testERC20Transfer{accountAddress: testCase.outgoingERC1155SingleTransfers}
 		incomingERC1155SingleTransfers := map[common.Address][]testERC20Transfer{accountAddress: testCase.incomingERC1155SingleTransfers}
 
-		fbc, tc, blockChannel, blockRangeDAO := setupFindBlocksCommand(t, accountAddress, big.NewInt(testCase.fromBlock), big.NewInt(testCase.toBlock), rangeSize, balances, outgoingERC20Transfers, incomingERC20Transfers, outgoingERC1155SingleTransfers, incomingERC1155SingleTransfers)
+		fbc, tc, blockChannel, blockRangeDAO, cleanup := setupFindBlocksCommand(t, accountAddress, big.NewInt(testCase.fromBlock), big.NewInt(testCase.toBlock), rangeSize, balances, outgoingERC20Transfers, incomingERC20Transfers, outgoingERC1155SingleTransfers, incomingERC1155SingleTransfers)
+		defer cleanup()
+
 		ctx := context.Background()
 		group := async.NewGroup(ctx)
 		group.Add(fbc.Command())
@@ -1198,7 +1197,8 @@ func TestFindBlocksCommandWithLimiter(t *testing.T) {
 	rangeSize := 20
 	accountAddress := common.HexToAddress("0x1234")
 	balances := map[common.Address][][]int{accountAddress: {{5, 1, 0}, {20, 2, 0}, {45, 1, 1}, {46, 50, 0}, {75, 0, 1}}}
-	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, nil, nil, nil, nil)
+	fbc, tc, blockChannel, _, cleanup := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, nil, nil, nil, nil)
+	defer cleanup()
 
 	limiter := rpclimiter.NewRequestLimiter(rpclimiter.NewInMemRequestsMapStorage())
 	err := limiter.SetLimit(transferHistoryTag, maxRequests, time.Hour)
@@ -1228,7 +1228,9 @@ func TestFindBlocksCommandWithLimiterTagDifferentThanTransfers(t *testing.T) {
 	outgoingERC20Transfers := map[common.Address][]testERC20Transfer{accountAddress: {{big.NewInt(6), tokenTXXAddress, big.NewInt(1), walletcommon.Erc20TransferEventType}}}
 	incomingERC20Transfers := map[common.Address][]testERC20Transfer{accountAddress: {{big.NewInt(6), tokenTXXAddress, big.NewInt(1), walletcommon.Erc20TransferEventType}}}
 
-	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, outgoingERC20Transfers, incomingERC20Transfers, nil, nil)
+	fbc, tc, blockChannel, _, cleanup := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, outgoingERC20Transfers, incomingERC20Transfers, nil, nil)
+	defer cleanup()
+
 	limiter := rpclimiter.NewRequestLimiter(rpclimiter.NewInMemRequestsMapStorage())
 	err := limiter.SetLimit("some-other-tag-than-transfer-history", maxRequests, time.Hour)
 	require.NoError(t, err)
@@ -1263,7 +1265,9 @@ func TestFindBlocksCommandWithLimiterForMultipleAccountsSameGroup(t *testing.T) 
 	storage := rpclimiter.NewInMemRequestsMapStorage()
 
 	// Set up the first account
-	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, account1, big.NewInt(0), big.NewInt(20), rangeSize, balances, outgoingERC20Transfers, nil, nil, nil)
+	fbc, tc, blockChannel, _, cleanup := setupFindBlocksCommand(t, account1, big.NewInt(0), big.NewInt(20), rangeSize, balances, outgoingERC20Transfers, nil, nil, nil)
+	defer cleanup()
+
 	tc.tag = transferHistoryTag + account1.String()
 	tc.groupTag = transferHistoryTag
 
@@ -1275,7 +1279,9 @@ func TestFindBlocksCommandWithLimiterForMultipleAccountsSameGroup(t *testing.T) 
 	tc.SetLimiter(limiter1)
 
 	// Set up the second account
-	fbc2, tc2, _, _ := setupFindBlocksCommand(t, account2, big.NewInt(0), big.NewInt(20), rangeSize, balances, nil, incomingERC20Transfers, nil, nil)
+	fbc2, tc2, _, _, cleanup := setupFindBlocksCommand(t, account2, big.NewInt(0), big.NewInt(20), rangeSize, balances, nil, incomingERC20Transfers, nil, nil)
+	defer cleanup()
+
 	tc2.tag = transferHistoryTag + account2.String()
 	tc2.groupTag = transferHistoryTag
 	limiter2 := rpclimiter.NewRequestLimiter(storage)
