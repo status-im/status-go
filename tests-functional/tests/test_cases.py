@@ -88,9 +88,11 @@ class TransactionTestCase(WalletTestCase):
 
 
 class EthRpcTestCase(WalletTestCase):
+    def init_tx_data(self):
+        self.rpc_client = RpcClient(
+            option.rpc_url_statusd
+        )
 
-    @pytest.fixture(autouse=True, scope='class')
-    def tx_data(self):
         tx_hash = self.send_valid_multi_transaction()
         self.wait_until_tx_not_pending(tx_hash)
 
