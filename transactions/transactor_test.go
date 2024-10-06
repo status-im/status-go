@@ -72,7 +72,6 @@ func (s *TransactorSuite) SetupTest() {
 		ProviderConfigs: nil,
 	}
 	rpcClient, _ := statusRpc.NewClient(config)
-
 	rpcClient.UpstreamChainID = chainID
 
 	ethClients := []ethclient.RPSLimitedEthClientInterface{
