@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"math/big"
 
-	d_common "github.com/status-im/status-go/common"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -16,6 +14,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase/migrations"
 	migrationsprevnodecfg "github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
+	d_common "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
@@ -26,10 +25,12 @@ import (
 
 const nodeCfgMigrationDate = 1640111208
 
-var customSteps = []*sqlite.PostStep{
-	{Version: 1674136690, CustomMigration: migrateEnsUsernames},
-	{Version: 1686048341, CustomMigration: migrateWalletJSONBlobs, RollBackVersion: 1686041510},
-	{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
+func GetCustomSteps() []*sqlite.PostStep {
+	return []*sqlite.PostStep{
+		{Version: 1674136690, CustomMigration: migrateEnsUsernames},
+		{Version: 1686048341, CustomMigration: migrateWalletJSONBlobs, RollBackVersion: 1686041510},
+		{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
+	}
 }
 
 var CurrentAppDBKeyUID string
@@ -65,7 +66,7 @@ func doMigration(db *sql.DB) error {
 		{Version: 1662365868, CustomMigration: FixMissingKeyUIDForAccounts},
 		{Version: 1720606449, CustomMigration: OptimizeMobileWakuV2SettingsForMobileV1},
 	}
-	postSteps = append(postSteps, customSteps...)
+	postSteps = append(postSteps, GetCustomSteps()...)
 	// Run all the new migrations
 	err = migrations.Migrate(db, postSteps)
 	if err != nil {

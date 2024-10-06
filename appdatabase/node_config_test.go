@@ -1,4 +1,4 @@
-package appdatabase
+package appdatabase_test
 
 import (
 	"crypto/rand"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
@@ -21,7 +22,7 @@ import (
 )
 
 func setupTestDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(DbInitializer{}, "settings-tests-")
+	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "settings-tests-")
 	require.NoError(t, err)
 	return db, func() { require.NoError(t, cleanup()) }
 }

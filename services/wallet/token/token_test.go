@@ -316,11 +316,8 @@ func TestGetTokenHistoricalBalance(t *testing.T) {
 }
 
 func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
 	accountsDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
@@ -331,7 +328,7 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
 	client := gethrpc.DialInProc(server)
-	rpcClient, _ := rpc.NewClient(client, chainID, nil, appDB, nil)
+	rpcClient, _ := rpc.NewClient(client, chainID, nil, appDB, walletDB, nil)
 	rpcClient.UpstreamChainID = chainID
 	nm := network.NewManager(appDB)
 	mediaServer, err := mediaserver.NewMediaServer(appDB, nil, nil, walletDB)

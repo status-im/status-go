@@ -2,7 +2,6 @@ package ens
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
@@ -11,21 +10,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/appdatabase"
+
 	statusRPC "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
 )
 
-func createDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "service-ens-tests-")
-	require.NoError(t, err)
-	return db, func() { require.NoError(t, cleanup()) }
-}
-
 func setupTestAPI(t *testing.T) (*API, func()) {
-	db, cancel := createDB(t)
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
 
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
@@ -33,14 +26,14 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 
 	_ = client
 
-	rpcClient, err := statusRPC.NewClient(nil, 1, nil, db, nil)
+	rpcClient, err := statusRPC.NewClient(nil, 1, nil, appDB, walletDB, nil)
 	require.NoError(t, err)
 
 	// import account keys
 	utils.Init()
 	require.NoError(t, utils.ImportTestAccount(t.TempDir(), utils.GetAccount1PKFile()))
 
-	return NewAPI(rpcClient, nil, nil, nil, db, time.Now, nil), cancel
+	return NewAPI(rpcClient, nil, nil, nil, appDB, time.Now, nil), cleanup
 }
 
 func TestResolver(t *testing.T) {
