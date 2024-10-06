@@ -1,4 +1,4 @@
-package ethclient
+package ethclient_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 func TestGeth_HeaderHash(t *testing.T) {
-	number, hash, header := getTestBlockHeader()
+	header, number, hash := getTestBlockHeader()
 	require.Equal(t, number.String(), header.Number.String())
 	require.Equal(t, hash, header.Hash())
 }

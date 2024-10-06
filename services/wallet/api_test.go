@@ -15,7 +15,6 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
@@ -24,7 +23,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 // TestAPI_GetWalletConnectActiveSessions tames coverage
@@ -105,17 +103,12 @@ func TestAPI_GetCryptoOnRamps(t *testing.T) {
 }
 
 func TestAPI_GetAddressDetails(t *testing.T) {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
-	defer appDB.Close()
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
 	accountsDb, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 	defer accountsDb.Close()
-
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
-	defer db.Close()
 
 	accountFeed := &event.Feed{}
 
@@ -147,7 +140,8 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 		Client:          nil,
 		UpstreamChainID: chainID,
 		Networks:        networks,
-		DB:              appDB,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: providerConfigs,
 	}

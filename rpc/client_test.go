@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"fmt"
 	"math/big"
@@ -14,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
 
@@ -22,15 +20,9 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
-func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "rpc-network-tests")
-	require.NoError(t, err)
-	return db, func() { require.NoError(t, cleanup()) }
-}
-
 func TestBlockedRoutesCall(t *testing.T) {
-	db, close := setupTestNetworkDB(t)
-	defer close()
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{
@@ -48,7 +40,8 @@ func TestBlockedRoutesCall(t *testing.T) {
 		Client:          gethRPCClient,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
@@ -76,8 +69,8 @@ func TestBlockedRoutesCall(t *testing.T) {
 }
 
 func TestBlockedRoutesRawCall(t *testing.T) {
-	db, close := setupTestNetworkDB(t)
-	defer close()
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{
@@ -95,7 +88,8 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 		Client:          gethRPCClient,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
@@ -114,8 +108,8 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 }
 
 func TestGetClientsUsingCache(t *testing.T) {
-	db, close := setupTestNetworkDB(t)
-	defer close()
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
 	providerConfig := params.ProviderConfig{
 		Enabled:  true,
@@ -163,7 +157,8 @@ func TestGetClientsUsingCache(t *testing.T) {
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        networks,
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: providerConfigs,
 	}

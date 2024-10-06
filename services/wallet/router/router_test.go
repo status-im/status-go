@@ -2,12 +2,10 @@ package router
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -16,7 +14,6 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func amountOptionEqual(a, b amountOption) bool {
@@ -82,20 +79,15 @@ func assertPathsEqual(t *testing.T, expected, actual routes.Route) {
 	}
 }
 
-func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "wallet-router-tests")
-	require.NoError(t, err)
-	return db, func() { require.NoError(t, cleanup()) }
-}
-
 func setupRouter(t *testing.T) (*Router, func()) {
-	db, cleanTmpDb := setupTestNetworkDB(t)
+	appDB, walletDB, cleanTmpDb := helpers.SetupTestMemorySQLAppDBs(t)
 
 	config := rpc.ClientConfig{
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        defaultNetworks,
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
