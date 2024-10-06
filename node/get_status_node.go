@@ -690,10 +690,18 @@ func (n *StatusNode) SetAppDB(db *sql.DB) {
 	n.appDB = db
 }
 
+func (n *StatusNode) GetAppDB() *sql.DB {
+	return n.appDB
+}
+
 func (n *StatusNode) SetMultiaccountsDB(db *multiaccounts.Database) {
 	n.multiaccountsDB = db
 }
 
 func (n *StatusNode) SetWalletDB(db *sql.DB) {
 	n.walletDB = db
+}
+
+func (n *StatusNode) GetWalletDB() *sql.DB {
+	return n.walletDB
 }
