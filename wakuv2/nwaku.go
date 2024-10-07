@@ -256,13 +256,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -1027,9 +1024,9 @@ func (w *Waku) Start() error {
 		return err
 	}
 
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-	<-ch
+	// ch := make(chan os.Signal, 1)
+	// signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	//<-ch
 
 	// if err = w.node.Start(w.ctx); err != nil {
 	// 	return fmt.Errorf("failed to start go-waku node: %v", err)
