@@ -16,7 +16,7 @@
     "RendezvousNodes": [],
     "WakuNodes": [
       "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@boot.staging.status.nodes.status.im",
-			"/dns4/boot-01.do-ams3.shards.staging.status.im/tcp/30303/p2p/16Uiu2HAmEqqio4UR1SWqAc7KY19t6qyDvtmyjreZpzUBJvb4u65R",
+			"/dns4/boot-01.do-ams3.status.staging.status.im/tcp/30303/p2p/16Uiu2HAmQE7FXQc6iZHdBzYfw3qCSDa9dLc1wsBJKoP4aZvztq2d",
       "/dns4/boot-01.gc-us-central1-a.status.staging.status.im/tcp/30303/p2p/16Uiu2HAmGAA54bBTE78MYidSy3P7Q9yAWFNTAEReJYD69VRvtL5r",
       "/dns4/boot-01.ac-cn-hongkong-c.status.staging.status.im/tcp/30303/p2p/16Uiu2HAmNTpGnyZ8W1BK2sXEmgSCNWiyDKgRU3NBR2DXST2HzxRU"
     ],
