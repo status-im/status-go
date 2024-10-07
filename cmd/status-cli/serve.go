@@ -83,6 +83,13 @@ func serve(cCtx *cli.Context) error {
 				return
 			}
 			logger.Infof("local notification: %v, title: %v, id: %v", ev.Category, ev.Title, ev.ID)
+		case msignal.EventMesssageDelivered:
+			var ev msignal.MessageDeliveredSignal
+			if err := json.Unmarshal(evt.Event, &ev); err != nil {
+				logger.Error("unmarshaling message delivered event", zap.Error(err), zap.Any("event", evt.Event))
+				return
+			}
+			logger.Infof("message delivered: %v", ev.MessageID)
 		default:
 			logger.Debugf("received event type '%v'\t%v", evt.Type, string(evt.Event))
 		}
