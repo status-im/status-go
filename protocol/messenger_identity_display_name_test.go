@@ -113,7 +113,7 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 	}
 	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
 	s.Require().NoError(err)
-	response, err := alicesOtherDevice.SendPairInstallation(context.Background(), nil)
+	response, err := alicesOtherDevice.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
@@ -133,7 +133,7 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 	s.Require().Equal("alice's-other-device", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("alice's-other-device-type", actualInstallation.InstallationMetadata.DeviceType)
 
-	err = s.m.EnableInstallation(alicesOtherDevice.installationID)
+	_, err = s.m.EnableInstallation(alicesOtherDevice.installationID)
 	s.Require().NoError(err)
 
 	// Set new display name on alice's device

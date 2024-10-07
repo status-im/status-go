@@ -17,3 +17,7 @@ func (j *EnableInstallationAndPair) Validate() error {
 
 	return nil
 }
+
+func (j *EnableInstallationAndPair) GetInstallationID() string {
+	return j.InstallationID
+}

@@ -277,7 +277,7 @@ func FindFirstByContentType(messages []*common.Message, contentType protobuf.Cha
 
 func PairDevices(s *suite.Suite, device1, device2 *Messenger) {
 	// Send pairing data
-	response, err := device1.SendPairInstallation(context.Background(), nil)
+	response, err := device1.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Len(response.Chats(), 1)
@@ -306,7 +306,7 @@ func PairDevices(s *suite.Suite, device1, device2 *Messenger) {
 	s.Require().NotNil(response)
 
 	// Ensure installation is enabled
-	err = device2.EnableInstallation(device1.installationID)
+	_, err = device2.EnableInstallation(device1.installationID)
 	s.Require().NoError(err)
 }
 

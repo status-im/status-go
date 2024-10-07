@@ -312,7 +312,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			}
 			// if receiver already logged in before local pairing, we need force enable the installation,
 			// AddInstallations won't make sure enable it, e.g. installation maybe already exist in db but not enabled yet
-			err = m.EnableInstallation(message.InstallationId)
+			_, err = m.EnableInstallation(message.InstallationId)
 			if err != nil {
 				return err
 			}

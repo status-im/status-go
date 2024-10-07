@@ -101,7 +101,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	}
 	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
 	s.Require().NoError(err)
-	response, err := alicesOtherDevice.SendPairInstallation(context.Background(), nil)
+	response, err := alicesOtherDevice.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
@@ -121,7 +121,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().Equal("alice's-other-device", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("alice's-other-device-type", actualInstallation.InstallationMetadata.DeviceType)
 
-	err = s.m.EnableInstallation(alicesOtherDevice.installationID)
+	_, err = s.m.EnableInstallation(alicesOtherDevice.installationID)
 	s.Require().NoError(err)
 
 	// Store seed phrase keypair with accounts on alice's device
@@ -321,7 +321,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	}
 	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
 	s.Require().NoError(err)
-	response, err := alicesOtherDevice.SendPairInstallation(context.Background(), nil)
+	response, err := alicesOtherDevice.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
@@ -341,7 +341,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().Equal("alice's-other-device", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("alice's-other-device-type", actualInstallation.InstallationMetadata.DeviceType)
 
-	err = s.m.EnableInstallation(alicesOtherDevice.installationID)
+	_, err = s.m.EnableInstallation(alicesOtherDevice.installationID)
 	s.Require().NoError(err)
 
 	// Move down account from position 1 to position 4
@@ -511,7 +511,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	}
 	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
 	s.Require().NoError(err)
-	response, err := alicesOtherDevice.SendPairInstallation(context.Background(), nil)
+	response, err := alicesOtherDevice.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
@@ -531,7 +531,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	s.Require().Equal("alice's-other-device", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("alice's-other-device-type", actualInstallation.InstallationMetadata.DeviceType)
 
-	err = s.m.EnableInstallation(alicesOtherDevice.installationID)
+	_, err = s.m.EnableInstallation(alicesOtherDevice.installationID)
 	s.Require().NoError(err)
 
 	// Trigger's a sync between devices

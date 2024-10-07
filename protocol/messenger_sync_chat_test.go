@@ -82,7 +82,7 @@ func (s *MessengerSyncChatSuite) Pair() {
 		DeviceType: "alice2",
 	})
 	s.Require().NoError(err)
-	response, err := s.alice2.SendPairInstallation(context.Background(), nil)
+	response, err := s.alice2.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
@@ -102,7 +102,7 @@ func (s *MessengerSyncChatSuite) Pair() {
 	s.Require().Equal("alice2", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("alice2", actualInstallation.InstallationMetadata.DeviceType)
 
-	err = s.alice1.EnableInstallation(s.alice2.installationID)
+	_, err = s.alice1.EnableInstallation(s.alice2.installationID)
 	s.Require().NoError(err)
 }
 

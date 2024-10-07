@@ -373,7 +373,8 @@ func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*transport.F
 
 // EnableInstallation enables an installation for multi-device sync.
 func (api *PublicAPI) EnableInstallation(installationID string) error {
-	return api.service.messenger.EnableInstallation(installationID)
+	_, err := api.service.messenger.EnableInstallation(installationID)
+	return err
 }
 
 // DisableInstallation disables an installation for multi-device sync.
@@ -1056,7 +1057,7 @@ func (api *PublicAPI) VerifiedUntrustworthy(ctx context.Context, request *reques
 }
 
 func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SendPairInstallation(ctx, nil)
+	return api.service.messenger.SendPairInstallation(ctx, "", nil)
 }
 
 func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) error {

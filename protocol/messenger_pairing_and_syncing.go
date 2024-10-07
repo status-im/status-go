@@ -17,42 +17,55 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 )
 
+type InstallationIDProvider interface {
+	GetInstallationID() string
+	Validate() error
+}
+
 func (m *Messenger) EnableInstallationAndSync(request *requests.EnableInstallationAndSync) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
-	err := m.EnableInstallation(request.InstallationID)
-	if err != nil {
-		return nil, err
-	}
-	response, err := m.SendPairInstallation(context.Background(), nil)
-	if err != nil {
-		return nil, err
-	}
-	err = m.SyncDevices(context.Background(), "", "", nil)
+
+	installation, err := m.EnableInstallation(request.InstallationID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Delete AC notif
-	err = m.deleteNotification(response, request.InstallationID)
+	response := &MessengerResponse{}
+	response.AddInstallation(installation)
+
+	pairResponse, err := m.SendPairInstallation(context.Background(), request.InstallationID, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return response, nil
+	if err = m.SyncDevices(context.Background(), "", "", nil); err != nil {
+		return nil, err
+	}
+
+	if err = m.deleteNotification(pairResponse, request.InstallationID); err != nil {
+		return nil, err
+	}
+
+	if err = pairResponse.Merge(response); err != nil {
+		return nil, err
+	}
+
+	return pairResponse, nil
 }
 
-func (m *Messenger) EnableInstallationAndPair(request *requests.EnableInstallationAndPair) (*MessengerResponse, error) {
+func (m *Messenger) EnableInstallationAndPair(request InstallationIDProvider) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
 
 	myIdentity := crypto.CompressPubkey(&m.identity.PublicKey)
 	timestamp := time.Now().UnixNano()
+	installationID := request.GetInstallationID()
 
 	installation := &multidevice.Installation{
-		ID:        request.InstallationID,
+		ID:        installationID,
 		Enabled:   true,
 		Version:   2,
 		Timestamp: timestamp,
@@ -62,20 +75,20 @@ func (m *Messenger) EnableInstallationAndPair(request *requests.EnableInstallati
 	if err != nil {
 		return nil, err
 	}
-	i, ok := m.allInstallations.Load(request.InstallationID)
+	i, ok := m.allInstallations.Load(installationID)
 	if !ok {
 		i = installation
 	} else {
 		i.Enabled = true
 	}
-	m.allInstallations.Store(request.InstallationID, i)
-	response, err := m.SendPairInstallation(context.Background(), nil)
+	m.allInstallations.Store(installationID, i)
+	response, err := m.SendPairInstallation(context.Background(), request.GetInstallationID(), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	notification := &ActivityCenterNotification{
-		ID:             types.FromHex(request.InstallationID),
+		ID:             types.FromHex(installationID),
 		Type:           ActivityCenterNotificationTypeNewInstallationCreated,
 		InstallationID: m.installationID, // Put our own installation ID, as we're the initiator of the pairing
 		Timestamp:      m.getTimesource().GetCurrentTime(),
@@ -92,7 +105,7 @@ func (m *Messenger) EnableInstallationAndPair(request *requests.EnableInstallati
 }
 
 // SendPairInstallation sends a pair installation message
-func (m *Messenger) SendPairInstallation(ctx context.Context, rawMessageHandler RawMessageHandler) (*MessengerResponse, error) {
+func (m *Messenger) SendPairInstallation(ctx context.Context, targetInstallationID string, rawMessageHandler RawMessageHandler) (*MessengerResponse, error) {
 	var err error
 	var response MessengerResponse
 
@@ -108,11 +121,13 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, rawMessageHandler 
 	clock, chat := m.getLastClockWithRelatedChat()
 
 	pairMessage := &protobuf.SyncPairInstallation{
-		Clock:          clock,
-		Name:           installation.InstallationMetadata.Name,
-		InstallationId: installation.ID,
-		DeviceType:     installation.InstallationMetadata.DeviceType,
-		Version:        installation.Version}
+		Clock:                clock,
+		Name:                 installation.InstallationMetadata.Name,
+		InstallationId:       installation.ID,
+		DeviceType:           installation.InstallationMetadata.DeviceType,
+		Version:              installation.Version,
+		TargetInstallationId: targetInstallationID,
+	}
 	encodedMessage, err := proto.Marshal(pairMessage)
 	if err != nil {
 		return nil, err
@@ -496,20 +511,21 @@ func (m *Messenger) SetInstallationName(id string, name string) error {
 	return m.encryptor.SetInstallationName(m.IdentityPublicKey(), id, name)
 }
 
-func (m *Messenger) EnableInstallation(id string) error {
+// EnableInstallation enables an installation and returns the installation
+func (m *Messenger) EnableInstallation(id string) (*multidevice.Installation, error) {
 	installation, ok := m.allInstallations.Load(id)
 	if !ok {
-		return errors.New("no installation found")
+		return nil, errors.New("no installation found")
 	}
 
 	err := m.encryptor.EnableInstallation(&m.identity.PublicKey, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	installation.Enabled = true
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allInstallations.Store(id, installation)
-	return nil
+	return installation, nil
 }
 
 func (m *Messenger) DisableInstallation(id string) error {

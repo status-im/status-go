@@ -3147,9 +3147,10 @@ type ReceivedMessageState struct {
 	// List of contacts modified
 	ModifiedContacts *stringBoolMap
 	// All installations in memory
-	AllInstallations *installationMap
-	// List of communities modified
+	AllInstallations      *installationMap
 	ModifiedInstallations *stringBoolMap
+	// List of installations targeted to this device modified
+	TargetedInstallations *stringBoolMap
 	// Map of existing messages
 	ExistingMessagesMap map[string]bool
 	// EmojiReactions is a list of emoji reactions for the current batch
@@ -3322,6 +3323,7 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 		ModifiedContacts:      new(stringBoolMap),
 		AllInstallations:      m.allInstallations,
 		ModifiedInstallations: m.modifiedInstallations,
+		TargetedInstallations: new(stringBoolMap),
 		ExistingMessagesMap:   make(map[string]bool),
 		EmojiReactions:        make(map[string]*EmojiReaction),
 		GroupChatInvitations:  make(map[string]*GroupChatInvitation),
@@ -3735,28 +3737,31 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 			}
 		}
 
-		if installation.Enabled {
-			// Delete AC notif since the installation is now enabled
-			err = m.deleteNotification(messageState.Response, id)
-			if err != nil {
-				m.logger.Error("error deleting notification", zap.Error(err))
-				return false
-			}
-		} else if id != m.installationID {
-			// Add activity center notification when we receive a new installation
-			notification := &ActivityCenterNotification{
-				ID:             types.FromHex(id),
-				Type:           ActivityCenterNotificationTypeNewInstallationReceived,
-				InstallationID: id,
-				Timestamp:      m.getTimesource().GetCurrentTime(),
-				Read:           false,
-				Deleted:        false,
-				UpdatedAt:      m.GetCurrentTimeInMillis(),
-			}
+		targeted, _ := messageState.TargetedInstallations.Load(id)
+		if targeted {
+			if installation.Enabled {
+				// Delete AC notif since the installation is now enabled
+				err = m.deleteNotification(messageState.Response, id)
+				if err != nil {
+					m.logger.Error("error deleting notification", zap.Error(err))
+					return false
+				}
+			} else if id != m.installationID {
+				// Add activity center notification when we receive a new installation
+				notification := &ActivityCenterNotification{
+					ID:             types.FromHex(id),
+					Type:           ActivityCenterNotificationTypeNewInstallationReceived,
+					InstallationID: id,
+					Timestamp:      m.getTimesource().GetCurrentTime(),
+					Read:           false,
+					Deleted:        false,
+					UpdatedAt:      m.GetCurrentTimeInMillis(),
+				}
 
-			err = m.addActivityCenterNotification(messageState.Response, notification, nil)
-			if err != nil {
-				return false
+				err = m.addActivityCenterNotification(messageState.Response, notification, nil)
+				if err != nil {
+					return false
+				}
 			}
 		}
 

@@ -91,8 +91,9 @@ message SyncPairInstallation {
   string installation_id = 2;
   string device_type = 3;
   string name = 4;
-  // following fields used for local pairing
+  // used for local pairing
   uint32 version = 5;
+  string target_installation_id = 6;
 }
 
 message SyncInstallationContactV2 {
