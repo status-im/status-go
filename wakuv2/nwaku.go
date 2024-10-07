@@ -4,8 +4,8 @@
 package wakuv2
 
 /*
-	#cgo LDFLAGS: -L../third_party/nwaku/vendor/negentropy/cpp/ -lnegentropy -L../third_party/nwaku/build/ -lwaku -lm -ldl -pthread -lminiupnpc -L../third_party/nwaku/vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc/build/ -lnatpmp -L../third_party/nwaku/vendor/nim-nat-traversal/vendor/libnatpmp-upstream/ -L../third_party/nwaku/vendor/nim-libbacktrace/install/usr/lib/ -lbacktrace -Wl,--allow-multiple-definition
-	#cgo LDFLAGS: -Wl,-rpath,../third_party/nwaku/build/
+	#cgo LDFLAGS: -L../third_party/nwaku/build/ -lnegentropy -lwaku
+	#cgo LDFLAGS: -L../third_party/nwaku -Wl,-rpath,../third_party/nwaku/build/
 
 	#include "../third_party/nwaku/library/libwaku.h"
 	#include <stdio.h>
@@ -19,17 +19,17 @@ package wakuv2
 		size_t len;
 	} Resp;
 
-	void* allocResp() {
+	static void* allocResp() {
 		return calloc(1, sizeof(Resp));
 	}
 
-	void freeResp(void* resp) {
+	static void freeResp(void* resp) {
 		if (resp != NULL) {
 			free(resp);
 		}
 	}
 
-	char* getMyCharPtr(void* resp) {
+	static char* getMyCharPtr(void* resp) {
 		if (resp == NULL) {
 			return NULL;
 		}
@@ -37,7 +37,7 @@ package wakuv2
 		return m->msg;
 	}
 
-	size_t getMyCharLen(void* resp) {
+	static size_t getMyCharLen(void* resp) {
 		if (resp == NULL) {
 			return 0;
 		}
@@ -45,7 +45,7 @@ package wakuv2
 		return m->len;
 	}
 
-	int getRet(void* resp) {
+	static int getRet(void* resp) {
 		if (resp == NULL) {
 			return 0;
 		}
@@ -54,8 +54,10 @@ package wakuv2
 	}
 
 	// resp must be set != NULL in case interest on retrieving data from the callback
-	void callback(int ret, char* msg, size_t len, void* resp) {
+	static void callback(int ret, char* msg, size_t len, void* resp) {
+		printf("---------- GABRIEL calling callback 1 ----\n");
 		if (resp != NULL) {
+			printf("---------- GABRIEL calling callback 2 ----\n");
 			Resp* m = (Resp*) resp;
 			m->ret = ret;
 			m->msg = msg;
@@ -65,6 +67,7 @@ package wakuv2
 
 	#define WAKU_CALL(call)                                                        \
 	do {                                                                           \
+		printf("---------- GABRIEL calling WAKU_CALL 1 ----\n"); 						\
 		int ret = call;                                                              \
 		if (ret != 0) {                                                              \
 			printf("Failed the call to: %s. Returned code: %d\n", #call, ret);         \
@@ -72,37 +75,37 @@ package wakuv2
 		}                                                                            \
 	} while (0)
 
-	void* cGoWakuNew(const char* configJson, void* resp) {
+	static void* cGoWakuNew(const char* configJson, void* resp) {
 		// We pass NULL because we are not interested in retrieving data from this callback
 		void* ret = waku_new(configJson, (WakuCallBack) callback, resp);
 		return ret;
 	}
 
-	void cGoWakuStart(void* wakuCtx, void* resp) {
+	static void cGoWakuStart(void* wakuCtx, void* resp) {
 		WAKU_CALL(waku_start(wakuCtx, (WakuCallBack) callback, resp));
 	}
 
-	void cGoWakuStop(void* wakuCtx, void* resp) {
+	static void cGoWakuStop(void* wakuCtx, void* resp) {
 		WAKU_CALL(waku_stop(wakuCtx, (WakuCallBack) callback, resp));
 	}
 
-	void cGoWakuDestroy(void* wakuCtx, void* resp) {
+	static void cGoWakuDestroy(void* wakuCtx, void* resp) {
 		WAKU_CALL(waku_destroy(wakuCtx, (WakuCallBack) callback, resp));
 	}
 
-	void cGoWakuStartDiscV5(void* wakuCtx, void* resp) {
+	static void cGoWakuStartDiscV5(void* wakuCtx, void* resp) {
 		WAKU_CALL(waku_start_discv5(wakuCtx, (WakuCallBack) callback, resp));
 	}
 
-	void cGoWakuStopDiscV5(void* wakuCtx, void* resp) {
+	static void cGoWakuStopDiscV5(void* wakuCtx, void* resp) {
 		WAKU_CALL(waku_stop_discv5(wakuCtx, (WakuCallBack) callback, resp));
 	}
 
-	void cGoWakuVersion(void* wakuCtx, void* resp) {
+	static void cGoWakuVersion(void* wakuCtx, void* resp) {
 		WAKU_CALL(waku_version(wakuCtx, (WakuCallBack) callback, resp));
 	}
 
-	void cGoWakuSetEventCallback(void* wakuCtx) {
+	static void cGoWakuSetEventCallback(void* wakuCtx) {
 		// The 'globalEventCallback' Go function is shared amongst all possible Waku instances.
 
 		// Given that the 'globalEventCallback' is shared, we pass again the
@@ -118,7 +121,7 @@ package wakuv2
 		waku_set_event_callback(wakuCtx, (WakuCallBack) globalEventCallback, wakuCtx);
 	}
 
-	void cGoWakuContentTopic(void* wakuCtx,
+	static void cGoWakuContentTopic(void* wakuCtx,
 							char* appName,
 							int appVersion,
 							char* contentTopicName,
@@ -134,15 +137,15 @@ package wakuv2
 							resp) );
 	}
 
-	void cGoWakuPubsubTopic(void* wakuCtx, char* topicName, void* resp) {
+	static void cGoWakuPubsubTopic(void* wakuCtx, char* topicName, void* resp) {
 		WAKU_CALL( waku_pubsub_topic(wakuCtx, topicName, (WakuCallBack) callback, resp) );
 	}
 
-	void cGoWakuDefaultPubsubTopic(void* wakuCtx, void* resp) {
+	static void cGoWakuDefaultPubsubTopic(void* wakuCtx, void* resp) {
 		WAKU_CALL (waku_default_pubsub_topic(wakuCtx, (WakuCallBack) callback, resp));
 	}
 
-	void cGoWakuRelayPublish(void* wakuCtx,
+	static void cGoWakuRelayPublish(void* wakuCtx,
                        const char* pubSubTopic,
                        const char* jsonWakuMessage,
                        int timeoutMs,
@@ -156,14 +159,14 @@ package wakuv2
                        resp));
 	}
 
-	void cGoWakuRelaySubscribe(void* wakuCtx, char* pubSubTopic, void* resp) {
+	static void cGoWakuRelaySubscribe(void* wakuCtx, char* pubSubTopic, void* resp) {
 		WAKU_CALL ( waku_relay_subscribe(wakuCtx,
 							pubSubTopic,
 							(WakuCallBack) callback,
 							resp) );
 	}
 
-	void cGoWakuRelayUnsubscribe(void* wakuCtx, char* pubSubTopic, void* resp) {
+	static void cGoWakuRelayUnsubscribe(void* wakuCtx, char* pubSubTopic, void* resp) {
 
 		WAKU_CALL ( waku_relay_unsubscribe(wakuCtx,
 							pubSubTopic,
@@ -171,7 +174,7 @@ package wakuv2
 							resp) );
 	}
 
-	void cGoWakuConnect(void* wakuCtx, char* peerMultiAddr, int timeoutMs, void* resp) {
+	static void cGoWakuConnect(void* wakuCtx, char* peerMultiAddr, int timeoutMs, void* resp) {
 		WAKU_CALL( waku_connect(wakuCtx,
 						peerMultiAddr,
 						timeoutMs,
@@ -179,23 +182,23 @@ package wakuv2
 						resp) );
 	}
 
-	void cGoWakuListenAddresses(void* wakuCtx, void* resp) {
+	static void cGoWakuListenAddresses(void* wakuCtx, void* resp) {
 		WAKU_CALL (waku_listen_addresses(wakuCtx, (WakuCallBack) callback, resp) );
 	}
 
-	void cGoWakuGetMyENR(void* ctx, void* resp) {
+	static void cGoWakuGetMyENR(void* ctx, void* resp) {
 		WAKU_CALL (waku_get_my_enr(ctx, (WakuCallBack) callback, resp) );
 	}
 
-	void cGoWakuListPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
+	static void cGoWakuListPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
 		WAKU_CALL (waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
 
-	void cGoWakuGetNumConnectedPeers(void* ctx, char* pubSubTopic, void* resp) {
+	static void cGoWakuGetNumConnectedPeers(void* ctx, char* pubSubTopic, void* resp) {
 		WAKU_CALL (waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
 
-	void cGoWakuLightpushPublish(void* wakuCtx,
+	static void cGoWakuLightpushPublish(void* wakuCtx,
 					const char* pubSubTopic,
 					const char* jsonWakuMessage,
 					void* resp) {
@@ -207,7 +210,7 @@ package wakuv2
 						resp));
 	}
 
-	void cGoWakuStoreQuery(void* wakuCtx,
+	static void cGoWakuStoreQuery(void* wakuCtx,
 					const char* jsonQuery,
 					const char* peerAddr,
 					int timeoutMs,
@@ -221,7 +224,7 @@ package wakuv2
 									resp));
 	}
 
-	void cGoWakuPeerExchangeQuery(void* wakuCtx,
+	static void cGoWakuPeerExchangeQuery(void* wakuCtx,
 								uint64_t numPeers,
 								void* resp) {
 
@@ -231,7 +234,7 @@ package wakuv2
 									resp));
 	}
 
-	void cGoWakuGetPeerIdsByProtocol(void* wakuCtx,
+	static void cGoWakuGetPeerIdsByProtocol(void* wakuCtx,
 									 const char* protocol,
 									 void* resp) {
 
@@ -1853,12 +1856,19 @@ func (self *Waku) WakuStart() error {
 
 	var resp = C.allocResp()
 	defer C.freeResp(resp)
+	
+	
+	fmt.Println("------------ GABRIEL called wakuStart")
 	C.cGoWakuStart(self.wakuCtx, resp)
+	fmt.Println("------------ GABRIEL wakuStart 2")
 
 	if C.getRet(resp) == C.RET_OK {
+		fmt.Println("------------ GABRIEL wakuStart received RET_OK")
 		return nil
 	}
+	fmt.Println("------------ GABRIEL wakuStart 3")
 	errMsg := "error WakuStart: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	fmt.Println("------------ GABRIEL error in wakuStart ", errMsg)
 	return errors.New(errMsg)
 }
 
@@ -2393,11 +2403,16 @@ func New(nodeKey *ecdsa.PrivateKey,
 	onHistoricMessagesRequestFailed func([]byte, peer.ID, error),
 	onPeerStats func(types.ConnStatus)) (*Waku, error) {
 
+	fmt.Println("-------- GABRIEL func New 1 ---------")
+
 	// Lock the main goroutine to its current OS thread
 	runtime.LockOSThread()
 
+	fmt.Println("-------- GABRIEL func New 2 ---------")
+
 	WakuSetup() // This should only be called once in the whole app's life
 
+	fmt.Println("-------- GABRIEL func New 3 ---------")
 	node, err := wakuNew(nodeKey,
 		fleet,
 		cfg, logger, appDB, ts, onHistoricMessagesRequestFailed,
@@ -2406,17 +2421,21 @@ func New(nodeKey *ecdsa.PrivateKey,
 		return nil, err
 	}
 
+	fmt.Println("-------- GABRIEL func New 4 ---------")
 	defaultPubsubTopic, err := node.WakuDefaultPubsubTopic()
 	if err != nil {
 		fmt.Println("Error happened:", err.Error())
 	}
 
+	fmt.Println("-------- GABRIEL func New 5 ---------")
 	err = node.WakuRelaySubscribe(defaultPubsubTopic)
 	if err != nil {
 		fmt.Println("Error happened:", err.Error())
 	}
 
+	fmt.Println("-------- GABRIEL func New 6 ---------")
 	node.WakuSetEventCallback()
+	fmt.Println("-------- GABRIEL func New 7 ---------")
 
 	return node, nil
 
