@@ -14,6 +14,12 @@ type BlockchainFullStatus struct {
 	StatusPerChainPerProvider map[uint64]map[string]rpcstatus.ProviderStatus `json:"statusPerChainPerProvider"`
 }
 
+// BlockchainStatus contains the status of the blockchain
+type BlockchainStatus struct {
+	Status         rpcstatus.ProviderStatus            `json:"status"`
+	StatusPerChain map[uint64]rpcstatus.ProviderStatus `json:"statusPerChain"`
+}
+
 // BlockchainHealthManager manages the state of all providers and aggregates their statuses.
 type BlockchainHealthManager struct {
 	mu          sync.RWMutex

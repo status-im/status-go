@@ -19,7 +19,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/ethereum/go-ethereum/event"
 	appCommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
@@ -27,6 +29,7 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 const (
@@ -48,6 +51,8 @@ const (
 	// rpcUserAgentUpstreamFormat a separate user agent format for upstream, because we should not be using upstream
 	// if we see this user agent in the logs that means parts of the application are using a malconfigured http client
 	rpcUserAgentUpstreamFormat = "procuratee-%s-upstream/%s"
+
+	EventBlockchainHealthChanged walletevent.EventType = "wallet-blockchain-health-changed" // Full status of the blockchain (including provider statuses)
 )
 
 // List of RPC client errors.
@@ -101,6 +106,10 @@ type Client struct {
 	router         *router
 	NetworkManager *network.Manager
 
+	healthMgr          *healthmanager.BlockchainHealthManager
+	stopMonitoringFunc context.CancelFunc
+	walletFeed         *event.Feed
+
 	handlersMx sync.RWMutex       // mx guards handlers
 	handlers   map[string]Handler // locally registered handlers
 	log        log.Logger
@@ -116,7 +125,7 @@ var verifProxyInitFn func(c *Client)
 //
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
-func NewClient(client *gethrpc.Client, upstreamChainID uint64, networks []params.Network, db *sql.DB, providerConfigs []params.ProviderConfig) (*Client, error) {
+func NewClient(client *gethrpc.Client, upstreamChainID uint64, networks []params.Network, db *sql.DB, walletFeed *event.Feed, providerConfigs []params.ProviderConfig) (*Client, error) {
 	var err error
 
 	log := log.New("package", "status-go/rpc.Client")
@@ -138,6 +147,8 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, networks []params
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		log:                log,
 		providerConfigs:    providerConfigs,
+		healthMgr:          healthmanager.NewBlockchainHealthManager(),
+		walletFeed:         walletFeed,
 	}
 
 	c.UpstreamChainID = upstreamChainID
@@ -148,6 +159,55 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, networks []params
 	}
 
 	return &c, nil
+}
+
+func (c *Client) Start(ctx context.Context) {
+	if c.stopMonitoringFunc != nil {
+		c.log.Warn("Blockchain health manager already started")
+		return
+	}
+
+	cancelableCtx, cancel := context.WithCancel(ctx)
+	c.stopMonitoringFunc = cancel
+	statusCh := c.healthMgr.Subscribe()
+	go c.monitorHealth(cancelableCtx, statusCh)
+}
+
+func (c *Client) Stop() {
+	c.healthMgr.Stop()
+	if c.stopMonitoringFunc == nil {
+		return
+	}
+	c.stopMonitoringFunc()
+	c.stopMonitoringFunc = nil
+}
+
+func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
+	sendFullStatusEventFunc := func() {
+		blockchainStatus := c.healthMgr.GetFullStatus()
+		encodedMessage, err := json.Marshal(blockchainStatus)
+		if err != nil {
+			c.log.Warn("could not marshal full blockchain status", "error", err)
+			return
+		}
+		if c.walletFeed == nil {
+			return
+		}
+		c.walletFeed.Send(walletevent.Event{
+			Type:    EventBlockchainHealthChanged,
+			Message: string(encodedMessage),
+			At:      time.Now().Unix(),
+		})
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-statusCh:
+			sendFullStatusEventFunc()
+		}
+	}
 }
 
 func (c *Client) GetNetworkManager() *network.Manager {
@@ -207,8 +267,10 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 		return nil, fmt.Errorf("could not find any RPC URL for chain: %d", chainID)
 	}
 
-	client := chain.NewClient(ethClients, chainID)
-	client.SetWalletNotifier(c.walletNotifier)
+	phm := healthmanager.NewProvidersHealthManager(chainID)
+	c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
+
+	client := chain.NewClient(ethClients, chainID, phm)
 	c.rpcClients[chainID] = client
 	return client, nil
 }
