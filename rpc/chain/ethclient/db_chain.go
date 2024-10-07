@@ -13,6 +13,8 @@ type EthClientChainStorageReader interface {
 	GetBlockUncleJSONByHashAndIndex(blockHash common.Hash, index uint64) (json.RawMessage, error)
 	GetTransactionJSONByHash(transactionHash common.Hash) (json.RawMessage, error)
 	GetTransactionReceiptJSONByHash(transactionHash common.Hash) (json.RawMessage, error)
+	GetBalance(account common.Address, blockNumber *big.Int) (*big.Int, error)
+	GetTransactionCount(account common.Address, blockNumber *big.Int) (uint64, error)
 }
 
 type EthClientChainStorageWriter interface {
@@ -20,6 +22,8 @@ type EthClientChainStorageWriter interface {
 	PutBlockUnclesJSON(blockHash common.Hash, unclesJSON []json.RawMessage) error
 	PutTransactionsJSON(transactionsJSON []json.RawMessage) error
 	PutTransactionReceiptsJSON(receiptsJSON []json.RawMessage) error
+	PutBalance(account common.Address, blockNumber *big.Int, balance *big.Int) error
+	PutTransactionCount(account common.Address, blockNumber *big.Int, txCount uint64) error
 }
 
 type EthClientChainStorage interface {
@@ -59,6 +63,14 @@ func (b *DBChain) GetTransactionReceiptJSONByHash(transactionHash common.Hash) (
 	return b.s.GetTransactionReceiptJSONByHash(b.chainID, transactionHash)
 }
 
+func (b *DBChain) GetBalance(account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	return b.s.GetBalance(b.chainID, account, blockNumber)
+}
+
+func (b *DBChain) GetTransactionCount(account common.Address, blockNumber *big.Int) (uint64, error) {
+	return b.s.GetTransactionCount(b.chainID, account, blockNumber)
+}
+
 func (b *DBChain) PutBlockJSON(blkJSON json.RawMessage, transactionDetailsFlag bool) error {
 	return b.s.PutBlockJSON(b.chainID, blkJSON, transactionDetailsFlag)
 }
@@ -73,4 +85,12 @@ func (b *DBChain) PutTransactionsJSON(transactionsJSON []json.RawMessage) error 
 
 func (b *DBChain) PutTransactionReceiptsJSON(receiptsJSON []json.RawMessage) error {
 	return b.s.PutTransactionReceiptsJSON(b.chainID, receiptsJSON)
+}
+
+func (b *DBChain) PutBalance(account common.Address, blockNumber *big.Int, balance *big.Int) error {
+	return b.s.PutBalance(b.chainID, account, blockNumber, balance)
+}
+
+func (b *DBChain) PutTransactionCount(account common.Address, blockNumber *big.Int, txCount uint64) error {
+	return b.s.PutTransactionCount(b.chainID, account, blockNumber, txCount)
 }

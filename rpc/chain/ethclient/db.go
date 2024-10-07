@@ -23,6 +23,8 @@ type EthClientStorageReader interface {
 	GetBlockUncleJSONByHashAndIndex(chainID uint64, blockHash common.Hash, index uint64) (json.RawMessage, error)
 	GetTransactionJSONByHash(chainID uint64, transactionHash common.Hash) (json.RawMessage, error)
 	GetTransactionReceiptJSONByHash(chainID uint64, transactionHash common.Hash) (json.RawMessage, error)
+	GetBalance(chainID uint64, account common.Address, blockNumber *big.Int) (*big.Int, error)
+	GetTransactionCount(chainID uint64, account common.Address, blockNumber *big.Int) (uint64, error)
 }
 
 type EthClientStorageWriter interface {
@@ -30,6 +32,8 @@ type EthClientStorageWriter interface {
 	PutBlockUnclesJSON(chainID uint64, blockHash common.Hash, unclesJSON []json.RawMessage) error
 	PutTransactionsJSON(chainID uint64, transactionsJSON []json.RawMessage) error
 	PutTransactionReceiptsJSON(chainID uint64, receiptsJSON []json.RawMessage) error
+	PutBalance(chainID uint64, account common.Address, blockNumber *big.Int, balance *big.Int) error
+	PutTransactionCount(chainID uint64, account common.Address, blockNumber *big.Int, txCount uint64) error
 }
 
 type EthClientStorage interface {
@@ -145,6 +149,54 @@ func (b *DB) GetTransactionReceiptJSONByHash(chainID uint64, transactionHash com
 	return receiptJSON, nil
 }
 
+func (b *DB) GetBalance(chainID uint64, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	if !isConcreteBlockNumber(blockNumber) {
+		return nil, sql.ErrNoRows
+	}
+
+	q := sq.Select("balance").
+		From("blockchain_data_balances").
+		Where(sq.Eq{"chain_id": chainID, "account": account, "block_number": (*bigint.SQLBigIntBytes)(blockNumber)})
+
+	query, args, err := q.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	balanceInt := (*bigint.SQLBigIntBytes)(big.NewInt(0))
+
+	err = b.db.QueryRow(query, args...).Scan(&balanceInt)
+	if err != nil {
+		return nil, err
+	}
+
+	return (*big.Int)(balanceInt), nil
+}
+
+func (b *DB) GetTransactionCount(chainID uint64, account common.Address, blockNumber *big.Int) (uint64, error) {
+	if !isConcreteBlockNumber(blockNumber) {
+		return 0, sql.ErrNoRows
+	}
+
+	q := sq.Select("transaction_count").
+		From("blockchain_data_transaction_counts").
+		Where(sq.Eq{"chain_id": chainID, "account": account, "block_number": (*bigint.SQLBigIntBytes)(blockNumber)})
+
+	query, args, err := q.ToSql()
+	if err != nil {
+		return 0, err
+	}
+
+	txCount := uint64(0)
+
+	err = b.db.QueryRow(query, args...).Scan(&txCount)
+	if err != nil {
+		return 0, err
+	}
+
+	return txCount, nil
+}
+
 func (b *DB) PutBlockJSON(chainID uint64, blkJSON json.RawMessage, transactionDetailsFlag bool) (err error) {
 	var tx *sql.Tx
 	tx, err = b.db.Begin()
@@ -231,6 +283,42 @@ func (b *DB) PutTransactionReceiptsJSON(chainID uint64, receiptsJSON []json.RawM
 			return
 		}
 	}
+	return
+}
+
+func (b *DB) PutBalance(chainID uint64, account common.Address, blockNumber *big.Int, balance *big.Int) (err error) {
+	var tx *sql.Tx
+	tx, err = b.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	err = putBalance(tx, chainID, account, blockNumber, balance)
+	return
+}
+
+func (b *DB) PutTransactionCount(chainID uint64, account common.Address, blockNumber *big.Int, txCount uint64) (err error) {
+	var tx *sql.Tx
+	tx, err = b.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	err = putTransactionCount(tx, chainID, account, blockNumber, txCount)
 	return
 }
 
@@ -329,6 +417,58 @@ func putReceiptJSON(creator sqlite.StatementCreator, chainID uint64, receiptJSON
 	q := sq.Replace("blockchain_data_receipts").
 		SetMap(sq.Eq{"chain_id": chainID, "transaction_hash": receipt.TxHash,
 			"receipt_json": receiptJSON,
+		})
+
+	query, args, err := q.ToSql()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := creator.Prepare(query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(args...)
+
+	return err
+}
+
+func putBalance(creator sqlite.StatementCreator, chainID uint64, account common.Address, blockNumber *big.Int, balance *big.Int) error {
+	if !isConcreteBlockNumber(blockNumber) {
+		return errors.New("invalid block number")
+	}
+
+	q := sq.Replace("blockchain_data_balances").
+		SetMap(sq.Eq{"chain_id": chainID, "account": account, "block_number": (*bigint.SQLBigIntBytes)(blockNumber),
+			"balance": (*bigint.SQLBigIntBytes)(balance),
+		})
+
+	query, args, err := q.ToSql()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := creator.Prepare(query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(args...)
+
+	return err
+}
+
+func putTransactionCount(creator sqlite.StatementCreator, chainID uint64, account common.Address, blockNumber *big.Int, txCount uint64) error {
+	if !isConcreteBlockNumber(blockNumber) {
+		return errors.New("invalid block number")
+	}
+
+	q := sq.Replace("blockchain_data_transaction_counts").
+		SetMap(sq.Eq{"chain_id": chainID, "account": account, "block_number": (*bigint.SQLBigIntBytes)(blockNumber),
+			"transaction_count": txCount,
 		})
 
 	query, args, err := q.ToSql()
