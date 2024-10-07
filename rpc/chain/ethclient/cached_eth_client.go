@@ -275,3 +275,71 @@ func (c *CachedEthClient) TransactionReceipt(ctx context.Context, hash common.Ha
 
 	return r, nil
 }
+
+func (c *CachedEthClient) callGetBalance(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	var result *hexutil.Big
+	err := c.CallContext(ctx, &result, "eth_getBalance", account, toBlockNumArg(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+
+	return result.ToInt(), nil
+}
+
+func (c *CachedEthClient) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	var result *big.Int
+
+	cacheValid := true
+	result, err := c.storage.GetBalance(account, blockNumber)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	} else if err == sql.ErrNoRows {
+		cacheValid = false
+		result, err = c.callGetBalance(ctx, account, blockNumber)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !cacheValid && isConcreteBlockNumber(blockNumber) {
+		if err := c.storage.PutBalance(account, blockNumber, result); err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
+}
+
+func (c *CachedEthClient) callGetTransactionCount(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
+	var result hexutil.Uint64
+	err := c.CallContext(ctx, &result, "eth_getTransactionCount", account, toBlockNumArg(blockNumber))
+	if err != nil {
+		return 0, err
+	}
+
+	return uint64(result), nil
+}
+
+func (c *CachedEthClient) NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
+	var result uint64
+
+	cacheValid := true
+	result, err := c.storage.GetTransactionCount(account, blockNumber)
+	if err != nil && err != sql.ErrNoRows {
+		return 0, err
+	} else if err == sql.ErrNoRows {
+		cacheValid = false
+		result, err = c.callGetTransactionCount(ctx, account, blockNumber)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if !cacheValid && isConcreteBlockNumber(blockNumber) {
+		if err := c.storage.PutTransactionCount(account, blockNumber, result); err != nil {
+			return 0, err
+		}
+	}
+
+	return result, nil
+}

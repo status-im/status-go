@@ -125,3 +125,7 @@ type txExtraInfo struct {
 	BlockHash   *common.Hash    `json:"blockHash,omitempty"`
 	From        *common.Address `json:"from,omitempty"`
 }
+
+func isConcreteBlockNumber(blockNumber *big.Int) bool {
+	return blockNumber != nil && blockNumber.Cmp(big.NewInt(0)) >= 0
+}
