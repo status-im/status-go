@@ -44,7 +44,7 @@ func TestBlockedRoutesCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil, nil)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -83,7 +83,7 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil, nil)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -110,7 +110,7 @@ func TestUpdateUpstreamURL(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: true, URL: ts.URL}, []params.Network{}, db, nil)
+	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: true, URL: ts.URL}, []params.Network{}, db, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, ts.URL, c.upstreamURL)
 
@@ -183,7 +183,7 @@ func TestGetClientsUsingCache(t *testing.T) {
 			DefaultFallbackURL2: server.URL + path3,
 		},
 	}
-	c, err := NewClient(nil, 1, params.UpstreamRPCConfig{}, networks, db, providerConfigs)
+	c, err := NewClient(nil, 1, params.UpstreamRPCConfig{}, networks, db, nil, providerConfigs)
 	require.NoError(t, err)
 
 	// Networks from DB must pick up DefaultRPCURL, DefaultFallbackURL, DefaultFallbackURL2

@@ -10,47 +10,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	mock_market "github.com/status-im/status-go/services/wallet/market/mock"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	mock_thirdparty "github.com/status-im/status-go/services/wallet/thirdparty/mock"
 )
-
-type MockPriceProvider struct {
-	mock_thirdparty.MockMarketDataProvider
-	mockPrices map[string]map[string]float64
-}
-
-func NewMockPriceProvider(ctrl *gomock.Controller) *MockPriceProvider {
-	return &MockPriceProvider{
-		MockMarketDataProvider: *mock_thirdparty.NewMockMarketDataProvider(ctrl),
-	}
-}
-
-func (mpp *MockPriceProvider) setMockPrices(prices map[string]map[string]float64) {
-	mpp.mockPrices = prices
-}
-
-func (mpp *MockPriceProvider) ID() string {
-	return "MockPriceProvider"
-}
-
-func (mpp *MockPriceProvider) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
-	res := make(map[string]map[string]float64)
-	for _, symbol := range symbols {
-		res[symbol] = make(map[string]float64)
-		for _, currency := range currencies {
-			res[symbol][currency] = mpp.mockPrices[symbol][currency]
-		}
-	}
-	return res, nil
-}
-
-type MockPriceProviderWithError struct {
-	MockPriceProvider
-}
-
-func (mpp *MockPriceProviderWithError) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
-	return nil, errors.New("error")
-}
 
 func setupMarketManager(t *testing.T, providers []thirdparty.MarketDataProvider) *Manager {
 	return NewManager(providers, &event.Feed{})
@@ -80,8 +43,8 @@ var mockPrices = map[string]map[string]float64{
 func TestPrice(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	priceProvider := NewMockPriceProvider(ctrl)
-	priceProvider.setMockPrices(mockPrices)
+	priceProvider := mock_market.NewMockPriceProvider(ctrl)
+	priceProvider.SetMockPrices(mockPrices)
 
 	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{priceProvider, priceProvider})
 
@@ -125,9 +88,12 @@ func TestPrice(t *testing.T) {
 func TestFetchPriceErrorFirstProvider(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	priceProvider := NewMockPriceProvider(ctrl)
-	priceProvider.setMockPrices(mockPrices)
-	priceProviderWithError := &MockPriceProviderWithError{}
+	priceProvider := mock_market.NewMockPriceProvider(ctrl)
+	priceProvider.SetMockPrices(mockPrices)
+
+	customErr := errors.New("error")
+	priceProviderWithError := mock_market.NewMockPriceProviderWithError(ctrl, customErr)
+
 	symbols := []string{"BTC", "ETH"}
 	currencies := []string{"USD", "EUR"}
 
