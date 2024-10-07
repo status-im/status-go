@@ -6,6 +6,6 @@ services:
     ports:
       - 3333:3333
       - 8354:8354
-  status-go-no-funds:
+  status-backend:
     ports:
       - 3334:3333
