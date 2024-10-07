@@ -4,14 +4,14 @@ import jsonschema
 import json
 import time
 from conftest import option, user_1, user_2
-from test_cases import RpcTestCase, TransactionTestCase
+from test_cases import StatusDTestCase, TransactionTestCase
 from dataclasses import dataclass, field
 from typing import List, Optional
 
 
-@pytest.mark.rpc
-@pytest.mark.wakuext
-class TestRpc(RpcTestCase):
+
+@pytest.mark.skip("to be reworked via status-backend")
+class TestRpc(StatusDTestCase):
 
     @pytest.mark.parametrize(
         "method, params",
@@ -22,15 +22,12 @@ class TestRpc(RpcTestCase):
     def test_(self, method, params):
         _id = str(random.randint(1, 8888))
 
-        response = self.rpc_request(method, params, _id, url=option.rpc_url_2)
-        self.verify_is_valid_json_rpc_response(response)
-        self.verify_json_schema(response, method)
+        response = self.rpc_client.rpc_valid_request(method, params, _id, url=option.rpc_url_2)
+        self.rpc_client.verify_json_schema(response, method)
 
 
-@pytest.mark.rpc
-@pytest.mark.accounts
-@pytest.mark.wakuext
-class TestRpcMessaging(RpcTestCase):
+@pytest.mark.skip("to be reworked via status-backend")
+class TestRpcMessaging(StatusDTestCase):
 
     @dataclass
     class User:
@@ -46,10 +43,10 @@ class TestRpcMessaging(RpcTestCase):
 
         # get chat public key
         for user in self.user_1, self.user_2:
-            response = self.rpc_request(
+            response = self.rpc_client.rpc_request(
                 "accounts_getAccounts", [], _id, url=user.rpc_url
             )
-            self.verify_is_valid_json_rpc_response(response)
+            self.rpc_client.verify_is_valid_json_rpc_response(response)
 
             user.chat_public_key = next(
                 (
@@ -64,7 +61,7 @@ class TestRpcMessaging(RpcTestCase):
         for sender in self.user_1, self.user_2:
             for receiver in self.user_1, self.user_2:
                 if sender != receiver:
-                    response = self.rpc_request(
+                    response = self.rpc_client.rpc_request(
                         method="wakuext_sendContactRequest",
                         params=[
                             {
@@ -76,12 +73,12 @@ class TestRpcMessaging(RpcTestCase):
                         url=sender.rpc_url,
                     )
 
-                    self.verify_is_valid_json_rpc_response(response)
+                    self.rpc_client.verify_is_valid_json_rpc_response(response)
                     sender.chat_id = response.json()["result"]["chats"][0]["lastMessage"]["id"]
 
         # accept contact requests
         for user in self.user_1, self.user_2:
-            response = self.rpc_request(
+            response = self.rpc_client.rpc_request(
                 method="wakuext_acceptContactRequest",
                 params=[
                     {
@@ -91,17 +88,17 @@ class TestRpcMessaging(RpcTestCase):
                 _id=99,
                 url=user.rpc_url,
             )
-            self.verify_is_valid_json_rpc_response(response)
+            self.rpc_client.verify_is_valid_json_rpc_response(response)
 
         # verify contacts
         for user in (self.user_1, self.user_2), (self.user_2, self.user_1):
-            response = self.rpc_request(
+            response = self.rpc_client.rpc_request(
                 method="wakuext_contacts",
                 params=[],
                 _id=99,
                 url=user[0].rpc_url,
             )
-            self.verify_is_valid_json_rpc_response(response)
+            self.rpc_client.verify_is_valid_json_rpc_response(response)
 
             response = response.json()
             assert response["result"][0]["added"] == True

@@ -30,22 +30,18 @@ services:
       - ./coverage/binary:/coverage/binary
     stop_signal: SIGINT
 
-  # TODO: Remove this duplication when implemented: https://github.com/status-im/status-go/issues/5803
-  status-go-no-funds:
-    user: ${FUNCTIONAL_TESTS_DOCKER_UID}
+  status-backend:
+    user: ${INTEGRATION_TESTS_DOCKER_UID}
     build:
       context: ../
       dockerfile: _assets/build/Dockerfile
       args:
         build_tags: gowaku_no_rln,enable_private_api
-        build_target: statusd
+        build_target: status-backend
         build_flags: -cover
     entrypoint: [
-      "statusd",
-      "-c", "/static/configs/config.json",
-      "--seed-phrase", "test test test test test test test test test test test takoe",
-      "--password", "Strong12345",
-      "--dir", "/tmp/status-go-data", # Keep in sync with `config.json/DataDir` value. Later this arg will not be needed.
+      "status-backend",
+      "--address", "0.0.0.0:3333",
     ]
     healthcheck:
       test: ["CMD-SHELL", "curl -X POST --data '{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":1}' -H 'Content-Type: application/json' http://0.0.0.0:3333 || exit 1"]
@@ -63,7 +59,7 @@ services:
     depends_on:
       status-go:
         condition: service_healthy
-      status-go-no-funds:
+      status-backend:
         condition: service_healthy
       deploy-communities-contracts:
         condition: service_completed_successfully
@@ -72,12 +68,13 @@ services:
       dockerfile: Dockerfile.tests-rpc
     entrypoint: [
       "pytest",
-      "-m", "wallet or ethclient",
-      "--rpc_url=http://status-go:3333",
-      "--rpc_url_2=http://status-go-no-funds:3333",
+      "-m", "rpc",
       "--anvil_url=http://anvil:8545",
-      "--ws_url=ws://status-go:8354",
-      "--junitxml=/tests-rpc/reports/report.xml",
+      "--rpc_url_statusd=http://status-go:3333",
+      "--rpc_url_status_backend=http://status-backend:3333",
+      "--ws_url_statusd=ws://status-go:8354",
+      "--ws_url_status_backend=ws://status-backend:3333",
+      "--junitxml=/tests-rpc/reports/report.xml"
     ]
     volumes:
       - .:/tests-rpc

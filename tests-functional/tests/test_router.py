@@ -41,10 +41,9 @@ class TestTransactionFromRoute(SignalTestCase):
                 "fromLockedAmount": {}
             }
         ]
-        response = self.rpc_request(method, params)
-        self.verify_is_valid_json_rpc_response(response)
+        response = self.rpc_client.rpc_valid_request(method, params)
 
-        routes = self.wait_for_signal("wallet.suggested.routes")
+        routes = self.signal_client.wait_for_signal("wallet.suggested.routes")
         assert routes['event']['Uuid'] == _uuid
 
         method = "wallet_buildTransactionsFromRoute"
@@ -54,15 +53,13 @@ class TestTransactionFromRoute(SignalTestCase):
                 "slippagePercentage": 0
             }
         ]
-        response = self.rpc_request(method, params)
-        self.verify_is_valid_json_rpc_response(response)
+        response = self.rpc_client.rpc_valid_request(method, params)
 
-        self.wait_for_signal("wallet.router.sign-transactions")
+        wallet_router_sign_transactions = self.signal_client.wait_for_signal(
+            "wallet.router.sign-transactions")
 
-        assert self.received_signals[
-            'wallet.router.sign-transactions']['event']['signingDetails']['signOnKeycard'] == False
-        transaction_hashes = self.received_signals[
-            'wallet.router.sign-transactions']['event']['signingDetails']['hashes']
+        assert wallet_router_sign_transactions['event']['signingDetails']['signOnKeycard'] == False
+        transaction_hashes = wallet_router_sign_transactions['event']['signingDetails']['hashes']
 
         assert transaction_hashes, "Transaction hashes are empty!"
 
@@ -77,8 +74,7 @@ class TestTransactionFromRoute(SignalTestCase):
                 option.password
             ]
 
-            response = self.rpc_request(method, params)
-            self.verify_is_valid_json_rpc_response(response)
+            response = self.rpc_client.rpc_valid_request(method, params)
 
             if response.json()["result"].startswith("0x"):
                 tx_signature = response.json()["result"][2:]
@@ -98,11 +94,10 @@ class TestTransactionFromRoute(SignalTestCase):
                 "Signatures": tx_signatures
             }
         ]
-        response = self.rpc_request(method, params)
-        self.verify_is_valid_json_rpc_response(response)
+        response = self.rpc_client.rpc_valid_request(method, params)
 
-        tx_status = self.wait_for_signal("wallet.transaction.status-changed")
-
+        tx_status = self.signal_client.wait_for_signal(
+            "wallet.transaction.status-changed")
 
         assert tx_status["event"]["chainId"] == 31337
         assert tx_status["event"]["status"] == "Success"
@@ -111,8 +106,7 @@ class TestTransactionFromRoute(SignalTestCase):
         method = "eth_getTransactionByHash"
         params = [tx_hash]
 
-        response = self.rpc_request(method, params, url=option.anvil_url)
-        self.verify_is_valid_json_rpc_response(response)
+        response = self.rpc_client.rpc_valid_request(method, params, url=option.anvil_url)
         tx_details = response.json()["result"]
 
         assert tx_details["value"] == amount_in

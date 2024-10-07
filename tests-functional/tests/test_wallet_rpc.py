@@ -3,7 +3,7 @@ import pytest
 import jsonschema
 import json
 from conftest import option, user_1, user_2
-from test_cases import RpcTestCase, TransactionTestCase
+from test_cases import StatusDTestCase, TransactionTestCase
 
 
 @pytest.mark.wallet
@@ -31,14 +31,12 @@ class TestTransactionRpc(TransactionTestCase):
             params[0][0]["chainId"] = self.network_id
             params[0][0]["hash"] = self.tx_hash
 
-        response = self.rpc_request(method, params, _id)
-        self.verify_is_valid_json_rpc_response(response)
-        with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
-            jsonschema.validate(instance=response.json(), schema=json.load(schema))
+        response = self.rpc_client.rpc_valid_request(method, params, _id)
+        self.rpc_client.verify_json_schema(response, method)
 
     def test_create_multi_transaction(self):
         response = self.wallet_create_multi_transaction()
-        self.verify_is_valid_json_rpc_response(response)
+        self.rpc_client.verify_is_valid_json_rpc_response(response)
         
         # how to create schema:
         # from schema_builder import CustomSchemaBuilder
@@ -64,18 +62,17 @@ class TestTransactionRpc(TransactionTestCase):
                                                  changed_values,
                                                  expected_error_code, expected_error_text):
         response = self.wallet_create_multi_transaction(**changed_values)
-        self.verify_is_json_rpc_error(response)
+        self.rpc_client.verify_is_json_rpc_error(response)
         actual_error_code, actual_error_text = response.json()['error']['code'], response.json()['error']['message']
         assert expected_error_code == actual_error_code, f"got code: {actual_error_code} instead of expected: {expected_error_code}"
         assert expected_error_text in actual_error_text, f"got error: {actual_error_text} that does not include: {expected_error_text}"
 
-        with open(f"{option.base_dir}/schemas/wallet_createMultiTransaction/transferTx_error", "r") as schema:
-             jsonschema.validate(instance=response.json(), schema=json.load(schema))
+        self.rpc_client.verify_json_schema(response, "wallet_createMultiTransaction/transferTx_error")
 
 
 @pytest.mark.wallet
 @pytest.mark.rpc
-class TestRpc(RpcTestCase):
+class TestRpc(StatusDTestCase):
 
     @pytest.mark.parametrize(
         "method, params",
@@ -90,7 +87,5 @@ class TestRpc(RpcTestCase):
     def test_(self, method, params):
         _id = str(random.randint(1, 8888))
 
-        response = self.rpc_request(method, params, _id)
-        self.verify_is_valid_json_rpc_response(response)
-        with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
-            jsonschema.validate(instance=response.json(), schema=json.load(schema))
+        response = self.rpc_client.rpc_valid_request(method, params, _id)
+        self.rpc_client.verify_json_schema(response, method)
