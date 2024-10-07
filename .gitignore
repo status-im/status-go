@@ -118,7 +118,7 @@ mock.go
 *.pb.go
 bindata.go
 migrations.go
-cmd/statusd/server/endpoints.go
+cmd/status-backend/server/endpoints.go
 protocol/messenger_handlers.go
 
 # Don't ignore generated files in the vendor/ directory
