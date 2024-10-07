@@ -28,8 +28,17 @@ message User {
  string color = 3;
 }
 
+message Transaction {
+    uint32 txType = 1;
+    string address = 2;
+    string amount = 3;
+    string asset = 4;
+    uint32 chainId = 5;
+    string toAsset = 6;
+}
+
 message URLData {
- // Community, Channel, or User
+ // Community, Channel, User or Transaction
  bytes content = 1;
  Shard shard = 2;
 }

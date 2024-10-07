@@ -45,11 +45,21 @@ type ContactURLData struct {
 	PublicKey   string `json:"publicKey"`
 }
 
+type TransactionURLData struct {
+	TxType  int    `json:"txType"`
+	Address string `json:"address"`
+	Amount  string `json:"amount"`
+	Asset   string `json:"asset"`
+	ChainID int    `json:"chainId"`
+	ToAsset string `json:"toAsset"`
+}
+
 type URLDataResponse struct {
-	Community *CommunityURLData        `json:"community"`
-	Channel   *CommunityChannelURLData `json:"channel"`
-	Contact   *ContactURLData          `json:"contact"`
-	Shard     *shard.Shard             `json:"shard,omitempty"`
+	Community   *CommunityURLData        `json:"community"`
+	Channel     *CommunityChannelURLData `json:"channel"`
+	Contact     *ContactURLData          `json:"contact"`
+	Transaction *TransactionURLData      `json:"tx"`
+	Shard       *shard.Shard             `json:"shard,omitempty"`
 }
 
 const baseShareURL = "https://status.app"
@@ -58,12 +68,14 @@ const userWithDataPath = "u/"
 const communityPath = "c#"
 const communityWithDataPath = "c/"
 const channelPath = "cc/"
+const transactionPath = "tx/"
 
 const sharedURLUserPrefix = baseShareURL + "/" + userPath
 const sharedURLUserPrefixWithData = baseShareURL + "/" + userWithDataPath
 const sharedURLCommunityPrefix = baseShareURL + "/" + communityPath
 const sharedURLCommunityPrefixWithData = baseShareURL + "/" + communityWithDataPath
 const sharedURLChannelPrefixWithData = baseShareURL + "/" + channelPath
+const sharedURLTransaction = baseShareURL + "/" + transactionPath
 
 const channelUUIDRegExp = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$"
 
@@ -302,6 +314,77 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 	return encodedData, shortKey, nil
 }
 
+func (m *Messenger) ShareTransactionURL(request *requests.TransactionShareURL) (string, error) {
+	encodedData, err := m.prepareTransactionUrl(request)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s%s", sharedURLTransaction, encodedData), nil
+}
+
+func (m *Messenger) prepareTransactionUrl(request *requests.TransactionShareURL) (string, error) {
+	if err := request.Validate(); err != nil {
+		return "", err
+	}
+
+	txProto := &protobuf.Transaction{
+		TxType:  uint32(request.TxType),
+		Address: request.Address,
+		Amount:  request.Amount,
+		Asset:   request.Asset,
+		ChainId: uint32(request.ChainID),
+		ToAsset: request.ToAsset,
+	}
+	txData, err := proto.Marshal(txProto)
+	if err != nil {
+		return "", err
+	}
+	urlDataProto := &protobuf.URLData{
+		Content: txData,
+	}
+
+	urlData, err := proto.Marshal(urlDataProto)
+	if err != nil {
+		return "", err
+	}
+
+	encodedData, err := encodeDataURL(urlData)
+	if err != nil {
+		return "", err
+	}
+	return encodedData, nil
+}
+
+func parseTransactionURL(data string) (*URLDataResponse, error) {
+	urlData, err := decodeDataURL(data)
+	if err != nil {
+		return nil, err
+	}
+
+	var urlDataProto protobuf.URLData
+	err = proto.Unmarshal(urlData, &urlDataProto)
+	if err != nil {
+		return nil, err
+	}
+
+	var txProto protobuf.Transaction
+	err = proto.Unmarshal(urlDataProto.Content, &txProto)
+	if err != nil {
+		return nil, err
+	}
+
+	return &URLDataResponse{
+		Transaction: &TransactionURLData{
+			TxType:  int(txProto.TxType),
+			Address: txProto.Address,
+			Amount:  txProto.Amount,
+			Asset:   txProto.Asset,
+			ChainID: int(txProto.ChainId),
+			ToAsset: txProto.ToAsset,
+		},
+	}, nil
+}
+
 func (m *Messenger) ShareCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
 	if err := request.Validate(); err != nil {
 		return "", err
@@ -518,7 +601,8 @@ func IsStatusSharedURL(url string) bool {
 		strings.HasPrefix(url, sharedURLUserPrefixWithData) ||
 		strings.HasPrefix(url, sharedURLCommunityPrefix) ||
 		strings.HasPrefix(url, sharedURLCommunityPrefixWithData) ||
-		strings.HasPrefix(url, sharedURLChannelPrefixWithData)
+		strings.HasPrefix(url, sharedURLChannelPrefixWithData) ||
+		strings.HasPrefix(url, sharedURLTransaction)
 }
 
 func splitSharedURLData(data string) (string, string, error) {
@@ -574,6 +658,11 @@ func ParseSharedURL(url string) (*URLDataResponse, error) {
 			return parseCommunityChannelURLWithChatKey(encodedData, chatKey)
 		}
 		return parseCommunityChannelURLWithData(encodedData, chatKey)
+	}
+
+	if strings.HasPrefix(url, sharedURLTransaction) {
+		trimmedURL := strings.TrimPrefix(url, sharedURLTransaction)
+		return parseTransactionURL(trimmedURL)
 	}
 
 	return nil, fmt.Errorf("not a status shared url")
