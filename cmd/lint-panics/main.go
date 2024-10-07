@@ -21,7 +21,7 @@ func main() {
 		panic(err)
 	}
 
-	logger = logger.Named("main")
+	//logger = logger.Named("main")
 
 	//handler := log.StreamHandler(os.Stdout, log.TerminalFormat(true))
 	//log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, handler))

@@ -57,18 +57,18 @@ func checkFileForGoroutines(filePath string, definition definitionGetter, logger
 			zap.String("lineContent", line),
 		)
 
-		cursorPos -= 2
-
 		// Calculate the cursor position by adjusting for tabs (counting tabs as 4 characters)
 		//tabs := strings.Count(line[:cursorPos], "\t")
 		//adjustedCursorPos := cursorPos - (tabs * 4) // Subtract 3 for each tab since a tab counts as 4 chars
 
+		// NOTE: gopls uses 0-based line and column numbers
 		defFilePath, defLineNumber, err := definition(filePath, lineNumber-1, cursorPos)
 		if err != nil {
 			lineLogger.Error("failed to find function", zap.Error(err))
 			continue
 		}
 
+		defLineNumber += 1
 		checkFirstLineInFunctionBody(defFilePath, defLineNumber, logger)
 	}
 
@@ -101,9 +101,9 @@ func checkFirstLineInFunctionBody(filePath string, startLine int, givenLogger *z
 		url := fmt.Sprintf("%s:%d", filePath, startLine)
 
 		if strings.Contains(line, "LogOnPanic()") {
-			givenLogger.Info("found defer gocommon.LogOnPanic() in function", zap.String("url", url))
+			givenLogger.Info("found LogOnPanic()", zap.String("url", url))
 		} else {
-			givenLogger.Warn("missing defer gocommon.LogOnPanic() in function", zap.String("url", url))
+			givenLogger.Warn("missing LogOnPanic()", zap.String("url", url))
 		}
 
 		return
