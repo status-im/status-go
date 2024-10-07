@@ -1,5 +1,6 @@
 import pytest
 
+from conftest import user_1
 from test_cases import EthRpcTestCase
 
 
@@ -41,6 +42,14 @@ class TestEth(EthRpcTestCase):
 
     def test_suggest_gas_price(self, tx_data, iterations):
         self.rpc_client.rpc_valid_request("ethclient_suggestGasPrice", [self.network_id])
+
+    def test_balance_at(self, tx_data, iterations):
+        self.rpc_client.rpc_valid_request("ethclient_balanceAt", [self.network_id, user_1.address, "0x0"])
+        self.rpc_client.rpc_valid_request("ethclient_balanceAt", [self.network_id, user_1.address, tx_data.block_number])
+
+    def test_nonce_at(self, tx_data, iterations):
+        self.rpc_client.rpc_valid_request("ethclient_nonceAt", [self.network_id, user_1.address, "0x0"])
+        self.rpc_client.rpc_valid_request("ethclient_nonceAt", [self.network_id, user_1.address, tx_data.block_number])
 
     def test_header_by_number(self, tx_data, iterations):
         response = self.rpc_client.rpc_valid_request("ethclient_headerByNumber",

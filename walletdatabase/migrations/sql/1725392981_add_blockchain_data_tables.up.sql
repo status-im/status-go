@@ -45,3 +45,27 @@ CREATE TABLE IF NOT EXISTS blockchain_data_receipts (
 ) WITHOUT ROWID;
 
 CREATE INDEX IF NOT EXISTS idx_blockchain_data_receipts_chain_id_transaction_hash ON blockchain_data_receipts (chain_id, transaction_hash);
+
+-- store balances
+CREATE TABLE IF NOT EXISTS blockchain_data_balances (
+    chain_id UNSIGNED BIGINT NOT NULL,
+    account BLOB NOT NULL,
+    block_number BLOB NOT NULL,
+    balance BLOB NOT NULL,
+    PRIMARY KEY (chain_id, account, block_number),
+    CONSTRAINT unique_balance_per_chain_per_account_per_block_number UNIQUE (chain_id, account, block_number) ON CONFLICT REPLACE
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_blockchain_data_balances_chain_id_account_block_number ON blockchain_data_balances (chain_id, account, block_number);
+
+-- store transaction counts
+CREATE TABLE IF NOT EXISTS blockchain_data_transaction_counts (
+    chain_id UNSIGNED BIGINT NOT NULL,
+    account BLOB NOT NULL,
+    block_number BLOB NOT NULL,
+    transaction_count BIGINT NOT NULL,
+    PRIMARY KEY (chain_id, account, block_number),
+    CONSTRAINT unique_transaction_count_per_chain_per_account_per_block_number UNIQUE (chain_id, account, block_number) ON CONFLICT REPLACE
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_blockchain_data_transaction_count_chain_id_account_block_number ON blockchain_data_transaction_counts (chain_id, account, block_number);

@@ -149,3 +149,23 @@ func (pa *PrivateAPI) BlockNumber(ctx context.Context, chainId uint64) (uint64, 
 
 	return client.BlockNumber(ctx)
 }
+
+func (pa *PrivateAPI) BalanceAt(ctx context.Context, chainId uint64, account common.Address, blockNumber *hexutil.Big) (*hexutil.Big, error) {
+	client, err := pa.client.EthClient(chainId)
+	if err != nil {
+		return nil, err
+	}
+
+	balance, err := client.BalanceAt(ctx, account, (*big.Int)(blockNumber))
+	return (*hexutil.Big)(balance), err
+}
+
+func (pa *PrivateAPI) NonceAt(ctx context.Context, chainId uint64, account common.Address, blockNumber *hexutil.Big) (uint64, error) {
+	client, err := pa.client.EthClient(chainId)
+	if err != nil {
+		return 0, err
+	}
+
+	nonce, err := client.NonceAt(ctx, account, (*big.Int)(blockNumber))
+	return nonce, err
+}
