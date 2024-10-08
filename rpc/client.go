@@ -124,35 +124,46 @@ type Client struct {
 // Is initialized in a build-tag-dependent module
 var verifProxyInitFn func(c *Client)
 
+// ClientConfig holds the configuration for initializing a new Client.
+type ClientConfig struct {
+	Client          *gethrpc.Client
+	UpstreamChainID uint64
+	UpstreamConfig  params.UpstreamRPCConfig
+	Networks        []params.Network
+	DB              *sql.DB
+	WalletFeed      *event.Feed
+	ProviderConfigs []params.ProviderConfig
+}
+
 // NewClient initializes Client and tries to connect to both,
 // upstream and local node.
 //
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
-func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.UpstreamRPCConfig, networks []params.Network, db *sql.DB, walletFeed *event.Feed, providerConfigs []params.ProviderConfig) (*Client, error) {
+func NewClient(config ClientConfig) (*Client, error) {
 	var err error
 
 	log := log.New("package", "status-go/rpc.Client")
-	networkManager := network.NewManager(db)
+	networkManager := network.NewManager(config.DB)
 	if networkManager == nil {
 		return nil, errors.New("failed to create network manager")
 	}
 
-	err = networkManager.Init(networks)
+	err = networkManager.Init(config.Networks)
 	if err != nil {
 		log.Error("Network manager failed to initialize", "error", err)
 	}
 
 	c := Client{
-		local:              client,
+		local:              config.Client,
 		NetworkManager:     networkManager,
 		handlers:           make(map[string]Handler),
 		rpcClients:         make(map[uint64]chain.ClientInterface),
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		log:                log,
-		providerConfigs:    providerConfigs,
+		providerConfigs:    config.ProviderConfigs,
 		healthMgr:          healthmanager.NewBlockchainHealthManager(),
-		walletFeed:         walletFeed,
+		walletFeed:         config.WalletFeed,
 	}
 
 	var opts []gethrpc.ClientOption
@@ -162,10 +173,10 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		}),
 	)
 
-	if upstream.Enabled {
-		c.UpstreamChainID = upstreamChainID
-		c.upstreamEnabled = upstream.Enabled
-		c.upstreamURL = upstream.URL
+	if config.UpstreamConfig.Enabled {
+		c.UpstreamChainID = config.UpstreamChainID
+		c.upstreamEnabled = config.UpstreamConfig.Enabled
+		c.upstreamURL = config.UpstreamConfig.URL
 		upstreamClient, err := gethrpc.DialOptions(context.Background(), c.upstreamURL, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("dial upstream server: %s", err)
@@ -180,14 +191,17 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		}
 
 		// Include the chain-id in the rpc client
-		rpcName := fmt.Sprintf("%s-chain-id-%d", hostPortUpstream, upstreamChainID)
+		rpcName := fmt.Sprintf("%s-chain-id-%d", hostPortUpstream, config.UpstreamChainID)
 
 		ethClients := []ethclient.RPSLimitedEthClientInterface{
 			ethclient.NewRPSLimitedEthClient(upstreamClient, limiter, rpcName),
 		}
-		phm := healthmanager.NewProvidersHealthManager(upstreamChainID)
-		c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
-		c.upstream = chain.NewClient(ethClients, upstreamChainID, phm)
+		phm := healthmanager.NewProvidersHealthManager(config.UpstreamChainID)
+		err = c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
+		if err != nil {
+			return nil, fmt.Errorf("register providers health manager: %s", err)
+		}
+		c.upstream = chain.NewClient(ethClients, config.UpstreamChainID, phm)
 	}
 
 	c.router = newRouter(c.upstreamEnabled)
@@ -309,7 +323,10 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 	}
 
 	phm := healthmanager.NewProvidersHealthManager(chainID)
-	c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
+	err := c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
+	if err != nil {
+		return nil, fmt.Errorf("register providers health manager: %s", err)
+	}
 
 	client := chain.NewClient(ethClients, chainID, phm)
 	c.rpcClients[chainID] = client
@@ -456,7 +473,10 @@ func (c *Client) UpdateUpstreamURL(url string) error {
 		ethclient.NewRPSLimitedEthClient(rpcClient, rpsLimiter, hostPortUpstream),
 	}
 	phm := healthmanager.NewProvidersHealthManager(c.UpstreamChainID)
-	c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
+	err = c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
+	if err != nil {
+		return fmt.Errorf("register providers health manager: %s", err)
+	}
 	c.upstream = chain.NewClient(ethClients, c.UpstreamChainID, phm)
 	c.upstreamURL = url
 	c.Unlock()

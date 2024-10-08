@@ -44,7 +44,16 @@ func TestBlockedRoutesCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil, nil)
+	config := ClientConfig{
+		Client:          gethRPCClient,
+		UpstreamChainID: 1,
+		UpstreamConfig:  params.UpstreamRPCConfig{Enabled: false, URL: ""},
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	c, err := NewClient(config)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -83,7 +92,16 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil, nil)
+	config := ClientConfig{
+		Client:          gethRPCClient,
+		UpstreamChainID: 1,
+		UpstreamConfig:  params.UpstreamRPCConfig{Enabled: false, URL: ""},
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	c, err := NewClient(config)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -110,7 +128,16 @@ func TestUpdateUpstreamURL(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: true, URL: ts.URL}, []params.Network{}, db, nil, nil)
+	config := ClientConfig{
+		Client:          gethRPCClient,
+		UpstreamChainID: 1,
+		UpstreamConfig:  params.UpstreamRPCConfig{Enabled: true, URL: ts.URL},
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	c, err := NewClient(config)
 	require.NoError(t, err)
 	require.Equal(t, ts.URL, c.upstreamURL)
 
@@ -183,7 +210,18 @@ func TestGetClientsUsingCache(t *testing.T) {
 			DefaultFallbackURL2: server.URL + path3,
 		},
 	}
-	c, err := NewClient(nil, 1, params.UpstreamRPCConfig{}, networks, db, nil, providerConfigs)
+
+	config := ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		UpstreamConfig:  params.UpstreamRPCConfig{},
+		Networks:        networks,
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: providerConfigs,
+	}
+
+	c, err := NewClient(config)
 	require.NoError(t, err)
 
 	// Networks from DB must pick up DefaultRPCURL, DefaultFallbackURL, DefaultFallbackURL2

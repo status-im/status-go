@@ -5,32 +5,31 @@ import (
 	"fmt"
 	"sync"
 
-	statusaggregator "github.com/status-im/status-go/healthmanager/aggregator"
+	"github.com/status-im/status-go/healthmanager/aggregator"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 )
 
 type ProvidersHealthManager struct {
 	mu          sync.RWMutex
 	chainID     uint64
-	aggregator  *statusaggregator.Aggregator
+	aggregator  *aggregator.Aggregator
 	subscribers []chan struct{}
+	lastStatus  *rpcstatus.ProviderStatus
 }
 
 // NewProvidersHealthManager creates a new instance of ProvidersHealthManager with the given chain ID.
 func NewProvidersHealthManager(chainID uint64) *ProvidersHealthManager {
-	aggregator := statusaggregator.NewAggregator(fmt.Sprintf("%d", chainID))
+	agg := aggregator.NewAggregator(fmt.Sprintf("%d", chainID))
 
 	return &ProvidersHealthManager{
 		chainID:    chainID,
-		aggregator: aggregator,
+		aggregator: agg,
 	}
 }
 
 // Update processes a batch of provider call statuses, updates the aggregated status, and emits chain status changes if necessary.
 func (p *ProvidersHealthManager) Update(ctx context.Context, callStatuses []rpcstatus.RpcProviderCallStatus) {
 	p.mu.Lock()
-
-	previousStatus := p.aggregator.GetAggregatedStatus()
 
 	// Update the aggregator with the new provider statuses
 	for _, rpcCallStatus := range callStatuses {
@@ -40,7 +39,7 @@ func (p *ProvidersHealthManager) Update(ctx context.Context, callStatuses []rpcs
 
 	newStatus := p.aggregator.GetAggregatedStatus()
 
-	shouldEmit := newStatus.Status != previousStatus.Status
+	shouldEmit := p.lastStatus == nil || p.lastStatus.Status != newStatus.Status
 	p.mu.Unlock()
 
 	if !shouldEmit {
@@ -48,6 +47,10 @@ func (p *ProvidersHealthManager) Update(ctx context.Context, callStatuses []rpcs
 	}
 
 	p.emitChainStatus(ctx)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.lastStatus = &newStatus
+
 }
 
 // GetStatuses returns a copy of the current provider statuses.
@@ -95,7 +98,7 @@ func (p *ProvidersHealthManager) UnsubscribeAll() {
 func (p *ProvidersHealthManager) Reset() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.aggregator = statusaggregator.NewAggregator(fmt.Sprintf("%d", p.chainID))
+	p.aggregator = aggregator.NewAggregator(fmt.Sprintf("%d", p.chainID))
 }
 
 // Status Returns the current aggregated status
