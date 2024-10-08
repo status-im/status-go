@@ -1,19 +1,5 @@
 package wakuv2
 
-import (
-	"errors"
-
-	"go.uber.org/zap"
-
-	"github.com/waku-org/go-waku/waku/v2/api/publish"
-	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/wakuv2/common"
-)
-
 type PublishMethod int
 
 const (
@@ -34,7 +20,7 @@ func (pm PublishMethod) String() string {
 
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
-func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]byte, error) {
+/* func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]byte, error) {
 	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
 	if w.protectedTopicStore != nil {
 		privKey, err := w.protectedTopicStore.FetchPrivateKey(pubsubTopic)
@@ -160,4 +146,4 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope, publishFn publish.Pu
 			})
 		}
 	}
-}
+} */

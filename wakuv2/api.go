@@ -18,27 +18,7 @@
 
 package wakuv2
 
-import (
-	"context"
-	"crypto/ecdsa"
-	"errors"
-	"fmt"
-	"sync"
-	"time"
-
-	"github.com/waku-org/go-waku/waku/v2/payload"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-
-	"github.com/status-im/status-go/wakuv2/common"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rpc"
-
-	"google.golang.org/protobuf/proto"
-)
-
+/*
 // List of errors
 var (
 	ErrSymAsym              = errors.New("specify either a symmetric or an asymmetric key")
@@ -513,4 +493,4 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 	api.mu.Unlock()
 
 	return id, nil
-}
+} */

@@ -5,11 +5,8 @@ package wakuv2
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/big"
-	"os"
 	"testing"
 	"time"
 
@@ -21,16 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
-	"google.golang.org/protobuf/proto"
-
-	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
-	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv2/common"
 )
 
 var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
@@ -174,7 +163,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, err)
 	fmt.Println("---------- GABRIEL 2 ----------")
 
-	// Creating a fake DNS Discovery ENRTree
+	/* // Creating a fake DNS Discovery ENRTree
 	tree, url := makeTestTree("n", parseNodes([]string{nwakuInfo.EnrUri}), nil)
 	fmt.Println("---------- GABRIEL 3 ----------")
 	enrTreeAddress := url
@@ -184,14 +173,27 @@ func TestBasicWakuV2(t *testing.T) {
 	}
 
 	fmt.Println("---------- GABRIEL 4 ----------")
-	config := &Config{}
+	fmt.Println("---------- enrTreeAddress: ", enrTreeAddress) */
+	
+	// Instead of the Config type, use WakuConfig
+	/* config := &Config{}
 	setDefaultConfig(config, false)
 	config.Port = 0
 	config.Resolver = mapResolver(tree.ToTXT("n"))
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
-	config.WakuNodes = []string{enrTreeAddress}
-	w, err := New(nil, "", config, nil, nil, nil, nil, nil)
+	config.WakuNodes = []string{enrTreeAddress} */
+
+	nwakuConfig := WakuConfig{
+	 // Host:        cfg.Host,
+		Port:        30303,
+		NodeKey:     "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
+		EnableRelay: true,
+		LogLevel:    "DEBUG",
+		DiscV5BootstrapNodes: []string{nwakuInfo.EnrUri},
+	}
+	
+	w, err := New(nil, "", &nwakuConfig, nil, nil, nil, nil, nil)
 	fmt.Println("---------- GABRIEL 5 ----------")
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
@@ -203,6 +205,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	fmt.Println("---------- GABRIEL 7 ----------")
 
+	/*
 	// DNSDiscovery
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -212,12 +215,19 @@ func TestBasicWakuV2(t *testing.T) {
 	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress, dnsdisc.WithResolver(config.Resolver))
 	require.NoError(t, err)
 
+	fmt.Println("---------- discoveredNodes: ", discoveredNodes)
+	
 	fmt.Println("---------- GABRIEL 9 ----------")
 	// Peer used for retrieving history
 	r, err := rand.Int(rand.Reader, big.NewInt(int64(len(discoveredNodes))))
 	require.NoError(t, err)
 
 	storeNode := discoveredNodes[int(r.Int64())]
+
+	fmt.Println("---------- storeNode: ", storeNode)
+	*/
+
+	// storeNode := discoveredNodes[int(r.Int64())]
 
 	fmt.Println("---------- GABRIEL 10 ----------")
 	options := func(b *backoff.ExponentialBackOff) {
@@ -236,7 +246,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	fmt.Println("---------- GABRIEL 12 ----------")
 
-	// Dropping Peer
+	/* // Dropping Peer
 	err = w.DropPeer(storeNode.PeerID)
 	require.NoError(t, err)
 
@@ -309,7 +319,7 @@ func TestBasicWakuV2(t *testing.T) {
 		}
 		return nil
 	}, options)
-	require.NoError(t, err)
+	require.NoError(t, err) */
 
 	require.NoError(t, w.Stop())
 }
