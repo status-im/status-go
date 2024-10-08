@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
-	"github.com/stretchr/testify/suite"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
 )
 
 type ProvidersHealthManagerSuite struct {
@@ -139,9 +141,12 @@ func (s *BlockchainHealthManagerSuite) TestInterleavedChainStatusChanges() {
 	phm1 := NewProvidersHealthManager(1)
 	phm2 := NewProvidersHealthManager(2)
 	phm3 := NewProvidersHealthManager(3)
-	s.manager.RegisterProvidersHealthManager(s.ctx, phm1)
-	s.manager.RegisterProvidersHealthManager(s.ctx, phm2)
-	s.manager.RegisterProvidersHealthManager(s.ctx, phm3)
+	err := s.manager.RegisterProvidersHealthManager(s.ctx, phm1)
+	s.Require().NoError(err)
+	err = s.manager.RegisterProvidersHealthManager(s.ctx, phm2)
+	s.Require().NoError(err)
+	err = s.manager.RegisterProvidersHealthManager(s.ctx, phm3)
+	s.Require().NoError(err)
 
 	// Subscribe to status updates
 	ch := s.manager.Subscribe()
@@ -163,7 +168,7 @@ func (s *BlockchainHealthManagerSuite) TestInterleavedChainStatusChanges() {
 	s.waitForUpdate(ch, rpcstatus.StatusUp, 100*time.Millisecond)
 
 	// Check that short status correctly reflects the mixed state
-	shortStatus := s.manager.GetShortStatus()
+	shortStatus := s.manager.GetStatusPerChain()
 	s.Equal(rpcstatus.StatusUp, shortStatus.Status.Status)
 	s.Equal(rpcstatus.StatusDown, shortStatus.StatusPerChain[1].Status) // Chain 1 is down
 	s.Equal(rpcstatus.StatusUp, shortStatus.StatusPerChain[2].Status)   // Chain 2 is still up
@@ -174,8 +179,10 @@ func (s *BlockchainHealthManagerSuite) TestDelayedChainUpdate() {
 	// Register providers for chains 1 and 2
 	phm1 := NewProvidersHealthManager(1)
 	phm2 := NewProvidersHealthManager(2)
-	s.manager.RegisterProvidersHealthManager(s.ctx, phm1)
-	s.manager.RegisterProvidersHealthManager(s.ctx, phm2)
+	err := s.manager.RegisterProvidersHealthManager(s.ctx, phm1)
+	s.Require().NoError(err)
+	err = s.manager.RegisterProvidersHealthManager(s.ctx, phm2)
+	s.Require().NoError(err)
 
 	// Subscribe to status updates
 	ch := s.manager.Subscribe()
@@ -195,7 +202,7 @@ func (s *BlockchainHealthManagerSuite) TestDelayedChainUpdate() {
 	s.waitForUpdate(ch, rpcstatus.StatusDown, 100*time.Millisecond)
 
 	// Check that short status reflects the final state where both chains are down
-	shortStatus := s.manager.GetShortStatus()
+	shortStatus := s.manager.GetStatusPerChain()
 	s.Equal(rpcstatus.StatusDown, shortStatus.Status.Status)
 	s.Equal(rpcstatus.StatusDown, shortStatus.StatusPerChain[1].Status) // Chain 1 is down
 	s.Equal(rpcstatus.StatusDown, shortStatus.StatusPerChain[2].Status) // Chain 2 is down

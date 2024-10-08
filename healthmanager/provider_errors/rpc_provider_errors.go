@@ -2,10 +2,11 @@ package provider_errors
 
 import (
 	"errors"
+	"strings"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/rpc"
-	"strings"
 )
 
 type RpcProviderErrorType string

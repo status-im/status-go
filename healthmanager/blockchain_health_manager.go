@@ -2,15 +2,16 @@ package healthmanager
 
 import (
 	"context"
-	"fmt"
+	"sync"
+
 	"github.com/status-im/status-go/healthmanager/aggregator"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
-	"sync"
 )
 
 // BlockchainFullStatus contains the full status of the blockchain, including provider statuses.
 type BlockchainFullStatus struct {
 	Status                    rpcstatus.ProviderStatus                       `json:"status"`
+	StatusPerChain            map[uint64]rpcstatus.ProviderStatus            `json:"statusPerChain"`
 	StatusPerChainPerProvider map[uint64]map[string]rpcstatus.ProviderStatus `json:"statusPerChainPerProvider"`
 }
 
@@ -28,7 +29,7 @@ type BlockchainHealthManager struct {
 
 	providers   map[uint64]*ProvidersHealthManager
 	cancelFuncs map[uint64]context.CancelFunc // Map chainID to cancel functions
-	lastStatus  BlockchainStatus
+	lastStatus  *BlockchainStatus
 	wg          sync.WaitGroup
 }
 
@@ -43,30 +44,37 @@ func NewBlockchainHealthManager() *BlockchainHealthManager {
 }
 
 // RegisterProvidersHealthManager registers the provider health manager.
-// It prevents registering the same provider twice for the same chain.
+// It removes any existing provider for the same chain before registering the new one.
 func (b *BlockchainHealthManager) RegisterProvidersHealthManager(ctx context.Context, phm *ProvidersHealthManager) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// Check if the provider for the given chainID is already registered
-	if _, exists := b.providers[phm.ChainID()]; exists {
-		// Log a warning or return an error to indicate that the provider is already registered
-		return fmt.Errorf("provider for chainID %d is already registered", phm.ChainID())
+	chainID := phm.ChainID()
+
+	// Check if a provider for the given chainID is already registered and remove it
+	if _, exists := b.providers[chainID]; exists {
+		// Cancel the existing context
+		if cancel, cancelExists := b.cancelFuncs[chainID]; cancelExists {
+			cancel()
+		}
+		// Remove the old registration
+		delete(b.providers, chainID)
+		delete(b.cancelFuncs, chainID)
 	}
 
 	// Proceed with the registration
-	b.providers[phm.ChainID()] = phm
+	b.providers[chainID] = phm
 
 	// Create a new context for the provider
 	providerCtx, cancel := context.WithCancel(ctx)
-	b.cancelFuncs[phm.ChainID()] = cancel
+	b.cancelFuncs[chainID] = cancel
 
 	statusCh := phm.Subscribe()
 	b.wg.Add(1)
 	go func(phm *ProvidersHealthManager, statusCh chan struct{}, providerCtx context.Context) {
 		defer func() {
-			b.wg.Done()
 			phm.Unsubscribe(statusCh)
+			b.wg.Done()
 		}()
 		for {
 			select {
@@ -91,6 +99,7 @@ func (b *BlockchainHealthManager) Stop() {
 		cancel()
 	}
 	clear(b.cancelFuncs)
+	clear(b.providers)
 
 	b.mu.Unlock()
 	b.wg.Wait()
@@ -134,15 +143,15 @@ func (b *BlockchainHealthManager) aggregateAndUpdateStatus(ctx context.Context) 
 	b.aggregator.UpdateBatch(providerStatuses)
 
 	// Get the new aggregated full and short status
-	newShortStatus := b.getShortStatus()
+	newShortStatus := b.getStatusPerChain()
 	b.mu.Unlock()
 
 	// Compare full and short statuses and emit if changed
-	if !compareShortStatus(newShortStatus, b.lastStatus) {
+	if b.lastStatus == nil || !compareShortStatus(newShortStatus, *b.lastStatus) {
 		b.emitBlockchainHealthStatus(ctx)
 		b.mu.Lock()
 		defer b.mu.Unlock()
-		b.lastStatus = newShortStatus
+		b.lastStatus = &newShortStatus
 	}
 }
 
@@ -192,15 +201,16 @@ func (b *BlockchainHealthManager) GetFullStatus() BlockchainFullStatus {
 		statusPerChainPerProvider[chainID] = providerStatuses
 	}
 
-	blockchainStatus := b.aggregator.GetAggregatedStatus()
+	statusPerChain := b.getStatusPerChain()
 
 	return BlockchainFullStatus{
-		Status:                    blockchainStatus,
+		Status:                    statusPerChain.Status,
+		StatusPerChain:            statusPerChain.StatusPerChain,
 		StatusPerChainPerProvider: statusPerChainPerProvider,
 	}
 }
 
-func (b *BlockchainHealthManager) getShortStatus() BlockchainStatus {
+func (b *BlockchainHealthManager) getStatusPerChain() BlockchainStatus {
 	statusPerChain := make(map[uint64]rpcstatus.ProviderStatus)
 
 	for chainID, phm := range b.providers {
@@ -216,10 +226,10 @@ func (b *BlockchainHealthManager) getShortStatus() BlockchainStatus {
 	}
 }
 
-func (b *BlockchainHealthManager) GetShortStatus() BlockchainStatus {
+func (b *BlockchainHealthManager) GetStatusPerChain() BlockchainStatus {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	return b.getShortStatus()
+	return b.getStatusPerChain()
 }
 
 // Status returns the current aggregated status.
