@@ -150,11 +150,12 @@ func parseNodes(rec []string) []*enode.Node {
 //
 // Using Docker:
 //
-//	IP_ADDRESS=$(hostname -I | awk '{print $1}');
-//	docker run \
-//	 -p 61000:61000/tcp -p 9000:9000/udp -p 8645:8645/tcp harbor.status.im/wakuorg/nwaku:v0.31.0 \
-//	 --tcp-port=61000 --discv5-discovery=true --cluster-id=16 --pubsub-topic=/waku/2/rs/16/32 --pubsub-topic=/waku/2/rs/16/64 \
-//	 --nat=extip:${IP_ADDRESS} --discv5-discovery --discv5-udp-port=9000 --rest-address=0.0.0.0 --rest-port=8646 --store
+// IP_ADDRESS=$(ipconfig getifaddr en0)
+// docker run \
+// -p 61000:61000/tcp -p 8000:8000/udp -p 8646:8646/tcp harbor.status.im/wakuorg/nwaku:v0.33.0 \
+// --discv5-discovery=true --cluster-id=16 --log-level=DEBUG \
+// --nat=extip:${IP_ADDRESS} --discv5-discovery --discv5-udp-port=8000 --rest-address=0.0.0.0 --store --rest-port=8646 \
+// --tcp-port=61000 --rest-admin=true --shard=64 --dns-discovery=true --dns-discovery-url="/dns4/boot-01.do-ams3.status.prod.status.im/tcp/30303/p2p/16Uiu2HAmAR24Mbb6VuzoyUiGx42UenDkshENVDj4qnmmbabLvo31"
 
 func TestBasicWakuV2(t *testing.T) {
 	fmt.Println("---------- GABRIEL 1 ----------")
@@ -192,6 +193,8 @@ func TestBasicWakuV2(t *testing.T) {
 		LogLevel:    "DEBUG",
 		Discv5BootstrapNodes: []string{nwakuInfo.EnrUri},
 		Discv5Discovery: true,
+		ClusterID: 16,
+		Shards: []uint16{64},
 	}
 	
 	w, err := New(nil, "", &nwakuConfig, nil, nil, nil, nil, nil)
@@ -238,10 +241,16 @@ func TestBasicWakuV2(t *testing.T) {
 	fmt.Println("---------- GABRIEL 11 ----------")
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		if len(w.Peers()) < 1 {
-			return errors.New("no peers discovered")
+		
+		numConnected, err := w.GetNumConnectedPeers()
+		fmt.Println("numConnected: ", numConnected)
+		if err != nil {
+			return err
 		}
-		return nil
+		if numConnected > 1 {
+			return nil
+		}
+		return errors.New("no peers discovered")
 	}, options)
 	require.NoError(t, err)
 

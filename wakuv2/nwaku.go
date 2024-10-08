@@ -1678,6 +1678,8 @@ type WakuConfig struct {
 	MaxMessageSize		 string `json:"maxMessageSize,omitempty"`
 	Discv5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
 	Discv5Discovery		 bool `json:"discv5Discovery,omitempty"`
+	ClusterID			 uint16 `json:"clusterId,omitempty"`
+	Shards			     []uint16 `json:"shards,omitempty"`	
 }
 
 type Waku struct {
