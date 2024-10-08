@@ -323,11 +323,11 @@ func TestCircuitBreaker_SuccessCallStatus(t *testing.T) {
 	assert.Len(t, result.FunctorCallStatuses(), 1)
 
 	status := result.FunctorCallStatuses()[0]
-	if status.name != "successCircuit" {
-		t.Errorf("Expected functor name to be 'successCircuit', got %s", status.name)
+	if status.Name != "successCircuit" {
+		t.Errorf("Expected functor name to be 'successCircuit', got %s", status.Name)
 	}
-	if status.err != nil {
-		t.Errorf("Expected no error in functor status, got %v", status.err)
+	if status.Err != nil {
+		t.Errorf("Expected no error in functor status, got %v", status.Err)
 	}
 }
 
@@ -350,11 +350,11 @@ func TestCircuitBreaker_ErrorCallStatus(t *testing.T) {
 	assert.Len(t, result.FunctorCallStatuses(), 1)
 
 	status := result.FunctorCallStatuses()[0]
-	if status.name != "errorCircuit" {
-		t.Errorf("Expected functor name to be 'errorCircuit', got %s", status.name)
+	if status.Name != "errorCircuit" {
+		t.Errorf("Expected functor name to be 'errorCircuit', got %s", status.Name)
 	}
-	if !errors.Is(status.err, expectedError) {
-		t.Errorf("Expected functor error to be '%v', got '%v'", expectedError, status.err)
+	if !errors.Is(status.Err, expectedError) {
+		t.Errorf("Expected functor error to be '%v', got '%v'", expectedError, status.Err)
 	}
 }
 
@@ -405,11 +405,11 @@ func TestCircuitBreaker_MultipleFunctorsResult(t *testing.T) {
 	statuses := result.FunctorCallStatuses()
 	require.Len(t, statuses, 2)
 
-	require.Equal(t, statuses[0].name, "circuit1")
-	require.NotNil(t, statuses[0].err)
+	require.Equal(t, statuses[0].Name, "circuit1")
+	require.NotNil(t, statuses[0].Err)
 
-	require.Equal(t, statuses[1].name, "circuit2")
-	require.Nil(t, statuses[1].err)
+	require.Equal(t, statuses[1].Name, "circuit2")
+	require.Nil(t, statuses[1].Err)
 }
 
 func TestCircuitBreaker_LastFunctorDirectExecution(t *testing.T) {
@@ -444,9 +444,9 @@ func TestCircuitBreaker_LastFunctorDirectExecution(t *testing.T) {
 	statuses := result.FunctorCallStatuses()
 	require.Len(t, statuses, 2)
 
-	require.Equal(t, statuses[0].name, "circuitName")
-	require.NotNil(t, statuses[0].err)
+	require.Equal(t, statuses[0].Name, "circuitName")
+	require.NotNil(t, statuses[0].Err)
 
-	require.Equal(t, statuses[1].name, "circuitName")
-	require.Nil(t, statuses[1].err)
+	require.Equal(t, statuses[1].Name, "circuitName")
+	require.Nil(t, statuses[1].Err)
 }

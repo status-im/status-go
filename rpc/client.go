@@ -121,34 +121,44 @@ type Client struct {
 // Is initialized in a build-tag-dependent module
 var verifProxyInitFn func(c *Client)
 
+// ClientConfig holds the configuration for initializing a new Client.
+type ClientConfig struct {
+	Client          *gethrpc.Client
+	UpstreamChainID uint64
+	Networks        []params.Network
+	DB              *sql.DB
+	WalletFeed      *event.Feed
+	ProviderConfigs []params.ProviderConfig
+}
+
 // NewClient initializes Client
 //
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
-func NewClient(client *gethrpc.Client, upstreamChainID uint64, networks []params.Network, db *sql.DB, walletFeed *event.Feed, providerConfigs []params.ProviderConfig) (*Client, error) {
+func NewClient(config ClientConfig) (*Client, error) {
 	var err error
 
 	log := log.New("package", "status-go/rpc.Client")
-	networkManager := network.NewManager(db)
+	networkManager := network.NewManager(config.DB)
 	if networkManager == nil {
 		return nil, errors.New("failed to create network manager")
 	}
 
-	err = networkManager.Init(networks)
+	err = networkManager.Init(config.Networks)
 	if err != nil {
 		log.Error("Network manager failed to initialize", "error", err)
 	}
 
 	c := Client{
-		local:              client,
+		local:              config.Client,
 		NetworkManager:     networkManager,
 		handlers:           make(map[string]Handler),
 		rpcClients:         make(map[uint64]chain.ClientInterface),
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		log:                log,
-		providerConfigs:    providerConfigs,
+		providerConfigs:    config.ProviderConfigs,
 		healthMgr:          healthmanager.NewBlockchainHealthManager(),
-		walletFeed:         walletFeed,
+		walletFeed:         config.WalletFeed,
 	}
 
 	c.UpstreamChainID = upstreamChainID
@@ -268,7 +278,10 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 	}
 
 	phm := healthmanager.NewProvidersHealthManager(chainID)
-	c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
+	err := c.healthMgr.RegisterProvidersHealthManager(context.Background(), phm)
+	if err != nil {
+		return nil, fmt.Errorf("register providers health manager: %s", err)
+	}
 
 	client := chain.NewClient(ethClients, chainID, phm)
 	c.rpcClients[chainID] = client
@@ -440,7 +453,8 @@ func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result in
 	if c.router.routeRemote(method) {
 		client, err := c.getClientUsingCache(chainID)
 		if err == nil {
-			return client.CallContext(ctx, result, method, args...)
+			return client.CallContext(ctx, r
+			esult, method, args...)
 		}
 	}
 

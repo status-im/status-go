@@ -3,9 +3,14 @@ package chain
 import (
 	"context"
 	"errors"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"strconv"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/core/vm"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -13,9 +18,6 @@ import (
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	mockEthclient "github.com/status-im/status-go/rpc/chain/ethclient/mock/client/ethclient"
 )
@@ -162,7 +164,7 @@ func (s *ClientWithFallbackSuite) TestVMErrorDoesNotMarkChainDown() {
 	require.Equal(s.T(), providerStatuses["test0"].Status, rpcstatus.StatusUp)
 }
 
-func (s *ClientWithFallbackSuite) TestNoClientsChainUnknown() {
+func (s *ClientWithFallbackSuite) TestNoClientsChainDown() {
 	s.setupClients(0)
 
 	ctx := context.Background()
@@ -174,7 +176,7 @@ func (s *ClientWithFallbackSuite) TestNoClientsChainUnknown() {
 
 	// THEN
 	chainStatus := s.providersHealthManager.Status()
-	require.Equal(s.T(), rpcstatus.StatusUnknown, chainStatus.Status)
+	require.Equal(s.T(), rpcstatus.StatusDown, chainStatus.Status)
 }
 
 func (s *ClientWithFallbackSuite) TestAllClientsDifferentErrors() {
@@ -228,11 +230,11 @@ func (s *ClientWithFallbackSuite) TestAllClientsNetworkErrors() {
 	require.Equal(s.T(), providerStatuses["test2"].Status, rpcstatus.StatusDown)
 }
 
-func (s *ClientWithFallbackSuite) TestChainStatusUnknownWhenAllProvidersUnknown() {
+func (s *ClientWithFallbackSuite) TestChainStatusDownWhenInitial() {
 	s.setupClients(2)
 
 	chainStatus := s.providersHealthManager.Status()
-	require.Equal(s.T(), rpcstatus.StatusUnknown, chainStatus.Status)
+	require.Equal(s.T(), rpcstatus.StatusDown, chainStatus.Status)
 }
 
 func TestClientWithFallbackSuite(t *testing.T) {

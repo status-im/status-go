@@ -5,19 +5,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/status-im/status-go/healthmanager"
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
-	mockEthclient "github.com/status-im/status-go/rpc/chain/ethclient/mock/client/ethclient"
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/status-im/status-go/healthmanager"
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
+	mockEthclient "github.com/status-im/status-go/rpc/chain/ethclient/mock/client/ethclient"
+
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/rpc/chain/ethclient"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+
 	"go.uber.org/mock/gomock"
+
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 )
 
 type BlockchainHealthManagerSuite struct {
@@ -53,7 +56,8 @@ func (s *BlockchainHealthManagerSuite) setupClients(chainIDs []uint64) {
 		phm := healthmanager.NewProvidersHealthManager(chainID)
 		client := NewClient([]ethclient.RPSLimitedEthClientInterface{mockEthClient}, chainID, phm)
 
-		s.blockchainHealthManager.RegisterProvidersHealthManager(ctx, phm)
+		err := s.blockchainHealthManager.RegisterProvidersHealthManager(ctx, phm)
+		require.NoError(s.T(), err)
 
 		s.mockProviders[chainID] = phm
 		s.mockEthClients[chainID] = mockEthClient
@@ -272,7 +276,7 @@ func (s *BlockchainHealthManagerSuite) TestGetShortStatus() {
 	s.waitForStatus(statusCh, rpcstatus.StatusUp)
 
 	// Get the short status from the BlockchainHealthManager
-	shortStatus := s.blockchainHealthManager.GetShortStatus()
+	shortStatus := s.blockchainHealthManager.GetStatusPerChain()
 
 	// Assert overall blockchain status
 	require.Equal(s.T(), rpcstatus.StatusUp, shortStatus.Status.Status)
