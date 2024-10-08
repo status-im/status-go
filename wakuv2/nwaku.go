@@ -1676,7 +1676,8 @@ type WakuConfig struct {
 	DnsDiscovery 		 string `json:"dnsDiscovery,omitempty"`
 	DnsDiscoveryUrl 	 string `json:"dnsDiscoveryUrl,omitempty"`
 	MaxMessageSize		 string `json:"maxMessageSize,omitempty"`
-	DiscV5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
+	Discv5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
+	Discv5Discovery		 bool `json:"discv5Discovery,omitempty"`
 }
 
 type Waku struct {
@@ -1834,7 +1835,7 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 			timesource:                      ts,
 			storeMsgIDsMu:                   sync.RWMutex{},
 			logger:                          logger,
-			discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,
+			discV5BootstrapNodes:            cfg.Discv5BootstrapNodes,
 			onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 			onPeerStats:                     onPeerStats,
 			onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
