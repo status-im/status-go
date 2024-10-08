@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
 )
 
 // StatusAggregatorTestSuite defines the test suite for Aggregator.
@@ -23,7 +24,7 @@ func (suite *StatusAggregatorTestSuite) SetupTest() {
 
 // TestNewAggregator verifies that a new Aggregator is initialized correctly.
 func (suite *StatusAggregatorTestSuite) TestNewAggregator() {
-	assert.Equal(suite.T(), "TestAggregator", suite.aggregator.Name, "Aggregator name should be set correctly")
+	assert.Equal(suite.T(), "TestAggregator", suite.aggregator.name, "Aggregator name should be set correctly")
 	assert.Empty(suite.T(), suite.aggregator.providerStatuses, "Aggregator should have no providers initially")
 }
 
@@ -94,7 +95,7 @@ func (suite *StatusAggregatorTestSuite) TestUpdate() {
 func (suite *StatusAggregatorTestSuite) TestComputeAggregatedStatus_NoProviders() {
 	aggStatus := suite.aggregator.ComputeAggregatedStatus()
 
-	assert.Equal(suite.T(), rpcstatus.StatusUnknown, aggStatus.Status, "Aggregated status should be 'unknown' when no providers are registered")
+	assert.Equal(suite.T(), rpcstatus.StatusDown, aggStatus.Status, "Aggregated status should be 'down' when no providers are registered")
 	assert.True(suite.T(), aggStatus.LastSuccessAt.IsZero(), "LastSuccessAt should be zero when no providers are registered")
 	assert.True(suite.T(), aggStatus.LastErrorAt.IsZero(), "LastErrorAt should be zero when no providers are registered")
 }

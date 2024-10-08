@@ -2,9 +2,10 @@ package rpcstatus
 
 import (
 	"errors"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"testing"
 	"time"
+
+	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 )
 
 func TestNewRpcProviderStatus(t *testing.T) {

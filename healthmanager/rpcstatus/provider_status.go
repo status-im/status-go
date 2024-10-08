@@ -17,11 +17,11 @@ const (
 
 // ProviderStatus holds the status information for a single provider.
 type ProviderStatus struct {
-	Name          string
-	LastSuccessAt time.Time
-	LastErrorAt   time.Time
-	LastError     error
-	Status        StatusType
+	Name          string     `json:"name"`
+	LastSuccessAt time.Time  `json:"last_success_at"`
+	LastErrorAt   time.Time  `json:"last_error_at"`
+	LastError     error      `json:"last_error"`
+	Status        StatusType `json:"status"`
 }
 
 // ProviderCallStatus represents the result of an arbitrary provider call.

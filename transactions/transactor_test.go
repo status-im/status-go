@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
+	statusRpc "github.com/status-im/status-go/rpc"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -26,7 +28,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/utils"
@@ -60,13 +61,23 @@ func (s *TransactorSuite) SetupTest() {
 	chainID := gethparams.AllEthashProtocolChanges.ChainID.Uint64()
 	db, err := sqlite.OpenUnecryptedDB(sqlite.InMemoryPath) // dummy to make rpc.Client happy
 	s.Require().NoError(err)
-	rpcClient, _ := rpc.NewClient(s.client, chainID, nil, db, nil)
+
+	config := statusRpc.ClientConfig{
+		Client:          s.client,
+		UpstreamChainID: chainID,
+		Networks:        nil,
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	rpcClient, _ := statusRpc.NewClient(config)
+
 	rpcClient.UpstreamChainID = chainID
 
 	ethClients := []ethclient.RPSLimitedEthClientInterface{
 		ethclient.NewRPSLimitedEthClient(s.client, rpclimiter.NewRPCRpsLimiter(), "local-1-chain-id-1"),
 	}
-	localClient := chain.NewClient(ethClients, chainID)
+	localClient := chain.NewClient(ethClients, chainID, nil)
 	rpcClient.SetClient(chainID, localClient)
 
 	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", "/tmp", chainID)

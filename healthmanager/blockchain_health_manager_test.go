@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
 )
 
 type BlockchainHealthManagerSuite struct {
@@ -50,7 +51,8 @@ func (s *BlockchainHealthManagerSuite) assertBlockChainStatus(expected rpcstatus
 // Test registering a provider health manager
 func (s *BlockchainHealthManagerSuite) TestRegisterProvidersHealthManager() {
 	phm := NewProvidersHealthManager(1) // Create a real ProvidersHealthManager
-	s.manager.RegisterProvidersHealthManager(context.Background(), phm)
+	err := s.manager.RegisterProvidersHealthManager(context.Background(), phm)
+	s.Require().NoError(err)
 
 	// Verify that the provider is registered
 	s.Require().NotNil(s.manager.providers[1])
@@ -59,7 +61,8 @@ func (s *BlockchainHealthManagerSuite) TestRegisterProvidersHealthManager() {
 // Test status updates and notifications
 func (s *BlockchainHealthManagerSuite) TestStatusUpdateNotification() {
 	phm := NewProvidersHealthManager(1)
-	s.manager.RegisterProvidersHealthManager(context.Background(), phm)
+	err := s.manager.RegisterProvidersHealthManager(context.Background(), phm)
+	s.Require().NoError(err)
 	ch := s.manager.Subscribe()
 
 	// Update the provider status
@@ -75,8 +78,10 @@ func (s *BlockchainHealthManagerSuite) TestGetFullStatus() {
 	phm1 := NewProvidersHealthManager(1)
 	phm2 := NewProvidersHealthManager(2)
 	ctx := context.Background()
-	s.manager.RegisterProvidersHealthManager(ctx, phm1)
-	s.manager.RegisterProvidersHealthManager(ctx, phm2)
+	err := s.manager.RegisterProvidersHealthManager(ctx, phm1)
+	s.Require().NoError(err)
+	err = s.manager.RegisterProvidersHealthManager(ctx, phm2)
+	s.Require().NoError(err)
 	ch := s.manager.Subscribe()
 
 	// Update the provider status
@@ -108,8 +113,15 @@ func (s *BlockchainHealthManagerSuite) TestConcurrentSubscriptionUnsubscription(
 	}
 
 	wg.Wait()
+
+	activeSubscribersCount := 0
+	s.manager.subscribers.Range(func(key, value interface{}) bool {
+		activeSubscribersCount++
+		return true
+	})
+
 	// After all subscribers are removed, there should be no active subscribers
-	s.Equal(0, len(s.manager.subscribers), "Expected no subscribers after unsubscription")
+	s.Equal(0, activeSubscribersCount, "Expected no subscribers after unsubscription")
 }
 
 func (s *BlockchainHealthManagerSuite) TestConcurrency() {
@@ -120,7 +132,8 @@ func (s *BlockchainHealthManagerSuite) TestConcurrency() {
 	defer cancel()
 	for i := 1; i <= chainsCount; i++ {
 		phm := NewProvidersHealthManager(uint64(i))
-		s.manager.RegisterProvidersHealthManager(ctx, phm)
+		err := s.manager.RegisterProvidersHealthManager(ctx, phm)
+		s.Require().NoError(err)
 	}
 
 	ch := s.manager.Subscribe()
@@ -161,7 +174,8 @@ func (s *BlockchainHealthManagerSuite) TestUnsubscribeOneOfMultipleSubscribers()
 	// Create an instance of BlockchainHealthManager and register a provider manager
 	phm := NewProvidersHealthManager(1)
 	ctx, cancel := context.WithCancel(s.ctx)
-	s.manager.RegisterProvidersHealthManager(ctx, phm)
+	err := s.manager.RegisterProvidersHealthManager(ctx, phm)
+	s.Require().NoError(err)
 
 	defer cancel()
 
@@ -196,7 +210,8 @@ func (s *BlockchainHealthManagerSuite) TestUnsubscribeOneOfMultipleSubscribers()
 func (s *BlockchainHealthManagerSuite) TestMixedProviderStatusInSingleChain() {
 	// Register a provider for chain 1
 	phm := NewProvidersHealthManager(1)
-	s.manager.RegisterProvidersHealthManager(s.ctx, phm)
+	err := s.manager.RegisterProvidersHealthManager(s.ctx, phm)
+	s.Require().NoError(err)
 
 	// Subscribe to status updates
 	ch := s.manager.Subscribe()
@@ -212,7 +227,7 @@ func (s *BlockchainHealthManagerSuite) TestMixedProviderStatusInSingleChain() {
 	s.waitForUpdate(ch, rpcstatus.StatusUp, 100*time.Millisecond)
 
 	// Verify that the short status reflects the chain as down, since one provider is down
-	shortStatus := s.manager.GetShortStatus()
+	shortStatus := s.manager.GetStatusPerChain()
 	s.Equal(rpcstatus.StatusUp, shortStatus.Status.Status)
 	s.Equal(rpcstatus.StatusUp, shortStatus.StatusPerChain[1].Status) // Chain 1 should be marked as down
 }

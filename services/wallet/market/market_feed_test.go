@@ -51,7 +51,7 @@ func (s *MarketTestSuite) TestEventOnRpsError() {
 	s.Require().Equal(event.Type, EventMarketStatusChanged)
 }
 
-func (s *MarketTestSuite) TestNoEventOnNetworkError() {
+func (s *MarketTestSuite) TestEventOnNetworkError() {
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()
 
@@ -62,10 +62,11 @@ func (s *MarketTestSuite) TestNoEventOnNetworkError() {
 
 	_, err := manager.FetchPrices(s.symbols, s.currencies)
 	s.Require().Error(err, "expected error from FetchPrices due to MockPriceProviderWithError")
-	_, ok := s.feedSub.WaitForEvent(time.Millisecond * 500)
+	event, ok := s.feedSub.WaitForEvent(500 * time.Millisecond)
+	s.Require().True(ok, "expected an event, but none was received")
 
-	//THEN
-	s.Require().False(ok, "expected no event, but one was received")
+	// THEN
+	s.Require().Equal(event.Type, EventMarketStatusChanged)
 }
 
 func TestMarketTestSuite(t *testing.T) {

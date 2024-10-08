@@ -2,15 +2,16 @@ package healthmanager
 
 import (
 	"context"
-	"fmt"
+	"sync"
+
 	"github.com/status-im/status-go/healthmanager/aggregator"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
-	"sync"
 )
 
 // BlockchainFullStatus contains the full status of the blockchain, including provider statuses.
 type BlockchainFullStatus struct {
 	Status                    rpcstatus.ProviderStatus                       `json:"status"`
+	StatusPerChain            map[uint64]rpcstatus.ProviderStatus            `json:"statusPerChain"`
 	StatusPerChainPerProvider map[uint64]map[string]rpcstatus.ProviderStatus `json:"statusPerChainPerProvider"`
 }
 
@@ -24,11 +25,11 @@ type BlockchainStatus struct {
 type BlockchainHealthManager struct {
 	mu          sync.RWMutex
 	aggregator  *aggregator.Aggregator
-	subscribers []chan struct{}
+	subscribers sync.Map // thread-safe
 
 	providers   map[uint64]*ProvidersHealthManager
 	cancelFuncs map[uint64]context.CancelFunc // Map chainID to cancel functions
-	lastStatus  BlockchainStatus
+	lastStatus  *BlockchainStatus
 	wg          sync.WaitGroup
 }
 
@@ -43,30 +44,37 @@ func NewBlockchainHealthManager() *BlockchainHealthManager {
 }
 
 // RegisterProvidersHealthManager registers the provider health manager.
-// It prevents registering the same provider twice for the same chain.
+// It removes any existing provider for the same chain before registering the new one.
 func (b *BlockchainHealthManager) RegisterProvidersHealthManager(ctx context.Context, phm *ProvidersHealthManager) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// Check if the provider for the given chainID is already registered
-	if _, exists := b.providers[phm.ChainID()]; exists {
-		// Log a warning or return an error to indicate that the provider is already registered
-		return fmt.Errorf("provider for chainID %d is already registered", phm.ChainID())
+	chainID := phm.ChainID()
+
+	// Check if a provider for the given chainID is already registered and remove it
+	if _, exists := b.providers[chainID]; exists {
+		// Cancel the existing context
+		if cancel, cancelExists := b.cancelFuncs[chainID]; cancelExists {
+			cancel()
+		}
+		// Remove the old registration
+		delete(b.providers, chainID)
+		delete(b.cancelFuncs, chainID)
 	}
 
 	// Proceed with the registration
-	b.providers[phm.ChainID()] = phm
+	b.providers[chainID] = phm
 
 	// Create a new context for the provider
 	providerCtx, cancel := context.WithCancel(ctx)
-	b.cancelFuncs[phm.ChainID()] = cancel
+	b.cancelFuncs[chainID] = cancel
 
 	statusCh := phm.Subscribe()
 	b.wg.Add(1)
 	go func(phm *ProvidersHealthManager, statusCh chan struct{}, providerCtx context.Context) {
 		defer func() {
-			b.wg.Done()
 			phm.Unsubscribe(statusCh)
+			b.wg.Done()
 		}()
 		for {
 			select {
@@ -91,6 +99,7 @@ func (b *BlockchainHealthManager) Stop() {
 		cancel()
 	}
 	clear(b.cancelFuncs)
+	clear(b.providers)
 
 	b.mu.Unlock()
 	b.wg.Wait()
@@ -99,30 +108,31 @@ func (b *BlockchainHealthManager) Stop() {
 // Subscribe allows clients to receive notifications about changes.
 func (b *BlockchainHealthManager) Subscribe() chan struct{} {
 	ch := make(chan struct{}, 1)
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.subscribers = append(b.subscribers, ch)
+	b.subscribers.Store(ch, struct{}{})
 	return ch
 }
 
 // Unsubscribe removes a subscriber from receiving notifications.
 func (b *BlockchainHealthManager) Unsubscribe(ch chan struct{}) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	// Remove the subscriber channel from the list
-	for i, subscriber := range b.subscribers {
-		if subscriber == ch {
-			b.subscribers = append(b.subscribers[:i], b.subscribers[i+1:]...)
-			close(ch)
-			break
-		}
-	}
+	b.subscribers.Delete(ch) // Удаляем подписчика из sync.Map
+	close(ch)
 }
 
 // aggregateAndUpdateStatus collects statuses from all providers and updates the overall and short status.
 func (b *BlockchainHealthManager) aggregateAndUpdateStatus(ctx context.Context) {
+	newShortStatus := b.aggregateStatus()
+
+	// If status has changed, update the last status and emit notifications
+	if b.shouldUpdateStatus(newShortStatus) {
+		b.updateStatus(newShortStatus)
+		b.emitBlockchainHealthStatus(ctx)
+	}
+}
+
+// aggregateStatus aggregates provider statuses and returns the new short status.
+func (b *BlockchainHealthManager) aggregateStatus() BlockchainStatus {
 	b.mu.Lock()
+	defer b.mu.Unlock()
 
 	// Collect statuses from all providers
 	providerStatuses := make([]rpcstatus.ProviderStatus, 0)
@@ -134,16 +144,22 @@ func (b *BlockchainHealthManager) aggregateAndUpdateStatus(ctx context.Context) 
 	b.aggregator.UpdateBatch(providerStatuses)
 
 	// Get the new aggregated full and short status
-	newShortStatus := b.getShortStatus()
-	b.mu.Unlock()
+	return b.getStatusPerChain()
+}
 
-	// Compare full and short statuses and emit if changed
-	if !compareShortStatus(newShortStatus, b.lastStatus) {
-		b.emitBlockchainHealthStatus(ctx)
-		b.mu.Lock()
-		defer b.mu.Unlock()
-		b.lastStatus = newShortStatus
-	}
+// shouldUpdateStatus checks if the status has changed and needs to be updated.
+func (b *BlockchainHealthManager) shouldUpdateStatus(newShortStatus BlockchainStatus) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.lastStatus == nil || !compareShortStatus(newShortStatus, *b.lastStatus)
+}
+
+// updateStatus updates the last known status with the new status.
+func (b *BlockchainHealthManager) updateStatus(newShortStatus BlockchainStatus) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.lastStatus = &newShortStatus
 }
 
 // compareShortStatus compares two BlockchainStatus structs and returns true if they are identical.
@@ -167,18 +183,18 @@ func compareShortStatus(newStatus, previousStatus BlockchainStatus) bool {
 
 // emitBlockchainHealthStatus sends a notification to all subscribers about the new blockchain status.
 func (b *BlockchainHealthManager) emitBlockchainHealthStatus(ctx context.Context) {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	for _, subscriber := range b.subscribers {
+	b.subscribers.Range(func(key, value interface{}) bool {
+		subscriber := key.(chan struct{})
 		select {
 		case <-ctx.Done():
 			// Stop sending notifications when the context is cancelled
-			return
+			return false
 		case subscriber <- struct{}{}:
 		default:
-			// Skip notification if the subscriber's channel is full
+			// Skip notification if the subscriber's channel is full (non-blocking)
 		}
-	}
+		return true
+	})
 }
 
 func (b *BlockchainHealthManager) GetFullStatus() BlockchainFullStatus {
@@ -192,15 +208,16 @@ func (b *BlockchainHealthManager) GetFullStatus() BlockchainFullStatus {
 		statusPerChainPerProvider[chainID] = providerStatuses
 	}
 
-	blockchainStatus := b.aggregator.GetAggregatedStatus()
+	statusPerChain := b.getStatusPerChain()
 
 	return BlockchainFullStatus{
-		Status:                    blockchainStatus,
+		Status:                    statusPerChain.Status,
+		StatusPerChain:            statusPerChain.StatusPerChain,
 		StatusPerChainPerProvider: statusPerChainPerProvider,
 	}
 }
 
-func (b *BlockchainHealthManager) getShortStatus() BlockchainStatus {
+func (b *BlockchainHealthManager) getStatusPerChain() BlockchainStatus {
 	statusPerChain := make(map[uint64]rpcstatus.ProviderStatus)
 
 	for chainID, phm := range b.providers {
@@ -216,10 +233,10 @@ func (b *BlockchainHealthManager) getShortStatus() BlockchainStatus {
 	}
 }
 
-func (b *BlockchainHealthManager) GetShortStatus() BlockchainStatus {
+func (b *BlockchainHealthManager) GetStatusPerChain() BlockchainStatus {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	return b.getShortStatus()
+	return b.getStatusPerChain()
 }
 
 // Status returns the current aggregated status.

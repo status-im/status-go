@@ -10,14 +10,14 @@ import (
 // Aggregator manages and aggregates the statuses of multiple providers.
 type Aggregator struct {
 	mu               sync.RWMutex
-	Name             string
+	name             string
 	providerStatuses map[string]*rpcstatus.ProviderStatus
 }
 
 // NewAggregator creates a new instance of Aggregator with the given name.
 func NewAggregator(name string) *Aggregator {
 	return &Aggregator{
-		Name:             name,
+		name:             name,
 		providerStatuses: make(map[string]*rpcstatus.ProviderStatus),
 	}
 }
@@ -100,7 +100,7 @@ func (a *Aggregator) ComputeAggregatedStatus() rpcstatus.ProviderStatus {
 	}
 
 	aggregatedStatus := rpcstatus.ProviderStatus{
-		Name:          a.Name,
+		Name:          a.name,
 		LastSuccessAt: lastSuccessAt,
 		LastErrorAt:   lastErrorAt,
 		LastError:     lastError,
