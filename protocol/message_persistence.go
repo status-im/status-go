@@ -1305,26 +1305,50 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 	return result, newCursor, nil
 }
 
-func (db sqlitePersistence) OldestMessageWhisperTimestampByChatID(chatID string) (timestamp uint64, hasAnyMessage bool, err error) {
-	var whisperTimestamp uint64
-	err = db.db.QueryRow(
-		`
+func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []string) (map[string]uint64, error) {
+	if len(chatIDs) == 0 {
+		return nil, nil
+	}
+
+	args := make([]interface{}, len(chatIDs))
+	for i, id := range chatIDs {
+		args[i] = id
+	}
+
+	inVector := strings.Repeat("?, ", len(chatIDs)-1) + "?"
+	//nolint:gosec
+	query := fmt.Sprintf(`
+		SELECT
+			m1.local_chat_id,
+			m1.whisper_timestamp
+		FROM (
 			SELECT
-				whisper_timestamp
-			FROM
-				user_messages m1
-			WHERE
-				m1.local_chat_id = ?
-			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id ASC
-			LIMIT 1
-		`, chatID).Scan(&whisperTimestamp)
-	if err == sql.ErrNoRows {
-		return 0, false, nil
-	}
+				m1.local_chat_id,
+				m1.whisper_timestamp,
+				ROW_NUMBER() OVER (PARTITION BY m1.local_chat_id ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id ASC) AS rn
+			FROM user_messages m1
+			WHERE m1.local_chat_id IN (%s)
+		) m1
+		WHERE m1.rn = 1
+	`, inVector)
+
+	rows, err := db.db.Query(query, args...)
 	if err != nil {
-		return 0, false, err
+		return nil, err
 	}
-	return whisperTimestamp, true, nil
+	defer rows.Close()
+
+	result := make(map[string]uint64)
+	for rows.Next() {
+		var chatID string
+		var whisperTimestamp uint64
+		if err := rows.Scan(&chatID, &whisperTimestamp); err != nil {
+			return nil, err
+		}
+		result[chatID] = whisperTimestamp
+	}
+
+	return result, nil
 }
 
 // EmojiReactionsByChatID returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
