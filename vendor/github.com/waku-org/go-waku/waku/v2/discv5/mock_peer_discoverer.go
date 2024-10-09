@@ -6,6 +6,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/service"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 // TestPeerDiscoverer is mock peer discoverer for testing
@@ -26,6 +27,7 @@ func NewTestPeerDiscoverer() *TestPeerDiscoverer {
 // Subscribe is for subscribing to peer discoverer
 func (t *TestPeerDiscoverer) Subscribe(ctx context.Context, ch <-chan service.PeerData) {
 	go func() {
+		defer utils.LogOnPanic()
 		for {
 			select {
 			case <-ctx.Done():

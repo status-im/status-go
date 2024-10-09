@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -69,9 +70,11 @@ func (r *FastestPeerSelector) FastestPeer(ctx context.Context, peers peer.IDSlic
 	pinged := make(map[peer.ID]struct{})
 
 	go func() {
+		defer utils.LogOnPanic()
 		// Ping any peer with no latency recorded
 		for peerToPing := range pingCh {
 			go func(p peer.ID) {
+				defer utils.LogOnPanic()
 				defer wg.Done()
 				rtt := time.Hour
 				result, err := r.PingPeer(ctx, p)
