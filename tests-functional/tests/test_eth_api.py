@@ -1,6 +1,6 @@
 import pytest
 
-from conftest import user_1
+from constants import user_1
 from test_cases import EthRpcTestCase
 
 

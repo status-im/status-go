@@ -50,6 +50,10 @@ func NewDB(db *sql.DB) *DB {
 }
 
 func (b *DB) GetBlockJSONByNumber(chainID uint64, blockNumber *big.Int, withTransactionDetails bool) (json.RawMessage, error) {
+	if !isConcreteBlockNumber(blockNumber) {
+		return nil, sql.ErrNoRows
+	}
+
 	q := sq.Select("block_json").
 		From("blockchain_data_blocks").
 		Where(sq.Eq{"chain_id": chainID, "block_number": (*bigint.SQLBigInt)(blockNumber), "with_transaction_details": withTransactionDetails})
@@ -328,7 +332,7 @@ func putBlockJSON(creator sqlite.StatementCreator, chainID uint64, blkJSON json.
 		return err
 	}
 
-	if rpcBlock.Number == nil {
+	if !isConcreteBlockNumber((*big.Int)(rpcBlock.Number)) {
 		// Pending block, don't store
 		return nil
 	}
