@@ -158,87 +158,35 @@ func parseNodes(rec []string) []*enode.Node {
 // --tcp-port=61000 --rest-admin=true --shard=64 --dns-discovery=true --dns-discovery-url="/dns4/boot-01.do-ams3.status.prod.status.im/tcp/30303/p2p/16Uiu2HAmAR24Mbb6VuzoyUiGx42UenDkshENVDj4qnmmbabLvo31"
 
 func TestBasicWakuV2(t *testing.T) {
-	fmt.Println("---------- GABRIEL 1 ----------")
 	extNodeRestPort := 8646
-	nwakuInfo, err := GetNwakuInfo(nil, &extNodeRestPort)
+	storeNodeInfo, err := GetNwakuInfo(nil, &extNodeRestPort)
 	require.NoError(t, err)
-	fmt.Println("---------- GABRIEL 2 ----------")
-
-	/* // Creating a fake DNS Discovery ENRTree
-	tree, url := makeTestTree("n", parseNodes([]string{nwakuInfo.EnrUri}), nil)
-	fmt.Println("---------- GABRIEL 3 ----------")
-	enrTreeAddress := url
-	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
-	if envEnrTreeAddress != "" {
-		enrTreeAddress = envEnrTreeAddress
-	}
-
-	fmt.Println("---------- GABRIEL 4 ----------")
-	fmt.Println("---------- enrTreeAddress: ", enrTreeAddress) */
 	
-	// Instead of the Config type, use WakuConfig
-	/* config := &Config{}
-	setDefaultConfig(config, false)
-	config.Port = 0
-	config.Resolver = mapResolver(tree.ToTXT("n"))
-	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
-	config.DiscoveryLimit = 20
-	config.WakuNodes = []string{enrTreeAddress} */
-
 	nwakuConfig := WakuConfig{
-	 // Host:        cfg.Host,
 		Port:        30303,
 		NodeKey:     "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
 		EnableRelay: true,
 		LogLevel:    "DEBUG",
-		Discv5BootstrapNodes: []string{nwakuInfo.EnrUri},
+		DnsDiscoveryUrl: "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im",
+		DnsDiscovery: true,
 		Discv5Discovery: true,
+		Staticnodes: []string{storeNodeInfo.ListenAddresses[0]},
 		ClusterID: 16,
 		Shards: []uint16{64},
 	}
 	
 	w, err := New(nil, "", &nwakuConfig, nil, nil, nil, nil, nil)
-	fmt.Println("---------- GABRIEL 5 ----------")
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
-	fmt.Println("---------- GABRIEL 6 ----------")
 
 	enr, err := w.ENR()
 	require.NoError(t, err)
 	require.NotNil(t, enr)
 
-	fmt.Println("---------- GABRIEL 7 ----------")
-
-	/*
-	// DNSDiscovery
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	fmt.Println("---------- GABRIEL 8 ----------")
-
-	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress, dnsdisc.WithResolver(config.Resolver))
-	require.NoError(t, err)
-
-	fmt.Println("---------- discoveredNodes: ", discoveredNodes)
-	
-	fmt.Println("---------- GABRIEL 9 ----------")
-	// Peer used for retrieving history
-	r, err := rand.Int(rand.Reader, big.NewInt(int64(len(discoveredNodes))))
-	require.NoError(t, err)
-
-	storeNode := discoveredNodes[int(r.Int64())]
-
-	fmt.Println("---------- storeNode: ", storeNode)
-	*/
-
-	// storeNode := discoveredNodes[int(r.Int64())]
-
-	fmt.Println("---------- GABRIEL 10 ----------")
 	options := func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 30 * time.Second
 	}
 
-	fmt.Println("---------- GABRIEL 11 ----------")
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
 		
@@ -247,14 +195,13 @@ func TestBasicWakuV2(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if numConnected > 1 {
+		// Have to be connected to at least 3 nodes: the static node, the bootstrap node, and one discovered node
+		if numConnected > 2 {
 			return nil
 		}
 		return errors.New("no peers discovered")
 	}, options)
 	require.NoError(t, err)
-
-	fmt.Println("---------- GABRIEL 12 ----------")
 
 	/* // Dropping Peer
 	err = w.DropPeer(storeNode.PeerID)

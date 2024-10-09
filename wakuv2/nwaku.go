@@ -1673,9 +1673,10 @@ type WakuConfig struct {
 	NodeKey     		 string `json:"key,omitempty"`
 	EnableRelay  		 bool   `json:"relay"`
 	LogLevel     		 string `json:"logLevel"`
-	DnsDiscovery 		 string `json:"dnsDiscovery,omitempty"`
+	DnsDiscovery 		 bool `json:"dnsDiscovery,omitempty"`
 	DnsDiscoveryUrl 	 string `json:"dnsDiscoveryUrl,omitempty"`
 	MaxMessageSize		 string `json:"maxMessageSize,omitempty"`
+	Staticnodes          []string `json:"staticnodes,omitempty"`
 	Discv5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
 	Discv5Discovery		 bool `json:"discv5Discovery,omitempty"`
 	ClusterID			 uint16 `json:"clusterId,omitempty"`
