@@ -95,12 +95,18 @@ func (c *CachedEthClient) getOrFetchBlockByHash(ctx context.Context, hash common
 
 func (c *CachedEthClient) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
 	block, err := c.getOrFetchBlockByHash(ctx, hash, false)
-	return block.header, err
+	if err != nil {
+		return nil, err
+	}
+	return block.header, nil
 }
 
 func (c *CachedEthClient) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
 	block, err := c.getOrFetchBlockByNumber(ctx, number, false)
-	return block.header, err
+	if err != nil {
+		return nil, err
+	}
+	return block.header, nil
 }
 
 func (c *CachedEthClient) getOrFetchUncles(ctx context.Context, blockHash common.Hash, uncleHashes []common.Hash) ([]*types.Header, error) {
@@ -283,7 +289,7 @@ func (c *CachedEthClient) callGetBalance(ctx context.Context, account common.Add
 		return nil, err
 	}
 
-	return result.ToInt(), nil
+	return (*big.Int)(result), nil
 }
 
 func (c *CachedEthClient) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
