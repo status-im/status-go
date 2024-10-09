@@ -106,7 +106,6 @@ func NewGoplsClient(ctx context.Context, logger *zap.Logger) *Connection {
 	gopls.stream = jsonrpc2.NewStream(conn)
 
 	ctx, gopls.conn, gopls.server = protocol.NewClient(ctx, gopls.client, gopls.stream, logger)
-	//client = protocol.ServerDispatcher(conn, logger)
 
 	initParams := protocol.InitializeParams{
 		//ProcessID: 1,
@@ -122,12 +121,11 @@ func NewGoplsClient(ctx context.Context, logger *zap.Logger) *Connection {
 	}
 
 	fmt.Println("Sending initialize request...")
-	initResult, err := gopls.server.Initialize(ctx, &initParams)
+	_, err = gopls.server.Initialize(ctx, &initParams)
 	if err != nil {
 		logger.Error("Error during initialize", zap.Error(err))
 		panic(err)
 	}
-	fmt.Printf("Initialize result: %+v\n", initResult)
 
 	// Step 2: Send 'initialized' notification
 	err = gopls.server.Initialized(ctx, &protocol.InitializedParams{})
@@ -136,7 +134,6 @@ func NewGoplsClient(ctx context.Context, logger *zap.Logger) *Connection {
 		panic(err)
 	}
 
-	fmt.Println("Initialized notification sent.")
 	//
 	//// Send the definition request
 	//params := &protocol.DefinitionParams{
@@ -160,8 +157,20 @@ func NewGoplsClient(ctx context.Context, logger *zap.Logger) *Connection {
 	return gopls
 }
 
-func (gopls *Connection) definitionTCP(filePath string, lineNumber int, charPosition int) (string, int, error) {
+func (gopls *Connection) Definition(filePath string, lineNumber int, charPosition int) (string, int, error) {
+	// NOTE: gopls uses 0-based line and column numbers
+	var defFile string
+	var defLine int
+	var err error
+	if goplsRemote {
+		defFile, defLine, err = gopls.definitionTCP(filePath, lineNumber-1, charPosition-1)
+	} else {
+		defFile, defLine, err = definitionCLI(filePath, lineNumber-1, charPosition-1, gopls.logger)
+	}
+	return defFile, defLine + 1, err
+}
 
+func (gopls *Connection) definitionTCP(filePath string, lineNumber int, charPosition int) (string, int, error) {
 	// Define the file URI and position where the function/method is invoked
 	fileURI := protocol.DocumentURI("file://" + filePath) // Replace with actual file URI
 	line := lineNumber                                    // Line number where the function is called

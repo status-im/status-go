@@ -4,16 +4,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
 	"time"
 	"context"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"path"
 )
 
 func main() {
 	// Initialize logger with colors
 	loggerConfig := zap.NewDevelopmentConfig()
-	loggerConfig.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
+	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	loggerConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
 	loggerConfig.Development = false
 	loggerConfig.DisableStacktrace = true
 	logger, err := loggerConfig.Build()
@@ -21,10 +23,7 @@ func main() {
 		panic(err)
 	}
 
-	//logger = logger.Named("main")
-
-	//handler := log.StreamHandler(os.Stdout, log.TerminalFormat(true))
-	//log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, handler))
+	logger = logger.Named("main")
 
 	if len(os.Args) < 2 {
 		logger.Error("Usage: go run main.go <directory>")
@@ -38,16 +37,10 @@ func main() {
 	defer cancel()
 
 	gopls := NewGoplsClient(ctx, logger)
-	definition := func(filePath string, lineNumber int, charPosition int) (string, int, error) {
-		if goplsHTTP {
-			return gopls.definitionTCP(filePath, lineNumber, charPosition)
-		} else {
-			return definitionCLI(filePath, lineNumber, charPosition, logger)
-		}
-	}
+	parser := NewParser(logger, gopls)
 
 	// Step 1: Scan all files and look for `go` calls
-	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(dir, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			logger.Error("failed to walk path", zap.String("path", dir), zap.Error(err))
 			return err
@@ -55,7 +48,8 @@ func main() {
 		if info.IsDir() {
 			return nil
 		}
-		if strings.HasPrefix(path, dir+"/vendor") {
+		vendorPath := path.Join(dir, "vendor")
+		if strings.HasPrefix(filePath, vendorPath) {
 			return nil
 		}
 		if !strings.HasSuffix(info.Name(), ".go") {
@@ -65,15 +59,12 @@ func main() {
 			return nil
 		}
 
-		logger.Info("scanning Go file", zap.String("file", path))
-		//content, err := os.ReadFile(path)
-		//if err != nil {
-		//	return err
-		//}
-		//gopls.DidOpen(ctx, path, string(content), logger)
+		_, err = parser.Run(filePath)
+		if err != nil {
+			return err
+		}
 
-		checkFileForGoroutines(path, definition, logger)
-		//gopls.DidClose(ctx, path)
+		//checkFileForGoroutines(path, definition, logger)
 
 		return nil
 	})

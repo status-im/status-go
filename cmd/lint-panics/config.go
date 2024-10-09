@@ -1,6 +1,6 @@
 package main
 
 const (
-	goplsHTTP    = true
+	goplsRemote  = true
 	goplsAddress = "http://localhost:6060"
 )
