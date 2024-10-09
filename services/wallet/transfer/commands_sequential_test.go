@@ -28,7 +28,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
@@ -1578,7 +1577,8 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
