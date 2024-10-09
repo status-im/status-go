@@ -585,19 +585,6 @@ func (tc *TestClient) CallContext(ctx context.Context, result interface{}, metho
 	return err
 }
 
-func (tc *TestClient) GetWalletNotifier() func(chainId uint64, message string) {
-	if tc.traceAPICalls {
-		tc.t.Log("GetWalletNotifier")
-	}
-	return nil
-}
-
-func (tc *TestClient) SetWalletNotifier(notifier func(chainId uint64, message string)) {
-	if tc.traceAPICalls {
-		tc.t.Log("SetWalletNotifier")
-	}
-}
-
 func (tc *TestClient) EstimateGas(ctx context.Context, call ethereum.CallMsg) (gas uint64, err error) {
 	err = tc.countAndlog("EstimateGas")
 	return 0, err
