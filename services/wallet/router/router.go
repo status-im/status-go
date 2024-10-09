@@ -202,25 +202,35 @@ func (r *Router) SuggestedRoutesAsync(input *requests.RouteInputParams) {
 	})
 }
 
+func (r *Router) clearActiveRoute() {
+	r.activeRoutesMutex.Lock()
+	r.activeRoutes = nil
+	r.activeRoutesMutex.Unlock()
+}
+
 func (r *Router) markRouteCanceled(value bool) {
 	r.routeCanceledMutex.Lock()
 	r.routeCanceled = value
 	r.routeCanceledMutex.Unlock()
 }
 
-func (r *Router) StopSuggestedRoutesAsyncCalculation() {
+func (r *Router) abortUpdates() {
 	r.markRouteCanceled(true)
 	r.unsubscribeFeesUpdateAccrossAllChains()
+}
+
+func (r *Router) StopSuggestedRoutesAsyncCalculation() {
+	r.abortUpdates()
 	r.scheduler.Stop()
 }
 
 func (r *Router) StopSuggestedRoutesCalculation() {
-	r.unsubscribeFeesUpdateAccrossAllChains()
+	r.abortUpdates()
 }
 
 func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInputParams) (suggestedRoutes *SuggestedRoutes, err error) {
-	// unsubscribe from updates
-	r.unsubscribeFeesUpdateAccrossAllChains()
+	r.clearActiveRoute()
+	r.abortUpdates()
 	r.markRouteCanceled(false)
 
 	// clear all processors
