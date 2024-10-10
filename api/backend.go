@@ -52,7 +52,7 @@ type StatusBackend interface {
 	SignTypedDataV4(typed signercore.TypedData, address string, password string) (types.HexBytes, error)
 
 	ConnectionChange(typ string, expensive bool)
-	AppStateChange(state string)
+	AppStateChange(state AppState)
 
 	ExtractGroupMembershipSignatures(signaturePairs [][2]string) ([]string, error)
 	SignGroupMembership(content string) (string, error)

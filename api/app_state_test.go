@@ -7,22 +7,22 @@ import (
 )
 
 func TestParseAppType(t *testing.T) {
-	check := func(input string, expectedState appState, expectError bool) {
-		actualState, err := parseAppState(input)
+	check := func(input string, expectedState AppState, expectError bool) {
+		actualState, err := ParseAppState(input)
 		assert.Equalf(t, expectedState, actualState, "unexpected result from parseAppState")
 		if expectError {
 			assert.NotNil(t, err, "error should not be nil")
 		}
 	}
 
-	check("active", appStateForeground, false)
-	check("background", appStateBackground, false)
-	check("inactive", appStateInactive, false)
-	check(" acTIVE ", appStateForeground, false)
-	check("    backGROUND  ", appStateBackground, false)
-	check("   INACTIVE   ", appStateInactive, false)
-	check("", appStateInvalid, true)
-	check("back ground", appStateInvalid, true)
-	check(" back ground ", appStateInvalid, true)
-	check("      ", appStateInvalid, true)
+	check("active", AppStateForeground, false)
+	check("background", AppStateBackground, false)
+	check("inactive", AppStateInactive, false)
+	check(" acTIVE ", AppStateForeground, false)
+	check("    backGROUND  ", AppStateBackground, false)
+	check("   INACTIVE   ", AppStateInactive, false)
+	check("", AppStateInvalid, true)
+	check("back ground", AppStateInvalid, true)
+	check(" back ground ", AppStateInvalid, true)
+	check("      ", AppStateInvalid, true)
 }
