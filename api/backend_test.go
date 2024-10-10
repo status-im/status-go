@@ -396,28 +396,28 @@ func TestAppStateChange(t *testing.T) {
 
 	var testCases = []struct {
 		name          string
-		fromState     appState
-		toState       appState
-		expectedState appState
+		fromState     AppState
+		toState       AppState
+		expectedState AppState
 	}{
 		{
 			name:          "success",
-			fromState:     appStateInactive,
-			toState:       appStateBackground,
-			expectedState: appStateBackground,
+			fromState:     AppStateInactive,
+			toState:       AppStateBackground,
+			expectedState: AppStateBackground,
 		},
 		{
 			name:          "invalid state",
-			fromState:     appStateInactive,
+			fromState:     AppStateInvalid,
 			toState:       "unexisting",
-			expectedState: appStateInactive,
+			expectedState: AppStateInvalid,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			backend.appState = tc.fromState
-			backend.AppStateChange(tc.toState.String())
+			backend.AppStateChange(tc.toState)
 			assert.Equal(t, tc.expectedState.String(), backend.appState.String())
 		})
 	}
