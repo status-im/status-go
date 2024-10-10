@@ -15,7 +15,7 @@ func main() {
 	// Initialize logger with colors
 	loggerConfig := zap.NewDevelopmentConfig()
 	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	loggerConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+	loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	loggerConfig.Development = false
 	loggerConfig.DisableStacktrace = true
 	logger, err := loggerConfig.Build()

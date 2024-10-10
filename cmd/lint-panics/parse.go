@@ -11,7 +11,10 @@ import (
 	"go/ast"
 	gotoken "go/token"
 	goparser "go/parser"
+	"github.com/pkg/errors"
 )
+
+const LogOnPanic = "LogOnPanic"
 
 type Processor struct {
 	logger   *zap.Logger
@@ -35,12 +38,7 @@ func (p *Processor) Run(path string) ([]string, error) {
 	logger := p.logger.With(zap.String("file", path))
 	//logger.Debug("scanning file")
 
-	src, err := os.ReadFile(path)
-	if err != nil {
-		logger.Error("failed to open file", zap.Error(err))
-	}
-
-	file, err := goparser.ParseFile(p.fset, path, src, 0)
+	file, err := p.parseFile(path)
 	if err != nil {
 		logger.Error("failed to parse file", zap.Error(err))
 		return nil, err
@@ -63,50 +61,36 @@ func (p *Processor) processNode(n ast.Node) bool {
 	case *ast.FuncLit:
 		// anonymous function
 		pos := p.fset.Position(fun.Pos())
-		if len(fun.Body.List) == 0 {
-			return true
-		}
-		body := fun.Body.List[0]
-		exprStmt, ok := body.(*ast.ExprStmt)
-		if !ok {
-			return true
-		}
-		callStmt, ok := exprStmt.X.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		selectorExpr, ok := callStmt.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-		firstLineFunName := selectorExpr.Sel.Name
-		p.logger.Debug("found anonymous goroutine",
+		logger := p.logger.With(
 			ZapURI(pos.Filename, pos.Line),
 			zap.Int("column", pos.Column),
-			zap.String("firstLineFunName", firstLineFunName),
 		)
-		if firstLineFunName != "LogOnPanic" {
-			p.logger.Warn("missing LogOnPanic()",
-				ZapURI(pos.Filename, pos.Line),
-				zap.Int("column", pos.Column),
-			)
+
+		logger.Debug("found anonymous goroutine")
+		if err := p.сheckGoroutine(fun.Body); err != nil {
+			logger.Warn("missing LogOnPanic()", zap.Error(err))
 		}
+
 	case *ast.SelectorExpr:
 		// method call
-		pos := p.fset.Position(fun.Pos())
+		pos := p.fset.Position(fun.Sel.Pos())
 		p.logger.Info("found method call as goroutine",
 			zap.String("methodName", fun.Sel.Name),
 			ZapURI(pos.Filename, pos.Line),
 			zap.Int("column", pos.Column),
 		)
-		// TODO: Find function definition and check first line
-		defFilePath, defLineNumber, err := p.language.Definition(pos.Filename, pos.Line, pos.Column)
+
+		defFilePath, defLineNumber, err := p.checkGoroutineDefinition(pos)
 		if err != nil {
-			p.logger.Error("failed to find function definition", zap.Error(err))
-			return false
+			logger := p.logger.With(
+				ZapURI(defFilePath, defLineNumber),
+				zap.Int("column", pos.Column),
+			)
+			logger.Warn("missing LogOnPanic()", zap.Error(err))
 		}
 
-		p.checkFirstLineInFunctionBody(defFilePath, defLineNumber)
+		//p.checkFirstLineInFunctionBody(defFilePath, defLineNumber)
+
 	case *ast.Ident:
 		// function call
 		pos := p.fset.Position(fun.Pos())
@@ -115,22 +99,112 @@ func (p *Processor) processNode(n ast.Node) bool {
 			ZapURI(pos.Filename, pos.Line),
 			zap.Int("column", pos.Column),
 		)
-		// TODO: Find function definition and check first line
-		defFilePath, defLineNumber, err := p.language.Definition(pos.Filename, pos.Line, pos.Column)
+
+		defFilePath, defLineNumber, err := p.checkGoroutineDefinition(pos)
 		if err != nil {
-			p.logger.Error("failed to find function definition", zap.Error(err))
-			return false
+			logger := p.logger.With(
+				ZapURI(defFilePath, defLineNumber),
+				zap.Int("column", pos.Column),
+			)
+			logger.Warn("missing LogOnPanic()", zap.Error(err))
 		}
 
-		p.checkFirstLineInFunctionBody(defFilePath, defLineNumber)
+		//p.checkFirstLineInFunctionBody(defFilePath, defLineNumber)
+
 	default:
 		p.logger.Error("unexpected goroutine type",
 			zap.String("type", fmt.Sprintf("%T", fun)),
 		)
-		return false
+		return true
 	}
 
 	return true
+}
+
+func (p *Processor) parseFile(path string) (*ast.File, error) {
+	logger := p.logger.With(zap.String("path", path))
+
+	src, err := os.ReadFile(path)
+	if err != nil {
+		logger.Error("failed to open file", zap.Error(err))
+	}
+
+	file, err := goparser.ParseFile(p.fset, path, src, 0)
+	if err != nil {
+		logger.Error("failed to parse file", zap.Error(err))
+		return nil, err
+	}
+
+	return file, nil
+}
+
+func (p *Processor) сheckGoroutine(body *ast.BlockStmt) error {
+	if body == nil {
+		p.logger.Warn("missing function body")
+		return nil
+	}
+	if len(body.List) == 0 {
+		return nil
+	}
+	firstStatement := body.List[0]
+	deferStatement, ok := firstStatement.(*ast.DeferStmt)
+	if !ok {
+		return errors.New("first statement is not defer")
+	}
+
+	//exprStmt, ok := firstStatement.(*ast.ExprStmt)
+	//if !ok {
+	//	return errors.New("first statement is not an expression")
+	//}
+	callStmt := deferStatement.Call
+	//if !ok {
+	//	return errors.New("first statement is not a call")
+	//}
+	selectorExpr, ok := callStmt.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return errors.New("first statement call is not a selector")
+	}
+	firstLineFunName := selectorExpr.Sel.Name
+	if firstLineFunName != LogOnPanic {
+		return errors.New("first statement is not LogOnPanic")
+	}
+
+	return nil
+}
+
+func (p *Processor) GetFunctionBody(node ast.Node, lineNumber int) (body *ast.BlockStmt) {
+	// Traverse the AST to find the function declaration at the specified position
+	ast.Inspect(node, func(n ast.Node) bool {
+		// Get the start position of the function
+
+		// Check if the node is a function declaration
+		funcDecl, ok := n.(*ast.FuncDecl)
+		if !ok {
+			return true
+		}
+
+		startPos := p.fset.Position(n.Pos())
+
+		if startPos.Line != lineNumber {
+			return true
+		}
+
+		//// Check if the function matches the given line and column
+		//if startPos.Line != line && startPos.Column <= column {
+		//	// Get the function body as a string
+		//	fmt.Printf("Found function %s at line %d, column %d\n", funcDecl.Name.Name, startPos.Line, startPos.Column)
+		//
+		//	// Get the body of the function
+		//	bodyPos := p.fset.Position(.Pos())
+		//
+		//}
+
+		body = funcDecl.Body
+
+		return false
+	})
+
+	return body
 }
 
 // checkFileForGoroutines scans a Go file for any `go` statements (goroutines)
@@ -192,6 +266,25 @@ func (p *Processor) checkFileForGoroutines(filePath string) {
 	}
 }
 
+func (p *Processor) checkGoroutineDefinition(pos gotoken.Position) (string, int, error) {
+	defFilePath, defLineNumber, err := p.language.Definition(pos.Filename, pos.Line, pos.Column)
+	if err != nil {
+		p.logger.Error("failed to find function definition", zap.Error(err))
+		return "", 0, err
+	}
+
+	file, err := p.parseFile(defFilePath)
+	if err != nil {
+		p.logger.Error("failed to parse file", zap.Error(err))
+		return "", 0, err
+	}
+
+	body := p.GetFunctionBody(file, defLineNumber)
+	err = p.сheckGoroutine(body)
+
+	return defFilePath, defLineNumber, err
+}
+
 // checkFirstLineInFunctionBody checks the first line inside a function body for `defer gocommon.utils.LogOnPanic()`
 func (p *Processor) checkFirstLineInFunctionBody(filePath string, startLine int) {
 	logger := p.logger.With(
@@ -216,7 +309,7 @@ func (p *Processor) checkFirstLineInFunctionBody(filePath string, startLine int)
 		line := scanner.Text()
 		url := fmt.Sprintf("%s:%d", filePath, startLine)
 
-		if strings.Contains(line, "LogOnPanic()") {
+		if strings.Contains(line, LogOnPanic+"()") {
 			p.logger.Info("found LogOnPanic()", zap.String("url", url))
 		} else {
 			p.logger.Warn("missing LogOnPanic()", zap.String("url", url))
