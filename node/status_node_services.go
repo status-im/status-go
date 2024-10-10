@@ -84,7 +84,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	setSettingsNotifier(accDB, settingsFeed)
 
 	services := []common.StatusService{}
-	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
+	services = append(services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
 	services = append(services, b.rpcStatsService())
 	services = append(services, b.appmetricsService())

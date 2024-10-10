@@ -56,7 +56,7 @@ func (s *TransactorSuite) SetupTest() {
 	chainID := gethparams.AllEthashProtocolChanges.ChainID.Uint64()
 	db, err := sqlite.OpenUnecryptedDB(sqlite.InMemoryPath) // dummy to make rpc.Client happy
 	s.Require().NoError(err)
-	rpcClient, _ := rpc.NewClient(s.client, chainID, params.UpstreamRPCConfig{}, nil, db, nil)
+	rpcClient, _ := rpc.NewClient(s.client, chainID, nil, db, nil)
 	rpcClient.UpstreamChainID = chainID
 	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", "/tmp", chainID)
 	s.Require().NoError(err)

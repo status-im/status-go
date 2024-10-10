@@ -17,7 +17,6 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/t/helpers"
@@ -405,7 +404,7 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
 	client := gethrpc.DialInProc(server)
-	rpcClient, _ := rpc.NewClient(client, chainID, params.UpstreamRPCConfig{}, nil, appDB, nil)
+	rpcClient, _ := rpc.NewClient(client, chainID, nil, appDB, nil)
 	rpcClient.UpstreamChainID = chainID
 
 	service := NewService(walletDB, accountsDB, &accountFeed, &walletFeed, rpcClient, nil, nil, nil)

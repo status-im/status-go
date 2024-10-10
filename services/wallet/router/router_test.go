@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -92,7 +91,7 @@ func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
 func setupRouter(t *testing.T) (*Router, func()) {
 	db, cleanTmpDb := setupTestNetworkDB(t)
 
-	client, _ := rpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, defaultNetworks, db, nil)
+	client, _ := rpc.NewClient(nil, 1, defaultNetworks, db, nil)
 
 	router := NewRouter(client, nil, nil, nil, nil, nil, nil, nil)
 
