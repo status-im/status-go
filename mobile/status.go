@@ -272,13 +272,34 @@ func callPrivateRPC(inputJSON string) string {
 	return resp
 }
 
+// Deprecated: Use VerifyAccountPasswordV2 instead
 func VerifyAccountPassword(keyStoreDir, address, password string) string {
-	return callWithResponse(verifyAccountPassword, keyStoreDir, address, password)
+	return verifyAccountPassword(keyStoreDir, address, password)
 }
 
 // verifyAccountPassword verifies account password.
 func verifyAccountPassword(keyStoreDir, address, password string) string {
 	_, err := statusBackend.AccountManager().VerifyAccountPassword(keyStoreDir, address, password)
+	return makeJSONResponse(err)
+}
+
+func VerifyAccountPasswordV2(requestJSON string) string {
+	return callWithResponse(verifyAccountPasswordV2, requestJSON)
+}
+
+func verifyAccountPasswordV2(requestJSON string) string {
+	var request requests.VerifyAccountPassword
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	_, err = statusBackend.AccountManager().VerifyAccountPassword(request.KeyStoreDir, request.Address, request.Password)
 	return makeJSONResponse(err)
 }
 
@@ -549,6 +570,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	return makeJSONResponse(nil)
 }
 
+// Deprecated: Use DeleteMultiaccountV2 instead
 func DeleteMultiaccount(keyUID, keyStoreDir string) string {
 	return callWithResponse(deleteMultiaccount, keyUID, keyStoreDir)
 }
@@ -556,6 +578,26 @@ func DeleteMultiaccount(keyUID, keyStoreDir string) string {
 // deleteMultiaccount
 func deleteMultiaccount(keyUID, keyStoreDir string) string {
 	err := statusBackend.DeleteMultiaccount(keyUID, keyStoreDir)
+	return makeJSONResponse(err)
+}
+
+func DeleteMultiaccountV2(requestJSON string) string {
+	return callWithResponse(deleteMultiaccountV2, requestJSON)
+}
+
+func deleteMultiaccountV2(requestJSON string) string {
+	var request requests.DeleteMultiaccount
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.DeleteMultiaccount(request.KeyUID, request.KeyStoreDir)
 	return makeJSONResponse(err)
 }
 
@@ -821,11 +863,13 @@ func sendTransactionWithChainID(chainID int, txArgsJSON, password string) string
 	return prepareJSONResponseWithCode(hash.String(), err, code)
 }
 
+// Deprecated: Use SendTransactionV2 instead.
 func SendTransaction(txArgsJSON, password string) string {
 	return sendTransaction(txArgsJSON, password)
 }
 
 // sendTransaction converts RPC args and calls backend.SendTransaction.
+// Deprecated: Use sendTransactionV2 instead.
 func sendTransaction(txArgsJSON, password string) string {
 	var params transactions.SendTxArgs
 	err := json.Unmarshal([]byte(txArgsJSON), &params)
@@ -833,6 +877,29 @@ func sendTransaction(txArgsJSON, password string) string {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
 	}
 	hash, err := statusBackend.SendTransaction(params, password)
+	code := codeUnknown
+	if c, ok := errToCodeMap[err]; ok {
+		code = c
+	}
+	return prepareJSONResponseWithCode(hash.String(), err, code)
+}
+
+func SendTransactionV2(requestJSON string) string {
+	return callWithResponse(sendTransactionV2, requestJSON)
+}
+
+func sendTransactionV2(requestJSON string) string {
+	var request requests.SendTransaction
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+	hash, err := statusBackend.SendTransaction(request.TxArgs, request.Password)
 	code := codeUnknown
 	if c, ok := errToCodeMap[err]; ok {
 		code = c
@@ -968,6 +1035,7 @@ func addPeer(enode string) string {
 	return makeJSONResponse(err)
 }
 
+// Deprecated: Use ConnectionChangeV2 instead.
 func ConnectionChange(typ string, expensive int) {
 	call(connectionChange, typ, expensive)
 }
@@ -976,6 +1044,19 @@ func ConnectionChange(typ string, expensive int) {
 // by ReactNative (see https://facebook.github.io/react-native/docs/netinfo.html)
 func connectionChange(typ string, expensive int) {
 	statusBackend.ConnectionChange(typ, expensive == 1)
+}
+
+func ConnectionChangeV2(requestJSON string) {
+	call(connectionChangeV2, requestJSON)
+}
+
+func connectionChangeV2(requestJSON string) {
+	var request requests.ConnectionChange
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		log.Error("error in connectionChangeV2", "error", err)
+	}
+	statusBackend.ConnectionChange(request.Type, request.Expensive == 1)
 }
 
 func AppStateChange(state string) {
@@ -1118,6 +1199,7 @@ func colorID(pk string) string {
 	return prepareJSONResponse(identityUtils.ToColorID(pk))
 }
 
+// Deprecated: Use ValidateMnemonicV2 instead.
 func ValidateMnemonic(mnemonic string) string {
 	return validateMnemonic(mnemonic)
 }
@@ -1140,6 +1222,19 @@ func validateMnemonic(mnemonic string) string {
 		return makeJSONResponse(err)
 	}
 	return string(data)
+}
+
+func ValidateMnemonicV2(requestJSON string) string {
+	return callWithResponse(validateMnemonicV2, requestJSON)
+}
+
+func validateMnemonicV2(requestJSON string) string {
+	var request requests.ValidateMnemonic
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return validateMnemonic(request.Mnemonic)
 }
 
 func DecompressPublicKey(key string) string {
@@ -1203,6 +1298,7 @@ func multiformatSerializePublicKey(key, outBase string) string {
 	return cpk
 }
 
+// Deprecated: Use MultiformatDeserializePublicKeyV2 instead.
 func MultiformatDeserializePublicKey(key, outBase string) string {
 	return callWithResponse(multiformatDeserializePublicKey, key, outBase)
 }
@@ -1217,6 +1313,20 @@ func multiformatDeserializePublicKey(key, outBase string) string {
 	return pk
 }
 
+func MultiformatDeserializePublicKeyV2(requestJSON string) string {
+	return callWithResponse(multiformatDeserializePublicKeyV2, requestJSON)
+}
+
+func multiformatDeserializePublicKeyV2(requestJSON string) string {
+	var request requests.MultiformatDeserializePublicKey
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return multiformatDeserializePublicKey(request.Key, request.OutBase)
+}
+
+// Deprecated: Use ExportUnencryptedDatabaseV2 instead.
 func ExportUnencryptedDatabase(accountData, password, databasePath string) string {
 	return exportUnencryptedDatabase(accountData, password, databasePath)
 }
@@ -1232,6 +1342,20 @@ func exportUnencryptedDatabase(accountData, password, databasePath string) strin
 	return makeJSONResponse(err)
 }
 
+func ExportUnencryptedDatabaseV2(requestJSON string) string {
+	return callWithResponse(exportUnencryptedDatabaseV2, requestJSON)
+}
+
+func exportUnencryptedDatabaseV2(requestJSON string) string {
+	var request requests.ExportUnencryptedDatabase
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return exportUnencryptedDatabase(request.AccountData, request.Password, request.DatabasePath)
+}
+
+// Deprecated: Use ImportUnencryptedDatabaseV2 instead.
 func ImportUnencryptedDatabase(accountData, password, databasePath string) string {
 	return importUnencryptedDatabase(accountData, password, databasePath)
 }
@@ -1247,6 +1371,20 @@ func importUnencryptedDatabase(accountData, password, databasePath string) strin
 	return makeJSONResponse(err)
 }
 
+func ImportUnencryptedDatabaseV2(requestJSON string) string {
+	return callWithResponse(importUnencryptedDatabaseV2, requestJSON)
+}
+
+func importUnencryptedDatabaseV2(requestJSON string) string {
+	var request requests.ImportUnencryptedDatabase
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return importUnencryptedDatabase(request.AccountData, request.Password, request.DatabasePath)
+}
+
+// Deprecated: Use ChangeDatabasePasswordV2 instead.
 func ChangeDatabasePassword(keyUID, password, newPassword string) string {
 	return changeDatabasePassword(keyUID, password, newPassword)
 }
@@ -1257,6 +1395,20 @@ func changeDatabasePassword(keyUID, password, newPassword string) string {
 	return makeJSONResponse(err)
 }
 
+func ChangeDatabasePasswordV2(requestJSON string) string {
+	return callWithResponse(changeDatabasePasswordV2, requestJSON)
+}
+
+func changeDatabasePasswordV2(requestJSON string) string {
+	var request requests.ChangeDatabasePassword
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return changeDatabasePassword(request.KeyUID, request.Password, request.NewPassword)
+}
+
+// Deprecated: Use ConvertToKeycardAccountV2 instead.
 func ConvertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword string) string {
 	return convertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword)
 }
@@ -1278,6 +1430,20 @@ func convertToKeycardAccount(accountData, settingsJSON, keycardUID, password, ne
 	return makeJSONResponse(err)
 }
 
+func ConvertToKeycardAccountV2(requestJSON string) string {
+	return callWithResponse(convertToKeycardAccountV2, requestJSON)
+}
+
+func convertToKeycardAccountV2(requestJSON string) string {
+	var request requests.ConvertToKeycardAccount
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return convertToKeycardAccount(request.AccountData, request.SettingsJSON, request.KeycardUID, request.Password, request.NewPassword)
+}
+
+// Deprecated: Use ConvertToRegularAccountV2 instead.
 func ConvertToRegularAccount(mnemonic, currPassword, newPassword string) string {
 	return convertToRegularAccount(mnemonic, currPassword, newPassword)
 }
@@ -1286,6 +1452,19 @@ func ConvertToRegularAccount(mnemonic, currPassword, newPassword string) string 
 func convertToRegularAccount(mnemonic, currPassword, newPassword string) string {
 	err := statusBackend.ConvertToRegularAccount(mnemonic, currPassword, newPassword)
 	return makeJSONResponse(err)
+}
+
+func ConvertToRegularAccountV2(requestJSON string) string {
+	return callWithResponse(convertToRegularAccountV2, requestJSON)
+}
+
+func convertToRegularAccountV2(requestJSON string) string {
+	var request requests.ConvertToRegularAccount
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return convertToRegularAccount(request.Mnemonic, request.CurrPassword, request.NewPassword)
 }
 
 func ImageServerTLSCert() string {
@@ -1371,6 +1550,7 @@ func fleets() string {
 	return string(data)
 }
 
+// Deprecated: Use SwitchFleetV2 instead.
 func SwitchFleet(fleet string, configJSON string) string {
 	return callWithResponse(switchFleet, fleet, configJSON)
 }
@@ -1397,7 +1577,38 @@ func switchFleet(fleet string, configJSON string) string {
 	return makeJSONResponse(err)
 }
 
+func SwitchFleetV2(requestJSON string) string {
+	return callWithResponse(switchFleetV2, requestJSON)
+}
+
+func switchFleetV2(requestJSON string) string {
+	var request requests.SwitchFleet
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return switchFleet(request.Fleet, request.ConfigJSON)
+}
+
+// Deprecated: Use GenerateImagesV2 instead.
 func GenerateImages(filepath string, aX, aY, bX, bY int) string {
+	return generateImages(filepath, aX, aY, bX, bY)
+}
+
+func GenerateImagesV2(requestJSON string) string {
+	return callWithResponse(generateImagesV2, requestJSON)
+}
+
+func generateImagesV2(requestJSON string) string {
+	var request requests.GenerateImages
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return generateImages(request.Filepath, request.AX, request.AY, request.BX, request.BY)
+}
+
+func generateImages(filepath string, aX, aY, bX, bY int) string {
 	iis, err := images.GenerateIdentityImages(filepath, aX, aY, bX, bY)
 	if err != nil {
 		return makeJSONResponse(err)
@@ -1514,6 +1725,7 @@ func (i *inputConnectionStringForBootstrappingResponse) toJSON(err error) string
 	return string(j)
 }
 
+// Deprecated: Use InputConnectionStringForBootstrappingV2 instead.
 func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 	return callWithResponse(inputConnectionStringForBootstrapping, cs, configJSON)
 }
@@ -1557,6 +1769,20 @@ func inputConnectionStringForBootstrapping(cs, configJSON string) string {
 	return response.toJSON(statusBackend.Logout())
 }
 
+func InputConnectionStringForBootstrappingV2(requestJSON string) string {
+	return callWithResponse(inputConnectionStringForBootstrappingV2, requestJSON)
+}
+
+func inputConnectionStringForBootstrappingV2(requestJSON string) string {
+	var request requests.InputConnectionStringForBootstrapping
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return inputConnectionStringForBootstrapping(request.ConnectionString, request.ConfigJSON)
+}
+
+// Deprecated: Use InputConnectionStringForBootstrappingAnotherDeviceV2 instead.
 func InputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) string {
 	return callWithResponse(inputConnectionStringForBootstrappingAnotherDevice, cs, configJSON)
 }
@@ -1584,6 +1810,19 @@ func inputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) s
 	return makeJSONResponse(err)
 }
 
+func InputConnectionStringForBootstrappingAnotherDeviceV2(requestJSON string) string {
+	return callWithResponse(inputConnectionStringForBootstrappingAnotherDeviceV2, requestJSON)
+}
+
+func inputConnectionStringForBootstrappingAnotherDeviceV2(requestJSON string) string {
+	var request requests.InputConnectionStringForBootstrappingAnotherDevice
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return inputConnectionStringForBootstrappingAnotherDevice(request.ConnectionString, request.ConfigJSON)
+}
+
 func GetConnectionStringForExportingKeypairsKeystores(configJSON string) string {
 	return callWithResponse(getConnectionStringForExportingKeypairsKeystores, configJSON)
 }
@@ -1603,6 +1842,7 @@ func getConnectionStringForExportingKeypairsKeystores(configJSON string) string 
 	return cs
 }
 
+// Deprecated: Use InputConnectionStringForImportingKeypairsKeystoresV2 instead.
 func InputConnectionStringForImportingKeypairsKeystores(cs, configJSON string) string {
 	return callWithResponse(inputConnectionStringForImportingKeypairsKeystores, cs, configJSON)
 }
@@ -1622,6 +1862,19 @@ func inputConnectionStringForImportingKeypairsKeystores(cs, configJSON string) s
 	return makeJSONResponse(err)
 }
 
+func InputConnectionStringForImportingKeypairsKeystoresV2(requestJSON string) string {
+	return callWithResponse(inputConnectionStringForImportingKeypairsKeystoresV2, requestJSON)
+}
+
+func inputConnectionStringForImportingKeypairsKeystoresV2(requestJSON string) string {
+	var request requests.InputConnectionStringForImportingKeypairsKeystores
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return inputConnectionStringForImportingKeypairsKeystores(request.ConnectionString, request.ConfigJSON)
+}
+
 func ValidateConnectionString(cs string) string {
 	return callWithResponse(validateConnectionString, cs)
 }
@@ -1634,6 +1887,7 @@ func validateConnectionString(cs string) string {
 	return err.Error()
 }
 
+// Deprecated: Use EncodeTransferV2 instead.
 func EncodeTransfer(to string, value string) string {
 	return callWithResponse(encodeTransfer, to, value)
 }
@@ -1647,6 +1901,20 @@ func encodeTransfer(to string, value string) string {
 	return result
 }
 
+func EncodeTransferV2(requestJSON string) string {
+	return callWithResponse(encodeTransferV2, requestJSON)
+}
+
+func encodeTransferV2(requestJSON string) string {
+	var request requests.EncodeTransfer
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return encodeTransfer(request.To, request.Value)
+}
+
+// Deprecated: Use EncodeFunctionCallV2 instead.
 func EncodeFunctionCall(method string, paramsJSON string) string {
 	return callWithResponse(encodeFunctionCall, method, paramsJSON)
 }
@@ -1658,6 +1926,19 @@ func encodeFunctionCall(method string, paramsJSON string) string {
 		return ""
 	}
 	return result
+}
+
+func EncodeFunctionCallV2(requestJSON string) string {
+	return callWithResponse(encodeFunctionCallV2, requestJSON)
+}
+
+func encodeFunctionCallV2(requestJSON string) string {
+	var request requests.EncodeFunctionCall
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return encodeFunctionCall(request.Method, request.ParamsJSON)
 }
 
 func DecodeParameters(decodeParamJSON string) string {
