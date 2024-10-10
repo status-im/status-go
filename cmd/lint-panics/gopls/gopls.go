@@ -33,7 +33,7 @@ func NewGoplsClient(ctx context.Context, logger *zap.Logger, rootDir string) *Co
 	client := NewDummyClient(logger)
 
 	// Create a JSON-RPC connection using stdin and stdout
-	gopls.cmd = exec.Command("gopls", "serve", "-rpc.trace", "-debug", "localhost:6061")
+	gopls.cmd = exec.Command("gopls", "serve")
 
 	stdin, err := gopls.cmd.StdinPipe()
 	if err != nil {

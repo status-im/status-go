@@ -67,8 +67,6 @@ func main() {
 			return err
 		}
 
-		//checkFileForGoroutines(path, definition, logger)
-
 		return nil
 	})
 

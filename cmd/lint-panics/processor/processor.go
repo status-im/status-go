@@ -31,9 +31,8 @@ func NewProcessor(logger *zap.Logger, lsp LSP) *Processor {
 	}
 }
 
-func (p *Processor) Run(path string) ([]string, error) {
+func (p *Processor) Run(path string) (*Result, error) {
 	logger := p.logger.With(zap.String("file", path))
-	//logger.Debug("scanning file")
 
 	file, err := p.parseFile(path)
 	if err != nil {
@@ -41,18 +40,26 @@ func (p *Processor) Run(path string) ([]string, error) {
 		return nil, err
 	}
 
-	// Traverse the AST to find goroutines
-	ast.Inspect(file, p.processNode)
+	result := NewResult()
 
-	return nil, nil
+	// Traverse the AST to find goroutines
+	ast.Inspect(file, func(n ast.Node) bool {
+		r := p.processNode(n)
+		result.Merge(r)
+		return true
+	})
+
+	return result, nil
 }
 
-func (p *Processor) processNode(n ast.Node) bool {
+func (p *Processor) processNode(n ast.Node) *Result {
 	// Check if the node is a GoStmt (which represents a 'go' statement)
 	goStmt, ok := n.(*ast.GoStmt)
 	if !ok {
-		return true
+		return nil
 	}
+
+	result := NewResult()
 
 	switch fun := goStmt.Call.Fun.(type) {
 	case *ast.FuncLit:
@@ -65,7 +72,8 @@ func (p *Processor) processNode(n ast.Node) bool {
 
 		logger.Debug("found anonymous goroutine")
 		if err := p.сheckGoroutine(fun.Body); err != nil {
-			logger.Warn("missing LogOnPanic()", zap.Error(err))
+			uri := p.logLinterError(pos, err)
+			result.Add(uri)
 		}
 
 	case *ast.SelectorExpr:
@@ -77,13 +85,10 @@ func (p *Processor) processNode(n ast.Node) bool {
 			zap.Int("column", pos.Column),
 		)
 
-		defFilePath, defLineNumber, err := p.checkGoroutineDefinition(pos)
+		defPos, err := p.checkGoroutineDefinition(pos)
 		if err != nil {
-			logger := p.logger.With(
-				utils.ZapURI(defFilePath, defLineNumber),
-				zap.Int("column", pos.Column),
-			)
-			logger.Warn("missing LogOnPanic()", zap.Error(err))
+			uri := p.logLinterError(defPos, err)
+			result.Add(uri)
 		}
 
 	case *ast.Ident:
@@ -95,23 +100,19 @@ func (p *Processor) processNode(n ast.Node) bool {
 			zap.Int("column", pos.Column),
 		)
 
-		defFilePath, defLineNumber, err := p.checkGoroutineDefinition(pos)
+		defPos, err := p.checkGoroutineDefinition(pos)
 		if err != nil {
-			logger := p.logger.With(
-				utils.ZapURI(defFilePath, defLineNumber),
-				zap.Int("column", pos.Column),
-			)
-			logger.Warn("missing LogOnPanic()", zap.Error(err))
+			uri := p.logLinterError(defPos, err)
+			result.Add(uri)
 		}
 
 	default:
 		p.logger.Error("unexpected goroutine type",
 			zap.String("type", fmt.Sprintf("%T", fun)),
 		)
-		return true
 	}
 
-	return true
+	return result
 }
 
 func (p *Processor) parseFile(path string) (*ast.File, error) {
@@ -193,21 +194,36 @@ func (p *Processor) GetFunctionBody(node ast.Node, lineNumber int) (body *ast.Bl
 	return body
 }
 
-func (p *Processor) checkGoroutineDefinition(pos gotoken.Position) (string, int, error) {
+func (p *Processor) checkGoroutineDefinition(pos gotoken.Position) (gotoken.Position, error) {
 	defFilePath, defLineNumber, err := p.lsp.Definition(pos.Filename, pos.Line, pos.Column)
 	if err != nil {
 		p.logger.Error("failed to find function definition", zap.Error(err))
-		return "", 0, err
+		return gotoken.Position{}, err
 	}
 
 	file, err := p.parseFile(defFilePath)
 	if err != nil {
 		p.logger.Error("failed to parse file", zap.Error(err))
-		return "", 0, err
+		return gotoken.Position{}, err
 	}
 
 	body := p.GetFunctionBody(file, defLineNumber)
 	err = p.сheckGoroutine(body)
 
-	return defFilePath, defLineNumber, err
+	defPosition := gotoken.Position{
+		Filename: defFilePath,
+		Line:     defLineNumber,
+		Offset:   -1,
+		Column:   -1,
+	}
+
+	return defPosition, err
+}
+
+func (p *Processor) logLinterError(pos gotoken.Position, err error) string {
+	uri := utils.URI(pos.Filename, pos.Line)
+	p.logger.Warn("missing LogOnPanic()",
+		zap.String("uri", uri),
+		zap.String("details", err.Error()))
+	return uri
 }
