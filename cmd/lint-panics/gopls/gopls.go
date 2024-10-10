@@ -1,10 +1,8 @@
-package main
+package gopls
 
 import (
 	"fmt"
 	"os/exec"
-	"strings"
-
 	"github.com/pkg/errors"
 
 	"go.lsp.dev/jsonrpc2"
@@ -16,6 +14,11 @@ import (
 	"io"
 
 	"go.uber.org/zap"
+)
+
+const (
+	goplsRemote  = true
+	goplsAddress = "http://localhost:6060"
 )
 
 var requestID = 1
@@ -159,14 +162,7 @@ func NewGoplsClient(ctx context.Context, logger *zap.Logger) *Connection {
 
 func (gopls *Connection) Definition(filePath string, lineNumber int, charPosition int) (string, int, error) {
 	// NOTE: gopls uses 0-based line and column numbers
-	var defFile string
-	var defLine int
-	var err error
-	if goplsRemote {
-		defFile, defLine, err = gopls.definitionTCP(filePath, lineNumber-1, charPosition-1)
-	} else {
-		defFile, defLine, err = definitionCLI(filePath, lineNumber-1, charPosition-1, gopls.logger)
-	}
+	defFile, defLine, err := gopls.definitionTCP(filePath, lineNumber-1, charPosition-1)
 	return defFile, defLine + 1, err
 }
 
@@ -275,38 +271,6 @@ func (gopls *Connection) definitionTCP(filePath string, lineNumber int, charPosi
 
 	location := locations[0]
 	return location.URI.Filename(), int(location.Range.Start.Line), nil
-}
-
-// Runs `gopls` to find the definition of the function/method
-func definitionCLI(filePath string, lineNumber int, charPosition int, logger *zap.Logger) (string, int, error) {
-	args := fmt.Sprintf("%s:%d:%d", filePath, lineNumber, charPosition)
-	cmd := exec.Command("gopls", "definition", args)
-	output, err := cmd.Output()
-	if err != nil {
-		logger.Error("Error running gopls definition",
-			zap.String("file", filePath),
-			zap.Int("line", lineNumber),
-			zap.Error(err))
-		return "", 0, errors.Wrap(err, "Error running gopls definition")
-	}
-
-	definitionOutput := string(output)
-
-	// The output of `gopls definition` will contain the file path and position of the function definition
-	// Example output might be: /path/to/file.go:23:5
-	logger.Debug("parsed definition", zap.String("definition", definitionOutput))
-
-	// Extract file path and line number from the output
-	parts := strings.Split(definitionOutput, ":")
-	if len(parts) < 2 {
-		logger.Error("Failed to parse gopls definition output",
-			zap.String("output", definitionOutput))
-		return "", 0, errors.New("Failed to parse gopls definition output")
-	}
-
-	defFilePath := parts[0]
-	defLineNumber := atoi(parts[1])
-	return defFilePath, defLineNumber, nil
 }
 
 func (gopls *Connection) DidOpen(ctx context.Context, path string, content string, logger *zap.Logger) {

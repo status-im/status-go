@@ -9,6 +9,9 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"path"
+
+	gopls2 "github.com/status-im/status-go/cmd/lint-panics/gopls"
+	"github.com/status-im/status-go/cmd/lint-panics/processor"
 )
 
 func main() {
@@ -36,8 +39,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	gopls := NewGoplsClient(ctx, logger)
-	parser := NewParser(logger, gopls)
+	gopls := gopls2.NewGoplsClient(ctx, logger)
+	parser := processor.NewProcessor(logger, gopls)
 
 	// Step 1: Scan all files and look for `go` calls
 	err = filepath.Walk(dir, func(filePath string, info os.FileInfo, err error) error {
