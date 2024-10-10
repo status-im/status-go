@@ -26,6 +26,8 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
+const ListenOrder = 1
+
 var log = logging.Logger("quic-transport")
 
 var ErrHolePunching = errors.New("hole punching attempted; no active dial")
@@ -101,6 +103,10 @@ func NewTransport(key ic.PrivKey, connManager *quicreuse.ConnManager, psk pnet.P
 
 		listeners: make(map[string][]*virtualListener),
 	}, nil
+}
+
+func (t *transport) ListenOrder() int {
+	return ListenOrder
 }
 
 // Dial dials a new QUIC connection

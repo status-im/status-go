@@ -307,7 +307,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
 		cfg.EnableStoreConfirmationForMessagesSent = false
 		//TODO: temporary work-around to improve lightClient connectivity, need to be removed once community sharding is implemented
-		opts = append(opts, node.WithPubSubTopics(cfg.DefaultShardedPubsubTopics))
+		opts = append(opts, node.WithShards(waku.defaultShardInfo.ShardIDs))
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.cfg.MaxMessageSize)),

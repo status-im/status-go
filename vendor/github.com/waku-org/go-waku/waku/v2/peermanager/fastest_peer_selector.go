@@ -139,7 +139,7 @@ func (r *FastestPeerSelector) FastestPeer(ctx context.Context, peers peer.IDSlic
 		}
 	}
 
-	return "", ErrNoPeersAvailable
+	return "", utils.ErrNoPeersAvailable
 }
 
 type pingResult struct {

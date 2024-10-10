@@ -231,7 +231,11 @@ func (p *H264Packet) parseBody(payload []byte) ([]byte, error) {
 		currOffset := int(stapaHeaderSize)
 		result := []byte{}
 		for currOffset < len(payload) {
-			naluSize := int(binary.BigEndian.Uint16(payload[currOffset:]))
+			naluSizeBytes := payload[currOffset:]
+			if len(naluSizeBytes) < stapaNALULengthSize {
+				break
+			}
+			naluSize := int(binary.BigEndian.Uint16(naluSizeBytes))
 			currOffset += stapaNALULengthSize
 
 			if len(payload) < currOffset+naluSize {

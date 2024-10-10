@@ -114,7 +114,7 @@ func (p *PubSub) notifyPeerDead(pid peer.ID) {
 	}
 }
 
-func (p *PubSub) handleNewPeer(ctx context.Context, pid peer.ID, outgoing <-chan *RPC) {
+func (p *PubSub) handleNewPeer(ctx context.Context, pid peer.ID, outgoing *rpcQueue) {
 	s, err := p.host.NewStream(p.ctx, pid, p.rt.Protocols()...)
 	if err != nil {
 		log.Debug("opening new stream to peer: ", err, pid)
@@ -135,7 +135,7 @@ func (p *PubSub) handleNewPeer(ctx context.Context, pid peer.ID, outgoing <-chan
 	}
 }
 
-func (p *PubSub) handleNewPeerWithBackoff(ctx context.Context, pid peer.ID, backoff time.Duration, outgoing <-chan *RPC) {
+func (p *PubSub) handleNewPeerWithBackoff(ctx context.Context, pid peer.ID, backoff time.Duration, outgoing *rpcQueue) {
 	select {
 	case <-time.After(backoff):
 		p.handleNewPeer(ctx, pid, outgoing)
@@ -156,7 +156,7 @@ func (p *PubSub) handlePeerDead(s network.Stream) {
 	p.notifyPeerDead(pid)
 }
 
-func (p *PubSub) handleSendingMessages(ctx context.Context, s network.Stream, outgoing <-chan *RPC) {
+func (p *PubSub) handleSendingMessages(ctx context.Context, s network.Stream, outgoing *rpcQueue) {
 	writeRpc := func(rpc *RPC) error {
 		size := uint64(rpc.Size())
 
@@ -174,20 +174,17 @@ func (p *PubSub) handleSendingMessages(ctx context.Context, s network.Stream, ou
 	}
 
 	defer s.Close()
-	for {
-		select {
-		case rpc, ok := <-outgoing:
-			if !ok {
-				return
-			}
+	for ctx.Err() == nil {
+		rpc, err := outgoing.Pop(ctx)
+		if err != nil {
+			log.Debugf("popping message from the queue to send to %s: %s", s.Conn().RemotePeer(), err)
+			return
+		}
 
-			err := writeRpc(rpc)
-			if err != nil {
-				s.Reset()
-				log.Debugf("writing message to %s: %s", s.Conn().RemotePeer(), err)
-				return
-			}
-		case <-ctx.Done():
+		err = writeRpc(rpc)
+		if err != nil {
+			s.Reset()
+			log.Debugf("writing message to %s: %s", s.Conn().RemotePeer(), err)
 			return
 		}
 	}
@@ -209,15 +206,17 @@ func rpcWithControl(msgs []*pb.Message,
 	ihave []*pb.ControlIHave,
 	iwant []*pb.ControlIWant,
 	graft []*pb.ControlGraft,
-	prune []*pb.ControlPrune) *RPC {
+	prune []*pb.ControlPrune,
+	idontwant []*pb.ControlIDontWant) *RPC {
 	return &RPC{
 		RPC: pb.RPC{
 			Publish: msgs,
 			Control: &pb.ControlMessage{
-				Ihave: ihave,
-				Iwant: iwant,
-				Graft: graft,
-				Prune: prune,
+				Ihave:     ihave,
+				Iwant:     iwant,
+				Graft:     graft,
+				Prune:     prune,
+				Idontwant: idontwant,
 			},
 		},
 	}

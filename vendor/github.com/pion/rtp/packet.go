@@ -215,6 +215,9 @@ func (p *Packet) Unmarshal(buf []byte) error {
 
 	end := len(buf)
 	if p.Header.Padding {
+		if end <= n {
+			return errTooSmall
+		}
 		p.PaddingSize = buf[end-1]
 		end -= int(p.PaddingSize)
 	}
@@ -475,6 +478,10 @@ func (p Packet) Marshal() (buf []byte, err error) {
 
 // MarshalTo serializes the packet and writes to the buffer.
 func (p *Packet) MarshalTo(buf []byte) (n int, err error) {
+	if p.Header.Padding && p.PaddingSize == 0 {
+		return 0, errInvalidRTPPadding
+	}
+
 	n, err = p.Header.MarshalTo(buf)
 	if err != nil {
 		return 0, err

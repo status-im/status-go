@@ -319,6 +319,11 @@ func WithPrivateKey(privKey *ecdsa.PrivateKey) WakuNodeOption {
 func WithClusterID(clusterID uint16) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.clusterID = clusterID
+		if params.shards == nil {
+			var pshards protocol.RelayShards
+			pshards.ClusterID = params.clusterID
+			params.shards = &pshards
+		}
 		return nil
 	}
 }
@@ -336,6 +341,18 @@ func WithPubSubTopics(topics []string) WakuNodeOption {
 			return errors.New("pubsubtopics have different clusterID than configured clusterID")
 		}
 		params.shards = &rs[0] //Only consider 0 as a node can only support 1 cluster as of now
+		return nil
+	}
+}
+
+func WithShards(shards []uint16) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		if params.shards == nil {
+			var pshards protocol.RelayShards
+			pshards.ClusterID = params.clusterID
+			params.shards = &pshards
+		}
+		params.shards.ShardIDs = shards
 		return nil
 	}
 }
