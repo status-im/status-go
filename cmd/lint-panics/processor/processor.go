@@ -14,20 +14,20 @@ import (
 const LogOnPanic = "LogOnPanic"
 
 type Processor struct {
-	logger   *zap.Logger
-	fset     *gotoken.FileSet
-	language LanguageInterface
+	logger *zap.Logger
+	fset   *gotoken.FileSet
+	lsp    LSP
 }
 
-type LanguageInterface interface {
+type LSP interface {
 	Definition(string, int, int) (string, int, error)
 }
 
-func NewProcessor(logger *zap.Logger, language LanguageInterface) *Processor {
+func NewProcessor(logger *zap.Logger, lsp LSP) *Processor {
 	return &Processor{
-		logger:   logger.Named("parser"),
-		fset:     gotoken.NewFileSet(),
-		language: language,
+		logger: logger.Named("parser"),
+		fset:   gotoken.NewFileSet(),
+		lsp:    lsp,
 	}
 }
 
@@ -194,7 +194,7 @@ func (p *Processor) GetFunctionBody(node ast.Node, lineNumber int) (body *ast.Bl
 }
 
 func (p *Processor) checkGoroutineDefinition(pos gotoken.Position) (string, int, error) {
-	defFilePath, defLineNumber, err := p.language.Definition(pos.Filename, pos.Line, pos.Column)
+	defFilePath, defLineNumber, err := p.lsp.Definition(pos.Filename, pos.Line, pos.Column)
 	if err != nil {
 		p.logger.Error("failed to find function definition", zap.Error(err))
 		return "", 0, err

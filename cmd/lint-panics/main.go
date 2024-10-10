@@ -39,7 +39,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	gopls := gopls2.NewGoplsClient(ctx, logger)
+	gopls := gopls2.NewGoplsClient(ctx, logger, dir)
 	parser := processor.NewProcessor(logger, gopls)
 
 	// Step 1: Scan all files and look for `go` calls
