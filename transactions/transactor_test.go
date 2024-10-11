@@ -7,6 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
+	"github.com/status-im/status-go/rpc/chain/rpclimiter"
+
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
@@ -58,6 +62,13 @@ func (s *TransactorSuite) SetupTest() {
 	s.Require().NoError(err)
 	rpcClient, _ := rpc.NewClient(s.client, chainID, nil, db, nil)
 	rpcClient.UpstreamChainID = chainID
+
+	ethClients := []ethclient.RPSLimitedEthClientInterface{
+		ethclient.NewRPSLimitedEthClient(s.client, rpclimiter.NewRPCRpsLimiter(), "local-1-chain-id-1"),
+	}
+	localClient := chain.NewClient(ethClients, chainID)
+	rpcClient.SetClient(chainID, localClient)
+
 	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", "/tmp", chainID)
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig

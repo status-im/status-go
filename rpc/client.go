@@ -377,9 +377,10 @@ func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result in
 
 	if c.router.routeRemote(method) {
 		client, err := c.getClientUsingCache(chainID)
-		if err == nil {
-			return client.CallContext(ctx, result, method, args...)
+		if err != nil {
+			return err
 		}
+		return client.CallContext(ctx, result, method, args...)
 	}
 
 	if c.local == nil {
