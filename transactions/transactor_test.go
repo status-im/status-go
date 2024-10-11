@@ -28,7 +28,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
 	mock_fake "github.com/status-im/status-go/transactions/fake"
@@ -58,9 +58,11 @@ func (s *TransactorSuite) SetupTest() {
 
 	// expected by simulated backend
 	chainID := gethparams.AllEthashProtocolChanges.ChainID.Uint64()
-	db, err := sqlite.OpenUnecryptedDB(sqlite.InMemoryPath) // dummy to make rpc.Client happy
-	s.Require().NoError(err)
-	rpcClient, _ := rpc.NewClient(s.client, chainID, nil, db, nil)
+
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(s.T())
+	defer cleanup()
+
+	rpcClient, _ := rpc.NewClient(s.client, chainID, nil, appDB, walletDB, nil)
 	rpcClient.UpstreamChainID = chainID
 
 	ethClients := []ethclient.RPSLimitedEthClientInterface{

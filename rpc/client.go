@@ -107,6 +107,9 @@ type Client struct {
 
 	walletNotifier  func(chainID uint64, message string)
 	providerConfigs []params.ProviderConfig
+
+	appDB    *sql.DB
+	walletDB *sql.DB
 }
 
 // Is initialized in a build-tag-dependent module
@@ -116,11 +119,11 @@ var verifProxyInitFn func(c *Client)
 //
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
-func NewClient(client *gethrpc.Client, upstreamChainID uint64, networks []params.Network, db *sql.DB, providerConfigs []params.ProviderConfig) (*Client, error) {
+func NewClient(client *gethrpc.Client, upstreamChainID uint64, networks []params.Network, appDB *sql.DB, walletDB *sql.DB, providerConfigs []params.ProviderConfig) (*Client, error) {
 	var err error
 
 	log := log.New("package", "status-go/rpc.Client")
-	networkManager := network.NewManager(db)
+	networkManager := network.NewManager(appDB)
 	if networkManager == nil {
 		return nil, errors.New("failed to create network manager")
 	}
@@ -138,6 +141,8 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, networks []params
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		log:                log,
 		providerConfigs:    providerConfigs,
+		appDB:              appDB,
+		walletDB:           walletDB,
 	}
 
 	c.UpstreamChainID = upstreamChainID
@@ -282,7 +287,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 				c.log.Error("get RPC limiter "+key, "error", err)
 			}
 
-			ethClients = append(ethClients, ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, circuitKey))
+			ethClients = append(ethClients, buildEthClient(rpcClient, rpcLimiter, circuitKey, network.ChainID, c.walletDB))
 		}
 	}
 
@@ -471,4 +476,10 @@ func setResultFromRPCResponse(result, response interface{}) (err error) {
 	value.Set(responseValue)
 
 	return nil
+}
+
+func buildEthClient(rpcClient *gethrpc.Client, limiter *rpclimiter.RPCRpsLimiter, name string, chainID uint64, walletDB *sql.DB) ethclient.RPSLimitedEthClientInterface {
+	ethClient := ethclient.NewRPSLimitedEthClient(rpcClient, limiter, name)
+	ethClientStorage := ethclient.NewDBChain(ethclient.NewDB(walletDB), chainID)
+	return ethclient.NewCachedEthClient(ethClient, ethClientStorage)
 }
