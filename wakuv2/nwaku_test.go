@@ -213,9 +213,14 @@ func TestBasicWakuV2(t *testing.T) {
 	connectedStoreNodes, err := w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
 	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
 
-	err = w.DropPeer(storeNode.ID)
+	err = w.DisconnectPeerById(storeNode.ID)
 	require.NoError(t, err)
 
+	connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
+	require.NoError(t, err)
+	isDisconnected := !slices.Contains(connectedStoreNodes, storeNode.ID)
+	require.True(t, isDisconnected, "nwaku should be disconnected from the store node")
+	
 	/* // Dropping Peer
 	err = w.DropPeer(storeNode.PeerID)
 	require.NoError(t, err)
