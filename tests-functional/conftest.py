@@ -1,5 +1,8 @@
 import os
+import threading
 from dataclasses import dataclass
+
+import pytest as pytest
 
 
 def pytest_addoption(parser):
@@ -40,31 +43,45 @@ def pytest_addoption(parser):
         default="Strong12345",
     )
 
-@dataclass
-class Account():
-    
-    address: str
-    private_key: str
-    password: str
-
-user_1 = Account(
-    address="0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
-    private_key="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-    password="Strong12345"
-)
-user_2 = Account(
-    address="0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
-    private_key="0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
-    password="Strong12345"
-)
 
 @dataclass
 class Option:
     pass
 
+
 option = Option()
+
 
 def pytest_configure(config):
     global option
     option = config.option
     option.base_dir = os.path.dirname(os.path.abspath(__file__))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def init_status_backend():
+    await_signals = [
+
+        "mediaserver.started",
+        "node.started",
+        "node.ready",
+        "node.login",
+
+        "wallet",  # TODO: a test per event of a different type
+    ]
+
+    from clients.status_backend import StatusBackend
+    backend_client = StatusBackend(
+        await_signals=await_signals
+    )
+
+    websocket_thread = threading.Thread(
+        target=backend_client._connect
+    )
+    websocket_thread.daemon = True
+    websocket_thread.start()
+
+    backend_client.init_status_backend()
+    backend_client.create_account_and_login()
+
+    yield backend_client

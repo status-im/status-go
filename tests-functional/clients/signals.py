@@ -1,14 +1,14 @@
-
-import websocket
-import time
 import json
 import logging
+import time
+
+import websocket
 
 
 class SignalClient:
 
     def __init__(self, ws_url, await_signals):
-        self.ws_url = ws_url
+        self.url = f"{ws_url}/signals"
 
         self.await_signals = await_signals
         self.received_signals = {
@@ -23,15 +23,15 @@ class SignalClient:
     def wait_for_signal(self, signal_type, timeout=20):
         start_time = time.time()
         while not self.received_signals.get(signal_type):
-            time_passed = time.time() - start_time
-            if time_passed >= timeout:
+            if time.time() - start_time >= timeout:
                 raise TimeoutError(
-                    f"Signal {signal_type} is not  received in {timeout} seconds")
+                    f"Signal {signal_type} is not received in {timeout} seconds")
             time.sleep(0.2)
+        logging.debug(f"Signal {signal_type} is received in {round(time.time() - start_time)} seconds")
         return self.received_signals[signal_type][0]
 
     def _on_error(self, ws, error):
-        logging.info(f"Error: {error}")
+        logging.error(f"Error: {error}")
 
     def _on_close(self, ws, close_status_code, close_msg):
         logging.info(f"Connection closed: {close_status_code}, {close_msg}")
@@ -40,7 +40,6 @@ class SignalClient:
         logging.info("Connection opened")
 
     def _connect(self):
-        self.url = f"{self.ws_url}/signals"
         ws = websocket.WebSocketApp(self.url,
                                     on_message=self.on_message,
                                     on_error=self._on_error,

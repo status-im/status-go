@@ -1,8 +1,10 @@
-import random
-import pytest
-import jsonschema
 import json
-from conftest import option, user_1, user_2
+import random
+
+import jsonschema
+import pytest
+
+from conftest import option
 from test_cases import StatusDTestCase, TransactionTestCase
 
 
@@ -37,11 +39,11 @@ class TestTransactionRpc(TransactionTestCase):
     def test_create_multi_transaction(self):
         response = self.wallet_create_multi_transaction()
         self.rpc_client.verify_is_valid_json_rpc_response(response)
-        
+
         # how to create schema:
         # from schema_builder import CustomSchemaBuilder
         # CustomSchemaBuilder(method).create_schema(response.json())
-        
+
         with open(f"{option.base_dir}/schemas/wallet_createMultiTransaction/transferTx_positive", "r") as schema:
             jsonschema.validate(instance=response.json(), schema=json.load(schema))
 
@@ -64,8 +66,10 @@ class TestTransactionRpc(TransactionTestCase):
         response = self.wallet_create_multi_transaction(**changed_values)
         self.rpc_client.verify_is_json_rpc_error(response)
         actual_error_code, actual_error_text = response.json()['error']['code'], response.json()['error']['message']
-        assert expected_error_code == actual_error_code, f"got code: {actual_error_code} instead of expected: {expected_error_code}"
-        assert expected_error_text in actual_error_text, f"got error: {actual_error_text} that does not include: {expected_error_text}"
+        assert expected_error_code == actual_error_code, \
+            f"got code: {actual_error_code} instead of expected: {expected_error_code}"
+        assert expected_error_text in actual_error_text, \
+            f"got error: {actual_error_text} that does not include: {expected_error_text}"
 
         self.rpc_client.verify_json_schema(response, "wallet_createMultiTransaction/transferTx_error")
 

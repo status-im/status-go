@@ -1,16 +1,18 @@
 import json
+import logging
 import threading
 import time
-import pytest
-import logging
-
-from conftest import option, user_1, user_2
-from clients.signals import SignalClient
-from clients.status_backend import RpcClient, StatusBackend
 from collections import namedtuple
 
-class StatusDTestCase:
+import pytest
 
+from clients.signals import SignalClient
+from clients.status_backend import RpcClient
+from conftest import option
+from constants import user_1, user_2
+
+
+class StatusDTestCase:
     network_id = 31337
 
     def setup_method(self):
@@ -18,8 +20,9 @@ class StatusDTestCase:
             option.rpc_url_statusd
         )
 
+
 class WalletTestCase(StatusDTestCase):
-    
+
     def setup_method(self):
         super().setup_method()
 
@@ -47,7 +50,7 @@ class WalletTestCase(StatusDTestCase):
                 "fromAddress": user_1.address,
                 "fromAmount": "0x5af3107a4000",
                 "fromAsset": "ETH",
-                "type": 0, # MultiTransactionSend
+                "type": 0,  # MultiTransactionSend
                 "toAddress": user_2.address,
                 "toAsset": "ETH",
             },
@@ -69,16 +72,18 @@ class WalletTestCase(StatusDTestCase):
         self.rpc_client.verify_is_valid_json_rpc_response(response)
         try:
             tx_hash = response.json(
-        )["result"]["hashes"][str(self.network_id)][0]
+            )["result"]["hashes"][str(self.network_id)][0]
         except (KeyError, json.JSONDecodeError):
             raise Exception(response.content)
         return tx_hash
+
 
 class TransactionTestCase(WalletTestCase):
 
     def setup_method(self):
         super().setup_method()
         self.tx_hash = self.send_valid_multi_transaction()
+
 
 class EthRpcTestCase(WalletTestCase):
 
@@ -97,7 +102,7 @@ class EthRpcTestCase(WalletTestCase):
             block_hash = receipt.json()["result"]["blockHash"]
         except (KeyError, json.JSONDecodeError):
             raise Exception(receipt.content)
-        
+
         TxData = namedtuple("TxData", ["tx_hash", "block_number", "block_hash"])
         return TxData(tx_hash, block_number, block_hash)
 
@@ -126,8 +131,8 @@ class EthRpcTestCase(WalletTestCase):
             response = self.rpc_client.rpc_valid_request(method, params)
         return response.json()["result"]["tx"]
 
-class SignalTestCase(StatusDTestCase):
 
+class SignalTestCase(StatusDTestCase):
     await_signals = []
 
     def setup_method(self):
@@ -137,6 +142,7 @@ class SignalTestCase(StatusDTestCase):
         websocket_thread = threading.Thread(target=self.signal_client._connect)
         websocket_thread.daemon = True
         websocket_thread.start()
+
 
 class StatusBackendTestCase:
 

@@ -1,13 +1,12 @@
 import random
-import pytest
-import jsonschema
-import json
 import time
-from conftest import option, user_1, user_2
-from test_cases import StatusDTestCase, TransactionTestCase
-from dataclasses import dataclass, field
-from typing import List, Optional
+from dataclasses import dataclass
+from typing import Optional
 
+import pytest
+
+from conftest import option
+from test_cases import StatusDTestCase
 
 
 @pytest.mark.skip("to be reworked via status-backend")
@@ -28,7 +27,6 @@ class TestRpc(StatusDTestCase):
 
 @pytest.mark.skip("to be reworked via status-backend")
 class TestRpcMessaging(StatusDTestCase):
-
     @dataclass
     class User:
         rpc_url: str
@@ -69,7 +67,7 @@ class TestRpcMessaging(StatusDTestCase):
                                 "message": f"contact request from {sender.chat_public_key}: sent at {time.time()}",
                             }
                         ],
-                        _id=99,
+                        request_id=99,
                         url=sender.rpc_url,
                     )
 
@@ -85,7 +83,7 @@ class TestRpcMessaging(StatusDTestCase):
                         "id": user.chat_id,
                     }
                 ],
-                _id=99,
+                request_id=99,
                 url=user.rpc_url,
             )
             self.rpc_client.verify_is_valid_json_rpc_response(response)
@@ -95,7 +93,7 @@ class TestRpcMessaging(StatusDTestCase):
             response = self.rpc_client.rpc_request(
                 method="wakuext_contacts",
                 params=[],
-                _id=99,
+                request_id=99,
                 url=user[0].rpc_url,
             )
             self.rpc_client.verify_is_valid_json_rpc_response(response)

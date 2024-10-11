@@ -1,11 +1,13 @@
 import json
 import os
-from conftest import option
+
 from genson import SchemaBuilder
+
+from conftest import option
 
 
 class CustomSchemaBuilder(SchemaBuilder):
-    
+
     def __init__(self, schema_name):
         super().__init__()
         self.path = f"{option.base_dir}/schemas/{schema_name}"

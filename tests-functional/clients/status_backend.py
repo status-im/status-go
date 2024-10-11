@@ -1,21 +1,22 @@
-import jsonschema
 import json
-import requests
+import logging
 from datetime import datetime
-from conftest import option, user_1
+
+import jsonschema
+import requests
+
 from clients.signals import SignalClient
+from conftest import option
+from constants import user_1
 
 
 class RpcClient:
 
-    def __init__(
-        self, rpc_url, client=requests.Session()
-    ):
-
+    def __init__(self, rpc_url, client=requests.Session()):
         self.client = client
         self.rpc_url = rpc_url
 
-    def _try_except_JSONDecodeError_KeyError(self, response, key: str):
+    def _check_decode_and_key_errors_in_response(self, response, key):
         try:
             return response.json()[key]
         except json.JSONDecodeError:
@@ -28,7 +29,7 @@ class RpcClient:
     def verify_is_valid_json_rpc_response(self, response, _id=None):
         assert response.status_code == 200
         assert response.content
-        self._try_except_JSONDecodeError_KeyError(response, "result")
+        self._check_decode_and_key_errors_in_response(response, "result")
 
         if _id:
             try:
@@ -43,14 +44,14 @@ class RpcClient:
     def verify_is_json_rpc_error(self, response):
         assert response.status_code == 200
         assert response.content
-        self._try_except_JSONDecodeError_KeyError(response, "error")
+        self._check_decode_and_key_errors_in_response(response, "error")
 
-    def rpc_request(self, method, params=[], _id=None, url=None):
+    def rpc_request(self, method, params=[], request_id=13, url=None):
         url = url if url else self.rpc_url
-        data = {"jsonrpc": "2.0", "method": method}
+        data = {"jsonrpc": "2.0", "method": method, "id": request_id}
         if params:
             data["params"] = params
-        data["id"] = _id if _id else 13
+        logging.info(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True, indent=4)}")
         response = self.client.post(url, json=data)
 
         return response
@@ -94,7 +95,7 @@ class StatusBackend(RpcClient, SignalClient):
         except KeyError:
             pass
 
-    def api_valid_request(self, method, data, url=None):
+    def api_valid_request(self, method, data):
         response = self.api_request(method, data)
         self.verify_is_valid_api_response(response)
         return response
