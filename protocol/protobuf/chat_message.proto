@@ -171,12 +171,22 @@ message UnfurledStatusChannelLink {
   UnfurledStatusCommunityLink community = 6;
 }
 
+message UnfurledStatusTransactionLink {
+    uint32 txType = 1;
+    string address = 2;
+    string amount = 3;
+    string asset = 4;
+    uint32 chainId = 5;
+    string toAsset = 6;
+}
+
 message UnfurledStatusLink {
   string url = 1;
   oneof payload {
     UnfurledStatusContactLink contact = 2;
     UnfurledStatusCommunityLink community = 3;
     UnfurledStatusChannelLink channel = 4;
+    UnfurledStatusTransactionLink transaction = 5;
   }
 }
 

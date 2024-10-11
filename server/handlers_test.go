@@ -265,6 +265,15 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 		},
 	}
 
+	transaction := &protobuf.UnfurledStatusTransactionLink{
+		TxType:  2,
+		Asset:   "Asset_1",
+		Amount:  "Amount_1",
+		Address: "Address_1",
+		ToAsset: "ToAsset_1",
+		ChainId: 11,
+	}
+
 	unfurledContact := &protobuf.UnfurledStatusLink{
 		Url: "https://status.app/u/",
 		Payload: &protobuf.UnfurledStatusLink_Contact{
@@ -293,12 +302,20 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 		},
 	}
 
+	unfurledTransaction := &protobuf.UnfurledStatusLink{
+		Url: "https://status.app/tx/",
+		Payload: &protobuf.UnfurledStatusLink_Transaction{
+			Transaction: transaction,
+		},
+	}
+
 	const (
 		messageIDContactOnly      = "1"
 		messageIDCommunityOnly    = "2"
 		messageIDChannelOnly      = "3"
 		messageIDAllLinks         = "4"
 		messageIDUnsupportedImage = "5"
+		messageIDTransactionOnly  = "6"
 	)
 
 	s.saveUserMessage(&common.Message{
@@ -342,6 +359,7 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 					unfurledContact,
 					unfurledCommunity,
 					unfurledChannel,
+					unfurledTransaction,
 				},
 			},
 		},
@@ -353,6 +371,17 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 			UnfurledStatusLinks: &protobuf.UnfurledStatusLinks{
 				UnfurledStatusLinks: []*protobuf.UnfurledStatusLink{
 					unfurledContactWithUnsupportedImage,
+				},
+			},
+		},
+	})
+
+	s.saveUserMessage(&common.Message{
+		ID: messageIDTransactionOnly,
+		ChatMessage: &protobuf.ChatMessage{
+			UnfurledStatusLinks: &protobuf.UnfurledStatusLinks{
+				UnfurledStatusLinks: []*protobuf.UnfurledStatusLink{
+					unfurledTransaction,
 				},
 			},
 		},
@@ -536,6 +565,26 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 			ExpectedHTTPStatusCode: http.StatusBadRequest,
 			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
 				s.Require().Equal("missing query parameter 'image-id'\n", rr.Body.String())
+			},
+		},
+		{
+			Name: "Test request with missing 'message-id' parameter",
+			Parameters: url.Values{
+				"url": {unfurledTransaction.Url},
+			},
+			ExpectedHTTPStatusCode: http.StatusBadRequest,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.Require().Equal("missing query parameter 'message-id'\n", rr.Body.String())
+			},
+		},
+		{
+			Name: "Test request with missing 'url' parameter",
+			Parameters: url.Values{
+				"message-id": {messageIDTransactionOnly},
+			},
+			ExpectedHTTPStatusCode: http.StatusBadRequest,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.Require().Equal("missing query parameter 'url'\n", rr.Body.String())
 			},
 		},
 	}

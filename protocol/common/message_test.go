@@ -338,6 +338,15 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 		},
 	}
 
+	transaction := &StatusTransactionLinkPreview{
+		TxType:  2,
+		Amount:  "Amount_22",
+		Asset:   "Asset_23",
+		ToAsset: "ToAsset_24",
+		Address: "Address_25",
+		ChainID: 26,
+	}
+
 	message := Message{
 		StatusLinkPreviews: []StatusLinkPreview{
 			{
@@ -352,6 +361,10 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 				URL:     "https://status.app/cc/",
 				Channel: channel,
 			},
+			{
+				URL:         "https://status.app/tx/",
+				Transaction: transaction,
+			},
 		},
 	}
 
@@ -360,7 +373,7 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 
 	unfurledLinks, err := message.ConvertStatusLinkPreviewsToProto()
 	require.NoError(t, err)
-	require.Len(t, unfurledLinks.UnfurledStatusLinks, 3)
+	require.Len(t, unfurledLinks.UnfurledStatusLinks, 4)
 
 	// Contact link
 
@@ -369,6 +382,7 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 	require.NotNil(t, l1.GetContact())
 	require.Nil(t, l1.GetCommunity())
 	require.Nil(t, l1.GetChannel())
+	require.Nil(t, l1.GetTransaction())
 	c1 := l1.GetContact()
 	require.Equal(t, compressedContactPublicKey, c1.PublicKey)
 	require.Equal(t, contact.DisplayName, c1.DisplayName)
@@ -385,6 +399,7 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 	require.NotNil(t, l2.GetCommunity())
 	require.Nil(t, l2.GetContact())
 	require.Nil(t, l2.GetChannel())
+	require.Nil(t, l2.GetTransaction())
 	c2 := l2.GetCommunity()
 	require.Equal(t, compressedCommunityPublicKey, c2.CommunityId)
 	require.Equal(t, community.DisplayName, c2.DisplayName)
@@ -407,6 +422,7 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 	require.NotNil(t, l3.GetChannel())
 	require.Nil(t, l3.GetContact())
 	require.Nil(t, l3.GetCommunity())
+	require.Nil(t, l3.GetTransaction())
 
 	c3 := l3.GetChannel()
 	require.Equal(t, channel.ChannelUUID, c3.ChannelUuid)
@@ -429,6 +445,23 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 	require.Equal(t, uint32(channel.Community.Banner.Width), c3.Community.Banner.Width)
 	require.Equal(t, uint32(channel.Community.Banner.Height), c3.Community.Banner.Height)
 	require.Equal(t, expectedThumbnailPayload, c3.Community.Banner.Payload)
+
+	// Transaction link
+
+	l4 := unfurledLinks.UnfurledStatusLinks[3]
+	require.Equal(t, "https://status.app/tx/", l4.Url)
+	require.NotNil(t, l4.GetTransaction())
+	require.Nil(t, l4.GetContact())
+	require.Nil(t, l4.GetCommunity())
+	require.Nil(t, l4.GetChannel())
+
+	t4 := l4.GetTransaction()
+	require.Equal(t, uint32(transaction.TxType), t4.TxType)
+	require.Equal(t, transaction.Amount, t4.Amount)
+	require.Equal(t, transaction.Asset, t4.Asset)
+	require.Equal(t, transaction.ToAsset, t4.ToAsset)
+	require.Equal(t, transaction.Address, t4.Address)
+	require.Equal(t, uint32(transaction.ChainID), t4.ChainId)
 
 	// Test any invalid link preview causes an early return.
 	invalidContactPreview := contact
@@ -516,6 +549,15 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 		},
 	}
 
+	transaction := &protobuf.UnfurledStatusTransactionLink{
+		TxType:  1,
+		Amount:  "100",
+		Asset:   "ETH",
+		ToAsset: "DAI",
+		Address: "0x1234567890",
+		ChainId: 11,
+	}
+
 	msg := Message{
 		ID: "42",
 		ChatMessage: &protobuf.ChatMessage{
@@ -539,6 +581,12 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 							Channel: channel,
 						},
 					},
+					{
+						Url: "https://status.app/tx/",
+						Payload: &protobuf.UnfurledStatusLink_Transaction{
+							Transaction: transaction,
+						},
+					},
 				},
 			},
 		},
@@ -549,7 +597,7 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	}
 
 	previews := msg.ConvertFromProtoToStatusLinkPreviews(urlMaker)
-	require.Len(t, previews, 3)
+	require.Len(t, previews, 4)
 
 	// Contact preview
 
@@ -558,6 +606,7 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	require.NotNil(t, p1.Contact)
 	require.Nil(t, p1.Community)
 	require.Nil(t, p1.Channel)
+	require.Nil(t, p1.Transaction)
 
 	c1 := p1.Contact
 	require.NotNil(t, c1)
@@ -577,6 +626,7 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	require.NotNil(t, p2.Community)
 	require.Nil(t, p2.Contact)
 	require.Nil(t, p2.Channel)
+	require.Nil(t, p2.Transaction)
 
 	c2 := p2.Community
 	require.Equal(t, communityID, c2.CommunityID)
@@ -602,6 +652,7 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	require.NotNil(t, p3.Channel)
 	require.Nil(t, p3.Contact)
 	require.Nil(t, p3.Community)
+	require.Nil(t, p3.Transaction)
 
 	c3 := previews[2].Channel
 	require.Equal(t, channel.ChannelUuid, c3.ChannelUUID)
@@ -627,6 +678,20 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	require.Equal(t, "", c3.Community.Banner.DataURI)
 	require.Equal(t, "https://localhost:6666/42-https://status.app/cc/-community-channel-banner", c3.Community.Banner.URL)
 
+	p4 := previews[3]
+	require.Equal(t, "https://status.app/tx/", p4.URL)
+	require.NotNil(t, p4.Transaction)
+	require.Nil(t, p4.Contact)
+	require.Nil(t, p4.Community)
+	require.Nil(t, p4.Channel)
+
+	t1 := p4.Transaction
+	require.Equal(t, transaction.TxType, uint32(t1.TxType))
+	require.Equal(t, transaction.Amount, t1.Amount)
+	require.Equal(t, transaction.Asset, t1.Asset)
+	require.Equal(t, transaction.ToAsset, t1.ToAsset)
+	require.Equal(t, transaction.Address, t1.Address)
+	require.Equal(t, transaction.ChainId, uint32(t1.ChainID))
 }
 
 func assertMarshalAndUnmarshalJSON[T any](t *testing.T, obj *T, msgAndArgs ...any) {

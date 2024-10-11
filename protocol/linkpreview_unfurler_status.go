@@ -83,6 +83,17 @@ func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusConta
 	return c, nil
 }
 
+func (u *StatusUnfurler) buildTransactionData(urlData *TransactionURLData) (*common.StatusTransactionLinkPreview, error) {
+	return &common.StatusTransactionLinkPreview{
+		TxType:  urlData.TxType,
+		Asset:   urlData.Asset,
+		Amount:  urlData.Amount,
+		Address: urlData.Address,
+		ChainID: urlData.ChainID,
+		ToAsset: urlData.ToAsset,
+	}, nil
+}
+
 func (u *StatusUnfurler) buildCommunityData(communityID string, shard *shard.Shard) (*communities.Community, *common.StatusCommunityLinkPreview, error) {
 	// This automatically checks the database
 	community, err := u.m.FetchCommunity(&FetchCommunityRequest{
@@ -168,6 +179,14 @@ func (u *StatusUnfurler) Unfurl() (*common.StatusLinkPreview, error) {
 		_, preview.Community, err = u.buildCommunityData(resp.Community.CommunityID, resp.Shard)
 		if err != nil {
 			return nil, fmt.Errorf("error when building community data: %w", err)
+		}
+		return preview, nil
+	}
+
+	if resp.Transaction != nil {
+		preview.Transaction, err = u.buildTransactionData(resp.Transaction)
+		if err != nil {
+			return nil, fmt.Errorf("error when building transaction data: %w", err)
 		}
 		return preview, nil
 	}
