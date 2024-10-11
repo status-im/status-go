@@ -167,7 +167,6 @@ func randomNodeConfig() *params.NodeConfig {
 		LogMaxSize:                randomInt(math.MaxInt64),
 		LogCompressRotated:        randomBool(),
 		LogToStderr:               randomBool(),
-		UpstreamConfig:            params.UpstreamRPCConfig{Enabled: randomBool(), URL: randomString()},
 		ClusterConfig: params.ClusterConfig{
 			Enabled:     randomBool(),
 			Fleet:       randomString(),

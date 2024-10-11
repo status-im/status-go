@@ -144,7 +144,7 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 			DefaultFallbackURL: serverWith1SecDelay.URL,
 		},
 	}
-	c, err := rpc.NewClient(nil, chainID, params.UpstreamRPCConfig{}, networks, appDB, providerConfigs)
+	c, err := rpc.NewClient(nil, chainID, networks, appDB, providerConfigs)
 	require.NoError(t, err)
 
 	chainClient, err := c.EthClient(chainID)

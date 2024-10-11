@@ -151,11 +151,6 @@ func insertClusterConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func insertUpstreamConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`INSERT OR REPLACE INTO upstream_config (enabled, url, synthetic_id) VALUES (?, ?, 'id')`, c.UpstreamConfig.Enabled, c.UpstreamConfig.URL)
-	return err
-}
-
 func insertLightETHConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`INSERT OR REPLACE INTO light_eth_config (enabled, database_cache, min_trusted_fraction, synthetic_id) VALUES (?, ?, ?, 'id')`, c.LightEthConfig.Enabled, c.LightEthConfig.DatabaseCache, c.LightEthConfig.MinTrustedFraction)
 	return err
@@ -336,7 +331,6 @@ func nodeConfigUpgradeInserts() []insertFn {
 		insertHTTPConfig,
 		insertIPCConfig,
 		insertLogConfig,
-		insertUpstreamConfig,
 		insertClusterConfig,
 		insertClusterConfigNodes,
 		insertLightETHConfig,
@@ -360,7 +354,6 @@ func nodeConfigNormalInserts() []insertFn {
 		insertHTTPConfig,
 		insertIPCConfig,
 		insertLogConfig,
-		insertUpstreamConfig,
 		insertClusterConfig,
 		insertClusterConfigNodes,
 		insertLightETHConfig,
@@ -497,11 +490,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 
 	err = tx.QueryRow("SELECT enabled, mobile_system, log_dir, log_level, file, max_backups, max_size, compress_rotated, log_to_stderr FROM log_config WHERE synthetic_id = 'id'").Scan(
 		&nodecfg.LogEnabled, &nodecfg.LogMobileSystem, &nodecfg.LogDir, &nodecfg.LogLevel, &nodecfg.LogFile, &nodecfg.LogMaxBackups, &nodecfg.LogMaxSize, &nodecfg.LogCompressRotated, &nodecfg.LogToStderr)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	err = tx.QueryRow("SELECT enabled, url FROM upstream_config WHERE synthetic_id = 'id'").Scan(&nodecfg.UpstreamConfig.Enabled, &nodecfg.UpstreamConfig.URL)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}

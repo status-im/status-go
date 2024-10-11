@@ -90,12 +90,9 @@ type ClientInterface interface {
 type Client struct {
 	sync.RWMutex
 
-	upstreamEnabled bool
-	upstreamURL     string
 	UpstreamChainID uint64
 
 	local              *gethrpc.Client
-	upstream           chain.ClientInterface
 	rpcClientsMutex    sync.RWMutex
 	rpcClients         map[uint64]chain.ClientInterface
 	rpsLimiterMutex    sync.RWMutex
@@ -115,12 +112,11 @@ type Client struct {
 // Is initialized in a build-tag-dependent module
 var verifProxyInitFn func(c *Client)
 
-// NewClient initializes Client and tries to connect to both,
-// upstream and local node.
+// NewClient initializes Client
 //
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
-func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.UpstreamRPCConfig, networks []params.Network, db *sql.DB, providerConfigs []params.ProviderConfig) (*Client, error) {
+func NewClient(client *gethrpc.Client, upstreamChainID uint64, networks []params.Network, db *sql.DB, providerConfigs []params.ProviderConfig) (*Client, error) {
 	var err error
 
 	log := log.New("package", "status-go/rpc.Client")
@@ -144,40 +140,8 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		providerConfigs:    providerConfigs,
 	}
 
-	var opts []gethrpc.ClientOption
-	opts = append(opts,
-		gethrpc.WithHeaders(http.Header{
-			"User-Agent": {rpcUserAgentUpstreamName},
-		}),
-	)
-
-	if upstream.Enabled {
-		c.UpstreamChainID = upstreamChainID
-		c.upstreamEnabled = upstream.Enabled
-		c.upstreamURL = upstream.URL
-		upstreamClient, err := gethrpc.DialOptions(context.Background(), c.upstreamURL, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("dial upstream server: %s", err)
-		}
-		limiter, err := c.getRPCRpsLimiter(c.upstreamURL)
-		if err != nil {
-			return nil, fmt.Errorf("get RPC limiter: %s", err)
-		}
-		hostPortUpstream, err := extractHostFromURL(c.upstreamURL)
-		if err != nil {
-			hostPortUpstream = "upstream"
-		}
-
-		// Include the chain-id in the rpc client
-		rpcName := fmt.Sprintf("%s-chain-id-%d", hostPortUpstream, upstreamChainID)
-
-		ethClients := []ethclient.RPSLimitedEthClientInterface{
-			ethclient.NewRPSLimitedEthClient(upstreamClient, limiter, rpcName),
-		}
-		c.upstream = chain.NewClient(ethClients, upstreamChainID)
-	}
-
-	c.router = newRouter(c.upstreamEnabled)
+	c.UpstreamChainID = upstreamChainID
+	c.router = newRouter(true)
 
 	if verifProxyInitFn != nil {
 		verifProxyInitFn(&c)
@@ -235,9 +199,6 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 
 	network := c.NetworkManager.Find(chainID)
 	if network == nil {
-		if c.UpstreamChainID == chainID {
-			return c.upstream, nil
-		}
 		return nil, fmt.Errorf("could not find network: %d", chainID)
 	}
 
@@ -366,36 +327,6 @@ func (c *Client) SetClient(chainID uint64, client chain.ClientInterface) {
 	c.rpcClientsMutex.Lock()
 	defer c.rpcClientsMutex.Unlock()
 	c.rpcClients[chainID] = client
-}
-
-// UpdateUpstreamURL changes the upstream RPC client URL, if the upstream is enabled.
-func (c *Client) UpdateUpstreamURL(url string) error {
-	if c.upstream == nil {
-		return nil
-	}
-
-	rpcClient, err := gethrpc.Dial(url)
-	if err != nil {
-		return err
-	}
-	rpsLimiter, err := c.getRPCRpsLimiter(url)
-	if err != nil {
-		return err
-	}
-	c.Lock()
-	hostPortUpstream, err := extractHostFromURL(url)
-	if err != nil {
-		hostPortUpstream = "upstream"
-	}
-
-	ethClients := []ethclient.RPSLimitedEthClientInterface{
-		ethclient.NewRPSLimitedEthClient(rpcClient, rpsLimiter, hostPortUpstream),
-	}
-	c.upstream = chain.NewClient(ethClients, c.UpstreamChainID)
-	c.upstreamURL = url
-	c.Unlock()
-
-	return nil
 }
 
 // Call performs a JSON-RPC call with the given arguments and unmarshals into
