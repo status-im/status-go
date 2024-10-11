@@ -21,7 +21,7 @@ import (
 )
 
 func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, accountsDB *accounts.Database, feed *event.Feed,
-	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
+	pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager,
 	chainClients map[uint64]chain.ClientInterface,
 	accounts []common.Address,
@@ -31,45 +31,43 @@ func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, blockRangesSeq
 ) *SequentialFetchStrategy {
 
 	return &SequentialFetchStrategy{
-		db:                 db,
-		blockDAO:           blockDAO,
-		blockRangesSeqDAO:  blockRangesSeqDAO,
-		accountsDB:         accountsDB,
-		feed:               feed,
-		transactionManager: transactionManager,
-		pendingTxManager:   pendingTxManager,
-		tokenManager:       tokenManager,
-		chainClients:       chainClients,
-		accounts:           accounts,
-		balanceCacher:      balanceCacher,
-		omitHistory:        omitHistory,
-		blockChainState:    blockChainState,
+		db:                db,
+		blockDAO:          blockDAO,
+		blockRangesSeqDAO: blockRangesSeqDAO,
+		accountsDB:        accountsDB,
+		feed:              feed,
+		pendingTxManager:  pendingTxManager,
+		tokenManager:      tokenManager,
+		chainClients:      chainClients,
+		accounts:          accounts,
+		balanceCacher:     balanceCacher,
+		omitHistory:       omitHistory,
+		blockChainState:   blockChainState,
 	}
 }
 
 type SequentialFetchStrategy struct {
-	db                 *Database
-	blockDAO           *BlockDAO
-	blockRangesSeqDAO  *BlockRangeSequentialDAO
-	accountsDB         *accounts.Database
-	feed               *event.Feed
-	mu                 sync.Mutex
-	group              *async.Group
-	transactionManager *TransactionManager
-	pendingTxManager   *transactions.PendingTxTracker
-	tokenManager       *token.Manager
-	chainClients       map[uint64]chain.ClientInterface
-	accounts           []common.Address
-	balanceCacher      balance.Cacher
-	omitHistory        bool
-	blockChainState    *blockchainstate.BlockChainState
+	db                *Database
+	blockDAO          *BlockDAO
+	blockRangesSeqDAO *BlockRangeSequentialDAO
+	accountsDB        *accounts.Database
+	feed              *event.Feed
+	mu                sync.Mutex
+	group             *async.Group
+	pendingTxManager  *transactions.PendingTxTracker
+	tokenManager      *token.Manager
+	chainClients      map[uint64]chain.ClientInterface
+	accounts          []common.Address
+	balanceCacher     balance.Cacher
+	omitHistory       bool
+	blockChainState   *blockchainstate.BlockChainState
 }
 
 func (s *SequentialFetchStrategy) newCommand(chainClient chain.ClientInterface,
 	accounts []common.Address) async.Commander {
 
 	return newLoadBlocksAndTransfersCommand(accounts, s.db, s.accountsDB, s.blockDAO, s.blockRangesSeqDAO, chainClient, s.feed,
-		s.transactionManager, s.pendingTxManager, s.tokenManager, s.balanceCacher, s.omitHistory, s.blockChainState)
+		s.pendingTxManager, s.tokenManager, s.balanceCacher, s.omitHistory, s.blockChainState)
 }
 
 func (s *SequentialFetchStrategy) start() error {

@@ -201,17 +201,16 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 }
 
 type transfersCommand struct {
-	db                 *Database
-	blockDAO           *BlockDAO
-	eth                *ETHDownloader
-	blockNums          []*big.Int
-	address            common.Address
-	chainClient        chain.ClientInterface
-	blocksLimit        int
-	transactionManager *TransactionManager
-	pendingTxManager   *transactions.PendingTxTracker
-	tokenManager       *token.Manager
-	feed               *event.Feed
+	db               *Database
+	blockDAO         *BlockDAO
+	eth              *ETHDownloader
+	blockNums        []*big.Int
+	address          common.Address
+	chainClient      chain.ClientInterface
+	blocksLimit      int
+	pendingTxManager *transactions.PendingTxTracker
+	tokenManager     *token.Manager
+	feed             *event.Feed
 
 	// result
 	fetchedTransfers []Transfer
@@ -272,13 +271,6 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 				err := c.saveAndConfirmPending(allTransfers, blockNum)
 				if err != nil {
 					logutils.ZapLogger().Error("saveAndConfirmPending error", zap.Error(err))
-					return err
-				}
-
-				// Check if multi transaction needs to be created
-				err = c.processMultiTransactions(ctx, allTransfers)
-				if err != nil {
-					logutils.ZapLogger().Error("processMultiTransactions error", zap.Error(err))
 					return err
 				}
 			} else {
@@ -422,73 +414,6 @@ func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers [
 	return notifyFunctions
 }
 
-// Mark all subTxs of a given Tx with the same multiTxID
-func setMultiTxID(tx Transaction, multiTxID w_common.MultiTransactionIDType) {
-	for _, subTx := range tx {
-		subTx.MultiTransactionID = multiTxID
-	}
-}
-
-func (c *transfersCommand) markMultiTxTokensAsPreviouslyOwned(ctx context.Context, multiTransaction *MultiTransaction, ownerAddress common.Address) {
-	if multiTransaction == nil {
-		return
-	}
-	if len(multiTransaction.ToAsset) > 0 && multiTransaction.ToNetworkID > 0 {
-		token := c.tokenManager.GetToken(multiTransaction.ToNetworkID, multiTransaction.ToAsset)
-		_, _ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, ownerAddress)
-	}
-	if len(multiTransaction.FromAsset) > 0 && multiTransaction.FromNetworkID > 0 {
-		token := c.tokenManager.GetToken(multiTransaction.FromNetworkID, multiTransaction.FromAsset)
-		_, _ = c.tokenManager.MarkAsPreviouslyOwnedToken(token, ownerAddress)
-	}
-}
-
-func (c *transfersCommand) checkAndProcessSwapMultiTx(ctx context.Context, tx Transaction) (bool, error) {
-	for _, subTx := range tx {
-		switch subTx.Type {
-		// If the Tx contains any uniswapV2Swap/uniswapV3Swap subTx, generate a Swap multiTx
-		case w_common.UniswapV2Swap, w_common.UniswapV3Swap:
-			multiTransaction, err := buildUniswapSwapMultitransaction(ctx, c.chainClient, c.tokenManager, subTx)
-			if err != nil {
-				return false, err
-			}
-
-			if multiTransaction != nil {
-				id, err := c.transactionManager.InsertMultiTransaction(multiTransaction)
-				if err != nil {
-					return false, err
-				}
-				setMultiTxID(tx, id)
-				c.markMultiTxTokensAsPreviouslyOwned(ctx, multiTransaction, subTx.Address)
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
-}
-
-func (c *transfersCommand) checkAndProcessBridgeMultiTx(ctx context.Context, tx Transaction) (bool, error) {
-	for _, subTx := range tx {
-		switch subTx.Type {
-		// If the Tx contains any hopBridge subTx, create/update Bridge multiTx
-		case w_common.HopBridgeFrom, w_common.HopBridgeTo:
-			multiTransaction, err := buildHopBridgeMultitransaction(ctx, c.chainClient, c.transactionManager, c.tokenManager, subTx)
-			if err != nil {
-				return false, err
-			}
-
-			if multiTransaction != nil {
-				setMultiTxID(tx, multiTransaction.ID)
-				c.markMultiTxTokensAsPreviouslyOwned(ctx, multiTransaction, subTx.Address)
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
-}
-
 func (c *transfersCommand) processUnknownErc20CommunityTransactions(ctx context.Context, allTransfers []Transfer) {
 	for _, tx := range allTransfers {
 		// To can be nil in case of erc20 contract creation
@@ -506,36 +431,6 @@ func (c *transfersCommand) processUnknownErc20CommunityTransactions(ctx context.
 			}
 		}
 	}
-}
-
-func (c *transfersCommand) processMultiTransactions(ctx context.Context, allTransfers []Transfer) error {
-	txByTxHash := subTransactionListToTransactionsByTxHash(allTransfers)
-
-	// Detect / Generate multitransactions
-	// Iterate over all detected transactions
-	for _, tx := range txByTxHash {
-		// Check if already matched to a multi transaction
-		if tx[0].MultiTransactionID > 0 {
-			continue
-		}
-
-		// Then check for a Swap transaction
-		txProcessed, err := c.checkAndProcessSwapMultiTx(ctx, tx)
-		if err != nil {
-			return err
-		}
-		if txProcessed {
-			continue
-		}
-
-		// Then check for a Bridge transaction
-		_, err = c.checkAndProcessBridgeMultiTx(ctx, tx)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (c *transfersCommand) notifyOfNewTransfers(blockNum *big.Int, transfers []Transfer) {
@@ -591,16 +486,15 @@ func (c *transfersCommand) notifyOfLatestTransfers(transfers []Transfer, transfe
 }
 
 type loadTransfersCommand struct {
-	accounts           []common.Address
-	db                 *Database
-	blockDAO           *BlockDAO
-	chainClient        chain.ClientInterface
-	blocksByAddress    map[common.Address][]*big.Int
-	transactionManager *TransactionManager
-	pendingTxManager   *transactions.PendingTxTracker
-	blocksLimit        int
-	tokenManager       *token.Manager
-	feed               *event.Feed
+	accounts         []common.Address
+	db               *Database
+	blockDAO         *BlockDAO
+	chainClient      chain.ClientInterface
+	blocksByAddress  map[common.Address][]*big.Int
+	pendingTxManager *transactions.PendingTxTracker
+	blocksLimit      int
+	tokenManager     *token.Manager
+	feed             *event.Feed
 }
 
 func (c *loadTransfersCommand) Command() async.Command {
@@ -617,13 +511,12 @@ func (c *loadTransfersCommand) Command() async.Command {
 // in `transferCommand` with exponential backoff instead of `loadTransfersCommand` (issue #4608).
 func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
 	return loadTransfers(parent, c.blockDAO, c.db, c.chainClient, c.blocksLimit, c.blocksByAddress,
-		c.transactionManager, c.pendingTxManager, c.tokenManager, c.feed)
+		c.pendingTxManager, c.tokenManager, c.feed)
 }
 
 func loadTransfers(ctx context.Context, blockDAO *BlockDAO, db *Database,
 	chainClient chain.ClientInterface, blocksLimitPerAccount int, blocksByAddress map[common.Address][]*big.Int,
-	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
-	tokenManager *token.Manager, feed *event.Feed) error {
+	pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager, feed *event.Feed) error {
 
 	logutils.ZapLogger().Debug("loadTransfers start",
 		zap.Uint64("chain", chainClient.NetworkID()),
@@ -646,11 +539,10 @@ func loadTransfers(ctx context.Context, blockDAO *BlockDAO, db *Database,
 				signer:      types.LatestSignerForChainID(chainClient.ToBigInt()),
 				db:          db,
 			},
-			blockNums:          blocksByAddress[address],
-			transactionManager: transactionManager,
-			pendingTxManager:   pendingTxManager,
-			tokenManager:       tokenManager,
-			feed:               feed,
+			blockNums:        blocksByAddress[address],
+			pendingTxManager: pendingTxManager,
+			tokenManager:     tokenManager,
+			feed:             feed,
 		}
 		group.Add(transfers.Command())
 	}
@@ -691,32 +583,4 @@ func uniqueHeaderPerBlockHash(allHeaders []*DBHeader) []*DBHeader {
 	}
 
 	return uniqHeaders
-}
-
-// Organize subTransactions by Transaction Hash
-func subTransactionListToTransactionsByTxHash(subTransactions []Transfer) map[common.Hash]Transaction {
-	rst := map[common.Hash]Transaction{}
-
-	for index := range subTransactions {
-		subTx := &subTransactions[index]
-		txHash := subTx.Transaction.Hash()
-
-		if _, ok := rst[txHash]; !ok {
-			rst[txHash] = make([]*Transfer, 0)
-		}
-		rst[txHash] = append(rst[txHash], subTx)
-	}
-
-	return rst
-}
-
-func IsTransferDetectionEvent(ev walletevent.EventType) bool {
-	if ev == EventInternalETHTransferDetected ||
-		ev == EventInternalERC20TransferDetected ||
-		ev == EventInternalERC721TransferDetected ||
-		ev == EventInternalERC1155TransferDetected {
-		return true
-	}
-
-	return false
 }

@@ -1081,7 +1081,7 @@ func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) 
 				go func() {
 					defer gocommon.LogOnPanic()
 					_ = loadTransfers(ctx, c.blockDAO, c.db, c.chainClient, noBlockLimit,
-						blocksByAddress, c.transactionManager, c.pendingTxManager, c.tokenManager, c.feed)
+						blocksByAddress, c.pendingTxManager, c.tokenManager, c.feed)
 				}()
 			}
 		}
@@ -1090,26 +1090,25 @@ func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) 
 
 func newLoadBlocksAndTransfersCommand(accounts []common.Address, db *Database, accountsDB *accounts.Database,
 	blockDAO *BlockDAO, blockRangesSeqDAO BlockRangeDAOer, chainClient chain.ClientInterface, feed *event.Feed,
-	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
+	pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager, balanceCacher balance.Cacher, omitHistory bool,
 	blockChainState *blockchainstate.BlockChainState) *loadBlocksAndTransfersCommand {
 
 	return &loadBlocksAndTransfersCommand{
-		accounts:           accounts,
-		db:                 db,
-		blockRangeDAO:      blockRangesSeqDAO,
-		accountsDB:         accountsDB,
-		blockDAO:           blockDAO,
-		chainClient:        chainClient,
-		feed:               feed,
-		balanceCacher:      balanceCacher,
-		transactionManager: transactionManager,
-		pendingTxManager:   pendingTxManager,
-		tokenManager:       tokenManager,
-		blocksLoadedCh:     make(chan []*DBHeader, 100),
-		omitHistory:        omitHistory,
-		contractMaker:      tokenManager.ContractMaker,
-		blockChainState:    blockChainState,
+		accounts:         accounts,
+		db:               db,
+		blockRangeDAO:    blockRangesSeqDAO,
+		accountsDB:       accountsDB,
+		blockDAO:         blockDAO,
+		chainClient:      chainClient,
+		feed:             feed,
+		balanceCacher:    balanceCacher,
+		pendingTxManager: pendingTxManager,
+		tokenManager:     tokenManager,
+		blocksLoadedCh:   make(chan []*DBHeader, 100),
+		omitHistory:      omitHistory,
+		contractMaker:    tokenManager.ContractMaker,
+		blockChainState:  blockChainState,
 	}
 }
 
@@ -1123,13 +1122,12 @@ type loadBlocksAndTransfersCommand struct {
 	feed          *event.Feed
 	balanceCacher balance.Cacher
 	// nonArchivalRPCNode bool // TODO Make use of it
-	transactionManager *TransactionManager
-	pendingTxManager   *transactions.PendingTxTracker
-	tokenManager       *token.Manager
-	blocksLoadedCh     chan []*DBHeader
-	omitHistory        bool
-	contractMaker      *contracts.ContractMaker
-	blockChainState    *blockchainstate.BlockChainState
+	pendingTxManager *transactions.PendingTxTracker
+	tokenManager     *token.Manager
+	blocksLoadedCh   chan []*DBHeader
+	omitHistory      bool
+	contractMaker    *contracts.ContractMaker
+	blockChainState  *blockchainstate.BlockChainState
 
 	// Not to be set by the caller
 	transfersLoaded map[common.Address]bool // For event RecentHistoryReady to be sent only once per account during app lifetime
@@ -1446,15 +1444,14 @@ func (c *loadBlocksAndTransfersCommand) startFetchingTransfersForLoadedBlocks(gr
 	go func() {
 		defer gocommon.LogOnPanic()
 		txCommand := &loadTransfersCommand{
-			accounts:           c.accounts,
-			db:                 c.db,
-			blockDAO:           c.blockDAO,
-			chainClient:        c.chainClient,
-			transactionManager: c.transactionManager,
-			pendingTxManager:   c.pendingTxManager,
-			tokenManager:       c.tokenManager,
-			blocksByAddress:    blocksMap,
-			feed:               c.feed,
+			accounts:         c.accounts,
+			db:               c.db,
+			blockDAO:         c.blockDAO,
+			chainClient:      c.chainClient,
+			pendingTxManager: c.pendingTxManager,
+			tokenManager:     c.tokenManager,
+			blocksByAddress:  blocksMap,
+			feed:             c.feed,
 		}
 
 		group.Add(txCommand.Command())
