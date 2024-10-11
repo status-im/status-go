@@ -1,8 +1,7 @@
 import random
+
 import pytest
-import jsonschema
-import json
-from conftest import option
+
 from test_cases import StatusDTestCase
 
 

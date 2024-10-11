@@ -1,7 +1,9 @@
-import pytest
-import time
 import uuid
-from conftest import user_1, user_2, option
+
+import pytest
+
+from conftest import option
+from constants import user_1, user_2
 from test_cases import SignalTestCase
 
 
@@ -9,7 +11,6 @@ from test_cases import SignalTestCase
 @pytest.mark.transaction
 @pytest.mark.wallet
 class TestTransactionFromRoute(SignalTestCase):
-
     await_signals = [
         "wallet.suggested.routes",
         "wallet.router.sign-transactions",
