@@ -2045,15 +2045,7 @@ func (m *Messenger) Mailservers() ([]string, error) {
 }
 
 func (m *Messenger) initChatsFirstMessageTimestamp(communityCache map[string]*communities.Community, chats []*Chat) {
-	var communityChats []*Chat
-	var communityChatIDs []string
-	for _, chat := range chats {
-		if !chat.CommunityChat() || chat.FirstMessageTimestamp != FirstMessageTimestampUndefined {
-			continue
-		}
-		communityChats = append(communityChats, chat)
-		communityChatIDs = append(communityChatIDs, chat.ID)
-	}
+	communityChats, communityChatIDs := m.filterCommunityChats(chats)
 	if len(communityChatIDs) == 0 {
 		return
 	}
@@ -2064,23 +2056,26 @@ func (m *Messenger) initChatsFirstMessageTimestamp(communityCache map[string]*co
 		return
 	}
 
-	getCommunity := func(communityID string) *communities.Community {
-		community, ok := communityCache[communityID]
-		if ok {
-			return community
-		}
-		community, err := m.communitiesManager.GetByIDString(communityID)
-		if err != nil {
-			m.logger.Warn("failed to get community", zap.Error(err), zap.String("communityID", communityID))
-			return nil
-		}
-		communityCache[communityID] = community
-		return community
-	}
+	changedCommunities := m.processCommunityChats(communityChats, communityCache, oldestMessageTimestamps)
+	m.saveAndPublishCommunities(changedCommunities)
+}
 
+func (m *Messenger) filterCommunityChats(chats []*Chat) ([]*Chat, []string) {
+	var communityChats []*Chat
+	var communityChatIDs []string
+	for _, chat := range chats {
+		if chat.CommunityChat() && chat.FirstMessageTimestamp == FirstMessageTimestampUndefined {
+			communityChats = append(communityChats, chat)
+			communityChatIDs = append(communityChatIDs, chat.ID)
+		}
+	}
+	return communityChats, communityChatIDs
+}
+
+func (m *Messenger) processCommunityChats(communityChats []*Chat, communityCache map[string]*communities.Community, oldestMessageTimestamps map[string]uint64) []*communities.Community {
 	var changedCommunities []*communities.Community
 	for _, chat := range communityChats {
-		community := getCommunity(chat.CommunityID)
+		community := m.getCommunity(chat.CommunityID, communityCache)
 		if community == nil {
 			continue
 		}
@@ -2097,12 +2092,31 @@ func (m *Messenger) initChatsFirstMessageTimestamp(communityCache map[string]*co
 		changes, err := m.updateChatFirstMessageTimestampForCommunity(chat, timestamp, community)
 		if err != nil {
 			m.logger.Warn("failed to init first message timestamp", zap.Error(err), zap.String("chatID", chat.ID))
-		} else if changes != nil {
+			continue
+		}
+		if changes != nil {
 			changedCommunities = append(changedCommunities, community)
 		}
 	}
+	return changedCommunities
+}
 
-	for _, community := range changedCommunities {
+func (m *Messenger) getCommunity(communityID string, communityCache map[string]*communities.Community) *communities.Community {
+	community, ok := communityCache[communityID]
+	if ok {
+		return community
+	}
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		m.logger.Warn("failed to get community", zap.Error(err), zap.String("communityID", communityID))
+		return nil
+	}
+	communityCache[communityID] = community
+	return community
+}
+
+func (m *Messenger) saveAndPublishCommunities(communities []*communities.Community) {
+	for _, community := range communities {
 		err := m.communitiesManager.SaveAndPublish(community)
 		if err != nil {
 			m.logger.Warn("failed to save and publish community", zap.Error(err), zap.String("communityID", community.IDString()))
