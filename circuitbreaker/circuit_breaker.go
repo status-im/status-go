@@ -3,6 +3,7 @@ package circuitbreaker
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
 
@@ -12,8 +13,16 @@ import (
 type FallbackFunc func() ([]any, error)
 
 type CommandResult struct {
-	res []any
-	err error
+	res                 []any
+	err                 error
+	functorCallStatuses []FunctorCallStatus
+	cancelled           bool
+}
+
+type FunctorCallStatus struct {
+	Name      string
+	Timestamp time.Time
+	Err       error
 }
 
 func (cr CommandResult) Result() []any {
@@ -22,6 +31,21 @@ func (cr CommandResult) Result() []any {
 
 func (cr CommandResult) Error() error {
 	return cr.err
+}
+func (cr CommandResult) Cancelled() bool {
+	return cr.cancelled
+}
+
+func (cr CommandResult) FunctorCallStatuses() []FunctorCallStatus {
+	return cr.functorCallStatuses
+}
+
+func (cr *CommandResult) addCallStatus(circuitName string, err error) {
+	cr.functorCallStatuses = append(cr.functorCallStatuses, FunctorCallStatus{
+		Name:      circuitName,
+		Timestamp: time.Now(),
+		Err:       err,
+	})
 }
 
 type Command struct {
@@ -106,23 +130,26 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 
 	for i, f := range cmd.functors {
 		if cmd.cancel {
+			result.cancelled = true
 			break
 		}
 
 		var err error
+		circuitName := f.circuitName
+		if cb.circuitNameHandler != nil {
+			circuitName = cb.circuitNameHandler(circuitName)
+		}
+
 		// if last command, execute without circuit
 		if i == len(cmd.functors)-1 {
 			res, execErr := f.exec()
 			err = execErr
 			if err == nil {
-				result = CommandResult{res: res}
+				result.res = res
+				result.err = nil
 			}
+			result.addCallStatus(circuitName, err)
 		} else {
-			circuitName := f.circuitName
-			if cb.circuitNameHandler != nil {
-				circuitName = cb.circuitNameHandler(circuitName)
-			}
-
 			if hystrix.GetCircuitSettings()[circuitName] == nil {
 				hystrix.ConfigureCommand(circuitName, hystrix.CommandConfig{
 					Timeout:                cb.config.Timeout,
@@ -137,13 +164,16 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 				res, err := f.exec()
 				// Write to result only if success
 				if err == nil {
-					result = CommandResult{res: res}
+					result.res = res
+					result.err = nil
 				}
+				result.addCallStatus(circuitName, err)
 
 				// If the command has been cancelled, we don't count
 				// the error towars breaking the circuit, and then we break
 				if cmd.cancel {
-					result = accumulateCommandError(result, f.circuitName, err)
+					result = accumulateCommandError(result, circuitName, err)
+					result.cancelled = true
 					return nil
 				}
 				if err != nil {
@@ -156,7 +186,7 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 			break
 		}
 
-		result = accumulateCommandError(result, f.circuitName, err)
+		result = accumulateCommandError(result, circuitName, err)
 
 		// Lets abuse every provider with the same amount of MaxConcurrentRequests,
 		// keep iterating even in case of ErrMaxConcurrency error

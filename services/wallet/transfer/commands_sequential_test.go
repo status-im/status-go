@@ -10,6 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/contracts"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
+	"github.com/status-im/status-go/t/utils"
+
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/mock/gomock"
@@ -24,30 +28,26 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
-	ethclient "github.com/status-im/status-go/rpc/chain/ethclient"
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/balance"
-	"github.com/status-im/status-go/services/wallet/blockchainstate"
-	"github.com/status-im/status-go/services/wallet/community"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/t/utils"
-
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multicommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
 	statusRpc "github.com/status-im/status-go/rpc"
+	ethclient "github.com/status-im/status-go/rpc/chain/ethclient"
+	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
+	"github.com/status-im/status-go/rpc/chain/rpclimiter"
+	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/balance"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -585,19 +585,6 @@ func (tc *TestClient) CallContext(ctx context.Context, result interface{}, metho
 	return err
 }
 
-func (tc *TestClient) GetWalletNotifier() func(chainId uint64, message string) {
-	if tc.traceAPICalls {
-		tc.t.Log("GetWalletNotifier")
-	}
-	return nil
-}
-
-func (tc *TestClient) SetWalletNotifier(notifier func(chainId uint64, message string)) {
-	if tc.traceAPICalls {
-		tc.t.Log("SetWalletNotifier")
-	}
-}
-
 func (tc *TestClient) EstimateGas(ctx context.Context, call ethereum.CallMsg) (gas uint64, err error) {
 	err = tc.countAndlog("EstimateGas")
 	return 0, err
@@ -1079,7 +1066,18 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 
 		return nil
 	}
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+
+	config := statusRpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		UpstreamConfig:  params.UpstreamRPCConfig{Enabled: false, URL: ""},
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	client, _ := statusRpc.NewClient(config)
+
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 	tokenManager.SetTokens([]*token.Token{
@@ -1342,7 +1340,17 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		currentBlock:           100,
 	}
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+	config := statusRpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		UpstreamConfig:  params.UpstreamRPCConfig{Enabled: false, URL: ""},
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	client, _ := statusRpc.NewClient(config)
+
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
@@ -1466,7 +1474,17 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 			currentBlock:           100,
 		}
 
-		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+		config := statusRpc.ClientConfig{
+			Client:          nil,
+			UpstreamChainID: 1,
+			UpstreamConfig:  params.UpstreamRPCConfig{Enabled: false, URL: ""},
+			Networks:        []params.Network{},
+			DB:              db,
+			WalletFeed:      nil,
+			ProviderConfigs: nil,
+		}
+		client, _ := statusRpc.NewClient(config)
+
 		client.SetClient(tc.NetworkID(), tc)
 		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
@@ -1546,7 +1564,17 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
 	require.NoError(t, err)
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+	config := statusRpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		UpstreamConfig:  params.UpstreamRPCConfig{Enabled: false, URL: ""},
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	client, _ := statusRpc.NewClient(config)
+
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
@@ -1660,7 +1688,17 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 	}
 	//tc.printPreparedData = true
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+	config := statusRpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		UpstreamConfig:  params.UpstreamRPCConfig{Enabled: false, URL: ""},
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	client, _ := statusRpc.NewClient(config)
+
 	client.SetClient(tc.NetworkID(), tc)
 
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
@@ -1799,7 +1837,17 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+	config := statusRpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		UpstreamConfig:  params.UpstreamRPCConfig{Enabled: false, URL: ""},
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	client, _ := statusRpc.NewClient(config)
+
 	maker, _ := contracts.NewContractMaker(client)
 
 	wdb := NewDB(db)

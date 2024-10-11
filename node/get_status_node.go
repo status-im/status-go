@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -331,11 +332,20 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		},
 	}
 
-	n.rpcClient, err = rpc.NewClient(gethNodeClient, n.config.NetworkID, n.config.UpstreamConfig, n.config.Networks, n.appDB, providerConfigs)
+	config := rpc.ClientConfig{
+		Client:          gethNodeClient,
+		UpstreamChainID: n.config.NetworkID,
+		UpstreamConfig:  n.config.UpstreamConfig,
+		Networks:        n.config.Networks,
+		DB:              n.appDB,
+		WalletFeed:      &n.walletFeed,
+		ProviderConfigs: providerConfigs,
+	}
+	n.rpcClient, err = rpc.NewClient(config)
+	n.rpcClient.Start(context.Background())
 	if err != nil {
 		return
 	}
-
 	return
 }
 
@@ -451,6 +461,7 @@ func (n *StatusNode) stop() error {
 		return err
 	}
 
+	n.rpcClient.Stop()
 	n.rpcClient = nil
 	// We need to clear `gethNode` because config is passed to `Start()`
 	// and may be completely different. Similarly with `config`.
