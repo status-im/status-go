@@ -7,10 +7,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -201,6 +204,16 @@ func TestBasicWakuV2(t *testing.T) {
 		}
 		return errors.New("no peers discovered")
 	}, options)
+	require.NoError(t, err)
+
+	storeNode, err :=peer.AddrInfoFromString(storeNodeInfo.ListenAddresses[0])
+	require.NoError(t, err)
+	require.NoError(t, err)
+
+	connectedStoreNodes, err := w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
+	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
+
+	err = w.DropPeer(storeNode.ID)
 	require.NoError(t, err)
 
 	/* // Dropping Peer
