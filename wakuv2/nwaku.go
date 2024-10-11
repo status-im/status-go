@@ -182,6 +182,20 @@ package wakuv2
 						resp) );
 	}
 
+	static void cGoWakuDialPeerById(void* wakuCtx,
+									char* peerId,
+									char* protocol,
+									int timeoutMs,
+									void* resp) {
+
+		WAKU_CALL( waku_dial_peer_by_id(wakuCtx,
+						peerId,
+						protocol,
+						timeoutMs,
+						(WakuCallBack) callback,
+						resp) );
+	}
+
 	static void cGoWakuDisconnectPeerById(void* wakuCtx, char* peerId, void* resp) {
 		WAKU_CALL( waku_disconnect_peer_by_id(wakuCtx,
 						peerId,
@@ -300,6 +314,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/utils"
@@ -1558,11 +1573,8 @@ func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
 	return nil
 }
 
-func (w *Waku) DialPeerByID(peerID peer.ID) error {
-	// ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
-	// defer cancel()
-	// return w.node.DialPeerByID(ctx, peerID)
-	return nil
+func (w *Waku) DialPeerByID(peerId peer.ID) error {
+	return w.WakuDialPeerById(peerId, string(relay.WakuRelayID_v200), 1000)
 }
 
 func (w *Waku) DropPeer(peerID peer.ID) error {
@@ -2166,6 +2178,24 @@ func (self *Waku) WakuConnect(peerMultiAddr string, timeoutMs int) error {
 		return nil
 	}
 	errMsg := "error WakuConnect: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (self *Waku) WakuDialPeerById(peerId peer.ID, protocol string, timeoutMs int) error {
+	var resp = C.allocResp()
+	var cPeerId = C.CString(peerId.String())
+	var cProtocol = C.CString(protocol)
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPeerId))
+	defer C.free(unsafe.Pointer(cProtocol))
+
+	C.cGoWakuDialPeerById(self.wakuCtx, cPeerId, cProtocol, C.int(timeoutMs), resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error DialPeerById: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return errors.New(errMsg)
 }

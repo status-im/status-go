@@ -153,12 +153,11 @@ func parseNodes(rec []string) []*enode.Node {
 //
 // Using Docker:
 //
-// IP_ADDRESS=$(ipconfig getifaddr en0)
-// docker run \
-// -p 61000:61000/tcp -p 8000:8000/udp -p 8646:8646/tcp harbor.status.im/wakuorg/nwaku:v0.33.0 \
-// --discv5-discovery=true --cluster-id=16 --log-level=DEBUG \
-// --nat=extip:${IP_ADDRESS} --discv5-discovery --discv5-udp-port=8000 --rest-address=0.0.0.0 --store --rest-port=8646 \
-// --tcp-port=61000 --rest-admin=true --shard=64 --dns-discovery=true --dns-discovery-url="/dns4/boot-01.do-ams3.status.prod.status.im/tcp/30303/p2p/16Uiu2HAmAR24Mbb6VuzoyUiGx42UenDkshENVDj4qnmmbabLvo31"
+//		IP_ADDRESS=$(hostname -I | awk '{print $1}');
+// 		docker run \
+// 		-p 61000:61000/tcp -p 8000:8000/udp -p 8646:8646/tcp harbor.status.im/wakuorg/nwaku:v0.33.0 \
+// 		--discv5-discovery=true --cluster-id=16 --log-level=DEBUG \
+// 		--nat=extip:${IP_ADDRESS} --discv5-discovery --discv5-udp-port=8000 --rest-address=0.0.0.0 --store --rest-port=8646 \
 
 func TestBasicWakuV2(t *testing.T) {
 	extNodeRestPort := 8646
@@ -211,6 +210,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, err)
 
 	connectedStoreNodes, err := w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
+	require.NoError(t, err)
 	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
 
 	err = w.DisconnectPeerById(storeNode.ID)
@@ -220,6 +220,13 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, err)
 	isDisconnected := !slices.Contains(connectedStoreNodes, storeNode.ID)
 	require.True(t, isDisconnected, "nwaku should be disconnected from the store node")
+	
+	err = w.DialPeerByID(storeNode.ID)
+	require.NoError(t, err)
+
+	connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
+	require.NoError(t, err)
+	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
 	
 	/* // Dropping Peer
 	err = w.DropPeer(storeNode.PeerID)
