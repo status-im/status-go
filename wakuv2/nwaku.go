@@ -332,7 +332,7 @@ const peersToPublishForLightpush = 2
 const publishingLimiterRate = rate.Limit(2)
 const publishingLimitBurst = 4
 
-type SentEnvelope struct {
+/* type SentEnvelope struct {
 	Envelope      *protocol.Envelope
 	PublishMethod PublishMethod
 }
@@ -352,7 +352,7 @@ type ITelemetryClient interface {
 
 func (w *Waku) SetStatusTelemetryClient(client ITelemetryClient) {
 	w.statusTelemetryClient = client
-}
+} */
 
 func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
 	cache := ttlcache.New[gethcommon.Hash, *common.ReceivedMessage](ttlcache.WithTTL[gethcommon.Hash, *common.ReceivedMessage](cacheTTL))
@@ -412,12 +412,11 @@ func (w *Waku) SubscribeToConnStatusChanges() *types.ConnStatusSubscription {
 	wg.Wait()
 
 	return result, nil
-} */
+}
 
 type fnApplyToEachPeer func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup)
 
-// This should be handled by nwaku?
-/* func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnApplyToEachPeer) error {
+func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnApplyToEachPeer) error {
 	w.logger.Info("retrieving nodes", zap.String("enr", enrtreeAddress))
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
@@ -458,10 +457,9 @@ type fnApplyToEachPeer func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup)
 	wg.Wait()
 
 	return nil
-} */
+}
 
-// This too? nwaku?
-/* func (w *Waku) discoverAndConnectPeers() {
+func (w *Waku) discoverAndConnectPeers() {
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
 		defer wg.Done()
 		if len(d.PeerInfo.Addrs) != 0 {
@@ -591,22 +589,22 @@ func (w *Waku) runPeerExchangeLoop() {
 			}
 		}
 	}
-} */
+}
 
-/* func (w *Waku) GetPubsubTopic(topic string) string {
+func (w *Waku) GetPubsubTopic(topic string) string {
 	if topic == "" {
 		topic = w.cfg.DefaultShardPubsubTopic
 	}
 
 	return topic
-} */
+}
 
 // CurrentTime returns current time.
 func (w *Waku) CurrentTime() time.Time {
 	return w.timesource.Now()
 }
 
-/* // APIs returns the RPC descriptors the Waku implementation offers
+// APIs returns the RPC descriptors the Waku implementation offers
 func (w *Waku) APIs() []rpc.API {
 	return []rpc.API{
 		{
@@ -869,9 +867,9 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 	return nil, fmt.Errorf("non-existent key ID")
 }
 
-// Subscribe installs a new message handler used for filtering, decrypting
+/* // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
-/* func (w *Waku) Subscribe(f *common.Filter) (string, error) {
+func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 	f.PubsubTopic = w.GetPubsubTopic(f.PubsubTopic)
 	id, err := w.filters.Install(f)
 	if err != nil {
@@ -898,7 +896,7 @@ func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 	}
 
 	return nil
-} */
+}
 
 // GetFilter returns the filter by id.
 func (w *Waku) GetFilter(id string) *common.Filter {
@@ -917,7 +915,7 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 	return nil
 }
 
-/* func (w *Waku) SkipPublishToTopic(value bool) {
+func (w *Waku) SkipPublishToTopic(value bool) {
 	w.cfg.SkipPublishToTopic = value
 }
 
@@ -1043,10 +1041,6 @@ func (w *Waku) Start() error {
 		fmt.Println("Error happened:", err.Error())
 		return err
 	}
-
-	// ch := make(chan os.Signal, 1)
-	// signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-	//<-ch
 
 	// if err = w.node.Start(w.ctx); err != nil {
 	// 	return fmt.Errorf("failed to start go-waku node: %v", err)
@@ -1208,21 +1202,21 @@ func (w *Waku) checkForConnectionChanges() {
 // 	}()
 // }
 
-/* func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
+func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	w.poolMu.Lock()
 	defer w.poolMu.Unlock()
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
 }
 
-func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic string, contentTopics []string) {
+/* func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic string, contentTopics []string) {
 	if !w.cfg.EnableMissingMessageVerification {
 		return
 	}
 
 	w.missingMsgVerifier.SetCriteriaInterest(peerID, protocol.NewContentFilter(pubsubTopic, contentTopics...))
-} */
+}
 
-/* func (w *Waku) setupRelaySubscriptions() error {
+func (w *Waku) setupRelaySubscriptions() error {
 	if w.cfg.LightClient {
 		return nil
 	}
@@ -1338,12 +1332,12 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage, processImmediately bool)
 	}
 
 	return true, nil
-}
+} */
 
 // postEvent queues the message for further processing.
 func (w *Waku) postEvent(envelope *common.ReceivedMessage) {
 	w.msgQueue <- envelope
-} */
+}
 
 /* // processQueueLoop delivers the messages to the watchers during the lifetime of the waku node.
 func (w *Waku) processQueueLoop() {
@@ -1733,7 +1727,6 @@ type Waku struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	// cfg     *Config
 	cfg		*WakuConfig
 	options []node.WakuNodeOption
 
@@ -1769,7 +1762,7 @@ type Waku struct {
 	onHistoricMessagesRequestFailed func([]byte, peer.ID, error)
 	onPeerStats                     func(types.ConnStatus)
 
-	statusTelemetryClient ITelemetryClient
+	// statusTelemetryClient ITelemetryClient
 
 	defaultShardInfo protocol.RelayShards
 }
@@ -1822,8 +1815,6 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 		return nil, err
 	}
 
-	fmt.Println("-------- CREATING CONFIG, jsonConfig: ", string(jsonConfig))
-
 	var cJsonConfig = C.CString(string(jsonConfig))
 	var resp = C.allocResp()
 
@@ -1870,8 +1861,6 @@ func (self *Waku) WakuStart() error {
 
 	var resp = C.allocResp()
 	defer C.freeResp(resp)
-	
-	
 	C.cGoWakuStart(self.wakuCtx, resp)
 
 	if C.getRet(resp) == C.RET_OK {
