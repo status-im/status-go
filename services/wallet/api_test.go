@@ -139,9 +139,8 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 
 	networks := []params.Network{
 		{
-			ChainID:            chainID,
-			DefaultRPCURL:      serverWith1SecDelay.URL,
-			DefaultFallbackURL: serverWith1SecDelay.URL,
+			ChainID:       chainID,
+			DefaultRPCURL: serverWith1SecDelay.URL + "/nodefleet/",
 		},
 	}
 	config := rpc.ClientConfig{
