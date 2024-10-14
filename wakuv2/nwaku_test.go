@@ -228,22 +228,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
 	
-	/* // Dropping Peer
-	err = w.DropPeer(storeNode.PeerID)
-	require.NoError(t, err)
-
-	// Dialing with peerID
-	err = w.DialPeerByID(storeNode.PeerID)
-	require.NoError(t, err)
-
-	err = tt.RetryWithBackOff(func() error {
-		if len(w.Peers()) < 1 {
-			return errors.New("no peers discovered")
-		}
-		return nil
-	}, options)
-	require.NoError(t, err)
-
+	/* 
 	filter := &common.Filter{
 		PubsubTopic:   config.DefaultShardPubsubTopic,
 		Messages:      common.NewMemoryMessageStore(),

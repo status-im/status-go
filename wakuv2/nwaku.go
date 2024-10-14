@@ -55,9 +55,7 @@ package wakuv2
 
 	// resp must be set != NULL in case interest on retrieving data from the callback
 	static void callback(int ret, char* msg, size_t len, void* resp) {
-		printf("---------- GABRIEL calling callback 1 ----\n");
 		if (resp != NULL) {
-			printf("---------- GABRIEL calling callback 2 ----\n");
 			Resp* m = (Resp*) resp;
 			m->ret = ret;
 			m->msg = msg;
@@ -67,7 +65,6 @@ package wakuv2
 
 	#define WAKU_CALL(call)                                                        \
 	do {                                                                           \
-		printf("---------- GABRIEL calling WAKU_CALL 1 ----\n"); 						\
 		int ret = call;                                                              \
 		if (ret != 0) {                                                              \
 			printf("Failed the call to: %s. Returned code: %d\n", #call, ret);         \
@@ -1875,17 +1872,12 @@ func (self *Waku) WakuStart() error {
 	defer C.freeResp(resp)
 	
 	
-	fmt.Println("------------ GABRIEL called wakuStart")
 	C.cGoWakuStart(self.wakuCtx, resp)
-	fmt.Println("------------ GABRIEL wakuStart 2")
 
 	if C.getRet(resp) == C.RET_OK {
-		fmt.Println("------------ GABRIEL wakuStart received RET_OK")
 		return nil
 	}
-	fmt.Println("------------ GABRIEL wakuStart 3")
 	errMsg := "error WakuStart: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	fmt.Println("------------ GABRIEL error in wakuStart ", errMsg)
 	return errors.New(errMsg)
 }
 
@@ -2457,16 +2449,11 @@ func New(nodeKey *ecdsa.PrivateKey,
 	onHistoricMessagesRequestFailed func([]byte, peer.ID, error),
 	onPeerStats func(types.ConnStatus)) (*Waku, error) {
 
-	fmt.Println("-------- GABRIEL func New 1 ---------")
-
 	// Lock the main goroutine to its current OS thread
 	runtime.LockOSThread()
 
-	fmt.Println("-------- GABRIEL func New 2 ---------")
-
 	WakuSetup() // This should only be called once in the whole app's life
 
-	fmt.Println("-------- GABRIEL func New 3 ---------")
 	node, err := wakuNew(nodeKey,
 		fleet,
 		cfg, logger, appDB, ts, onHistoricMessagesRequestFailed,
@@ -2475,21 +2462,17 @@ func New(nodeKey *ecdsa.PrivateKey,
 		return nil, err
 	}
 
-	fmt.Println("-------- GABRIEL func New 4 ---------")
 	defaultPubsubTopic, err := node.WakuDefaultPubsubTopic()
 	if err != nil {
 		fmt.Println("Error happened:", err.Error())
 	}
 
-	fmt.Println("-------- GABRIEL func New 5 ---------")
 	err = node.WakuRelaySubscribe(defaultPubsubTopic)
 	if err != nil {
 		fmt.Println("Error happened:", err.Error())
 	}
 
-	fmt.Println("-------- GABRIEL func New 6 ---------")
 	node.WakuSetEventCallback()
-	fmt.Println("-------- GABRIEL func New 7 ---------")
 
 	return node, nil
 
