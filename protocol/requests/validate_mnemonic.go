@@ -1,5 +1,5 @@
 package requests
 
 type ValidateMnemonic struct {
-    Mnemonic string `json:"mnemonic"`
+	Mnemonic string `json:"mnemonic"`
 }
