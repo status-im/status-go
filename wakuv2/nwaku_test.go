@@ -157,7 +157,7 @@ func parseNodes(rec []string) []*enode.Node {
 // 	docker run \
 // 	-p 61000:61000/tcp -p 8000:8000/udp -p 8646:8646/tcp harbor.status.im/wakuorg/nwaku:v0.33.0 \
 // 	--discv5-discovery=true --cluster-id=16 --log-level=DEBUG \
-// 	--nat=extip:${IP_ADDRESS} --discv5-discovery --discv5-udp-port=8000 --rest-address=0.0.0.0 --store --rest-port=8646 \
+// 	--nat=extip:${IP_ADDRESS} --discv5-udp-port=8000 --rest-address=0.0.0.0 --store --rest-port=8646 \
 
 func TestBasicWakuV2(t *testing.T) {
 	extNodeRestPort := 8646
@@ -205,25 +205,31 @@ func TestBasicWakuV2(t *testing.T) {
 	}, options)
 	require.NoError(t, err)
 
+	// Get local store node address
 	storeNode, err :=peer.AddrInfoFromString(storeNodeInfo.ListenAddresses[0])
 	require.NoError(t, err)
 	require.NoError(t, err)
 
+	// Check that we are indeed connected to the store node
 	connectedStoreNodes, err := w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
 	require.NoError(t, err)
 	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
 
+	// Disconnect from the store node
 	err = w.DisconnectPeerById(storeNode.ID)
 	require.NoError(t, err)
 
+	// Check that we are indeed disconnected
 	connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
 	require.NoError(t, err)
 	isDisconnected := !slices.Contains(connectedStoreNodes, storeNode.ID)
 	require.True(t, isDisconnected, "nwaku should be disconnected from the store node")
 	
+	// Re-connect
 	err = w.DialPeerByID(storeNode.ID)
 	require.NoError(t, err)
 
+	// Check that we are connected again
 	connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
 	require.NoError(t, err)
 	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
