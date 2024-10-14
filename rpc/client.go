@@ -36,11 +36,6 @@ const (
 	// DefaultCallTimeout is a default timeout for an RPC call
 	DefaultCallTimeout = time.Minute
 
-	// Names of providers
-	providerGrove       = "grove"
-	providerInfura      = "infura"
-	ProviderStatusProxy = "status-proxy"
-
 	mobile  = "mobile"
 	desktop = "desktop"
 
@@ -250,15 +245,6 @@ func (c *Client) getRPCRpsLimiter(key string) (*rpclimiter.RPCRpsLimiter, error)
 	return limiter, nil
 }
 
-func getProviderConfig(providerConfigs []params.ProviderConfig, providerName string) (params.ProviderConfig, error) {
-	for _, providerConfig := range providerConfigs {
-		if providerConfig.Name == providerName {
-			return providerConfig, nil
-		}
-	}
-	return params.ProviderConfig{}, fmt.Errorf("provider config not found for provider: %s", providerName)
-}
-
 func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, error) {
 	c.rpcClientsMutex.Lock()
 	defer c.rpcClientsMutex.Unlock()
@@ -292,46 +278,20 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 }
 
 func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEthClientInterface {
-	urls := make(map[string]string)
-	keys := make([]string, 0)
-	authMap := make(map[string]string)
-
-	// find proxy provider
-	proxyProvider, err := getProviderConfig(c.providerConfigs, ProviderStatusProxy)
-	if err != nil {
-		c.log.Warn("could not find provider config for status-proxy", "error", err)
-	}
-
-	if proxyProvider.Enabled {
-		key := ProviderStatusProxy
-		keyFallback := ProviderStatusProxy + "-fallback"
-		keyFallback2 := ProviderStatusProxy + "-fallback2"
-		urls[key] = network.DefaultRPCURL
-		urls[keyFallback] = network.DefaultFallbackURL
-		urls[keyFallback2] = network.DefaultFallbackURL2
-		keys = []string{key, keyFallback, keyFallback2}
-		authMap[key] = proxyProvider.User + ":" + proxyProvider.Password
-		authMap[keyFallback] = authMap[key]
-		authMap[keyFallback2] = authMap[key]
-	}
-	keys = append(keys, []string{"main", "fallback"}...)
-	urls["main"] = network.RPCURL
-	urls["fallback"] = network.FallbackURL
-
 	ethClients := make([]ethclient.RPSLimitedEthClientInterface, 0)
-	for index, key := range keys {
+
+	providers := c.prepareProviders(network)
+	for index, provider := range providers {
 		var rpcClient *gethrpc.Client
 		var rpcLimiter *rpclimiter.RPCRpsLimiter
 		var err error
 		var hostPort string
-		url := urls[key]
 
-		if len(url) > 0 {
+		if len(provider.URL) > 0 {
 			// For now, we only support auth for status-proxy.
-			authStr, ok := authMap[key]
 			var opts []gethrpc.ClientOption
-			if ok {
-				authEncoded := base64.StdEncoding.EncodeToString([]byte(authStr))
+			if provider.authenticationNeeded() {
+				authEncoded := base64.StdEncoding.EncodeToString([]byte(provider.Auth))
 				opts = append(opts,
 					gethrpc.WithHeaders(http.Header{
 						"Authorization": {"Basic " + authEncoded},
@@ -340,16 +300,16 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 				)
 			}
 
-			rpcClient, err = gethrpc.DialOptions(context.Background(), url, opts...)
+			rpcClient, err = gethrpc.DialOptions(context.Background(), provider.URL, opts...)
 			if err != nil {
-				c.log.Error("dial server "+key, "error", err)
+				c.log.Error("dial server "+provider.Key, "error", err)
 			}
 
 			// If using the status-proxy, consider each endpoint as a separate provider
-			circuitKey := fmt.Sprintf("%s-%d", key, index)
+			circuitKey := fmt.Sprintf("%s-%d", provider.Key, index)
 			// Otherwise host is good enough
-			if !strings.Contains(url, "status.im") {
-				hostPort, err = extractHostFromURL(url)
+			if !strings.Contains(provider.URL, "status.im") {
+				hostPort, err = extractHostFromURL(provider.URL)
 				if err == nil {
 					circuitKey = hostPort
 				}
@@ -357,7 +317,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 
 			rpcLimiter, err = c.getRPCRpsLimiter(circuitKey)
 			if err != nil {
-				c.log.Error("get RPC limiter "+key, "error", err)
+				c.log.Error("get RPC limiter "+provider.Key, "error", err)
 			}
 
 			ethClients = append(ethClients, ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, circuitKey))

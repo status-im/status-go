@@ -131,9 +131,9 @@ func TestGetClientsUsingCache(t *testing.T) {
 	// Create a new ServeMux
 	mux := http.NewServeMux()
 
-	path1 := "/foo"
-	path2 := "/bar"
-	path3 := "/baz"
+	path1 := "/api.status.im/nodefleet/foo"
+	path2 := "/api.status.im/infura/bar"
+	path3 := "/api.status.im/infura.io/baz"
 
 	authHandler := func(w http.ResponseWriter, r *http.Request) {
 		authToken := base64.StdEncoding.EncodeToString([]byte(providerConfig.User + ":" + providerConfig.Password))

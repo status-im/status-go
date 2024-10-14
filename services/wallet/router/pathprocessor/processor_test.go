@@ -14,8 +14,6 @@ import (
 var mainnet = params.Network{
 	ChainID:                walletCommon.EthereumMainnet,
 	ChainName:              "Mainnet",
-	RPCURL:                 "https://eth-archival.rpc.grove.city/v1/",
-	FallbackURL:            "https://mainnet.infura.io/v3/",
 	BlockExplorerURL:       "https://etherscan.io/",
 	IconURL:                "network/Network=Ethereum",
 	ChainColor:             "#627EEA",
@@ -32,8 +30,6 @@ var mainnet = params.Network{
 var optimism = params.Network{
 	ChainID:                walletCommon.OptimismMainnet,
 	ChainName:              "Optimism",
-	RPCURL:                 "https://optimism-mainnet.rpc.grove.city/v1/",
-	FallbackURL:            "https://optimism-mainnet.infura.io/v3/",
 	BlockExplorerURL:       "https://optimistic.etherscan.io",
 	IconURL:                "network/Network=Optimism",
 	ChainColor:             "#E90101",

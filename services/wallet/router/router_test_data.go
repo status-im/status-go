@@ -46,6 +46,8 @@ const (
 
 	testApprovalGasEstimation = 1000
 	testApprovalL1Fee         = 100000000000
+
+	stageName = "test"
 )
 
 var (
@@ -89,8 +91,11 @@ var (
 var mainnet = params.Network{
 	ChainID:                walletCommon.EthereumMainnet,
 	ChainName:              "Mainnet",
-	RPCURL:                 "https://eth-archival.rpc.grove.city/v1/",
-	FallbackURL:            "https://mainnet.infura.io/v3/",
+	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/ethereum/mainnet/", stageName),
+	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/ethereum/mainnet/", stageName),
+	DefaultFallbackURL2:    "https://mainnet.infura.io/v3/",
+	RPCURL:                 fmt.Sprintf("https://%s.api.status.im/grove/ethereum/mainnet/", stageName),
+	FallbackURL:            "https://eth-archival.rpc.grove.city/v1/",
 	BlockExplorerURL:       "https://etherscan.io/",
 	IconURL:                "network/Network=Ethereum",
 	ChainColor:             "#627EEA",
@@ -104,29 +109,14 @@ var mainnet = params.Network{
 	RelatedChainID:         walletCommon.EthereumMainnet,
 }
 
-var sepolia = params.Network{
-	ChainID:                walletCommon.EthereumSepolia,
-	ChainName:              "Mainnet",
-	RPCURL:                 "https://sepolia-archival.rpc.grove.city/v1/",
-	FallbackURL:            "https://sepolia.infura.io/v3/",
-	BlockExplorerURL:       "https://sepolia.etherscan.io/",
-	IconURL:                "network/Network=Ethereum",
-	ChainColor:             "#627EEA",
-	ShortName:              "eth",
-	NativeCurrencyName:     "Ether",
-	NativeCurrencySymbol:   "ETH",
-	NativeCurrencyDecimals: 18,
-	IsTest:                 true,
-	Layer:                  1,
-	Enabled:                true,
-	RelatedChainID:         walletCommon.EthereumMainnet,
-}
-
 var optimism = params.Network{
 	ChainID:                walletCommon.OptimismMainnet,
 	ChainName:              "Optimism",
-	RPCURL:                 "https://optimism-mainnet.rpc.grove.city/v1/",
-	FallbackURL:            "https://optimism-mainnet.infura.io/v3/",
+	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/optimism/mainnet/", stageName),
+	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/optimism/mainnet/", stageName),
+	DefaultFallbackURL2:    "https://optimism-mainnet.infura.io/v3/",
+	RPCURL:                 fmt.Sprintf("https://%s.api.status.im/grove/optimism/mainnet/", stageName),
+	FallbackURL:            "https://optimism-archival.rpc.grove.city/v1/",
 	BlockExplorerURL:       "https://optimistic.etherscan.io",
 	IconURL:                "network/Network=Optimism",
 	ChainColor:             "#E90101",
@@ -140,30 +130,14 @@ var optimism = params.Network{
 	RelatedChainID:         walletCommon.OptimismMainnet,
 }
 
-var optimismSepolia = params.Network{
-	ChainID:                walletCommon.OptimismSepolia,
-	ChainName:              "Optimism",
-	RPCURL:                 "https://optimism-sepolia-archival.rpc.grove.city/v1/",
-	FallbackURL:            "https://optimism-sepolia.infura.io/v3/",
-	BlockExplorerURL:       "https://sepolia-optimism.etherscan.io/",
-	IconURL:                "network/Network=Optimism",
-	ChainColor:             "#E90101",
-	ShortName:              "oeth",
-	NativeCurrencyName:     "Ether",
-	NativeCurrencySymbol:   "ETH",
-	NativeCurrencyDecimals: 18,
-	IsTest:                 true,
-	Layer:                  2,
-	Enabled:                false,
-	RelatedChainID:         walletCommon.OptimismMainnet,
-}
-
 var arbitrum = params.Network{
 	ChainID:                walletCommon.ArbitrumMainnet,
 	ChainName:              "Arbitrum",
-	RPCURL:                 "https://arbitrum-one.rpc.grove.city/v1/",
-	FallbackURL:            "https://arbitrum-mainnet.infura.io/v3/",
-	BlockExplorerURL:       "https://arbiscan.io/",
+	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/arbitrum/mainnet/", stageName),
+	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/arbitrum/mainnet/", stageName),
+	DefaultFallbackURL2:    "https://arbitrum-mainnet.infura.io/v3/",
+	RPCURL:                 fmt.Sprintf("https://%s.api.status.im/grove/arbitrum/mainnet/", stageName),
+	FallbackURL:            "https://arbitrum-one.rpc.grove.city/v1/",
 	IconURL:                "network/Network=Arbitrum",
 	ChainColor:             "#51D0F0",
 	ShortName:              "arb1",
@@ -176,31 +150,10 @@ var arbitrum = params.Network{
 	RelatedChainID:         walletCommon.ArbitrumMainnet,
 }
 
-var arbitrumSepolia = params.Network{
-	ChainID:                walletCommon.ArbitrumSepolia,
-	ChainName:              "Arbitrum",
-	RPCURL:                 "https://arbitrum-sepolia-archival.rpc.grove.city/v1/",
-	FallbackURL:            "https://arbitrum-sepolia.infura.io/v3/",
-	BlockExplorerURL:       "https://sepolia-explorer.arbitrum.io/",
-	IconURL:                "network/Network=Arbitrum",
-	ChainColor:             "#51D0F0",
-	ShortName:              "arb1",
-	NativeCurrencyName:     "Ether",
-	NativeCurrencySymbol:   "ETH",
-	NativeCurrencyDecimals: 18,
-	IsTest:                 true,
-	Layer:                  2,
-	Enabled:                false,
-	RelatedChainID:         walletCommon.ArbitrumMainnet,
-}
-
 var defaultNetworks = []params.Network{
 	mainnet,
-	sepolia,
 	optimism,
-	optimismSepolia,
 	arbitrum,
-	arbitrumSepolia,
 }
 
 type normalTestParams struct {
