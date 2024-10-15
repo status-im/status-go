@@ -4,7 +4,7 @@
     "properties": {
         "type": {
             "type": "string",
-            "const": "node.ready"
+            "const": "node.started"
         },
         "event": {
             "type": "null"
