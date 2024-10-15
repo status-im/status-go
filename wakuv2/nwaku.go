@@ -2283,6 +2283,7 @@ type WakuConfig struct {
 	Staticnodes          []string `json:"staticnodes,omitempty"`
 	Discv5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
 	Discv5Discovery		 bool `json:"discv5Discovery,omitempty"`
+	Discv5UdpPort		 uint16 `json:"discv5UdpPort,omitempty"`
 	ClusterID			 uint16 `json:"clusterId,omitempty"`
 	Shards			     []uint16 `json:"shards,omitempty"`	
 	PeerExchange		 bool `json:"peerExchange,omitempty"`
