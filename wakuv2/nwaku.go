@@ -2202,8 +2202,6 @@ func (self *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
 			addrsRet = append(addrsRet, addr)
 		}
 
-		fmt.Println("AAAAAA listen addresses: ", listenAddresses)
-
 		return addrsRet, nil
 	}
 	errMsg := "error WakuListenAddresses: " +
@@ -2458,9 +2456,11 @@ func New(nodeKey *ecdsa.PrivateKey,
 		fmt.Println("Error happened:", err.Error())
 	}
 
-	err = node.WakuRelaySubscribe(defaultPubsubTopic)
-	if err != nil {
-		fmt.Println("Error happened:", err.Error())
+	if cfg.EnableRelay {
+		err = node.WakuRelaySubscribe(defaultPubsubTopic)
+		if err != nil {
+			fmt.Println("Error happened:", err.Error())
+		}
 	}
 
 	node.WakuSetEventCallback()
