@@ -1310,7 +1310,7 @@ func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []str
 		return nil, nil
 	}
 
-	args := make([]interface{}, len(chatIDs))
+	args := make([]any, len(chatIDs))
 	for i, id := range chatIDs {
 		args[i] = id
 	}
@@ -1346,6 +1346,9 @@ func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []str
 			return nil, err
 		}
 		result[chatID] = whisperTimestamp
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return result, nil
