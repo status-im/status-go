@@ -6,7 +6,6 @@ package wakuv2
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -193,7 +192,6 @@ func TestBasicWakuV2(t *testing.T) {
 	err = tt.RetryWithBackOff(func() error {
 		
 		numConnected, err := w.GetNumConnectedPeers()
-		fmt.Println("numConnected: ", numConnected)
 		if err != nil {
 			return err
 		}
