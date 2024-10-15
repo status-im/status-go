@@ -366,7 +366,7 @@ func (c *Controller) startSettingsWatcher() {
 	}
 
 	settingChangeCb := func(setting settings.SettingField, value interface{}) {
-		if setting.Equals(settings.TestNetworksEnabled) || setting.Equals(settings.IsGoerliEnabled) {
+		if setting.Equals(settings.TestNetworksEnabled) {
 			c.stopPeriodicalOwnershipFetch()
 			err := c.startPeriodicalOwnershipFetch()
 			if err != nil {

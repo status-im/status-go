@@ -20,7 +20,7 @@ import (
 func TestNewNodeConfigWithDefaults(t *testing.T) {
 	c, err := params.NewNodeConfigWithDefaults(
 		"/some/data/path",
-		params.GoerliNetworkID,
+		params.SepoliaNetworkID,
 		params.WithFleet(params.FleetProd),
 		params.WithLES(),
 		params.WithMailserver(),
@@ -87,7 +87,7 @@ func TestNewConfigFromJSON(t *testing.T) {
 func TestConfigWriteRead(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", tmpDir, params.GoerliNetworkID)
+	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", tmpDir, params.SepoliaNetworkID)
 	require.Nil(t, err, "cannot create new config object")
 
 	err = nodeConfig.Save()
@@ -96,7 +96,7 @@ func TestConfigWriteRead(t *testing.T) {
 	loadedConfigData, err := ioutil.ReadFile(filepath.Join(nodeConfig.DataDir, "config.json"))
 	require.Nil(t, err, "cannot read configuration from disk")
 	loadedConfig := string(loadedConfigData)
-	require.Contains(t, loadedConfig, fmt.Sprintf(`"NetworkId": %d`, params.GoerliNetworkID))
+	require.Contains(t, loadedConfig, fmt.Sprintf(`"NetworkId": %d`, params.SepoliaNetworkID))
 	require.Contains(t, loadedConfig, fmt.Sprintf(`"DataDir": "%s"`, tmpDir))
 }
 

@@ -160,10 +160,6 @@ func (f *FeeManager) getBaseFee(ctx context.Context, client chain.ClientInterfac
 		common.OptimismSepolia,
 		common.ArbitrumSepolia:
 		config = params.SepoliaChainConfig
-	case common.EthereumGoerli,
-		common.OptimismGoerli,
-		common.ArbitrumGoerli:
-		config = params.GoerliChainConfig
 	}
 	baseFee := misc.CalcBaseFee(config, header)
 	return baseFee, nil
@@ -263,7 +259,7 @@ func (f *FeeManager) getFeeHistorySorted(chainID uint64) ([]*big.Int, error) {
 
 // Returns L1 fee for placing a transaction to L1 chain, appicable only for txs made from L2.
 func (f *FeeManager) GetL1Fee(ctx context.Context, chainID uint64, input []byte) (uint64, error) {
-	if chainID == common.EthereumMainnet || chainID == common.EthereumSepolia && chainID != common.EthereumGoerli {
+	if chainID == common.EthereumMainnet || chainID == common.EthereumSepolia {
 		return 0, nil
 	}
 
