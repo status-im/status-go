@@ -9,6 +9,7 @@ import (
 	goparser "go/parser"
 	"github.com/pkg/errors"
 	"github.com/status-im/status-go/cmd/lint-panics/utils"
+	"context"
 )
 
 const LogOnPanic = "LogOnPanic"
@@ -20,7 +21,7 @@ type Processor struct {
 }
 
 type LSP interface {
-	Definition(string, int, int) (string, int, error)
+	Definition(context.Context, string, int, int) (string, int, error)
 }
 
 func NewProcessor(logger *zap.Logger, lsp LSP) *Processor {
@@ -31,7 +32,7 @@ func NewProcessor(logger *zap.Logger, lsp LSP) *Processor {
 	}
 }
 
-func (p *Processor) Run(path string) (*Result, error) {
+func (p *Processor) Run(ctx context.Context, path string) (*Result, error) {
 	logger := p.logger.With(zap.String("file", path))
 
 	file, err := p.parseFile(path)
@@ -44,7 +45,7 @@ func (p *Processor) Run(path string) (*Result, error) {
 
 	// Traverse the AST to find goroutines
 	ast.Inspect(file, func(n ast.Node) bool {
-		r := p.processNode(n)
+		r := p.processNode(ctx, n)
 		result.Merge(r)
 		return true
 	})
@@ -52,7 +53,7 @@ func (p *Processor) Run(path string) (*Result, error) {
 	return result, nil
 }
 
-func (p *Processor) processNode(n ast.Node) *Result {
+func (p *Processor) processNode(ctx context.Context, n ast.Node) *Result {
 	// Check if the node is a GoStmt (which represents a 'go' statement)
 	goStmt, ok := n.(*ast.GoStmt)
 	if !ok {
@@ -85,7 +86,7 @@ func (p *Processor) processNode(n ast.Node) *Result {
 			zap.Int("column", pos.Column),
 		)
 
-		defPos, err := p.checkGoroutineDefinition(pos)
+		defPos, err := p.checkGoroutineDefinition(ctx, pos)
 		if err != nil {
 			uri := p.logLinterError(defPos, err)
 			result.Add(uri)
@@ -100,7 +101,7 @@ func (p *Processor) processNode(n ast.Node) *Result {
 			zap.Int("column", pos.Column),
 		)
 
-		defPos, err := p.checkGoroutineDefinition(pos)
+		defPos, err := p.checkGoroutineDefinition(ctx, pos)
 		if err != nil {
 			uri := p.logLinterError(defPos, err)
 			result.Add(uri)
@@ -194,8 +195,8 @@ func (p *Processor) GetFunctionBody(node ast.Node, lineNumber int) (body *ast.Bl
 	return body
 }
 
-func (p *Processor) checkGoroutineDefinition(pos gotoken.Position) (gotoken.Position, error) {
-	defFilePath, defLineNumber, err := p.lsp.Definition(pos.Filename, pos.Line, pos.Column)
+func (p *Processor) checkGoroutineDefinition(ctx context.Context, pos gotoken.Position) (gotoken.Position, error) {
+	defFilePath, defLineNumber, err := p.lsp.Definition(ctx, pos.Filename, pos.Line, pos.Column)
 	if err != nil {
 		p.logger.Error("failed to find function definition", zap.Error(err))
 		return gotoken.Position{}, err

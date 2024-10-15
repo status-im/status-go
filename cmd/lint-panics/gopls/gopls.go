@@ -84,13 +84,13 @@ func NewGoplsClient(ctx context.Context, logger *zap.Logger, rootDir string) *Co
 	return gopls
 }
 
-func (gopls *Connection) Definition(filePath string, lineNumber int, charPosition int) (string, int, error) {
+func (gopls *Connection) Definition(ctx context.Context, filePath string, lineNumber int, charPosition int) (string, int, error) {
 	// NOTE: gopls uses 0-based line and column numbers
-	defFile, defLine, err := gopls.definition(filePath, lineNumber-1, charPosition-1)
+	defFile, defLine, err := gopls.definition(ctx, filePath, lineNumber-1, charPosition-1)
 	return defFile, defLine + 1, err
 }
 
-func (gopls *Connection) definition(filePath string, lineNumber int, charPosition int) (string, int, error) {
+func (gopls *Connection) definition(ctx context.Context, filePath string, lineNumber int, charPosition int) (string, int, error) {
 	// Define the file URI and position where the function/method is invoked
 	fileURI := protocol.DocumentURI("file://" + filePath) // Replace with actual file URI
 	line := lineNumber                                    // Line number where the function is called
@@ -110,7 +110,7 @@ func (gopls *Connection) definition(filePath string, lineNumber int, charPositio
 	}
 
 	// Create context with a timeout to avoid hanging
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	locations, err := gopls.server.Definition(ctx, params)

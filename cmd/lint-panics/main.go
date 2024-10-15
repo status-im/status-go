@@ -12,6 +12,7 @@ import (
 
 	gopls2 "github.com/status-im/status-go/cmd/lint-panics/gopls"
 	"github.com/status-im/status-go/cmd/lint-panics/processor"
+	"fmt"
 )
 
 func main() {
@@ -33,14 +34,17 @@ func main() {
 		return
 	}
 
-	dir := os.Args[1]
+	dir := path.Dir(os.Args[1])
+	vendorPath := path.Join(dir, "vendor")
+
 	logger.Info("starting analysis...", zap.String("directory", dir))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	gopls := gopls2.NewGoplsClient(ctx, logger, dir)
 	parser := processor.NewProcessor(logger, gopls)
+	result := processor.NewResult()
 
 	// Step 1: Scan all files and look for `go` calls
 	err = filepath.Walk(dir, func(filePath string, info os.FileInfo, err error) error {
@@ -51,7 +55,6 @@ func main() {
 		if info.IsDir() {
 			return nil
 		}
-		vendorPath := path.Join(dir, "vendor")
 		if strings.HasPrefix(filePath, vendorPath) {
 			return nil
 		}
@@ -62,11 +65,12 @@ func main() {
 			return nil
 		}
 
-		_, err = parser.Run(filePath)
+		r, err := parser.Run(ctx, filePath)
 		if err != nil {
 			return err
 		}
 
+		result.Merge(r)
 		return nil
 	})
 
@@ -75,4 +79,6 @@ func main() {
 	}
 
 	logger.Info("analysis complete")
+
+	fmt.Fprintln(os.Stderr, strings.Join(result.Paths(), "\n"))
 }

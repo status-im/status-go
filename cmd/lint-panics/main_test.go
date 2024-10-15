@@ -29,7 +29,7 @@ func Test(t *testing.T) {
 	gopls := gopls2.NewGoplsClient(ctx, logger, testDir)
 	parser := processor.NewProcessor(logger, gopls)
 
-	result, err := parser.Run(testFie)
+	result, err := parser.Run(ctx, testFie)
 	require.NoError(t, err)
 
 	paths := result.Paths()
