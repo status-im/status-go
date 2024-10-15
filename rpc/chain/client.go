@@ -20,6 +20,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/circuitbreaker"
+	"github.com/status-im/status-go/healthmanager"
+	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/rpc/chain/tagger"
@@ -63,10 +65,11 @@ func ClientWithTag(chainClient ClientInterface, tag, groupTag string) ClientInte
 }
 
 type ClientWithFallback struct {
-	ChainID        uint64
-	ethClients     []ethclient.RPSLimitedEthClientInterface
-	commonLimiter  rpclimiter.RequestLimiter
-	circuitbreaker *circuitbreaker.CircuitBreaker
+	ChainID                uint64
+	ethClients             []ethclient.RPSLimitedEthClientInterface
+	commonLimiter          rpclimiter.RequestLimiter
+	circuitbreaker         *circuitbreaker.CircuitBreaker
+	providersHealthManager *healthmanager.ProvidersHealthManager
 
 	WalletNotifier func(chainId uint64, message string)
 
@@ -111,7 +114,7 @@ var propagateErrors = []error{
 	bind.ErrNoCode,
 }
 
-func NewClient(ethClients []ethclient.RPSLimitedEthClientInterface, chainID uint64) *ClientWithFallback {
+func NewClient(ethClients []ethclient.RPSLimitedEthClientInterface, chainID uint64, providersHealthManager *healthmanager.ProvidersHealthManager) *ClientWithFallback {
 	cbConfig := circuitbreaker.Config{
 		Timeout:               20000,
 		MaxConcurrentRequests: 100,
@@ -123,11 +126,12 @@ func NewClient(ethClients []ethclient.RPSLimitedEthClientInterface, chainID uint
 	isConnected.Store(true)
 
 	return &ClientWithFallback{
-		ChainID:        chainID,
-		ethClients:     ethClients,
-		isConnected:    isConnected,
-		LastCheckedAt:  time.Now().Unix(),
-		circuitbreaker: circuitbreaker.NewCircuitBreaker(cbConfig),
+		ChainID:                chainID,
+		ethClients:             ethClients,
+		isConnected:            isConnected,
+		LastCheckedAt:          time.Now().Unix(),
+		circuitbreaker:         circuitbreaker.NewCircuitBreaker(cbConfig),
+		providersHealthManager: providersHealthManager,
 	}
 }
 
@@ -238,6 +242,10 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, ethClients []ethclien
 	}
 
 	result := c.circuitbreaker.Execute(cmd)
+	if c.providersHealthManager != nil {
+		rpcCallStatuses := convertFunctorCallStatuses(result.FunctorCallStatuses())
+		c.providersHealthManager.Update(ctx, rpcCallStatuses)
+	}
 	if result.Error() != nil {
 		return nil, result.Error()
 	}
@@ -841,4 +849,11 @@ func (c *ClientWithFallback) GetCircuitBreaker() *circuitbreaker.CircuitBreaker 
 
 func (c *ClientWithFallback) SetCircuitBreaker(cb *circuitbreaker.CircuitBreaker) {
 	c.circuitbreaker = cb
+}
+
+func convertFunctorCallStatuses(statuses []circuitbreaker.FunctorCallStatus) (result []rpcstatus.RpcProviderCallStatus) {
+	for _, f := range statuses {
+		result = append(result, rpcstatus.RpcProviderCallStatus{Name: f.Name, Timestamp: f.Timestamp, Err: f.Err})
+	}
+	return
 }

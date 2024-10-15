@@ -32,7 +32,7 @@ func setupClientTest(t *testing.T) (*ClientWithFallback, []*mock_ethclient.MockR
 		ethClients = append(ethClients, ethCl)
 	}
 
-	client := NewClient(ethClients, 0)
+	client := NewClient(ethClients, 0, nil)
 
 	cleanup := func() {
 		mockCtrl.Finish()

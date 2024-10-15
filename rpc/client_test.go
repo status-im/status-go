@@ -44,7 +44,15 @@ func TestBlockedRoutesCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, []params.Network{}, db, nil)
+	config := ClientConfig{
+		Client:          gethRPCClient,
+		UpstreamChainID: 1,
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	c, err := NewClient(config)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -83,7 +91,15 @@ func TestBlockedRoutesRawCall(t *testing.T) {
 	gethRPCClient, err := gethrpc.Dial(ts.URL)
 	require.NoError(t, err)
 
-	c, err := NewClient(gethRPCClient, 1, []params.Network{}, db, nil)
+	config := ClientConfig{
+		Client:          gethRPCClient,
+		UpstreamChainID: 1,
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	c, err := NewClient(config)
 	require.NoError(t, err)
 
 	for _, m := range blockedMethods {
@@ -142,7 +158,17 @@ func TestGetClientsUsingCache(t *testing.T) {
 			DefaultFallbackURL2: server.URL + path3,
 		},
 	}
-	c, err := NewClient(nil, 1, networks, db, providerConfigs)
+
+	config := ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		Networks:        networks,
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: providerConfigs,
+	}
+
+	c, err := NewClient(config)
 	require.NoError(t, err)
 
 	// Networks from DB must pick up DefaultRPCURL, DefaultFallbackURL, DefaultFallbackURL2

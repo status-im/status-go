@@ -91,7 +91,15 @@ func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
 func setupRouter(t *testing.T) (*Router, func()) {
 	db, cleanTmpDb := setupTestNetworkDB(t)
 
-	client, _ := rpc.NewClient(nil, 1, defaultNetworks, db, nil)
+	config := rpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		Networks:        defaultNetworks,
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	client, _ := rpc.NewClient(config)
 
 	router := NewRouter(client, nil, nil, nil, nil, nil, nil, nil)
 
