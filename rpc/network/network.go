@@ -13,8 +13,6 @@ import (
 
 var SepoliaChainIDs = []uint64{11155111, 421614, 11155420}
 
-var GoerliChainIDs = []uint64{5, 421613, 420}
-
 type CombinedNetwork struct {
 	Prod *params.Network
 	Test *params.Network
@@ -245,11 +243,6 @@ func (nm *Manager) GetAll() ([]*params.Network, error) {
 }
 
 func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
-	isGoerliEnabled, err := nm.accountsDB.GetIsGoerliEnabled()
-	if err != nil {
-		return nil, err
-	}
-
 	query := newNetworksQuery()
 	if onlyEnabled {
 		query.filterEnabled(true)
@@ -262,32 +255,6 @@ func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
 
 	var results []*params.Network
 	for _, network := range networks {
-		if isGoerliEnabled {
-			found := false
-			for _, chainID := range SepoliaChainIDs {
-				if network.ChainID == chainID {
-					found = true
-					break
-				}
-			}
-			if found {
-				continue
-			}
-		}
-
-		if !isGoerliEnabled {
-			found := false
-
-			for _, chainID := range GoerliChainIDs {
-				if network.ChainID == chainID {
-					found = true
-					break
-				}
-			}
-			if found {
-				continue
-			}
-		}
 
 		configuredNetwork, err := findNetwork(nm.configuredNetworks, network.ChainID)
 		if err != nil {
@@ -345,8 +312,7 @@ func (nm *Manager) GetTestNetworksEnabled() (result bool, err error) {
 	return nm.accountsDB.GetTestNetworksEnabled()
 }
 
-// Returns all networks for active mode (test/prod) and in case of test mode,
-// returns either Goerli or Sepolia networks based on the value of isGoerliEnabled
+// Returns all networks for active mode (test/prod)
 func (nm *Manager) GetActiveNetworks() ([]*params.Network, error) {
 	areTestNetworksEnabled, err := nm.GetTestNetworksEnabled()
 	if err != nil {

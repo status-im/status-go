@@ -52,7 +52,7 @@ var (
 	TestNetworkNames = map[int]string{
 		params.MainNetworkID:        "Mainnet",
 		params.StatusChainNetworkID: "StatusChain",
-		params.GoerliNetworkID:      "Goerli",
+		params.SepoliaNetworkID:     "Sepolia",
 	}
 
 	syncTimeout = 50 * time.Minute
@@ -127,8 +127,8 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 	switch id {
 	case params.MainNetworkID:
 		url = params.MainnetEthereumNetworkURL
-	case params.GoerliNetworkID:
-		url = params.GoerliEthereumNetworkURL
+	case params.SepoliaNetworkID:
+		url = params.SepoliaEthereumNetworkURL
 	default:
 		err = ErrNoRemoteURL
 	}
@@ -143,8 +143,8 @@ func GetHeadHashFromNetworkID(id int) string {
 		return "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
 	case params.StatusChainNetworkID:
 		return "0xe9d8920a99dc66a9557a87d51f9d14a34ec50aae04298e0f142187427d3c832e"
-	case params.GoerliNetworkID:
-		return "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a"
+	case params.SepoliaNetworkID:
+		return "0x25a5cc106eea7138acab33231d7160d69cb777ee0c2c553fcddf5138993e6dd9"
 	}
 	// Every other ID must break the test.
 	panic(fmt.Sprintf("invalid network id: %d", id))
@@ -168,8 +168,8 @@ func GetNetworkID() int {
 		return params.MainNetworkID
 	case fmt.Sprintf("%d", params.StatusChainNetworkID), "statuschain":
 		return params.StatusChainNetworkID
-	case fmt.Sprintf("%d", params.GoerliNetworkID), "goerli":
-		return params.GoerliNetworkID
+	case fmt.Sprintf("%d", params.SepoliaNetworkID), "sepolia":
+		return params.SepoliaNetworkID
 	}
 	// Every other selected network must break the test.
 	panic(fmt.Sprintf("invalid selected network: %q", *networkSelected))

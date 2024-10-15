@@ -11,13 +11,10 @@ import (
 
 const (
 	mainnetChainID         uint64 = 1
-	goerliChainID          uint64 = 5
 	sepoliaChainID         uint64 = 11155111
 	optimismChainID        uint64 = 10
-	optimismGoerliChainID  uint64 = 420
 	optimismSepoliaChainID uint64 = 11155420
 	arbitrumChainID        uint64 = 42161
-	arbitrumGoerliChainID  uint64 = 421613
 	arbitrumSepoliaChainID uint64 = 421614
 	sntSymbol                     = "SNT"
 	sttSymbol                     = "STT"
@@ -44,30 +41,10 @@ func mainnet(stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  1,
 		Enabled:                true,
-		RelatedChainID:         goerliChainID,
+		RelatedChainID:         sepoliaChainID,
 	}
 }
 
-func goerli(stageName string) params.Network {
-	return params.Network{
-		ChainID:                goerliChainID,
-		ChainName:              "Mainnet",
-		RPCURL:                 "https://goerli.infura.io/v3/",
-		FallbackURL:            "",
-		BlockExplorerURL:       "https://goerli.etherscan.io/",
-		IconURL:                "network/Network=Ethereum",
-		ChainColor:             "#627EEA",
-		ShortName:              "goEth",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 true,
-		Layer:                  1,
-		Enabled:                true,
-		RelatedChainID:         mainnetChainID,
-	}
-
-}
 func sepolia(stageName string) params.Network {
 	return params.Network{
 		ChainID:                sepoliaChainID,
@@ -110,27 +87,7 @@ func optimism(stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  2,
 		Enabled:                true,
-		RelatedChainID:         optimismGoerliChainID,
-	}
-}
-
-func optimismGoerli(stageName string) params.Network {
-	return params.Network{
-		ChainID:                optimismGoerliChainID,
-		ChainName:              "Optimism",
-		RPCURL:                 "https://optimism-goerli.infura.io/v3/",
-		FallbackURL:            "",
-		BlockExplorerURL:       "https://goerli-optimism.etherscan.io/",
-		IconURL:                "network/Network=Optimism",
-		ChainColor:             "#E90101",
-		ShortName:              "goOpt",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 true,
-		Layer:                  2,
-		Enabled:                false,
-		RelatedChainID:         optimismChainID,
+		RelatedChainID:         optimismSepoliaChainID,
 	}
 }
 
@@ -176,27 +133,7 @@ func arbitrum(stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  2,
 		Enabled:                true,
-		RelatedChainID:         arbitrumGoerliChainID,
-	}
-}
-
-func arbitrumGoerli(stageName string) params.Network {
-	return params.Network{
-		ChainID:                arbitrumGoerliChainID,
-		ChainName:              "Arbitrum",
-		RPCURL:                 "https://arbitrum-goerli.infura.io/v3/",
-		FallbackURL:            "",
-		BlockExplorerURL:       "https://goerli.arbiscan.io/",
-		IconURL:                "network/Network=Arbitrum",
-		ChainColor:             "#51D0F0",
-		ShortName:              "goArb",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 true,
-		Layer:                  2,
-		Enabled:                false,
-		RelatedChainID:         arbitrumChainID,
+		RelatedChainID:         arbitrumSepoliaChainID,
 	}
 }
 
@@ -226,24 +163,16 @@ func arbitrumSepolia(stageName string) params.Network {
 func defaultNetworks(stageName string) []params.Network {
 	return []params.Network{
 		mainnet(stageName),
-		goerli(stageName),
 		sepolia(stageName),
 		optimism(stageName),
-		optimismGoerli(stageName),
 		optimismSepolia(stageName),
 		arbitrum(stageName),
-		arbitrumGoerli(stageName),
 		arbitrumSepolia(stageName),
 	}
 }
 
 var mainnetGanacheTokenOverrides = params.TokenOverride{
 	Symbol:  sntSymbol,
-	Address: ganacheTokenAddress,
-}
-
-var goerliGanacheTokenOverrides = params.TokenOverride{
-	Symbol:  sttSymbol,
 	Address: ganacheTokenAddress,
 }
 
@@ -275,11 +204,10 @@ func setRPCs(networks []params.Network, request *requests.WalletSecretsConfig) [
 		if request.GanacheURL != "" {
 			n.RPCURL = request.GanacheURL
 			n.FallbackURL = request.GanacheURL
-			switch n.ChainID {
-			case mainnetChainID:
-				n.TokenOverrides = []params.TokenOverride{mainnetGanacheTokenOverrides}
-			case goerliChainID:
-				n.TokenOverrides = []params.TokenOverride{goerliGanacheTokenOverrides}
+			if n.ChainID == mainnetChainID {
+				n.TokenOverrides = []params.TokenOverride{
+					mainnetGanacheTokenOverrides,
+				}
 			}
 		}
 

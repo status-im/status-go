@@ -392,11 +392,6 @@ var (
 		dBColumnName:   "test_networks_enabled",
 		valueHandler:   BoolHandler,
 	}
-	IsGoerliEnabled = SettingField{
-		reactFieldName: "is-goerli-enabled?",
-		dBColumnName:   "is_goerli_enabled",
-		valueHandler:   BoolHandler,
-	}
 	TokenGroupByCommunity = SettingField{
 		reactFieldName: "token-group-by-community?",
 		dBColumnName:   "wallet_token_preferences_group_by_community",
@@ -532,7 +527,6 @@ var (
 		GifFavourites,
 		GifRecents,
 		HideHomeTooltip,
-		IsGoerliEnabled,
 		KeycardInstanceUID,
 		KeycardPairedOn,
 		KeycardPairing,

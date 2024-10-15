@@ -28,9 +28,9 @@ var initNetworks = []params.Network{
 	},
 	{
 		ChainID:                11155111,
-		ChainName:              "Goerli",
-		RPCURL:                 "http://goerli.blockscout.com/",
-		BlockExplorerURL:       "https://goerli.etherscan.io/",
+		ChainName:              "Sepolia",
+		RPCURL:                 "https://sepolia.infura.io/v3/",
+		BlockExplorerURL:       "https://sepolia.etherscan.io/",
 		IconURL:                "",
 		NativeCurrencyName:     "Ether",
 		NativeCurrencySymbol:   "ETH",
@@ -52,7 +52,7 @@ var initNetworks = []params.Network{
 		IsTest:                 false,
 		Layer:                  2,
 		Enabled:                true,
-		RelatedChainID:         420,
+		RelatedChainID:         11155420,
 	},
 }
 

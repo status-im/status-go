@@ -23,24 +23,16 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig)
 
-	require.Len(t, actualNetworks, 9)
-
-	ignoreDefaultRPCURLCheck := false // TODO: used just because of Goerli, remove once we remove Goerli from the default networks
+	require.Len(t, actualNetworks, 6)
 
 	for _, n := range actualNetworks {
 		var err error
 		switch n.ChainID {
 		case mainnetChainID:
-		case goerliChainID:
-			ignoreDefaultRPCURLCheck = true
 		case sepoliaChainID:
 		case optimismChainID:
-		case optimismGoerliChainID:
-			ignoreDefaultRPCURLCheck = true
 		case optimismSepoliaChainID:
 		case arbitrumChainID:
-		case arbitrumGoerliChainID:
-			ignoreDefaultRPCURLCheck = true
 		case arbitrumSepoliaChainID:
 		default:
 			err = errors.Errorf("unexpected chain id: %d", n.ChainID)
@@ -48,13 +40,11 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		require.NoError(t, err)
 
 		// check default chains
-		if !ignoreDefaultRPCURLCheck {
-			// DefaultRPCURL and DefaultFallbackURL are mandatory
-			require.True(t, strings.Contains(n.DefaultRPCURL, stageName))
-			require.True(t, strings.Contains(n.DefaultFallbackURL, stageName))
-			if n.DefaultFallbackURL2 != "" {
-				require.True(t, strings.Contains(actualNetworks[0].DefaultFallbackURL2, stageName))
-			}
+		// DefaultRPCURL and DefaultFallbackURL are mandatory
+		require.True(t, strings.Contains(n.DefaultRPCURL, stageName))
+		require.True(t, strings.Contains(n.DefaultFallbackURL, stageName))
+		if n.DefaultFallbackURL2 != "" {
+			require.True(t, strings.Contains(actualNetworks[0].DefaultFallbackURL2, stageName))
 		}
 
 		// check fallback options
@@ -73,12 +63,11 @@ func TestBuildDefaultNetworksGanache(t *testing.T) {
 
 	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig)
 
-	require.Len(t, actualNetworks, 9)
+	require.Len(t, actualNetworks, 6)
 
 	for _, n := range actualNetworks {
 		require.True(t, strings.Contains(n.RPCURL, ganacheURL))
 		require.True(t, strings.Contains(n.FallbackURL, ganacheURL))
-
 	}
 
 	require.Equal(t, mainnetChainID, actualNetworks[0].ChainID)
@@ -87,12 +76,4 @@ func TestBuildDefaultNetworksGanache(t *testing.T) {
 	require.Len(t, actualNetworks[0].TokenOverrides, 1)
 	require.Equal(t, sntSymbol, actualNetworks[0].TokenOverrides[0].Symbol)
 	require.Equal(t, ganacheTokenAddress, actualNetworks[0].TokenOverrides[0].Address)
-
-	require.Equal(t, goerliChainID, actualNetworks[1].ChainID)
-
-	require.NotNil(t, actualNetworks[1].TokenOverrides)
-	require.Len(t, actualNetworks[1].TokenOverrides, 1)
-	require.Equal(t, sttSymbol, actualNetworks[1].TokenOverrides[0].Symbol)
-	require.Equal(t, ganacheTokenAddress, actualNetworks[1].TokenOverrides[0].Address)
-
 }

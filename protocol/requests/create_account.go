@@ -93,13 +93,10 @@ type WalletSecretsConfig struct {
 	RaribleTestnetAPIKey string `json:"raribleTestnetApiKey"`
 
 	AlchemyEthereumMainnetToken string `json:"alchemyEthereumMainnetToken"`
-	AlchemyEthereumGoerliToken  string `json:"alchemyEthereumGoerliToken"`
 	AlchemyEthereumSepoliaToken string `json:"alchemyEthereumSepoliaToken"`
 	AlchemyArbitrumMainnetToken string `json:"alchemyArbitrumMainnetToken"`
-	AlchemyArbitrumGoerliToken  string `json:"alchemyArbitrumGoerliToken"`
 	AlchemyArbitrumSepoliaToken string `json:"alchemyArbitrumSepoliaToken"`
 	AlchemyOptimismMainnetToken string `json:"alchemyOptimismMainnetToken"`
-	AlchemyOptimismGoerliToken  string `json:"alchemyOptimismGoerliToken"`
 	AlchemyOptimismSepoliaToken string `json:"alchemyOptimismSepoliaToken"`
 
 	StatusProxyStageName          string `json:"statusProxyStageName"`
