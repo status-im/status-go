@@ -14,6 +14,7 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -320,9 +321,68 @@ func makeTestTree(domain string, nodes []*enode.Node, links []string) (*ethdnsdi
 	return tree, url
 }
 
-/*
 func TestPeerExchange(t *testing.T) {
+	
 	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+	
+	// start node which serve as PeerExchange server
+	pxServerConfig := WakuConfig{
+		// Port:        30303,
+		// NodeKey:     "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
+		EnableRelay: false,
+		LogLevel:    "DEBUG",
+		Discv5Discovery: true,
+		ClusterID: 16,
+		Shards: []uint16{64},
+		PeerExchange: true,
+	}
+	pxServerNode, err := New(nil, "", &pxServerConfig, logger.Named("pxServerNode"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, pxServerNode.Start())
+
+	time.Sleep(1 * time.Second)
+
+	enr, err := pxServerNode.ENR()
+	require.NoError(t, err)
+	require.NotNil(t, enr)
+
+	// start node that will be discovered by PeerExchange
+	discV5NodeConfig := WakuConfig{
+		// Port:        30303,
+		// NodeKey:     "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
+		EnableRelay: false,
+		LogLevel:    "DEBUG",
+		Discv5Discovery: true,
+		ClusterID: 16,
+		Shards: []uint16{64},
+		PeerExchange: false,
+		Discv5BootstrapNodes: []string{enr.String()},
+	}
+
+	discV5Node, err := New(nil, "", &discV5NodeConfig, logger.Named("discV5Node"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, discV5Node.Start())
+
+	time.Sleep(1 * time.Second)
+
+	// start light node which use PeerExchange to discover peers
+
+	pxClientConfig := WakuConfig{
+		// Port:        30303,
+		// NodeKey:     "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
+		EnableRelay: false,
+		LogLevel:    "DEBUG",
+		Discv5Discovery: false,
+		ClusterID: 16,
+		Shards: []uint16{64},
+		PeerExchange: false,
+		PeerExchangeNode: "", // TODO: fill
+	}
+
+	
+	
+	/* logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 	// start node which serve as PeerExchange server
 	config := &Config{}
@@ -398,8 +458,10 @@ func TestPeerExchange(t *testing.T) {
 
 	require.NoError(t, lightNode.Stop())
 	require.NoError(t, pxServerNode.Stop())
-	require.NoError(t, discV5Node.Stop())
+	require.NoError(t, discV5Node.Stop()) */
 }
+
+/*
 
 func TestWakuV2Filter(t *testing.T) {
 	t.Skip("flaky test")

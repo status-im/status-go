@@ -1691,6 +1691,8 @@ type WakuConfig struct {
 	Discv5Discovery		 bool `json:"discv5Discovery,omitempty"`
 	ClusterID			 uint16 `json:"clusterId,omitempty"`
 	Shards			     []uint16 `json:"shards,omitempty"`	
+	PeerExchange		 bool `json:"peerExchange,omitempty"`
+	PeerExchangeNode	 string `json:"peerExchangeNode,omitempty"`
 }
 
 type Waku struct {
