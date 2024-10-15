@@ -1688,19 +1688,20 @@ type WakuPubsubTopic = string
 type WakuContentTopic = string
 
 type WakuConfig struct {
-	Host        		 string `json:"host,omitempty"`
-	Port        		 int    `json:"port,omitempty"`
-	NodeKey     		 string `json:"key,omitempty"`
-	EnableRelay  		 bool   `json:"relay"`
-	LogLevel     		 string `json:"logLevel"`
-	DnsDiscovery 		 bool `json:"dnsDiscovery,omitempty"`
-	DnsDiscoveryUrl 	 string `json:"dnsDiscoveryUrl,omitempty"`
-	MaxMessageSize		 string `json:"maxMessageSize,omitempty"`
-	Staticnodes          []string `json:"staticnodes,omitempty"`
-	Discv5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
-	Discv5Discovery		 bool `json:"discv5Discovery,omitempty"`
-	ClusterID			 uint16 `json:"clusterId,omitempty"`
-	Shards			     []uint16 `json:"shards,omitempty"`	
+	Host        		 	string `json:"host,omitempty"`
+	Port        		 	int    `json:"port,omitempty"`
+	NodeKey     		 	string `json:"key,omitempty"`
+	EnableRelay  		 	bool   `json:"relay"`
+	LogLevel     		 	string `json:"logLevel"`
+	DnsDiscovery 		 	bool `json:"dnsDiscovery,omitempty"`
+	DnsDiscoveryUrl 	 	string `json:"dnsDiscoveryUrl,omitempty"`
+	MaxMessageSize		 	string `json:"maxMessageSize,omitempty"`
+	Staticnodes          	[]string `json:"staticnodes,omitempty"`
+	Discv5BootstrapNodes 	[]string `json:"discv5BootstrapNodes,omitempty"`
+	Discv5Discovery		 	bool `json:"discv5Discovery,omitempty"`
+	ClusterID			 	uint16 `json:"clusterId,omitempty"`
+	Shards			     	[]uint16 `json:"shards,omitempty"`	
+	DnsDiscoveryNameServers []string `json:"dnsDiscoveryNameServers,omitempty"`
 }
 
 type Waku struct {

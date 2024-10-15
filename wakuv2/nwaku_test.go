@@ -6,6 +6,8 @@ package wakuv2
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"slices"
 	"testing"
 	"time"
@@ -163,12 +165,40 @@ func TestBasicWakuV2(t *testing.T) {
 	storeNodeInfo, err := GetNwakuInfo(nil, &extNodeRestPort)
 	require.NoError(t, err)
 	
+	// Creating a fake DNS Discovery ENRTree
+	tree, url := makeTestTree("n", parseNodes([]string{storeNodeInfo.EnrUri}), nil)
+	enrTreeAddress := url
+	/* envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
+	if envEnrTreeAddress != "" {
+		enrTreeAddress = envEnrTreeAddress
+	} */
+
+	fmt.Println("--------- tree.ToTXT('n'): ", tree.ToTXT("n"))
+	fmt.Println("--------- enrTreeAddress ", enrTreeAddress)
+	fmt.Println("--------- url ", url)
+	
+	dnsServer, err := CreateFakeDnsServer("")
+	require.NoError(t, err)
+
+	// Channel to signal when the server is done
+    done := make(chan bool)
+
+    go func() {
+        err := dnsServer.ListenAndServe()
+        if err != nil {
+            log.Printf("DNS server error: %v", err)
+        }
+        done <- true
+    }()
+    
+	
 	nwakuConfig := WakuConfig{
 		Port:        30303,
 		NodeKey:     "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
 		EnableRelay: true,
 		LogLevel:    "DEBUG",
-		DnsDiscoveryUrl: "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im",
+		DnsDiscoveryUrl: url,
+		DnsDiscoveryNameServers: []string{"127.0.0.1"},
 		DnsDiscovery: true,
 		Discv5Discovery: true,
 		Staticnodes: []string{storeNodeInfo.ListenAddresses[0]},
@@ -291,6 +321,12 @@ func TestBasicWakuV2(t *testing.T) {
 		return nil
 	}, options)
 	require.NoError(t, err) */
+
+	dnsServer.Shutdown()
+
+    // Wait for the server to finish
+    <-done
+    log.Println("DNS server stopped")
 
 	require.NoError(t, w.Stop())
 }
