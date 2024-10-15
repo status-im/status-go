@@ -336,7 +336,9 @@ func TestPeerExchange(t *testing.T) {
 		ClusterID: 16,
 		Shards: []uint16{64},
 		PeerExchange: true,
+		Discv5UdpPort: 9000,
 	}
+
 	pxServerNode, err := New(nil, "", &pxServerConfig, logger.Named("pxServerNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, pxServerNode.Start())
@@ -346,6 +348,8 @@ func TestPeerExchange(t *testing.T) {
 	enr, err := pxServerNode.ENR()
 	require.NoError(t, err)
 	require.NotNil(t, enr)
+
+	ma, err := pxServerNode.ListenAddresses()
 
 	// start node that will be discovered by PeerExchange
 	discV5NodeConfig := WakuConfig{
@@ -358,6 +362,7 @@ func TestPeerExchange(t *testing.T) {
 		Shards: []uint16{64},
 		PeerExchange: false,
 		Discv5BootstrapNodes: []string{enr.String()},
+		Discv5UdpPort: 9001,
 	}
 
 	discV5Node, err := New(nil, "", &discV5NodeConfig, logger.Named("discV5Node"), nil, nil, nil, nil)
@@ -377,8 +382,17 @@ func TestPeerExchange(t *testing.T) {
 		ClusterID: 16,
 		Shards: []uint16{64},
 		PeerExchange: false,
+		Discv5UdpPort: 9002,
 		PeerExchangeNode: "", // TODO: fill
 	}
+
+	lightNode, err := New(nil, "", &pxClientConfig, logger.Named("lightNode"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, lightNode.Start())
+
+	require.NoError(t, lightNode.Stop())
+	require.NoError(t, pxServerNode.Stop())
+	require.NoError(t, discV5Node.Stop())
 
 	
 	
