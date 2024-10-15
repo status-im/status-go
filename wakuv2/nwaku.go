@@ -1813,7 +1813,8 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 		ts = timesource.Default()
 	}
 
-	/* cfg = setDefaults(cfg)
+	/* TODO-nwaku 
+	cfg = setDefaults(cfg)
 	if err = cfg.Validate(logger); err != nil {
 		return nil, err
 	} */
@@ -1859,7 +1860,7 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 			onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 			onPeerStats:                     onPeerStats,
 			onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
-		  //sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
+		  //sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish), // TODO-nwaku
 		}, nil
 	}
 
