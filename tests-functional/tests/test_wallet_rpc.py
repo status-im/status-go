@@ -34,7 +34,7 @@ class TestTransactionRpc(TransactionTestCase):
             params[0][0]["hash"] = self.tx_hash
 
         response = self.rpc_client.rpc_valid_request(method, params, _id)
-        self.rpc_client.verify_json_schema(response, method)
+        self.rpc_client.verify_json_schema(response.json(), method)
 
     def test_create_multi_transaction(self):
         response = self.wallet_create_multi_transaction()
@@ -71,7 +71,7 @@ class TestTransactionRpc(TransactionTestCase):
         assert expected_error_text in actual_error_text, \
             f"got error: {actual_error_text} that does not include: {expected_error_text}"
 
-        self.rpc_client.verify_json_schema(response, "wallet_createMultiTransaction/transferTx_error")
+        self.rpc_client.verify_json_schema(response.json(), "wallet_createMultiTransaction/transferTx_error")
 
 
 @pytest.mark.wallet
@@ -92,4 +92,4 @@ class TestRpc(StatusBackendTestCase):
         _id = str(random.randint(1, 8888))
 
         response = self.rpc_client.rpc_valid_request(method, params, _id)
-        self.rpc_client.verify_json_schema(response, method)
+        self.rpc_client.verify_json_schema(response.json(), method)

@@ -65,10 +65,10 @@ class RpcClient:
         response = self.rpc_request(method, params, _id, url)
         self.verify_is_valid_json_rpc_response(response, _id)
         return response
-
+            
     def verify_json_schema(self, response, method):
         with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
-            jsonschema.validate(instance=response.json(),
+            jsonschema.validate(instance=response,
                                 schema=json.load(schema))
 
 

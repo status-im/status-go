@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "node.login"
+    },
+    "event": {
+      "type": "object",
+      "properties": {
+        "settings": {
+          "type": "object",
+          "properties": {
+            "address": { "type": "string" },
+            "currency": { "type": "string" },
+            "networks/current-network": { "type": "string" },
+            "dapps-address": { "type": "string" },
+            "device-name": { "type": "string" },
+            "display-name": { "type": "string" },
+            "eip1581-address": { "type": "string" },
+            "installation-id": { "type": "string" },
+            "key-uid": { "type": "string" },
+            "latest-derived-path": { "type": "integer" },
+            "link-preview-request-enabled": { "type": "boolean" },
+            "messages-from-contacts-only": { "type": "boolean" },
+            "mnemonic": { "type": "string" },
+            "mutual-contact-enabled?": { "type": "boolean" },
+            "name": { "type": "string" },
+            "networks/networks": { "type": "array" },
+            "photo-path": { "type": "string" },
+            "preview-privacy?": { "type": "boolean" },
+            "public-key": { "type": "string" },
+            "signing-phrase": { "type": "string" },
+            "default-sync-period": { "type": "integer" },
+            "send-push-notifications?": { "type": "boolean" },
+            "appearance": { "type": "integer" },
+            "profile-pictures-show-to": { "type": "integer" },
+            "profile-pictures-visibility": { "type": "integer" },
+            "use-mailservers?": { "type": "boolean" },
+            "wallet-root-address": { "type": "string" },
+            "send-status-updates?": { "type": "boolean" },
+            "current-user-status": {
+              "type": "object",
+              "properties": {
+                "publicKey": { "type": "string" },
+                "statusType": { "type": "integer" },
+                "clock": { "type": "integer" },
+                "text": { "type": "string" }
+              },
+              "required": ["publicKey", "statusType", "clock", "text"]
+            },
+            "gifs/recent-gifs": { "type": ["null", "array"] },
+            "gifs/favorite-gifs": { "type": ["null", "array"] },
+            "last-backup": { "type": "integer" },
+            "backup-enabled?": { "type": "boolean" },
+            "gifs/api-key": { "type": "string" },
+            "show-community-asset-when-sending-tokens?": { "type": "boolean" },
+            "display-assets-below-balance-threshold": { "type": "integer" },
+            "url-unfurling-mode": { "type": "integer" },
+            "compressedKey": { "type": "string" },
+            "emojiHash": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "required": [
+            "address", "currency", "networks/current-network", "dapps-address",
+            "device-name", "display-name", "eip1581-address", "installation-id",
+            "key-uid", "latest-derived-path", "link-preview-request-enabled",
+            "messages-from-contacts-only", "mutual-contact-enabled?",
+            "name", "networks/networks", "photo-path", "preview-privacy?",
+            "public-key", "signing-phrase", "default-sync-period",
+            "send-push-notifications?", "appearance", "profile-pictures-show-to",
+            "profile-pictures-visibility", "use-mailservers?", "wallet-root-address",
+            "send-status-updates?", "current-user-status", "gifs/recent-gifs",
+            "gifs/favorite-gifs", "last-backup", "backup-enabled?", "gifs/api-key",
+            "show-community-asset-when-sending-tokens?",
+            "display-assets-below-balance-threshold", "url-unfurling-mode",
+            "compressedKey", "emojiHash"
+          ]
+        },
+        "account": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "timestamp": { "type": "integer" },
+            "identicon": { "type": "string" },
+            "colorHash": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": { "type": "integer" },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "colorId": { "type": "integer" },
+            "customizationColor": { "type": "string" },
+            "keycard-pairing": { "type": "string" },
+            "key-uid": { "type": "string" },
+            "images": { "type": ["null", "array"] },
+            "kdfIterations": { "type": "integer" }
+          },
+          "required": [
+            "name", "timestamp", "identicon", "colorHash", "colorId",
+            "customizationColor", "keycard-pairing", "key-uid", "images",
+            "kdfIterations"
+          ]
+        }
+      },
+      "required": ["settings", "account"]
+    }
+  },
+  "required": ["type", "event"]
+}
