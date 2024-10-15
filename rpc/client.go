@@ -203,6 +203,8 @@ func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
 		if c.walletFeed == nil {
 			return
 		}
+		// FIXME: remove these excessive logs in future release (2.31+)
+		c.log.Debug("Sending blockchain health status event", "status", string(encodedMessage))
 		c.walletFeed.Send(walletevent.Event{
 			Type:    EventBlockchainHealthChanged,
 			Message: string(encodedMessage),
