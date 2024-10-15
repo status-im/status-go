@@ -18,7 +18,8 @@
 
 package wakuv2
 
-/* import (
+/* TODO-nwaku
+import (
 	"testing"
 	"time"
 

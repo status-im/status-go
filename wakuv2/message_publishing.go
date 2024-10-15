@@ -1,6 +1,7 @@
 package wakuv2
 
-/* import (
+/* TODO-nwaku
+import (
 	"errors"
 
 	"go.uber.org/zap"

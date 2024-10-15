@@ -332,7 +332,8 @@ const peersToPublishForLightpush = 2
 const publishingLimiterRate = rate.Limit(2)
 const publishingLimitBurst = 4
 
-/* type SentEnvelope struct {
+/* TODO-nwaku 
+type SentEnvelope struct {
 	Envelope      *protocol.Envelope
 	PublishMethod PublishMethod
 }
@@ -368,7 +369,8 @@ func (w *Waku) SubscribeToConnStatusChanges() *types.ConnStatusSubscription {
 	return subscription
 }
 
-/* func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) ([]*enode.Node, error) {
+/* TODO-nwaku 
+func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string) ([]*enode.Node, error) {
 	wg := sync.WaitGroup{}
 	mu := sync.Mutex{}
 	var result []*enode.Node
@@ -502,7 +504,8 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	w.WakuConnect(addr.String(), 1000)
 }
 
-/* func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
+/* TODO-nwaku 
+func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
 	w.wg.Add(1)
 	defer w.wg.Done()
 
@@ -867,7 +870,8 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 	return nil, fmt.Errorf("non-existent key ID")
 }
 
-/* // Subscribe installs a new message handler used for filtering, decrypting
+/* TODO-nwaku 
+// Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
 func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 	f.PubsubTopic = w.GetPubsubTopic(f.PubsubTopic)
@@ -1017,7 +1021,8 @@ func (w *Waku) Query(ctx context.Context,
 	return nil, 0, nil
 }
 
-/* // OnNewEnvelope is an interface from Waku FilterManager API that gets invoked when any new message is received by Filter.
+/* TODO-nwaku 
+// OnNewEnvelope is an interface from Waku FilterManager API that gets invoked when any new message is received by Filter.
 func (w *Waku) OnNewEnvelope(env *protocol.Envelope) error {
 	return w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 } */
@@ -1208,7 +1213,8 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
 }
 
-/* func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic string, contentTopics []string) {
+/* TODO-nwaku 
+func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic string, contentTopics []string) {
 	if !w.cfg.EnableMissingMessageVerification {
 		return
 	}
@@ -1250,7 +1256,8 @@ func (w *Waku) setupRelaySubscriptions() error {
 	return nil
 } */
 
-/* func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType, processImmediately bool) error {
+/* TODO-nwaku 
+func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType, processImmediately bool) error {
 	if envelope == nil {
 		return nil
 	}
@@ -1339,7 +1346,8 @@ func (w *Waku) postEvent(envelope *common.ReceivedMessage) {
 	w.msgQueue <- envelope
 }
 
-/* // processQueueLoop delivers the messages to the watchers during the lifetime of the waku node.
+/* TODO-nwaku
+// processQueueLoop delivers the messages to the watchers during the lifetime of the waku node.
 func (w *Waku) processQueueLoop() {
 	if w.ctx == nil {
 		return
@@ -1435,7 +1443,8 @@ func (w *Waku) Peers() types.PeerStats {
 	// return FormatPeerStats(w.node)
 }
 
-/* func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
+/* TODO-nwaku 
+func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 	if w.cfg.LightClient {
 		return nil, errors.New("only available in relay mode")
 	}
@@ -1511,7 +1520,8 @@ func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
 	// }
 }
 
-/* func (w *Waku) ConnectionChanged(state connection.State) {
+/* TODO-nwaku 
+func (w *Waku) ConnectionChanged(state connection.State) {
 	isOnline := !state.Offline
 	if w.cfg.LightClient {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
@@ -1762,7 +1772,7 @@ type Waku struct {
 	onHistoricMessagesRequestFailed func([]byte, peer.ID, error)
 	onPeerStats                     func(types.ConnStatus)
 
-	// statusTelemetryClient ITelemetryClient
+	// statusTelemetryClient ITelemetryClient // TODO-nwaku
 
 	defaultShardInfo protocol.RelayShards
 }
@@ -2424,7 +2434,8 @@ func (self *Waku) DisconnectPeerById(peerId peer.ID) error {
 // }
 
 // MaxMessageSize returns the maximum accepted message size.
-/* func (w *Waku) MaxMessageSize() uint32 {
+/* TODO-nwaku 
+func (w *Waku) MaxMessageSize() uint32 {
 	return w.cfg.MaxMessageSize
 } */
 
