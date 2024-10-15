@@ -65,6 +65,11 @@ class RpcClient:
         with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
             jsonschema.validate(instance=response.json(),
                                 schema=json.load(schema))
+            
+    def verify_json_signal_schema(self, response, method):
+        with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
+            jsonschema.validate(instance=response,
+                                schema=json.load(schema))
 
 
 class StatusBackend(RpcClient, SignalClient):
