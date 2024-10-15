@@ -101,6 +101,7 @@ require (
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
 	go.lsp.dev/jsonrpc2 v0.10.0
 	go.lsp.dev/protocol v0.12.0
+	go.lsp.dev/uri v0.3.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/multierr v1.11.0
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
@@ -278,7 +279,6 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.lsp.dev/pkg v0.0.0-20210717090340-384b27a52fb2 // indirect
-	go.lsp.dev/uri v0.3.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/fx v1.22.1 // indirect
