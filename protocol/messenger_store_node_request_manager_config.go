@@ -3,8 +3,8 @@ package protocol
 type StoreNodeRequestConfig struct {
 	WaitForResponse   bool
 	StopWhenDataFound bool
-	InitialPageSize   uint32
-	FurtherPageSize   uint32
+	InitialPageSize   uint64
+	FurtherPageSize   uint64
 }
 
 type StoreNodeRequestOption func(*StoreNodeRequestConfig)
@@ -40,13 +40,13 @@ func WithStopWhenDataFound(stopWhenDataFound bool) StoreNodeRequestOption {
 	}
 }
 
-func WithInitialPageSize(initialPageSize uint32) StoreNodeRequestOption {
+func WithInitialPageSize(initialPageSize uint64) StoreNodeRequestOption {
 	return func(c *StoreNodeRequestConfig) {
 		c.InitialPageSize = initialPageSize
 	}
 }
 
-func WithFurtherPageSize(furtherPageSize uint32) StoreNodeRequestOption {
+func WithFurtherPageSize(furtherPageSize uint64) StoreNodeRequestOption {
 	return func(c *StoreNodeRequestConfig) {
 		c.FurtherPageSize = furtherPageSize
 	}
