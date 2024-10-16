@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const backoffInterval = 30
+const backoffInterval = 60
 
 var errNotInitialized = errors.New("datasync transport not initialized")
 var DatasyncTicker = 300 * time.Millisecond
