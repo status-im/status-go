@@ -2,6 +2,7 @@ package routeexecution
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -22,14 +23,24 @@ type Manager struct {
 	router             *router.Router
 	transactionManager *transfer.TransactionManager
 	transferController *transfer.Controller
+	db                 *DB
+
+	// Local data used for storage purposes
+	buildInputParams *requests.RouterBuildTransactionsParams
 }
 
-func NewManager(router *router.Router, transactionManager *transfer.TransactionManager, transferController *transfer.Controller) *Manager {
+func NewManager(walletDB *sql.DB, router *router.Router, transactionManager *transfer.TransactionManager, transferController *transfer.Controller) *Manager {
 	return &Manager{
 		router:             router,
 		transactionManager: transactionManager,
 		transferController: transferController,
+		db:                 NewDB(walletDB),
 	}
+}
+
+func (m *Manager) clearLocalRouteData() {
+	m.buildInputParams = nil
+	m.transactionManager.ClearLocalRouterTransactionsData()
 }
 
 func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputParams *requests.RouterBuildTransactionsParams) {
@@ -45,7 +56,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 
 		defer func() {
 			if err != nil {
-				m.transactionManager.ClearLocalRouterTransactionsData()
+				m.clearLocalRouteData()
 				err = statusErrors.CreateErrorResponseFromError(err)
 				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
 			}
@@ -58,6 +69,8 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 			err = ErrCannotResolveRouteId
 			return
 		}
+
+		m.buildInputParams = buildInputParams
 
 		updateFields(response.SendDetails, routeInputParams)
 
@@ -104,7 +117,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			}
 
 			if clearLocalData {
-				m.transactionManager.ClearLocalRouterTransactionsData()
+				m.clearLocalRouteData()
 			}
 
 			if err != nil {
@@ -159,6 +172,18 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 		//////////////////////////////////////////////////////////////////////////////
 
 		response.SentTransactions, err = m.transactionManager.SendRouterTransactions(ctx, multiTx)
+		if err != nil {
+			// TODO #16556: Handle partially successful Tx sends?
+			return
+		}
+
+		routerTransactions := m.transactionManager.GetRouterTransactions()
+
+		routeData := NewRouteData(&routeInputParams, m.buildInputParams, routerTransactions)
+		err = m.db.PutRouteData(routeData)
+		if err != nil {
+			return
+		}
 
 		var (
 			chainIDs  []uint64
