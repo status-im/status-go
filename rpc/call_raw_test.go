@@ -59,6 +59,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 		id         json.RawMessage
 		chainID    uint64
 		shouldFail bool
+		timeout    uint64
 	}{
 		{
 			"params_array",
@@ -73,6 +74,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			json.RawMessage(`42`),
 			0,
 			false,
+			0,
 		},
 		{
 			"params_empty_array",
@@ -82,6 +84,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			nil,
 			0,
 			false,
+			0,
 		},
 		{
 			"params_none",
@@ -91,6 +94,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			nil,
 			0,
 			false,
+			0,
 		},
 		{
 			"params_chain_id",
@@ -100,6 +104,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			nil,
 			2,
 			false,
+			0,
 		},
 		{
 			"getFilterMessage",
@@ -109,6 +114,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			json.RawMessage(`44`),
 			0,
 			false,
+			0,
 		},
 		{
 			"getFilterMessage_array",
@@ -118,6 +124,7 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			nil,
 			0,
 			true,
+			0,
 		},
 		{
 			"empty_array",
@@ -127,21 +134,33 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 			nil,
 			0,
 			true,
+			0,
+		},
+		{
+			"timeout",
+			json.RawMessage(`{"jsonrpc": "2.0", "timeout": 2000, "method": "test"}`),
+			[]interface{}{},
+			"test",
+			nil,
+			0,
+			false,
+			2000,
 		},
 	}
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			chainID, method, params, id, err := methodAndParamsFromBody(test.body)
+			response, err := methodAndParamsFromBody(test.body)
 			if test.shouldFail {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, test.chainID, chainID)
-			require.Equal(t, test.method, method)
-			require.Equal(t, test.params, params)
-			require.EqualValues(t, test.id, id)
+			require.Equal(t, test.timeout, response.Timeout)
+			require.Equal(t, test.chainID, response.ChainID)
+			require.Equal(t, test.method, response.Method)
+			require.Equal(t, test.params, response.Params)
+			require.EqualValues(t, test.id, response.ID)
 		})
 	}
 }
