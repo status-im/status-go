@@ -216,6 +216,10 @@ package wakuv2
 		WAKU_CALL (waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
 
+	static void cGoWakuGetPeerIdsFromPeerStore(void* wakuCtx, void* resp) {
+		WAKU_CALL (waku_get_peerids_from_peerstore(wakuCtx, (WakuCallBack) callback, resp) );
+	}
+
 	static void cGoWakuLightpushPublish(void* wakuCtx,
 					const char* pubSubTopic,
 					const char* jsonWakuMessage,
@@ -2854,6 +2858,36 @@ func (self *Waku) GetNumConnectedPeers(paramPubsubTopic ...string) (int, error) 
 	return 0, errors.New(errMsg)
 }
 
+func (self *Waku) GetPeerIdsFromPeerStore() (peer.IDSlice, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+	C.cGoWakuGetPeerIdsFromPeerStore(self.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		if peersStr == "" {
+			return peer.IDSlice{}, nil
+		}
+		// peersStr contains a comma-separated list of peer ids
+		itemsPeerIds := strings.Split(peersStr, ",")
+
+		var peers peer.IDSlice
+		for _, peer := range itemsPeerIds {
+			id, err := peermod.Decode(peer)
+			if err != nil {
+				errMsg := "GetPeerIdsFromPeerStore - error decoding peerId: " + err.Error()
+				return nil, errors.New(errMsg)
+			}
+			peers = append(peers, id)
+		}
+
+		return peers, nil
+	}
+	errMsg := "error GetPeerIdsFromPeerStore: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, errors.New(errMsg)
+}
+
 func (self *Waku) GetPeerIdsByProtocol(protocol string) (peer.IDSlice, error) {
 	var resp = C.allocResp()
 	var cProtocol = C.CString(protocol)
@@ -2874,7 +2908,7 @@ func (self *Waku) GetPeerIdsByProtocol(protocol string) (peer.IDSlice, error) {
 		for _, p := range itemsPeerIds {
 			id, err := peer.Decode(p)
 			if err != nil {
-				errMsg := "GetPeerIdsByProtocol - error converting string to int: " + err.Error()
+				errMsg := "GetPeerIdsByProtocol - error decoding peerId: " + err.Error()
 				return nil, errors.New(errMsg)
 			}
 			peers = append(peers, id)
