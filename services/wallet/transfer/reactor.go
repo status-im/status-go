@@ -48,36 +48,34 @@ type HistoryFetcher interface {
 
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
-	db                 *Database
-	blockDAO           *BlockDAO
-	blockRangesSeqDAO  *BlockRangeSequentialDAO
-	accountsDB         *accounts.Database
-	feed               *event.Feed
-	transactionManager *TransactionManager
-	pendingTxManager   *transactions.PendingTxTracker
-	tokenManager       *token.Manager
-	strategy           HistoryFetcher
-	balanceCacher      balance.Cacher
-	omitHistory        bool
-	blockChainState    *blockchainstate.BlockChainState
-	chainIDs           []uint64
+	db                *Database
+	blockDAO          *BlockDAO
+	blockRangesSeqDAO *BlockRangeSequentialDAO
+	accountsDB        *accounts.Database
+	feed              *event.Feed
+	pendingTxManager  *transactions.PendingTxTracker
+	tokenManager      *token.Manager
+	strategy          HistoryFetcher
+	balanceCacher     balance.Cacher
+	omitHistory       bool
+	blockChainState   *blockchainstate.BlockChainState
+	chainIDs          []uint64
 }
 
 func NewReactor(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, accountsDB *accounts.Database, feed *event.Feed, tm *TransactionManager,
 	pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager,
 	balanceCacher balance.Cacher, omitHistory bool, blockChainState *blockchainstate.BlockChainState) *Reactor {
 	return &Reactor{
-		db:                 db,
-		accountsDB:         accountsDB,
-		blockDAO:           blockDAO,
-		blockRangesSeqDAO:  blockRangesSeqDAO,
-		feed:               feed,
-		transactionManager: tm,
-		pendingTxManager:   pendingTxManager,
-		tokenManager:       tokenManager,
-		balanceCacher:      balanceCacher,
-		omitHistory:        omitHistory,
-		blockChainState:    blockChainState,
+		db:                db,
+		accountsDB:        accountsDB,
+		blockDAO:          blockDAO,
+		blockRangesSeqDAO: blockRangesSeqDAO,
+		feed:              feed,
+		pendingTxManager:  pendingTxManager,
+		tokenManager:      tokenManager,
+		balanceCacher:     balanceCacher,
+		omitHistory:       omitHistory,
+		blockChainState:   blockChainState,
 	}
 }
 
@@ -114,7 +112,6 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]chain.ClientInterf
 		r.blockRangesSeqDAO,
 		r.accountsDB,
 		r.feed,
-		r.transactionManager,
 		r.pendingTxManager,
 		r.tokenManager,
 		chainClients,
