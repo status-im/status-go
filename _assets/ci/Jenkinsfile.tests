@@ -17,17 +17,17 @@ pipeline {
     )
     booleanParam(
       name: 'UNIT_TEST_FAILFAST',
-      defaultValue: !isTestNightlyJob(),
+      defaultValue: !isNightlyJob(),
       description: 'Should the job fail fast on first test failure?'
     )
     booleanParam(
       name: 'UNIT_TEST_RERUN_FAILS',
-      defaultValue: !isTestNightlyJob(),
+      defaultValue: !isNightlyJob(),
       description: 'Should the job rerun failed tests?'
     )
     booleanParam(
       name: 'UNIT_TEST_USE_DEVELOPMENT_LOGGER',
-      defaultValue: !isTestNightlyJob(),
+      defaultValue: !isNightlyJob(),
       description: 'Should the job use detailed logging for tests, potentially generating large logs?'
     )
     booleanParam(
@@ -55,9 +55,9 @@ pipeline {
     disableConcurrentBuilds()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
-      numToKeepStr: isTestNightlyJob() ? '14' : '5',
+      numToKeepStr: isNightlyJob() ? '14' : '5',
       daysToKeepStr: '30',
-      artifactNumToKeepStr: isTestNightlyJob() ? '14' : '1',
+      artifactNumToKeepStr: isNightlyJob() ? '14' : '1',
     ))
   }
 
@@ -113,7 +113,7 @@ pipeline {
 
     stage('Migration') {
       when { // https://github.com/status-im/status-go/issues/4993#issuecomment-2022685544
-        expression { !isTestNightlyJob() }
+        expression { !isNightlyJob() }
       }
       steps { script {
         nix.shell('make migration-check', pure: false)
@@ -125,7 +125,7 @@ pipeline {
         BASE_BRANCH = "${env.BASE_BRANCH}"
       }
       when { // https://github.com/status-im/status-go/issues/4993#issuecomment-2022685544
-        expression { !isTestNightlyJob() }
+        expression { !isNightlyJob() }
       }
       steps { script {
         nix.shell('make commit-check', pure: false)
@@ -204,7 +204,7 @@ pipeline {
       script {
         env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
-        if (isTestNightlyJob()) {
+        if (isNightlyJob()) {
           archiveArtifacts('report_*.xml, test_*.log, test-coverage.html, test-coverage.out, coverage/codeclimate.json')
         }
         if (params.UNIT_TEST_RERUN_FAILS) {
@@ -244,8 +244,8 @@ pipeline {
   } // post
 } // pipeline
 
-def isTestNightlyJob() { env.JOB_BASE_NAME == 'tests-nightly' }
+def isNightlyJob() { env.JOB_BASE_NAME == 'tests-nightly' }
 
-def getDefaultUnitTestCount() { isTestNightlyJob() ? '20' : '1' }
+def getDefaultUnitTestCount() { isNightlyJob() ? '20' : '1' }
 
-def getDefaultTimeout() { isTestNightlyJob() ? 5*60 : 50 }
+def getDefaultTimeout() { isNightlyJob() ? 5*60 : 50 }
