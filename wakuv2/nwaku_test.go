@@ -350,6 +350,8 @@ func TestPeerExchange(t *testing.T) {
 	require.NotNil(t, enr)
 
 	ma, err := pxServerNode.ListenAddresses()
+	require.NoError(t, err)
+	require.NotNil(t, ma)
 
 	// start node that will be discovered by PeerExchange
 	discV5NodeConfig := WakuConfig{
@@ -371,8 +373,7 @@ func TestPeerExchange(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	// start light node which use PeerExchange to discover peers
-
+	// start light node which use PeerExchange to discover peers	
 	pxClientConfig := WakuConfig{
 		// Port:        30303,
 		// NodeKey:     "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
@@ -381,14 +382,32 @@ func TestPeerExchange(t *testing.T) {
 		Discv5Discovery: false,
 		ClusterID: 16,
 		Shards: []uint16{64},
-		PeerExchange: false,
+		PeerExchange: true,
 		Discv5UdpPort: 9002,
-		PeerExchangeNode: "", // TODO: fill
+		PeerExchangeNode: ma[0].String(),
 	}
 
 	lightNode, err := New(nil, "", &pxClientConfig, logger.Named("lightNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, lightNode.Start())
+
+	// Sanity check, not great, but it's probably helpful
+	options := func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 30 * time.Second
+	}
+
+	err = tt.RetryWithBackOff(func() error {
+		peers, err := lightNode.GetPeerIdsFromPeerStore()
+		fmt.Println("------------ peers: ", peers)
+		if err != nil {
+			return err
+		}
+		if len(peers) == 2 {
+			return nil
+		}
+		return errors.New("no peers discovered")
+	}, options)
+	require.NoError(t, err)
 
 	require.NoError(t, lightNode.Stop())
 	require.NoError(t, pxServerNode.Stop())
