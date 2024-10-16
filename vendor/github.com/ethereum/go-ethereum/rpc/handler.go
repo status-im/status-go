@@ -347,6 +347,7 @@ func (h *handler) handleCall(cp *callProc, msg *jsonrpcMessage) *jsonrpcMessage 
 		rpcServingTimer.UpdateSince(start)
 		updateServeTimeHistogram(msg.Method, answer.Error == nil, time.Since(start))
 	}
+	log.Info("status-go RPC call:", "request", msg)
 	return answer
 }
 
