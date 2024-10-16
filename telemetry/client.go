@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
 
+	"github.com/status-im/status-go/wakuv2/common"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 
@@ -37,6 +38,7 @@ const (
 	MessageCheckFailureMetric  TelemetryType = "MessageCheckFailure"
 	PeerCountByShardMetric     TelemetryType = "PeerCountByShard"
 	PeerCountByOriginMetric    TelemetryType = "PeerCountByOrigin"
+	DialFailureMetric          TelemetryType = "DialFailure"
 	MaxRetryCache                            = 5000
 )
 
@@ -103,6 +105,14 @@ func (c *Client) PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin ma
 	}
 }
 
+func (c *Client) PushDialFailure(ctx context.Context, dialFailure common.DialError) {
+	var errorMessage string = ""
+	if dialFailure.ErrType == common.ErrorUnknown {
+		errorMessage = dialFailure.ErrMsg
+	}
+	c.processAndPushTelemetry(ctx, DialFailure{ErrorType: dialFailure.ErrType, ErrorMsg: errorMessage, Protocols: dialFailure.Protocols})
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
@@ -134,6 +144,12 @@ type PeerCountByShard struct {
 type PeerCountByOrigin struct {
 	Origin wps.Origin
 	Count  uint
+}
+
+type DialFailure struct {
+	ErrorType common.DialErrorType
+	ErrorMsg  string
+	Protocols string
 }
 
 type Client struct {
@@ -308,6 +324,12 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			TelemetryType: PeerCountByOriginMetric,
 			TelemetryData: c.ProcessPeerCountByOrigin(v),
 		}
+	case DialFailure:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: DialFailureMetric,
+			TelemetryData: c.ProcessDialFailure(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
@@ -462,6 +484,16 @@ func (c *Client) ProcessPeerCountByOrigin(peerCountByOrigin PeerCountByOrigin) *
 	postBody := c.commonPostBody()
 	postBody["origin"] = peerCountByOrigin.Origin
 	postBody["count"] = peerCountByOrigin.Count
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessDialFailure(dialFailure DialFailure) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["errorType"] = dialFailure.ErrorType
+	postBody["errorMsg"] = dialFailure.ErrorMsg
+	postBody["protocols"] = dialFailure.Protocols
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage
