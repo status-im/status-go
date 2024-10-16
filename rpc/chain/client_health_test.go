@@ -17,7 +17,6 @@ import (
 	healthManager "github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 
 	mockEthclient "github.com/status-im/status-go/rpc/chain/ethclient/mock/client/ethclient"
 )
@@ -25,7 +24,7 @@ import (
 type ClientWithFallbackSuite struct {
 	suite.Suite
 	client                 *ClientWithFallback
-	mockEthClients         []*mockEthclient.MockRPSLimitedEthClientInterface
+	mockEthClients         []*mockEthclient.MockEthClientInterface
 	providersHealthManager *healthManager.ProvidersHealthManager
 	mockCtrl               *gomock.Controller
 }
@@ -39,13 +38,12 @@ func (s *ClientWithFallbackSuite) TearDownTest() {
 }
 
 func (s *ClientWithFallbackSuite) setupClients(numClients int) {
-	s.mockEthClients = make([]*mockEthclient.MockRPSLimitedEthClientInterface, 0)
-	ethClients := make([]ethclient.RPSLimitedEthClientInterface, 0)
+	s.mockEthClients = make([]*mockEthclient.MockEthClientInterface, 0)
+	ethClients := make([]ethclient.EthClientInterface, 0)
 
 	for i := 0; i < numClients; i++ {
-		ethClient := mockEthclient.NewMockRPSLimitedEthClientInterface(s.mockCtrl)
+		ethClient := mockEthclient.NewMockEthClientInterface(s.mockCtrl)
 		ethClient.EXPECT().GetName().AnyTimes().Return("test" + strconv.Itoa(i))
-		ethClient.EXPECT().GetLimiter().AnyTimes().Return(nil)
 
 		s.mockEthClients = append(s.mockEthClients, ethClient)
 		ethClients = append(ethClients, ethClient)
@@ -104,7 +102,8 @@ func (s *ClientWithFallbackSuite) TestRPSLimitErrorDoesNotMarkChainDown() {
 	hash := common.HexToHash("0x1234")
 
 	// WHEN
-	s.mockEthClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, rpclimiter.ErrRequestsOverLimit).Times(1)
+	rpsError := errors.New("Request rate exceeded")
+	s.mockEthClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, rpsError).Times(1)
 
 	_, err := s.client.BlockByHash(ctx, hash)
 	require.Error(s.T(), err)
@@ -186,7 +185,7 @@ func (s *ClientWithFallbackSuite) TestAllClientsDifferentErrors() {
 
 	// GIVEN
 	s.mockEthClients[0].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("no such host")).Times(1)
-	s.mockEthClients[1].EXPECT().BlockByHash(ctx, hash).Return(nil, rpclimiter.ErrRequestsOverLimit).Times(1)
+	s.mockEthClients[1].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("request rate exceeded")).Times(1)
 	s.mockEthClients[2].EXPECT().BlockByHash(ctx, hash).Return(nil, vm.ErrOutOfGas).Times(1)
 
 	// WHEN

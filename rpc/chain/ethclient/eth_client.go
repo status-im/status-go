@@ -61,6 +61,8 @@ type EthClientInterface interface {
 	BaseEthClientInterface
 	// Additional external calls
 	RPCClientInterface
+	GetName() string
+	CopyWithName(name string) EthClientInterface
 	GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error)
 	bind.ContractCaller
 	bind.ContractBackend
@@ -69,16 +71,25 @@ type EthClientInterface interface {
 // EthClient implements EthClientInterface
 type EthClient struct {
 	*ethclient.Client
+	name      string
 	rpcClient *rpc.Client
 }
 
-func NewEthClient(rpcClient *rpc.Client) *EthClient {
+func NewEthClient(rpcClient *rpc.Client, name string) *EthClient {
 	return &EthClient{
 		Client:    ethclient.NewClient(rpcClient),
+		name:      name,
 		rpcClient: rpcClient,
 	}
 }
 
+func (c *EthClient) GetName() string {
+	return c.name
+}
+
+func (c *EthClient) CopyWithName(name string) EthClientInterface {
+	return NewEthClient(c.rpcClient, name)
+}
 func (ec *EthClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
 	return ec.rpcClient.BatchCallContext(ctx, b)
 }
