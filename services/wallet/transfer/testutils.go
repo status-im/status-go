@@ -215,11 +215,11 @@ var EthMainnet = token.Token{
 	ChainID: 1,
 }
 
-var EthGoerli = token.Token{
+var EthSepolia = token.Token{
 	Address: eth_common.HexToAddress("0x"),
 	Name:    "Ether",
 	Symbol:  "ETH",
-	ChainID: 5,
+	ChainID: 11155111,
 }
 
 var EthOptimism = token.Token{
@@ -236,11 +236,12 @@ var UsdcMainnet = token.Token{
 	ChainID: 1,
 }
 
-var UsdcGoerli = token.Token{
-	Address: eth_common.HexToAddress("0x98339d8c260052b7ad81c28c16c0b98420f2b46a"),
-	Name:    "USD Coin",
-	Symbol:  "USDC",
-	ChainID: 5,
+var UsdcSepolia = token.Token{
+	Address:  eth_common.HexToAddress("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"),
+	Name:     "USD Coin",
+	Symbol:   "USDC",
+	Decimals: 6,
+	ChainID:  11155111,
 }
 
 var UsdcOptimism = token.Token{
@@ -264,16 +265,17 @@ var DaiMainnet = token.Token{
 	ChainID: 5,
 }
 
-var DaiGoerli = token.Token{
-	Address: eth_common.HexToAddress("0xf2edF1c091f683E3fb452497d9a98A49cBA84666"),
-	Name:    "DAI Stablecoin",
-	Symbol:  "DAI",
-	ChainID: 5,
+var DaiSepolia = token.Token{
+	Address:  eth_common.HexToAddress("0x3e622317f8c93f7328350cf0b56d9ed4c620c5d6"),
+	Name:     "DAI Stablecoin",
+	Symbol:   "DAI",
+	Decimals: 18,
+	ChainID:  11155111,
 }
 
-// TestTokens contains ETH/Mainnet, ETH/Goerli, ETH/Optimism, USDC/Mainnet, USDC/Goerli, USDC/Optimism, SNT/Mainnet, DAI/Mainnet, DAI/Goerli
+// TestTokens contains ETH/Mainnet, ETH/Sepolia, ETH/Optimism, USDC/Mainnet, USDC/Sepolia, USDC/Optimism, SNT/Mainnet, DAI/Mainnet, DAI/Sepolia
 var TestTokens = []*token.Token{
-	&EthMainnet, &EthGoerli, &EthOptimism, &UsdcMainnet, &UsdcGoerli, &UsdcOptimism, &SntMainnet, &DaiMainnet, &DaiGoerli,
+	&EthMainnet, &EthSepolia, &EthOptimism, &UsdcMainnet, &UsdcSepolia, &UsdcOptimism, &SntMainnet, &DaiMainnet, &DaiSepolia,
 }
 
 func LookupTokenIdentity(chainID uint64, address eth_common.Address, native bool) *token.Token {

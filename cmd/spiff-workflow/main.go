@@ -56,10 +56,10 @@ var (
 	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
 	networkID = flag.Int(
 		"network-id",
-		params.GoerliNetworkID,
+		params.SepoliaNetworkID,
 		fmt.Sprintf(
-			"A network ID: %d (Mainnet), %d (Goerli)",
-			params.MainNetworkID, params.GoerliNetworkID,
+			"A network ID: %d (Mainnet), %d (Sepolia)",
+			params.MainNetworkID, params.SepoliaNetworkID,
 		),
 	)
 	listenAddr = flag.String("addr", "", "address to bind listener to")

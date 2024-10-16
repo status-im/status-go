@@ -101,14 +101,14 @@ func setupTestActivityDB(tb testing.TB) (deps FilterDependencies, close func()) 
 }
 
 type testData struct {
-	tr1               transfer.TestTransfer // index 1, ETH/Goerli
+	tr1               transfer.TestTransfer // index 1, ETH/Sepolia
 	pendingTr         transfer.TestTransfer // index 2, ETH/Optimism
 	multiTx1Tr1       transfer.TestTransfer // index 3, USDC/Mainnet
-	multiTx2Tr1       transfer.TestTransfer // index 4, USDC/Goerli
+	multiTx2Tr1       transfer.TestTransfer // index 4, USDC/Sepolia
 	multiTx1Tr2       transfer.TestTransfer // index 5, USDC/Optimism
 	multiTx2Tr2       transfer.TestTransfer // index 6, SNT/Mainnet
 	multiTx2PendingTr transfer.TestTransfer // index 7, DAI/Mainnet
-	multiTx3Tr1       transfer.TestTransfer // index 8, DAI/Goerli
+	multiTx3Tr1       transfer.TestTransfer // index 8, DAI/Sepolia
 
 	multiTx1   transfer.MultiTransaction
 	multiTx1ID common.MultiTransactionIDType
@@ -125,7 +125,7 @@ type testData struct {
 // Generates and adds to the DB 8 transfers and 3 multitransactions.
 // There are only 5 extractable activity entries (transactions + multi-transactions) with timestamps 1-5. The others are associated with a multi-transaction
 func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddresses []eth.Address) {
-	// Generates ETH/Goerli, ETH/Optimism, USDC/Mainnet, USDC/Goerli, USDC/Optimism, SNT/Mainnet, DAI/Mainnet, DAI/Goerli
+	// Generates ETH/Sepolia, ETH/Optimism, USDC/Mainnet, USDC/Sepolia, USDC/Optimism, SNT/Mainnet, DAI/Mainnet, DAI/Sepolia
 	trs, fromAddresses, toAddresses := transfer.GenerateTestTransfers(t, db, 1, 8)
 
 	// Plain transfer
@@ -1016,9 +1016,9 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 	deps, close := setupTestActivityDB(t)
 	defer close()
 
-	// Adds 4 extractable transactions 2 transactions (ETH/Goerli, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
+	// Adds 4 extractable transactions 2 transactions (ETH/Sepolia, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
 	td, fromTds, toTds := fillTestData(t, deps.db)
-	// Add 9 transactions DAI/Goerli, ETH/Mainnet, ETH/Goerli, ETH/Optimism, USDC/Mainnet, USDC/Goerli, USDC/Optimism, SNT/Mainnet, DAI/Mainnet
+	// Add 9 transactions DAI/Sepolia, ETH/Mainnet, ETH/Sepolia, ETH/Optimism, USDC/Mainnet, USDC/Sepolia, USDC/Optimism, SNT/Mainnet, DAI/Mainnet
 	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 9)
 	for i := range trs {
 		tokenAddr := transfer.TestTokens[i].Address
@@ -1061,7 +1061,7 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 	}}
 	entries, err = getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
-	// Three MT for which ChainID is ignored and one transfer on the main net and the Goerli is ignored
+	// Three MT for which ChainID is ignored and one transfer on the main net and the Sepolia is ignored
 	require.Equal(t, 4, len(entries))
 	require.Equal(t, Erc20, entries[0].tokenIn.TokenType)
 	require.Equal(t, transfer.UsdcMainnet.Address, entries[0].tokenIn.Address)
@@ -1084,15 +1084,15 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 		Address:   transfer.UsdcMainnet.Address,
 	}, {
 		TokenType: Erc20,
-		ChainID:   common.ChainID(transfer.UsdcGoerli.ChainID),
-		Address:   transfer.UsdcGoerli.Address,
+		ChainID:   common.ChainID(transfer.UsdcSepolia.ChainID),
+		Address:   transfer.UsdcSepolia.Address,
 	}}
 	entries, err = getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
-	// Three MT for which ChainID is ignored and two transfers on the main net and Goerli
+	// Three MT for which ChainID is ignored and two transfers on the main net and Sepolia
 	require.Equal(t, 5, len(entries))
 	require.Equal(t, Erc20, entries[0].tokenIn.TokenType)
-	require.Equal(t, transfer.UsdcGoerli.Address, entries[0].tokenIn.Address)
+	require.Equal(t, transfer.UsdcSepolia.Address, entries[0].tokenIn.Address)
 	require.Nil(t, entries[0].tokenOut)
 }
 
@@ -1100,7 +1100,7 @@ func TestGetActivityEntriesFilterByCollectibles(t *testing.T) {
 	deps, close := setupTestActivityDB(t)
 	defer close()
 
-	// Adds 4 extractable transactions 2 transactions (ETH/Goerli, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
+	// Adds 4 extractable transactions 2 transactions (ETH/Sepolia, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
 	td, fromTds, toTds := fillTestData(t, deps.db)
 	// Add 4 transactions with collectibles
 	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 4)
@@ -1400,7 +1400,7 @@ func TestGetTxDetails(t *testing.T) {
 	deps, close := setupTestActivityDB(t)
 	defer close()
 
-	// Adds 4 extractable transactions 2 transactions (ETH/Goerli, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
+	// Adds 4 extractable transactions 2 transactions (ETH/Sepolia, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
 	td, _, _ := fillTestData(t, deps.db)
 
 	_, err := getTxDetails(context.Background(), deps.db, "")
@@ -1423,7 +1423,7 @@ func TestGetMultiTxDetails(t *testing.T) {
 	deps, close := setupTestActivityDB(t)
 	defer close()
 
-	// Adds 4 extractable transactions 2 transactions (ETH/Goerli, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
+	// Adds 4 extractable transactions 2 transactions (ETH/Sepolia, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
 	td, _, _ := fillTestData(t, deps.db)
 
 	_, err := getMultiTxDetails(context.Background(), deps.db, 0)

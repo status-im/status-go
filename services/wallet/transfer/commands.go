@@ -48,9 +48,6 @@ var (
 	// This will work only for binance testnet as mainnet doesn't support
 	// archival request.
 	binanceChainErc20BatchSize    = big.NewInt(5000)
-	goerliErc20BatchSize          = big.NewInt(100000)
-	goerliErc20ArbitrumBatchSize  = big.NewInt(10000)
-	goerliErc20OptimismBatchSize  = big.NewInt(10000)
 	sepoliaErc20BatchSize         = big.NewInt(100000)
 	sepoliaErc20ArbitrumBatchSize = big.NewInt(10000)
 	sepoliaErc20OptimismBatchSize = big.NewInt(10000)
@@ -139,12 +136,6 @@ func getErc20BatchSize(chainID uint64) *big.Int {
 		return sepoliaErc20OptimismBatchSize
 	case w_common.ArbitrumSepolia:
 		return sepoliaErc20ArbitrumBatchSize
-	case w_common.EthereumGoerli:
-		return goerliErc20BatchSize
-	case w_common.OptimismGoerli:
-		return goerliErc20OptimismBatchSize
-	case w_common.ArbitrumGoerli:
-		return goerliErc20ArbitrumBatchSize
 	case w_common.BinanceChainID:
 		return binanceChainErc20BatchSize
 	case w_common.BinanceTestChainID:

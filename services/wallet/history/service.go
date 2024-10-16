@@ -446,7 +446,7 @@ func (s *Service) addEntriesToDB(ctx context.Context, client chain.ClientInterfa
 			if token == nil {
 				log.Warn("Token not found", "chainID", network.ChainID, "address", address.String(), "tokenAddress", entry.tokenAddress.String())
 				// TODO Add "supported=false" flag to such tokens to avoid checking them again and again
-				continue // Skip token that we don't have symbol for. For example we don't have tokens in store for goerli optimism
+				continue // Skip token that we don't have symbol for. For example we don't have tokens in store for sepolia optimism
 			} else {
 				entry.tokenSymbol = token.Symbol
 			}
