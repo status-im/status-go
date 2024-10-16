@@ -62,9 +62,7 @@ func determineRpcErrorType(err error) RpcProviderErrorType {
 	if err == nil {
 		return RpcErrorTypeNone
 	}
-	//if IsRpsLimitError(err) {
-	//	return RpcErrorTypeRPSLimit
-	//}
+
 	if IsMethodNotFoundError(err) || IsNotFoundError(err) {
 		return RpcErrorTypeMethodNotFound
 	}

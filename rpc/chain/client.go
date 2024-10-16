@@ -5,7 +5,6 @@ package chain
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 	"sync/atomic"
@@ -67,7 +66,7 @@ func ClientWithTag(chainClient ClientInterface, tag, groupTag string) ClientInte
 type ClientWithFallback struct {
 	ChainID                uint64
 	ethClients             []ethclient.RPSLimitedEthClientInterface
-	commonLimiter          rpclimiter.RequestLimiter
+	commonLimiter          rpclimiter.RequestLimiter // FIXME: remove from RPC client https://github.com/status-im/status-go/issues/5942
 	circuitbreaker         *circuitbreaker.CircuitBreaker
 	providersHealthManager *healthmanager.ProvidersHealthManager
 
@@ -160,12 +159,6 @@ func isVMError(err error) bool {
 	return false
 }
 
-func isRPSLimitError(err error) bool {
-	return strings.Contains(err.Error(), "backoff_seconds") ||
-		strings.Contains(err.Error(), "has exceeded its throughput limit") ||
-		strings.Contains(err.Error(), "request rate exceeded")
-}
-
 func (c *ClientWithFallback) SetIsConnected(value bool) {
 	c.LastCheckedAt = time.Now().Unix()
 	if !value {
@@ -191,46 +184,14 @@ func (c *ClientWithFallback) IsConnected() bool {
 }
 
 func (c *ClientWithFallback) makeCall(ctx context.Context, ethClients []ethclient.RPSLimitedEthClientInterface, f func(client ethclient.RPSLimitedEthClientInterface) (interface{}, error)) (interface{}, error) {
-	if c.commonLimiter != nil {
-		if allow, err := c.commonLimiter.Allow(c.tag); !allow {
-			return nil, fmt.Errorf("tag=%s, %w", c.tag, err)
-		}
-
-		if allow, err := c.commonLimiter.Allow(c.groupTag); !allow {
-			return nil, fmt.Errorf("groupTag=%s, %w", c.groupTag, err)
-		}
-	}
-
 	c.LastCheckedAt = time.Now().Unix()
 
 	cmd := circuitbreaker.NewCommand(ctx, nil)
 	for _, provider := range ethClients {
 		provider := provider
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
-			limiter := provider.GetLimiter()
-			if limiter != nil {
-				err := provider.GetLimiter().WaitForRequestsAvailability(1)
-				if err != nil {
-					return nil, err
-				}
-			}
-
 			res, err := f(provider)
 			if err != nil {
-				if limiter != nil && isRPSLimitError(err) {
-					provider.GetLimiter().ReduceLimit()
-
-					err = provider.GetLimiter().WaitForRequestsAvailability(1)
-					if err != nil {
-						return nil, err
-					}
-
-					res, err = f(provider)
-					if err == nil {
-						return []interface{}{res}, err
-					}
-				}
-
 				if isVMError(err) || errors.Is(err, context.Canceled) {
 					cmd.Cancel()
 				}
