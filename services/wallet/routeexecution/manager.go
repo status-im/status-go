@@ -2,11 +2,16 @@ package routeexecution
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 
 	status_common "github.com/status-im/status-go/common"
 	statusErrors "github.com/status-im/status-go/errors"
@@ -23,14 +28,24 @@ type Manager struct {
 	router             *router.Router
 	transactionManager *transfer.TransactionManager
 	transferController *transfer.Controller
+	db                 *DB
+
+	// Local data used for storage purposes
+	buildInputParams *requests.RouterBuildTransactionsParams
 }
 
-func NewManager(router *router.Router, transactionManager *transfer.TransactionManager, transferController *transfer.Controller) *Manager {
+func NewManager(walletDB *sql.DB, router *router.Router, transactionManager *transfer.TransactionManager, transferController *transfer.Controller) *Manager {
 	return &Manager{
 		router:             router,
 		transactionManager: transactionManager,
 		transferController: transferController,
+		db:                 NewDB(walletDB),
 	}
+}
+
+func (m *Manager) clearLocalRouteData() {
+	m.buildInputParams = nil
+	m.transactionManager.ClearLocalRouterTransactionsData()
 }
 
 func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputParams *requests.RouterBuildTransactionsParams) {
@@ -48,7 +63,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 
 		defer func() {
 			if err != nil {
-				m.transactionManager.ClearLocalRouterTransactionsData()
+				m.clearLocalRouteData()
 				err = statusErrors.CreateErrorResponseFromError(err)
 				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
 			}
@@ -61,6 +76,8 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 			err = ErrCannotResolveRouteId
 			return
 		}
+
+		m.buildInputParams = buildInputParams
 
 		updateFields(response.SendDetails, routeInputParams)
 
@@ -108,7 +125,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			}
 
 			if clearLocalData {
-				m.transactionManager.ClearLocalRouterTransactionsData()
+				m.clearLocalRouteData()
 			}
 
 			if err != nil {
@@ -163,6 +180,20 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 		//////////////////////////////////////////////////////////////////////////////
 
 		response.SentTransactions, err = m.transactionManager.SendRouterTransactions(ctx, multiTx)
+		if err != nil {
+			log.Error("Error sending router transactions", "error", err)
+			// TODO #16556: Handle partially successful Tx sends?
+			// Don't return, store whichever transactions were successfully sent
+		}
+
+		// don't overwrite err since we want to process it in the deferred function
+		var tmpErr error
+		routerTransactions := m.transactionManager.GetRouterTransactions()
+		routeData := NewRouteData(&routeInputParams, m.buildInputParams, routerTransactions)
+		tmpErr = m.db.PutRouteData(routeData)
+		if tmpErr != nil {
+			log.Error("Error storing route data", "error", tmpErr)
+		}
 
 		var (
 			chainIDs  []uint64
@@ -173,13 +204,17 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			addresses = append(addresses, common.Address(tx.FromAddress))
 			go func(chainId uint64, txHash common.Hash) {
 				defer status_common.LogOnPanic()
-				err = m.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
-				if err != nil {
+				tmpErr = m.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
+				if tmpErr != nil {
+					logutils.ZapLogger().Error("Error watching transaction", zap.Error(tmpErr))
 					return
 				}
 			}(tx.FromChain, common.Hash(tx.Hash))
 		}
-		err = m.transferController.CheckRecentHistory(chainIDs, addresses)
+		tmpErr = m.transferController.CheckRecentHistory(chainIDs, addresses)
+		if tmpErr != nil {
+			logutils.ZapLogger().Error("Error checking recent history", zap.Error(tmpErr))
+		}
 	}()
 }
 

@@ -75,8 +75,9 @@ type StatusChangedPayload struct {
 
 // PendingTxTracker implements StatusService in common/status_node_service.go
 type PendingTxTracker struct {
-	db        *sql.DB
-	rpcClient rpc.ClientInterface
+	db          *sql.DB
+	trackedTxDB *DB
+	rpcClient   rpc.ClientInterface
 
 	rpcFilter *rpcfilters.Service
 	eventFeed *event.Feed
@@ -87,11 +88,12 @@ type PendingTxTracker struct {
 
 func NewPendingTxTracker(db *sql.DB, rpcClient rpc.ClientInterface, rpcFilter *rpcfilters.Service, eventFeed *event.Feed, checkInterval time.Duration) *PendingTxTracker {
 	tm := &PendingTxTracker{
-		db:        db,
-		rpcClient: rpcClient,
-		eventFeed: eventFeed,
-		rpcFilter: rpcFilter,
-		logger:    logutils.ZapLogger().Named("PendingTxTracker"),
+		db:          db,
+		trackedTxDB: NewDB(db),
+		rpcClient:   rpcClient,
+		eventFeed:   eventFeed,
+		rpcFilter:   rpcFilter,
+		logger:      logutils.ZapLogger().Named("PendingTxTracker"),
 	}
 	tm.taskRunner = NewConditionalRepeater(checkInterval, func(ctx context.Context) bool {
 		return tm.fetchAndUpdateDB(ctx)
@@ -238,6 +240,20 @@ func fetchBatchTxStatus(ctx context.Context, rpcClient rpc.ClientInterface, chai
 
 // updateDBStatus returns entries that were updated only
 func (tm *PendingTxTracker) updateDBStatus(ctx context.Context, chainID common.ChainID, statuses []txStatusRes) ([]txStatusRes, error) {
+	for _, br := range statuses {
+		err := tm.trackedTxDB.UpdateTxStatus(
+			TxIdentity{
+				ChainID: chainID,
+				Hash:    br.hash,
+			},
+			br.Status,
+		)
+		if err != nil {
+			tm.logger.Error("Failed to update trackedTx status", zap.Stringer("hash", br.hash), zap.Error(err))
+			continue
+		}
+	}
+
 	res := make([]txStatusRes, 0, len(statuses))
 	tx, err := tm.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -557,6 +573,18 @@ func (tm *PendingTxTracker) StoreAndTrackPendingTx(transaction *PendingTransacti
 }
 
 func (tm *PendingTxTracker) addPending(transaction *PendingTransaction) error {
+	err := tm.trackedTxDB.PutTx(TrackedTx{
+		ID: TxIdentity{
+			ChainID: transaction.ChainID,
+			Hash:    transaction.Hash,
+		},
+		Status:    Pending,
+		Timestamp: transaction.Timestamp,
+	})
+	if err != nil {
+		return err
+	}
+
 	var notifyFn func()
 	tx, err := tm.db.Begin()
 	if err != nil {
@@ -637,6 +665,7 @@ func (tm *PendingTxTracker) addPending(transaction *PendingTransaction) error {
 		transaction.AutoDelete,
 		transaction.Nonce,
 	)
+
 	// Notify listeners of new pending transaction (used in activity history)
 	if err == nil {
 		tm.notifyPendingTransactionListeners(PendingTxUpdatePayload{

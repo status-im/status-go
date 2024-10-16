@@ -34,8 +34,8 @@ func (tm *TransactionManager) ClearLocalRouterTransactionsData() {
 
 func (tm *TransactionManager) ApprovalRequiredForPath(pathProcessorName string) bool {
 	for _, desc := range tm.routerTransactions {
-		if desc.routerPath.ProcessorName == pathProcessorName &&
-			desc.routerPath.ApprovalRequired {
+		if desc.RouterPath.ProcessorName == pathProcessorName &&
+			desc.RouterPath.ApprovalRequired {
 			return true
 		}
 	}
@@ -44,8 +44,7 @@ func (tm *TransactionManager) ApprovalRequiredForPath(pathProcessorName string) 
 
 func (tm *TransactionManager) ApprovalPlacedForPath(pathProcessorName string) bool {
 	for _, desc := range tm.routerTransactions {
-		if desc.routerPath.ProcessorName == pathProcessorName &&
-			desc.approvalTxSentHash != (types.Hash{}) {
+		if desc.RouterPath.ProcessorName == pathProcessorName && desc.IsApprovalPlaced() {
 			return true
 		}
 	}
@@ -54,8 +53,7 @@ func (tm *TransactionManager) ApprovalPlacedForPath(pathProcessorName string) bo
 
 func (tm *TransactionManager) TxPlacedForPath(pathProcessorName string) bool {
 	for _, desc := range tm.routerTransactions {
-		if desc.routerPath.ProcessorName == pathProcessorName &&
-			desc.txSentHash != (types.Hash{}) {
+		if desc.RouterPath.ProcessorName == pathProcessorName && desc.IsTxPlaced() {
 			return true
 		}
 	}
@@ -103,10 +101,10 @@ func (tm *TransactionManager) buildApprovalTxForPath(path *routes.Path, addressF
 	usedNonces[path.FromChain.ChainID] = int64(usedNonce)
 
 	tm.routerTransactions = append(tm.routerTransactions, &RouterTransactionDetails{
-		routerPath:         path,
-		approvalTxArgs:     approavalSendArgs,
-		approvalTx:         builtApprovalTx,
-		approvalHashToSign: types.Hash(approvalTxHash),
+		RouterPath:         path,
+		ApprovalTxArgs:     approavalSendArgs,
+		ApprovalTx:         builtApprovalTx,
+		ApprovalHashToSign: types.Hash(approvalTxHash),
 	})
 
 	return types.Hash(approvalTxHash), nil
@@ -193,10 +191,10 @@ func (tm *TransactionManager) buildTxForPath(path *routes.Path, pathProcessors m
 	usedNonces[path.FromChain.ChainID] = int64(usedNonce)
 
 	tm.routerTransactions = append(tm.routerTransactions, &RouterTransactionDetails{
-		routerPath:   path,
-		txArgs:       sendArgs,
-		tx:           builtTx,
-		txHashToSign: types.Hash(txHash),
+		RouterPath:   path,
+		TxArgs:       sendArgs,
+		Tx:           builtTx,
+		TxHashToSign: types.Hash(txHash),
 	})
 
 	return types.Hash(txHash), nil
@@ -291,20 +289,20 @@ func (tm *TransactionManager) ValidateAndAddSignaturesToRouterTransactions(signa
 
 	// check if all transactions have been signed
 	for _, desc := range tm.routerTransactions {
-		if desc.approvalTx != nil && desc.approvalTxSentHash == (types.Hash{}) {
-			sig, err := getSignatureForTxHash(desc.approvalHashToSign.String(), signatures)
+		if desc.ApprovalTx != nil && desc.ApprovalTxSentHash == (types.Hash{}) {
+			sig, err := getSignatureForTxHash(desc.ApprovalHashToSign.String(), signatures)
 			if err != nil {
 				return err
 			}
-			desc.approvalSignature = sig
+			desc.ApprovalSignature = sig
 		}
 
-		if desc.tx != nil && desc.txSentHash == (types.Hash{}) {
-			sig, err := getSignatureForTxHash(desc.txHashToSign.String(), signatures)
+		if desc.Tx != nil && desc.TxSentHash == (types.Hash{}) {
+			sig, err := getSignatureForTxHash(desc.TxHashToSign.String(), signatures)
 			if err != nil {
 				return err
 			}
-			desc.txSignature = sig
+			desc.TxSignature = sig
 		}
 	}
 
@@ -316,41 +314,45 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiT
 
 	// send transactions
 	for _, desc := range tm.routerTransactions {
-		if desc.approvalTx != nil && desc.approvalTxSentHash == (types.Hash{}) {
+		if desc.ApprovalTx != nil && !desc.IsApprovalPlaced() {
 			var approvalTxWithSignature *ethTypes.Transaction
-			approvalTxWithSignature, err = tm.transactor.AddSignatureToTransaction(desc.approvalTxArgs.FromChainID, desc.approvalTx, desc.approvalSignature)
+			approvalTxWithSignature, err = tm.transactor.AddSignatureToTransaction(desc.ApprovalTxArgs.FromChainID, desc.ApprovalTx, desc.ApprovalSignature)
 			if err != nil {
-				return nil, err
+				return
 			}
 
-			desc.approvalTxSentHash, err = tm.transactor.SendTransactionWithSignature(common.Address(desc.approvalTxArgs.From), desc.approvalTxArgs.FromTokenID, multiTx.ID, approvalTxWithSignature)
+			desc.ApprovalTxSentHash, err = tm.transactor.SendTransactionWithSignature(common.Address(desc.ApprovalTxArgs.From), desc.ApprovalTxArgs.FromTokenID, multiTx.ID, approvalTxWithSignature)
 			if err != nil {
-				return nil, err
+				return
 			}
 
-			transactions = append(transactions, responses.NewRouterSentTransaction(desc.approvalTxArgs, desc.approvalTxSentHash, true))
+			transactions = append(transactions, responses.NewRouterSentTransaction(desc.ApprovalTxArgs, desc.ApprovalTxSentHash, true))
 
 			// if approval is needed for swap, then we need to wait for the approval tx to be mined before sending the swap tx
-			if desc.routerPath.ProcessorName == pathprocessor.ProcessorSwapParaswapName {
+			if desc.RouterPath.ProcessorName == pathprocessor.ProcessorSwapParaswapName {
 				continue
 			}
 		}
 
-		if desc.tx != nil && desc.txSentHash == (types.Hash{}) {
+		if desc.Tx != nil && !desc.IsTxPlaced() {
 			var txWithSignature *ethTypes.Transaction
-			txWithSignature, err = tm.transactor.AddSignatureToTransaction(desc.txArgs.FromChainID, desc.tx, desc.txSignature)
+			txWithSignature, err = tm.transactor.AddSignatureToTransaction(desc.TxArgs.FromChainID, desc.Tx, desc.TxSignature)
 			if err != nil {
-				return nil, err
+				return
 			}
 
-			desc.txSentHash, err = tm.transactor.SendTransactionWithSignature(common.Address(desc.txArgs.From), desc.txArgs.FromTokenID, multiTx.ID, txWithSignature)
+			desc.TxSentHash, err = tm.transactor.SendTransactionWithSignature(common.Address(desc.TxArgs.From), desc.TxArgs.FromTokenID, multiTx.ID, txWithSignature)
 			if err != nil {
-				return nil, err
+				return
 			}
 
-			transactions = append(transactions, responses.NewRouterSentTransaction(desc.txArgs, desc.txSentHash, false))
+			transactions = append(transactions, responses.NewRouterSentTransaction(desc.TxArgs, desc.TxSentHash, false))
 		}
 	}
 
 	return
+}
+
+func (tm *TransactionManager) GetRouterTransactions() []*RouterTransactionDetails {
+	return tm.routerTransactions
 }
