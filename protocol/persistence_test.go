@@ -322,15 +322,15 @@ func TestLatestMessageByChatID(t *testing.T) {
 	require.Equal(t, m[0].ID, ids[9])
 }
 
-func TestOldestMessageWhisperTimestampByChatID(t *testing.T) {
+func TestOldestMessageWhisperTimestampByChatIDs(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := newSQLitePersistence(db)
 	chatID := testPublicChatID
 
-	_, hasMessage, err := p.OldestMessageWhisperTimestampByChatID(chatID)
+	timestamps, err := p.OldestMessageWhisperTimestampByChatIDs([]string{chatID})
 	require.NoError(t, err)
-	require.False(t, hasMessage)
+	require.Equal(t, 0, len(timestamps))
 
 	var messages []*common.Message
 	for i := 0; i < 10; i++ {
@@ -348,10 +348,10 @@ func TestOldestMessageWhisperTimestampByChatID(t *testing.T) {
 	err = p.SaveMessages(messages)
 	require.NoError(t, err)
 
-	timestamp, hasMessage, err := p.OldestMessageWhisperTimestampByChatID(chatID)
+	timestamps, err = p.OldestMessageWhisperTimestampByChatIDs([]string{chatID})
 	require.NoError(t, err)
-	require.True(t, hasMessage)
-	require.Equal(t, uint64(10), timestamp)
+	require.Equal(t, 1, len(timestamps))
+	require.Equal(t, uint64(10), timestamps[chatID])
 }
 
 func TestPinMessageByChatID(t *testing.T) {

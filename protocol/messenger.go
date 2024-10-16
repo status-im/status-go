@@ -1859,17 +1859,18 @@ func (m *Messenger) InitFilters() error {
 	}
 
 	communityInfo := make(map[string]*communities.Community)
+	var validChats []*Chat
 	for _, chat := range chats {
 		if err := chat.Validate(); err != nil {
 			logger.Warn("failed to validate chat", zap.Error(err))
 			continue
 		}
+		validChats = append(validChats, chat)
+	}
 
-		if err = m.initChatFirstMessageTimestamp(chat); err != nil {
-			logger.Warn("failed to init first message timestamp", zap.Error(err))
-			continue
-		}
+	m.initChatsFirstMessageTimestamp(communityInfo, validChats)
 
+	for _, chat := range validChats {
 		if !chat.Active || chat.Timeline() {
 			m.allChats.Store(chat.ID, chat)
 			continue
@@ -2043,24 +2044,84 @@ func (m *Messenger) Mailservers() ([]string, error) {
 	return nil, ErrNotImplemented
 }
 
-func (m *Messenger) initChatFirstMessageTimestamp(chat *Chat) error {
-	if !chat.CommunityChat() || chat.FirstMessageTimestamp != FirstMessageTimestampUndefined {
+func (m *Messenger) initChatsFirstMessageTimestamp(communityCache map[string]*communities.Community, chats []*Chat) {
+	communityChats, communityChatIDs := m.filterCommunityChats(chats)
+	if len(communityChatIDs) == 0 {
+		return
+	}
+
+	oldestMessageTimestamps, err := m.persistence.OldestMessageWhisperTimestampByChatIDs(communityChatIDs)
+	if err != nil {
+		m.logger.Warn("failed to get oldest message timestamps", zap.Error(err))
+		return
+	}
+
+	changedCommunities := m.processCommunityChats(communityChats, communityCache, oldestMessageTimestamps)
+	m.saveAndPublishCommunities(changedCommunities)
+}
+
+func (m *Messenger) filterCommunityChats(chats []*Chat) ([]*Chat, []string) {
+	var communityChats []*Chat
+	var communityChatIDs []string
+	for _, chat := range chats {
+		if chat.CommunityChat() && chat.FirstMessageTimestamp == FirstMessageTimestampUndefined {
+			communityChats = append(communityChats, chat)
+			communityChatIDs = append(communityChatIDs, chat.ID)
+		}
+	}
+	return communityChats, communityChatIDs
+}
+
+func (m *Messenger) processCommunityChats(communityChats []*Chat, communityCache map[string]*communities.Community, oldestMessageTimestamps map[string]uint64) []*communities.Community {
+	var changedCommunities []*communities.Community
+	for _, chat := range communityChats {
+		community := m.getCommunity(chat.CommunityID, communityCache)
+		if community == nil {
+			continue
+		}
+
+		oldestMessageTimestamp, ok := oldestMessageTimestamps[chat.ID]
+		timestamp := uint32(FirstMessageTimestampNoMessage)
+		if ok {
+			if oldestMessageTimestamp == FirstMessageTimestampUndefined {
+				continue
+			}
+			timestamp = whisperToUnixTimestamp(oldestMessageTimestamp)
+		}
+
+		changes, err := m.updateChatFirstMessageTimestampForCommunity(chat, timestamp, community)
+		if err != nil {
+			m.logger.Warn("failed to init first message timestamp", zap.Error(err), zap.String("chatID", chat.ID))
+			continue
+		}
+		if changes != nil {
+			changedCommunities = append(changedCommunities, community)
+		}
+	}
+	return changedCommunities
+}
+
+func (m *Messenger) getCommunity(communityID string, communityCache map[string]*communities.Community) *communities.Community {
+	community, ok := communityCache[communityID]
+	if ok {
+		return community
+	}
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		m.logger.Warn("failed to get community", zap.Error(err), zap.String("communityID", communityID))
 		return nil
 	}
+	communityCache[communityID] = community
+	return community
+}
 
-	oldestMessageTimestamp, hasAnyMessage, err := m.persistence.OldestMessageWhisperTimestampByChatID(chat.ID)
-	if err != nil {
-		return err
-	}
-
-	if hasAnyMessage {
-		if oldestMessageTimestamp == FirstMessageTimestampUndefined {
-			return nil
+func (m *Messenger) saveAndPublishCommunities(communities []*communities.Community) {
+	for _, community := range communities {
+		err := m.communitiesManager.SaveAndPublish(community)
+		if err != nil {
+			m.logger.Warn("failed to save and publish community", zap.Error(err), zap.String("communityID", community.IDString()))
 		}
-		return m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(oldestMessageTimestamp), &MessengerResponse{})
 	}
-
-	return m.updateChatFirstMessageTimestamp(chat, FirstMessageTimestampNoMessage, &MessengerResponse{})
 }
 
 func (m *Messenger) addMessagesAndChat(chat *Chat, messages []*common.Message, response *MessengerResponse) (*MessengerResponse, error) {
@@ -2555,6 +2616,13 @@ func (m *Messenger) updateChatFirstMessageTimestamp(chat *Chat, timestamp uint32
 	}
 
 	return nil
+}
+
+func (m *Messenger) updateChatFirstMessageTimestampForCommunity(chat *Chat, timestamp uint32, community *communities.Community) (*communities.CommunityChanges, error) {
+	if community.IsControlNode() && chat.UpdateFirstMessageTimestamp(timestamp) {
+		return m.communitiesManager.UpdateChatFirstMessageTimestamp(community, chat.ID, chat.FirstMessageTimestamp)
+	}
+	return nil, nil
 }
 
 func (m *Messenger) ShareImageMessage(request *requests.ShareImageMessage) (*MessengerResponse, error) {
