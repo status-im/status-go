@@ -198,7 +198,7 @@ func NewService(
 		router.AddPathProcessor(processor)
 	}
 
-	routeExecutionManager := routeexecution.NewManager(router, transactionManager, transferController)
+	routeExecutionManager := routeexecution.NewManager(db, router, transactionManager, transferController)
 
 	return &Service{
 		db:                    db,
