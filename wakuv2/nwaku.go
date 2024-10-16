@@ -208,6 +208,10 @@ package wakuv2
 		WAKU_CALL (waku_get_my_enr(ctx, (WakuCallBack) callback, resp) );
 	}
 
+	static void cGoWakuGetMyPeerId(void* ctx, void* resp) {
+		WAKU_CALL (waku_get_my_peerid(ctx, (WakuCallBack) callback, resp) );
+	}
+
 	static void cGoWakuListPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
 		WAKU_CALL (waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
@@ -2195,10 +2199,24 @@ func (w *Waku) Clean() error {
 	return nil
 }
 
-// TODO-nwaku
-func (w *Waku) PeerID() peer.ID {
-	// return w.node.Host().ID()
-	return ""
+func (w *Waku) PeerID() (peer.ID, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+	C.cGoWakuGetMyPeerId(w.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		
+		peerIdStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))		
+		id, err := peermod.Decode(peerIdStr)
+		if err != nil {
+			errMsg := "WakuGetMyPeerId - error decoding peerId: " + err.Error()
+			return "", errors.New(errMsg)
+		}
+		return id, nil
+	}
+	errMsg := "error WakuGetMyPeerId: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return "", errors.New(errMsg)
 }
 
 // validatePrivateKey checks the format of the given private key.
