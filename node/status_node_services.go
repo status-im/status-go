@@ -594,7 +594,6 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB,
 		b.walletSrvc = wallet.NewService(
 			b.walletDB, accountsDB, appDB, b.rpcClient, accountsFeed, settingsFeed, b.gethAccountManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()),
-			b.stickersService(accountsDB),
 			b.pendingTracker,
 			walletFeed,
 			b.httpServer,
