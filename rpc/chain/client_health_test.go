@@ -24,7 +24,7 @@ import (
 type ClientWithFallbackSuite struct {
 	suite.Suite
 	client                 *ClientWithFallback
-	mockEthClients         []*mockEthclient.MockRPSLimitedEthClientInterface
+	mockEthClients         []*mockEthclient.MockEthClientInterface
 	providersHealthManager *healthManager.ProvidersHealthManager
 	mockCtrl               *gomock.Controller
 }
@@ -38,11 +38,11 @@ func (s *ClientWithFallbackSuite) TearDownTest() {
 }
 
 func (s *ClientWithFallbackSuite) setupClients(numClients int) {
-	s.mockEthClients = make([]*mockEthclient.MockRPSLimitedEthClientInterface, 0)
-	ethClients := make([]ethclient.RPSLimitedEthClientInterface, 0)
+	s.mockEthClients = make([]*mockEthclient.MockEthClientInterface, 0)
+	ethClients := make([]ethclient.EthClientInterface, 0)
 
 	for i := 0; i < numClients; i++ {
-		ethClient := mockEthclient.NewMockRPSLimitedEthClientInterface(s.mockCtrl)
+		ethClient := mockEthclient.NewMockEthClientInterface(s.mockCtrl)
 		ethClient.EXPECT().GetName().AnyTimes().Return("test" + strconv.Itoa(i))
 
 		s.mockEthClients = append(s.mockEthClients, ethClient)

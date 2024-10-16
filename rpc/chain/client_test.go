@@ -21,7 +21,7 @@ func setupClientTest(t *testing.T) (*ClientWithFallback, []*mock_ethclient.MockR
 	mockCtrl := gomock.NewController(t)
 
 	mockEthClients := make([]*mock_ethclient.MockRPSLimitedEthClientInterface, 0)
-	ethClients := make([]ethclient.RPSLimitedEthClientInterface, 0)
+	ethClients := make([]ethclient.EthClientInterface, 0)
 
 	for i := 0; i < 3; i++ {
 		ethCl := mock_ethclient.NewMockRPSLimitedEthClientInterface(mockCtrl)

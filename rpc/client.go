@@ -277,7 +277,7 @@ func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, err
 	return client, nil
 }
 
-func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEthClientInterface {
+func (c *Client) getEthClients(network *params.Network) []ethclient.EthClientInterface {
 	urls := make(map[string]string)
 	keys := make([]string, 0)
 	authMap := make(map[string]string)
@@ -304,7 +304,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 	urls["main"] = network.RPCURL
 	urls["fallback"] = network.FallbackURL
 
-	ethClients := make([]ethclient.RPSLimitedEthClientInterface, 0)
+	ethClients := make([]ethclient.EthClientInterface, 0)
 	for index, key := range keys {
 		var rpcClient *gethrpc.Client
 		var err error

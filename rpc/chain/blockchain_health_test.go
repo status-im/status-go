@@ -27,7 +27,7 @@ type BlockchainHealthManagerSuite struct {
 	suite.Suite
 	blockchainHealthManager *healthmanager.BlockchainHealthManager
 	mockProviders           map[uint64]*healthmanager.ProvidersHealthManager
-	mockEthClients          map[uint64]*mockEthclient.MockRPSLimitedEthClientInterface
+	mockEthClients          map[uint64]*mockEthclient.MockEthClientInterface
 	clients                 map[uint64]*ClientWithFallback
 	mockCtrl                *gomock.Controller
 }
@@ -35,7 +35,7 @@ type BlockchainHealthManagerSuite struct {
 func (s *BlockchainHealthManagerSuite) SetupTest() {
 	s.blockchainHealthManager = healthmanager.NewBlockchainHealthManager()
 	s.mockProviders = make(map[uint64]*healthmanager.ProvidersHealthManager)
-	s.mockEthClients = make(map[uint64]*mockEthclient.MockRPSLimitedEthClientInterface)
+	s.mockEthClients = make(map[uint64]*mockEthclient.MockEthClientInterface)
 	s.clients = make(map[uint64]*ClientWithFallback)
 	s.mockCtrl = gomock.NewController(s.T())
 }
@@ -49,11 +49,11 @@ func (s *BlockchainHealthManagerSuite) setupClients(chainIDs []uint64) {
 	ctx := context.Background()
 
 	for _, chainID := range chainIDs {
-		mockEthClient := mockEthclient.NewMockRPSLimitedEthClientInterface(s.mockCtrl)
+		mockEthClient := mockEthclient.NewMockEthClientInterface(s.mockCtrl)
 		mockEthClient.EXPECT().GetName().AnyTimes().Return(fmt.Sprintf("test_client_chain_%d", chainID))
 
 		phm := healthmanager.NewProvidersHealthManager(chainID)
-		client := NewClient([]ethclient.RPSLimitedEthClientInterface{mockEthClient}, chainID, phm)
+		client := NewClient([]ethclient.EthClientInterface{mockEthClient}, chainID, phm)
 
 		err := s.blockchainHealthManager.RegisterProvidersHealthManager(ctx, phm)
 		require.NoError(s.T(), err)
