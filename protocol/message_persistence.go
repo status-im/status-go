@@ -1318,19 +1318,14 @@ func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []str
 	inVector := strings.Repeat("?, ", len(chatIDs)-1) + "?"
 	//nolint:gosec
 	query := fmt.Sprintf(`
-		SELECT
-			m1.local_chat_id,
-			m1.whisper_timestamp
-		FROM (
-			SELECT
-				m1.local_chat_id,
-				m1.whisper_timestamp,
-				ROW_NUMBER() OVER (PARTITION BY m1.local_chat_id ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id ASC) AS rn
-			FROM user_messages m1
-			WHERE m1.local_chat_id IN (%s)
-		) m1
-		WHERE m1.rn = 1
-	`, inVector)
+    SELECT
+        m1.local_chat_id,
+        m1.whisper_timestamp,
+        MIN(substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id)
+    FROM user_messages m1
+    WHERE m1.local_chat_id IN (%s)
+    GROUP BY m1.local_chat_id
+`, inVector)
 
 	rows, err := db.db.Query(query, args...)
 	if err != nil {
@@ -1342,7 +1337,8 @@ func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []str
 	for rows.Next() {
 		var chatID string
 		var whisperTimestamp uint64
-		if err := rows.Scan(&chatID, &whisperTimestamp); err != nil {
+		var cursor string
+		if err := rows.Scan(&chatID, &whisperTimestamp, &cursor); err != nil {
 			return nil, err
 		}
 		result[chatID] = whisperTimestamp
