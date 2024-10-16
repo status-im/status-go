@@ -11,7 +11,8 @@
 - [How to run a Bootnode](BOOTNODE.md)
 - [How to run a Mailserver](MAILSERVER.md)
 - [How to run a Waku node](./_examples/README.md#run-waku-node)
-- [How to configure status-go](/config)
+- [How to configure status-go](/config/README.md)
+- [How to run status-go as HTTP server](/cmd/status-backend/README.md)
 
 ## Policies
 
