@@ -176,6 +176,7 @@ status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend
 
 run-status-backend: PORT ?= 0
+run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	go run ./cmd/status-backend --address localhost:${PORT}
 
@@ -323,7 +324,7 @@ generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
 generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
-	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) -x $(PACKAGES)
+	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
 
 generate-contracts:
 	go generate ./contracts
