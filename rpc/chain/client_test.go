@@ -26,7 +26,6 @@ func setupClientTest(t *testing.T) (*ClientWithFallback, []*mock_ethclient.MockR
 	for i := 0; i < 3; i++ {
 		ethCl := mock_ethclient.NewMockRPSLimitedEthClientInterface(mockCtrl)
 		ethCl.EXPECT().GetName().AnyTimes().Return("test" + strconv.Itoa(i))
-		ethCl.EXPECT().GetLimiter().AnyTimes().Return(nil)
 
 		mockEthClients = append(mockEthClients, ethCl)
 		ethClients = append(ethClients, ethCl)

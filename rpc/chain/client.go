@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/rpc/chain/tagger"
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/wallet/connection"
@@ -35,8 +34,6 @@ type ClientInterface interface {
 	GetWalletNotifier() func(chainId uint64, message string)
 	SetWalletNotifier(notifier func(chainId uint64, message string))
 	connection.Connectable
-	GetLimiter() rpclimiter.RequestLimiter
-	SetLimiter(rpclimiter.RequestLimiter)
 }
 
 type HealthMonitor interface {
@@ -66,7 +63,6 @@ func ClientWithTag(chainClient ClientInterface, tag, groupTag string) ClientInte
 type ClientWithFallback struct {
 	ChainID                uint64
 	ethClients             []ethclient.RPSLimitedEthClientInterface
-	commonLimiter          rpclimiter.RequestLimiter // FIXME: remove from RPC client https://github.com/status-im/status-go/issues/5942
 	circuitbreaker         *circuitbreaker.CircuitBreaker
 	providersHealthManager *healthmanager.ProvidersHealthManager
 
@@ -83,7 +79,6 @@ func (c *ClientWithFallback) Copy() interface{} {
 	return &ClientWithFallback{
 		ChainID:        c.ChainID,
 		ethClients:     c.ethClients,
-		commonLimiter:  c.commonLimiter,
 		circuitbreaker: c.circuitbreaker,
 		WalletNotifier: c.WalletNotifier,
 		isConnected:    c.isConnected,
@@ -765,7 +760,7 @@ func (c *ClientWithFallback) SetWalletNotifier(notifier func(chainId uint64, mes
 func (c *ClientWithFallback) toggleConnectionState(err error) {
 	connected := true
 	if err != nil {
-		if !isNotFoundError(err) && !isVMError(err) && !errors.Is(err, rpclimiter.ErrRequestsOverLimit) && !errors.Is(err, context.Canceled) {
+		if !isNotFoundError(err) && !isVMError(err) && !errors.Is(err, context.Canceled) {
 			log.Warn("Error not in chain call", "error", err, "chain", c.ChainID)
 			connected = false
 		} else {
@@ -794,14 +789,6 @@ func (c *ClientWithFallback) SetGroupTag(tag string) {
 func (c *ClientWithFallback) DeepCopyTag() tagger.Tagger {
 	copy := *c
 	return &copy
-}
-
-func (c *ClientWithFallback) GetLimiter() rpclimiter.RequestLimiter {
-	return c.commonLimiter
-}
-
-func (c *ClientWithFallback) SetLimiter(limiter rpclimiter.RequestLimiter) {
-	c.commonLimiter = limiter
 }
 
 func (c *ClientWithFallback) GetCircuitBreaker() *circuitbreaker.CircuitBreaker {

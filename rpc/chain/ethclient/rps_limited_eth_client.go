@@ -4,7 +4,6 @@ package ethclient
 
 import (
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 )
 
 // RPSLimitedEthClientInterface extends EthClientInterface with additional
@@ -14,27 +13,20 @@ import (
 // PRS limiting. fallback mechanisms or caching.
 type RPSLimitedEthClientInterface interface {
 	EthClientInterface
-	GetLimiter() *rpclimiter.RPCRpsLimiter
 	GetName() string
 	CopyWithName(name string) RPSLimitedEthClientInterface
 }
 
 type RPSLimitedEthClient struct {
 	*EthClient
-	limiter *rpclimiter.RPCRpsLimiter
-	name    string
+	name string
 }
 
-func NewRPSLimitedEthClient(rpcClient *rpc.Client, limiter *rpclimiter.RPCRpsLimiter, name string) *RPSLimitedEthClient {
+func NewRPSLimitedEthClient(rpcClient *rpc.Client, name string) *RPSLimitedEthClient {
 	return &RPSLimitedEthClient{
 		EthClient: NewEthClient(rpcClient),
-		limiter:   limiter,
 		name:      name,
 	}
-}
-
-func (c *RPSLimitedEthClient) GetLimiter() *rpclimiter.RPCRpsLimiter {
-	return c.limiter
 }
 
 func (c *RPSLimitedEthClient) GetName() string {
@@ -42,5 +34,5 @@ func (c *RPSLimitedEthClient) GetName() string {
 }
 
 func (c *RPSLimitedEthClient) CopyWithName(name string) RPSLimitedEthClientInterface {
-	return NewRPSLimitedEthClient(c.rpcClient, c.limiter, name)
+	return NewRPSLimitedEthClient(c.rpcClient, name)
 }

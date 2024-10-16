@@ -51,7 +51,6 @@ func (s *BlockchainHealthManagerSuite) setupClients(chainIDs []uint64) {
 	for _, chainID := range chainIDs {
 		mockEthClient := mockEthclient.NewMockRPSLimitedEthClientInterface(s.mockCtrl)
 		mockEthClient.EXPECT().GetName().AnyTimes().Return(fmt.Sprintf("test_client_chain_%d", chainID))
-		mockEthClient.EXPECT().GetLimiter().AnyTimes().Return(nil)
 
 		phm := healthmanager.NewProvidersHealthManager(chainID)
 		client := NewClient([]ethclient.RPSLimitedEthClientInterface{mockEthClient}, chainID, phm)
