@@ -733,8 +733,6 @@ func signMessage(rpcParams string) string {
 
 // SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
 // if password matches selected account.
-//
-// Deprecated: Use SignTypedDataV2 instead.
 func SignTypedData(data, address, password string) string {
 	return signTypedData(data, address, password)
 }
@@ -749,26 +747,6 @@ func signTypedData(data, address, password string) string {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
 	}
 	result, err := statusBackend.SignTypedData(typed, address, password)
-	return prepareJSONResponse(result.String(), err)
-}
-
-func SignTypedDataV2(requestJSON string) string {
-	return callWithResponse(signTypedDataV2, requestJSON)
-}
-
-func signTypedDataV2(requestJSON string) string {
-	var request requests.SignTypedData
-	err := json.Unmarshal([]byte(requestJSON), &request)
-	if err != nil {
-		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
-	}
-
-	err = request.Validate()
-	if err != nil {
-		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
-	}
-
-	result, err := statusBackend.SignTypedData(request.TypedData, request.Address, request.Password)
 	return prepareJSONResponse(result.String(), err)
 }
 
@@ -1056,7 +1034,7 @@ func connectionChangeV2(requestJSON string) {
 	if err != nil {
 		log.Error("error in connectionChangeV2", "error", err)
 	}
-	statusBackend.ConnectionChange(request.Type, request.Expensive == 1)
+	statusBackend.ConnectionChange(request.Type, request.Expensive)
 }
 
 func AppStateChange(state string) {
@@ -1405,7 +1383,7 @@ func changeDatabasePasswordV2(requestJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return changeDatabasePassword(request.KeyUID, request.Password, request.NewPassword)
+	return changeDatabasePassword(request.KeyUID, request.OldPassword, request.NewPassword)
 }
 
 // Deprecated: Use ConvertToKeycardAccountV2 instead.
@@ -1440,7 +1418,8 @@ func convertToKeycardAccountV2(requestJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return convertToKeycardAccount(request.AccountData, request.SettingsJSON, request.KeycardUID, request.Password, request.NewPassword)
+	err = statusBackend.ConvertToKeycardAccount(request.Account, request.Settings, request.KeycardUID, request.OldPassword, request.NewPassword)
+	return makeJSONResponse(err)
 }
 
 // Deprecated: Use ConvertToRegularAccountV2 instead.
