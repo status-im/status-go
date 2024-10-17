@@ -28,6 +28,7 @@ var tokenPeg = map[string]string{
 	"USDS":  "USD",
 	"USDT":  "USD",
 	"USDP":  "USD",
+	"USDSC": "USD",
 }
 
 func GetTokenPegSymbol(symbol string) string {
@@ -1243,8 +1244,8 @@ func newDefaultStore() *DefaultStore {
 			},
 			&Token{
 				Address:     common.HexToAddress("0xA4Bdb11dc0a2bEC88d24A3aa1E6Bb17201112eBe"),
-				Name:        "StableUSD",
-				Symbol:      "USDS",
+				Name:        "Stably USD Classic",
+				Symbol:      "USDSC",
 				Decimals:    6,
 				ChainID:     1,
 				TokenListID: "status",
