@@ -127,7 +127,7 @@ func main() {
 		profiling.NewProfiler(*pprofPort).Go()
 	}
 
-	backend := api.NewGethStatusBackend()
+	backend := api.NewGethStatusBackend(logutils.ZapLogger())
 	err = ImportAccount(*seedPhrase, backend)
 	if err != nil {
 		logger.Error("failed import account", "err", err)
