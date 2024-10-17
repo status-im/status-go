@@ -5,7 +5,7 @@ import jsonschema
 import pytest
 
 from conftest import option
-from test_cases import StatusDTestCase, TransactionTestCase
+from test_cases import StatusBackendTestCase, TransactionTestCase
 
 
 @pytest.mark.wallet
@@ -76,7 +76,7 @@ class TestTransactionRpc(TransactionTestCase):
 
 @pytest.mark.wallet
 @pytest.mark.rpc
-class TestRpc(StatusDTestCase):
+class TestRpc(StatusBackendTestCase):
 
     @pytest.mark.parametrize(
         "method, params",

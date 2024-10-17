@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime
+from json import JSONDecodeError
 
 import jsonschema
 import requests
@@ -27,7 +28,7 @@ class RpcClient:
                 f"Key '{key}' not found in the JSON response: {response.content}")
 
     def verify_is_valid_json_rpc_response(self, response, _id=None):
-        assert response.status_code == 200
+        assert response.status_code == 200, f"Got response {response.content}, status code {response.status_code}"
         assert response.content
         self._check_decode_and_key_errors_in_response(response, "result")
 
@@ -53,7 +54,10 @@ class RpcClient:
             data["params"] = params
         logging.info(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True, indent=4)}")
         response = self.client.post(url, json=data)
-
+        try:
+            logging.info(f"Got response: {json.dumps(response.json(), sort_keys=True, indent=4)}")
+        except JSONDecodeError:
+            logging.info(f"Got response: {response.content}")
         return response
 
     def rpc_valid_request(self, method, params=[], _id=None, url=None):
@@ -69,7 +73,7 @@ class RpcClient:
 
 class StatusBackend(RpcClient, SignalClient):
 
-    def __init__(self, await_signals):
+    def __init__(self, await_signals=list()):
 
         self.api_url = f"{option.rpc_url_status_backend}/statusgo"
         self.ws_url = f"{option.ws_url_status_backend}"
@@ -81,12 +85,15 @@ class StatusBackend(RpcClient, SignalClient):
     def api_request(self, method, data, url=None):
         url = url if url else self.api_url
         url = f"{url}/{method}"
+        logging.info(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True, indent=4)}")
         response = requests.post(url, json=data)
+        logging.info(f"Got response: {response.content}")
         return response
 
     def verify_is_valid_api_response(self, response):
-        assert response.status_code == 200
+        assert response.status_code == 200, f"Got response {response.content}, status code {response.status_code}"
         assert response.content
+        logging.info(f"Got response: {response.content}")
         try:
             assert not response.json()["error"]
         except json.JSONDecodeError:
@@ -116,6 +123,18 @@ class StatusBackend(RpcClient, SignalClient):
             "displayName": display_name,
             "password": password,
             "customizationColor": "primary"
+        }
+        return self.api_valid_request(method, data)
+
+    def restore_account_and_login(self, display_name="Mr_Meeseeks", user=user_1):
+        method = "RestoreAccountAndLogin"
+        data = {
+            "rootDataDir": "/..",
+            "displayName": display_name,
+            "password": user.password,
+            "mnemonic": user.passphrase,
+            "customizationColor": "blue",
+            "testNetworksEnabled": True
         }
         return self.api_valid_request(method, data)
 
