@@ -1,6 +1,9 @@
 package utils
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 var renameMapping = map[string]string{
 	"STT": "SNT",
@@ -32,22 +35,36 @@ func GetRealSymbol(symbol string) string {
 	return strings.ToUpper(symbol)
 }
 
-func ChunkSymbols(symbols []string, chunkSizeOptional ...int) [][]string {
+type ChunkSymbolsParams struct {
+	MaxSymbolsPerChunk  int
+	MaxCharsPerChunk    int
+	ExtraCharsPerSymbol int
+}
+
+func ChunkSymbols(symbols []string, params ChunkSymbolsParams) ([][]string, error) {
 	var chunks [][]string
-	chunkSize := 100
-	if len(chunkSizeOptional) > 0 {
-		chunkSize = chunkSizeOptional[0]
+	if len(symbols) == 0 {
+		return chunks, nil
 	}
 
-	for i := 0; i < len(symbols); i += chunkSize {
-		end := i + chunkSize
-
-		if end > len(symbols) {
-			end = len(symbols)
+	chunk := make([]string, 0, 100)
+	chunkChars := 0
+	for _, symbol := range symbols {
+		symbolChars := len(symbol) + params.ExtraCharsPerSymbol
+		if params.MaxCharsPerChunk > 0 && symbolChars > params.MaxCharsPerChunk {
+			return nil, errors.New("chunk cannot fit symbol: " + symbol)
 		}
-
-		chunks = append(chunks, symbols[i:end])
+		if (params.MaxCharsPerChunk > 0 && chunkChars+symbolChars > params.MaxCharsPerChunk) ||
+			(params.MaxSymbolsPerChunk > 0 && len(chunk) >= params.MaxSymbolsPerChunk) {
+			// Max chars/symbols reached, store chunk and start a new one
+			chunks = append(chunks, chunk)
+			chunk = make([]string, 0, 100)
+			chunkChars = 0
+		}
+		chunk = append(chunk, symbol)
+		chunkChars += symbolChars
 	}
+	chunks = append(chunks, chunk)
 
-	return chunks
+	return chunks, nil
 }
