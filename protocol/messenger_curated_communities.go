@@ -93,7 +93,7 @@ func (m *Messenger) getCuratedCommunitiesFromContract() (*communities.CuratedCom
 
 	chainID := uint64(10) // Optimism Mainnet
 	if testNetworksEnabled {
-		chainID = 420 // Optimism Goerli
+		chainID = 11155420 // Optimism Sepolia
 	}
 
 	directory, err := m.contractMaker.NewDirectory(chainID)

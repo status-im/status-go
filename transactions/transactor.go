@@ -110,8 +110,7 @@ func (t *Transactor) NextNonce(rpcClient rpc.ClientInterface, chainID uint64, fr
 	// We need to take into consideration all pending transactions in case of Optimism, cause the network returns always
 	// the nonce of last executed tx + 1 for the next nonce value.
 	if chainID == wallet_common.OptimismMainnet ||
-		chainID == wallet_common.OptimismSepolia ||
-		chainID == wallet_common.OptimismGoerli {
+		chainID == wallet_common.OptimismSepolia {
 		if t.pendingTracker != nil {
 			countOfPendingTXs, err := t.pendingTracker.CountPendingTxsFromNonce(wallet_common.ChainID(chainID), common.Address(from), nonce)
 			if err != nil {

@@ -105,7 +105,7 @@ func (m *Messenger) CreateOpenCommunity() (*MessengerResponse, error) {
 func (m *Messenger) CreateTokenGatedCommunity() (*MessengerResponse, error) {
 	response, err := m.CreateCommunity(&requests.CreateCommunity{
 		Name:                         "SNT community",
-		Description:                  "require 10 SNT Goerli to use",
+		Description:                  "require 10 SNT Sepolia to use",
 		Color:                        "#eab700",
 		HistoryArchiveSupportEnabled: true,
 		Membership:                   protobuf.CommunityPermissions_MANUAL_ACCEPT,
@@ -122,7 +122,7 @@ func (m *Messenger) CreateTokenGatedCommunity() (*MessengerResponse, error) {
 		CommunityID: cid,
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{{
-			ContractAddresses: map[uint64]string{params.GoerliNetworkID: "0x3D6AFAA395C31FCd391fE3D562E75fe9E8ec7E6a"},
+			ContractAddresses: map[uint64]string{params.SepoliaNetworkID: "0x3D6AFAA395C31FCd391fE3D562E75fe9E8ec7E6a"},
 			Type:              protobuf.CommunityTokenType_ERC20,
 			Symbol:            "STT",
 			Name:              "Status Test Token",
