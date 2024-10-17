@@ -362,21 +362,30 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit: generate
-test-unit: export BUILD_TAGS ?=
-test-unit: export UNIT_TEST_DRY_RUN ?= false
-test-unit: export UNIT_TEST_COUNT ?= 1
-test-unit: export UNIT_TEST_FAILFAST ?= true
+test-unit-prep: generate
+test-unit-prep: export BUILD_TAGS ?=
+test-unit-prep: export UNIT_TEST_DRY_RUN ?= false
+test-unit-prep: export UNIT_TEST_COUNT ?= 1
+test-unit-prep: export UNIT_TEST_FAILFAST ?= true
+test-unit-prep: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
+test-unit-prep: export UNIT_TEST_REPORT_CODECLIMATE ?= false
+test-unit-prep: export UNIT_TEST_REPORT_CODECOV ?= false
+
+test-unit: test-unit-prep
 test-unit: export UNIT_TEST_RERUN_FAILS ?= true
-test-unit: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
-test-unit: export UNIT_TEST_REPORT_CODECLIMATE ?= false
-test-unit: export UNIT_TEST_REPORT_CODECOV ?= false
 test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./... | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
-	grep -v /transactions/fake)
+	grep -v /transactions/fake | \
+	grep -v /tests-unit-network)
 test-unit: ##@tests Run unit and integration tests
+	./_assets/scripts/run_unit_tests.sh
+
+test-unit-network: test-unit-prep
+test-unit-network: export UNIT_TEST_RERUN_FAILS ?= false
+test-unit-network: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./tests-unit-network/...)
+test-unit-network: ##@tests Run unit and integration tests with network access
 	./_assets/scripts/run_unit_tests.sh
 
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
