@@ -1,5 +1,6 @@
 package wakuv2
 
+/* TODO-nwaku
 import (
 	"errors"
 
@@ -116,3 +117,4 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 		})
 	}
 }
+*/
