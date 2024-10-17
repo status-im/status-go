@@ -2,6 +2,6 @@ package requests
 
 type ChangeDatabasePassword struct {
 	KeyUID      string `json:"keyUID"`
-	Password    string `json:"password"`
+	OldPassword string `json:"oldPassword"`
 	NewPassword string `json:"newPassword"`
 }

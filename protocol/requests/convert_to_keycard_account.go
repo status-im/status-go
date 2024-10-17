@@ -1,9 +1,14 @@
 package requests
 
+import (
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
+)
+
 type ConvertToKeycardAccount struct {
-	AccountData  string `json:"accountData"`
-	SettingsJSON string `json:"settingsJSON"`
-	KeycardUID   string `json:"keycardUID"`
-	Password     string `json:"password"`
-	NewPassword  string `json:"newPassword"`
+	Account     multiaccounts.Account `json:"account"`
+	Settings    settings.Settings     `json:"settings"`
+	KeycardUID  string                `json:"keycardUID"`
+	OldPassword string                `json:"oldPassword"`
+	NewPassword string                `json:"newPassword"`
 }
