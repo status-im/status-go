@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 type Manager struct {
@@ -22,7 +24,7 @@ func (c *Manager) GetProviders(ctx context.Context) ([]CryptoOnRamp, error) {
 	for _, provider := range c.providers {
 		cryptoOnRamp, err := provider.GetCryptoOnRamp(ctx)
 		if err != nil {
-			log.Error("failed to get crypto on ramp", "id", provider.ID(), "error", err)
+			logutils.ZapLogger().Error("failed to get crypto on ramp", zap.String("id", provider.ID()), zap.Error(err))
 			continue
 		}
 

@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 type DBSession struct {
@@ -33,7 +35,7 @@ func UpsertSession(db *sql.DB, data DBSession) error {
 		if err != nil {
 			rollErr := tx.Rollback()
 			if rollErr != nil {
-				log.Error("error rolling back transaction", "rollErr", rollErr, "err", err)
+				logutils.ZapLogger().Error("error rolling back transaction", zap.NamedError("rollErr", rollErr), zap.Error(err))
 			}
 		}
 	}()

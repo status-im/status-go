@@ -6,14 +6,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	nodetypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
@@ -63,7 +65,7 @@ var requestTimeout = 20 * time.Second
 func (c *findNewBlocksCommand) detectTransfers(parent context.Context, accounts []common.Address) (*big.Int, []common.Address, error) {
 	bc, err := c.contractMaker.NewBalanceChecker(c.chainClient.NetworkID())
 	if err != nil {
-		log.Error("findNewBlocksCommand error creating balance checker", "error", err, "chain", c.chainClient.NetworkID())
+		logutils.ZapLogger().Error("findNewBlocksCommand error creating balance checker", zap.Uint64("chain", c.chainClient.NetworkID()), zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -78,13 +80,13 @@ func (c *findNewBlocksCommand) detectTransfers(parent context.Context, accounts 
 			tokenAddresses = append(tokenAddresses, token.Address)
 		}
 	}
-	log.Debug("findNewBlocksCommand detectTransfers", "cnt", len(tokenAddresses))
+	logutils.ZapLogger().Debug("findNewBlocksCommand detectTransfers", zap.Int("cnt", len(tokenAddresses)))
 
 	ctx, cancel := context.WithTimeout(parent, requestTimeout)
 	defer cancel()
 	blockNum, hashes, err := bc.BalancesHash(&bind.CallOpts{Context: ctx}, c.accounts, tokenAddresses)
 	if err != nil {
-		log.Error("findNewBlocksCommand can't get balances hashes", "error", err)
+		logutils.ZapLogger().Error("findNewBlocksCommand can't get balances hashes", zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -92,12 +94,21 @@ func (c *findNewBlocksCommand) detectTransfers(parent context.Context, accounts 
 	for idx, account := range accounts {
 		blockRange, _, err := c.blockRangeDAO.getBlockRange(c.chainClient.NetworkID(), account)
 		if err != nil {
-			log.Error("findNewBlocksCommand can't get block range", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+			logutils.ZapLogger().Error("findNewBlocksCommand can't get block range",
+				zap.Stringer("account", account),
+				zap.Uint64("chain", c.chainClient.NetworkID()),
+				zap.Error(err),
+			)
 			return nil, nil, err
 		}
 
 		checkHash := common.BytesToHash(hashes[idx][:])
-		log.Debug("findNewBlocksCommand comparing hashes", "account", account, "network", c.chainClient.NetworkID(), "old hash", blockRange.balanceCheckHash, "new hash", checkHash.String())
+		logutils.ZapLogger().Debug("findNewBlocksCommand comparing hashes",
+			zap.Stringer("account", account),
+			zap.Uint64("network", c.chainClient.NetworkID()),
+			zap.String("old hash", blockRange.balanceCheckHash),
+			zap.Stringer("new hash", checkHash),
+		)
 		if checkHash.String() != blockRange.balanceCheckHash {
 			addressesToCheck = append(addressesToCheck, account)
 		}
@@ -106,7 +117,11 @@ func (c *findNewBlocksCommand) detectTransfers(parent context.Context, accounts 
 
 		err = c.blockRangeDAO.upsertRange(c.chainClient.NetworkID(), account, blockRange)
 		if err != nil {
-			log.Error("findNewBlocksCommand can't update balance check", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+			logutils.ZapLogger().Error("findNewBlocksCommand can't update balance check",
+				zap.Stringer("account", account),
+				zap.Uint64("chain", c.chainClient.NetworkID()),
+				zap.Error(err),
+			)
 			return nil, nil, err
 		}
 	}
@@ -121,20 +136,31 @@ func (c *findNewBlocksCommand) detectNonceChange(parent context.Context, to *big
 
 		blockRange, _, err := c.blockRangeDAO.getBlockRange(c.chainClient.NetworkID(), account)
 		if err != nil {
-			log.Error("findNewBlocksCommand can't get block range", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+			logutils.ZapLogger().Error("findNewBlocksCommand can't get block range",
+				zap.Stringer("account", account),
+				zap.Uint64("chain", c.chainClient.NetworkID()),
+				zap.Error(err),
+			)
 			return nil, err
 		}
 
 		lastNonceInfo, ok := c.lastNonces[account]
 		if !ok || lastNonceInfo.blockNumber.Cmp(blockRange.eth.LastKnown) != 0 {
-			log.Debug("Fetching old nonce", "at", blockRange.eth.LastKnown, "acc", account)
+			logutils.ZapLogger().Debug("Fetching old nonce",
+				zap.Stringer("at", blockRange.eth.LastKnown),
+				zap.Stringer("acc", account),
+			)
 			if blockRange.eth.LastKnown == nil {
 				blockRange.eth.LastKnown = big.NewInt(0)
 				oldNonce = new(int64) // At 0 block nonce is 0
 			} else {
 				oldNonce, err = c.balanceCacher.NonceAt(parent, c.chainClient, account, blockRange.eth.LastKnown)
 				if err != nil {
-					log.Error("findNewBlocksCommand can't get nonce", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+					logutils.ZapLogger().Error("findNewBlocksCommand can't get nonce",
+						zap.Stringer("account", account),
+						zap.Uint64("chain", c.chainClient.NetworkID()),
+						zap.Error(err),
+					)
 					return nil, err
 				}
 			}
@@ -144,11 +170,20 @@ func (c *findNewBlocksCommand) detectNonceChange(parent context.Context, to *big
 
 		newNonce, err := c.balanceCacher.NonceAt(parent, c.chainClient, account, to)
 		if err != nil {
-			log.Error("findNewBlocksCommand can't get nonce", "error", err, "account", account, "chain", c.chainClient.NetworkID())
+			logutils.ZapLogger().Error("findNewBlocksCommand can't get nonce",
+				zap.Stringer("account", account),
+				zap.Uint64("chain", c.chainClient.NetworkID()),
+				zap.Error(err),
+			)
 			return nil, err
 		}
 
-		log.Debug("Comparing nonces", "oldNonce", *oldNonce, "newNonce", *newNonce, "to", to, "acc", account)
+		logutils.ZapLogger().Debug("Comparing nonces",
+			zap.Int64p("oldNonce", oldNonce),
+			zap.Int64p("newNonce", newNonce),
+			zap.Stringer("to", to),
+			zap.Stringer("acc", account),
+		)
 
 		if *newNonce != *oldNonce {
 			addressesWithChange[account] = blockRange.eth.LastKnown
@@ -188,7 +223,7 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 		}
 		if mnemonicWasNotShown {
 			if acc.AddressWasNotShown {
-				log.Info("skip findNewBlocksCommand, mnemonic has not been shown and the address has not been shared yet", "address", account)
+				logutils.ZapLogger().Info("skip findNewBlocksCommand, mnemonic has not been shown and the address has not been shared yet", zap.Stringer("address", account))
 				continue
 			}
 		}
@@ -205,27 +240,33 @@ func (c *findNewBlocksCommand) Run(parent context.Context) error {
 
 	headNum, accountsWithDetectedChanges, err := c.detectTransfers(parent, accountsToCheck)
 	if err != nil {
-		log.Error("findNewBlocksCommand error on transfer detection", "error", err, "chain", c.chainClient.NetworkID())
+		logutils.ZapLogger().Error("findNewBlocksCommand error on transfer detection",
+			zap.Uint64("chain", c.chainClient.NetworkID()),
+			zap.Error(err),
+		)
 		return err
 	}
 
 	c.blockChainState.SetLastBlockNumber(c.chainClient.NetworkID(), headNum.Uint64())
 
 	if len(accountsWithDetectedChanges) != 0 {
-		log.Debug("findNewBlocksCommand detected accounts with changes, proceeding", "accounts", accountsWithDetectedChanges, "from", c.fromBlockNumber)
+		logutils.ZapLogger().Debug("findNewBlocksCommand detected accounts with changes",
+			zap.Stringers("accounts", accountsWithDetectedChanges),
+			zap.Stringer("from", c.fromBlockNumber),
+		)
 		err = c.findAndSaveEthBlocks(parent, c.fromBlockNumber, headNum, accountsToCheck)
 		if err != nil {
 			return err
 		}
 	} else if c.iteration%c.nonceCheckIntervalIterations == 0 && len(accountsWithOutsideTransfers) > 0 {
-		log.Debug("findNewBlocksCommand nonce check", "accounts", accountsWithOutsideTransfers)
+		logutils.ZapLogger().Debug("findNewBlocksCommand nonce check", zap.Stringers("accounts", accountsWithOutsideTransfers))
 		accountsWithNonceChanges, err := c.detectNonceChange(parent, headNum, accountsWithOutsideTransfers)
 		if err != nil {
 			return err
 		}
 
 		if len(accountsWithNonceChanges) > 0 {
-			log.Debug("findNewBlocksCommand detected nonce diff", "accounts", accountsWithNonceChanges)
+			logutils.ZapLogger().Debug("findNewBlocksCommand detected nonce diff", zap.Any("accounts", accountsWithNonceChanges))
 			for account, from := range accountsWithNonceChanges {
 				err = c.findAndSaveEthBlocks(parent, from, headNum, []common.Address{account})
 				if err != nil {
@@ -276,12 +317,18 @@ func (c *findNewBlocksCommand) findAndSaveEthBlocks(parent context.Context, from
 				return err
 			}
 			if acc.AddressWasNotShown {
-				log.Info("skip findNewBlocksCommand, mnemonic has not been shown and the address has not been shared yet", "address", account)
+				logutils.ZapLogger().Info("skip findNewBlocksCommand, mnemonic has not been shown and the address has not been shared yet", zap.Stringer("address", account))
 				continue
 			}
 		}
 
-		log.Debug("start findNewBlocksCommand", "account", account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", fromNum, "to", headNum)
+		logutils.ZapLogger().Debug("start findNewBlocksCommand",
+			zap.Stringer("account", account),
+			zap.Uint64("chain", c.chainClient.NetworkID()),
+			zap.Bool("noLimit", c.noLimit),
+			zap.Stringer("from", fromNum),
+			zap.Stringer("to", headNum),
+		)
 
 		headers, startBlockNum, err := c.findBlocksWithEthTransfers(parent, account, fromNum, headNum)
 		if err != nil {
@@ -289,9 +336,12 @@ func (c *findNewBlocksCommand) findAndSaveEthBlocks(parent context.Context, from
 		}
 
 		if len(headers) > 0 {
-			log.Debug("findNewBlocksCommand saving headers", "len", len(headers), "lastBlockNumber", headNum,
-				"balance", c.balanceCacher.Cache().GetBalance(account, c.chainClient.NetworkID(), headNum),
-				"nonce", c.balanceCacher.Cache().GetNonce(account, c.chainClient.NetworkID(), headNum))
+			logutils.ZapLogger().Debug("findNewBlocksCommand saving headers",
+				zap.Int("len", len(headers)),
+				zap.Stringer("lastBlockNumber", headNum),
+				zap.Stringer("balance", c.balanceCacher.Cache().GetBalance(account, c.chainClient.NetworkID(), headNum)),
+				zap.Int64p("nonce", c.balanceCacher.Cache().GetNonce(account, c.chainClient.NetworkID(), headNum)),
+			)
 
 			err := c.db.SaveBlocks(c.chainClient.NetworkID(), headers)
 			if err != nil {
@@ -306,7 +356,13 @@ func (c *findNewBlocksCommand) findAndSaveEthBlocks(parent context.Context, from
 			return err
 		}
 
-		log.Debug("end findNewBlocksCommand", "account", account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", fromNum, "to", headNum)
+		logutils.ZapLogger().Debug("end findNewBlocksCommand",
+			zap.Stringer("account", account),
+			zap.Uint64("chain", c.chainClient.NetworkID()),
+			zap.Bool("noLimit", c.noLimit),
+			zap.Stringer("from", fromNum),
+			zap.Stringer("to", headNum),
+		)
 	}
 
 	return nil
@@ -319,12 +375,20 @@ func (c *findNewBlocksCommand) findAndSaveTokenBlocks(parent context.Context, fr
 	const incomingOnly = false
 	erc20Headers, err := c.fastIndexErc20(parent, fromNum, headNum, incomingOnly)
 	if err != nil {
-		log.Error("findNewBlocksCommand fastIndexErc20", "err", err, "account", c.accounts, "chain", c.chainClient.NetworkID())
+		logutils.ZapLogger().Error("findNewBlocksCommand fastIndexErc20",
+			zap.Stringers("account", c.accounts),
+			zap.Uint64("chain", c.chainClient.NetworkID()),
+			zap.Error(err),
+		)
 		return err
 	}
 
 	if len(erc20Headers) > 0 {
-		log.Debug("findNewBlocksCommand saving headers", "len", len(erc20Headers), "from", fromNum, "to", headNum)
+		logutils.ZapLogger().Debug("findNewBlocksCommand saving headers",
+			zap.Int("len", len(erc20Headers)),
+			zap.Stringer("from", fromNum),
+			zap.Stringer("to", headNum),
+		)
 
 		// get not loaded headers from DB for all accs and blocks
 		preLoadedTransactions, err := c.db.GetTransactionsToLoad(c.chainClient.NetworkID(), common.Address{}, nil)
@@ -346,12 +410,16 @@ func (c *findNewBlocksCommand) findAndSaveTokenBlocks(parent context.Context, fr
 }
 
 func (c *findBlocksCommand) markTokenBlockRangeChecked(accounts []common.Address, from, to *big.Int) error {
-	log.Debug("markTokenBlockRangeChecked", "chain", c.chainClient.NetworkID(), "from", from.Uint64(), "to", to.Uint64())
+	logutils.ZapLogger().Debug("markTokenBlockRangeChecked",
+		zap.Uint64("chain", c.chainClient.NetworkID()),
+		zap.Uint64("from", from.Uint64()),
+		zap.Uint64("to", to.Uint64()),
+	)
 
 	for _, account := range accounts {
 		err := c.blockRangeDAO.updateTokenRange(c.chainClient.NetworkID(), account, &BlockRange{FirstKnown: from, LastKnown: to})
 		if err != nil {
-			log.Error("findNewBlocksCommand upsertTokenRange", "error", err)
+			logutils.ZapLogger().Error("findNewBlocksCommand upsertTokenRange", zap.Error(err))
 			return err
 		}
 	}
@@ -379,7 +447,13 @@ func filterNewPreloadedTransactions(erc20Headers []*DBHeader, preLoadedTransfers
 }
 
 func (c *findNewBlocksCommand) findBlocksWithEthTransfers(parent context.Context, account common.Address, fromOrig, toOrig *big.Int) (headers []*DBHeader, startBlockNum *big.Int, err error) {
-	log.Debug("start findNewBlocksCommand::findBlocksWithEthTransfers", "account", account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", c.fromBlockNumber, "to", c.toBlockNumber)
+	logutils.ZapLogger().Debug("start findNewBlocksCommand::findBlocksWithEthTransfers",
+		zap.Stringer("account", account),
+		zap.Uint64("chain", c.chainClient.NetworkID()),
+		zap.Bool("noLimit", c.noLimit),
+		zap.Stringer("from", c.fromBlockNumber),
+		zap.Stringer("to", c.toBlockNumber),
+	)
 
 	rangeSize := big.NewInt(int64(c.defaultNodeBlockChunkSize))
 
@@ -392,7 +466,10 @@ func (c *findNewBlocksCommand) findBlocksWithEthTransfers(parent context.Context
 
 	for {
 		if from.Cmp(to) == 0 {
-			log.Debug("findNewBlocksCommand empty range", "from", from, "to", to)
+			logutils.ZapLogger().Debug("findNewBlocksCommand empty range",
+				zap.Stringer("from", from),
+				zap.Stringer("to", to),
+			)
 			break
 		}
 
@@ -402,24 +479,40 @@ func (c *findNewBlocksCommand) findBlocksWithEthTransfers(parent context.Context
 		var ethHeaders []*DBHeader
 		newFromBlock, ethHeaders, startBlockNum, err = c.fastIndex(parent, account, c.balanceCacher, fromBlock, to)
 		if err != nil {
-			log.Error("findNewBlocksCommand checkRange fastIndex", "err", err, "account", account,
-				"chain", c.chainClient.NetworkID())
+			logutils.ZapLogger().Error("findNewBlocksCommand checkRange fastIndex",
+				zap.Stringer("account", account),
+				zap.Uint64("chain", c.chainClient.NetworkID()),
+				zap.Error(err),
+			)
 			return nil, nil, err
 		}
-		log.Debug("findNewBlocksCommand checkRange", "chainID", c.chainClient.NetworkID(), "account", account,
-			"startBlock", startBlockNum, "newFromBlock", newFromBlock.Number, "toBlockNumber", to, "noLimit", c.noLimit)
+		logutils.ZapLogger().Debug("findNewBlocksCommand checkRange",
+			zap.Uint64("chainID", c.chainClient.NetworkID()),
+			zap.Stringer("account", account),
+			zap.Stringer("startBlock", startBlockNum),
+			zap.Stringer("newFromBlock", newFromBlock.Number),
+			zap.Stringer("toBlockNumber", to),
+			zap.Bool("noLimit", c.noLimit),
+		)
 
 		headers = append(headers, ethHeaders...)
 
 		if startBlockNum != nil && startBlockNum.Cmp(from) >= 0 {
-			log.Debug("Checked all ranges, stop execution", "startBlock", startBlockNum, "from", from, "to", to)
+			logutils.ZapLogger().Debug("Checked all ranges, stop execution",
+				zap.Stringer("startBlock", startBlockNum),
+				zap.Stringer("from", from),
+				zap.Stringer("to", to),
+			)
 			break
 		}
 
 		nextFrom, nextTo := nextRange(c.defaultNodeBlockChunkSize, newFromBlock.Number, fromOrig)
 
 		if nextFrom.Cmp(from) == 0 && nextTo.Cmp(to) == 0 {
-			log.Debug("findNewBlocksCommand empty next range", "from", from, "to", to)
+			logutils.ZapLogger().Debug("findNewBlocksCommand empty next range",
+				zap.Stringer("from", from),
+				zap.Stringer("to", to),
+			)
 			break
 		}
 
@@ -427,7 +520,11 @@ func (c *findNewBlocksCommand) findBlocksWithEthTransfers(parent context.Context
 		to = nextTo
 	}
 
-	log.Debug("end findNewBlocksCommand::findBlocksWithEthTransfers", "account", account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit)
+	logutils.ZapLogger().Debug("end findNewBlocksCommand::findBlocksWithEthTransfers",
+		zap.Stringer("account", account),
+		zap.Uint64("chain", c.chainClient.NetworkID()),
+		zap.Bool("noLimit", c.noLimit),
+	)
 
 	return headers, startBlockNum, nil
 }
@@ -539,7 +636,12 @@ func (c *findBlocksCommand) ERC20ScanByBalance(parent context.Context, account c
 }
 
 func (c *findBlocksCommand) checkERC20Tail(parent context.Context, account common.Address) ([]*DBHeader, error) {
-	log.Debug("checkERC20Tail", "account", account, "to block", c.startBlockNumber, "from", c.resFromBlock.Number)
+	logutils.ZapLogger().Debug(
+		"checkERC20Tail",
+		zap.Stringer("account", account),
+		zap.Stringer("to block", c.startBlockNumber),
+		zap.Stringer("from", c.resFromBlock.Number),
+	)
 	tokens, err := c.tokenManager.GetTokens(c.chainClient.NetworkID())
 	if err != nil {
 		return nil, err
@@ -597,7 +699,13 @@ func (c *findBlocksCommand) checkERC20Tail(parent context.Context, account commo
 }
 
 func (c *findBlocksCommand) Run(parent context.Context) (err error) {
-	log.Debug("start findBlocksCommand", "accounts", c.accounts, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", c.fromBlockNumber, "to", c.toBlockNumber)
+	logutils.ZapLogger().Debug("start findBlocksCommand",
+		zap.Any("accounts", c.accounts),
+		zap.Uint64("chain", c.chainClient.NetworkID()),
+		zap.Bool("noLimit", c.noLimit),
+		zap.Stringer("from", c.fromBlockNumber),
+		zap.Stringer("to", c.toBlockNumber),
+	)
 
 	account := c.accounts[0] // For now this command supports only 1 account
 	mnemonicWasNotShown, err := c.accountsDB.GetMnemonicWasNotShown()
@@ -611,7 +719,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 			return err
 		}
 		if account.AddressWasNotShown {
-			log.Info("skip findBlocksCommand, mnemonic has not been shown and the address has not been shared yet", "address", account)
+			logutils.ZapLogger().Info("skip findBlocksCommand, mnemonic has not been shown and the address has not been shared yet", zap.Stringer("address", account.Address))
 			return nil
 		}
 	}
@@ -626,7 +734,9 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 
 	for {
 		if from.Cmp(to) == 0 {
-			log.Debug("findBlocksCommand empty range", "from", from, "to", to)
+			logutils.ZapLogger().Debug("findBlocksCommand empty range",
+				zap.Stringer("from", from),
+				zap.Stringer("to", to))
 			break
 		}
 
@@ -635,7 +745,11 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 			if c.fromBlockNumber.Cmp(zero) == 0 && c.startBlockNumber != nil && c.startBlockNumber.Cmp(zero) == 1 {
 				headers, err = c.checkERC20Tail(parent, account)
 				if err != nil {
-					log.Error("findBlocksCommand checkERC20Tail", "err", err, "account", account, "chain", c.chainClient.NetworkID())
+					logutils.ZapLogger().Error("findBlocksCommand checkERC20Tail",
+						zap.Stringer("account", account),
+						zap.Uint64("chain", c.chainClient.NetworkID()),
+						zap.Error(err),
+					)
 					break
 				}
 			}
@@ -647,9 +761,12 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 		}
 
 		if len(headers) > 0 {
-			log.Debug("findBlocksCommand saving headers", "len", len(headers), "lastBlockNumber", to,
-				"balance", c.balanceCacher.Cache().GetBalance(account, c.chainClient.NetworkID(), to),
-				"nonce", c.balanceCacher.Cache().GetNonce(account, c.chainClient.NetworkID(), to))
+			logutils.ZapLogger().Debug("findBlocksCommand saving headers",
+				zap.Int("len", len(headers)),
+				zap.Stringer("lastBlockNumber", to),
+				zap.Stringer("balance", c.balanceCacher.Cache().GetBalance(account, c.chainClient.NetworkID(), to)),
+				zap.Int64p("nonce", c.balanceCacher.Cache().GetNonce(account, c.chainClient.NetworkID(), to)),
+			)
 
 			err = c.db.SaveBlocks(c.chainClient.NetworkID(), headers)
 			if err != nil {
@@ -664,7 +781,10 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 			if err != nil {
 				break
 			}
-			log.Debug("findBlocksCommand reached first ETH transfer and checked erc20 tail", "chain", c.chainClient.NetworkID(), "account", account)
+			logutils.ZapLogger().Debug("findBlocksCommand reached first ETH transfer and checked erc20 tail",
+				zap.Uint64("chain", c.chainClient.NetworkID()),
+				zap.Stringer("account", account),
+			)
 			break
 		}
 
@@ -680,20 +800,31 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 
 		// if we have found first ETH block and we have not reached the start of ETH history yet
 		if c.startBlockNumber != nil && c.fromBlockNumber.Cmp(from) == -1 {
-			log.Debug("ERC20 tail should be checked", "initial from", c.fromBlockNumber, "actual from", from, "first ETH block", c.startBlockNumber)
+			logutils.ZapLogger().Debug("ERC20 tail should be checked",
+				zap.Stringer("initial from", c.fromBlockNumber),
+				zap.Stringer("actual from", from),
+				zap.Stringer("first ETH block", c.startBlockNumber),
+			)
 			c.reachedETHHistoryStart = true
 			continue
 		}
 
 		if c.startBlockNumber != nil && c.startBlockNumber.Cmp(from) >= 0 {
-			log.Debug("Checked all ranges, stop execution", "startBlock", c.startBlockNumber, "from", from, "to", to)
+			logutils.ZapLogger().Debug("Checked all ranges, stop execution",
+				zap.Stringer("startBlock", c.startBlockNumber),
+				zap.Stringer("from", from),
+				zap.Stringer("to", to),
+			)
 			break
 		}
 
 		nextFrom, nextTo := nextRange(c.defaultNodeBlockChunkSize, c.resFromBlock.Number, c.fromBlockNumber)
 
 		if nextFrom.Cmp(from) == 0 && nextTo.Cmp(to) == 0 {
-			log.Debug("findBlocksCommand empty next range", "from", from, "to", to)
+			logutils.ZapLogger().Debug("findBlocksCommand empty next range",
+				zap.Stringer("from", from),
+				zap.Stringer("to", to),
+			)
 			break
 		}
 
@@ -701,7 +832,12 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 		to = nextTo
 	}
 
-	log.Debug("end findBlocksCommand", "account", account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "err", err)
+	logutils.ZapLogger().Debug("end findBlocksCommand",
+		zap.Stringer("account", account),
+		zap.Uint64("chain", c.chainClient.NetworkID()),
+		zap.Bool("noLimit", c.noLimit),
+		zap.Error(err),
+	)
 
 	return err
 }
@@ -711,12 +847,17 @@ func (c *findBlocksCommand) blocksFound(headers []*DBHeader) {
 }
 
 func (c *findBlocksCommand) markEthBlockRangeChecked(account common.Address, blockRange *BlockRange) error {
-	log.Debug("upsert block range", "Start", blockRange.Start, "FirstKnown", blockRange.FirstKnown, "LastKnown", blockRange.LastKnown,
-		"chain", c.chainClient.NetworkID(), "account", account)
+	logutils.ZapLogger().Debug("upsert block range",
+		zap.Stringer("Start", blockRange.Start),
+		zap.Stringer("FirstKnown", blockRange.FirstKnown),
+		zap.Stringer("LastKnown", blockRange.LastKnown),
+		zap.Uint64("chain", c.chainClient.NetworkID()),
+		zap.Stringer("account", account),
+	)
 
 	err := c.blockRangeDAO.upsertEthRange(c.chainClient.NetworkID(), account, blockRange)
 	if err != nil {
-		log.Error("findBlocksCommand upsertRange", "error", err)
+		logutils.ZapLogger().Error("findBlocksCommand upsertRange", zap.Error(err))
 		return err
 	}
 
@@ -731,18 +872,31 @@ func (c *findBlocksCommand) checkRange(parent context.Context, from *big.Int, to
 
 	newFromBlock, ethHeaders, startBlock, err := c.fastIndex(parent, account, c.balanceCacher, fromBlock, to)
 	if err != nil {
-		log.Error("findBlocksCommand checkRange fastIndex", "err", err, "account", account,
-			"chain", c.chainClient.NetworkID())
+		logutils.ZapLogger().Error("findBlocksCommand checkRange fastIndex",
+			zap.Stringer("account", account),
+			zap.Uint64("chain", c.chainClient.NetworkID()),
+			zap.Error(err),
+		)
 		return nil, err
 	}
-	log.Debug("findBlocksCommand checkRange", "chainID", c.chainClient.NetworkID(), "account", account,
-		"startBlock", startBlock, "newFromBlock", newFromBlock.Number, "toBlockNumber", to, "noLimit", c.noLimit)
+	logutils.ZapLogger().Debug("findBlocksCommand checkRange",
+		zap.Uint64("chainID", c.chainClient.NetworkID()),
+		zap.Stringer("account", account),
+		zap.Stringer("startBlock", startBlock),
+		zap.Stringer("newFromBlock", newFromBlock.Number),
+		zap.Stringer("toBlockNumber", to),
+		zap.Bool("noLimit", c.noLimit),
+	)
 
 	// There could be incoming ERC20 transfers which don't change the balance
 	// and nonce of ETH account, so we keep looking for them
 	erc20Headers, err := c.fastIndexErc20(parent, newFromBlock.Number, to, false)
 	if err != nil {
-		log.Error("findBlocksCommand checkRange fastIndexErc20", "err", err, "account", account, "chain", c.chainClient.NetworkID())
+		logutils.ZapLogger().Error("findBlocksCommand checkRange fastIndexErc20",
+			zap.Stringer("account", account),
+			zap.Uint64("chain", c.chainClient.NetworkID()),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
@@ -755,9 +909,14 @@ func (c *findBlocksCommand) checkRange(parent context.Context, from *big.Int, to
 	c.resFromBlock = newFromBlock
 	c.startBlockNumber = startBlock
 
-	log.Debug("end findBlocksCommand checkRange", "chainID", c.chainClient.NetworkID(), "account", account,
-		"c.startBlock", c.startBlockNumber, "newFromBlock", newFromBlock.Number,
-		"toBlockNumber", to, "c.resFromBlock", c.resFromBlock.Number)
+	logutils.ZapLogger().Debug("end findBlocksCommand checkRange",
+		zap.Uint64("chainID", c.chainClient.NetworkID()),
+		zap.Stringer("account", account),
+		zap.Stringer("c.startBlock", c.startBlockNumber),
+		zap.Stringer("newFromBlock", newFromBlock.Number),
+		zap.Stringer("toBlockNumber", to),
+		zap.Stringer("c.resFromBlock", c.resFromBlock.Number),
+	)
 
 	return
 }
@@ -767,8 +926,12 @@ func loadBlockRangeInfo(chainID uint64, account common.Address, blockDAO BlockRa
 
 	blockRange, _, err := blockDAO.getBlockRange(chainID, account)
 	if err != nil {
-		log.Error("failed to load block ranges from database", "chain", chainID, "account", account,
-			"error", err)
+		logutils.ZapLogger().Error(
+			"failed to load block ranges from database",
+			zap.Uint64("chain", chainID),
+			zap.Stringer("account", account),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
@@ -792,7 +955,7 @@ func areAllHistoryBlocksLoadedForAddress(blockRangeDAO BlockRangeDAOer, chainID 
 
 	blockRange, _, err := blockRangeDAO.getBlockRange(chainID, address)
 	if err != nil {
-		log.Error("findBlocksCommand getBlockRange", "error", err)
+		logutils.ZapLogger().Error("findBlocksCommand getBlockRange", zap.Error(err))
 		return false, err
 	}
 
@@ -805,8 +968,12 @@ func (c *findBlocksCommand) fastIndex(ctx context.Context, account common.Addres
 	fromBlock *Block, toBlockNumber *big.Int) (resultingFrom *Block, headers []*DBHeader,
 	startBlock *big.Int, err error) {
 
-	log.Debug("fast index started", "chainID", c.chainClient.NetworkID(), "account", account,
-		"from", fromBlock.Number, "to", toBlockNumber)
+	logutils.ZapLogger().Debug("fast index started",
+		zap.Uint64("chainID", c.chainClient.NetworkID()),
+		zap.Stringer("account", account),
+		zap.Stringer("from", fromBlock.Number),
+		zap.Stringer("to", toBlockNumber),
+	)
 
 	start := time.Now()
 	group := async.NewGroup(ctx)
@@ -826,7 +993,7 @@ func (c *findBlocksCommand) fastIndex(ctx context.Context, account common.Addres
 	select {
 	case <-ctx.Done():
 		err = ctx.Err()
-		log.Debug("fast indexer ctx Done", "error", err)
+		logutils.ZapLogger().Debug("fast indexer ctx Done", zap.Error(err))
 		return
 	case <-group.WaitAsync():
 		if command.error != nil {
@@ -836,8 +1003,14 @@ func (c *findBlocksCommand) fastIndex(ctx context.Context, account common.Addres
 		resultingFrom = &Block{Number: command.resultingFrom}
 		headers = command.foundHeaders
 		startBlock = command.startBlock
-		log.Debug("fast indexer finished", "chainID", c.chainClient.NetworkID(), "account", account, "in", time.Since(start),
-			"startBlock", command.startBlock, "resultingFrom", resultingFrom.Number, "headers", len(headers))
+		logutils.ZapLogger().Debug("fast indexer finished",
+			zap.Uint64("chainID", c.chainClient.NetworkID()),
+			zap.Stringer("account", account),
+			zap.Duration("in", time.Since(start)),
+			zap.Stringer("startBlock", command.startBlock),
+			zap.Stringer("resultingFrom", resultingFrom.Number),
+			zap.Int("headers", len(headers)),
+		)
 		return
 	}
 }
@@ -865,8 +1038,11 @@ func (c *findBlocksCommand) fastIndexErc20(ctx context.Context, fromBlockNumber 
 		return nil, ctx.Err()
 	case <-group.WaitAsync():
 		headers := erc20.foundHeaders
-		log.Debug("fast indexer Erc20 finished", "chainID", c.chainClient.NetworkID(),
-			"in", time.Since(start), "headers", len(headers))
+		logutils.ZapLogger().Debug("fast indexer Erc20 finished",
+			zap.Uint64("chainID", c.chainClient.NetworkID()),
+			zap.Duration("in", time.Since(start)),
+			zap.Int("headers", len(headers)),
+		)
 		return headers, nil
 	}
 }
@@ -880,15 +1056,21 @@ func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) 
 			c.decLoops()
 		}()
 
-		log.Debug("loadTransfersLoop start", "chain", c.chainClient.NetworkID())
+		logutils.ZapLogger().Debug("loadTransfersLoop start", zap.Uint64("chain", c.chainClient.NetworkID()))
 
 		for {
 			select {
 			case <-ctx.Done():
-				log.Debug("startTransfersLoop done", "chain", c.chainClient.NetworkID(), "error", ctx.Err())
+				logutils.ZapLogger().Debug("startTransfersLoop done",
+					zap.Uint64("chain", c.chainClient.NetworkID()),
+					zap.Error(ctx.Err()),
+				)
 				return
 			case dbHeaders := <-c.blocksLoadedCh:
-				log.Debug("loadTransfersOnDemand transfers received", "chain", c.chainClient.NetworkID(), "headers", len(dbHeaders))
+				logutils.ZapLogger().Debug("loadTransfersOnDemand transfers received",
+					zap.Uint64("chain", c.chainClient.NetworkID()),
+					zap.Int("headers", len(dbHeaders)),
+				)
 
 				blocksByAddress := map[common.Address][]*big.Int{}
 				// iterate over headers and group them by address
@@ -967,7 +1149,10 @@ func (c *loadBlocksAndTransfersCommand) isStarted() bool {
 }
 
 func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) (err error) {
-	log.Debug("start load all transfers command", "chain", c.chainClient.NetworkID(), "accounts", c.accounts)
+	logutils.ZapLogger().Debug("start load all transfers command",
+		zap.Uint64("chain", c.chainClient.NetworkID()),
+		zap.Any("accounts", c.accounts),
+	)
 
 	// Finite processes (to be restarted on error, but stopped on success or context cancel):
 	// fetching transfers for loaded blocks
@@ -1015,7 +1200,7 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) (err error) 
 	// It will start loadTransfersCommand which will run until all transfers from DB are loaded or any one failed to load
 	err = c.startFetchingTransfersForLoadedBlocks(finiteGroup)
 	if err != nil {
-		log.Error("loadBlocksAndTransfersCommand fetchTransfersForLoadedBlocks", "error", err)
+		logutils.ZapLogger().Error("loadBlocksAndTransfersCommand fetchTransfersForLoadedBlocks", zap.Error(err))
 		return err
 	}
 
@@ -1027,16 +1212,26 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) (err error) 
 	// It will start findBlocksCommands which will run until success when all blocks are loaded
 	err = c.fetchHistoryBlocks(finiteGroup, c.accounts, fromNum, headNum, c.blocksLoadedCh)
 	if err != nil {
-		log.Error("loadBlocksAndTransfersCommand fetchHistoryBlocks", "error", err)
+		logutils.ZapLogger().Error("loadBlocksAndTransfersCommand fetchHistoryBlocks", zap.Error(err))
 		return err
 	}
 
 	select {
 	case <-ctx.Done():
-		log.Debug("loadBlocksAndTransfers command cancelled", "chain", c.chainClient.NetworkID(), "accounts", c.accounts, "error", ctx.Err())
+		logutils.ZapLogger().Debug("loadBlocksAndTransfers command cancelled",
+			zap.Uint64("chain", c.chainClient.NetworkID()),
+			zap.Stringers("accounts", c.accounts),
+			zap.Error(ctx.Err()),
+		)
 	case <-finiteGroup.WaitAsync():
 		err = finiteGroup.Error() // if there was an error, rerun the command
-		log.Debug("end loadBlocksAndTransfers command", "chain", c.chainClient.NetworkID(), "accounts", c.accounts, "error", err, "group", finiteGroup.Name())
+		logutils.ZapLogger().Debug(
+			"end loadBlocksAndTransfers command",
+			zap.Uint64("chain", c.chainClient.NetworkID()),
+			zap.Stringers("accounts", c.accounts),
+			zap.String("group", finiteGroup.Name()),
+			zap.Error(err),
+		)
 	}
 
 	return err
@@ -1071,19 +1266,22 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(group *async.AtomicGr
 }
 
 func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *async.AtomicGroup, account common.Address, fromNum, toNum *big.Int, blocksLoadedCh chan []*DBHeader) error {
-
-	log.Debug("fetchHistoryBlocks start", "chainID", c.chainClient.NetworkID(), "account", account, "omit", c.omitHistory)
+	logutils.ZapLogger().Debug("fetchHistoryBlocks start",
+		zap.Uint64("chainID", c.chainClient.NetworkID()),
+		zap.Stringer("account", account),
+		zap.Bool("omit", c.omitHistory),
+	)
 
 	if c.omitHistory {
 		blockRange := &ethTokensBlockRanges{eth: &BlockRange{nil, big.NewInt(0), toNum}, tokens: &BlockRange{nil, big.NewInt(0), toNum}}
 		err := c.blockRangeDAO.upsertRange(c.chainClient.NetworkID(), account, blockRange)
-		log.Error("fetchHistoryBlocks upsertRange", "error", err)
+		logutils.ZapLogger().Error("fetchHistoryBlocks upsertRange", zap.Error(err))
 		return err
 	}
 
 	blockRange, err := loadBlockRangeInfo(c.chainClient.NetworkID(), account, c.blockRangeDAO)
 	if err != nil {
-		log.Error("fetchHistoryBlocks loadBlockRangeInfo", "error", err)
+		logutils.ZapLogger().Error("fetchHistoryBlocks loadBlockRangeInfo", zap.Error(err))
 		return err
 	}
 
@@ -1132,7 +1330,11 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 		}
 
 		for _, rangeItem := range ranges {
-			log.Debug("range item", "r", rangeItem, "n", c.chainClient.NetworkID(), "a", account)
+			logutils.ZapLogger().Debug("range item",
+				zap.Stringers("r", rangeItem),
+				zap.Uint64("n", c.chainClient.NetworkID()),
+				zap.Stringer("a", account),
+			)
 
 			fbc := &findBlocksCommand{
 				accounts:                  []common.Address{account},
@@ -1157,7 +1359,10 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 }
 
 func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(ctx context.Context, addresses []common.Address, fromNum *big.Int, blocksLoadedCh chan<- []*DBHeader) {
-	log.Debug("startFetchingNewBlocks start", "chainID", c.chainClient.NetworkID(), "accounts", addresses)
+	logutils.ZapLogger().Debug("startFetchingNewBlocks start",
+		zap.Uint64("chainID", c.chainClient.NetworkID()),
+		zap.Stringers("accounts", addresses),
+	)
 
 	c.incLoops()
 	go func() {
@@ -1192,7 +1397,11 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(ctx context.Conte
 		// No need to wait for the group since it is infinite
 		<-ctx.Done()
 
-		log.Debug("startFetchingNewBlocks end", "chainID", c.chainClient.NetworkID(), "accounts", addresses, "error", ctx.Err())
+		logutils.ZapLogger().Debug("startFetchingNewBlocks end",
+			zap.Uint64("chainID", c.chainClient.NetworkID()),
+			zap.Stringers("accounts", addresses),
+			zap.Error(ctx.Err()),
+		)
 	}()
 }
 
@@ -1201,12 +1410,15 @@ func (c *loadBlocksAndTransfersCommand) getBlocksToLoad() (map[common.Address][]
 	for _, account := range c.accounts {
 		blocks, err := c.blockDAO.GetBlocksToLoadByAddress(c.chainClient.NetworkID(), account, numberOfBlocksCheckedPerIteration)
 		if err != nil {
-			log.Error("loadBlocksAndTransfersCommand GetBlocksToLoadByAddress", "error", err)
+			logutils.ZapLogger().Error("loadBlocksAndTransfersCommand GetBlocksToLoadByAddress", zap.Error(err))
 			return nil, err
 		}
 
 		if len(blocks) == 0 {
-			log.Debug("fetchTransfers no blocks to load", "chainID", c.chainClient.NetworkID(), "account", account)
+			logutils.ZapLogger().Debug("fetchTransfers no blocks to load",
+				zap.Uint64("chainID", c.chainClient.NetworkID()),
+				zap.Stringer("account", account),
+			)
 			continue
 		}
 
@@ -1214,15 +1426,17 @@ func (c *loadBlocksAndTransfersCommand) getBlocksToLoad() (map[common.Address][]
 	}
 
 	if len(blocksMap) == 0 {
-		log.Debug("fetchTransfers no blocks to load", "chainID", c.chainClient.NetworkID())
+		logutils.ZapLogger().Debug("fetchTransfers no blocks to load", zap.Uint64("chainID", c.chainClient.NetworkID()))
 	}
 
 	return blocksMap, nil
 }
 
 func (c *loadBlocksAndTransfersCommand) startFetchingTransfersForLoadedBlocks(group *async.AtomicGroup) error {
-
-	log.Debug("fetchTransfers start", "chainID", c.chainClient.NetworkID(), "accounts", c.accounts)
+	logutils.ZapLogger().Debug("fetchTransfers start",
+		zap.Uint64("chainID", c.chainClient.NetworkID()),
+		zap.Stringers("accounts", c.accounts),
+	)
 
 	blocksMap, err := c.getBlocksToLoad()
 	if err != nil {
@@ -1244,7 +1458,10 @@ func (c *loadBlocksAndTransfersCommand) startFetchingTransfersForLoadedBlocks(gr
 		}
 
 		group.Add(txCommand.Command())
-		log.Debug("fetchTransfers end", "chainID", c.chainClient.NetworkID(), "accounts", c.accounts)
+		logutils.ZapLogger().Debug("fetchTransfers end",
+			zap.Uint64("chainID", c.chainClient.NetworkID()),
+			zap.Stringers("accounts", c.accounts),
+		)
 	}()
 
 	return nil
@@ -1263,14 +1480,14 @@ func (c *loadBlocksAndTransfersCommand) notifyHistoryReady(account common.Addres
 func (c *loadBlocksAndTransfersCommand) areAllTransfersLoaded(account common.Address) (bool, error) {
 	allBlocksLoaded, err := areAllHistoryBlocksLoadedForAddress(c.blockRangeDAO, c.chainClient.NetworkID(), account)
 	if err != nil {
-		log.Error("loadBlockAndTransfersCommand allHistoryBlocksLoaded", "error", err)
+		logutils.ZapLogger().Error("loadBlockAndTransfersCommand allHistoryBlocksLoaded", zap.Error(err))
 		return false, err
 	}
 
 	if allBlocksLoaded {
 		headers, err := c.blockDAO.GetBlocksToLoadByAddress(c.chainClient.NetworkID(), account, 1)
 		if err != nil {
-			log.Error("loadBlocksAndTransfersCommand GetFirstSavedBlock", "error", err)
+			logutils.ZapLogger().Error("loadBlocksAndTransfersCommand GetFirstSavedBlock", zap.Error(err))
 			return false, err
 		}
 
@@ -1289,7 +1506,7 @@ func getHeadBlockNumber(parent context.Context, chainClient chain.ClientInterfac
 	head, err := chainClient.HeaderByNumber(ctx, nil)
 	cancel()
 	if err != nil {
-		log.Error("getHeadBlockNumber", "error", err)
+		logutils.ZapLogger().Error("getHeadBlockNumber", zap.Error(err))
 		return nil, err
 	}
 
@@ -1297,7 +1514,10 @@ func getHeadBlockNumber(parent context.Context, chainClient chain.ClientInterfac
 }
 
 func nextRange(maxRangeSize int, prevFrom, zeroBlockNumber *big.Int) (*big.Int, *big.Int) {
-	log.Debug("next range start", "from", prevFrom, "zeroBlockNumber", zeroBlockNumber)
+	logutils.ZapLogger().Debug("next range start",
+		zap.Stringer("from", prevFrom),
+		zap.Stringer("zeroBlockNumber", zeroBlockNumber),
+	)
 
 	rangeSize := big.NewInt(int64(maxRangeSize))
 
@@ -1307,7 +1527,11 @@ func nextRange(maxRangeSize int, prevFrom, zeroBlockNumber *big.Int) (*big.Int, 
 		from = new(big.Int).Set(zeroBlockNumber)
 	}
 
-	log.Debug("next range end", "from", from, "to", to, "zeroBlockNumber", zeroBlockNumber)
+	logutils.ZapLogger().Debug("next range end",
+		zap.Stringer("from", from),
+		zap.Stringer("to", to),
+		zap.Stringer("zeroBlockNumber", zeroBlockNumber),
+	)
 
 	return from, to
 }
@@ -1323,12 +1547,19 @@ func createChainClientWithLimiter(client chain.ClientInterface, account common.A
 
 	// Check if limit is already reached, then skip the comamnd
 	if allow, err := limiter.Allow(accountTag); !allow {
-		log.Info("fetchHistoryBlocksForAccount limit reached", "account", account, "chain", chainClient.NetworkID(), "error", err)
+		logutils.ZapLogger().Info("fetchHistoryBlocksForAccount limit reached",
+			zap.Stringer("account", account),
+			zap.Uint64("chain", chainClient.NetworkID()),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	if allow, err := limiter.Allow(transferHistoryTag); !allow {
-		log.Info("fetchHistoryBlocksForAccount common limit reached", "chain", chainClient.NetworkID(), "error", err)
+		logutils.ZapLogger().Info("fetchHistoryBlocksForAccount common limit reached",
+			zap.Uint64("chain", chainClient.NetworkID()),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
@@ -1336,7 +1567,10 @@ func createChainClientWithLimiter(client chain.ClientInterface, account common.A
 	if limit == nil {
 		err := limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, rpclimiter.LimitInfinitely)
 		if err != nil {
-			log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "accountTag", accountTag)
+			logutils.ZapLogger().Error("fetchHistoryBlocksForAccount SetLimit",
+				zap.String("accountTag", accountTag),
+				zap.Error(err),
+			)
 		}
 	}
 
@@ -1344,7 +1578,10 @@ func createChainClientWithLimiter(client chain.ClientInterface, account common.A
 	// after app restart if the limit was reached. Currently there is no way to reset the limit from UI
 	err := limiter.SetLimit(transferHistoryTag, transferHistoryLimit, transferHistoryLimitPeriod)
 	if err != nil {
-		log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "groupTag", transferHistoryTag)
+		logutils.ZapLogger().Error("fetchHistoryBlocksForAccount SetLimit",
+			zap.String("groupTag", transferHistoryTag),
+			zap.Error(err),
+		)
 	}
 	chainClient.SetLimiter(limiter)
 

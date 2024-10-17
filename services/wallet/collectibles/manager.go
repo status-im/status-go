@@ -11,14 +11,16 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/circuitbreaker"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/contracts/ierc1155"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/server"
@@ -135,7 +137,7 @@ func (o *Manager) doContentTypeRequest(ctx context.Context, url string) (string,
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			log.Error("failed to close head request body", "err", err)
+			logutils.ZapLogger().Error("failed to close head request body", zap.Error(err))
 		}
 	}()
 
@@ -233,7 +235,10 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 			func() ([]interface{}, error) {
 				assetContainer, err := provider.FetchAllAssetsByOwnerAndContractAddress(ctx, chainID, owner, contractAddresses, cursor, limit)
 				if err != nil {
-					log.Error("FetchAllAssetsByOwnerAndContractAddress failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+					logutils.ZapLogger().Error("FetchAllAssetsByOwnerAndContractAddress failed for",
+						zap.String("provider", provider.ID()),
+						zap.Stringer("chainID", chainID),
+						zap.Error(err))
 				}
 				return []interface{}{assetContainer}, err
 			}, getCircuitName(provider, chainID),
@@ -247,7 +252,10 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 
 	cmdRes := o.circuitBreaker.Execute(cmd)
 	if cmdRes.Error() != nil {
-		log.Error("FetchAllAssetsByOwnerAndContractAddress failed for", "chainID", chainID, "err", cmdRes.Error())
+		logutils.ZapLogger().Error("FetchAllAssetsByOwnerAndContractAddress failed for",
+			zap.Stringer("chainID", chainID),
+			zap.Error(cmdRes.Error()),
+		)
 		return nil, cmdRes.Error()
 	}
 
@@ -277,7 +285,11 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 			func() ([]interface{}, error) {
 				assetContainer, err := provider.FetchAllAssetsByOwner(ctx, chainID, owner, cursor, limit)
 				if err != nil {
-					log.Error("FetchAllAssetsByOwner failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+					logutils.ZapLogger().Error("FetchAllAssetsByOwner failed for",
+						zap.String("provider", provider.ID()),
+						zap.Stringer("chainID", chainID),
+						zap.Error(err),
+					)
 				}
 				return []interface{}{assetContainer}, err
 			}, getCircuitName(provider, chainID),
@@ -291,7 +303,10 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 
 	cmdRes := o.circuitBreaker.Execute(cmd)
 	if cmdRes.Error() != nil {
-		log.Error("FetchAllAssetsByOwner failed for", "chainID", chainID, "err", cmdRes.Error())
+		logutils.ZapLogger().Error("FetchAllAssetsByOwner failed for",
+			zap.Stringer("chainID", chainID),
+			zap.Error(cmdRes.Error()),
+		)
 		return nil, cmdRes.Error()
 	}
 
@@ -372,7 +387,11 @@ func (o *Manager) fillMissingBalances(ctx context.Context, owner common.Address,
 
 			balances, err := o.FetchERC1155Balances(ctx, owner, chainID, contractAddress, tokenIDs)
 			if err != nil {
-				log.Error("FetchERC1155Balances failed", "chainID", chainID, "contractAddress", contractAddress, "err", err)
+				logutils.ZapLogger().Error("FetchERC1155Balances failed",
+					zap.Stringer("chainID", chainID),
+					zap.Stringer("contractAddress", contractAddress),
+					zap.Error(err),
+				)
 				continue
 			}
 
@@ -432,13 +451,21 @@ func (o *Manager) FetchMissingAssetsByCollectibleUniqueID(ctx context.Context, u
 
 			fetchedAssets, err := o.fetchMissingAssetsForChainByCollectibleUniqueID(ctx, chainID, idsToFetch)
 			if err != nil {
-				log.Error("FetchMissingAssetsByCollectibleUniqueID failed for", "chainID", chainID, "ids", idsToFetch, "err", err)
+				logutils.ZapLogger().Error("FetchMissingAssetsByCollectibleUniqueID failed for",
+					zap.Stringer("chainID", chainID),
+					zap.Any("ids", idsToFetch),
+					zap.Error(err),
+				)
 				return err
 			}
 
 			updatedCollectibles, err := o.processFullCollectibleData(ctx, fetchedAssets, asyncFetch)
 			if err != nil {
-				log.Error("processFullCollectibleData failed for", "chainID", chainID, "len(fetchedAssets)", len(fetchedAssets), "err", err)
+				logutils.ZapLogger().Error("processFullCollectibleData failed for",
+					zap.Stringer("chainID", chainID),
+					zap.Int("len(fetchedAssets)", len(fetchedAssets)),
+					zap.Error(err),
+				)
 				return err
 			}
 
@@ -466,7 +493,11 @@ func (o *Manager) fetchMissingAssetsForChainByCollectibleUniqueID(ctx context.Co
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]any, error) {
 			fetchedAssets, err := provider.FetchAssetsByCollectibleUniqueID(ctx, idsToFetch)
 			if err != nil {
-				log.Error("fetchMissingAssetsForChainByCollectibleUniqueID failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+				logutils.ZapLogger().Error("fetchMissingAssetsForChainByCollectibleUniqueID failed",
+					zap.String("provider", provider.ID()),
+					zap.Stringer("chainID", chainID),
+					zap.Error(err),
+				)
 			}
 
 			return []any{fetchedAssets}, err
@@ -479,7 +510,10 @@ func (o *Manager) fetchMissingAssetsForChainByCollectibleUniqueID(ctx context.Co
 
 	cmdRes := o.circuitBreaker.Execute(cmd)
 	if cmdRes.Error() != nil {
-		log.Error("fetchMissingAssetsForChainByCollectibleUniqueID failed for", "chainID", chainID, "err", cmdRes.Error())
+		logutils.ZapLogger().Error("fetchMissingAssetsForChainByCollectibleUniqueID failed for",
+			zap.Stringer("chainID", chainID),
+			zap.Error(cmdRes.Error()),
+		)
 		return nil, cmdRes.Error()
 	}
 	return cmdRes.Result()[0].([]thirdparty.FullCollectibleData), cmdRes.Error()
@@ -518,7 +552,10 @@ func (o *Manager) FetchCollectionsDataByContractID(ctx context.Context, ids []th
 
 			cmdRes := o.circuitBreaker.Execute(cmd)
 			if cmdRes.Error() != nil {
-				log.Error("FetchCollectionsDataByContractID failed for", "chainID", chainID, "err", cmdRes.Error())
+				logutils.ZapLogger().Error("FetchCollectionsDataByContractID failed for",
+					zap.Stringer("chainID", chainID),
+					zap.Error(cmdRes.Error()),
+				)
 				return cmdRes.Error()
 			}
 
@@ -563,7 +600,11 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(ctx context.Context, c
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]any, error) {
 			res, err := provider.FetchCollectibleOwnersByContractAddress(ctx, chainID, contractAddress)
 			if err != nil {
-				log.Error("FetchCollectibleOwnersByContractAddress failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+				logutils.ZapLogger().Error("FetchCollectibleOwnersByContractAddress failed",
+					zap.String("provider", provider.ID()),
+					zap.Stringer("chainID", chainID),
+					zap.Error(err),
+				)
 			}
 			return []any{res}, err
 		}, getCircuitName(provider, chainID)))
@@ -575,7 +616,10 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(ctx context.Context, c
 
 	cmdRes := o.circuitBreaker.Execute(cmd)
 	if cmdRes.Error() != nil {
-		log.Error("FetchCollectibleOwnersByContractAddress failed for", "chainID", chainID, "err", cmdRes.Error())
+		logutils.ZapLogger().Error("FetchCollectibleOwnersByContractAddress failed for",
+			zap.Stringer("chainID", chainID),
+			zap.Error(cmdRes.Error()),
+		)
 		return nil, cmdRes.Error()
 	}
 	return cmdRes.Result()[0].(*thirdparty.CollectibleContractOwnership), cmdRes.Error()
@@ -642,7 +686,7 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 			// Get TokenURI if not given by provider
 			err := o.fillTokenURI(ctx, asset)
 			if err != nil {
-				log.Error("fillTokenURI failed", "err", err)
+				logutils.ZapLogger().Error("fillTokenURI failed", zap.Error(err))
 				delete(fullyFetchedAssets, asset.CollectibleData.ID.HashKey())
 				continue
 			}
@@ -650,7 +694,7 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 			// Get CommunityID if obtainable from TokenURI
 			err = o.fillCommunityID(asset)
 			if err != nil {
-				log.Error("fillCommunityID failed", "err", err)
+				logutils.ZapLogger().Error("fillCommunityID failed", zap.Error(err))
 				delete(fullyFetchedAssets, asset.CollectibleData.ID.HashKey())
 				continue
 			}
@@ -676,7 +720,7 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 		} else {
 			err := o.fetchCommunityAssets(communityID, communityAssets)
 			if err != nil {
-				log.Error("fetchCommunityAssets failed", "communityID", communityID, "err", err)
+				logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", communityID), zap.Error(err))
 				continue
 			}
 			for _, asset := range communityAssets {
@@ -688,7 +732,7 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 	for _, asset := range fullyFetchedAssets {
 		err := o.fillAnimationMediatype(ctx, asset)
 		if err != nil {
-			log.Error("fillAnimationMediatype failed", "err", err)
+			logutils.ZapLogger().Error("fillAnimationMediatype failed", zap.Error(err))
 			delete(fullyFetchedAssets, asset.CollectibleData.ID.HashKey())
 			continue
 		}
@@ -764,9 +808,9 @@ func (o *Manager) fillCommunityID(asset *thirdparty.FullCollectibleData) error {
 func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
 	communityFound, err := o.communityManager.FillCollectiblesMetadata(communityID, communityAssets)
 	if err != nil {
-		log.Error("FillCollectiblesMetadata failed", "communityID", communityID, "err", err)
+		logutils.ZapLogger().Error("FillCollectiblesMetadata failed", zap.String("communityID", communityID), zap.Error(err))
 	} else if !communityFound {
-		log.Warn("fetchCommunityAssets community not found", "communityID", communityID)
+		logutils.ZapLogger().Warn("fetchCommunityAssets community not found", zap.String("communityID", communityID))
 	}
 
 	// If the community is found, we update the DB.
@@ -785,13 +829,13 @@ func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*th
 
 	err = o.collectiblesDataDB.SetData(collectiblesData, allowUpdate)
 	if err != nil {
-		log.Error("collectiblesDataDB SetData failed", "communityID", communityID, "err", err)
+		logutils.ZapLogger().Error("collectiblesDataDB SetData failed", zap.String("communityID", communityID), zap.Error(err))
 		return err
 	}
 
 	err = o.collectionsDataDB.SetData(collectionsData, allowUpdate)
 	if err != nil {
-		log.Error("collectionsDataDB SetData failed", "communityID", communityID, "err", err)
+		logutils.ZapLogger().Error("collectionsDataDB SetData failed", zap.String("communityID", communityID), zap.Error(err))
 		return err
 	}
 
@@ -799,7 +843,7 @@ func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*th
 		if asset.CollectibleCommunityInfo != nil {
 			err = o.collectiblesDataDB.SetCommunityInfo(asset.CollectibleData.ID, *asset.CollectibleCommunityInfo)
 			if err != nil {
-				log.Error("collectiblesDataDB SetCommunityInfo failed", "communityID", communityID, "err", err)
+				logutils.ZapLogger().Error("collectiblesDataDB SetCommunityInfo failed", zap.String("communityID", communityID), zap.Error(err))
 				return err
 			}
 		}
@@ -817,7 +861,7 @@ func (o *Manager) fetchCommunityAssetsAsync(_ context.Context, communityID strin
 		defer gocommon.LogOnPanic()
 		err := o.fetchCommunityAssets(communityID, communityAssets)
 		if err != nil {
-			log.Error("fetchCommunityAssets failed", "communityID", communityID, "err", err)
+			logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", communityID), zap.Error(err))
 			return
 		}
 
@@ -968,7 +1012,7 @@ func (o *Manager) signalUpdatedCollectiblesData(ids []thirdparty.CollectibleUniq
 
 		collectibles, err := o.getCacheFullCollectibleData(pageIDs)
 		if err != nil {
-			log.Error("Error getting FullCollectibleData from cache: %v", err)
+			logutils.ZapLogger().Error("Error getting FullCollectibleData from cache", zap.Error(err))
 			return
 		}
 
@@ -977,7 +1021,7 @@ func (o *Manager) signalUpdatedCollectiblesData(ids []thirdparty.CollectibleUniq
 
 		payload, err := json.Marshal(details)
 		if err != nil {
-			log.Error("Error marshaling response: %v", err)
+			logutils.ZapLogger().Error("Error marshaling response", zap.Error(err))
 			return
 		}
 
@@ -1008,7 +1052,11 @@ func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.C
 
 		container, err := provider.SearchCollectibles(ctx, chainID, collections, text, cursor, limit)
 		if err != nil {
-			log.Error("FetchAllAssetsByOwner failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+			logutils.ZapLogger().Error("FetchAllAssetsByOwner failed for",
+				zap.String("provider", provider.ID()),
+				zap.Stringer("chainID", chainID),
+				zap.Error(err),
+			)
 			continue
 		}
 
@@ -1042,7 +1090,11 @@ func (o *Manager) SearchCollections(ctx context.Context, chainID walletCommon.Ch
 		// TODO (#13951): Be smarter about how we handle the user-entered string
 		container, err := provider.SearchCollections(ctx, chainID, query, cursor, limit)
 		if err != nil {
-			log.Error("FetchAllAssetsByOwner failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+			logutils.ZapLogger().Error("FetchAllAssetsByOwner failed for",
+				zap.String("provider", provider.ID()),
+				zap.Stringer("chainID", chainID),
+				zap.Error(err),
+			)
 			continue
 		}
 
@@ -1067,7 +1119,11 @@ func (o *Manager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) 
 
 		socials, err := o.getOrFetchSocialsForCollection(context.Background(), contractID)
 		if err != nil || socials == nil {
-			log.Debug("FetchCollectionSocialsAsync failed for", "chainID", contractID.ChainID, "address", contractID.Address, "err", err)
+			logutils.ZapLogger().Debug("FetchCollectionSocialsAsync failed for",
+				zap.Stringer("chainID", contractID.ChainID),
+				zap.Stringer("address", contractID.Address),
+				zap.Error(err),
+			)
 			return
 		}
 
@@ -1078,7 +1134,7 @@ func (o *Manager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) 
 
 		payload, err := json.Marshal(socialsMessage)
 		if err != nil {
-			log.Error("Error marshaling response: %v", err)
+			logutils.ZapLogger().Error("Error marshaling response", zap.Error(err))
 			return
 		}
 
@@ -1096,7 +1152,11 @@ func (o *Manager) FetchCollectionSocialsAsync(contractID thirdparty.ContractID) 
 func (o *Manager) getOrFetchSocialsForCollection(_ context.Context, contractID thirdparty.ContractID) (*thirdparty.CollectionSocials, error) {
 	socials, err := o.collectionsDataDB.GetSocialsForID(contractID)
 	if err != nil {
-		log.Debug("getOrFetchSocialsForCollection failed for", "chainID", contractID.ChainID, "address", contractID.Address, "err", err)
+		logutils.ZapLogger().Debug("getOrFetchSocialsForCollection failed for",
+			zap.Stringer("chainID", contractID.ChainID),
+			zap.Stringer("address", contractID.Address),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 	if socials == nil {
@@ -1116,7 +1176,11 @@ func (o *Manager) fetchSocialsForCollection(ctx context.Context, contractID thir
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
 			socials, err := provider.FetchCollectionSocials(ctx, contractID)
 			if err != nil {
-				log.Error("FetchCollectionSocials failed for", "provider", provider.ID(), "chainID", contractID.ChainID, "err", err)
+				logutils.ZapLogger().Error("FetchCollectionSocials failed for",
+					zap.String("provider", provider.ID()),
+					zap.Stringer("chainID", contractID.ChainID),
+					zap.Error(err),
+				)
 			}
 			return []interface{}{socials}, err
 		}, getCircuitName(provider, contractID.ChainID)))
@@ -1128,14 +1192,17 @@ func (o *Manager) fetchSocialsForCollection(ctx context.Context, contractID thir
 
 	cmdRes := o.circuitBreaker.Execute(cmd)
 	if cmdRes.Error() != nil {
-		log.Error("fetchSocialsForCollection failed for", "chainID", contractID.ChainID, "err", cmdRes.Error())
+		logutils.ZapLogger().Error("fetchSocialsForCollection failed for",
+			zap.Stringer("chainID", contractID.ChainID),
+			zap.Error(cmdRes.Error()),
+		)
 		return nil, cmdRes.Error()
 	}
 
 	socials := cmdRes.Result()[0].(*thirdparty.CollectionSocials)
 	err := o.collectionsDataDB.SetCollectionSocialsData(contractID, socials)
 	if err != nil {
-		log.Error("Error saving socials to DB: %v", err)
+		logutils.ZapLogger().Error("Error saving socials to DB", zap.Error(err))
 		return nil, err
 	}
 

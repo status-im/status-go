@@ -6,8 +6,10 @@ import (
 	hpprof "net/http/pprof"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 // Profiler runs and controls a HTTP pprof interface.
@@ -38,7 +40,7 @@ func NewProfiler(port int) *Profiler {
 func (p *Profiler) Go() {
 	go func() {
 		defer common.LogOnPanic()
-		log.Info("debug server stopped", "err", p.server.ListenAndServe())
+		logutils.ZapLogger().Info("debug server stopped", zap.Error(p.server.ListenAndServe()))
 	}()
-	log.Info("debug server started")
+	logutils.ZapLogger().Info("debug server started")
 }

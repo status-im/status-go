@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 	xdraw "golang.org/x/image/draw"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 )
 
 type Circle struct {
@@ -48,7 +48,10 @@ func Resize(size ResizeDimension, img image.Image) image.Image {
 		width, height = uint(size), 0
 	}
 
-	log.Info("resizing", "size", size, "width", width, "height", height)
+	logutils.ZapLogger().Info("resizing",
+		zap.Uint("size", uint(size)),
+		zap.Uint("width", width),
+		zap.Uint("height", height))
 
 	return resize.Resize(width, height, img, resize.Bilinear)
 }
@@ -264,14 +267,14 @@ func SuperimposeLogoOnQRImage(imageBytes []byte, qrFilepath []byte) []byte {
 	img1, _, err := image.Decode(bytes.NewReader(imageBytes))
 
 	if err != nil {
-		log.Error("error decoding logo Image", zap.Error(err))
+		logutils.ZapLogger().Error("error decoding logo Image", zap.Error(err))
 		return nil
 	}
 
 	img2, _, err := image.Decode(bytes.NewReader(qrFilepath))
 
 	if err != nil {
-		log.Error("error decoding QR Image", zap.Error(err))
+		logutils.ZapLogger().Error("error decoding QR Image", zap.Error(err))
 		return nil
 	}
 	// Create a new image with the dimensions of the first image
@@ -290,7 +293,7 @@ func SuperimposeLogoOnQRImage(imageBytes []byte, qrFilepath []byte) []byte {
 	err = png.Encode(&b, result)
 
 	if err != nil {
-		log.Error("error encoding final result Image to Buffer", zap.Error(err))
+		logutils.ZapLogger().Error("error encoding final result Image to Buffer", zap.Error(err))
 		return nil
 	}
 

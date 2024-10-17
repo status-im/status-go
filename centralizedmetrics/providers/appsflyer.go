@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/centralizedmetrics/common"
 )
@@ -23,14 +24,17 @@ type AppsflyerMetricProcessor struct {
 	appID   string
 	secret  string
 	baseURL string
+
+	logger *zap.Logger
 }
 
 // NewAppsflyerMetricProcessor is a constructor for AppsflyerMetricProcessor
-func NewAppsflyerMetricProcessor(appID, secret, baseURL string) *AppsflyerMetricProcessor {
+func NewAppsflyerMetricProcessor(appID, secret, baseURL string, logger *zap.Logger) *AppsflyerMetricProcessor {
 	return &AppsflyerMetricProcessor{
 		appID:   appID,
 		secret:  secret,
 		baseURL: baseURL,
+		logger:  logger,
 	}
 }
 
@@ -85,7 +89,8 @@ func (p *AppsflyerMetricProcessor) sendToAppsflyer(metric common.Metric) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Warn("failed to send metric", "status-code", resp.StatusCode, "body", resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		p.logger.Warn("failed to send metric", zap.Int("status-code", resp.StatusCode), zap.String("body", string(body)), zap.Error(err))
 		return errors.New("failed to send metric to Appsflyer")
 	}
 

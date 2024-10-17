@@ -5,9 +5,11 @@ import (
 	"math/big"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
@@ -113,12 +115,15 @@ func (s *SequentialFetchStrategy) kind() FetchStrategyType {
 func (s *SequentialFetchStrategy) getTransfersByAddress(ctx context.Context, chainID uint64, address common.Address, toBlock *big.Int,
 	limit int64) ([]Transfer, error) {
 
-	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address,
-		"chainID", chainID, "toBlock", toBlock, "limit", limit)
+	logutils.ZapLogger().Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address",
+		zap.Stringer("address", address),
+		zap.Uint64("chainID", chainID),
+		zap.Stringer("toBlock", toBlock),
+		zap.Int64("limit", limit))
 
 	rst, err := s.db.GetTransfersByAddress(chainID, address, toBlock, limit)
 	if err != nil {
-		log.Error("[WalletAPI:: GetTransfersByAddress] can't fetch transfers", "err", err)
+		logutils.ZapLogger().Error("[WalletAPI:: GetTransfersByAddress] can't fetch transfers", zap.Error(err))
 		return nil, err
 	}
 

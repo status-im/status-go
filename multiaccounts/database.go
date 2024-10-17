@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/migrations"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -484,7 +484,7 @@ func (db *Database) publishOnIdentityImageSubscriptions(change *IdentityImageSub
 		select {
 		case s <- change:
 		default:
-			log.Warn("subscription channel full, dropping message")
+			logutils.ZapLogger().Warn("subscription channel full, dropping message")
 		}
 	}
 }

@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
+	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 )
 
 type FallbackFunc func() ([]any, error)
@@ -177,7 +178,7 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 					return nil
 				}
 				if err != nil {
-					log.Warn("hystrix error", "error", err, "provider", circuitName)
+					logutils.ZapLogger().Warn("hystrix error", zap.String("provider", circuitName), zap.Error(err))
 				}
 				return err
 			}, nil)

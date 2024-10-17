@@ -4,13 +4,15 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 )
 
 const (
@@ -101,10 +103,10 @@ func (ps *ConnectionManager) Start() {
 			case <-ps.quit:
 				return
 			case err := <-sub.Err():
-				log.Error("retry after error subscribing to p2p events", "error", err)
+				logutils.ZapLogger().Error("retry after error subscribing to p2p events", zap.Error(err))
 				return
 			case err := <-whisperSub.Err():
-				log.Error("retry after error suscribing to eventSub events", "error", err)
+				logutils.ZapLogger().Error("retry after error suscribing to eventSub events", zap.Error(err))
 				return
 			case newNodes := <-ps.notifications:
 				state.processReplacement(newNodes, events)
@@ -125,7 +127,7 @@ func (ps *ConnectionManager) Start() {
 						continue
 					}
 					failuresPerServer[ev.Peer]++
-					log.Debug("request to a mail server expired, disconnect a peer", "address", ev.Peer)
+					logutils.ZapLogger().Debug("request to a mail server expired, disconnect a peer", zap.Stringer("address", ev.Peer))
 					if failuresPerServer[ev.Peer] >= ps.maxFailures {
 						state.nodeDisconnected(ev.Peer)
 					}
@@ -157,12 +159,13 @@ func (state *internalState) processReplacement(newNodes []*enode.Node, events <-
 	}
 	state.replaceNodes(replacement)
 	if state.ReachedTarget() {
-		log.Debug("already connected with required target", "target", state.target)
+		logutils.ZapLogger().Debug("already connected with required target", zap.Int("target", state.target))
 		return
 	}
 	if state.timeout != 0 {
-		log.Debug("waiting defined timeout to establish connections",
-			"timeout", state.timeout, "target", state.target)
+		logutils.ZapLogger().Debug("waiting defined timeout to establish connections",
+			zap.Duration("timeout", state.timeout),
+			zap.Int("target", state.target))
 		timer := time.NewTimer(state.timeout)
 		waitForConnections(state, timer.C, events)
 		timer.Stop()
@@ -250,10 +253,10 @@ func (state *internalState) nodeDisconnected(peer types.EnodeID) {
 func processPeerEvent(state *internalState, ev *p2p.PeerEvent) {
 	switch ev.Type {
 	case p2p.PeerEventTypeAdd:
-		log.Debug("connected to a mailserver", "address", ev.Peer)
+		logutils.ZapLogger().Debug("connected to a mailserver", zap.Stringer("address", ev.Peer))
 		state.nodeAdded(types.EnodeID(ev.Peer))
 	case p2p.PeerEventTypeDrop:
-		log.Debug("mailserver disconnected", "address", ev.Peer)
+		logutils.ZapLogger().Debug("mailserver disconnected", zap.Stringer("address", ev.Peer))
 		state.nodeDisconnected(types.EnodeID(ev.Peer))
 	}
 }

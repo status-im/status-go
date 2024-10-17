@@ -1796,7 +1796,12 @@ func (w *Waku) seedBootnodesForDiscV5() {
 			}
 
 			if !canQuery() {
-				w.logger.Info("can't query bootnodes", zap.Int("peer-count", len(w.node.Host().Network().Peers())), zap.Int64("lastTry", lastTry), zap.Int64("now", now()), zap.Int64("backoff", bootnodesQueryBackoffMs*int64(math.Exp2(float64(retries)))), zap.Int("retries", retries))
+				w.logger.Info("can't query bootnodes",
+					zap.Int("peer-count", len(w.node.Host().Network().Peers())),
+					zap.Int64("lastTry", lastTry), zap.Int64("now", now()),
+					zap.Int64("backoff", bootnodesQueryBackoffMs*int64(math.Exp2(float64(retries)))),
+					zap.Int("retries", retries),
+				)
 				continue
 			}
 

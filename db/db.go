@@ -9,8 +9,9 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 )
 
 type storagePrefix byte
@@ -84,7 +85,7 @@ func Create(path, dbName string) (*leveldb.DB, error) {
 func Open(path string, opts *opt.Options) (db *leveldb.DB, err error) {
 	db, err = leveldb.OpenFile(path, opts)
 	if _, iscorrupted := err.(*errors.ErrCorrupted); iscorrupted {
-		log.Info("database is corrupted trying to recover", "path", path)
+		logutils.ZapLogger().Info("database is corrupted trying to recover", zap.String("path", path))
 		db, err = leveldb.RecoverFile(path, nil)
 	}
 	return

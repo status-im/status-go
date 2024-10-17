@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol"
@@ -19,14 +17,12 @@ var (
 
 func NewAPI(service *Service) *API {
 	return &API{
-		s:   service,
-		log: log.New("package", "status-go/services/chat.API"),
+		s: service,
 	}
 }
 
 type API struct {
-	s   *Service
-	log log.Logger
+	s *Service
 }
 
 func (api *API) EditChat(ctx context.Context, communityID types.HexBytes, chatID string, name string, color string, image images.CroppedImage) (*protocol.MessengerResponse, error) {

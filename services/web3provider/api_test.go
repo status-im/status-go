@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
@@ -54,7 +55,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	utils.Init()
 	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount1PKFile()))
 
-	accManager := account.NewGethManager()
+	accManager := account.NewGethManager(tt.MustCreateTestLogger())
 
 	nodeConfig := &params.NodeConfig{
 		KeyStoreDir: keyStoreDir,

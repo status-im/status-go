@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
@@ -95,7 +96,10 @@ func setupGethStatusBackend() (*GethStatusBackend, func() error, func() error, f
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	backend := NewGethStatusBackend()
+	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
 	backend.StatusNode().SetAppDB(db)
 
 	ma, stop2, err := setupTestMultiDB()
@@ -292,7 +296,8 @@ func TestBackendGettersConcurrently(t *testing.T) {
 
 func TestBackendConnectionChangesConcurrently(t *testing.T) {
 	connections := [...]string{connection.Wifi, connection.Cellular, connection.Unknown}
-	backend := NewGethStatusBackend()
+	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
+
 	count := 3
 
 	var wg sync.WaitGroup
@@ -310,7 +315,8 @@ func TestBackendConnectionChangesConcurrently(t *testing.T) {
 }
 
 func TestBackendConnectionChangesToOffline(t *testing.T) {
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+
 	b.ConnectionChange(connection.None, false)
 	assert.True(t, b.connectionState.Offline)
 
@@ -386,7 +392,7 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 }
 
 func TestAppStateChange(t *testing.T) {
-	backend := NewGethStatusBackend()
+	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 
 	var testCases = []struct {
 		name          string
@@ -460,7 +466,7 @@ func TestBlockedRPCMethods(t *testing.T) {
 }
 
 func TestCallRPCWithStoppedNode(t *testing.T) {
-	backend := NewGethStatusBackend()
+	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 
 	resp, err := backend.CallRPC(
 		`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}`,
@@ -699,7 +705,8 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 	utils.Init()
 
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+
 	chatKey, err := gethcrypto.GenerateKey()
 	require.NoError(t, err)
 	walletKey, err := gethcrypto.GenerateKey()
@@ -767,7 +774,8 @@ func TestRuntimeLogLevelIsNotWrittenToDatabase(t *testing.T) {
 func TestLoginWithKey(t *testing.T) {
 	utils.Init()
 
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+
 	chatKey, err := gethcrypto.GenerateKey()
 	require.NoError(t, err)
 	walletKey, err := gethcrypto.GenerateKey()
@@ -825,7 +833,8 @@ func TestLoginAccount(t *testing.T) {
 	tmpdir := t.TempDir()
 	nameserver := "8.8.8.8"
 
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
@@ -883,7 +892,8 @@ func TestLoginAccount(t *testing.T) {
 func TestVerifyDatabasePassword(t *testing.T) {
 	utils.Init()
 
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
+
 	chatKey, err := gethcrypto.GenerateKey()
 	require.NoError(t, err)
 	walletKey, err := gethcrypto.GenerateKey()
@@ -921,7 +931,7 @@ func TestVerifyDatabasePassword(t *testing.T) {
 }
 
 func TestDeleteMultiaccount(t *testing.T) {
-	backend := NewGethStatusBackend()
+	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 
 	rootDataDir := t.TempDir()
 
@@ -1280,7 +1290,7 @@ func loginDesktopUser(t *testing.T, conf *params.NodeConfig) {
 	username := "TestUser"
 	passwd := "0xC888C9CE9E098D5864D3DED6EBCC140A12142263BACE3A23A36F9905F12BD64A" // #nosec G101
 
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 
 	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
 	b.UpdateRootDataDir(conf.DataDir)
@@ -1329,7 +1339,7 @@ func TestChangeDatabasePassword(t *testing.T) {
 	oldPassword := "password"
 	newPassword := "newPassword"
 
-	backend := NewGethStatusBackend()
+	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 	backend.UpdateRootDataDir(t.TempDir())
 
 	// Setup keystore to test decryption of it
@@ -1386,7 +1396,7 @@ func TestCreateWallet(t *testing.T) {
 	password := "some-password2" // nolint: goconst
 	tmpdir := t.TempDir()
 
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 	defer func() {
 		require.NoError(t, b.StopNode())
 	}()
@@ -1451,7 +1461,7 @@ func TestSetFleet(t *testing.T) {
 	password := "some-password2" // nolint: goconst
 	tmpdir := t.TempDir()
 
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
@@ -1520,7 +1530,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	raribleMainnetAPIKey := "rarible-mainnet-api-key" // nolint: gosec
 	raribleTestnetAPIKey := "rarible-testnet-api-key" // nolint: gosec
 
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 	createAccountRequest := &requests.CreateAccount{
 		DisplayName:        "some-display-name",
 		CustomizationColor: "#ffffff",
@@ -1585,7 +1595,7 @@ func TestTestnetEnabledSettingOnCreateAccount(t *testing.T) {
 	utils.Init()
 	tmpdir := t.TempDir()
 
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 
 	// Creating an account with test networks enabled
 	createAccountRequest1 := &requests.CreateAccount{
@@ -1631,7 +1641,7 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 	utils.Init()
 	tmpdir := t.TempDir()
 
-	backend := NewGethStatusBackend()
+	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 
 	// Test case 1: Valid restore account request
 	restoreRequest := &requests.RestoreAccount{
@@ -1666,7 +1676,7 @@ func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
 	utils.Init()
 	tmpdir := t.TempDir()
 
-	backend := NewGethStatusBackend()
+	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
 
 	// Test case: Valid restore account request without DisplayName
 	restoreRequest := &requests.RestoreAccount{
@@ -1687,7 +1697,7 @@ func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
 
 func TestAcceptTerms(t *testing.T) {
 	tmpdir := t.TempDir()
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
@@ -1850,7 +1860,8 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 
-	backend := NewGethStatusBackend()
+	backend := NewGethStatusBackend(tt.MustCreateTestLogger())
+	require.NoError(t, err)
 
 	require.NoError(t, backend.AccountManager().InitKeystore(conf.KeyStoreDir))
 	backend.UpdateRootDataDir(conf.DataDir)

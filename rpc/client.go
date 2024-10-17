@@ -16,12 +16,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/ethereum/go-ethereum/event"
 	appCommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
@@ -107,7 +109,7 @@ type Client struct {
 
 	handlersMx sync.RWMutex       // mx guards handlers
 	handlers   map[string]Handler // locally registered handlers
-	log        log.Logger
+	logger     *zap.Logger
 
 	walletNotifier  func(chainID uint64, message string)
 	providerConfigs []params.ProviderConfig
@@ -133,7 +135,7 @@ type ClientConfig struct {
 func NewClient(config ClientConfig) (*Client, error) {
 	var err error
 
-	log := log.New("package", "status-go/rpc.Client")
+	logger := logutils.ZapLogger().Named("rpcClient")
 	networkManager := network.NewManager(config.DB)
 	if networkManager == nil {
 		return nil, errors.New("failed to create network manager")
@@ -141,7 +143,7 @@ func NewClient(config ClientConfig) (*Client, error) {
 
 	err = networkManager.Init(config.Networks)
 	if err != nil {
-		log.Error("Network manager failed to initialize", "error", err)
+		logger.Error("Network manager failed to initialize", zap.Error(err))
 	}
 
 	c := Client{
@@ -150,7 +152,7 @@ func NewClient(config ClientConfig) (*Client, error) {
 		handlers:           make(map[string]Handler),
 		rpcClients:         make(map[uint64]chain.ClientInterface),
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
-		log:                log,
+		logger:             logger,
 		providerConfigs:    config.ProviderConfigs,
 		healthMgr:          healthmanager.NewBlockchainHealthManager(),
 		walletFeed:         config.WalletFeed,
@@ -168,7 +170,7 @@ func NewClient(config ClientConfig) (*Client, error) {
 
 func (c *Client) Start(ctx context.Context) {
 	if c.stopMonitoringFunc != nil {
-		c.log.Warn("Blockchain health manager already started")
+		c.logger.Warn("Blockchain health manager already started")
 		return
 	}
 
@@ -193,14 +195,14 @@ func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
 		blockchainStatus := c.healthMgr.GetFullStatus()
 		encodedMessage, err := json.Marshal(blockchainStatus)
 		if err != nil {
-			c.log.Warn("could not marshal full blockchain status", "error", err)
+			c.logger.Warn("could not marshal full blockchain status", zap.Error(err))
 			return
 		}
 		if c.walletFeed == nil {
 			return
 		}
 		// FIXME: remove these excessive logs in future release (2.31+)
-		c.log.Debug("Sending blockchain health status event", "status", string(encodedMessage))
+		c.logger.Debug("Sending blockchain health status event", zap.String("status", string(encodedMessage)))
 		c.walletFeed.Send(walletevent.Event{
 			Type:    EventBlockchainHealthChanged,
 			Message: string(encodedMessage),
@@ -303,7 +305,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 
 			rpcClient, err = gethrpc.DialOptions(context.Background(), provider.URL, opts...)
 			if err != nil {
-				c.log.Error("dial server "+provider.Key, "error", err)
+				c.logger.Error("dial server "+provider.Key, zap.Error(err))
 			}
 
 			// If using the status-proxy, consider each endpoint as a separate provider
@@ -318,7 +320,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 
 			rpcLimiter, err = c.getRPCRpsLimiter(circuitKey)
 			if err != nil {
-				c.log.Error("get RPC limiter "+provider.Key, "error", err)
+				c.logger.Error("get RPC limiter "+provider.Key, zap.Error(err))
 			}
 
 			ethClients = append(ethClients, ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, circuitKey))
@@ -423,7 +425,7 @@ func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result in
 	}
 
 	if c.local == nil {
-		c.log.Warn("Local JSON-RPC endpoint missing", "method", method)
+		c.logger.Warn("Local JSON-RPC endpoint missing", zap.String("method", method))
 		return errors.New("missing local JSON-RPC endpoint")
 	}
 	return c.local.CallContext(ctx, result, method, args...)

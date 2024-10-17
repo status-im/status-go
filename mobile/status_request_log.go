@@ -5,11 +5,12 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
-	"runtime/debug"
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/requestlog"
 )
 
@@ -65,7 +66,7 @@ func call(fn any, params ...any) any {
 	defer func() {
 		if r := recover(); r != nil {
 			// we're not sure if request logging is enabled here, so we log it use default logger
-			log.Error("panic found in call", "error", r, "stacktrace", string(debug.Stack()))
+			logutils.ZapLogger().Error("panic found in call", zap.Any("error", r), zap.Stack("stacktrace"))
 			panic(r)
 		}
 	}()
