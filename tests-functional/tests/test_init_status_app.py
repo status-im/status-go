@@ -1,11 +1,9 @@
 import pytest
 
-from test_cases import StatusBackendTestCase
-
 
 @pytest.mark.create_account
 @pytest.mark.rpc
-class TestInitialiseApp(StatusBackendTestCase):
+class TestInitialiseApp:
 
     @pytest.mark.init
     def test_init_app(self, init_status_backend):
