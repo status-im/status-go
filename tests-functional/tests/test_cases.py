@@ -7,7 +7,7 @@ from collections import namedtuple
 import pytest
 
 from clients.signals import SignalClient
-from clients.status_backend import RpcClient
+from clients.status_backend import RpcClient, StatusBackend
 from conftest import option
 from constants import user_1, user_2
 
@@ -19,6 +19,11 @@ class StatusDTestCase:
         self.rpc_client = RpcClient(
             option.rpc_url_statusd
         )
+
+
+class StatusBackendTestCase:
+    def setup_class(self):
+        self.rpc_client = StatusBackend()
 
 
 class WalletTestCase(StatusDTestCase):
@@ -144,7 +149,7 @@ class SignalTestCase(StatusDTestCase):
         websocket_thread.start()
 
 
-class StatusBackendTestCase:
+class InitBackendTestCase:
 
     def setup_method(self):
         pass

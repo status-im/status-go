@@ -6,11 +6,10 @@ from typing import Optional
 import pytest
 
 from conftest import option
-from test_cases import StatusDTestCase
+from test_cases import StatusBackendTestCase
 
 
-@pytest.mark.skip("to be reworked via status-backend")
-class TestRpc(StatusDTestCase):
+class TestRpc(StatusBackendTestCase):
 
     @pytest.mark.parametrize(
         "method, params",
@@ -21,12 +20,12 @@ class TestRpc(StatusDTestCase):
     def test_(self, method, params):
         _id = str(random.randint(1, 8888))
 
-        response = self.rpc_client.rpc_valid_request(method, params, _id, url=option.rpc_url_2)
+        response = self.rpc_client.rpc_valid_request(method, params, _id)
         self.rpc_client.verify_json_schema(response, method)
 
 
 @pytest.mark.skip("to be reworked via status-backend")
-class TestRpcMessaging(StatusDTestCase):
+class TestRpcMessaging(StatusBackendTestCase):
     @dataclass
     class User:
         rpc_url: str
@@ -99,5 +98,5 @@ class TestRpcMessaging(StatusDTestCase):
             self.rpc_client.verify_is_valid_json_rpc_response(response)
 
             response = response.json()
-            assert response["result"][0]["added"] == True
+            assert response["result"][0]["added"] is True
             assert response["result"][0]["id"] == user[1].chat_public_key
