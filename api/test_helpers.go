@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -28,7 +30,11 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 		return
 	}
 
-	backend = NewGethStatusBackend()
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		return
+	}
+	backend = NewGethStatusBackend(logger)
 	backend.UpdateRootDataDir(tmpdir)
 
 	err = backend.AccountManager().InitKeystore(filepath.Join(tmpdir, "keystore"))

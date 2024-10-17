@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/requests"
 )
@@ -43,7 +44,9 @@ func TestCreateAccountAndLogin(t *testing.T) {
 	var request requests.CreateAccount
 	err := json.Unmarshal([]byte(requestJSON), &request)
 	require.NoError(t, err)
-	statusBackend := NewGethStatusBackend()
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+	statusBackend := NewGethStatusBackend(logger)
 	_, err = statusBackend.CreateAccountAndLogin(&request)
 	require.NoError(t, err)
 	t.Logf("TestCreateAccountAndLogin: create account user1 and login successfully")
