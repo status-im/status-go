@@ -2152,7 +2152,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	startDate := messageDate.Add(-time.Minute)
 	endDate := messageDate.Add(time.Minute)
 	topic := types.BytesToTopic(transport.ToTopic(chat.ID))
-	topics := []types.TopicType{topic}
+	communityCommonTopic := types.BytesToTopic(transport.ToTopic(community.MemberUpdateChannelID()))
+	topics := []types.TopicType{topic, communityCommonTopic}
 
 	torrentConfig := params.TorrentConfig{
 		Enabled:    true,

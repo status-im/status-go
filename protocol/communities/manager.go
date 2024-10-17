@@ -4183,6 +4183,7 @@ func (m *Manager) GetOwnedCommunitiesChatIDs() (map[string]bool, error) {
 			for _, id := range c.ChatIDs() {
 				chatIDs[id] = true
 			}
+			chatIDs[c.MemberUpdateChannelID()] = true // TODO: for now including this chatID as controlled so that archiving works without any issues.
 		}
 	}
 	return chatIDs, nil
