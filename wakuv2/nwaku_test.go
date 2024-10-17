@@ -162,20 +162,20 @@ func TestBasicWakuV2(t *testing.T) {
 	extNodeRestPort := 8646
 	storeNodeInfo, err := GetNwakuInfo(nil, &extNodeRestPort)
 	require.NoError(t, err)
-	
+
 	nwakuConfig := WakuConfig{
-		Port:        30303,
-		NodeKey:     "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
-		EnableRelay: true,
-		LogLevel:    "DEBUG",
+		Port:            30303,
+		NodeKey:         "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
+		EnableRelay:     true,
+		LogLevel:        "DEBUG",
 		DnsDiscoveryUrl: "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im",
-		DnsDiscovery: true,
+		DnsDiscovery:    true,
 		Discv5Discovery: true,
-		Staticnodes: []string{storeNodeInfo.ListenAddresses[0]},
-		ClusterID: 16,
-		Shards: []uint16{64},
+		Staticnodes:     []string{storeNodeInfo.ListenAddresses[0]},
+		ClusterID:       16,
+		Shards:          []uint16{64},
 	}
-	
+
 	w, err := New(nil, "", &nwakuConfig, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
@@ -190,7 +190,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		
+
 		numConnected, err := w.GetNumConnectedPeers()
 		if err != nil {
 			return err
@@ -204,7 +204,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get local store node address
-	storeNode, err :=peer.AddrInfoFromString(storeNodeInfo.ListenAddresses[0])
+	storeNode, err := peer.AddrInfoFromString(storeNodeInfo.ListenAddresses[0])
 	require.NoError(t, err)
 	require.NoError(t, err)
 
@@ -222,7 +222,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, err)
 	isDisconnected := !slices.Contains(connectedStoreNodes, storeNode.ID)
 	require.True(t, isDisconnected, "nwaku should be disconnected from the store node")
-	
+
 	// Re-connect
 	err = w.DialPeerByID(storeNode.ID)
 	require.NoError(t, err)
@@ -231,66 +231,66 @@ func TestBasicWakuV2(t *testing.T) {
 	connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
 	require.NoError(t, err)
 	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
-	
-	/* 
-	filter := &common.Filter{
-		PubsubTopic:   config.DefaultShardPubsubTopic,
-		Messages:      common.NewMemoryMessageStore(),
-		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
-	}
 
-	_, err = w.Subscribe(filter)
-	require.NoError(t, err)
-
-	msgTimestamp := w.timestamp()
-	contentTopic := maps.Keys(filter.ContentTopics)[0]
-
-	time.Sleep(2 * time.Second)
-
-	_, err = w.Send(config.DefaultShardPubsubTopic, &pb.WakuMessage{
-		Payload:      []byte{1, 2, 3, 4, 5},
-		ContentTopic: contentTopic.ContentTopic(),
-		Version:      proto.Uint32(0),
-		Timestamp:    &msgTimestamp,
-	}, nil)
-
-	require.NoError(t, err)
-
-	time.Sleep(1 * time.Second)
-
-	messages := filter.Retrieve()
-	require.Len(t, messages, 1)
-
-	timestampInSeconds := msgTimestamp / int64(time.Second)
-	marginInSeconds := 20
-
-	options = func(b *backoff.ExponentialBackOff) {
-		b.MaxElapsedTime = 60 * time.Second
-		b.InitialInterval = 500 * time.Millisecond
-	}
-	err = tt.RetryWithBackOff(func() error {
-		_, envelopeCount, err := w.Query(
-			context.Background(),
-			storeNode.PeerID,
-			store.FilterCriteria{
-				ContentFilter: protocol.NewContentFilter(config.DefaultShardPubsubTopic, contentTopic.ContentTopic()),
-				TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
-				TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
-			},
-			nil,
-			nil,
-			false,
-		)
-		if err != nil || envelopeCount == 0 {
-			// in case of failure extend timestamp margin up to 40secs
-			if marginInSeconds < 40 {
-				marginInSeconds += 5
-			}
-			return errors.New("no messages received from store node")
+	/*
+		filter := &common.Filter{
+			PubsubTopic:   config.DefaultShardPubsubTopic,
+			Messages:      common.NewMemoryMessageStore(),
+			ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
 		}
-		return nil
-	}, options)
-	require.NoError(t, err) */
+
+		_, err = w.Subscribe(filter)
+		require.NoError(t, err)
+
+		msgTimestamp := w.timestamp()
+		contentTopic := maps.Keys(filter.ContentTopics)[0]
+
+		time.Sleep(2 * time.Second)
+
+		_, err = w.Send(config.DefaultShardPubsubTopic, &pb.WakuMessage{
+			Payload:      []byte{1, 2, 3, 4, 5},
+			ContentTopic: contentTopic.ContentTopic(),
+			Version:      proto.Uint32(0),
+			Timestamp:    &msgTimestamp,
+		}, nil)
+
+		require.NoError(t, err)
+
+		time.Sleep(1 * time.Second)
+
+		messages := filter.Retrieve()
+		require.Len(t, messages, 1)
+
+		timestampInSeconds := msgTimestamp / int64(time.Second)
+		marginInSeconds := 20
+
+		options = func(b *backoff.ExponentialBackOff) {
+			b.MaxElapsedTime = 60 * time.Second
+			b.InitialInterval = 500 * time.Millisecond
+		}
+		err = tt.RetryWithBackOff(func() error {
+			_, envelopeCount, err := w.Query(
+				context.Background(),
+				storeNode.PeerID,
+				store.FilterCriteria{
+					ContentFilter: protocol.NewContentFilter(config.DefaultShardPubsubTopic, contentTopic.ContentTopic()),
+					TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
+					TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
+				},
+				nil,
+				nil,
+				false,
+			)
+			if err != nil || envelopeCount == 0 {
+				// in case of failure extend timestamp margin up to 40secs
+				if marginInSeconds < 40 {
+					marginInSeconds += 5
+				}
+				return errors.New("no messages received from store node")
+			}
+			return nil
+		}, options)
+		require.NoError(t, err) */
 
 	require.NoError(t, w.Stop())
 }
