@@ -74,6 +74,14 @@ func (t timestamp) String() string {
 	return time.Unix(0, int64(t)).Format(time.RFC3339)
 }
 
+func Timep(key string, time *int64) zapcore.Field {
+	if time == nil {
+		return zap.String(key, "-")
+	} else {
+		return Time(key, *time)
+	}
+}
+
 func Epoch(key string, time time.Time) zap.Field {
 	return zap.String(key, fmt.Sprintf("%d", time.UnixNano()))
 }

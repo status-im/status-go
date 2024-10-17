@@ -4,12 +4,12 @@ import (
 	"errors"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 type SetCommunityShard struct {
 	CommunityID types.HexBytes  `json:"communityId"`
-	Shard       *shard.Shard    `json:"shard,omitempty"`
+	Shard       *wakuv2.Shard   `json:"shard,omitempty"`
 	PrivateKey  *types.HexBytes `json:"privateKey,omitempty"`
 }
 
@@ -19,7 +19,7 @@ func (s *SetCommunityShard) Validate() error {
 	}
 	if s.Shard != nil {
 		// TODO: for now only MainStatusShard(16) is accepted
-		if s.Shard.Cluster != shard.MainStatusShardCluster {
+		if s.Shard.Cluster != wakuv2.MainStatusShardCluster {
 			return errors.New("invalid shard cluster")
 		}
 		if s.Shard.Index > 1023 {

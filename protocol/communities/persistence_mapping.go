@@ -7,8 +7,8 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 func communityToRecord(community *Community) (*CommunityRecord, error) {
@@ -118,9 +118,9 @@ func recordBundleToCommunity(
 		}
 	}
 
-	var s *shard.Shard = nil
+	var s *wakuv2.Shard = nil
 	if r.community.shardCluster != nil && r.community.shardIndex != nil {
-		s = &shard.Shard{
+		s = &wakuv2.Shard{
 			Cluster: uint16(*r.community.shardCluster),
 			Index:   uint16(*r.community.shardIndex),
 		}
