@@ -660,11 +660,12 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 	}
 
 	newMessage := &types.NewMessage{
-		TTL:         whisperTTL,
-		Payload:     payload,
-		PowTarget:   calculatePoW(payload),
-		PowTime:     whisperPoWTime,
-		PubsubTopic: rawMessage.PubsubTopic,
+		TTL:                  whisperTTL,
+		Payload:              payload,
+		PowTarget:            calculatePoW(payload),
+		PowTime:              whisperPoWTime,
+		PubsubTopic:          rawMessage.PubsubTopic,
+		ContentTopicOverride: rawMessage.ContentTopicOverride,
 	}
 
 	if rawMessage.BeforeDispatch != nil {
@@ -765,6 +766,7 @@ func (s *MessageSender) SendPublic(
 	newMessage.Ephemeral = rawMessage.Ephemeral
 	newMessage.PubsubTopic = rawMessage.PubsubTopic
 	newMessage.Priority = rawMessage.Priority
+	newMessage.ContentTopicOverride = rawMessage.ContentTopicOverride
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 
