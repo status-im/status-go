@@ -73,7 +73,15 @@ func NewClientWithParams(params Params) *Client {
 }
 
 func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
-	chunks := utils.ChunkSymbols(symbols, 60)
+	const maxFsymsLength = 300
+	chunkSymbolParams := utils.ChunkSymbolsParams{
+		MaxCharsPerChunk:    maxFsymsLength,
+		ExtraCharsPerSymbol: 1, // joined with a comma
+	}
+	chunks, err := utils.ChunkSymbols(symbols, chunkSymbolParams)
+	if err != nil {
+		return nil, err
+	}
 	result := make(map[string]map[string]float64)
 	realCurrencies := utils.RenameSymbols(currencies)
 	for _, smbls := range chunks {
@@ -82,6 +90,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 		params := url.Values{}
 		params.Add("fsyms", strings.Join(realSymbols, ","))
 		params.Add("tsyms", strings.Join(realCurrencies, ","))
+		params.Add("relaxedValidation", "true")
 		params.Add("extraParams", extraParamStatus)
 
 		url := fmt.Sprintf("%s/data/pricemulti", c.baseURL)
@@ -129,7 +138,15 @@ func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.Toke
 }
 
 func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
-	chunks := utils.ChunkSymbols(symbols)
+	const maxFsymsLength = 300
+	chunkSymbolParams := utils.ChunkSymbolsParams{
+		MaxCharsPerChunk:    maxFsymsLength,
+		ExtraCharsPerSymbol: 1, // joined with a comma
+	}
+	chunks, err := utils.ChunkSymbols(symbols, chunkSymbolParams)
+	if err != nil {
+		return nil, err
+	}
 	realCurrency := utils.GetRealSymbol(currency)
 	item := map[string]thirdparty.TokenMarketValues{}
 	for _, smbls := range chunks {
@@ -138,6 +155,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		params := url.Values{}
 		params.Add("fsyms", strings.Join(realSymbols, ","))
 		params.Add("tsyms", realCurrency)
+		params.Add("relaxedValidation", "true")
 		params.Add("extraParams", extraParamStatus)
 
 		url := fmt.Sprintf("%s/data/pricemultifull", c.baseURL)
