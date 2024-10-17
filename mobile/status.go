@@ -1330,7 +1330,8 @@ func exportUnencryptedDatabaseV2(requestJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return exportUnencryptedDatabase(request.AccountData, request.Password, request.DatabasePath)
+	err = statusBackend.ExportUnencryptedDatabase(request.Account, request.Password, request.DatabasePath)
+	return makeJSONResponse(err)
 }
 
 // Deprecated: Use ImportUnencryptedDatabaseV2 instead.
@@ -1359,7 +1360,8 @@ func importUnencryptedDatabaseV2(requestJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return importUnencryptedDatabase(request.AccountData, request.Password, request.DatabasePath)
+	err = statusBackend.ImportUnencryptedDatabase(request.Account, request.Password, request.DatabasePath)
+	return makeJSONResponse(err)
 }
 
 // Deprecated: Use ChangeDatabasePasswordV2 instead.
