@@ -430,7 +430,7 @@ func Test_tokensListsValidity(t *testing.T) {
 					}
 				}
 
-				require.True(t, found)
+				require.True(t, found, "Token %s not found in list %s", token.Symbol, list.Name)
 			} else {
 				tmpMap[key] = []*Token{token}
 			}
