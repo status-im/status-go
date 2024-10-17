@@ -54,6 +54,15 @@ type StatusCommunityLinkPreview struct {
 	Banner       LinkPreviewThumbnail `json:"banner,omitempty"`
 }
 
+type StatusTransactionLinkPreview struct {
+	TxType  int    `json:"txType"`
+	Amount  string `json:"amount"`
+	Asset   string `json:"asset"`
+	ToAsset string `json:"toAsset"`
+	Address string `json:"address"`
+	ChainID int    `json:"chainId"`
+}
+
 type StatusCommunityChannelLinkPreview struct {
 	ChannelUUID string                      `json:"channelUuid"`
 	Emoji       string                      `json:"emoji"`
@@ -64,10 +73,11 @@ type StatusCommunityChannelLinkPreview struct {
 }
 
 type StatusLinkPreview struct {
-	URL       string                             `json:"url,omitempty"`
-	Contact   *StatusContactLinkPreview          `json:"contact,omitempty"`
-	Community *StatusCommunityLinkPreview        `json:"community,omitempty"`
-	Channel   *StatusCommunityChannelLinkPreview `json:"channel,omitempty"`
+	URL         string                             `json:"url,omitempty"`
+	Contact     *StatusContactLinkPreview          `json:"contact,omitempty"`
+	Community   *StatusCommunityLinkPreview        `json:"community,omitempty"`
+	Channel     *StatusCommunityChannelLinkPreview `json:"channel,omitempty"`
+	Transaction *StatusTransactionLinkPreview      `json:"transaction,omitempty"`
 }
 
 func (thumbnail *LinkPreviewThumbnail) IsEmpty() bool {
@@ -161,17 +171,23 @@ func (preview *StatusLinkPreview) validateForProto() error {
 	}
 
 	// At least and only one of Contact/Community/Channel should be present in the preview
-	if preview.Contact != nil && preview.Community != nil {
-		return fmt.Errorf("both contact and community are set at the same time")
+	var linkTypes []string
+	if preview.Contact != nil {
+		linkTypes = append(linkTypes, "Contact")
 	}
-	if preview.Community != nil && preview.Channel != nil {
-		return fmt.Errorf("both community and channel are set at the same time")
+	if preview.Community != nil {
+		linkTypes = append(linkTypes, "Community")
 	}
-	if preview.Channel != nil && preview.Contact != nil {
-		return fmt.Errorf("both contact and channel are set at the same time")
+	if preview.Channel != nil {
+		linkTypes = append(linkTypes, "Channel")
 	}
-	if preview.Contact == nil && preview.Community == nil && preview.Channel == nil {
-		return fmt.Errorf("none of contact/community/channel are set")
+	if preview.Transaction != nil {
+		linkTypes = append(linkTypes, "Transaction")
+	}
+	if len(linkTypes) > 1 {
+		return fmt.Errorf("multiple components set at the same time: %v", linkTypes)
+	} else if len(linkTypes) == 0 {
+		return fmt.Errorf("none of contact/community/channel/transaction are set")
 	}
 
 	if preview.Contact != nil {
@@ -200,6 +216,14 @@ func (preview *StatusLinkPreview) validateForProto() error {
 		}
 		return nil
 	}
+
+	if preview.Transaction != nil {
+		if preview.Transaction.Asset == "" && preview.Transaction.Amount == "" && preview.Transaction.Address == "" && preview.Transaction.ToAsset == "" {
+			return fmt.Errorf("transaction fields are empty")
+		}
+		return nil
+	}
+
 	return nil
 }
 
@@ -444,6 +468,19 @@ func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLi
 
 		}
 
+		if preview.Transaction != nil {
+			ul.Payload = &protobuf.UnfurledStatusLink_Transaction{
+				Transaction: &protobuf.UnfurledStatusTransactionLink{
+					TxType:  uint32(preview.Transaction.TxType),
+					Amount:  preview.Transaction.Amount,
+					Asset:   preview.Transaction.Asset,
+					ToAsset: preview.Transaction.ToAsset,
+					Address: preview.Transaction.Address,
+					ChainId: uint32(preview.Transaction.ChainID),
+				},
+			}
+		}
+
 		unfurledLinks = append(unfurledLinks, ul)
 	}
 
@@ -505,6 +542,17 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 			if c.Community != nil {
 				lp.Channel.Community = new(StatusCommunityLinkPreview)
 				lp.Channel.Community.loadFromProto(c.Community, link.Url, MediaServerChannelCommunityPrefix, makeMediaServerURLMessageWrapper)
+			}
+		}
+
+		if c := link.GetTransaction(); c != nil {
+			lp.Transaction = &StatusTransactionLinkPreview{
+				TxType:  int(c.TxType),
+				Amount:  c.Amount,
+				Asset:   c.Asset,
+				ToAsset: c.ToAsset,
+				Address: c.Address,
+				ChainID: int(c.ChainId),
 			}
 		}
 
