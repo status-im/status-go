@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
@@ -38,6 +39,7 @@ type jsonrpcRequest struct {
 	ChainID uint64          `json:"chainId"`
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params,omitempty"`
+	Timeout uint64          `json:"timeout,omitempty"`
 }
 
 type jsonrpcSuccessfulResponse struct {
@@ -111,10 +113,27 @@ func (c *Client) callBatchMethods(ctx context.Context, msgs json.RawMessage) str
 // callSingleMethod executes single JSON-RPC message and constructs proper response.
 func (c *Client) callSingleMethod(ctx context.Context, msg json.RawMessage) string {
 	// unmarshal JSON body into json-rpc request
-	chainID, method, params, id, err := methodAndParamsFromBody(msg)
+	jsonrpcParams, err := methodAndParamsFromBody(msg)
 	if err != nil {
-		return newErrorResponse(errInvalidMessageCode, err, id)
+		return newErrorResponse(errInvalidMessageCode, err, nil)
 	}
+
+	chainID := jsonrpcParams.ChainID
+	method := jsonrpcParams.Method
+	params := jsonrpcParams.Params
+	timeout := jsonrpcParams.Timeout
+	id := jsonrpcParams.ID
+
+	if timeout != 0 {
+		// TODO: remove me
+		c.log.Info("setting 50ms timeout", "method", method)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Millisecond)
+		defer cancel()
+	}
+
+	// TODO: remove me
+	c.log.Info("calling method", "method", method)
 
 	if chainID == 0 {
 		chainID = c.UpstreamChainID
@@ -139,24 +158,38 @@ func (c *Client) callSingleMethod(ctx context.Context, msg json.RawMessage) stri
 	return newSuccessResponse(result, id)
 }
 
+type jsonrpcParameters struct {
+	ChainID uint64
+	Method  string
+	Params  []interface{}
+	Timeout uint64
+	ID      json.RawMessage
+}
+
 // methodAndParamsFromBody extracts Method and Params of
 // JSON-RPC body into values ready to use with ethereum-go's
 // RPC client Call() function. A lot of empty interface usage is
 // due to the underlying code design :/
-func methodAndParamsFromBody(body json.RawMessage) (uint64, string, []interface{}, json.RawMessage, error) {
+func methodAndParamsFromBody(body json.RawMessage) (*jsonrpcParameters, error) {
 	msg, err := unmarshalMessage(body)
 	if err != nil {
-		return 0, "", nil, nil, err
+		return nil, err
 	}
 	params := []interface{}{}
 	if msg.Params != nil {
 		err = json.Unmarshal(msg.Params, &params)
 		if err != nil {
-			return 0, "", nil, nil, err
+			return nil, err
 		}
 	}
 
-	return msg.ChainID, msg.Method, params, msg.ID, nil
+	return &jsonrpcParameters{
+		ChainID: msg.ChainID,
+		Method:  msg.Method,
+		Params:  params,
+		Timeout: msg.Timeout,
+		ID:      msg.ID,
+	}, nil
 }
 
 // unmarshalMessage tries to unmarshal JSON-RPC message.
