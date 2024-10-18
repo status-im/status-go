@@ -1,6 +1,7 @@
 package common
 
 import (
+	"math/big"
 	"strconv"
 	"time"
 
@@ -29,11 +30,10 @@ const (
 	ArbitrumSepolia    uint64 = 421614
 	BinanceChainID     uint64 = 56 // obsolete?
 	BinanceTestChainID uint64 = 97 // obsolete?
+	AnvilMainnet       uint64 = 31337
 )
 
 var (
-	ZeroAddress = ethCommon.HexToAddress("0x0000000000000000000000000000000000000000")
-
 	SupportedNetworks = map[uint64]bool{
 		EthereumMainnet: true,
 		OptimismMainnet: true,
@@ -55,6 +55,14 @@ const (
 	ContractTypeERC721
 	ContractTypeERC1155
 )
+
+func ZeroAddress() ethCommon.Address {
+	return ethCommon.Address{}
+}
+
+func ZeroBigIntValue() *big.Int {
+	return big.NewInt(0)
+}
 
 func (c ChainID) String() string {
 	return strconv.FormatUint(uint64(c), 10)

@@ -36,7 +36,7 @@ func (s *SyncRawMessageHandler) CollectInstallationData(rawMessageCollector *Raw
 	if err != nil {
 		return err
 	}
-	_, err = messenger.SendPairInstallation(context.TODO(), rawMessageCollector.dispatchMessage)
+	_, err = messenger.SendPairInstallation(context.TODO(), "", rawMessageCollector.dispatchMessage)
 	return err
 }
 

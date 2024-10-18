@@ -527,6 +527,7 @@ func (m *Manager) Start() error {
 	}
 
 	go func() {
+		defer utils.LogOnPanic()
 		_ = m.fillMissingCommunityTokens()
 	}()
 
@@ -535,6 +536,7 @@ func (m *Manager) Start() error {
 
 func (m *Manager) runENSVerificationLoop() {
 	go func() {
+		defer utils.LogOnPanic()
 		for {
 			select {
 			case <-m.quit:
@@ -615,6 +617,7 @@ func (m *Manager) CommunitiesToValidate() (map[string][]communityToValidate, err
 func (m *Manager) runOwnerVerificationLoop() {
 	m.logger.Info("starting owner verification loop")
 	go func() {
+		defer utils.LogOnPanic()
 		for {
 			select {
 			case <-m.quit:
@@ -1351,7 +1354,7 @@ func (m *Manager) StartMembersReevaluationLoop(communityID types.HexBytes, reeva
 }
 
 func (m *Manager) reevaluateMembersLoop(communityID types.HexBytes, reevaluateOnStart bool) {
-
+	defer utils.LogOnPanic()
 	if _, exists := m.membersReevaluationTasks.Load(communityID.String()); exists {
 		return
 	}
@@ -1996,6 +1999,12 @@ func (m *Manager) EditChatFirstMessageTimestamp(communityID types.HexBytes, chat
 	m.publish(&Subscription{Community: community})
 
 	return community, changes, nil
+}
+
+func (m *Manager) UpdateChatFirstMessageTimestamp(community *Community, chatID string, timestamp uint32) (*CommunityChanges, error) {
+	communityID := community.ID().String()
+	chatID = strings.TrimPrefix(chatID, communityID)
+	return community.UpdateChatFirstMessageTimestamp(chatID, timestamp)
 }
 
 func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories) (*Community, *CommunityChanges, error) {
@@ -3488,6 +3497,17 @@ type CheckAllChannelsPermissionsResponse struct {
 }
 
 func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) (*RequestToJoin, error) {
+	if len(request.CommunityDescriptionProtocolMessage) > 0 {
+		description, err := unmarshalCommunityDescriptionMessage(request.CommunityDescriptionProtocolMessage, signer)
+		if err != nil {
+			return nil, err
+		}
+		_, err = m.HandleCommunityDescriptionMessage(signer, description, request.CommunityDescriptionProtocolMessage, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	m.communityLock.Lock(request.CommunityId)
 	defer m.communityLock.Unlock(request.CommunityId)
 
@@ -3498,57 +3518,11 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	communityDescriptionBytes, err := proto.Marshal(request.Community)
-	if err != nil {
-		return nil, err
-	}
-
-	// We need to wrap `request.Community` in an `ApplicationMetadataMessage`
-	// of type `CommunityDescription` because `UpdateCommunityDescription` expects this.
-	//
-	// This is merely for marsheling/unmarsheling, hence we attaching a `Signature`
-	// is not needed.
-	metadataMessage := &protobuf.ApplicationMetadataMessage{
-		Payload: communityDescriptionBytes,
-		Type:    protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
-	}
-
-	appMetadataMsg, err := proto.Marshal(metadataMessage)
-	if err != nil {
-		return nil, err
-	}
-
-	isControlNodeSigner := common.IsPubKeyEqual(community.ControlNode(), signer)
-	if !isControlNodeSigner {
-		m.logger.Debug("signer is not control node", zap.String("signer", common.PubkeyToHex(signer)), zap.String("controlNode", common.PubkeyToHex(community.ControlNode())))
-		return nil, ErrNotAuthorized
-	}
-
-	_, processedDescription, err := m.preprocessDescription(community.ID(), request.Community)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = community.UpdateCommunityDescription(processedDescription, appMetadataMsg, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = m.handleCommunityTokensMetadata(community); err != nil {
-		return nil, err
-	}
-
 	if community.Encrypted() && len(request.Grant) > 0 {
 		_, err = m.HandleCommunityGrant(community, request.Grant, request.Clock)
 		if err != nil && err != ErrGrantOlder && err != ErrGrantExpired {
 			m.logger.Error("Error handling a community grant", zap.Error(err))
 		}
-	}
-
-	err = m.persistence.SaveCommunity(community)
-
-	if err != nil {
-		return nil, err
 	}
 
 	if request.Accepted {
@@ -3557,7 +3531,6 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 			return nil, err
 		}
 	} else {
-
 		err = m.persistence.SetRequestToJoinState(pkString, community.ID(), RequestToJoinStateDeclined)
 		if err != nil {
 			return nil, err
@@ -3921,7 +3894,7 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 		community.config.CommunityDescription = description
 
 		if community.config.EventsData != nil {
-			eventsDescription, err := validateAndGetEventsMessageCommunityDescription(community.config.EventsData.EventsBaseCommunityDescription, community.ControlNode())
+			eventsDescription, err := unmarshalCommunityDescriptionMessage(community.config.EventsData.EventsBaseCommunityDescription, community.ControlNode())
 			if err != nil {
 				m.logger.Error("invalid EventsBaseCommunityDescription", zap.Error(err))
 			}
@@ -4463,6 +4436,10 @@ func (m *Manager) accountsHasPrivilegedPermission(preParsedCommunityPermissionDa
 	return false
 }
 
+func (m *Manager) SaveAndPublish(community *Community) error {
+	return m.saveAndPublish(community)
+}
+
 func (m *Manager) saveAndPublish(community *Community) error {
 	err := m.persistence.SaveCommunity(community)
 	if err != nil {
@@ -4894,8 +4871,8 @@ func (m *Manager) ShareRequestsToJoinWithPrivilegedMembers(community *Community,
 	return nil
 }
 
-func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Community, requestsToJoin *RequestToJoin) error {
-	pk, err := common.HexToPubkey(requestsToJoin.PublicKey)
+func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Community, requestToJoin *RequestToJoin) error {
+	pk, err := common.HexToPubkey(requestToJoin.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -4903,9 +4880,13 @@ func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Com
 	acceptedRequestsToJoinWithoutRevealedAccounts := make(map[string]*protobuf.CommunityRequestToJoin)
 	acceptedRequestsToJoinWithRevealedAccounts := make(map[string]*protobuf.CommunityRequestToJoin)
 
-	acceptedRequestsToJoinWithRevealedAccounts[requestsToJoin.PublicKey] = requestsToJoin.ToCommunityRequestToJoinProtobuf()
-	requestsToJoin.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
-	acceptedRequestsToJoinWithoutRevealedAccounts[requestsToJoin.PublicKey] = requestsToJoin.ToCommunityRequestToJoinProtobuf()
+	acceptedRequestsToJoinWithRevealedAccounts[requestToJoin.PublicKey] = requestToJoin.ToCommunityRequestToJoinProtobuf()
+
+	revealedAccounts := requestToJoin.RevealedAccounts
+	requestToJoin.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
+	acceptedRequestsToJoinWithoutRevealedAccounts[requestToJoin.PublicKey] = requestToJoin.ToCommunityRequestToJoinProtobuf()
+	// Set back the revealed accounts
+	requestToJoin.RevealedAccounts = revealedAccounts
 
 	msgWithRevealedAccounts := &protobuf.CommunityPrivilegedUserSyncMessage{
 		Type:          protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN,
@@ -5251,4 +5232,39 @@ func (m *Manager) updateEncryptionKeysRequests(communityID types.HexBytes, chann
 
 func (m *Manager) UpdateEncryptionKeysRequests(communityID types.HexBytes, channelIDs []string) error {
 	return m.updateEncryptionKeysRequests(communityID, channelIDs, time.Now().UnixMilli())
+}
+
+func unmarshalCommunityDescriptionMessage(signedDescription []byte, signerPubkey *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
+	metadata := &protobuf.ApplicationMetadataMessage{}
+
+	err := proto.Unmarshal(signedDescription, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	if metadata.Type != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+		return nil, ErrInvalidMessage
+	}
+
+	signer, err := utils.RecoverKey(metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	if signer == nil {
+		return nil, errors.New("CommunityDescription does not contain the control node signature")
+	}
+
+	if !signer.Equal(signerPubkey) {
+		return nil, errors.New("CommunityDescription was not signed by an owner")
+	}
+
+	description := &protobuf.CommunityDescription{}
+
+	err = proto.Unmarshal(metadata.Payload, description)
+	if err != nil {
+		return nil, err
+	}
+
+	return description, nil
 }

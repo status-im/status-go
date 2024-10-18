@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/connmgr"
@@ -24,6 +25,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/host/autonat"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
+	blankhost "github.com/libp2p/go-libp2p/p2p/host/blank"
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
@@ -34,10 +36,12 @@ import (
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	"github.com/libp2p/go-libp2p/p2p/transport/quicreuse"
+	libp2pwebrtc "github.com/libp2p/go-libp2p/p2p/transport/webrtc"
 	"github.com/prometheus/client_golang/prometheus"
 
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/quic-go/quic-go"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -131,6 +135,13 @@ type Config struct {
 	SwarmOpts []swarm.Option
 
 	DisableIdentifyAddressDiscovery bool
+
+	EnableAutoNATv2 bool
+
+	UDPBlackHoleSuccessCounter        *swarm.BlackHoleSuccessCounter
+	CustomUDPBlackHoleSuccessCounter  bool
+	IPv6BlackHoleSuccessCounter       *swarm.BlackHoleSuccessCounter
+	CustomIPv6BlackHoleSuccessCounter bool
 }
 
 func (cfg *Config) makeSwarm(eventBus event.Bus, enableMetrics bool) (*swarm.Swarm, error) {
@@ -165,7 +176,10 @@ func (cfg *Config) makeSwarm(eventBus event.Bus, enableMetrics bool) (*swarm.Swa
 		return nil, err
 	}
 
-	opts := cfg.SwarmOpts
+	opts := append(cfg.SwarmOpts,
+		swarm.WithUDPBlackHoleSuccessCounter(cfg.UDPBlackHoleSuccessCounter),
+		swarm.WithIPv6BlackHoleSuccessCounter(cfg.IPv6BlackHoleSuccessCounter),
+	)
 	if cfg.Reporter != nil {
 		opts = append(opts, swarm.WithMetrics(cfg.Reporter))
 	}
@@ -193,6 +207,77 @@ func (cfg *Config) makeSwarm(eventBus event.Bus, enableMetrics bool) (*swarm.Swa
 	return swarm.NewSwarm(pid, cfg.Peerstore, eventBus, opts...)
 }
 
+func (cfg *Config) makeAutoNATV2Host() (host.Host, error) {
+	autonatPrivKey, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	ps, err := pstoremem.NewPeerstore()
+	if err != nil {
+		return nil, err
+	}
+
+	autoNatCfg := Config{
+		Transports:                  cfg.Transports,
+		Muxers:                      cfg.Muxers,
+		SecurityTransports:          cfg.SecurityTransports,
+		Insecure:                    cfg.Insecure,
+		PSK:                         cfg.PSK,
+		ConnectionGater:             cfg.ConnectionGater,
+		Reporter:                    cfg.Reporter,
+		PeerKey:                     autonatPrivKey,
+		Peerstore:                   ps,
+		DialRanker:                  swarm.NoDelayDialRanker,
+		UDPBlackHoleSuccessCounter:  cfg.UDPBlackHoleSuccessCounter,
+		IPv6BlackHoleSuccessCounter: cfg.IPv6BlackHoleSuccessCounter,
+		ResourceManager:             cfg.ResourceManager,
+		SwarmOpts: []swarm.Option{
+			// Don't update black hole state for failed autonat dials
+			swarm.WithReadOnlyBlackHoleDetector(),
+		},
+	}
+	fxopts, err := autoNatCfg.addTransports()
+	if err != nil {
+		return nil, err
+	}
+	var dialerHost host.Host
+	fxopts = append(fxopts,
+		fx.Provide(eventbus.NewBus),
+		fx.Provide(func(lifecycle fx.Lifecycle, b event.Bus) (*swarm.Swarm, error) {
+			lifecycle.Append(fx.Hook{
+				OnStop: func(context.Context) error {
+					return ps.Close()
+				}})
+			sw, err := autoNatCfg.makeSwarm(b, false)
+			return sw, err
+		}),
+		fx.Provide(func(sw *swarm.Swarm) *blankhost.BlankHost {
+			return blankhost.NewBlankHost(sw)
+		}),
+		fx.Provide(func(bh *blankhost.BlankHost) host.Host {
+			return bh
+		}),
+		fx.Provide(func() crypto.PrivKey { return autonatPrivKey }),
+		fx.Provide(func(bh host.Host) peer.ID { return bh.ID() }),
+		fx.Invoke(func(bh *blankhost.BlankHost) {
+			dialerHost = bh
+		}),
+	)
+	app := fx.New(fxopts...)
+	if err := app.Err(); err != nil {
+		return nil, err
+	}
+	err = app.Start(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		<-dialerHost.Network().(*swarm.Swarm).Done()
+		app.Stop(context.Background())
+	}()
+	return dialerHost, nil
+}
+
 func (cfg *Config) addTransports() ([]fx.Option, error) {
 	fxopts := []fx.Option{
 		fx.WithLogger(func() fxevent.Logger { return getFXLogger() }),
@@ -202,6 +287,29 @@ func (cfg *Config) addTransports() ([]fx.Option, error) {
 		fx.Provide(func() pnet.PSK { return cfg.PSK }),
 		fx.Provide(func() network.ResourceManager { return cfg.ResourceManager }),
 		fx.Provide(func() *madns.Resolver { return cfg.MultiaddrResolver }),
+		fx.Provide(func(cm *quicreuse.ConnManager, sw *swarm.Swarm) libp2pwebrtc.ListenUDPFn {
+			hasQuicAddrPortFor := func(network string, laddr *net.UDPAddr) bool {
+				quicAddrPorts := map[string]struct{}{}
+				for _, addr := range sw.ListenAddresses() {
+					if _, err := addr.ValueForProtocol(ma.P_QUIC_V1); err == nil {
+						netw, addr, err := manet.DialArgs(addr)
+						if err != nil {
+							return false
+						}
+						quicAddrPorts[netw+"_"+addr] = struct{}{}
+					}
+				}
+				_, ok := quicAddrPorts[network+"_"+laddr.String()]
+				return ok
+			}
+
+			return func(network string, laddr *net.UDPAddr) (net.PacketConn, error) {
+				if hasQuicAddrPortFor(network, laddr) {
+					return cm.SharedNonQUICPacketConn(network, laddr)
+				}
+				return net.ListenUDP(network, laddr)
+			}
+		}),
 	}
 	fxopts = append(fxopts, cfg.Transports...)
 	if cfg.Insecure {
@@ -260,8 +368,12 @@ func (cfg *Config) addTransports() ([]fx.Option, error) {
 		fxopts = append(fxopts, cfg.QUICReuse...)
 	} else {
 		fxopts = append(fxopts,
-			fx.Provide(func(key quic.StatelessResetKey, tokenGenerator quic.TokenGeneratorKey, _ *swarm.Swarm, lifecycle fx.Lifecycle) (*quicreuse.ConnManager, error) {
-				cm, err := quicreuse.NewConnManager(key, tokenGenerator)
+			fx.Provide(func(key quic.StatelessResetKey, tokenGenerator quic.TokenGeneratorKey, lifecycle fx.Lifecycle) (*quicreuse.ConnManager, error) {
+				var opts []quicreuse.Option
+				if !cfg.DisableMetrics {
+					opts = append(opts, quicreuse.EnableMetrics(cfg.PrometheusRegisterer))
+				}
+				cm, err := quicreuse.NewConnManager(key, tokenGenerator, opts...)
 				if err != nil {
 					return nil, err
 				}
@@ -291,6 +403,14 @@ func (cfg *Config) addTransports() ([]fx.Option, error) {
 }
 
 func (cfg *Config) newBasicHost(swrm *swarm.Swarm, eventBus event.Bus) (*bhost.BasicHost, error) {
+	var autonatv2Dialer host.Host
+	if cfg.EnableAutoNATv2 {
+		ah, err := cfg.makeAutoNATV2Host()
+		if err != nil {
+			return nil, err
+		}
+		autonatv2Dialer = ah
+	}
 	h, err := bhost.NewHost(swrm, &bhost.HostOpts{
 		EventBus:                        eventBus,
 		ConnManager:                     cfg.ConnManager,
@@ -306,6 +426,8 @@ func (cfg *Config) newBasicHost(swrm *swarm.Swarm, eventBus event.Bus) (*bhost.B
 		EnableMetrics:                   !cfg.DisableMetrics,
 		PrometheusRegisterer:            cfg.PrometheusRegisterer,
 		DisableIdentifyAddressDiscovery: cfg.DisableIdentifyAddressDiscovery,
+		EnableAutoNATv2:                 cfg.EnableAutoNATv2,
+		AutoNATv2Dialer:                 autonatv2Dialer,
 	})
 	if err != nil {
 		return nil, err
@@ -315,9 +437,9 @@ func (cfg *Config) newBasicHost(swrm *swarm.Swarm, eventBus event.Bus) (*bhost.B
 		// addresses by default.
 		//
 		// TODO: We shouldn't be doing this here.
-		oldFactory := h.AddrsFactory
+		originalAddrFactory := h.AddrsFactory
 		h.AddrsFactory = func(addrs []ma.Multiaddr) []ma.Multiaddr {
-			return oldFactory(autorelay.Filter(addrs))
+			return originalAddrFactory(autorelay.Filter(addrs))
 		}
 	}
 	return h, nil
@@ -347,18 +469,17 @@ func (cfg *Config) NewNode() (host.Host, error) {
 		fx.Provide(func() event.Bus {
 			return eventbus.NewBus(eventbus.WithMetricsTracer(eventbus.NewMetricsTracer(eventbus.WithRegisterer(cfg.PrometheusRegisterer))))
 		}),
-		fx.Provide(func(eventBus event.Bus, lifecycle fx.Lifecycle) (*swarm.Swarm, error) {
-			sw, err := cfg.makeSwarm(eventBus, !cfg.DisableMetrics)
-			if err != nil {
-				return nil, err
-			}
-			lifecycle.Append(fx.StopHook(sw.Close))
-			return sw, nil
+		fx.Provide(func() crypto.PrivKey {
+			return cfg.PeerKey
 		}),
 		// Make sure the swarm constructor depends on the quicreuse.ConnManager.
 		// That way, the ConnManager will be started before the swarm, and more importantly,
 		// the swarm will be stopped before the ConnManager.
-		fx.Decorate(func(sw *swarm.Swarm, _ *quicreuse.ConnManager, lifecycle fx.Lifecycle) *swarm.Swarm {
+		fx.Provide(func(eventBus event.Bus, _ *quicreuse.ConnManager, lifecycle fx.Lifecycle) (*swarm.Swarm, error) {
+			sw, err := cfg.makeSwarm(eventBus, !cfg.DisableMetrics)
+			if err != nil {
+				return nil, err
+			}
 			lifecycle.Append(fx.Hook{
 				OnStart: func(context.Context) error {
 					// TODO: This method succeeds if listening on one address succeeds. We
@@ -369,14 +490,13 @@ func (cfg *Config) NewNode() (host.Host, error) {
 					return sw.Close()
 				},
 			})
-			return sw
+			return sw, nil
 		}),
 		fx.Provide(cfg.newBasicHost),
 		fx.Provide(func(bh *bhost.BasicHost) host.Host {
 			return bh
 		}),
 		fx.Provide(func(h *swarm.Swarm) peer.ID { return h.LocalPeer() }),
-		fx.Provide(func(h *swarm.Swarm) crypto.PrivKey { return h.Peerstore().PrivKey(h.LocalPeer()) }),
 	}
 	transportOpts, err := cfg.addTransports()
 	if err != nil {
@@ -394,26 +514,36 @@ func (cfg *Config) NewNode() (host.Host, error) {
 		)
 	}
 
-	// Note: h.AddrsFactory may be changed by relayFinder, but non-relay version is
-	// used by AutoNAT below.
-	if cfg.EnableAutoRelay {
-		if !cfg.DisableMetrics {
-			mt := autorelay.WithMetricsTracer(
-				autorelay.NewMetricsTracer(autorelay.WithRegisterer(cfg.PrometheusRegisterer)))
-			mtOpts := []autorelay.Option{mt}
-			cfg.AutoRelayOpts = append(mtOpts, cfg.AutoRelayOpts...)
-		}
-		fxopts = append(fxopts,
-			fx.Invoke(func(h *bhost.BasicHost, lifecycle fx.Lifecycle) (*autorelay.AutoRelay, error) {
+	// originalAddrFactory is the AddrFactory before it's modified by autorelay
+	// we need this for checking reachability via autonat
+	originalAddrFactory := func(addrs []ma.Multiaddr) []ma.Multiaddr {
+		return addrs
+	}
+
+	// enable autorelay
+	fxopts = append(fxopts,
+		fx.Invoke(func(h *bhost.BasicHost) {
+			originalAddrFactory = h.AddrsFactory
+		}),
+		fx.Invoke(func(h *bhost.BasicHost, lifecycle fx.Lifecycle) error {
+			if cfg.EnableAutoRelay {
+				if !cfg.DisableMetrics {
+					mt := autorelay.WithMetricsTracer(
+						autorelay.NewMetricsTracer(autorelay.WithRegisterer(cfg.PrometheusRegisterer)))
+					mtOpts := []autorelay.Option{mt}
+					cfg.AutoRelayOpts = append(mtOpts, cfg.AutoRelayOpts...)
+				}
+
 				ar, err := autorelay.NewAutoRelay(h, cfg.AutoRelayOpts...)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				lifecycle.Append(fx.StartStopHook(ar.Start, ar.Close))
-				return ar, nil
-			}),
-		)
-	}
+				return nil
+			}
+			return nil
+		}),
+	)
 
 	var bh *bhost.BasicHost
 	fxopts = append(fxopts, fx.Invoke(func(bho *bhost.BasicHost) { bh = bho }))
@@ -431,7 +561,7 @@ func (cfg *Config) NewNode() (host.Host, error) {
 		return nil, err
 	}
 
-	if err := cfg.addAutoNAT(bh); err != nil {
+	if err := cfg.addAutoNAT(bh, originalAddrFactory); err != nil {
 		app.Stop(context.Background())
 		if cfg.Routing != nil {
 			rh.Close()
@@ -447,8 +577,7 @@ func (cfg *Config) NewNode() (host.Host, error) {
 	return &closableBasicHost{App: app, BasicHost: bh}, nil
 }
 
-func (cfg *Config) addAutoNAT(h *bhost.BasicHost) error {
-	addrF := h.AddrsFactory
+func (cfg *Config) addAutoNAT(h *bhost.BasicHost, addrF AddrsFactory) error {
 	autonatOpts := []autonat.Option{
 		autonat.UsingAddresses(func() []ma.Multiaddr {
 			return addrF(h.AllAddrs())
@@ -487,10 +616,10 @@ func (cfg *Config) addAutoNAT(h *bhost.BasicHost) error {
 			PeerKey:            autonatPrivKey,
 			Peerstore:          ps,
 			DialRanker:         swarm.NoDelayDialRanker,
+			ResourceManager:    cfg.ResourceManager,
 			SwarmOpts: []swarm.Option{
-				// It is better to disable black hole detection and just attempt a dial for autonat
-				swarm.WithUDPBlackHoleConfig(false, 0, 0),
-				swarm.WithIPv6BlackHoleConfig(false, 0, 0),
+				swarm.WithUDPBlackHoleSuccessCounter(nil),
+				swarm.WithIPv6BlackHoleSuccessCounter(nil),
 			},
 		}
 

@@ -19,6 +19,7 @@ type Parameters struct {
 	pageLimit         uint64
 	forward           bool
 	includeData       bool
+	skipRatelimit     bool
 }
 
 type RequestOption func(*Parameters) error
@@ -111,6 +112,14 @@ func WithPaging(forward bool, limit uint64) RequestOption {
 func IncludeData(v bool) RequestOption {
 	return func(params *Parameters) error {
 		params.includeData = v
+		return nil
+	}
+}
+
+// Skips the rate limiting for the current request (might cause the store request to fail with TOO_MANY_REQUESTS (429))
+func SkipRateLimit() RequestOption {
+	return func(params *Parameters) error {
+		params.skipRatelimit = true
 		return nil
 	}
 }

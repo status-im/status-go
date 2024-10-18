@@ -28,6 +28,23 @@ const ShardingBitVectorEnrField = "rsv"
 // WakuEnrBitfield is a8-bit flag field to indicate Waku capabilities. Only the 4 LSBs are currently defined according to RFC31 (https://rfc.vac.dev/spec/31/).
 type WakuEnrBitfield = uint8
 
+func GetWakuEnrBitField(node *enode.Node) (WakuEnrBitfield, error) {
+	enrField := []byte{}
+	err := node.Record().Load(enr.WithEntry(WakuENRField, &enrField))
+	if err != nil {
+		if enr.IsNotFound(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+
+	if len(enrField) == 0 {
+		return 0, err
+	}
+
+	return WakuEnrBitfield(enrField[0]), nil
+}
+
 // NewWakuEnrBitfield creates a WakuEnrBitField whose value will depend on which protocols are enabled in the node
 func NewWakuEnrBitfield(lightpush, filter, store, relay bool) WakuEnrBitfield {
 	var v uint8

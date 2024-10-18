@@ -9,6 +9,8 @@ import (
 
 	"github.com/beevik/ntp"
 
+	"github.com/status-im/status-go/common"
+
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -73,6 +75,7 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 	responses := make(chan queryResponse, len(servers))
 	for _, server := range servers {
 		go func(server string) {
+			defer common.LogOnPanic()
 			response, err := timeQuery(server, ntp.QueryOptions{
 				Timeout: DefaultRPCTimeout,
 			})
@@ -183,6 +186,7 @@ func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod 
 	}
 	s.quit = make(chan struct{})
 	go func() {
+		defer common.LogOnPanic()
 		for {
 			select {
 			case <-time.After(period):

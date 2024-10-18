@@ -1162,6 +1162,12 @@ func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
 				return ErrKeypairDifferentAccountsKeyUID
 			}
 		}
+	} else if dbKeypair.Removed {
+		// If the key pair beind added was removed in the past, then all its accounts must be removed before adding it again.
+		err = db.deleteAccountsForKeyUID(tx, keypair.KeyUID)
+		if err != nil {
+			return err
+		}
 	}
 
 	_, err = tx.Exec(`
@@ -1599,6 +1605,15 @@ func (db *Database) MoveWalletAccount(fromPosition int64, toPosition int64, cloc
 	return db.setClockOfLastAccountsPositionChange(tx, clock)
 }
 
+func (db *Database) deleteAccountsForKeyUID(tx *sql.Tx, keyUID string) error {
+	if tx == nil {
+		return errDbTransactionIsNil
+	}
+
+	_, err := tx.Exec("DELETE FROM keypairs_accounts WHERE key_uid = ?", keyUID)
+	return err
+}
+
 func (db *Database) CheckAndDeleteExpiredKeypairsAndAccounts(time uint64) error {
 	tx, err := db.db.Begin()
 	if err != nil {
@@ -1728,7 +1743,7 @@ func (db *Database) ResolveSuggestedPathForKeypair(keyUID string) (suggestedPath
 	}()
 
 	var kp *Keypair
-	kp, err = db.getKeypairByKeyUID(tx, keyUID, true)
+	kp, err = db.getKeypairByKeyUID(tx, keyUID, false)
 	if err != nil {
 		if err == ErrDbKeypairNotFound {
 			return fmt.Sprintf("%s0", statusWalletRootPath), nil

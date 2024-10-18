@@ -7,6 +7,7 @@ let
   isMacM1 = stdenv.isDarwin && stdenv.isAarch64;
   isMacIntel = stdenv.isDarwin && stdenv.isx86_64;
 
+  apple_sdk = pkgs.darwin.apple_sdk.override { version = "11.0"; };
   /* Lock requires Xcode verison. */
   xcodeWrapper = callPackage ./pkgs/xcodeenv/compose-xcodewrapper.nix { } {
       versions = ["14.3" "15.1" "15.2" "15.3" "15.4"];
@@ -23,13 +24,11 @@ in pkgs.mkShell {
 
   buildInputs = with pkgs; [
     git jq which
-    go golangci-lint go-junit-report gopls go-bindata gomobileMod codecov-cli
+    go golangci-lint go-junit-report gopls go-bindata gomobileMod codecov-cli go-generate-fast
     mockgen protobuf3_20 protoc-gen-go gotestsum go-modvendor openjdk cc-test-reporter
    ] ++ lib.optionals (stdenv.isDarwin) [ xcodeWrapper ]
      ++ lib.optionals (isMacIntel) [
    pkgs.darwin.apple_sdk.libs.xpc
-   pkgs.darwin.apple_sdk_11_0.frameworks.Security
-   pkgs.darwin.apple_sdk_11_0.frameworks.CoreServices
    ];
 
    shellHook = lib.optionalString (!isMacM1) ''
@@ -42,4 +41,3 @@ in pkgs.mkShell {
   # https://github.com/status-im/status-mobile/pull/13912
   __noChroot = stdenv.isDarwin;
 }
-

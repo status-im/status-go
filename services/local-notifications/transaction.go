@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -166,6 +167,7 @@ func (s *Service) StartWalletWatcher() {
 
 	maxKnownBlocks := map[common.Address]*big.Int{}
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer s.walletTransmitter.wg.Done()
 		historyReady := false
 		for {

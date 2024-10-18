@@ -37,12 +37,9 @@ calculate_new_version() {
     # Parse commits to determine if there are breaking changes
     output=$(parse_commits "$latest_tag" "$target_commit")
     exit_code=$?
+    echo "$output" | sed '$d' >&2 # Skip the last line, it contains the breaking change flag
 
-    a=$(echo "$output" | sed '$d')
     is_breaking_change=$(echo "$output" | tail -n 1)
-
-    echo "$a" >&2
-
 
     if [[ $is_breaking_change == 'true' ]]; then
       echo -e "${YLW}Breaking change detected${RST}" >&2

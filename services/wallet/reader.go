@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/market"
@@ -117,6 +118,7 @@ func (r *Reader) Start() error {
 	r.startWalletEventsWatcher()
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		ticker := time.NewTicker(walletTickReloadPeriod)
 		defer ticker.Stop()
 		for {
@@ -479,15 +481,15 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 
 	var (
 		group             = async.NewAtomicGroup(ctx)
-		prices            = map[string]map[string]float64{}
+		prices            = map[string]map[string]market.DataPoint{}
 		tokenDetails      = map[string]thirdparty.TokenDetails{}
 		tokenMarketValues = map[string]thirdparty.TokenMarketValues{}
 	)
 
 	group.Add(func(parent context.Context) error {
-		prices, err = r.marketManager.FetchPrices(tokenSymbols, currencies)
+		prices, err = r.marketManager.GetOrFetchPrices(tokenSymbols, currencies, market.MaxAgeInSecondsForBalances)
 		if err != nil {
-			log.Info("marketManager.FetchPrices err", err)
+			log.Info("marketManager.GetOrFetchPrices err", err)
 		}
 		return nil
 	})
@@ -501,9 +503,9 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 	})
 
 	group.Add(func(parent context.Context) error {
-		tokenMarketValues, err = r.marketManager.FetchTokenMarketValues(tokenSymbols, currency)
+		tokenMarketValues, err = r.marketManager.GetOrFetchTokenMarketValues(tokenSymbols, currency, market.MaxAgeInSecondsForBalances)
 		if err != nil {
-			log.Info("marketManager.FetchTokenMarketValues err", err)
+			log.Info("marketManager.GetOrFetchTokenMarketValues err", err)
 		}
 		return nil
 	})
@@ -533,7 +535,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 					ChangePctDay:    tokenMarketValues[tok.Symbol].CHANGEPCTDAY,
 					ChangePct24hour: tokenMarketValues[tok.Symbol].CHANGEPCT24HOUR,
 					Change24hour:    tokenMarketValues[tok.Symbol].CHANGE24HOUR,
-					Price:           prices[tok.Symbol][currency],
+					Price:           prices[tok.Symbol][currency].Price,
 					HasError:        !r.marketManager.IsConnected,
 				}
 			}

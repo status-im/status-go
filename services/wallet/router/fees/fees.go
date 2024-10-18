@@ -87,7 +87,7 @@ type FeeHistory struct {
 }
 
 type FeeManager struct {
-	RPCClient *rpc.Client
+	RPCClient rpc.ClientInterface
 }
 
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {

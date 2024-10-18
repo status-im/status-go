@@ -9,6 +9,7 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -333,6 +334,7 @@ func (s *Service) subscribeToEvents() {
 
 // processEvents runs only if more than one session is active
 func (s *Service) processEvents() {
+	defer gocommon.LogOnPanic()
 	eventCount := 0
 	lastUpdate := time.Now().UnixMilli()
 	for event := range s.ch {
@@ -411,6 +413,7 @@ func (s *Service) detectNew(changeCount int) {
 }
 
 func notify(eventFeed *event.Feed, id SessionID, hasNewOnTop bool, mixed []*EntryUpdate) {
+	defer gocommon.LogOnPanic()
 	payload := SessionUpdate{
 		New: mixed,
 	}
@@ -452,6 +455,7 @@ func (s *Service) getActivityDetailsAsync(requestID int32, entries []Entry) {
 	ctx := context.Background()
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		activityData, err := s.getActivityDetails(ctx, entries)
 		if len(activityData) != 0 {
 			sendResponseEvent(s.eventFeed, &requestID, EventActivityFilteringUpdate, activityData, err)

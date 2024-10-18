@@ -26,6 +26,7 @@ const (
 	P_P2P               = 421
 	P_IPFS              = P_P2P // alias for backwards compatibility
 	P_HTTP              = 480
+	P_HTTP_PATH         = 481
 	P_HTTPS             = 443 // deprecated alias for /tls/http
 	P_ONION             = 444 // also for backwards compatibility
 	P_ONION3            = 445
@@ -206,6 +207,13 @@ var (
 		Code:  P_HTTP,
 		VCode: CodeToVarint(P_HTTP),
 	}
+	protoHTTPPath = Protocol{
+		Name:       "http-path",
+		Code:       P_HTTP_PATH,
+		VCode:      CodeToVarint(P_HTTP_PATH),
+		Size:       LengthPrefixedVarSize,
+		Transcoder: TranscoderHTTPPath,
+	}
 	protoHTTPS = Protocol{
 		Name:  "https",
 		Code:  P_HTTPS,
@@ -301,6 +309,7 @@ func init() {
 		protoWEBTRANSPORT,
 		protoCERTHASH,
 		protoHTTP,
+		protoHTTPPath,
 		protoHTTPS,
 		protoP2P,
 		protoUNIX,

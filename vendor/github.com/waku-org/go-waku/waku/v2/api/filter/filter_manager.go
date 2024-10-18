@@ -13,6 +13,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 // Methods on FilterManager just aggregate filters from application and subscribe to them
@@ -31,7 +32,7 @@ type appFilterMap map[string]filterConfig
 type FilterManager struct {
 	sync.Mutex
 	ctx                    context.Context
-	opts                   []SubscribeOptions
+	params                 *subscribeParameters
 	minPeersPerFilter      int
 	onlineChecker          *onlinechecker.DefaultOnlineChecker
 	filterSubscriptions    map[string]SubDetails // map of aggregated filters to apiSub details
@@ -64,7 +65,6 @@ func NewFilterManager(ctx context.Context, logger *zap.Logger, minPeersPerFilter
 	// This fn is being mocked in test
 	mgr := new(FilterManager)
 	mgr.ctx = ctx
-	mgr.opts = opts
 	mgr.logger = logger
 	mgr.minPeersPerFilter = minPeersPerFilter
 	mgr.envProcessor = envProcessor
@@ -72,15 +72,23 @@ func NewFilterManager(ctx context.Context, logger *zap.Logger, minPeersPerFilter
 	mgr.node = node
 	mgr.onlineChecker = onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker)
 	mgr.node.SetOnlineChecker(mgr.onlineChecker)
-	mgr.filterSubBatchDuration = 5 * time.Second
 	mgr.incompleteFilterBatch = make(map[string]filterConfig)
 	mgr.filterConfigs = make(appFilterMap)
 	mgr.waitingToSubQueue = make(chan filterConfig, 100)
+
+	//parsing the subscribe params only to read the batchInterval passed.
+	mgr.params = new(subscribeParameters)
+	opts = append(defaultOptions(), opts...)
+	for _, opt := range opts {
+		opt(mgr.params)
+	}
+	mgr.filterSubBatchDuration = mgr.params.batchInterval
 	go mgr.startFilterSubLoop()
 	return mgr
 }
 
 func (mgr *FilterManager) startFilterSubLoop() {
+	defer utils.LogOnPanic()
 	ticker := time.NewTicker(mgr.filterSubBatchDuration)
 	defer ticker.Stop()
 	for {
@@ -151,9 +159,10 @@ func (mgr *FilterManager) SubscribeFilter(filterID string, cf protocol.ContentFi
 }
 
 func (mgr *FilterManager) subscribeAndRunLoop(f filterConfig) {
+	defer utils.LogOnPanic()
 	ctx, cancel := context.WithCancel(mgr.ctx)
 	config := FilterConfig{MaxPeers: mgr.minPeersPerFilter}
-	sub, err := Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger, mgr.opts...)
+	sub, err := Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger, mgr.params)
 	mgr.Lock()
 	mgr.filterSubscriptions[f.ID] = SubDetails{cancel, sub}
 	mgr.Unlock()

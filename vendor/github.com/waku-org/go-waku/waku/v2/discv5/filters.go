@@ -4,7 +4,6 @@ import (
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/p2p/enr"
 )
 
 // FilterPredicate is to create a Predicate using a custom function
@@ -36,16 +35,11 @@ func FilterShard(cluster, index uint16) Predicate {
 func FilterCapabilities(flags wenr.WakuEnrBitfield) Predicate {
 	return func(iterator enode.Iterator) enode.Iterator {
 		predicate := func(node *enode.Node) bool {
-			enrField := new(wenr.WakuEnrBitfield)
-			if err := node.Record().Load(enr.WithEntry(wenr.WakuENRField, &enrField)); err != nil {
+			enrField, err := wenr.GetWakuEnrBitField(node)
+			if err != nil {
 				return false
 			}
-
-			if enrField == nil {
-				return false
-			}
-
-			return *enrField&flags == flags
+			return enrField&flags == flags
 		}
 		return enode.Filter(iterator, predicate)
 	}

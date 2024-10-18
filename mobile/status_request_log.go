@@ -13,7 +13,28 @@ import (
 	"github.com/status-im/status-go/logutils/requestlog"
 )
 
-var sensitiveRegex = regexp.MustCompile(`(?i)(".*?(password|mnemonic|openseaAPIKey|poktToken|alchemyArbitrumMainnetToken|raribleTestnetAPIKey|alchemyOptimismMainnetToken|statusProxyBlockchainUser|alchemyEthereumSepoliaToken|alchemyArbitrumSepoliaToken|infuraToken|raribleMainnetAPIKey|alchemyEthereumMainnetToken).*?")\s*:\s*("[^"]*")`)
+var sensitiveKeys = []string{
+	"password",
+	"mnemonic",
+	"openseaAPIKey",
+	"poktToken",
+	"alchemyArbitrumMainnetToken",
+	"raribleTestnetAPIKey",
+	"alchemyOptimismMainnetToken",
+	"statusProxyBlockchainUser",
+	"alchemyEthereumSepoliaToken",
+	"alchemyArbitrumSepoliaToken",
+	"infuraToken",
+	"raribleMainnetAPIKey",
+	"alchemyEthereumMainnetToken",
+	"alchemyOptimismSepoliaToken",
+	"verifyENSURL",
+	"verifyTransactionURL",
+}
+
+var sensitiveRegexString = fmt.Sprintf(`(?i)(".*?(%s).*?")\s*:\s*("[^"]*")`, strings.Join(sensitiveKeys, "|"))
+
+var sensitiveRegex = regexp.MustCompile(sensitiveRegexString)
 
 func getFunctionName(fn any) string {
 	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
@@ -25,12 +46,26 @@ func getShortFunctionName(fn any) string {
 	return parts[len(parts)-1]
 }
 
-// logAndCall logs request call details and executes the fn function if logging is enabled
-func logAndCall(fn any, params ...any) any {
+// call executes the given function and logs request details if logging is enabled
+//
+// Parameters:
+//   - fn: The function to be executed
+//   - params: A variadic list of parameters to be passed to the function
+//
+// Returns:
+//   - The result of the function execution (if any)
+//
+// Functionality:
+// 1. Sets up panic recovery to log and re-panic
+// 2. Records start time if request logging is enabled
+// 3. Uses reflection to call the given function
+// 4. If request logging is enabled, logs method name, parameters, response, and execution duration
+// 5. Removes sensitive information before logging
+func call(fn any, params ...any) any {
 	defer func() {
 		if r := recover(); r != nil {
 			// we're not sure if request logging is enabled here, so we log it use default logger
-			log.Error("panic found in logAndCall", "error", r, "stacktrace", string(debug.Stack()))
+			log.Error("panic found in call", "error", r, "stacktrace", string(debug.Stack()))
 			panic(r)
 		}
 	}()
@@ -71,8 +106,8 @@ func logAndCall(fn any, params ...any) any {
 	return resp
 }
 
-func logAndCallString(fn any, params ...any) string {
-	resp := logAndCall(fn, params...)
+func callWithResponse(fn any, params ...any) string {
+	resp := call(fn, params...)
 	if resp == nil {
 		return ""
 	}

@@ -49,13 +49,14 @@ func (s SendType) FetchPrices(marketManager *market.Manager, tokenIDs []string) 
 		symbols = []string{"ETH"}
 	}
 
-	pricesMap, err := marketManager.FetchPrices(symbols, []string{"USD"})
+	pricesMap, err := marketManager.GetOrFetchPrices(symbols, []string{"USD"}, market.MaxAgeInSecondsForFresh)
+
 	if err != nil {
 		return nil, err
 	}
 	prices := make(map[string]float64, 0)
 	for symbol, pricePerCurrency := range pricesMap {
-		prices[symbol] = pricePerCurrency["USD"]
+		prices[symbol] = pricePerCurrency["USD"].Price
 	}
 	if s.IsCollectiblesTransfer() {
 		for _, tokenID := range tokenIDs {
@@ -118,16 +119,16 @@ func (s SendType) CanUseProcessor(p pathprocessor.PathProcessor) bool {
 }
 
 func (s SendType) ProcessZeroAmountInProcessor(amountIn *big.Int, amountOut *big.Int, processorName string) bool {
-	if amountIn.Cmp(pathprocessor.ZeroBigIntValue) == 0 {
+	if amountIn.Cmp(walletCommon.ZeroBigIntValue()) == 0 {
 		if s == Transfer {
 			if processorName != pathprocessor.ProcessorTransferName {
 				return false
 			}
 		} else if s == Swap {
-			if amountOut.Cmp(pathprocessor.ZeroBigIntValue) == 0 {
+			if amountOut.Cmp(walletCommon.ZeroBigIntValue()) == 0 {
 				return false
 			}
-		} else {
+		} else if s != ENSRelease {
 			return false
 		}
 	}

@@ -1,0 +1,3624 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "properties": {
+                "AED": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "AFN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "ALL": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "AMD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "ANG": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "AOA": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "ARS": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "AUD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "AWG": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "AZN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BAM": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BBD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BDT": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BGN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BHD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BIF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BMD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BND": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BOB": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BOV": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BRL": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BSD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BTN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BWP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BYN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "BZD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CAD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CDF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CHE": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CHF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CHW": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CLF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CLP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CNY": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "COP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "COU": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CRC": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CUC": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CUP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CVE": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "CZK": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "DJF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "DKK": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "DOP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "DZD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "EGP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "ERN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "ETB": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "EUR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "FJD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "FKP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "GBP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "GEL": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "GHS": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "GIP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "GMD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "GNF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "GTQ": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "GYD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "HKD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "HNL": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "HTG": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "HUF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "IDR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "ILS": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "INR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "IQD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "IRR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "ISK": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "JMD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "JOD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "JPY": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "KES": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "KGS": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "KHR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "KMF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "KPW": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "KRW": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "KWD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "KYD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "KZT": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "LAK": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "LBP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "LKR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "LRD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "LSL": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "LYD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MAD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MDL": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MGA": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MKD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MMK": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MNT": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MOP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MRU": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MUR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MVR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MWK": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MXN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MXV": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MYR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "MZN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "NAD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "NGN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "NIO": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "NOK": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "NPR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "NZD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "OMR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "PAB": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "PEN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "PGK": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "PHP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "PKR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "PLN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "PYG": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "QAR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "RON": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "RSD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "RUB": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "RWF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SAR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SBD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SCR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SDG": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SEK": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SGD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SHP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SLE": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SLL": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SOS": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SRD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SSP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "STN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SVC": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SYP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "SZL": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "THB": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "TJS": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "TMT": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "TND": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "TOP": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "TRY": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "TTD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "TWD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "TZS": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "UAH": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "UGX": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "USD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "USN": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "UYI": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "UYU": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "UYW": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "UZS": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "VED": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "VES": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "VND": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "VUV": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "WST": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XAF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XAG": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XAU": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XBA": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XBB": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XBC": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XBD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XCD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XDR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XOF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XPD": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XPF": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XPT": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XSU": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XTS": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XUA": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "XXX": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "YER": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "ZAR": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "ZMW": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                },
+                "ZWL": {
+                    "properties": {
+                        "displayDecimals": {
+                            "type": "integer"
+                        },
+                        "stripTrailingZeroes": {
+                            "type": "boolean"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "displayDecimals",
+                        "stripTrailingZeroes",
+                        "symbol"
+                    ],
+                    "type": "object"
+                }
+            },
+            "required": [
+                "AED",
+                "AFN",
+                "ALL",
+                "AMD",
+                "ANG",
+                "AOA",
+                "ARS",
+                "AUD",
+                "AWG",
+                "AZN",
+                "BAM",
+                "BBD",
+                "BDT",
+                "BGN",
+                "BHD",
+                "BIF",
+                "BMD",
+                "BND",
+                "BOB",
+                "BOV",
+                "BRL",
+                "BSD",
+                "BTN",
+                "BWP",
+                "BYN",
+                "BZD",
+                "CAD",
+                "CDF",
+                "CHE",
+                "CHF",
+                "CHW",
+                "CLF",
+                "CLP",
+                "CNY",
+                "COP",
+                "COU",
+                "CRC",
+                "CUC",
+                "CUP",
+                "CVE",
+                "CZK",
+                "DJF",
+                "DKK",
+                "DOP",
+                "DZD",
+                "EGP",
+                "ERN",
+                "ETB",
+                "EUR",
+                "FJD",
+                "FKP",
+                "GBP",
+                "GEL",
+                "GHS",
+                "GIP",
+                "GMD",
+                "GNF",
+                "GTQ",
+                "GYD",
+                "HKD",
+                "HNL",
+                "HTG",
+                "HUF",
+                "IDR",
+                "ILS",
+                "INR",
+                "IQD",
+                "IRR",
+                "ISK",
+                "JMD",
+                "JOD",
+                "JPY",
+                "KES",
+                "KGS",
+                "KHR",
+                "KMF",
+                "KPW",
+                "KRW",
+                "KWD",
+                "KYD",
+                "KZT",
+                "LAK",
+                "LBP",
+                "LKR",
+                "LRD",
+                "LSL",
+                "LYD",
+                "MAD",
+                "MDL",
+                "MGA",
+                "MKD",
+                "MMK",
+                "MNT",
+                "MOP",
+                "MRU",
+                "MUR",
+                "MVR",
+                "MWK",
+                "MXN",
+                "MXV",
+                "MYR",
+                "MZN",
+                "NAD",
+                "NGN",
+                "NIO",
+                "NOK",
+                "NPR",
+                "NZD",
+                "OMR",
+                "PAB",
+                "PEN",
+                "PGK",
+                "PHP",
+                "PKR",
+                "PLN",
+                "PYG",
+                "QAR",
+                "RON",
+                "RSD",
+                "RUB",
+                "RWF",
+                "SAR",
+                "SBD",
+                "SCR",
+                "SDG",
+                "SEK",
+                "SGD",
+                "SHP",
+                "SLE",
+                "SLL",
+                "SOS",
+                "SRD",
+                "SSP",
+                "STN",
+                "SVC",
+                "SYP",
+                "SZL",
+                "THB",
+                "TJS",
+                "TMT",
+                "TND",
+                "TOP",
+                "TRY",
+                "TTD",
+                "TWD",
+                "TZS",
+                "UAH",
+                "UGX",
+                "USD",
+                "USN",
+                "UYI",
+                "UYU",
+                "UYW",
+                "UZS",
+                "VED",
+                "VES",
+                "VND",
+                "VUV",
+                "WST",
+                "XAF",
+                "XAG",
+                "XAU",
+                "XBA",
+                "XBB",
+                "XBC",
+                "XBD",
+                "XCD",
+                "XDR",
+                "XOF",
+                "XPD",
+                "XPF",
+                "XPT",
+                "XSU",
+                "XTS",
+                "XUA",
+                "XXX",
+                "YER",
+                "ZAR",
+                "ZMW",
+                "ZWL"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

@@ -2,6 +2,7 @@ package pb
 
 import (
 	"errors"
+	"fmt"
 )
 
 // MaxContentTopics is the maximum number of allowed contenttopics in a query
@@ -10,7 +11,6 @@ const MaxContentTopics = 10
 var (
 	errMissingRequestID       = errors.New("missing RequestId field")
 	errMessageHashOtherFields = errors.New("cannot use MessageHashes with ContentTopics/PubsubTopic")
-	errRequestIDMismatch      = errors.New("requestID in response does not match request")
 	errMaxContentTopics       = errors.New("exceeds the maximum number of ContentTopics allowed")
 	errEmptyContentTopic      = errors.New("one or more content topics specified is empty")
 	errMissingPubsubTopic     = errors.New("missing PubsubTopic field")
@@ -57,8 +57,8 @@ func (x *StoreQueryRequest) Validate() error {
 }
 
 func (x *StoreQueryResponse) Validate(requestID string) error {
-	if x.RequestId != "" && x.RequestId != requestID {
-		return errRequestIDMismatch
+	if x.RequestId != "" && x.RequestId != "N/A" && x.RequestId != requestID {
+		return fmt.Errorf("requestID %s in response does not match requestID in request %s", x.RequestId, requestID)
 	}
 
 	if x.StatusCode == nil {

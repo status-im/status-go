@@ -2,7 +2,6 @@ package pathprocessor
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -55,7 +55,7 @@ func (s *ERC721Processor) AvailableFor(params ProcessorInputParams) (bool, error
 }
 
 func (s *ERC721Processor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
 }
 
 func (s *ERC721Processor) packTxInputDataInternally(params ProcessorInputParams, functionName string) ([]byte, error) {
@@ -64,9 +64,9 @@ func (s *ERC721Processor) packTxInputDataInternally(params ProcessorInputParams,
 		return []byte{}, createERC721ErrorResponse(err)
 	}
 
-	id, success := big.NewInt(0).SetString(params.FromToken.Symbol, 0)
-	if !success {
-		return []byte{}, createERC721ErrorResponse(fmt.Errorf("failed to convert %s to big.Int", params.FromToken.Symbol))
+	id, err := walletCommon.GetTokenIdFromSymbol(params.FromToken.Symbol)
+	if err != nil {
+		return []byte{}, createERC721ErrorResponse(err)
 	}
 
 	return abi.Pack(functionName,
@@ -146,6 +146,7 @@ func (s *ERC721Processor) EstimateGas(params ProcessorInputParams) (uint64, erro
 	return uint64(increasedEstimation), nil
 }
 
+// TODO: remove this struct once mobile switches to the new approach
 func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
 	from := common.Address(sendArgs.ERC721TransferTx.From)
 
@@ -157,7 +158,8 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 		FromAddr: from,
 		ToAddr:   sendArgs.ERC721TransferTx.Recipient,
 		FromToken: &token.Token{
-			Symbol: sendArgs.ERC721TransferTx.TokenID.String(),
+			Symbol:  sendArgs.ERC721TransferTx.TokenID.String(),
+			Address: common.Address(*sendArgs.ERC721TransferTx.To),
 		},
 	}
 	err = s.checkIfFunctionExists(inputParams, functionNameSafeTransferFrom)
@@ -207,6 +209,76 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 	return tx, nil
 }
 
+func (s *ERC721Processor) sendOrBuildV2(sendArgs *transactions.SendTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
+	from := common.Address(sendArgs.From)
+	to := common.Address(*sendArgs.To)
+
+	useSafeTransferFrom := true
+	inputParams := ProcessorInputParams{
+		FromChain: &params.Network{
+			ChainID: sendArgs.FromChainID,
+		},
+		FromAddr: from,
+		ToAddr:   to,
+		FromToken: &token.Token{
+			Symbol:  sendArgs.FromTokenID,
+			Address: common.Address(sendArgs.ToContractAddress),
+		},
+	}
+	err = s.checkIfFunctionExists(inputParams, functionNameSafeTransferFrom)
+	if err != nil {
+		useSafeTransferFrom = false
+	}
+
+	ethClient, err := s.rpcClient.EthClient(sendArgs.FromChainID)
+	if err != nil {
+		return tx, createERC721ErrorResponse(err)
+	}
+
+	contract, err := collectibles.NewCollectibles(common.Address(sendArgs.ToContractAddress), ethClient)
+	if err != nil {
+		return tx, createERC721ErrorResponse(err)
+	}
+
+	id, err := walletCommon.GetTokenIdFromSymbol(sendArgs.FromTokenID)
+	if err != nil {
+		return tx, createERC1155ErrorResponse(err)
+	}
+
+	var nonce uint64
+	if lastUsedNonce < 0 {
+		nonce, err = s.transactor.NextNonce(s.rpcClient, sendArgs.FromChainID, sendArgs.From)
+		if err != nil {
+			return tx, createERC721ErrorResponse(err)
+		}
+	} else {
+		nonce = uint64(lastUsedNonce) + 1
+	}
+
+	argNonce := hexutil.Uint64(nonce)
+	sendArgs.Nonce = &argNonce
+	txOpts := sendArgs.ToTransactOpts(signerFn)
+	if useSafeTransferFrom {
+		tx, err = contract.SafeTransferFrom(txOpts,
+			from,
+			to,
+			id)
+	} else {
+		tx, err = contract.TransferFrom(txOpts,
+			from,
+			to,
+			id)
+	}
+	if err != nil {
+		return tx, createERC721ErrorResponse(err)
+	}
+	err = s.transactor.StoreAndTrackPendingTx(from, sendArgs.FromTokenID, sendArgs.FromChainID, sendArgs.MultiTransactionID, tx)
+	if err != nil {
+		return tx, createERC721ErrorResponse(err)
+	}
+	return tx, nil
+}
+
 func (s *ERC721Processor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
 	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount), lastUsedNonce)
 	if err != nil {
@@ -217,6 +289,11 @@ func (s *ERC721Processor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce
 
 func (s *ERC721Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	tx, err := s.sendOrBuild(sendArgs, nil, lastUsedNonce)
+	return tx, tx.Nonce(), err
+}
+
+func (s *ERC721Processor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	tx, err := s.sendOrBuildV2(sendArgs, nil, lastUsedNonce)
 	return tx, tx.Nonce(), err
 }
 

@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/rpc/chain"
+	ethclient "github.com/status-im/status-go/rpc/chain/ethclient"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
@@ -83,7 +83,7 @@ func setupTestService(tb testing.TB) (state testState) {
 
 	state.chainClient = transactions.NewMockChainClient()
 	state.rpcClient = mock_rpcclient.NewMockClientInterface(mockCtrl)
-	state.rpcClient.EXPECT().AbstractEthClient(gomock.Any()).DoAndReturn(func(chainID common.ChainID) (chain.BatchCallClient, error) {
+	state.rpcClient.EXPECT().AbstractEthClient(gomock.Any()).DoAndReturn(func(chainID common.ChainID) (ethclient.BatchCallClient, error) {
 		return state.chainClient.AbstractEthClient(chainID)
 	}).AnyTimes()
 

@@ -3,6 +3,7 @@ package pathprocessor
 import (
 	"fmt"
 	"math/big"
+	"strings"
 
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
@@ -24,4 +25,11 @@ func makeKey(fromChain, toChain uint64, fromTokenSymbol, toTokenSymbol string) s
 		return fmt.Sprintf("%d-%d-%s-%s", fromChain, toChain, fromTokenSymbol, toTokenSymbol)
 	}
 	return fmt.Sprintf("%d-%d", fromChain, toChain)
+}
+
+func getNameFromEnsUsername(ensUsername string) string {
+	if strings.HasSuffix(ensUsername, StatusDomain) {
+		return ensUsername[:len(ensUsername)-len(StatusDomain)]
+	}
+	return ensUsername
 }

@@ -166,21 +166,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Error: "NodeKey is invalid",
 		},
 		{
-			Name: "Validate that UpstreamConfig.URL is validated if UpstreamConfig is enabled",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
-				"NoDiscovery": true,
-				"UpstreamConfig": {
-					"Enabled": true,
-					"URL": "[bad.url]"
-				}
-			}`,
-			Error: "'[bad.url]' is invalid",
-		},
-		{
 			Name: "Validate that UpstreamConfig.URL is not validated if UpstreamConfig is disabled",
 			Config: `{
 				"NetworkId": 1,

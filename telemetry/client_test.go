@@ -116,6 +116,18 @@ func withMockServer(t *testing.T, expectedType TelemetryType, expectedCondition 
 	wg.Wait()
 }
 
+func sendEnvelope(ctx context.Context, client *Client) {
+	client.PushSentEnvelope(ctx, wakuv2.SentEnvelope{
+		Envelope: v2protocol.NewEnvelope(&pb.WakuMessage{
+			Payload:      []byte{1, 2, 3, 4, 5},
+			ContentTopic: testContentTopic,
+			Version:      proto.Uint32(0),
+			Timestamp:    proto.Int64(time.Now().Unix()),
+		}, 0, ""),
+		PublishMethod: publish.LightPush,
+	})
+}
+
 func TestClient_ProcessReceivedMessages(t *testing.T) {
 	withMockServer(t, ReceivedMessagesMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
 		// Create a telemetry request to send
@@ -145,38 +157,11 @@ func TestClient_ProcessReceivedMessages(t *testing.T) {
 	})
 }
 
-func TestClient_ProcessReceivedEnvelope(t *testing.T) {
-	withMockServer(t, ReceivedEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
-		// Create a telemetry request to send
-		envelope := v2protocol.NewEnvelope(&pb.WakuMessage{
-			Payload:      []byte{1, 2, 3, 4, 5},
-			ContentTopic: testContentTopic,
-			Version:      proto.Uint32(0),
-			Timestamp:    proto.Int64(time.Now().Unix()),
-		}, 0, "")
-
-		// Send the telemetry request
-		client.Start(ctx)
-		client.PushReceivedEnvelope(ctx, envelope)
-	})
-}
-
 func TestClient_ProcessSentEnvelope(t *testing.T) {
 	withMockServer(t, SentEnvelopeMetric, nil, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
-		// Create a telemetry request to send
-		sentEnvelope := wakuv2.SentEnvelope{
-			Envelope: v2protocol.NewEnvelope(&pb.WakuMessage{
-				Payload:      []byte{1, 2, 3, 4, 5},
-				ContentTopic: testContentTopic,
-				Version:      proto.Uint32(0),
-				Timestamp:    proto.Int64(time.Now().Unix()),
-			}, 0, ""),
-			PublishMethod: publish.LightPush,
-		}
-
 		// Send the telemetry request
 		client.Start(ctx)
-		client.PushSentEnvelope(ctx, sentEnvelope)
+		sendEnvelope(ctx, client)
 	})
 }
 
@@ -283,24 +268,14 @@ func TestRetryCache(t *testing.T) {
 	client.Start(ctx)
 
 	for i := 0; i < 3; i++ {
-		client.PushReceivedEnvelope(ctx, v2protocol.NewEnvelope(&pb.WakuMessage{
-			Payload:      []byte{1, 2, 3, 4, 5},
-			ContentTopic: testContentTopic,
-			Version:      proto.Uint32(0),
-			Timestamp:    proto.Int64(time.Now().Unix()),
-		}, 0, ""))
+		sendEnvelope(ctx, client)
 	}
 
 	time.Sleep(110 * time.Millisecond)
 
 	require.Equal(t, 3, len(client.telemetryRetryCache))
 
-	client.PushReceivedEnvelope(ctx, v2protocol.NewEnvelope(&pb.WakuMessage{
-		Payload:      []byte{1, 2, 3, 4, 5},
-		ContentTopic: testContentTopic,
-		Version:      proto.Uint32(0),
-		Timestamp:    proto.Int64(time.Now().Unix()),
-	}, 0, ""))
+	sendEnvelope(ctx, client)
 
 	wg.Wait()
 
@@ -316,24 +291,14 @@ func TestRetryCacheCleanup(t *testing.T) {
 	client.Start(ctx)
 
 	for i := 0; i < 6000; i++ {
-		client.PushReceivedEnvelope(ctx, v2protocol.NewEnvelope(&pb.WakuMessage{
-			Payload:      []byte{1, 2, 3, 4, 5},
-			ContentTopic: testContentTopic,
-			Version:      proto.Uint32(0),
-			Timestamp:    proto.Int64(time.Now().Unix()),
-		}, 0, ""))
+		sendEnvelope(ctx, client)
 	}
 
 	time.Sleep(110 * time.Millisecond)
 
 	require.Equal(t, 6000, len(client.telemetryRetryCache))
 
-	client.PushReceivedEnvelope(ctx, v2protocol.NewEnvelope(&pb.WakuMessage{
-		Payload:      []byte{1, 2, 3, 4, 5},
-		ContentTopic: testContentTopic,
-		Version:      proto.Uint32(0),
-		Timestamp:    proto.Int64(time.Now().Unix()),
-	}, 0, ""))
+	sendEnvelope(ctx, client)
 
 	time.Sleep(210 * time.Millisecond)
 
@@ -357,7 +322,7 @@ func setDefaultConfig(config *wakuv2.Config, lightMode bool) {
 var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.shards.nodes.status.im"
 
 func TestPeerCount(t *testing.T) {
-	t.Skip("flaky test")
+	// t.Skip("flaky test")
 
 	expectedCondition := func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
 		found := slices.ContainsFunc(received, func(req TelemetryRequest) bool {
@@ -371,6 +336,9 @@ func TestPeerCount(t *testing.T) {
 		setDefaultConfig(config, false)
 		config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
 		config.DiscoveryLimit = 20
+		config.TelemetryServerURL = client.serverURL
+		config.TelemetrySendPeriodMs = 1500
+		config.TelemetryPeerCountSendPeriod = 1500
 		w, err := wakuv2.New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
 		require.NoError(t, err)
 
@@ -405,16 +373,83 @@ func TestPeerId(t *testing.T) {
 		require.True(t, ok)
 		return ok, false
 	}
-	withMockServer(t, ReceivedEnvelopeMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+	withMockServer(t, SentEnvelopeMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+		// Send the telemetry request
 		client.Start(ctx)
-
-		client.PushReceivedEnvelope(ctx, v2protocol.NewEnvelope(&pb.WakuMessage{
-			Payload:      []byte{1, 2, 3, 4, 5},
-			ContentTopic: testContentTopic,
-			Version:      proto.Uint32(0),
-			Timestamp:    proto.Int64(time.Now().Unix()),
-		}, 0, ""))
+		sendEnvelope(ctx, client)
 
 	})
 
+}
+
+func TestPeerCountByShard(t *testing.T) {
+	expectedCondition := func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
+		found := slices.ContainsFunc(received, func(req TelemetryRequest) bool {
+			return req.TelemetryType == PeerCountByShardMetric
+		})
+		return found, false
+	}
+	withMockServer(t, PeerCountByShardMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+		config := &wakuv2.Config{}
+		setDefaultConfig(config, false)
+		config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
+		config.DiscoveryLimit = 20
+		config.TelemetryServerURL = client.serverURL
+		config.TelemetryPeerCountSendPeriod = 1500
+		config.TelemetrySendPeriodMs = 1500
+		w, err := wakuv2.New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
+		require.NoError(t, err)
+
+		w.SetStatusTelemetryClient(client)
+		client.Start(ctx)
+
+		require.NoError(t, w.Start())
+
+		err = tt.RetryWithBackOff(func() error {
+			if len(w.Peers()) == 0 {
+				return errors.New("no peers discovered")
+			}
+			return nil
+		})
+
+		require.NoError(t, err)
+
+		require.NotEqual(t, 0, len(w.Peers()))
+	})
+}
+
+func TestPeerCountByOrigin(t *testing.T) {
+	expectedCondition := func(received []TelemetryRequest) (shouldSucceed bool, shouldFail bool) {
+		found := slices.ContainsFunc(received, func(req TelemetryRequest) bool {
+			return req.TelemetryType == PeerCountByOriginMetric
+		})
+		return found, false
+	}
+	withMockServer(t, PeerCountByOriginMetric, expectedCondition, func(ctx context.Context, t *testing.T, client *Client, wg *sync.WaitGroup) {
+		config := &wakuv2.Config{}
+		setDefaultConfig(config, false)
+		config.DiscV5BootstrapNodes = []string{testStoreENRBootstrap}
+		config.DiscoveryLimit = 20
+		config.TelemetryServerURL = client.serverURL
+		config.TelemetryPeerCountSendPeriod = 1500
+		config.TelemetrySendPeriodMs = 1500
+		w, err := wakuv2.New(nil, "shards.staging", config, nil, nil, nil, nil, nil)
+		require.NoError(t, err)
+
+		w.SetStatusTelemetryClient(client)
+		client.Start(ctx)
+
+		require.NoError(t, w.Start())
+
+		err = tt.RetryWithBackOff(func() error {
+			if len(w.Peers()) == 0 {
+				return errors.New("no peers discovered")
+			}
+			return nil
+		})
+
+		require.NoError(t, err)
+
+		require.NotEqual(t, 0, len(w.Peers()))
+	})
 }

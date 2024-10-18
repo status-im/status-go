@@ -195,10 +195,9 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, p
 
 	stream, err := wakuLP.h.NewStream(ctx, peerID, LightPushID_v20beta1)
 	if err != nil {
-		logger.Error("creating stream to peer", zap.Error(err))
 		wakuLP.metrics.RecordError(dialFailure)
-		if ps, ok := wakuLP.h.Peerstore().(peerstore.WakuPeerstore); ok {
-			ps.AddConnFailure(peerID)
+		if wakuLP.pm != nil {
+			wakuLP.pm.HandleDialError(err, peerID)
 		}
 		return nil, err
 	}
@@ -335,6 +334,7 @@ func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessa
 	for i, peerID := range params.selectedPeers {
 		wg.Add(1)
 		go func(index int, id peer.ID) {
+			defer utils.LogOnPanic()
 			paramsValue := *params
 			paramsValue.requestID = protocol.GenerateRequestID()
 			defer wg.Done()

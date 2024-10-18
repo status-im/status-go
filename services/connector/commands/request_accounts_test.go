@@ -14,30 +14,21 @@ import (
 )
 
 func TestFailToRequestAccountsWithMissingDAppFields(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	cmd := &RequestAccountsCommand{Db: db}
+	state, close := setupCommand(t, Method_EthRequestAccounts)
+	t.Cleanup(close)
 
 	// Missing DApp fields
 	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, nil)
 	assert.NoError(t, err)
 
-	result, err := cmd.Execute(request)
+	result, err := state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrRequestMissingDAppData, err)
 	assert.Empty(t, result)
 }
 
 func TestRequestAccountsWithSignalTimeout(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	clientHandler := NewClientSideHandler()
-
-	cmd := &RequestAccountsCommand{
-		ClientHandler: clientHandler,
-		Db:            db,
-	}
+	state, close := setupCommand(t, Method_EthRequestAccounts)
+	t.Cleanup(close)
 
 	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x01})
 	assert.NoError(t, err)
@@ -45,21 +36,14 @@ func TestRequestAccountsWithSignalTimeout(t *testing.T) {
 	backupWalletResponseMaxInterval := WalletResponseMaxInterval
 	WalletResponseMaxInterval = 1 * time.Millisecond
 
-	_, err = cmd.Execute(request)
+	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrWalletResponseTimeout, err)
 	WalletResponseMaxInterval = backupWalletResponseMaxInterval
 }
 
 func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	clientHandler := NewClientSideHandler()
-
-	cmd := &RequestAccountsCommand{
-		ClientHandler: clientHandler,
-		Db:            db,
-	}
+	state, close := setupCommand(t, Method_EthRequestAccounts)
+	t.Cleanup(close)
 
 	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
 	assert.NoError(t, err)
@@ -78,7 +62,7 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 			err := json.Unmarshal(evt.Event, &ev)
 			assert.NoError(t, err)
 
-			err = clientHandler.RequestAccountsAccepted(RequestAccountsAcceptedArgs{
+			err = state.handler.RequestAccountsAccepted(RequestAccountsAcceptedArgs{
 				RequestID: ev.RequestID,
 				Account:   accountAddress,
 				ChainID:   walletCommon.EthereumMainnet,
@@ -91,13 +75,13 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	expectedResponse := FormatAccountAddressToResponse(accountAddress)
-	response, err := cmd.Execute(request)
+	response, err := state.cmd.Execute(state.ctx, request)
 	assert.NoError(t, err)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 
 	// Check dApp in the database
-	dApp, err := persistence.SelectDAppByUrl(db, request.URL)
+	dApp, err := persistence.SelectDAppByUrl(state.walletDb, request.URL)
 	assert.NoError(t, err)
 	assert.Equal(t, request.Name, dApp.Name)
 	assert.Equal(t, request.IconURL, dApp.IconURL)
@@ -105,7 +89,7 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 	assert.Equal(t, walletCommon.EthereumMainnet, dApp.ChainID)
 
 	// This should not invoke UI side
-	response, err = cmd.Execute(request)
+	response, err = state.cmd.Execute(state.ctx, request)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 
@@ -113,15 +97,8 @@ func TestRequestAccountsAcceptedAndRequestAgain(t *testing.T) {
 }
 
 func TestRequestAccountsRejected(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	clientHandler := NewClientSideHandler()
-
-	cmd := &RequestAccountsCommand{
-		ClientHandler: clientHandler,
-		Db:            db,
-	}
+	state, close := setupCommand(t, Method_EthRequestAccounts)
+	t.Cleanup(close)
 
 	request, err := ConstructRPCRequest("eth_requestAccounts", []interface{}{}, &testDAppData)
 	assert.NoError(t, err)
@@ -137,7 +114,7 @@ func TestRequestAccountsRejected(t *testing.T) {
 			err := json.Unmarshal(evt.Event, &ev)
 			assert.NoError(t, err)
 
-			err = clientHandler.RequestAccountsRejected(RejectedArgs{
+			err = state.handler.RequestAccountsRejected(RejectedArgs{
 				RequestID: ev.RequestID,
 			})
 			assert.NoError(t, err)
@@ -145,6 +122,6 @@ func TestRequestAccountsRejected(t *testing.T) {
 	}))
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
-	_, err = cmd.Execute(request)
+	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrRequestAccountsRejectedByUser, err)
 }

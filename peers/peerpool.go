@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers/verifier"
@@ -145,6 +146,7 @@ func (p *PeerPool) Start(server *p2p.Server) error {
 	p.serverSubscription = server.SubscribeEvents(p.events)
 	p.wg.Add(1)
 	go func() {
+		defer common.LogOnPanic()
 		p.handleServerPeers(server, p.events)
 		p.wg.Done()
 	}()
@@ -247,6 +249,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 
 	queueRetry := func(d time.Duration) {
 		go func() {
+			defer common.LogOnPanic()
 			time.Sleep(d)
 			select {
 			case retryDiscv5 <- struct{}{}:
@@ -258,6 +261,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 
 	queueStop := func() {
 		go func() {
+			defer common.LogOnPanic()
 			select {
 			case stopDiscv5 <- struct{}{}:
 			default:
@@ -308,6 +312,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 }
 
 func (p *PeerPool) handlePeerEventType(server *p2p.Server, event *p2p.PeerEvent, queueRetry func(time.Duration), queueStop func()) {
+	defer common.LogOnPanic()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

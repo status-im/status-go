@@ -1,0 +1,2 @@
+### GET request to example server
+GET {{address}}/statusgo/Logout

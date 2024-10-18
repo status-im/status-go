@@ -1647,6 +1647,7 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 	account, err := backend.RestoreAccountAndLogin(restoreRequest)
 	require.NoError(t, err)
 	require.NotNil(t, account)
+	require.Equal(t, "Account1", account.Name)
 
 	// Test case 2: Invalid restore account request
 	invalidRequest := &requests.RestoreAccount{}
@@ -1658,6 +1659,29 @@ func TestRestoreAccountAndLogin(t *testing.T) {
 	mnemonic, err := db.Mnemonic()
 	require.NoError(t, err)
 	require.Empty(t, mnemonic)
+}
+
+func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
+	utils.Init()
+	tmpdir := t.TempDir()
+
+	backend := NewGethStatusBackend()
+
+	// Test case: Valid restore account request without DisplayName
+	restoreRequest := &requests.RestoreAccount{
+		Mnemonic:    "test test test test test test test test test test test test",
+		FetchBackup: false,
+		CreateAccount: requests.CreateAccount{
+			DeviceName:         "StatusIM",
+			Password:           "password",
+			CustomizationColor: "0x000000",
+			RootDataDir:        tmpdir,
+		},
+	}
+	account, err := backend.RestoreAccountAndLogin(restoreRequest)
+	require.NoError(t, err)
+	require.NotNil(t, account)
+	require.NotEmpty(t, account.Name)
 }
 
 func TestCreateAccountPathsValidation(t *testing.T) {

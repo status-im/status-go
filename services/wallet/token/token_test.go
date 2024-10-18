@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -331,7 +331,17 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
 	client := gethrpc.DialInProc(server)
-	rpcClient, _ := rpc.NewClient(client, chainID, params.UpstreamRPCConfig{}, nil, appDB, nil)
+
+	config := rpc.ClientConfig{
+		Client:          client,
+		UpstreamChainID: chainID,
+		Networks:        nil,
+		DB:              appDB,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	rpcClient, _ := rpc.NewClient(config)
+
 	rpcClient.UpstreamChainID = chainID
 	nm := network.NewManager(appDB)
 	mediaServer, err := mediaserver.NewMediaServer(appDB, nil, nil, walletDB)

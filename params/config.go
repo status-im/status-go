@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -293,20 +292,6 @@ func NewLimits(min, max int) Limits {
 	}
 }
 
-// ----------
-// UpstreamRPCConfig
-// ----------
-
-// UpstreamRPCConfig stores configuration for upstream rpc connection.
-type UpstreamRPCConfig struct {
-	// Enabled flag specifies whether feature is enabled
-	Enabled bool
-
-	// URL sets the rpc upstream host address for communication with
-	// a non-local infura endpoint.
-	URL string
-}
-
 type ProviderConfig struct {
 	// Enabled flag specifies whether feature is enabled
 	Enabled bool `validate:"required"`
@@ -459,9 +444,6 @@ type NodeConfig struct {
 	// EnableStatusService should be true to enable methods under status namespace.
 	EnableStatusService bool
 
-	// UpstreamConfig extra config for providing upstream infura server.
-	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
-
 	// Initial networks to load
 	Networks []Network
 
@@ -539,8 +521,9 @@ type TokenOverride struct {
 type Network struct {
 	ChainID                uint64          `json:"chainId"`
 	ChainName              string          `json:"chainName"`
-	DefaultRPCURL          string          `json:"defaultRpcUrl"`      // proxy rpc url
-	DefaultFallbackURL     string          `json:"defaultFallbackURL"` // proxy fallback url
+	DefaultRPCURL          string          `json:"defaultRpcUrl"`       // proxy rpc url
+	DefaultFallbackURL     string          `json:"defaultFallbackURL"`  // proxy fallback url
+	DefaultFallbackURL2    string          `json:"defaultFallbackURL2"` // second proxy fallback url
 	RPCURL                 string          `json:"rpcUrl"`
 	OriginalRPCURL         string          `json:"originalRpcUrl"`
 	FallbackURL            string          `json:"fallbackURL"`
@@ -950,9 +933,6 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		LogFile:                "",
 		LogLevel:               "ERROR",
 		NoDiscovery:            true,
-		UpstreamConfig: UpstreamRPCConfig{
-			URL: getUpstreamURL(networkID),
-		},
 		LightEthConfig: LightEthConfig{
 			DatabaseCache: 16,
 		},
@@ -1060,10 +1040,6 @@ func (c *NodeConfig) Validate() error {
 		}
 	}
 
-	if c.UpstreamConfig.Enabled && c.LightEthConfig.Enabled {
-		return fmt.Errorf("both UpstreamConfig and LightEthConfig are enabled, but they are mutually exclusive")
-	}
-
 	if err := c.validateChildStructs(validate); err != nil {
 		return err
 	}
@@ -1095,9 +1071,6 @@ func (c *NodeConfig) Validate() error {
 
 func (c *NodeConfig) validateChildStructs(validate *validator.Validate) error {
 	// Validate child structs
-	if err := c.UpstreamConfig.Validate(validate); err != nil {
-		return err
-	}
 	if err := c.ClusterConfig.Validate(validate); err != nil {
 		return err
 	}
@@ -1113,23 +1086,6 @@ func (c *NodeConfig) validateChildStructs(validate *validator.Validate) error {
 	if err := c.TorrentConfig.Validate(validate); err != nil {
 		return err
 	}
-	return nil
-}
-
-// Validate validates the UpstreamRPCConfig struct and returns an error if inconsistent values are found
-func (c *UpstreamRPCConfig) Validate(validate *validator.Validate) error {
-	if !c.Enabled {
-		return nil
-	}
-
-	if err := validate.Struct(c); err != nil {
-		return err
-	}
-
-	if _, err := url.ParseRequestURI(c.URL); err != nil {
-		return fmt.Errorf("UpstreamRPCConfig.URL '%s' is invalid: %v", c.URL, err.Error())
-	}
-
 	return nil
 }
 
@@ -1185,17 +1141,6 @@ func (c *TorrentConfig) Validate(validate *validator.Validate) error {
 		return fmt.Errorf("TorrentConfig.DataDir and TorrentConfig.TorrentDir cannot be \"\"")
 	}
 	return nil
-}
-
-func getUpstreamURL(networkID uint64) string {
-	switch networkID {
-	case MainNetworkID:
-		return MainnetEthereumNetworkURL
-	case GoerliNetworkID:
-		return GoerliEthereumNetworkURL
-	}
-
-	return ""
 }
 
 // Save dumps configuration to the disk

@@ -44,6 +44,7 @@ type RouteInputParams struct {
 	AmountIn             *hexutil.Big            `json:"amountIn" validate:"required"`
 	AmountOut            *hexutil.Big            `json:"amountOut"`
 	TokenID              string                  `json:"tokenID" validate:"required"`
+	TokenIDIsOwnerToken  bool                    `json:"tokenIDIsOwnerToken"`
 	ToTokenID            string                  `json:"toTokenID"`
 	DisabledFromChainIDs []uint64                `json:"disabledFromChainIDs"`
 	DisabledToChainIDs   []uint64                `json:"disabledToChainIDs"`
@@ -123,8 +124,8 @@ func (i *RouteInputParams) Validate() error {
 
 		if i.AmountIn != nil &&
 			i.AmountOut != nil &&
-			i.AmountIn.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 &&
-			i.AmountOut.ToInt().Cmp(pathprocessor.ZeroBigIntValue) > 0 {
+			i.AmountIn.ToInt().Cmp(walletCommon.ZeroBigIntValue()) > 0 &&
+			i.AmountOut.ToInt().Cmp(walletCommon.ZeroBigIntValue()) > 0 {
 			return ErrSwapAmountInAmountOutMustBeExclusive
 		}
 

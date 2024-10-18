@@ -21,25 +21,21 @@ func preparePersonalSignRequest(dApp signal.ConnectorDApp, challenge, address st
 }
 
 func TestFailToPersonalSignWithMissingDAppFields(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	cmd := &PersonalSignCommand{Db: db}
+	state, close := setupCommand(t, Method_PersonalSign)
+	t.Cleanup(close)
 
 	// Missing DApp fields
 	request, err := ConstructRPCRequest("personal_sign", []interface{}{}, nil)
 	assert.NoError(t, err)
 
-	result, err := cmd.Execute(request)
+	result, err := state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrRequestMissingDAppData, err)
 	assert.Empty(t, result)
 }
 
 func TestFailToPersonalSignForUnpermittedDApp(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	cmd := &PersonalSignCommand{Db: db}
+	state, close := setupCommand(t, Method_PersonalSign)
+	t.Cleanup(close)
 
 	request, err := preparePersonalSignRequest(testDAppData,
 		"0x506c65617365207369676e2074686973206d65737361676520746f20636f6e6669726d20796f7572206964656e746974792e",
@@ -47,37 +43,28 @@ func TestFailToPersonalSignForUnpermittedDApp(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	result, err := cmd.Execute(request)
+	result, err := state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrDAppIsNotPermittedByUser, err)
 	assert.Empty(t, result)
 }
 
 func TestFailToPersonalSignWithoutParams(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	cmd := &PersonalSignCommand{Db: db}
+	state, close := setupCommand(t, Method_PersonalSign)
+	t.Cleanup(close)
 
 	request, err := ConstructRPCRequest("personal_sign", nil, &testDAppData)
 	assert.NoError(t, err)
 
-	result, err := cmd.Execute(request)
+	result, err := state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrEmptyRPCParams, err)
 	assert.Empty(t, result)
 }
 
 func TestFailToPersonalSignWithSignalTimout(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
+	state, close := setupCommand(t, Method_PersonalSign)
+	t.Cleanup(close)
 
-	clientHandler := NewClientSideHandler()
-
-	cmd := &PersonalSignCommand{
-		Db:            db,
-		ClientHandler: clientHandler,
-	}
-
-	err := PersistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
+	err := PersistDAppData(state.walletDb, testDAppData, types.Address{0x01}, uint64(0x1))
 	assert.NoError(t, err)
 
 	request, err := preparePersonalSignRequest(testDAppData,
@@ -89,25 +76,18 @@ func TestFailToPersonalSignWithSignalTimout(t *testing.T) {
 	backupWalletResponseMaxInterval := WalletResponseMaxInterval
 	WalletResponseMaxInterval = 1 * time.Millisecond
 
-	_, err = cmd.Execute(request)
+	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrWalletResponseTimeout, err)
 	WalletResponseMaxInterval = backupWalletResponseMaxInterval
 }
 
 func TestPersonalSignWithSignalAccepted(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
+	state, close := setupCommand(t, Method_PersonalSign)
+	t.Cleanup(close)
 
 	fakedSignature := "0x051"
 
-	clientHandler := NewClientSideHandler()
-
-	cmd := &PersonalSignCommand{
-		Db:            db,
-		ClientHandler: clientHandler,
-	}
-
-	err := PersistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
+	err := PersistDAppData(state.walletDb, testDAppData, types.Address{0x01}, uint64(0x1))
 	assert.NoError(t, err)
 
 	challenge := "0x506c65617365207369676e2074686973206d65737361676520746f20636f6e6669726d20796f7572206964656e746974792e"
@@ -128,7 +108,7 @@ func TestPersonalSignWithSignalAccepted(t *testing.T) {
 			assert.Equal(t, ev.Challenge, challenge)
 			assert.Equal(t, ev.Address, address)
 
-			err = clientHandler.PersonalSignAccepted(PersonalSignAcceptedArgs{
+			err = state.handler.PersonalSignAccepted(PersonalSignAcceptedArgs{
 				Signature: fakedSignature,
 				RequestID: ev.RequestID,
 			})
@@ -137,23 +117,16 @@ func TestPersonalSignWithSignalAccepted(t *testing.T) {
 	}))
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
-	response, err := cmd.Execute(request)
+	response, err := state.cmd.Execute(state.ctx, request)
 	assert.NoError(t, err)
 	assert.Equal(t, response, fakedSignature)
 }
 
 func TestPersonalSignWithSignalRejected(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
+	state, close := setupCommand(t, Method_PersonalSign)
+	t.Cleanup(close)
 
-	clientHandler := NewClientSideHandler()
-
-	cmd := &PersonalSignCommand{
-		Db:            db,
-		ClientHandler: clientHandler,
-	}
-
-	err := PersistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
+	err := PersistDAppData(state.walletDb, testDAppData, types.Address{0x01}, uint64(0x1))
 	assert.NoError(t, err)
 
 	challenge := "0x506c65617365207369676e2074686973206d65737361676520746f20636f6e6669726d20796f7572206964656e746974792e"
@@ -172,7 +145,7 @@ func TestPersonalSignWithSignalRejected(t *testing.T) {
 			err := json.Unmarshal(evt.Event, &ev)
 			assert.NoError(t, err)
 
-			err = clientHandler.PersonalSignRejected(RejectedArgs{
+			err = state.handler.PersonalSignRejected(RejectedArgs{
 				RequestID: ev.RequestID,
 			})
 			assert.NoError(t, err)
@@ -180,6 +153,6 @@ func TestPersonalSignWithSignalRejected(t *testing.T) {
 	}))
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
-	_, err = cmd.Execute(request)
+	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrPersonalSignRejectedByUser, err)
 }

@@ -1,5 +1,7 @@
 package contracts
 
+//go:generate mockgen -source=contracts.go -destination=mock/contracts.go
+
 import (
 	"errors"
 

@@ -7,6 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
 )
@@ -75,6 +76,7 @@ func (p *Publisher) tickerLoop() {
 	ticker := time.NewTicker(tickerInterval * time.Second)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		logger := p.logger.With(zap.String("site", "tickerLoop"))
 
 		for {

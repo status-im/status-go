@@ -1,19 +1,21 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 
+	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 type ChainIDCommand struct {
-	NetworkManager NetworkManagerInterface
+	NetworkManager *network.Manager
 	Db             *sql.DB
 }
 
-func (c *ChainIDCommand) Execute(request RPCRequest) (interface{}, error) {
+func (c *ChainIDCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err

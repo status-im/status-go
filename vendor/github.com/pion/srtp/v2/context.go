@@ -4,6 +4,7 @@
 package srtp
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/pion/transport/v2/replaydetector"
@@ -56,6 +57,14 @@ type Context struct {
 
 	newSRTCPReplayDetector func() replaydetector.ReplayDetector
 	newSRTPReplayDetector  func() replaydetector.ReplayDetector
+
+	profile ProtectionProfile
+
+	sendMKI []byte                // Master Key Identifier used for encrypting RTP/RTCP packets. Set to nil if MKI is not enabled.
+	mkis    map[string]srtpCipher // Master Key Identifier to cipher mapping. Used for decrypting packets. Empty if MKI is not enabled.
+
+	encryptSRTP  bool
+	encryptSRTCP bool
 }
 
 // CreateContext creates a new SRTP Context.
@@ -66,43 +75,19 @@ type Context struct {
 //
 //	decCtx, err := srtp.CreateContext(key, salt, profile, srtp.SRTPReplayProtection(256))
 func CreateContext(masterKey, masterSalt []byte, profile ProtectionProfile, opts ...ContextOption) (c *Context, err error) {
-	keyLen, err := profile.keyLen()
-	if err != nil {
-		return nil, err
-	}
-
-	saltLen, err := profile.saltLen()
-	if err != nil {
-		return nil, err
-	}
-
-	if masterKeyLen := len(masterKey); masterKeyLen != keyLen {
-		return c, fmt.Errorf("%w expected(%d) actual(%d)", errShortSrtpMasterKey, masterKey, keyLen)
-	} else if masterSaltLen := len(masterSalt); masterSaltLen != saltLen {
-		return c, fmt.Errorf("%w expected(%d) actual(%d)", errShortSrtpMasterSalt, saltLen, masterSaltLen)
-	}
-
 	c = &Context{
 		srtpSSRCStates:  map[uint32]*srtpSSRCState{},
 		srtcpSSRCStates: map[uint32]*srtcpSSRCState{},
-	}
-
-	switch profile {
-	case ProtectionProfileAeadAes128Gcm, ProtectionProfileAeadAes256Gcm:
-		c.cipher, err = newSrtpCipherAeadAesGcm(profile, masterKey, masterSalt)
-	case ProtectionProfileAes128CmHmacSha1_32, ProtectionProfileAes128CmHmacSha1_80:
-		c.cipher, err = newSrtpCipherAesCmHmacSha1(profile, masterKey, masterSalt)
-	default:
-		return nil, fmt.Errorf("%w: %#v", errNoSuchSRTPProfile, profile)
-	}
-	if err != nil {
-		return nil, err
+		profile:         profile,
+		mkis:            map[string]srtpCipher{},
 	}
 
 	for _, o := range append(
 		[]ContextOption{ // Default options
 			SRTPNoReplayProtection(),
 			SRTCPNoReplayProtection(),
+			SRTPEncryption(),
+			SRTCPEncryption(),
 		},
 		opts..., // User specified options
 	) {
@@ -111,7 +96,91 @@ func CreateContext(masterKey, masterSalt []byte, profile ProtectionProfile, opts
 		}
 	}
 
+	c.cipher, err = c.createCipher(c.sendMKI, masterKey, masterSalt, c.encryptSRTP, c.encryptSRTCP)
+	if err != nil {
+		return nil, err
+	}
+	if len(c.sendMKI) != 0 {
+		c.mkis[string(c.sendMKI)] = c.cipher
+	}
+
 	return c, nil
+}
+
+// AddCipherForMKI adds new MKI with associated masker key and salt. Context must be created with MasterKeyIndicator option
+// to enable MKI support. MKI must be unique and have the same length as the one used for creating Context.
+// Operation is not thread-safe, you need to provide synchronization with decrypting packets.
+func (c *Context) AddCipherForMKI(mki, masterKey, masterSalt []byte) error {
+	if len(c.mkis) == 0 {
+		return errMKIIsNotEnabled
+	}
+	if len(mki) == 0 || len(mki) != len(c.sendMKI) {
+		return errInvalidMKILength
+	}
+	if _, ok := c.mkis[string(mki)]; ok {
+		return errMKIAlreadyInUse
+	}
+
+	cipher, err := c.createCipher(mki, masterKey, masterSalt, c.encryptSRTP, c.encryptSRTCP)
+	if err != nil {
+		return err
+	}
+	c.mkis[string(mki)] = cipher
+	return nil
+}
+
+func (c *Context) createCipher(mki, masterKey, masterSalt []byte, encryptSRTP, encryptSRTCP bool) (srtpCipher, error) {
+	keyLen, err := c.profile.KeyLen()
+	if err != nil {
+		return nil, err
+	}
+
+	saltLen, err := c.profile.SaltLen()
+	if err != nil {
+		return nil, err
+	}
+
+	if masterKeyLen := len(masterKey); masterKeyLen != keyLen {
+		return nil, fmt.Errorf("%w expected(%d) actual(%d)", errShortSrtpMasterKey, masterKey, keyLen)
+	} else if masterSaltLen := len(masterSalt); masterSaltLen != saltLen {
+		return nil, fmt.Errorf("%w expected(%d) actual(%d)", errShortSrtpMasterSalt, saltLen, masterSaltLen)
+	}
+
+	switch c.profile {
+	case ProtectionProfileAeadAes128Gcm, ProtectionProfileAeadAes256Gcm:
+		return newSrtpCipherAeadAesGcm(c.profile, masterKey, masterSalt, mki, encryptSRTP, encryptSRTCP)
+	case ProtectionProfileAes128CmHmacSha1_32, ProtectionProfileAes128CmHmacSha1_80, ProtectionProfileAes256CmHmacSha1_32, ProtectionProfileAes256CmHmacSha1_80:
+		return newSrtpCipherAesCmHmacSha1(c.profile, masterKey, masterSalt, mki, encryptSRTP, encryptSRTCP)
+	case ProtectionProfileNullHmacSha1_32, ProtectionProfileNullHmacSha1_80:
+		return newSrtpCipherAesCmHmacSha1(c.profile, masterKey, masterSalt, mki, false, false)
+	default:
+		return nil, fmt.Errorf("%w: %#v", errNoSuchSRTPProfile, c.profile)
+	}
+}
+
+// RemoveMKI removes one of MKIs. You cannot remove last MKI and one used for encrypting RTP/RTCP packets.
+// Operation is not thread-safe, you need to provide synchronization with decrypting packets.
+func (c *Context) RemoveMKI(mki []byte) error {
+	if _, ok := c.mkis[string(mki)]; !ok {
+		return ErrMKINotFound
+	}
+	if bytes.Equal(mki, c.sendMKI) {
+		return errMKIAlreadyInUse
+	}
+	delete(c.mkis, string(mki))
+	return nil
+}
+
+// SetSendMKI switches MKI and cipher used for encrypting RTP/RTCP packets.
+// Operation is not thread-safe, you need to provide synchronization with encrypting packets.
+func (c *Context) SetSendMKI(mki []byte) error {
+	cipher, ok := c.mkis[string(mki)]
+	if !ok {
+		return ErrMKINotFound
+	}
+	c.sendMKI = mki
+	c.cipher = cipher
+	return nil
 }
 
 // https://tools.ietf.org/html/rfc3550#appendix-A.1

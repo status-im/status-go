@@ -35,6 +35,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
+	gocommon "github.com/status-im/status-go/common"
 )
 
 // List of errors
@@ -207,8 +208,6 @@ func (api *PublicWakuAPI) CancelLightClient(ctx context.Context) bool {
 	api.w.SetLightClientMode(false)
 	return !api.w.LightClientMode()
 }
-
-//go:generate gencodec -type NewMessage -field-override newMessageOverride -out gen_newmessage_json.go
 
 // NewMessage represents a new waku message that is posted through the RPC.
 type NewMessage struct {
@@ -402,6 +401,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 	// create subscription and start waiting for message events
 	rpcSub := notifier.CreateSubscription()
 	go func() {
+		defer gocommon.LogOnPanic()
 		// for now poll internally, refactor waku internal for channel support
 		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()
@@ -425,8 +425,6 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 
 	return rpcSub, nil
 }
-
-//go:generate gencodec -type Message -field-override messageOverride -out gen_message_json.go
 
 // Message is the RPC representation of a waku message.
 type Message struct {

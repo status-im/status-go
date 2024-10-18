@@ -1,5 +1,7 @@
 package transactions
 
+//go:generate mockgen -package=mock_transactor -source=transactor.go -destination=mock/transactor.go
+
 import (
 	"bytes"
 	"context"
@@ -153,6 +155,10 @@ func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs SendTxA
 func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs, lastUsedNonce int64) (tx *gethtypes.Transaction, nonce uint64, err error) {
 	wrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
 	tx, err = t.validateAndBuildTransaction(wrapper, sendArgs, lastUsedNonce)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	return tx, tx.Nonce(), err
 }
 
@@ -412,7 +418,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 		if args.IsDynamicFeeTx() {
 			gasFeeCap := (*big.Int)(args.MaxFeePerGas)
 			gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
-			gas, err = t.rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
+			gas, err = rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
 				From:      common.Address(args.From),
 				To:        gethToPtr,
 				GasFeeCap: gasFeeCap,
@@ -421,7 +427,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 				Data:      args.GetInput(),
 			})
 		} else {
-			gas, err = t.rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
+			gas, err = rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
 				From:     common.Address(args.From),
 				To:       gethToPtr,
 				GasPrice: gasPrice,
@@ -439,6 +445,11 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 }
 
 func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccount *account.SelectedExtKey, args SendTxArgs, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error) {
+	symbol := args.Symbol
+	if args.Version == SendTxArgsVersion1 {
+		symbol = args.FromTokenID
+	}
+
 	if err = t.validateAccount(args, selectedAccount); err != nil {
 		return hash, nonce, err
 	}
@@ -454,7 +465,7 @@ func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccoun
 		return hash, nonce, err
 	}
 
-	hash, err = t.sendTransaction(rpcWrapper, common.Address(args.From), args.Symbol, args.MultiTransactionID, signedTx)
+	hash, err = t.sendTransaction(rpcWrapper, common.Address(args.From), symbol, args.MultiTransactionID, signedTx)
 	return hash, tx.Nonce(), err
 }
 

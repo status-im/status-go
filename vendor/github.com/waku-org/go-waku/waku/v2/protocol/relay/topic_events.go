@@ -8,6 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -51,6 +52,7 @@ func (w *WakuRelay) addPeerTopicEventListener(topic *pubsub.Topic) (*pubsub.Topi
 }
 
 func (w *WakuRelay) topicEventPoll(topic string, handler *pubsub.TopicEventHandler) {
+	defer utils.LogOnPanic()
 	defer w.WaitGroup().Done()
 	for {
 		evt, err := handler.NextPeerEvent(w.Context())

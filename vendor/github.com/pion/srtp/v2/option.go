@@ -71,3 +71,50 @@ type nopReplayDetector struct{}
 func (s *nopReplayDetector) Check(uint64) (func(), bool) {
 	return func() {}, true
 }
+
+// MasterKeyIndicator sets RTP/RTCP MKI for the initial master key. Array passed as an argument will be
+// copied as-is to encrypted SRTP/SRTCP packets, so it must be of proper length and in Big Endian format.
+// All MKIs added later using Context.AddCipherForMKI must have the same length as the one used here.
+func MasterKeyIndicator(mki []byte) ContextOption {
+	return func(c *Context) error {
+		if len(mki) > 0 {
+			c.sendMKI = make([]byte, len(mki))
+			copy(c.sendMKI, mki)
+		}
+		return nil
+	}
+}
+
+// SRTPEncryption enables SRTP encryption.
+func SRTPEncryption() ContextOption { // nolint:revive
+	return func(c *Context) error {
+		c.encryptSRTP = true
+		return nil
+	}
+}
+
+// SRTPNoEncryption disables SRTP encryption. This option is useful when you want to use NullCipher for SRTP and keep authentication only.
+// It simplifies debugging and testing, but it is not recommended for production use.
+func SRTPNoEncryption() ContextOption { // nolint:revive
+	return func(c *Context) error {
+		c.encryptSRTP = false
+		return nil
+	}
+}
+
+// SRTCPEncryption enables SRTCP encryption.
+func SRTCPEncryption() ContextOption {
+	return func(c *Context) error {
+		c.encryptSRTCP = true
+		return nil
+	}
+}
+
+// SRTCPNoEncryption disables SRTCP encryption. This option is useful when you want to use NullCipher for SRTCP and keep authentication only.
+// It simplifies debugging and testing, but it is not recommended for production use.
+func SRTCPNoEncryption() ContextOption {
+	return func(c *Context) error {
+		c.encryptSRTCP = false
+		return nil
+	}
+}

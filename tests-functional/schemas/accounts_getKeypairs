@@ -1,0 +1,150 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "items": {
+                "properties": {
+                    "accounts": {
+                        "items": {
+                            "properties": {
+                                "address": {
+                                    "type": "string"
+                                },
+                                "chat": {
+                                    "type": "boolean"
+                                },
+                                "clock": {
+                                    "type": "integer"
+                                },
+                                "colorId": {
+                                    "type": "string"
+                                },
+                                "createdAt": {
+                                    "type": "integer"
+                                },
+                                "emoji": {
+                                    "type": "string"
+                                },
+                                "hidden": {
+                                    "type": "boolean"
+                                },
+                                "key-uid": {
+                                    "type": "string"
+                                },
+                                "mixedcase-address": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "operable": {
+                                    "type": "string"
+                                },
+                                "path": {
+                                    "type": "string"
+                                },
+                                "position": {
+                                    "type": "integer"
+                                },
+                                "prodPreferredChainIds": {
+                                    "type": "string"
+                                },
+                                "public-key": {
+                                    "type": "string"
+                                },
+                                "removed": {
+                                    "type": "boolean"
+                                },
+                                "testPreferredChainIds": {
+                                    "type": "string"
+                                },
+                                "type": {
+                                    "type": "string"
+                                },
+                                "wallet": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "address",
+                                "chat",
+                                "clock",
+                                "colorId",
+                                "createdAt",
+                                "emoji",
+                                "hidden",
+                                "key-uid",
+                                "mixedcase-address",
+                                "name",
+                                "operable",
+                                "path",
+                                "position",
+                                "prodPreferredChainIds",
+                                "public-key",
+                                "removed",
+                                "testPreferredChainIds",
+                                "type",
+                                "wallet"
+                            ],
+                            "type": "object"
+                        },
+                        "type": "array"
+                    },
+                    "clock": {
+                        "type": "integer"
+                    },
+                    "derived-from": {
+                        "type": "string"
+                    },
+                    "key-uid": {
+                        "type": "string"
+                    },
+                    "keycards": {
+                        "type": "array"
+                    },
+                    "last-used-derivation-index": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "removed": {
+                        "type": "boolean"
+                    },
+                    "synced-from": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "accounts",
+                    "clock",
+                    "derived-from",
+                    "key-uid",
+                    "keycards",
+                    "last-used-derivation-index",
+                    "name",
+                    "removed",
+                    "synced-from",
+                    "type"
+                ],
+                "type": "object"
+            },
+            "type": "array"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

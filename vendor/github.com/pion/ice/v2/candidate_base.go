@@ -447,6 +447,13 @@ func (c *candidateBase) copy() (Candidate, error) {
 	return UnmarshalCandidate(c.Marshal())
 }
 
+func removeZoneIDFromAddress(addr string) string {
+	if i := strings.Index(addr, "%"); i != -1 {
+		return addr[:i]
+	}
+	return addr
+}
+
 // Marshal returns the string representation of the ICECandidate
 func (c *candidateBase) Marshal() string {
 	val := c.Foundation()
@@ -459,7 +466,7 @@ func (c *candidateBase) Marshal() string {
 		c.Component(),
 		c.NetworkType().NetworkShort(),
 		c.Priority(),
-		c.Address(),
+		removeZoneIDFromAddress(c.Address()),
 		c.Port(),
 		c.Type())
 
@@ -509,7 +516,7 @@ func UnmarshalCandidate(raw string) (Candidate, error) {
 	priority := uint32(priorityRaw)
 
 	// Address
-	address := split[4]
+	address := removeZoneIDFromAddress(split[4])
 
 	// Port
 	rawPort, err := strconv.ParseUint(split[5], 10, 16)

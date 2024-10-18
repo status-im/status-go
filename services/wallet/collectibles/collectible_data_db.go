@@ -1,5 +1,7 @@
 package collectibles
 
+//go:generate mockgen -package=mock_collectibles -source=collectible_data_db.go -destination=mock/collectible_data_db.go
+
 import (
 	"database/sql"
 	"fmt"

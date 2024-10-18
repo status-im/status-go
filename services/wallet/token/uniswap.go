@@ -16,6 +16,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x3E5A19c91266aD8cE2477B91585d1856B84062dF"),
+		Name:      "Ancient8",
+		Symbol:    "A8",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9"),
 		Name:      "Aave",
 		Symbol:    "AAVE",
@@ -43,6 +52,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x44108f0223A3C3028F5Fe7AEC7f9bb2E66beF82F"),
+		Name:      "Across Protocol Token",
+		Symbol:    "ACX",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xADE00C28244d5CE17D72E40330B1c318cD12B7c3"),
 		Name:      "Ambire AdEx",
 		Symbol:    "ADX",
@@ -55,6 +73,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0x91Af0fBB28ABA7E31403Cb457106Ce79397FD4E6"),
 		Name:      "Aergo",
 		Symbol:    "AERGO",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xB528edBef013aff855ac3c50b381f253aF13b997"),
+		Name:      "Aevo",
+		Symbol:    "AEVO",
 		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
@@ -133,6 +160,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x8457CA5040ad67fdebbCC8EdCE889A335Bc0fbFB"),
+		Name:      "AltLayer",
+		Symbol:    "ALT",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xfF20817765cB7f73d4bde2e66e067E58D11095C2"),
 		Name:      "Amp",
 		Symbol:    "AMP",
@@ -181,6 +217,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xB50721BCf8d664c30412Cfbc6cf7a15145234ad1"),
 		Name:      "Arbitrum",
 		Symbol:    "ARB",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x6E2a43be0B1d33b726f0CA3b8de60b3482b8b050"),
+		Name:      "Arkham",
+		Symbol:    "ARKM",
 		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
@@ -313,9 +358,27 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x62D0A8458eD7719FDAF978fe5929C6D342B0bFcE"),
+		Name:      "Beam",
+		Symbol:    "BEAM",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xF17e65822b568B3903685a7c9F496CF7656Cc6C2"),
 		Name:      "Biconomy",
 		Symbol:    "BICO",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x64Bc2cA1Be492bE7185FAA2c8835d9b824c8a194"),
+		Name:      "Big Time",
+		Symbol:    "BIGTIME",
 		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
@@ -403,6 +466,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"),
+		Name:      "Coinbase Wrapped BTC",
+		Symbol:    "cbBTC",
+		Decimals:  8,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xBe9895146f7AF43049ca1c1AE358B0541Ea49704"),
 		Name:      "Coinbase Wrapped Staked ETH",
 		Symbol:    "cbETH",
@@ -413,7 +485,7 @@ var uniswapTokens = []*Token{
 
 	{
 		Address:   common.HexToAddress("0x3294395e62F4eB6aF3f1Fcf89f5602D90Fb3Ef69"),
-		Name:      "CELO Native Asset",
+		Name:      "Celo native asset (Wormhole)",
 		Symbol:    "CELO",
 		Decimals:  18,
 		ChainID:   1,
@@ -479,6 +551,15 @@ var uniswapTokens = []*Token{
 		Name:      "Circuits of Value",
 		Symbol:    "COVAL",
 		Decimals:  8,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x66761Fa41377003622aEE3c7675Fc7b5c1C2FaC5"),
+		Name:      "Clearpool",
+		Symbol:    "CPOOL",
+		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
 	},
@@ -559,6 +640,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B"),
 		Name:      "Convex Finance",
 		Symbol:    "CVX",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x7ABc8A5768E6bE61A6c693a6e4EAcb5B60602C4D"),
+		Name:      "Covalent X Token",
+		Symbol:    "CXT",
 		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
@@ -682,6 +772,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x57e114B691Db790C35207b2e685D4A43181e6061"),
+		Name:      "Ethena",
+		Symbol:    "ENA",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xF629cBd94d3791C9250152BD8dfBDF380E2a3B9c"),
 		Name:      "Enjin Coin",
 		Symbol:    "ENJ",
@@ -709,6 +808,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0xFe0c30065B384F05761f15d0CC899D4F9F9Cc0eB"),
+		Name:      "Ether.fi",
+		Symbol:    "ETHFI",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xd9Fcd98c322942075A5C3860693e9f4f03AAE07b"),
 		Name:      "Euler",
 		Symbol:    "EUL",
@@ -720,7 +828,7 @@ var uniswapTokens = []*Token{
 	{
 		Address:   common.HexToAddress("0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c"),
 		Name:      "Euro Coin",
-		Symbol:    "EUROC",
+		Symbol:    "EURC",
 		Decimals:  6,
 		ChainID:   1,
 		PegSymbol: "",
@@ -749,6 +857,15 @@ var uniswapTokens = []*Token{
 		Name:      "Stafi",
 		Symbol:    "FIS",
 		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xcf0C122c6b73ff809C693DB761e7BaeBe62b6a2E"),
+		Name:      "FLOKI",
+		Symbol:    "FLOKI",
+		Decimals:  9,
 		ChainID:   1,
 		PegSymbol: "",
 	},
@@ -817,8 +934,17 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x9C7BEBa8F6eF6643aBd725e45a4E8387eF260649"),
+		Name:      "Gravity",
+		Symbol:    "G",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x5fAa989Af96Af85384b8a938c2EdE4A7378D9875"),
-		Name:      "Project Galaxy",
+		Name:      "Galxe",
 		Symbol:    "GAL",
 		Decimals:  18,
 		ChainID:   1,
@@ -826,8 +952,8 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x15D4c048F83bd7e37d49eA4C83a07267Ec4203dA"),
-		Name:      "Gala",
+		Address:   common.HexToAddress("0xd1d2Eb1B1e90B638588728b4130137D262C87cae"),
+		Name:      "GALA",
 		Symbol:    "GALA",
 		Decimals:  8,
 		ChainID:   1,
@@ -1078,6 +1204,24 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x96543ef8d2C75C26387c1a319ae69c0BEE6f3fe7"),
+		Name:      "Kujira",
+		Symbol:    "KUJI",
+		Decimals:  6,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x88909D489678dD17aA6D9609F89B0419Bf78FD9a"),
+		Name:      "Layer3",
+		Symbol:    "L3",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x037A54AaB062628C9Bbae1FDB1583c195585fe41"),
 		Name:      "LCX",
 		Symbol:    "LCX",
@@ -1099,6 +1243,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0x514910771AF9Ca656af840dff83E8264EcF986CA"),
 		Name:      "ChainLink Token",
 		Symbol:    "LINK",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xb59490aB09A0f526Cc7305822aC65f2Ab12f9723"),
+		Name:      "Litentry",
+		Symbol:    "LIT",
 		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
@@ -1144,6 +1297,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD"),
 		Name:      "LoopringCoin V2",
 		Symbol:    "LRC",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xd0a6053f087E87a25dC60701ba6E663b1a548E85"),
+		Name:      "BLOCKLORDS",
+		Symbol:    "LRDS",
 		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
@@ -1222,6 +1384,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0xb131f4A55907B10d1F0A50d8ab8FA09EC342cd74"),
+		Name:      "Memecoin",
+		Symbol:    "MEME",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x9E32b13ce7f2E80A01932B42553652E053D6ed8e"),
 		Name:      "Metis",
 		Symbol:    "METIS",
@@ -1261,6 +1432,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xec67005c4E498Ec7f55E092bd1d35cbC47C91892"),
 		Name:      "Melon",
 		Symbol:    "MLN",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xaaeE1A9723aaDB7afA2810263653A34bA2C21C7a"),
+		Name:      "Mog Coin",
+		Symbol:    "MOG",
 		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
@@ -1411,6 +1591,24 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x36E66fbBce51e4cD5bd3C62B637Eb411b18949D4"),
+		Name:      "Omni Network",
+		Symbol:    "OMNI",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xfAbA6f8e4a5E8Ab82F62fe7C39859FA577269BE3"),
+		Name:      "Ondo Finance",
+		Symbol:    "ONDO",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x6F59e0461Ae5E2799F1fB3847f05a63B16d0DbF8"),
 		Name:      "ORCA Alliance",
 		Symbol:    "ORCA",
@@ -1456,6 +1654,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x0D3CbED3f69EE050668ADF3D9Ea57241cBa33A2B"),
+		Name:      "PlayDapp",
+		Symbol:    "PDA",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x6982508145454Ce325dDbE47a25d4ec3d2311933"),
 		Name:      "Pepe",
 		Symbol:    "PEPE",
@@ -1474,9 +1681,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x3a4f40631a4f906c2BaD353Ed06De7A5D3fCb430"),
-		Name:      "PlayDapp",
-		Symbol:    "PLA",
+		Address:   common.HexToAddress("0x7613C48E0cd50E42dD9Bf0f6c235063145f6f8DC"),
+		Name:      "Pirate Nation",
+		Symbol:    "PIRATE",
 		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
@@ -1486,6 +1693,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xD8912C10681D8B21Fd3742244f44658dBA12264E"),
 		Name:      "Pluton",
 		Symbol:    "PLU",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x455e53CBB86018Ac2B8092FdCd39d8444aFFC3F6"),
+		Name:      "Polygon Ecosystem Token",
+		Symbol:    "POL",
 		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
@@ -1513,6 +1729,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0x57B946008913B82E4dF85f501cbAeD910e58D26C"),
 		Name:      "Marlin",
 		Symbol:    "POND",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x1Bbe973BeF3a977Fc51CbED703E8ffDEfE001Fed"),
+		Name:      "Portal",
+		Symbol:    "PORTAL",
 		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
@@ -1708,6 +1933,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x3B50805453023a91a8bf641e279401a0b23FA6F9"),
+		Name:      "Renzo",
+		Symbol:    "REZ",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xD291E7a03283640FDc51b121aC401383A46cC623"),
 		Name:      "Rari Governance Token",
 		Symbol:    "RGT",
@@ -1753,9 +1987,27 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x5aFE3855358E112B5647B952709E6165e1c1eEEe"),
+		Name:      "Safe",
+		Symbol:    "SAFE",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x3845badAde8e6dFF049820680d1F14bD3903a5d0"),
 		Name:      "The Sandbox",
 		Symbol:    "SAND",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x30D20208d987713f46DFD34EF128Bb16C404D10f"),
+		Name:      "Stader",
+		Symbol:    "SD",
 		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
@@ -1856,6 +2108,15 @@ var uniswapTokens = []*Token{
 		Name:      "Storj Token",
 		Symbol:    "STORJ",
 		Decimals:  8,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xCa14007Eff0dB1f8135f4C25B34De49AB0d42766"),
+		Name:      "Starknet",
+		Symbol:    "STRK",
+		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
 	},
@@ -2032,6 +2293,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0xA35923162C49cF95e6BF26623385eb431ad920D3"),
+		Name:      "Turbo",
+		Symbol:    "TURBO",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xd084B83C305daFD76AE3E1b4E1F1fe2eCcCb3988"),
 		Name:      "The Virtua Kolect",
 		Symbol:    "TVK",
@@ -2081,6 +2351,15 @@ var uniswapTokens = []*Token{
 		Name:      "USDCoin",
 		Symbol:    "USDC",
 		Decimals:  6,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x8E870D67F660D95d5be530380D0eC0bd388289E1"),
+		Name:      "Pax Dollar",
+		Symbol:    "USDP",
+		Decimals:  18,
 		ChainID:   1,
 		PegSymbol: "",
 	},
@@ -2203,6 +2482,24 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0xf091867EC603A6628eD83D274E835539D82e9cc8"),
+		Name:      "Zetachain",
+		Symbol:    "Zeta",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x6985884C4392D348587B19cb9eAAf157F13271cd"),
+		Name:      "LayerZero",
+		Symbol:    "ZRO",
+		Decimals:  18,
+		ChainID:   1,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xE41d2489571d322189246DaFA5ebDe1F4699F498"),
 		Name:      "0x Protocol Token",
 		Symbol:    "ZRX",
@@ -2311,6 +2608,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0xFf733b2A3557a7ed6697007ab5D11B79FdD1b76B"),
+		Name:      "Across Protocol Token",
+		Symbol:    "ACX",
+		Decimals:  18,
+		ChainID:   10,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x334cc734866E97D8452Ae6261d68Fd9bc9BFa31E"),
 		Name:      "ARPA Chain",
 		Symbol:    "ARPA",
@@ -2323,6 +2629,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xFE8B128bA8C78aabC59d4c64cEE7fF28e9379921"),
 		Name:      "Balancer",
 		Symbol:    "BAL",
+		Decimals:  18,
+		ChainID:   10,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x07ad578FF86B135bE19A12759064b802Cb88854D"),
+		Name:      "Boba Network",
+		Symbol:    "BOBA",
 		Decimals:  18,
 		ChainID:   10,
 		PegSymbol: "",
@@ -2359,6 +2674,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xadDb6A0412DE1BA0F936DCaeb8Aaa24578dcF3B2"),
 		Name:      "Coinbase Wrapped Staked ETH",
 		Symbol:    "cbETH",
+		Decimals:  18,
+		ChainID:   10,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x9b88D293b7a791E40d36A39765FFd5A1B9b5c349"),
+		Name:      "Celo native asset (Wormhole)",
+		Symbol:    "CELO",
 		Decimals:  18,
 		ChainID:   10,
 		PegSymbol: "",
@@ -2455,6 +2779,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x3A18dcC9745eDcD1Ef33ecB93b0b6eBA5671e7Ca"),
+		Name:      "Kujira",
+		Symbol:    "KUJI",
+		Decimals:  6,
+		ChainID:   10,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xFdb794692724153d1488CcdBE0C56c252596735F"),
 		Name:      "Lido DAO",
 		Symbol:    "LDO",
@@ -2509,6 +2842,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x2561aa2bB1d2Eb6629EDd7b0938d7679B8b49f9E"),
+		Name:      "Ocean Protocol",
+		Symbol:    "OCEAN",
+		Decimals:  18,
+		ChainID:   10,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x4200000000000000000000000000000000000042"),
 		Name:      "Optimism",
 		Symbol:    "OP",
@@ -2548,6 +2890,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xB548f63D4405466B36C0c0aC3318a22fDcec711a"),
 		Name:      "Rari Governance Token",
 		Symbol:    "RGT",
+		Decimals:  18,
+		ChainID:   10,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x650AF3C15AF43dcB218406d30784416D64Cfb6B2"),
+		Name:      "Status",
+		Symbol:    "SNT",
 		Decimals:  18,
 		ChainID:   10,
 		PegSymbol: "",
@@ -2662,6 +3013,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db"),
+		Name:      "Velodrome Finance",
+		Symbol:    "VELO",
+		Decimals:  18,
+		ChainID:   10,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x68f180fcCe6836688e9084f035309E29Bf0A2095"),
 		Name:      "Wrapped BTC",
 		Symbol:    "WBTC",
@@ -2689,9 +3049,27 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x9db118D43069B73B8a252bF0be49d50Edbd81fc8"),
+		Name:      "XYO Network",
+		Symbol:    "XYO",
+		Decimals:  18,
+		ChainID:   10,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x9046D36440290FfDE54FE0DD84Db8b1CfEE9107B"),
 		Name:      "yearn finance",
 		Symbol:    "YFI",
+		Decimals:  18,
+		ChainID:   10,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x6985884C4392D348587B19cb9eAAf157F13271cd"),
+		Name:      "LayerZero",
+		Symbol:    "ZRO",
 		Decimals:  18,
 		ChainID:   10,
 		PegSymbol: "",
@@ -3022,6 +3400,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0xfb5B838b6cfEEdC2873aB27866079AC55363D37E"),
+		Name:      "FLOKI",
+		Symbol:    "FLOKI",
+		Decimals:  9,
+		ChainID:   56,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x90C97F71E18723b0Cf0dfa30ee176Ab653E89F40"),
 		Name:      "Frax",
 		Symbol:    "FRAX",
@@ -3050,7 +3437,7 @@ var uniswapTokens = []*Token{
 
 	{
 		Address:   common.HexToAddress("0xe4Cc45Bb5DBDA06dB6183E8bf016569f40497Aa5"),
-		Name:      "Project Galaxy",
+		Name:      "Galxe",
 		Symbol:    "GAL",
 		Decimals:  18,
 		ChainID:   56,
@@ -3089,6 +3476,15 @@ var uniswapTokens = []*Token{
 		Name:      "Jupiter",
 		Symbol:    "JUP",
 		Decimals:  18,
+		ChainID:   56,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x073690e6CE25bE816E68F32dCA3e11067c9FB5Cc"),
+		Name:      "Kujira",
+		Symbol:    "KUJI",
+		Decimals:  6,
 		ChainID:   56,
 		PegSymbol: "",
 	},
@@ -3223,6 +3619,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0x833F307aC507D47309fD8CDD1F835BeF8D702a93"),
 		Name:      "REVV",
 		Symbol:    "REVV",
+		Decimals:  18,
+		ChainID:   56,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x3BC5AC0dFdC871B365d159f728dd1B9A0B5481E8"),
+		Name:      "Stader",
+		Symbol:    "SD",
 		Decimals:  18,
 		ChainID:   56,
 		PegSymbol: "",
@@ -3391,11 +3796,11 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x9c2C5fd7b07E95EE044DDeba0E97a665F142394f"),
-		Name:      "1inch",
-		Symbol:    "1INCH",
+		Address:   common.HexToAddress("0x6985884C4392D348587B19cb9eAAf157F13271cd"),
+		Name:      "LayerZero",
+		Symbol:    "ZRO",
 		Decimals:  18,
-		ChainID:   137,
+		ChainID:   56,
 		PegSymbol: "",
 	},
 
@@ -3403,15 +3808,6 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xD6DF932A45C0f255f85145f286eA0b292B21C90B"),
 		Name:      "Aave",
 		Symbol:    "AAVE",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xdDa7b23D2D72746663E7939743f929a3d85FC975"),
-		Name:      "Ambire AdEx",
-		Symbol:    "ADX",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -3427,162 +3823,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x6a6bD53d677F8632631662C48bD47b1D4D6524ee"),
-		Name:      "Adventure Gold",
-		Symbol:    "AGLD",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xe2341718c6C0CbFa8e6686102DD8FbF4047a9e9B"),
-		Name:      "AIOZ Network",
-		Symbol:    "AIOZ",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x95c300e7740D2A88a44124B424bFC1cB2F9c3b89"),
-		Name:      "Alchemix",
-		Symbol:    "ALCX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x82dCf1Df86AdA26b2dCd9ba6334CeDb8c2448e9e"),
-		Name:      "Aleph im",
-		Symbol:    "ALEPH",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xbFc70507384047Aa74c29Cdc8c5Cb88D0f7213AC"),
-		Name:      "Alethea Artificial Liquid Intelligence",
-		Symbol:    "ALI",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x50858d870FAF55da2fD90FB6DF7c34b5648305C6"),
-		Name:      "My Neighbor Alice",
-		Symbol:    "ALICE",
-		Decimals:  6,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x3AE490db48d74B1bC626400135d4616377D0109f"),
-		Name:      "Alpha Venture DAO",
-		Symbol:    "ALPHA",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x0621d647cecbFb64b79E44302c1933cB4f27054d"),
 		Name:      "Amp",
 		Symbol:    "AMP",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x101A023270368c0D50BFfb62780F4aFd4ea79C35"),
-		Name:      "Ankr",
-		Symbol:    "ANKR",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x2b8504ab5eFc246d0eC5Ec7E74565683227497de"),
-		Name:      "Aragon",
-		Symbol:    "ANT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xB7b31a6BC18e48888545CE79e83E06003bE70930"),
-		Name:      "ApeCoin",
-		Symbol:    "APE",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x45C27821E80F8789b60Fd8B600C73815d34DDa6C"),
-		Name:      "API3",
-		Symbol:    "API3",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xEE800B277A96B0f490a1A732e1D6395FAD960A26"),
-		Name:      "ARPA Chain",
-		Symbol:    "ARPA",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x04bEa9FCE76943E90520489cCAb84E84C0198E29"),
-		Name:      "AirSwap",
-		Symbol:    "AST",
-		Decimals:  4,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x0df0f72EE0e5c9B7ca761ECec42754992B2Da5BF"),
-		Name:      "Automata",
-		Symbol:    "ATA",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x5eB8D998371971D01954205c7AFE90A7AF6a95AC"),
-		Name:      "Audius",
-		Symbol:    "AUDIO",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x61BDD9C7d4dF4Bf47A4508c0c8245505F2Af5b7b"),
-		Name:      "Axie Infinity",
-		Symbol:    "AXS",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x1FcbE5937B0cc2adf69772D228fA4205aCF4D9b2"),
-		Name:      "Badger DAO",
-		Symbol:    "BADGER",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -3607,90 +3850,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x3Cef98bb43d732E2F285eE605a8158cDE967D219"),
-		Name:      "Basic Attention Token",
-		Symbol:    "BAT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x91c89A94567980f0e9723b487b0beD586eE96aa7"),
-		Name:      "Biconomy",
-		Symbol:    "BICO",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x438B28C5AA5F00a817b7Def7cE2Fb3d5d1970974"),
-		Name:      "Bluzelle",
-		Symbol:    "BLZ",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0xc26D47d5c33aC71AC5CF9F776D63Ba292a4F7842"),
 		Name:      "Bancor Network Token",
 		Symbol:    "BNT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xa4B2B20b2C73c7046ED19AC6bfF5E5285c58F20a"),
-		Name:      "Boba Network",
-		Symbol:    "BOBA",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xA041544fe2BE56CCe31Ebb69102B965E06aacE80"),
-		Name:      "BarnBridge",
-		Symbol:    "BOND",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xdAb529f40E671A1D4bF91361c21bf9f0C9712ab7"),
-		Name:      "Binance USD",
-		Symbol:    "BUSD",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x91a4635F620766145C099E15889Bd2766906A559"),
-		Name:      "Celer Network",
-		Symbol:    "CELR",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x594C984E3318e91313f881B021A0C4203fF5E59F"),
-		Name:      "Chromia",
-		Symbol:    "CHR",
-		Decimals:  6,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xf1938Ce12400f9a761084E7A80d37e732a4dA056"),
-		Name:      "Chiliz",
-		Symbol:    "CHZ",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -3706,55 +3868,10 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x93B0fF1C8828F6eB039D345Ff681eD735086d925"),
-		Name:      "Covalent",
-		Symbol:    "CQT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xAdA58DF0F643D959C2A47c9D4d4c1a4deFe3F11C"),
-		Name:      "Cronos",
-		Symbol:    "CRO",
-		Decimals:  8,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x172370d5Cd63279eFa6d502DAB29171933a610AF"),
 		Name:      "Curve DAO Token",
 		Symbol:    "CRV",
 		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x2727Ab1c2D22170ABc9b595177B2D5C6E1Ab7B7B"),
-		Name:      "Cartesi",
-		Symbol:    "CTSI",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x8c208BC2A808a088a78398fed8f2640cab0b6EDb"),
-		Name:      "Cryptex Finance",
-		Symbol:    "CTX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x276C9cbaa4BDf57d7109a41e67BD09699536FA3d"),
-		Name:      "Somnium Space CUBEs",
-		Symbol:    "CUBE",
-		Decimals:  8,
 		ChainID:   137,
 		PegSymbol: "",
 	},
@@ -3769,81 +3886,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x4257EA7637c355F81616050CbB6a9b709fd72683"),
-		Name:      "Convex Finance",
-		Symbol:    "CVX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063"),
 		Name:      "Dai Stablecoin",
 		Symbol:    "DAI",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x26f5FB1e6C8a65b3A873fF0a213FA16EFF5a7828"),
-		Name:      "DerivaDAO",
-		Symbol:    "DDX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xff835562C761205659939B64583dd381a6AA4D92"),
-		Name:      "DexTools",
-		Symbol:    "DEXT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x993f2CafE9dbE525243f4A78BeBC69DAc8D36000"),
-		Name:      "DIA",
-		Symbol:    "DIA",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x85955046DF4668e1DD369D2DE9f3AEB98DD2A369"),
-		Name:      "DeFi Pulse Index",
-		Symbol:    "DPI",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x4C3bF0a3DE9524aF68327d1D2558a3B70d17D42a"),
-		Name:      "dYdX",
-		Symbol:    "DYDX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xE0339c80fFDE91F3e20494Df88d4206D86024cdF"),
-		Name:      "Dogelon Mars",
-		Symbol:    "ELON",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x7eC26842F195c852Fa843bB9f6D8B583a274a157"),
-		Name:      "Enjin Coin",
-		Symbol:    "ENJ",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -3859,132 +3904,6 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x0E50BEA95Fe001A370A4F1C220C49AEdCB982DeC"),
-		Name:      "Ethernity Chain",
-		Symbol:    "ERN",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x8a037dbcA8134FFc72C362e394e35E0Cad618F85"),
-		Name:      "Euro Coin",
-		Symbol:    "EUROC",
-		Decimals:  6,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x176f5AB638cf4Ff3B6239Ba609C3fadAA46ef5B0"),
-		Name:      "Harvest Finance",
-		Symbol:    "FARM",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x7583FEDDbceFA813dc18259940F76a02710A8905"),
-		Name:      "Fetch ai",
-		Symbol:    "FET",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x7A7B94F18EF6AD056CDa648588181CDA84800f94"),
-		Name:      "Stafi",
-		Symbol:    "FIS",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x9ff62d1FC52A907B6DCbA8077c2DDCA6E6a9d3e1"),
-		Name:      "Forta",
-		Symbol:    "FORT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x5eCbA59DAcc1ADc5bDEA35f38A732823fc3dE977"),
-		Name:      "Ampleforth Governance Token",
-		Symbol:    "FORTH",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x65A05DB8322701724c197AF82C9CaE41195B0aA8"),
-		Name:      "ShapeShift FOX Token",
-		Symbol:    "FOX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x104592a158490a9228070E0A8e5343B499e125D0"),
-		Name:      "Frax",
-		Symbol:    "FRAX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xC9c1c1c20B3658F8787CC2FD702267791f224Ce1"),
-		Name:      "Fantom",
-		Symbol:    "FTM",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x3e121107F6F22DA4911079845a470757aF4e1A1b"),
-		Name:      "Frax Share",
-		Symbol:    "FXS",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x09E1943Dd2A4e82032773594f50CF54453000b97"),
-		Name:      "Gala",
-		Symbol:    "GALA",
-		Decimals:  8,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7"),
-		Name:      "Aavegotchi",
-		Symbol:    "GHST",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x0B220b82F3eA3B7F6d9A1D8ab58930C064A2b5Bf"),
-		Name:      "Golem",
-		Symbol:    "GLM",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x5FFD62D3C3eE2E81C00A7b9079FB248e7dF024A8"),
 		Name:      "Gnosis Token",
 		Symbol:    "GNO",
@@ -3994,126 +3913,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0xF88fc6b493eda7650E4bcf7A290E8d108F677CfE"),
-		Name:      "Gods Unchained",
-		Symbol:    "GODS",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x5fe2B58c013d7601147DcdD68C143A77499f5531"),
 		Name:      "The Graph",
 		Symbol:    "GRT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xdb95f9188479575F3F718a245EcA1B3BF74567EC"),
-		Name:      "Gitcoin",
-		Symbol:    "GTC",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xC8A94a3d3D2dabC3C1CaffFFDcA6A7543c3e3e65"),
-		Name:      "Gemini Dollar",
-		Symbol:    "GUSD",
-		Decimals:  2,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x482bc619eE7662759CDc0685B4E78f464Da39C73"),
-		Name:      "GYEN",
-		Symbol:    "GYEN",
-		Decimals:  6,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x6cCBF3627b2C83AFEF05bf2F035E7f7B210Fe30D"),
-		Name:      "HOPR",
-		Symbol:    "HOPR",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x9Cb74C8032b007466865f060ad2c46145d45553D"),
-		Name:      "IDEX",
-		Symbol:    "IDEX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xFA46dAf9909e116DBc40Fe1cC95fC0Bb1f452aBE"),
-		Name:      "Illuvium",
-		Symbol:    "ILV",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x183070C90B34A63292cC908Ce1b263Cb56D49A7F"),
-		Name:      "Immutable X",
-		Symbol:    "IMX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xfBd8A3b908e764dBcD51e27992464B4432A1132b"),
-		Name:      "Index Cooperative",
-		Symbol:    "INDEX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x4E8dc2149EaC3f3dEf36b1c281EA466338249371"),
-		Name:      "Injective",
-		Symbol:    "INJ",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xF18Ac368001b0DdC80aA6a8374deb49e868EFDb8"),
-		Name:      "Inverse Finance",
-		Symbol:    "INV",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xf6372cDb9c1d3674E83842e3800F2A62aC9F3C66"),
-		Name:      "IoTeX",
-		Symbol:    "IOTX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xb87f5c1E81077FfcfE821dA240fd20C99c533aF1"),
-		Name:      "JasmyCoin",
-		Symbol:    "JASMY",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -4138,45 +3940,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x53AEc293212E3B792563Bc16f1be26956adb12e9"),
-		Name:      "Keep3rV1",
-		Symbol:    "KP3R",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xE8A51D0dD1b4525189ddA2187F90ddF0932b5482"),
-		Name:      "LCX",
-		Symbol:    "LCX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xC3C7d422809852031b44ab29EEC9F1EfF2A58756"),
-		Name:      "Lido DAO",
-		Symbol:    "LDO",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39"),
 		Name:      "ChainLink Token",
 		Symbol:    "LINK",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x465b67CB20A7E8bC4c51b4C7DA591C1945b41427"),
-		Name:      "League of Kingdoms",
-		Symbol:    "LOKA",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -4192,36 +3958,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x3962F4A0A0051DccE0be73A7e09cEf5756736712"),
-		Name:      "Livepeer",
-		Symbol:    "LPT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x8Ab2Fec94d17ae69FB90E7c773f2C85Ed1802c01"),
-		Name:      "Liquity",
-		Symbol:    "LQTY",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x84e1670F61347CDaeD56dcc736FB990fBB47ddC1"),
 		Name:      "LoopringCoin V2",
 		Symbol:    "LRC",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x23001f892c0C82b79303EDC9B9033cD190BB21c7"),
-		Name:      "Liquity USD",
-		Symbol:    "LUSD",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -4237,63 +3976,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x2B9E7ccDF0F4e5B24757c1E1a80e311E34Cb10c7"),
-		Name:      "Mask Network",
-		Symbol:    "MASK",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x347ACCAFdA7F8c5BdeC57fa34a5b663CBd1aeca7"),
-		Name:      "MATH",
-		Symbol:    "MATH",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x0000000000000000000000000000000000001010"),
 		Name:      "Polygon",
 		Symbol:    "MATIC",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xAa7DbD1598251f856C12f63557A4C4397c253Cea"),
-		Name:      "Moss Carbon Credit",
-		Symbol:    "MCO2",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x1B9D40715E757Bdb9bdEC3215B898E46d8a3b71a"),
-		Name:      "Metis",
-		Symbol:    "METIS",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x01288e04435bFcd4718FF203D6eD18146C17Cd4b"),
-		Name:      "Magic Internet Money",
-		Symbol:    "MIM",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x1C5cccA2CB59145A4B25F452660cbA6436DDce9b"),
-		Name:      "Mirror Protocol",
-		Symbol:    "MIR",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -4309,42 +3994,6 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0xa9f37D84c856fDa3812ad0519Dad44FA0a3Fe207"),
-		Name:      "Melon",
-		Symbol:    "MLN",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x6968105460f67c3BF751bE7C15f92F5286Fd0CE5"),
-		Name:      "Monavale",
-		Symbol:    "MONA",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xA3c322Ad15218fBFAEd26bA7f616249f7705D945"),
-		Name:      "GensoKishi Metaverse",
-		Symbol:    "MV",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x4985E0B13554fB521840e893574D3848C10Fcc6f"),
-		Name:      "PolySwarm",
-		Symbol:    "NCT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x0Bf519071b02F22C17E7Ed5F4002ee1911f46729"),
 		Name:      "Numeraire",
 		Symbol:    "NMR",
@@ -4354,189 +4003,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x282d8efCe846A88B159800bd4130ad77443Fa1A1"),
-		Name:      "Ocean Protocol",
-		Symbol:    "OCEAN",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xa63Beffd33AB3a2EfD92a39A7D2361CEE14cEbA8"),
-		Name:      "Origin Protocol",
-		Symbol:    "OGN",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x62414D03084EeB269E18C970a21f45D2967F0170"),
-		Name:      "OMG Network",
-		Symbol:    "OMG",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x0EE392bA5ef1354c9bd75a98044667d307C0e773"),
-		Name:      "Orion Protocol",
-		Symbol:    "ORN",
-		Decimals:  8,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x9880e3dDA13c8e7D4804691A45160102d31F6060"),
 		Name:      "Orchid",
 		Symbol:    "OXT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x553d3D295e0f695B9228246232eDF400ed3560B5"),
-		Name:      "PAX Gold",
-		Symbol:    "PAXG",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x263534a4Fe3cb249dF46810718B7B612a30ebbff"),
-		Name:      "Perpetual Protocol",
-		Symbol:    "PERP",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x8765f05ADce126d70bcdF1b0a48Db573316662eB"),
-		Name:      "PlayDapp",
-		Symbol:    "PLA",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x7dc0cb65EC6019330a6841e9c274f2EE57A6CA6C"),
-		Name:      "Pluton",
-		Symbol:    "PLU",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x8dc302e2141DA59c934d900886DbF1518Fd92cd4"),
-		Name:      "Polkastarter",
-		Symbol:    "POLS",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xcB059C5573646047D6d88dDdb87B745C18161d3b"),
-		Name:      "Polymath",
-		Symbol:    "POLY",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x73580A2416A57f1C4b6391DBA688A9e4f7DBECE0"),
-		Name:      "Marlin",
-		Symbol:    "POND",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x0AaB8DC887D34f00D50E19aee48371a941390d14"),
-		Name:      "Power Ledger",
-		Symbol:    "POWR",
-		Decimals:  6,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x82FFdFD1d8699E8886a4e77CeFA9dd9710a7FefD"),
-		Name:      "Propy",
-		Symbol:    "PRO",
-		Decimals:  8,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x9377Eeb7419486FD4D485671d50baa4BF77c2222"),
-		Name:      "PARSIQ",
-		Symbol:    "PRQ",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x36B77a184bE8ee56f5E81C56727B20647A42e28E"),
-		Name:      "Quant",
-		Symbol:    "QNT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x831753DD7087CaC61aB5644b308642cc1c33Dc13"),
-		Name:      "Quickswap",
-		Symbol:    "QUICK",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x2f81e176471CC57fDC76f7d332FB4511bF2bebDD"),
-		Name:      "Radicle",
-		Symbol:    "RAD",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x00e5646f60AC6Fb446f621d146B6E1886f002905"),
-		Name:      "Rai Reflex Index",
-		Symbol:    "RAI",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x780053837cE2CeEaD2A90D9151aA21FC89eD49c2"),
-		Name:      "Rarible",
-		Symbol:    "RARI",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xc3cFFDAf8F3fdF07da6D5e3A89B8723D5E385ff8"),
-		Name:      "Rubic",
-		Symbol:    "RBC",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -4561,108 +4030,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0xAdf2F2Ed91755eA3f4bcC9107a494879f633ae7C"),
-		Name:      "Request",
-		Symbol:    "REQ",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x70c006878a5A50Ed185ac4C87d837633923De296"),
-		Name:      "REVV",
-		Symbol:    "REVV",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x3b9dB434F08003A89554CDB43b3e0b1f8734BdE7"),
-		Name:      "Rari Governance Token",
-		Symbol:    "RGT",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xbe662058e00849C3Eef2AC9664f37fEfdF2cdbFE"),
-		Name:      "iExec RLC",
-		Symbol:    "RLC",
-		Decimals:  9,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x76b8D57e5ac6afAc5D415a054453d1DD2c3C0094"),
-		Name:      "Rally",
-		Symbol:    "RLY",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x61299774020dA444Af134c82fa83E3810b309991"),
-		Name:      "Render Token",
-		Symbol:    "RNDR",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xF92501c8213da1D6C74A76372CCc720Dc8818407"),
-		Name:      "Rook",
-		Symbol:    "ROOK",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xBbba073C31bF03b8ACf7c28EF0738DeCF3695683"),
-		Name:      "The Sandbox",
-		Symbol:    "SAND",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x6f8a06447Ff6FcF75d803135a7de15CE88C1d4ec"),
-		Name:      "Shiba Inu",
-		Symbol:    "SHIB",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x0C7304fBAf2A320a1c50c46FE03752722F729946"),
-		Name:      "Smooth Love Potion",
-		Symbol:    "SLP",
-		Decimals:  0,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x50B728D8D964fd00C2d0AAD81718b71311feF68a"),
 		Name:      "Synthetix Network Token",
 		Symbol:    "SNX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xcdB3C70CD25FD15307D84C4F9D37d5C043B33Fb2"),
-		Name:      "Spell Token",
-		Symbol:    "SPELL",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -4678,108 +4048,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0xB36e3391B22a970d31A9b620Ae1A414C6c256d2a"),
-		Name:      "Stox",
-		Symbol:    "STX",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x60Ea918FC64360269Da4efBDA11d8fC6514617C6"),
-		Name:      "SUKU",
-		Symbol:    "SUKU",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xa1428174F516F527fafdD146b883bB4428682737"),
-		Name:      "SuperFarm",
-		Symbol:    "SUPER",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0xF81b4Bec6Ca8f9fe7bE01CA734F55B2b6e03A7a0"),
 		Name:      "Synth sUSD",
 		Symbol:    "sUSD",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a"),
-		Name:      "Sushi",
-		Symbol:    "SUSHI",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x6aBB753C1893194DE4a83c6e8B4EadFc105Fd5f5"),
-		Name:      "Swipe",
-		Symbol:    "SXP",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xe1708AbDE4847B4929b70547E5197F1Ba1db2250"),
-		Name:      "Tokemak",
-		Symbol:    "TOKE",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xA7b98d63a137bF402b4570799ac4caD0BB1c4B1c"),
-		Name:      "OriginTrail",
-		Symbol:    "TRAC",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xE3322702BEdaaEd36CdDAb233360B939775ae5f1"),
-		Name:      "Tellor",
-		Symbol:    "TRB",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x8676815789211E799a6DC86d02748ADF9cF86836"),
-		Name:      "Tribe",
-		Symbol:    "TRIBE",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x5b77bCA482bd3E7958b1103d123888EfCCDaF803"),
-		Name:      "TrueFi",
-		Symbol:    "TRU",
-		Decimals:  8,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x5667dcC0ab74D1b1355C3b2061893399331B57e2"),
-		Name:      "The Virtua Kolect",
-		Symbol:    "TVK",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -4849,15 +4120,6 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x90bb6fEB70A9a43CfAaA615F856BA309FD759A90"),
-		Name:      "Wrapped Centrifuge",
-		Symbol:    "WCFG",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"),
 		Name:      "Wrapped Ether",
 		Symbol:    "WETH",
@@ -4876,28 +4138,10 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x1B815d120B3eF02039Ee11dC2d33DE7aA4a8C603"),
-		Name:      "WOO Network",
-		Symbol:    "WOO",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0xDC3326e71D45186F113a2F448984CA0e8D201995"),
 		Name:      "XSGD",
 		Symbol:    "XSGD",
 		Decimals:  6,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xd2507e7b5794179380673870d88B22F94da6abe0"),
-		Name:      "XYO Network",
-		Symbol:    "XYO",
-		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
 	},
@@ -4912,18 +4156,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0xb8cb8a7F4C2885C03e57E973C74827909Fdc2032"),
-		Name:      "DFI money",
-		Symbol:    "YFII",
-		Decimals:  18,
-		ChainID:   137,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x82617aA52dddf5Ed9Bb7B370ED777b3182A30fd1"),
-		Name:      "Yield Guild Games",
-		Symbol:    "YGG",
+		Address:   common.HexToAddress("0x6985884C4392D348587B19cb9eAAf157F13271cd"),
+		Name:      "LayerZero",
+		Symbol:    "ZRO",
 		Decimals:  18,
 		ChainID:   137,
 		PegSymbol: "",
@@ -4948,9 +4183,45 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x940181a94A35A4569E4529A3CDfB74e38FD98631"),
+		Name:      "Aerodrome Finance",
+		Symbol:    "AERO",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x97c806e7665d3AFd84A8Fe1837921403D59F3Dcc"),
+		Name:      "Alethea Artificial Liquid Intelligence",
+		Symbol:    "ALI",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x1C9Fa01e87487712706Fb469a13bEb234262C867"),
+		Name:      "ARPA Chain",
+		Symbol:    "ARPA",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x4158734D47Fc9692176B5085E0F52ee0Da5d47F1"),
 		Name:      "Balancer",
 		Symbol:    "BAL",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x1F9bD96DDB4Bd07d6061f8933e9bA9EDE9967550"),
+		Name:      "Boba Network",
+		Symbol:    "BOBA",
 		Decimals:  18,
 		ChainID:   8453,
 		PegSymbol: "",
@@ -4961,6 +4232,15 @@ var uniswapTokens = []*Token{
 		Name:      "Braintrust",
 		Symbol:    "BTRST",
 		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"),
+		Name:      "Coinbase Wrapped BTC",
+		Symbol:    "cbBTC",
+		Decimals:  8,
 		ChainID:   8453,
 		PegSymbol: "",
 	},
@@ -4993,10 +4273,37 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x259Fac10c5CbFEFE3E710e1D9467f70a76138d45"),
+		Name:      "Cartesi",
+		Symbol:    "CTSI",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xBB22Ff867F8Ca3D5F2251B4084F6Ec86D4666E14"),
+		Name:      "Cryptex Finance",
+		Symbol:    "CTX",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb"),
 		Name:      "Dai Stablecoin",
 		Symbol:    "DAI",
 		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42"),
+		Name:      "EURC",
+		Symbol:    "EURC",
+		Decimals:  6,
 		ChainID:   8453,
 		PegSymbol: "",
 	},
@@ -5011,9 +4318,162 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x74F804B4140ee70830B3Eef4e690325841575F89"),
+		Name:      "Fetch ai",
+		Symbol:    "FET",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x968B2323d4b005C7D39c67D31774FE83c9943A60"),
+		Name:      "Ampleforth Governance Token",
+		Symbol:    "FORTH",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x2dbe0d779c7A04F7a5de83326973effE23356930"),
+		Name:      "ShapeShift FOX Token",
+		Symbol:    "FOX",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xcD2F22236DD9Dfe2356D7C543161D4d260FD9BcB"),
+		Name:      "Aavegotchi",
+		Symbol:    "GHST",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xBCBAf311ceC8a4EAC0430193A528d9FF27ae38C1"),
+		Name:      "IoTeX",
+		Symbol:    "IOTX",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xFf9957816c813C5Ad0b9881A8990Df1E3AA2a057"),
+		Name:      "Geojam",
+		Symbol:    "JAM",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x5259384690aCF240e9b0A8811bD0FFbFBDdc125C"),
+		Name:      "Liquity",
+		Symbol:    "LQTY",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x0D760ee479401Bb4C40BDB7604b329FfF411b3f2"),
+		Name:      "LoopringCoin V2",
+		Symbol:    "LRC",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xB676f87A6E701f0DE8De5Ab91B56b66109766DB1"),
+		Name:      "BLOCKLORDS",
+		Symbol:    "LRDS",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x368181499736d0c0CC614DBB145E2EC1AC86b8c6"),
+		Name:      "Liquity USD",
+		Symbol:    "LUSD",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x2Da56AcB9Ea78330f947bD57C54119Debda7AF71"),
+		Name:      "Mog Coin",
+		Symbol:    "MOG",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x7002458B1DF59EccB57387bC79fFc7C29E22e6f7"),
+		Name:      "Origin Protocol",
+		Symbol:    "OGN",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xB4fDe59a779991bfB6a52253B51947828b982be3"),
+		Name:      "Pepe",
+		Symbol:    "PEPE",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xfA980cEd6895AC314E7dE34Ef1bFAE90a5AdD21b"),
 		Name:      "Prime",
 		Symbol:    "PRIME",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x18dD5B087bCA9920562aFf7A0199b96B9230438b"),
+		Name:      "Propy",
+		Symbol:    "PRO",
+		Decimals:  8,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x38815A4455921667d673B4cb3d48F0383eE93400"),
+		Name:      "pSTAKE Finance",
+		Symbol:    "PSTAKE",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x1C7a460413dD4e964f96D8dFC56E7223cE88CD85"),
+		Name:      "Seamlesss",
+		Symbol:    "SEAM",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x22e6966B799c4D5B13BE962E1D117b56327FDa66"),
+		Name:      "Synthetix Network Token",
+		Symbol:    "SNX",
 		Decimals:  18,
 		ChainID:   8453,
 		PegSymbol: "",
@@ -5041,6 +4501,24 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xA81a52B4dda010896cDd386C7fBdc5CDc835ba23"),
 		Name:      "OriginTrail",
 		Symbol:    "TRAC",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xF8e9E61FFB2b491f7DF29823a76009743671CD96"),
+		Name:      "Tellor",
+		Symbol:    "TRB",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xc3De830EA07524a0761646a6a4e4be0e114a3C83"),
+		Name:      "Uniswap",
+		Symbol:    "UNI",
 		Decimals:  18,
 		ChainID:   8453,
 		PegSymbol: "",
@@ -5083,9 +4561,27 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0xD7B99ffB8B2afc6fe013a17207cbe50f223aDc94"),
+		Name:      "XYO Network",
+		Symbol:    "XYO",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x9EaF8C1E34F05a589EDa6BAfdF391Cf6Ad3CB239"),
 		Name:      "yearn finance",
 		Symbol:    "YFI",
+		Decimals:  18,
+		ChainID:   8453,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x6985884C4392D348587B19cb9eAAf157F13271cd"),
+		Name:      "LayerZero",
+		Symbol:    "ZRO",
 		Decimals:  18,
 		ChainID:   8453,
 		PegSymbol: "",
@@ -5113,6 +4609,24 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xba5DdD1f9d7F570dc94a51479a000E3BCE967196"),
 		Name:      "Aave",
 		Symbol:    "AAVE",
+		Decimals:  18,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x53691596d1BCe8CEa565b84d4915e69e03d9C99d"),
+		Name:      "Across Protocol Token",
+		Symbol:    "ACX",
+		Decimals:  18,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x377c1Fc73D4D0f5600cd943776CED07c2B9783cd"),
+		Name:      "Aevo",
+		Symbol:    "AEVO",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -5209,6 +4723,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0xDac5094B7D59647626444a4F905060FCda4E656E"),
+		Name:      "Arkham",
+		Symbol:    "ARKM",
+		Decimals:  18,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xAC9Ac2C17cdFED4AbC80A53c5553388575714d03"),
 		Name:      "Automata",
 		Symbol:    "ATA",
@@ -5230,15 +4753,6 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xe88998Fb579266628aF6a03e3821d5983e5D0089"),
 		Name:      "Axie Infinity",
 		Symbol:    "AXS",
-		Decimals:  18,
-		ChainID:   42161,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xBfa641051Ba0a0Ad1b0AcF549a89536A0D76472E"),
-		Name:      "Badger DAO",
-		Symbol:    "BADGER",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -5317,6 +4831,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x4E51aC49bC5e2d87e0EF713E9e5AB2D71EF4F336"),
+		Name:      "Celo native asset (Wormhole)",
+		Symbol:    "CELO",
+		Decimals:  18,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x3a8B787f78D775AECFEEa15706D4221B40F345AB"),
 		Name:      "Celer Network",
 		Symbol:    "CELR",
@@ -5344,10 +4867,10 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x8ea3156f834A0dfC78F1A5304fAC2CdA676F354C"),
-		Name:      "Cronos",
-		Symbol:    "CRO",
-		Decimals:  8,
+		Address:   common.HexToAddress("0x69b937dB799a9BECC9E8A6F0a5d36eA3657273bf"),
+		Name:      "Covalent",
+		Symbol:    "CQT",
+		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
 	},
@@ -5398,27 +4921,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1"),
-		Name:      "Dai Stablecoin",
-		Symbol:    "DAI",
-		Decimals:  18,
-		ChainID:   42161,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x3Be7cB2e9413Ef8F42b4A202a0114EB59b64e227"),
 		Name:      "DexTools",
 		Symbol:    "DEXT",
-		Decimals:  18,
-		ChainID:   42161,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xca642467C6Ebe58c13cB4A7091317f34E17ac05e"),
-		Name:      "DIA",
-		Symbol:    "DIA",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -5461,6 +4966,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0xdf8F0c63D9335A0AbD89F9F752d293A98EA977d8"),
+		Name:      "Ethena",
+		Symbol:    "ENA",
+		Decimals:  18,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x7fa9549791EFc9030e1Ed3F25D18014163806758"),
 		Name:      "Enjin Coin",
 		Symbol:    "ENJ",
@@ -5488,9 +5002,18 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x07D65C18CECbA423298c0aEB5d2BeDED4DFd5736"),
+		Name:      "Ether.fi",
+		Symbol:    "ETHFI",
+		Decimals:  18,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x863708032B5c328e11aBcbC0DF9D79C71Fc52a48"),
 		Name:      "Euro Coin",
-		Symbol:    "EUROC",
+		Symbol:    "EURC",
 		Decimals:  6,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -5524,18 +5047,18 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x3A1429d50E0cBBc45c997aF600541Fe1cc3D2923"),
-		Name:      "Forta",
-		Symbol:    "FORT",
-		Decimals:  18,
+		Address:   common.HexToAddress("0xA8C25FdC09763A176353CC6a76882e05b4905FAe"),
+		Name:      "FLOKI",
+		Symbol:    "FLOKI",
+		Decimals:  9,
 		ChainID:   42161,
 		PegSymbol: "",
 	},
 
 	{
-		Address:   common.HexToAddress("0xf929de51D91C77E42f5090069E0AD7A09e513c73"),
-		Name:      "ShapeShift FOX Token",
-		Symbol:    "FOX",
+		Address:   common.HexToAddress("0x3A1429d50E0cBBc45c997aF600541Fe1cc3D2923"),
+		Name:      "Forta",
+		Symbol:    "FORT",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -5560,17 +5083,17 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0xd9f9d2Ee2d3EFE420699079f16D9e924affFdEA4"),
-		Name:      "Frax Share",
-		Symbol:    "FXS",
+		Address:   common.HexToAddress("0xc27E7325a6BEA1FcC06de7941473f5279bfd1182"),
+		Name:      "Galxe",
+		Symbol:    "GAL",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
 	},
 
 	{
-		Address:   common.HexToAddress("0x2Ed5C8fA0D7Ad71025638aFe5fd72E4fbc5A2667"),
-		Name:      "Gala",
+		Address:   common.HexToAddress("0x2A676eeAd159c4C8e8593471c6d666F02827FF8C"),
+		Name:      "GALA",
 		Symbol:    "GALA",
 		Decimals:  8,
 		ChainID:   42161,
@@ -5581,15 +5104,6 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a"),
 		Name:      "GMX",
 		Symbol:    "GMX",
-		Decimals:  18,
-		ChainID:   42161,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xa0b862F60edEf4452F25B4160F177db44DeB6Cf1"),
-		Name:      "Gnosis Token",
-		Symbol:    "GNO",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -5641,15 +5155,6 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x61cA9D186f6b9a793BC08F6C79fd35f205488673"),
-		Name:      "Illuvium",
-		Symbol:    "ILV",
-		Decimals:  18,
-		ChainID:   42161,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0x3cFD99593a7F035F717142095a3898e3Fca7783e"),
 		Name:      "Immutable X",
 		Symbol:    "IMX",
@@ -5663,6 +5168,24 @@ var uniswapTokens = []*Token{
 		Name:      "Injective",
 		Symbol:    "INJ",
 		Decimals:  18,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x25f05699548D3A0820b99f93c10c8BB573E27083"),
+		Name:      "JasmyCoin",
+		Symbol:    "JASMY",
+		Decimals:  18,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x3A18dcC9745eDcD1Ef33ecB93b0b6eBA5671e7Ca"),
+		Name:      "Kujira",
+		Symbol:    "KUJI",
+		Decimals:  6,
 		ChainID:   42161,
 		PegSymbol: "",
 	},
@@ -5704,18 +5227,18 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x46d0cE7de6247b0A95f67b43B589b4041BaE7fbE"),
-		Name:      "LoopringCoin V2",
-		Symbol:    "LRC",
+		Address:   common.HexToAddress("0x93b346b6BC2548dA6A1E7d98E9a421B42541425b"),
+		Name:      "Liquity USD",
+		Symbol:    "LUSD",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
 	},
 
 	{
-		Address:   common.HexToAddress("0x93b346b6BC2548dA6A1E7d98E9a421B42541425b"),
-		Name:      "Liquity USD",
-		Symbol:    "LUSD",
+		Address:   common.HexToAddress("0x539bdE0d7Dbd336b79148AA742883198BBF60342"),
+		Name:      "MAGIC",
+		Symbol:    "MAGIC",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -5794,9 +5317,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x29024832eC3baBF5074D4F46102aA988097f0Ca0"),
-		Name:      "Maple",
-		Symbol:    "MPL",
+		Address:   common.HexToAddress("0x96c42662820F6Ea32f0A61A06a38a72B206aABaC"),
+		Name:      "Mog Coin",
+		Symbol:    "MOG",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -5812,9 +5335,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x91b468Fe3dce581D7a6cFE34189F1314b6862eD6"),
-		Name:      "MXC",
-		Symbol:    "MXC",
+		Address:   common.HexToAddress("0x5445972E76c5e4CEdD12B6e2BceF69133E15992F"),
+		Name:      "GensoKishi Metaverse",
+		Symbol:    "MV",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -5857,15 +5380,6 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x6FEb262FEb0f775B5312D2e009923f7f58AE423E"),
-		Name:      "Origin Protocol",
-		Symbol:    "OGN",
-		Decimals:  18,
-		ChainID:   42161,
-		PegSymbol: "",
-	},
-
-	{
 		Address:   common.HexToAddress("0xd962C1895c46AC0378C502c207748b7061421e8e"),
 		Name:      "OMG Network",
 		Symbol:    "OMG",
@@ -5875,18 +5389,18 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0xfEb4DfC8C4Cf7Ed305bb08065D08eC6ee6728429"),
-		Name:      "PAX Gold",
-		Symbol:    "PAXG",
+		Address:   common.HexToAddress("0xA2d52A05B8Bead5d824DF54Dd1AA63188B37A5E7"),
+		Name:      "Ondo Finance",
+		Symbol:    "ONDO",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
 	},
 
 	{
-		Address:   common.HexToAddress("0x35E6A59F786d9266c7961eA28c7b768B33959cbB"),
-		Name:      "Pepe",
-		Symbol:    "PEPE",
+		Address:   common.HexToAddress("0xfEb4DfC8C4Cf7Ed305bb08065D08eC6ee6728429"),
+		Name:      "PAX Gold",
+		Symbol:    "PAXG",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -6010,10 +5524,10 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0xef888bcA6AB6B1d26dbeC977C455388ecd794794"),
-		Name:      "Rari Governance Token",
-		Symbol:    "RGT",
-		Decimals:  18,
+		Address:   common.HexToAddress("0xE575586566b02A16338c199c23cA6d295D794e66"),
+		Name:      "iExec RLC",
+		Symbol:    "RLC",
+		Decimals:  9,
 		ChainID:   42161,
 		PegSymbol: "",
 	},
@@ -6031,6 +5545,15 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("0xd1318eb19DBF2647743c720ed35174efd64e3DAC"),
 		Name:      "The Sandbox",
 		Symbol:    "SAND",
+		Decimals:  18,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x1629c4112952a7a377cB9B8d7d8c903092f34B63"),
+		Name:      "Stader",
+		Symbol:    "SD",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -6077,15 +5600,6 @@ var uniswapTokens = []*Token{
 		Name:      "Unisocks",
 		Symbol:    "SOCKS",
 		Decimals:  18,
-		ChainID:   42161,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xb74Da9FE2F96B9E0a5f4A3cf0b92dd2bEC617124"),
-		Name:      "SOL Wormhole ",
-		Symbol:    "SOL",
-		Decimals:  9,
 		ChainID:   42161,
 		PegSymbol: "",
 	},
@@ -6190,9 +5704,9 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0xd693Ec944A85eeca4247eC1c3b130DCa9B0C3b22"),
-		Name:      "UMA Voting Token v1",
-		Symbol:    "UMA",
+		Address:   common.HexToAddress("0x5C816d4582c857dcadb1bB1F62Ad6c9DEde4576a"),
+		Name:      "Turbo",
+		Symbol:    "TURBO",
 		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
@@ -6221,6 +5735,15 @@ var uniswapTokens = []*Token{
 		Name:      "Bridged USDC",
 		Symbol:    "USDC.e",
 		Decimals:  6,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x78df3a6044Ce3cB1905500345B967788b699dF8f"),
+		Name:      "Pax Dollar",
+		Symbol:    "USDP",
+		Decimals:  18,
 		ChainID:   42161,
 		PegSymbol: "",
 	},
@@ -6298,6 +5821,24 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x6DdBbcE7858D276678FC2B36123fD60547b88954"),
+		Name:      "Zetachain",
+		Symbol:    "Zeta",
+		Decimals:  18,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x6985884C4392D348587B19cb9eAAf157F13271cd"),
+		Name:      "LayerZero",
+		Symbol:    "ZRO",
+		Decimals:  18,
+		ChainID:   42161,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0xBD591Bd4DdB64b77B5f76Eab8f03d02519235Ae2"),
 		Name:      "0x Protocol Token",
 		Symbol:    "ZRX",
@@ -6320,6 +5861,24 @@ var uniswapTokens = []*Token{
 		Name:      "Celo",
 		Symbol:    "CELO",
 		Decimals:  18,
+		ChainID:   42220,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0xcebA9300f2b948710d2653dD7B07f33A8B32118C"),
+		Name:      "USDCoin",
+		Symbol:    "USDC",
+		Decimals:  6,
+		ChainID:   42220,
+		PegSymbol: "",
+	},
+
+	{
+		Address:   common.HexToAddress("0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e"),
+		Name:      "Tether USD",
+		Symbol:    "USDT",
+		Decimals:  6,
 		ChainID:   42220,
 		PegSymbol: "",
 	},
@@ -6667,6 +6226,15 @@ var uniswapTokens = []*Token{
 	},
 
 	{
+		Address:   common.HexToAddress("0x6985884C4392D348587B19cb9eAAf157F13271cd"),
+		Name:      "LayerZero",
+		Symbol:    "ZRO",
+		Decimals:  18,
+		ChainID:   43114,
+		PegSymbol: "",
+	},
+
+	{
 		Address:   common.HexToAddress("0x596fA47043f99A4e0F122243B841E55375cdE0d2"),
 		Name:      "0x Protocol Token",
 		Symbol:    "ZRX",
@@ -6694,74 +6262,11 @@ var uniswapTokens = []*Token{
 	},
 
 	{
-		Address:   common.HexToAddress("0x4fC531f8Ae7A7808E0dccCA08F1e3c7694582950"),
-		Name:      "Coinbase Wrapped Staked ETH",
-		Symbol:    "cbETH",
+		Address:   common.HexToAddress("0xb1a5700fA2358173Fe465e6eA4Ff52E36e88E2ad"),
+		Name:      "Blast",
+		Symbol:    "BLAST",
 		Decimals:  18,
-		ChainID:   84531,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xA29b548056c3fD0f68BAd9d4829EC4E66f22f796"),
-		Name:      "Compound",
-		Symbol:    "COMP",
-		Decimals:  18,
-		ChainID:   84531,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x174956bDfbCEb6e53089297cce4fE2825E58d92C"),
-		Name:      "Dai Stablecoin",
-		Symbol:    "DAI",
-		Decimals:  18,
-		ChainID:   84531,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x121dAEb77cFbC6a9CfC691Da4F5E97c8Bd02518F"),
-		Name:      "Prime",
-		Symbol:    "PRIME",
-		Decimals:  18,
-		ChainID:   84531,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x783349cd20f26CE12e747b1a17bC38D252c9e119"),
-		Name:      "tBTC",
-		Symbol:    "tBTC",
-		Decimals:  18,
-		ChainID:   84531,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0xF175520C52418dfE19C8098071a252da48Cd1C19"),
-		Name:      "USDCoin",
-		Symbol:    "USDC",
-		Decimals:  6,
-		ChainID:   84531,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x395Ae52bB17aef68C2888d941736A71dC6d4e125"),
-		Name:      "Wrapped Ampleforth",
-		Symbol:    "WAMPL",
-		Decimals:  18,
-		ChainID:   84531,
-		PegSymbol: "",
-	},
-
-	{
-		Address:   common.HexToAddress("0x4200000000000000000000000000000000000006"),
-		Name:      "Wrapped Ether",
-		Symbol:    "WETH",
-		Decimals:  18,
-		ChainID:   84531,
+		ChainID:   81457,
 		PegSymbol: "",
 	},
 

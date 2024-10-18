@@ -22,6 +22,7 @@ import (
 
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
 
 	"github.com/status-im/status-go/account"
@@ -220,6 +221,7 @@ func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities
 func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communities.Subscription) {
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case sub, more := <-c:
@@ -382,6 +384,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	}
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case sub, more := <-c:
@@ -504,6 +507,7 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 	ticker := time.NewTicker(5 * time.Minute)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:
@@ -822,6 +826,7 @@ func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
 	ticker := time.NewTicker(grantUpdateInterval)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:
@@ -929,11 +934,7 @@ func (m *Messenger) CommunityUpdateLastOpenedAt(communityID string) (int64, erro
 		return 0, err
 	}
 	currentTime := time.Now().Unix()
-	updatedCommunity, err := m.communitiesManager.CommunityUpdateLastOpenedAt(id, currentTime)
-	if err != nil {
-		return 0, err
-	}
-	err = m.syncCommunity(context.Background(), updatedCommunity, m.dispatchMessage)
+	_, err = m.communitiesManager.CommunityUpdateLastOpenedAt(id, currentTime)
 	if err != nil {
 		return 0, err
 	}
@@ -1548,6 +1549,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 
 	// We send a push notification in the background
 	go func() {
+		defer gocommon.LogOnPanic()
 		if m.pushNotificationClient != nil {
 			pks, err := community.CanManageUsersPublicKeys()
 			if err != nil {
@@ -1987,14 +1989,20 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 			return nil, err
 		}
 
+		descriptionMessage, err := community.ToProtocolMessageBytes()
+		if err != nil {
+			return nil, err
+		}
+
 		requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
-			Clock:                    community.Clock(),
-			Accepted:                 true,
-			CommunityId:              community.ID(),
-			Community:                encryptedDescription,
-			Grant:                    grant,
-			ProtectedTopicPrivateKey: crypto.FromECDSA(key),
-			Shard:                    community.Shard().Protobuffer(),
+			Clock:                               community.Clock(),
+			Accepted:                            true,
+			CommunityId:                         community.ID(),
+			Community:                           encryptedDescription, // Deprecated but kept for backward compatibility, to be removed in future
+			Grant:                               grant,
+			ProtectedTopicPrivateKey:            crypto.FromECDSA(key),
+			Shard:                               community.Shard().Protobuffer(),
+			CommunityDescriptionProtocolMessage: descriptionMessage,
 		}
 
 		// The purpose of this torrent code is to get the 'magnetlink' to populate 'requestToJoinResponseProto.MagnetUri'
@@ -3805,7 +3813,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 	// This is good to do so that we don't have to queue all the actions done after the handled community description.
 	// `signer` is `communityID` for a community with no owner token and `owner public key` otherwise
 	signer, err := utils.RecoverKey(&amm)
-	if err != nil {
+	if signer == nil || err != nil {
 		logger.Debug("failed to recover community description signer", zap.Error(err))
 		return err
 	}
@@ -3900,7 +3908,7 @@ func (m *Messenger) HandleSyncCommunitySettings(messageState *ReceivedMessageSta
 }
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {
-
+	defer utils.LogOnPanic()
 	m.logger.Debug("initializing history archive tasks")
 
 	for _, c := range communities {
@@ -4021,6 +4029,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 
 func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
 	go func() {
+		defer gocommon.LogOnPanic()
 		time.Sleep(importInitialDelay)
 		m.importDelayer.once.Do(func() {
 			close(m.importDelayer.wait)
@@ -4077,6 +4086,7 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 	task.Waiter.Add(1)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer task.Waiter.Done()
 		err := m.importHistoryArchives(communityID, task.CancelChan)
 		if err != nil {
@@ -4101,6 +4111,7 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	go func() {
+		defer gocommon.LogOnPanic()
 		<-cancel
 		cancelFunc()
 	}()
@@ -4662,6 +4673,7 @@ func (m *Messenger) startCommunityRekeyLoop() {
 
 	ticker := time.NewTicker(d)
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-ticker.C:
@@ -5108,6 +5120,7 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 	logger := m.logger.Named("requestMissingCommunityChannelsHRKeysLoop")
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-time.After(5 * time.Minute):

@@ -31,7 +31,7 @@ func (s *MessengerSyncClearHistory) pair() *Messenger {
 		DeviceType: "their-device-type",
 	})
 	s.Require().NoError(err)
-	response, err := theirMessenger.SendPairInstallation(context.Background(), nil)
+	response, err := theirMessenger.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
@@ -49,7 +49,7 @@ func (s *MessengerSyncClearHistory) pair() *Messenger {
 	s.Require().Equal("their-name", actualInstallation.InstallationMetadata.Name)
 	s.Require().Equal("their-device-type", actualInstallation.InstallationMetadata.DeviceType)
 
-	err = s.m.EnableInstallation(theirMessenger.installationID)
+	_, err = s.m.EnableInstallation(theirMessenger.installationID)
 	s.Require().NoError(err)
 
 	return theirMessenger

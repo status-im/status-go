@@ -1305,26 +1305,49 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 	return result, newCursor, nil
 }
 
-func (db sqlitePersistence) OldestMessageWhisperTimestampByChatID(chatID string) (timestamp uint64, hasAnyMessage bool, err error) {
-	var whisperTimestamp uint64
-	err = db.db.QueryRow(
-		`
-			SELECT
-				whisper_timestamp
-			FROM
-				user_messages m1
-			WHERE
-				m1.local_chat_id = ?
-			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id ASC
-			LIMIT 1
-		`, chatID).Scan(&whisperTimestamp)
-	if err == sql.ErrNoRows {
-		return 0, false, nil
+func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []string) (map[string]uint64, error) {
+	if len(chatIDs) == 0 {
+		return nil, nil
 	}
+
+	args := make([]any, len(chatIDs))
+	for i, id := range chatIDs {
+		args[i] = id
+	}
+
+	inVector := strings.Repeat("?, ", len(chatIDs)-1) + "?"
+	//nolint:gosec
+	query := fmt.Sprintf(`
+    SELECT
+        m1.local_chat_id,
+        m1.whisper_timestamp,
+        MIN(substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id)
+    FROM user_messages m1
+    WHERE m1.local_chat_id IN (%s)
+    GROUP BY m1.local_chat_id
+`, inVector)
+
+	rows, err := db.db.Query(query, args...)
 	if err != nil {
-		return 0, false, err
+		return nil, err
 	}
-	return whisperTimestamp, true, nil
+	defer rows.Close()
+
+	result := make(map[string]uint64)
+	for rows.Next() {
+		var chatID string
+		var whisperTimestamp uint64
+		var cursor string
+		if err := rows.Scan(&chatID, &whisperTimestamp, &cursor); err != nil {
+			return nil, err
+		}
+		result[chatID] = whisperTimestamp
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 // EmojiReactionsByChatID returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
@@ -1577,11 +1600,6 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 			}
 
 			err = db.saveBridgeMessage(tx, msg.GetBridgeMessage(), msg.ID)
-			if err != nil {
-				return
-			}
-			// handle replies
-			err = db.findAndUpdateReplies(tx, msg.GetBridgeMessage().MessageID, msg.ID)
 			if err != nil {
 				return
 			}
@@ -2972,46 +2990,8 @@ func (db sqlitePersistence) GetCommunityMemberMessagesToDelete(member string, co
 	return result, nil
 }
 
-// Finds status messages id which are replies for bridgeMessageID
-func (db sqlitePersistence) findStatusMessageIdsReplies(tx *sql.Tx, bridgeMessageID string) ([]string, error) {
-	rows, err := tx.Query(`SELECT user_messages_id FROM bridge_messages WHERE parent_message_id = ?`, bridgeMessageID)
-	if err != nil {
-		return []string{}, err
-	}
-	defer rows.Close()
-
-	var statusMessageIDs []string
-	for rows.Next() {
-		var statusMessageID string
-		err = rows.Scan(&statusMessageID)
-		if err != nil {
-			return []string{}, err
-		}
-		statusMessageIDs = append(statusMessageIDs, statusMessageID)
-	}
-	return statusMessageIDs, nil
-}
-
 func (db sqlitePersistence) FindStatusMessageIDForBridgeMessageID(messageID string) (string, error) {
 	rows, err := db.db.Query(`SELECT user_messages_id FROM bridge_messages WHERE message_id = ?`, messageID)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-
-	if rows.Next() {
-		var statusMessageID string
-		err = rows.Scan(&statusMessageID)
-		if err != nil {
-			return "", err
-		}
-		return statusMessageID, nil
-	}
-	return "", nil
-}
-
-func (db sqlitePersistence) findStatusMessageIDForBridgeMessageID(tx *sql.Tx, messageID string) (string, error) {
-	rows, err := tx.Query(`SELECT user_messages_id FROM bridge_messages WHERE message_id = ?`, messageID)
 	if err != nil {
 		return "", err
 	}
@@ -3062,28 +3042,8 @@ func (db sqlitePersistence) updateBridgeMessageContent(tx *sql.Tx, bridgeMessage
 	return err
 }
 
-// Finds if there are any messages that are replies to that message (in case replies were received earlier)
-func (db sqlitePersistence) findAndUpdateReplies(tx *sql.Tx, bridgeMessageID string, statusMessageID string) error {
-	replyMessageIds, err := db.findStatusMessageIdsReplies(tx, bridgeMessageID)
-	if err != nil {
-		return err
-	}
-	if len(replyMessageIds) == 0 {
-		return nil
-	}
-	return db.updateStatusMessagesWithResponse(tx, replyMessageIds, statusMessageID)
-}
-
 func (db sqlitePersistence) findAndUpdateRepliedTo(tx *sql.Tx, discordParentMessageID string, statusMessageID string) error {
-	// Finds status messages id which are replies for bridgeMessageID
-	repliedMessageID, err := db.findStatusMessageIDForBridgeMessageID(tx, discordParentMessageID)
-	if err != nil {
-		return err
-	}
-	if repliedMessageID == "" {
-		return nil
-	}
-	return db.updateStatusMessagesWithResponse(tx, []string{statusMessageID}, repliedMessageID)
+	return db.updateStatusMessagesWithResponse(tx, []string{statusMessageID}, discordParentMessageID)
 }
 
 func (db sqlitePersistence) GetCommunityMemberAllMessages(member string, communityID string) ([]*common.Message, error) {

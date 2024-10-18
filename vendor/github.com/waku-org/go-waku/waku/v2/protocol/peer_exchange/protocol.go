@@ -21,6 +21,7 @@ import (
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange/pb"
 	"github.com/waku-org/go-waku/waku/v2/service"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
@@ -223,6 +224,7 @@ func (wakuPX *WakuPeerExchange) iterate(ctx context.Context) error {
 }
 
 func (wakuPX *WakuPeerExchange) runPeerExchangeDiscv5Loop(ctx context.Context) {
+	defer utils.LogOnPanic()
 	defer wakuPX.WaitGroup().Done()
 
 	// Runs a discv5 loop adding new peers to the px peer cache

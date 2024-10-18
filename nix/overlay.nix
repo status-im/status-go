@@ -9,18 +9,21 @@ let
   inherit (prev) callPackage;
 in rec {
   androidPkgs = prev.androidenv.composeAndroidPackages {
+    cmdLineToolsVersion = "9.0";
     toolsVersion = "26.1.1";
     platformToolsVersion = "33.0.3";
-    buildToolsVersions = [ "31.0.0" ];
-    platformVersions = [ "31" ];
-    cmakeVersions = [ "3.18.1" ];
-    ndkVersion = "22.1.7171670";
+    buildToolsVersions = [ "34.0.0" ];
+    platformVersions = [ "34" ];
+    cmakeVersions = [ "3.22.1" ];
+    ndkVersion = "25.2.9519653";
     includeNDK = true;
     includeExtras = [
       "extras;android;m2repository"
       "extras;google;m2repository"
     ];
   };
+
+  openjdk = prev.openjdk17_headless;
 
   go = prev.go_1_21;
   buildGoModule = prev.buildGo121Module;
@@ -53,6 +56,7 @@ in rec {
   go-modvendor = callPackage ./pkgs/go-modvendor { };
   cc-test-reporter = callPackage ./pkgs/cc-test-reporter { };
   codecov-cli = callPackage ./pkgs/codecov-cli { };
+  go-generate-fast = callPackage ./pkgs/go-generate-fast { };
 
   gomobile = (prev.gomobile.overrideAttrs (old: {
     patches = [

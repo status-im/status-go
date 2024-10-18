@@ -1627,6 +1627,12 @@ func (o *Community) marshaledDescription() ([]byte, error) {
 		}
 	}
 
+	// Ensure that communities created prior to the introduction of tokenized ownership
+	// propagate community ID through the description.
+	if len(clone.ID) == 0 {
+		clone.ID = o.IDString()
+	}
+
 	return proto.Marshal(clone)
 }
 

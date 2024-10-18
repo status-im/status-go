@@ -55,9 +55,11 @@ type PeerConnection struct {
 
 	idpLoginURL *string
 
-	isClosed               *atomicBool
-	isNegotiationNeeded    *atomicBool
-	negotiationNeededState negotiationNeededState
+	isClosed                                *atomicBool
+	isGracefulClosed                        *atomicBool
+	isGracefulClosedDone                    chan struct{}
+	isNegotiationNeeded                     *atomicBool
+	updateNegotiationNeededFlagOnEmptyChain *atomicBool
 
 	lastOffer  string
 	lastAnswer string
@@ -68,7 +70,8 @@ type PeerConnection struct {
 	// should be defined (see JSEP 3.4.1).
 	greaterMid int
 
-	rtpTransceivers []*RTPTransceiver
+	rtpTransceivers        []*RTPTransceiver
+	nonMediaBandwidthProbe atomic.Value // RTPReceiver
 
 	onSignalingStateChangeHandler     func(SignalingState)
 	onICEConnectionStateChangeHandler atomic.Value // func(ICEConnectionState)
@@ -115,6 +118,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	// https://w3c.github.io/webrtc-pc/#constructor (Step #2)
 	// Some variables defined explicitly despite their implicit zero values to
 	// allow better readability to understand what is happening.
+
 	pc := &PeerConnection{
 		statsID: fmt.Sprintf("PeerConnection-%d", time.Now().UnixNano()),
 		configuration: Configuration{
@@ -125,18 +129,21 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 			Certificates:         []Certificate{},
 			ICECandidatePoolSize: 0,
 		},
-		ops:                    newOperations(),
-		isClosed:               &atomicBool{},
-		isNegotiationNeeded:    &atomicBool{},
-		negotiationNeededState: negotiationNeededStateEmpty,
-		lastOffer:              "",
-		lastAnswer:             "",
-		greaterMid:             -1,
-		signalingState:         SignalingStateStable,
+		isClosed:                                &atomicBool{},
+		isGracefulClosed:                        &atomicBool{},
+		isGracefulClosedDone:                    make(chan struct{}),
+		isNegotiationNeeded:                     &atomicBool{},
+		updateNegotiationNeededFlagOnEmptyChain: &atomicBool{},
+		lastOffer:                               "",
+		lastAnswer:                              "",
+		greaterMid:                              -1,
+		signalingState:                          SignalingStateStable,
 
 		api: api,
 		log: api.settingEngine.LoggerFactory.NewLogger("pc"),
 	}
+	pc.ops = newOperations(pc.updateNegotiationNeededFlagOnEmptyChain, pc.onNegotiationNeeded)
+
 	pc.iceConnectionState.Store(ICEConnectionStateNew)
 	pc.connectionState.Store(PeerConnectionStateNew)
 
@@ -293,66 +300,54 @@ func (pc *PeerConnection) OnNegotiationNeeded(f func()) {
 
 // onNegotiationNeeded enqueues negotiationNeededOp if necessary
 // caller of this method should hold `pc.mu` lock
+// https://www.w3.org/TR/webrtc/#dfn-update-the-negotiation-needed-flag
 func (pc *PeerConnection) onNegotiationNeeded() {
-	// https://w3c.github.io/webrtc-pc/#updating-the-negotiation-needed-flag
-	// non-canon step 1
-	if pc.negotiationNeededState == negotiationNeededStateRun {
-		pc.negotiationNeededState = negotiationNeededStateQueue
-		return
-	} else if pc.negotiationNeededState == negotiationNeededStateQueue {
+	// 4.7.3.1 If the length of connection.[[Operations]] is not 0, then set
+	// connection.[[UpdateNegotiationNeededFlagOnEmptyChain]] to true, and abort these steps.
+	if !pc.ops.IsEmpty() {
+		pc.updateNegotiationNeededFlagOnEmptyChain.set(true)
 		return
 	}
-	pc.negotiationNeededState = negotiationNeededStateRun
 	pc.ops.Enqueue(pc.negotiationNeededOp)
 }
 
+// https://www.w3.org/TR/webrtc/#dfn-update-the-negotiation-needed-flag
 func (pc *PeerConnection) negotiationNeededOp() {
-	// Don't run NegotiatedNeeded checks if OnNegotiationNeeded is not set
-	if handler, ok := pc.onNegotiationNeededHandler.Load().(func()); !ok || handler == nil {
-		return
-	}
-
-	// https://www.w3.org/TR/webrtc/#updating-the-negotiation-needed-flag
-	// Step 2.1
+	// 4.7.3.2.1 If connection.[[IsClosed]] is true, abort these steps.
 	if pc.isClosed.get() {
 		return
 	}
-	// non-canon step 2.2
+
+	// 4.7.3.2.2 If the length of connection.[[Operations]] is not 0,
+	// then set connection.[[UpdateNegotiationNeededFlagOnEmptyChain]] to
+	// true, and abort these steps.
 	if !pc.ops.IsEmpty() {
-		pc.ops.Enqueue(pc.negotiationNeededOp)
+		pc.updateNegotiationNeededFlagOnEmptyChain.set(true)
 		return
 	}
 
-	// non-canon, run again if there was a request
-	defer func() {
-		pc.mu.Lock()
-		defer pc.mu.Unlock()
-		if pc.negotiationNeededState == negotiationNeededStateQueue {
-			defer pc.onNegotiationNeeded()
-		}
-		pc.negotiationNeededState = negotiationNeededStateEmpty
-	}()
-
-	// Step 2.3
+	// 4.7.3.2.3 If connection's signaling state is not "stable", abort these steps.
 	if pc.SignalingState() != SignalingStateStable {
 		return
 	}
 
-	// Step 2.4
+	// 4.7.3.2.4 If the result of checking if negotiation is needed is false,
+	// clear the negotiation-needed flag by setting connection.[[NegotiationNeeded]]
+	// to false, and abort these steps.
 	if !pc.checkNegotiationNeeded() {
 		pc.isNegotiationNeeded.set(false)
 		return
 	}
 
-	// Step 2.5
+	// 4.7.3.2.5 If connection.[[NegotiationNeeded]] is already true, abort these steps.
 	if pc.isNegotiationNeeded.get() {
 		return
 	}
 
-	// Step 2.6
+	// 4.7.3.2.6 Set connection.[[NegotiationNeeded]] to true.
 	pc.isNegotiationNeeded.set(true)
 
-	// Step 2.7
+	// 4.7.3.2.7 Fire an event named negotiationneeded at connection.
 	if handler, ok := pc.onNegotiationNeededHandler.Load().(func()); ok && handler != nil {
 		handler()
 	}
@@ -1534,6 +1529,32 @@ func (pc *PeerConnection) handleUndeclaredSSRC(ssrc SSRC, remoteDescription *Ses
 	return true, nil
 }
 
+// Chrome sends probing traffic on SSRC 0. This reads the packets to ensure that we properly
+// generate TWCC reports for it. Since this isn't actually media we don't pass this to the user
+func (pc *PeerConnection) handleNonMediaBandwidthProbe() {
+	nonMediaBandwidthProbe, err := pc.api.NewRTPReceiver(RTPCodecTypeVideo, pc.dtlsTransport)
+	if err != nil {
+		pc.log.Errorf("handleNonMediaBandwidthProbe failed to create RTPReceiver: %v", err)
+		return
+	}
+
+	if err = nonMediaBandwidthProbe.Receive(RTPReceiveParameters{
+		Encodings: []RTPDecodingParameters{{RTPCodingParameters: RTPCodingParameters{}}},
+	}); err != nil {
+		pc.log.Errorf("handleNonMediaBandwidthProbe failed to start RTPReceiver: %v", err)
+		return
+	}
+
+	pc.nonMediaBandwidthProbe.Store(nonMediaBandwidthProbe)
+	b := make([]byte, pc.api.settingEngine.getReceiveMTU())
+	for {
+		if _, _, err = nonMediaBandwidthProbe.readRTP(b, nonMediaBandwidthProbe.Track()); err != nil {
+			pc.log.Tracef("handleNonMediaBandwidthProbe read exiting: %v", err)
+			return
+		}
+	}
+}
+
 func (pc *PeerConnection) handleIncomingSSRC(rtpStream io.Reader, ssrc SSRC) error { //nolint:gocognit
 	remoteDescription := pc.RemoteDescription()
 	if remoteDescription == nil {
@@ -1653,20 +1674,41 @@ func (pc *PeerConnection) undeclaredRTPMediaProcessor() {
 			return
 		}
 
-		stream, ssrc, err := srtpSession.AcceptStream()
+		srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
+		if err != nil {
+			pc.log.Warnf("undeclaredMediaProcessor failed to open SrtcpSession: %v", err)
+			return
+		}
+
+		srtpReadStream, ssrc, err := srtpSession.AcceptStream()
 		if err != nil {
 			pc.log.Warnf("Failed to accept RTP %v", err)
 			return
 		}
 
+		// open accompanying srtcp stream
+		srtcpReadStream, err := srtcpSession.OpenReadStream(ssrc)
+		if err != nil {
+			pc.log.Warnf("Failed to open RTCP stream for %d: %v", ssrc, err)
+			return
+		}
+
 		if pc.isClosed.get() {
-			if err = stream.Close(); err != nil {
+			if err = srtpReadStream.Close(); err != nil {
 				pc.log.Warnf("Failed to close RTP stream %v", err)
+			}
+			if err = srtcpReadStream.Close(); err != nil {
+				pc.log.Warnf("Failed to close RTCP stream %v", err)
 			}
 			continue
 		}
 
-		pc.dtlsTransport.storeSimulcastStream(stream)
+		pc.dtlsTransport.storeSimulcastStream(srtpReadStream, srtcpReadStream)
+
+		if ssrc == 0 {
+			go pc.handleNonMediaBandwidthProbe()
+			continue
+		}
 
 		if atomic.AddUint64(&simulcastRoutineCount, 1) >= simulcastMaxProbeRoutines {
 			atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
@@ -1679,7 +1721,7 @@ func (pc *PeerConnection) undeclaredRTPMediaProcessor() {
 				pc.log.Errorf(incomingUnhandledRTPSsrc, ssrc, err)
 			}
 			atomic.AddUint64(&simulcastRoutineCount, ^uint64(0))
-		}(stream, SSRC(ssrc))
+		}(srtpReadStream, SSRC(ssrc))
 	}
 }
 
@@ -2044,12 +2086,33 @@ func (pc *PeerConnection) writeRTCP(pkts []rtcp.Packet, _ interceptor.Attributes
 	return pc.dtlsTransport.WriteRTCP(pkts)
 }
 
-// Close ends the PeerConnection
+// Close ends the PeerConnection.
 func (pc *PeerConnection) Close() error {
+	return pc.close(false /* shouldGracefullyClose */)
+}
+
+// GracefulClose ends the PeerConnection. It also waits
+// for any goroutines it started to complete. This is only safe to call outside of
+// PeerConnection callbacks or if in a callback, in its own goroutine.
+func (pc *PeerConnection) GracefulClose() error {
+	return pc.close(true /* shouldGracefullyClose */)
+}
+
+func (pc *PeerConnection) close(shouldGracefullyClose bool) error {
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #1)
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #2)
+	alreadyGracefullyClosed := shouldGracefullyClose && pc.isGracefulClosed.swap(true)
 	if pc.isClosed.swap(true) {
+		if alreadyGracefullyClosed {
+			// similar but distinct condition where we may be waiting for some
+			// other graceful close to finish. Incorrectly using isClosed may
+			// leak a goroutine.
+			<-pc.isGracefulClosedDone
+		}
 		return nil
+	}
+	if shouldGracefullyClose && !alreadyGracefullyClosed {
+		defer close(pc.isGracefulClosedDone)
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #3)
@@ -2072,6 +2135,9 @@ func (pc *PeerConnection) Close() error {
 			closeErrs = append(closeErrs, t.Stop())
 		}
 	}
+	if nonMediaBandwidthProbe, ok := pc.nonMediaBandwidthProbe.Load().(*RTPReceiver); ok {
+		closeErrs = append(closeErrs, nonMediaBandwidthProbe.Stop())
+	}
 	pc.mu.Unlock()
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #5)
@@ -2091,11 +2157,27 @@ func (pc *PeerConnection) Close() error {
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #8, #9, #10)
 	if pc.iceTransport != nil {
-		closeErrs = append(closeErrs, pc.iceTransport.Stop())
+		if shouldGracefullyClose {
+			// note that it isn't canon to stop gracefully
+			closeErrs = append(closeErrs, pc.iceTransport.GracefulStop())
+		} else {
+			closeErrs = append(closeErrs, pc.iceTransport.Stop())
+		}
 	}
 
 	// https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close (step #11)
 	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
+
+	if shouldGracefullyClose {
+		pc.ops.GracefulClose()
+
+		// note that it isn't canon to stop gracefully
+		pc.sctpTransport.lock.Lock()
+		for _, d := range pc.sctpTransport.dataChannels {
+			closeErrs = append(closeErrs, d.GracefulClose())
+		}
+		pc.sctpTransport.lock.Unlock()
+	}
 
 	return util.FlattenErrs(closeErrs)
 }
@@ -2114,10 +2196,11 @@ func (pc *PeerConnection) addRTPTransceiver(t *RTPTransceiver) {
 // by the ICEAgent since the offer or answer was created.
 func (pc *PeerConnection) CurrentLocalDescription() *SessionDescription {
 	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
 	localDescription := pc.currentLocalDescription
 	iceGather := pc.iceGatherer
 	iceGatheringState := pc.ICEGatheringState()
-	pc.mu.Unlock()
 	return populateLocalCandidates(localDescription, iceGather, iceGatheringState)
 }
 
@@ -2127,10 +2210,11 @@ func (pc *PeerConnection) CurrentLocalDescription() *SessionDescription {
 // PeerConnection is in the stable state, the value is null.
 func (pc *PeerConnection) PendingLocalDescription() *SessionDescription {
 	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
 	localDescription := pc.pendingLocalDescription
 	iceGather := pc.iceGatherer
 	iceGatheringState := pc.ICEGatheringState()
-	pc.mu.Unlock()
 	return populateLocalCandidates(localDescription, iceGather, iceGatheringState)
 }
 
@@ -2455,7 +2539,9 @@ func (pc *PeerConnection) generateMatchedSDP(transceivers []*RTPTransceiver, use
 				sender.setNegotiated()
 			}
 			mediaTransceivers := []*RTPTransceiver{t}
-			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, ridMap: getRids(media)})
+
+			extensions, _ := rtpExtensionsFromMediaDescription(media)
+			mediaSections = append(mediaSections, mediaSection{id: midValue, transceivers: mediaTransceivers, matchExtensions: extensions, rids: getRids(media)})
 		}
 	}
 

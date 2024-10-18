@@ -373,7 +373,8 @@ func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*transport.F
 
 // EnableInstallation enables an installation for multi-device sync.
 func (api *PublicAPI) EnableInstallation(installationID string) error {
-	return api.service.messenger.EnableInstallation(installationID)
+	_, err := api.service.messenger.EnableInstallation(installationID)
+	return err
 }
 
 // DisableInstallation disables an installation for multi-device sync.
@@ -1056,15 +1057,20 @@ func (api *PublicAPI) VerifiedUntrustworthy(ctx context.Context, request *reques
 }
 
 func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SendPairInstallation(ctx, nil)
+	return api.service.messenger.SendPairInstallation(ctx, "", nil)
 }
 
 func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) error {
 	return api.service.messenger.SyncDevices(ctx, name, picture, nil)
 }
 
-func (api *PublicAPI) EnableAndSyncInstallation(request *requests.EnableAndSyncInstallation) error {
-	return api.service.messenger.EnableAndSyncInstallation(request)
+// Deprecated: Use EnableInstallationAndSync instead
+func (api *PublicAPI) EnableAndSyncInstallation(request *requests.EnableInstallationAndSync) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EnableInstallationAndSync(request)
+}
+
+func (api *PublicAPI) EnableInstallationAndSync(request *requests.EnableInstallationAndSync) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EnableInstallationAndSync(request)
 }
 
 func (api *PublicAPI) EnableInstallationAndPair(request *requests.EnableInstallationAndPair) (*protocol.MessengerResponse, error) {
@@ -1705,8 +1711,8 @@ func (api *PublicAPI) ChatMentionReplaceWithPublicKey(chatID, text string) (stri
 // 2. user input "c", call this function with text "abc"
 // whatever, we should ensure ChatMentionOnChangeText know(invoked) the latest full text.
 // ChatMentionOnChangeText will maintain state of fulltext and diff between previous/latest full text internally.
-func (api *PublicAPI) ChatMentionOnChangeText(chatID, text string) (*protocol.ChatMentionContext, error) {
-	return api.service.messenger.GetMentionsManager().OnChangeText(chatID, text)
+func (api *PublicAPI) ChatMentionOnChangeText(chatID, text string, callID uint64) (*protocol.ChatMentionContext, error) {
+	return api.service.messenger.GetMentionsManager().OnChangeText(chatID, text, callID)
 }
 
 // ChatMentionSelectMention select mention from mention suggestion list

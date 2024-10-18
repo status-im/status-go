@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 
 	"go.uber.org/zap"
@@ -108,7 +108,7 @@ func setupRouteValidationMaps(fromLockedAmount map[uint64]*hexutil.Big) (map[uin
 	fromExcluded := make(map[uint64]bool)
 
 	for chainID, amount := range fromLockedAmount {
-		if amount.ToInt().Cmp(pathprocessor.ZeroBigIntValue) <= 0 {
+		if amount.ToInt().Cmp(walletCommon.ZeroBigIntValue()) <= 0 {
 			fromExcluded[chainID] = false
 		} else {
 			fromIncluded[chainID] = false

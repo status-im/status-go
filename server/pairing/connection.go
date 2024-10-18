@@ -59,13 +59,10 @@ func NewConnectionParams(netIPs []net.IP, port int, publicKey *ecdsa.PublicKey, 
 //   - AES encryption key
 //   - string InstallationID of the sending device
 //   - string KeyUID of the sending device
+//
 // NOTE:
 // - append(accrete) parameters instead of changing(breaking) existing parameters. Appending should **never** break, modifying existing parameters will break. Watch this before making changes: https://www.youtube.com/watch?v=oyLBGkS5ICk
 // - never strictly check version, unless you really want to break
-
-// This flag is used to keep compatibility with 2.29. It will output a 5 parameters connection string with version 3.
-var keep229Compatibility bool = true
-
 func (cp *ConnectionParams) ToString() string {
 	v := base58.Encode(new(big.Int).SetInt64(int64(cp.version)).Bytes())
 	ips := base58.Encode(SerializeNetIps(cp.netIPs))
@@ -73,18 +70,12 @@ func (cp *ConnectionParams) ToString() string {
 	k := base58.Encode(elliptic.MarshalCompressed(cp.publicKey.Curve, cp.publicKey.X, cp.publicKey.Y))
 	ek := base58.Encode(cp.aesKey)
 
-	if keep229Compatibility {
-		return fmt.Sprintf("%s%s:%s:%s:%s:%s", connectionStringID, v, ips, p, k, ek)
-	}
-
 	var i string
 	if cp.installationID != "" {
-
 		u, err := uuid.Parse(cp.installationID)
 		if err != nil {
 			log.Fatalf("Failed to parse UUID: %v", err)
 		} else {
-
 			// Convert UUID to byte slice
 			byteSlice := u[:]
 			i = base58.Encode(byteSlice)
@@ -94,7 +85,6 @@ func (cp *ConnectionParams) ToString() string {
 	var kuid string
 	if cp.keyUID != "" {
 		kuid = base58.Encode([]byte(cp.keyUID))
-
 	}
 
 	return fmt.Sprintf("%s%s:%s:%s:%s:%s:%s:%s", connectionStringID, v, ips, p, k, ek, i, kuid)

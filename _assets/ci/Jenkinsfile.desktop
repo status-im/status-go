@@ -42,7 +42,7 @@ pipeline {
     TMPDIR   = "${WORKSPACE_TMP}"
     GOPATH   = "${WORKSPACE_TMP}/go"
     GOCACHE  = "${WORKSPACE_TMP}/gocache"
-    PATH     = "${PATH}:${GOPATH}/bin"
+    PATH     = "${PATH}:${GOPATH}/bin:/c/Users/jenkins/go/bin"
     REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
     VERSION  = sh(script: "./_assets/scripts/version.sh", returnStdout: true)
     ARTIFACT = utils.pkgFilename(
@@ -66,7 +66,13 @@ pipeline {
          }
       }
     }
-    /* Sanity-check C bindings */
+
+    stage('Generate') {
+      steps { script {
+        shell('make generate')
+      } }
+    }
+
     stage('Build Static Lib') {
         steps {
             script {

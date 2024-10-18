@@ -3,14 +3,17 @@ package filter
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/waku-org/go-waku/waku/v2/onlinechecker"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -27,6 +30,9 @@ func (fc FilterConfig) String() string {
 	return string(jsonStr)
 }
 
+const filterSubLoopInterval = 5 * time.Second
+const filterSubMaxErrCnt = 3
+
 type Sub struct {
 	ContentFilter         protocol.ContentFilter
 	DataCh                chan *protocol.Envelope
@@ -40,6 +46,7 @@ type Sub struct {
 	onlineChecker         onlinechecker.OnlineChecker
 	resubscribeInProgress bool
 	id                    string
+	errcnt                int
 }
 
 type subscribeParameters struct {
@@ -69,13 +76,7 @@ func defaultOptions() []SubscribeOptions {
 }
 
 // Subscribe
-func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilter protocol.ContentFilter, config FilterConfig, log *zap.Logger, opts ...SubscribeOptions) (*Sub, error) {
-	optList := append(defaultOptions(), opts...)
-	params := new(subscribeParameters)
-	for _, opt := range optList {
-		opt(params)
-	}
-
+func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilter protocol.ContentFilter, config FilterConfig, log *zap.Logger, params *subscribeParameters) (*Sub, error) {
 	sub := new(Sub)
 	sub.id = uuid.NewString()
 	sub.wf = wf
@@ -95,12 +96,14 @@ func Subscribe(ctx context.Context, wf *filter.WakuFilterLightNode, contentFilte
 			sub.multiplex(subs)
 		}
 	}
-
-	go sub.subscriptionLoop(params.batchInterval)
+	// filter subscription loop is to check if target subscriptions for a filter are active and if not
+	// trigger resubscribe.
+	go sub.subscriptionLoop(filterSubLoopInterval)
 	return sub, nil
 }
 
 func (apiSub *Sub) Unsubscribe(contentFilter protocol.ContentFilter) {
+	defer utils.LogOnPanic()
 	_, err := apiSub.wf.Unsubscribe(apiSub.ctx, contentFilter)
 	//Not reading result unless we want to do specific error handling?
 	if err != nil {
@@ -108,12 +111,14 @@ func (apiSub *Sub) Unsubscribe(contentFilter protocol.ContentFilter) {
 	}
 }
 
-func (apiSub *Sub) subscriptionLoop(batchInterval time.Duration) {
-	ticker := time.NewTicker(batchInterval)
+func (apiSub *Sub) subscriptionLoop(loopInterval time.Duration) {
+	defer utils.LogOnPanic()
+	ticker := time.NewTicker(loopInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
+			apiSub.errcnt = 0 //reset errorCount
 			if apiSub.onlineChecker.IsOnline() && len(apiSub.subs) < apiSub.Config.MaxPeers &&
 				!apiSub.resubscribeInProgress && len(apiSub.closing) < apiSub.Config.MaxPeers {
 				apiSub.closing <- ""
@@ -123,9 +128,11 @@ func (apiSub *Sub) subscriptionLoop(batchInterval time.Duration) {
 			apiSub.cleanup()
 			return
 		case subId := <-apiSub.closing:
-			apiSub.resubscribeInProgress = true
-			//trigger resubscribe flow for subscription.
-			apiSub.checkAndResubscribe(subId)
+			if apiSub.errcnt < filterSubMaxErrCnt {
+				apiSub.resubscribeInProgress = true
+				//trigger resubscribe flow for subscription.
+				apiSub.checkAndResubscribe(subId)
+			}
 		}
 	}
 }
@@ -181,6 +188,10 @@ func (apiSub *Sub) resubscribe(failedPeer peer.ID) {
 	apiSub.multiplex(subs)
 }
 
+func possibleRecursiveError(err error) bool {
+	return errors.Is(err, utils.ErrNoPeersAvailable) || errors.Is(err, swarm.ErrDialBackoff)
+}
+
 func (apiSub *Sub) subscribe(contentFilter protocol.ContentFilter, peerCount int, peersToExclude ...peer.ID) ([]*subscription.SubscriptionDetails, error) {
 	// Low-level subscribe, returns a set of SubscriptionDetails
 	options := make([]filter.FilterSubscribeOption, 0)
@@ -195,6 +206,9 @@ func (apiSub *Sub) subscribe(contentFilter protocol.ContentFilter, peerCount int
 	subs, err := apiSub.wf.Subscribe(apiSub.ctx, contentFilter, options...)
 
 	if err != nil {
+		if possibleRecursiveError(err) {
+			apiSub.errcnt++
+		}
 		//Inform of error, so that resubscribe can be triggered if required
 		if len(apiSub.closing) < apiSub.Config.MaxPeers {
 			apiSub.closing <- ""
@@ -216,12 +230,14 @@ func (apiSub *Sub) multiplex(subs []*subscription.SubscriptionDetails) {
 	for _, subDetails := range subs {
 		apiSub.subs[subDetails.ID] = subDetails
 		go func(subDetails *subscription.SubscriptionDetails) {
+			defer utils.LogOnPanic()
 			apiSub.log.Debug("new multiplex", zap.String("sub-id", subDetails.ID))
 			for env := range subDetails.C {
 				apiSub.DataCh <- env
 			}
 		}(subDetails)
 		go func(subDetails *subscription.SubscriptionDetails) {
+			defer utils.LogOnPanic()
 			select {
 			case <-apiSub.ctx.Done():
 				return

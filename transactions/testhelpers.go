@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/rpc/chain/ethclient"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
@@ -22,7 +23,7 @@ type MockETHClient struct {
 	mock.Mock
 }
 
-var _ chain.BatchCallClient = (*MockETHClient)(nil)
+var _ ethclient.BatchCallClient = (*MockETHClient)(nil)
 
 func (m *MockETHClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
 	args := m.Called(ctx, b)
@@ -53,7 +54,7 @@ func (m *MockChainClient) SetAvailableClients(chainIDs []common.ChainID) *MockCh
 	return m
 }
 
-func (m *MockChainClient) AbstractEthClient(chainID common.ChainID) (chain.BatchCallClient, error) {
+func (m *MockChainClient) AbstractEthClient(chainID common.ChainID) (ethclient.BatchCallClient, error) {
 	if _, ok := m.Clients[chainID]; !ok {
 		panic(fmt.Sprintf("no mock client for chainID %d", chainID))
 	}

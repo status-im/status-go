@@ -13,6 +13,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	dbi "github.com/waku-org/go-libp2p-rendezvous/db"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -315,6 +316,7 @@ func (db *DB) ValidCookie(ns string, cookie []byte) bool {
 }
 
 func (db *DB) background(ctx context.Context) {
+	defer utils.LogOnPanic()
 	for {
 		db.cleanupExpired()
 

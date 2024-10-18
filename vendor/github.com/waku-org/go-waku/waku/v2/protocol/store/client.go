@@ -19,6 +19,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -69,14 +70,19 @@ type WakuStore struct {
 	timesource timesource.Timesource
 	log        *zap.Logger
 	pm         *peermanager.PeerManager
+
+	defaultRatelimit rate.Limit
+	rateLimiters     map[peer.ID]*rate.Limiter
 }
 
 // NewWakuStore is used to instantiate a StoreV3 client
-func NewWakuStore(pm *peermanager.PeerManager, timesource timesource.Timesource, log *zap.Logger) *WakuStore {
+func NewWakuStore(pm *peermanager.PeerManager, timesource timesource.Timesource, log *zap.Logger, defaultRatelimit rate.Limit) *WakuStore {
 	s := new(WakuStore)
 	s.log = log.Named("store-client")
 	s.timesource = timesource
 	s.pm = pm
+	s.defaultRatelimit = defaultRatelimit
+	s.rateLimiters = make(map[peer.ID]*rate.Limiter)
 
 	if pm != nil {
 		pm.RegisterWakuProtocol(StoreQueryID_v300, StoreENRField)
@@ -171,7 +177,7 @@ func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...Requ
 		return nil, err
 	}
 
-	response, err := s.queryFrom(ctx, storeRequest, params.selectedPeer)
+	response, err := s.queryFrom(ctx, storeRequest, params)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +217,7 @@ func (s *WakuStore) Exists(ctx context.Context, messageHash wpb.MessageHash, opt
 	return len(result.messages) != 0, nil
 }
 
-func (s *WakuStore) next(ctx context.Context, r *Result) (*Result, error) {
+func (s *WakuStore) next(ctx context.Context, r *Result, opts ...RequestOption) (*Result, error) {
 	if r.IsComplete() {
 		return &Result{
 			store:         s,
@@ -223,11 +229,22 @@ func (s *WakuStore) next(ctx context.Context, r *Result) (*Result, error) {
 		}, nil
 	}
 
+	params := new(Parameters)
+	params.selectedPeer = r.PeerID()
+	optList := DefaultOptions()
+	optList = append(optList, opts...)
+	for _, opt := range optList {
+		err := opt(params)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	storeRequest := proto.Clone(r.storeRequest).(*pb.StoreQueryRequest)
 	storeRequest.RequestId = hex.EncodeToString(protocol.GenerateRequestID())
 	storeRequest.PaginationCursor = r.Cursor()
 
-	response, err := s.queryFrom(ctx, storeRequest, r.PeerID())
+	response, err := s.queryFrom(ctx, storeRequest, params)
 	if err != nil {
 		return nil, err
 	}
@@ -245,16 +262,27 @@ func (s *WakuStore) next(ctx context.Context, r *Result) (*Result, error) {
 
 }
 
-func (s *WakuStore) queryFrom(ctx context.Context, storeRequest *pb.StoreQueryRequest, selectedPeer peer.ID) (*pb.StoreQueryResponse, error) {
-	logger := s.log.With(logging.HostID("peer", selectedPeer), zap.String("requestId", hex.EncodeToString([]byte(storeRequest.RequestId))))
+func (s *WakuStore) queryFrom(ctx context.Context, storeRequest *pb.StoreQueryRequest, params *Parameters) (*pb.StoreQueryResponse, error) {
+	logger := s.log.With(logging.HostID("peer", params.selectedPeer), zap.String("requestId", hex.EncodeToString([]byte(storeRequest.RequestId))))
 
 	logger.Debug("sending store request")
 
-	stream, err := s.h.NewStream(ctx, selectedPeer, StoreQueryID_v300)
+	if !params.skipRatelimit {
+		rateLimiter, ok := s.rateLimiters[params.selectedPeer]
+		if !ok {
+			rateLimiter = rate.NewLimiter(s.defaultRatelimit, 1)
+			s.rateLimiters[params.selectedPeer] = rateLimiter
+		}
+		err := rateLimiter.Wait(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	stream, err := s.h.NewStream(ctx, params.selectedPeer, StoreQueryID_v300)
 	if err != nil {
-		logger.Error("creating stream to peer", zap.Error(err))
-		if ps, ok := s.h.Peerstore().(peerstore.WakuPeerstore); ok {
-			ps.AddConnFailure(selectedPeer)
+		if s.pm != nil {
+			s.pm.HandleDialError(err, params.selectedPeer)
 		}
 		return nil, err
 	}

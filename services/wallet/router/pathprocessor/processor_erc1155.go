@@ -2,7 +2,6 @@ package pathprocessor
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/status-im/status-go/contracts/ierc1155"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -48,7 +48,7 @@ func (s *ERC1155Processor) AvailableFor(params ProcessorInputParams) (bool, erro
 }
 
 func (s *ERC1155Processor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
 }
 
 func (s *ERC1155Processor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
@@ -57,9 +57,9 @@ func (s *ERC1155Processor) PackTxInputData(params ProcessorInputParams) ([]byte,
 		return []byte{}, createERC1155ErrorResponse(err)
 	}
 
-	id, success := big.NewInt(0).SetString(params.FromToken.Symbol, 0)
-	if !success {
-		return []byte{}, createERC1155ErrorResponse(fmt.Errorf("failed to convert %s to big.Int", params.FromToken.Symbol))
+	id, err := walletCommon.GetTokenIdFromSymbol(params.FromToken.Symbol)
+	if err != nil {
+		return []byte{}, createERC1155ErrorResponse(err)
 	}
 
 	return abi.Pack("safeTransferFrom",
@@ -108,6 +108,7 @@ func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams) (uint64, err
 	return uint64(increasedEstimation), nil
 }
 
+// TODO: remove this struct once mobile switches to the new approach
 func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
 	ethClient, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
@@ -150,6 +151,54 @@ func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signe
 	return tx, nil
 }
 
+func (s *ERC1155Processor) sendOrBuildV2(sendArgs *transactions.SendTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
+	ethClient, err := s.rpcClient.EthClient(sendArgs.FromChainID)
+	if err != nil {
+		return tx, createERC1155ErrorResponse(err)
+	}
+
+	contract, err := ierc1155.NewIerc1155(common.Address(sendArgs.ToContractAddress), ethClient)
+	if err != nil {
+		return tx, createERC1155ErrorResponse(err)
+	}
+
+	id, err := walletCommon.GetTokenIdFromSymbol(sendArgs.FromTokenID)
+	if err != nil {
+		return tx, createERC1155ErrorResponse(err)
+	}
+
+	var nonce uint64
+	if lastUsedNonce < 0 {
+		nonce, err = s.transactor.NextNonce(s.rpcClient, sendArgs.FromChainID, sendArgs.From)
+		if err != nil {
+			return tx, createERC1155ErrorResponse(err)
+		}
+	} else {
+		nonce = uint64(lastUsedNonce) + 1
+	}
+
+	argNonce := hexutil.Uint64(nonce)
+	sendArgs.Nonce = &argNonce
+	txOpts := sendArgs.ToTransactOpts(signerFn)
+	from := common.Address(sendArgs.From)
+	tx, err = contract.SafeTransferFrom(
+		txOpts,
+		from,
+		common.Address(*sendArgs.To),
+		id,
+		sendArgs.Value.ToInt(),
+		[]byte{},
+	)
+	if err != nil {
+		return tx, createERC1155ErrorResponse(err)
+	}
+	err = s.transactor.StoreAndTrackPendingTx(from, sendArgs.FromTokenID, sendArgs.FromChainID, sendArgs.MultiTransactionID, tx)
+	if err != nil {
+		return tx, createERC1155ErrorResponse(err)
+	}
+	return tx, nil
+}
+
 func (s *ERC1155Processor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
 	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC1155TransferTx.From, verifiedAccount), lastUsedNonce)
 	if err != nil {
@@ -160,6 +209,11 @@ func (s *ERC1155Processor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonc
 
 func (s *ERC1155Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	tx, err := s.sendOrBuild(sendArgs, nil, lastUsedNonce)
+	return tx, tx.Nonce(), err
+}
+
+func (s *ERC1155Processor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	tx, err := s.sendOrBuildV2(sendArgs, nil, lastUsedNonce)
 	return tx, tx.Nonce(), err
 }
 

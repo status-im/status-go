@@ -5,10 +5,27 @@
 package srtp
 
 import (
+	"fmt"
+
 	"github.com/pion/rtp"
 )
 
 func (c *Context) decryptRTP(dst, ciphertext []byte, header *rtp.Header, headerLen int) ([]byte, error) {
+	authTagLen, err := c.cipher.AuthTagRTPLen()
+	if err != nil {
+		return nil, err
+	}
+	aeadAuthTagLen, err := c.cipher.AEADAuthTagLen()
+	if err != nil {
+		return nil, err
+	}
+	mkiLen := len(c.sendMKI)
+
+	// Verify that encrypted packet is long enough
+	if len(ciphertext) < (headerLen + aeadAuthTagLen + mkiLen + authTagLen) {
+		return nil, fmt.Errorf("%w: %d", errTooShortRTP, len(ciphertext))
+	}
+
 	s := c.getSRTPSSRCState(header.SSRC)
 
 	roc, diff, _ := s.nextRolloverCount(header.SequenceNumber)
@@ -21,13 +38,19 @@ func (c *Context) decryptRTP(dst, ciphertext []byte, header *rtp.Header, headerL
 		}
 	}
 
-	authTagLen, err := c.cipher.rtpAuthTagLen()
-	if err != nil {
-		return nil, err
+	cipher := c.cipher
+	if len(c.mkis) > 0 {
+		// Find cipher for MKI
+		actualMKI := c.cipher.getMKI(ciphertext, true)
+		cipher, ok = c.mkis[string(actualMKI)]
+		if !ok {
+			return nil, ErrMKINotFound
+		}
 	}
-	dst = growBufferSize(dst, len(ciphertext)-authTagLen)
 
-	dst, err = c.cipher.decryptRTP(dst, ciphertext, header, headerLen, roc)
+	dst = growBufferSize(dst, len(ciphertext)-authTagLen-len(c.sendMKI))
+
+	dst, err = cipher.decryptRTP(dst, ciphertext, header, headerLen, roc)
 	if err != nil {
 		return nil, err
 	}

@@ -10,9 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
+	"github.com/status-im/status-go/contracts"
+	"github.com/status-im/status-go/services/wallet/blockchainstate"
+	"github.com/status-im/status-go/t/utils"
+
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/mock/gomock"
 	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
 
 	"github.com/stretchr/testify/require"
@@ -24,29 +28,26 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/balancechecker"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/rpc/chain"
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/balance"
-	"github.com/status-im/status-go/services/wallet/blockchainstate"
-	"github.com/status-im/status-go/services/wallet/community"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/t/utils"
-
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multicommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
 	statusRpc "github.com/status-im/status-go/rpc"
+	ethclient "github.com/status-im/status-go/rpc/chain/ethclient"
+	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
+	"github.com/status-im/status-go/rpc/chain/rpclimiter"
+	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/balance"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -67,7 +68,7 @@ type TestClient struct {
 	rw                             sync.RWMutex
 	callsCounter                   map[string]int
 	currentBlock                   uint64
-	limiter                        chain.RequestLimiter
+	limiter                        rpclimiter.RequestLimiter
 	tag                            string
 	groupTag                       string
 }
@@ -231,9 +232,10 @@ func (tc *TestClient) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([
 	logs := []types.Log{}
 	for _, transfer := range allTransfers {
 		if transfer.block.Cmp(q.FromBlock) >= 0 && transfer.block.Cmp(q.ToBlock) <= 0 {
+			header := getTestHeader(transfer.block)
 			log := types.Log{
-				BlockNumber: transfer.block.Uint64(),
-				BlockHash:   common.BigToHash(transfer.block),
+				BlockNumber: header.Number.Uint64(),
+				BlockHash:   header.Hash(),
 			}
 
 			// Use the address at least in one any(from/to) topic to trick the implementation
@@ -286,6 +288,18 @@ func (tc *TestClient) tokenBalanceAt(account common.Address, token common.Addres
 	return balance
 }
 
+func getTestHeader(number *big.Int) *types.Header {
+	return &types.Header{
+		Number:     big.NewInt(0).Set(number),
+		Time:       0,
+		Difficulty: big.NewInt(0),
+		ParentHash: common.Hash{},
+		Nonce:      types.BlockNonce{},
+		MixDigest:  common.Hash{},
+		Extra:      make([]byte, 0),
+	}
+}
+
 func (tc *TestClient) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
 	if number == nil {
 		number = big.NewInt(int64(tc.currentBlock))
@@ -296,28 +310,14 @@ func (tc *TestClient) HeaderByNumber(ctx context.Context, number *big.Int) (*typ
 		return nil, err
 	}
 
-	header := &types.Header{
-		Number: number,
-		Time:   0,
-	}
+	header := getTestHeader(number)
 
 	return header, nil
 }
 
-func (tc *TestClient) CallBlockHashByTransaction(ctx context.Context, blockNumber *big.Int, index uint) (common.Hash, error) {
-	err := tc.countAndlog("CallBlockHashByTransaction")
-	if err != nil {
-		return common.Hash{}, err
-	}
-	return common.BigToHash(blockNumber), nil
-}
-
 func (tc *TestClient) GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.Int) (string, error) {
 	err := tc.countAndlog("GetBaseFeeFromBlock")
-	if err != nil {
-		return "", err
-	}
-	return "", nil
+	return "", err
 }
 
 func (tc *TestClient) NetworkID() uint64 {
@@ -582,10 +582,7 @@ func (tc *TestClient) prepareTokenBalanceHistory(toBlock int) {
 
 func (tc *TestClient) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
 	err := tc.countAndlog("CallContext")
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (tc *TestClient) GetWalletNotifier() func(chainId uint64, message string) {
@@ -603,74 +600,47 @@ func (tc *TestClient) SetWalletNotifier(notifier func(chainId uint64, message st
 
 func (tc *TestClient) EstimateGas(ctx context.Context, call ethereum.CallMsg) (gas uint64, err error) {
 	err = tc.countAndlog("EstimateGas")
-	if err != nil {
-		return 0, err
-	}
-	return 0, nil
+	return 0, err
 }
 
 func (tc *TestClient) PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error) {
 	err := tc.countAndlog("PendingCodeAt")
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
+	return nil, err
 }
 
 func (tc *TestClient) PendingCallContract(ctx context.Context, call ethereum.CallMsg) ([]byte, error) {
 	err := tc.countAndlog("PendingCallContract")
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
+	return nil, err
 }
 
 func (tc *TestClient) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
 	err := tc.countAndlog("PendingNonceAt")
-	if err != nil {
-		return 0, err
-	}
-	return 0, nil
+	return 0, err
 }
 
 func (tc *TestClient) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 	err := tc.countAndlog("SuggestGasPrice")
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
+	return nil, err
 }
 
 func (tc *TestClient) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	err := tc.countAndlog("SendTransaction")
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (tc *TestClient) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
 	err := tc.countAndlog("SuggestGasTipCap")
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
+	return nil, err
 }
 
 func (tc *TestClient) BatchCallContextIgnoringLocalHandlers(ctx context.Context, b []rpc.BatchElem) error {
 	err := tc.countAndlog("BatchCallContextIgnoringLocalHandlers")
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (tc *TestClient) CallContextIgnoringLocalHandlers(ctx context.Context, result interface{}, method string, args ...interface{}) error {
 	err := tc.countAndlog("CallContextIgnoringLocalHandlers")
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (tc *TestClient) CallRaw(data string) string {
@@ -684,35 +654,62 @@ func (tc *TestClient) GetChainID() *big.Int {
 
 func (tc *TestClient) SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
 	err := tc.countAndlog("SubscribeFilterLogs")
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
+	return nil, err
 }
 
 func (tc *TestClient) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	err := tc.countAndlog("TransactionReceipt")
+	return nil, err
+}
+
+func (tc *TestClient) TransactionByHash(ctx context.Context, txHash common.Hash) (*types.Transaction, bool, error) {
+	err := tc.countAndlog("TransactionByHash")
+	return nil, false, err
+}
+
+func (tc *TestClient) BlockNumber(ctx context.Context) (uint64, error) {
+	err := tc.countAndlog("BlockNumber")
+	return 0, err
+}
+
+func (tc *TestClient) FeeHistory(ctx context.Context, blockCount uint64, lastBlock *big.Int, rewardPercentiles []float64) (*ethereum.FeeHistory, error) {
+	err := tc.countAndlog("FeeHistory")
 	if err != nil {
 		return nil, err
 	}
 	return nil, nil
 }
 
-func (tc *TestClient) TransactionByHash(ctx context.Context, txHash common.Hash) (*types.Transaction, bool, error) {
-	err := tc.countAndlog("TransactionByHash")
-	if err != nil {
-		return nil, false, err
-	}
-	return nil, false, nil
+func (tc *TestClient) PendingBalanceAt(ctx context.Context, account common.Address) (*big.Int, error) {
+	err := tc.countAndlog("PendingBalanceAt")
+	return nil, err
 }
 
-func (tc *TestClient) BlockNumber(ctx context.Context) (uint64, error) {
-	err := tc.countAndlog("BlockNumber")
-	if err != nil {
-		return 0, err
-	}
-	return 0, nil
+func (tc *TestClient) PendingStorageAt(ctx context.Context, account common.Address, key common.Hash) ([]byte, error) {
+	err := tc.countAndlog("PendingStorageAt")
+	return nil, err
 }
+
+func (tc *TestClient) PendingTransactionCount(ctx context.Context) (uint, error) {
+	err := tc.countAndlog("PendingTransactionCount")
+	return 0, err
+}
+
+func (tc *TestClient) StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error) {
+	err := tc.countAndlog("StorageAt")
+	return nil, err
+}
+
+func (tc *TestClient) SyncProgress(ctx context.Context) (*ethereum.SyncProgress, error) {
+	err := tc.countAndlog("SyncProgress")
+	return nil, err
+}
+
+func (tc *TestClient) TransactionSender(ctx context.Context, tx *types.Transaction, block common.Hash, index uint) (common.Address, error) {
+	err := tc.countAndlog("TransactionSender")
+	return common.Address{}, err
+}
+
 func (tc *TestClient) SetIsConnected(value bool) {
 	if tc.traceAPICalls {
 		tc.t.Log("SetIsConnected")
@@ -727,12 +724,18 @@ func (tc *TestClient) IsConnected() bool {
 	return true
 }
 
-func (tc *TestClient) GetLimiter() chain.RequestLimiter {
+func (tc *TestClient) GetLimiter() rpclimiter.RequestLimiter {
 	return tc.limiter
 }
 
-func (tc *TestClient) SetLimiter(limiter chain.RequestLimiter) {
+func (tc *TestClient) SetLimiter(limiter rpclimiter.RequestLimiter) {
 	tc.limiter = limiter
+}
+
+func (tc *TestClient) Close() {
+	if tc.traceAPICalls {
+		tc.t.Log("Close")
+	}
 }
 
 type testERC20Transfer struct {
@@ -1057,11 +1060,11 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 		if tc.GetLimiter() != nil {
 			if allow, _ := tc.GetLimiter().Allow(tc.tag); !allow {
 				t.Log("ERROR: requests over limit")
-				return chain.ErrRequestsOverLimit
+				return rpclimiter.ErrRequestsOverLimit
 			}
 			if allow, _ := tc.GetLimiter().Allow(tc.groupTag); !allow {
 				t.Log("ERROR: requests over limit for group tag")
-				return chain.ErrRequestsOverLimit
+				return rpclimiter.ErrRequestsOverLimit
 			}
 		}
 
@@ -1076,7 +1079,17 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 
 		return nil
 	}
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+
+	config := statusRpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	client, _ := statusRpc.NewClient(config)
+
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 	tokenManager.SetTokens([]*token.Token{
@@ -1187,7 +1200,7 @@ func TestFindBlocksCommandWithLimiter(t *testing.T) {
 	balances := map[common.Address][][]int{accountAddress: {{5, 1, 0}, {20, 2, 0}, {45, 1, 1}, {46, 50, 0}, {75, 0, 1}}}
 	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, nil, nil, nil, nil)
 
-	limiter := chain.NewRequestLimiter(chain.NewInMemRequestsMapStorage())
+	limiter := rpclimiter.NewRequestLimiter(rpclimiter.NewInMemRequestsMapStorage())
 	err := limiter.SetLimit(transferHistoryTag, maxRequests, time.Hour)
 	require.NoError(t, err)
 	tc.SetLimiter(limiter)
@@ -1202,7 +1215,7 @@ func TestFindBlocksCommandWithLimiter(t *testing.T) {
 		t.Log("ERROR")
 	case <-group.WaitAsync():
 		close(blockChannel)
-		require.Error(t, chain.ErrRequestsOverLimit, group.Error())
+		require.Error(t, rpclimiter.ErrRequestsOverLimit, group.Error())
 		require.Equal(t, maxRequests, tc.getCounter())
 	}
 }
@@ -1216,7 +1229,7 @@ func TestFindBlocksCommandWithLimiterTagDifferentThanTransfers(t *testing.T) {
 	incomingERC20Transfers := map[common.Address][]testERC20Transfer{accountAddress: {{big.NewInt(6), tokenTXXAddress, big.NewInt(1), walletcommon.Erc20TransferEventType}}}
 
 	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, accountAddress, big.NewInt(0), big.NewInt(20), rangeSize, balances, outgoingERC20Transfers, incomingERC20Transfers, nil, nil)
-	limiter := chain.NewRequestLimiter(chain.NewInMemRequestsMapStorage())
+	limiter := rpclimiter.NewRequestLimiter(rpclimiter.NewInMemRequestsMapStorage())
 	err := limiter.SetLimit("some-other-tag-than-transfer-history", maxRequests, time.Hour)
 	require.NoError(t, err)
 	tc.SetLimiter(limiter)
@@ -1247,14 +1260,14 @@ func TestFindBlocksCommandWithLimiterForMultipleAccountsSameGroup(t *testing.T) 
 	incomingERC20Transfers := map[common.Address][]testERC20Transfer{account2: {{big.NewInt(6), tokenTXXAddress, big.NewInt(1), walletcommon.Erc20TransferEventType}}}
 
 	// Limiters share the same storage
-	storage := chain.NewInMemRequestsMapStorage()
+	storage := rpclimiter.NewInMemRequestsMapStorage()
 
 	// Set up the first account
 	fbc, tc, blockChannel, _ := setupFindBlocksCommand(t, account1, big.NewInt(0), big.NewInt(20), rangeSize, balances, outgoingERC20Transfers, nil, nil, nil)
 	tc.tag = transferHistoryTag + account1.String()
 	tc.groupTag = transferHistoryTag
 
-	limiter1 := chain.NewRequestLimiter(storage)
+	limiter1 := rpclimiter.NewRequestLimiter(storage)
 	err := limiter1.SetLimit(transferHistoryTag, maxRequestsTotal, time.Hour)
 	require.NoError(t, err)
 	err = limiter1.SetLimit(transferHistoryTag+account1.String(), limit1, time.Hour)
@@ -1265,7 +1278,7 @@ func TestFindBlocksCommandWithLimiterForMultipleAccountsSameGroup(t *testing.T) 
 	fbc2, tc2, _, _ := setupFindBlocksCommand(t, account2, big.NewInt(0), big.NewInt(20), rangeSize, balances, nil, incomingERC20Transfers, nil, nil)
 	tc2.tag = transferHistoryTag + account2.String()
 	tc2.groupTag = transferHistoryTag
-	limiter2 := chain.NewRequestLimiter(storage)
+	limiter2 := rpclimiter.NewRequestLimiter(storage)
 	err = limiter2.SetLimit(transferHistoryTag, maxRequestsTotal, time.Hour)
 	require.NoError(t, err)
 	err = limiter2.SetLimit(transferHistoryTag+account2.String(), limit2, time.Hour)
@@ -1309,7 +1322,7 @@ func newMockChainClient() *MockChainClient {
 	}
 }
 
-func (m *MockChainClient) AbstractEthClient(chainID walletcommon.ChainID) (chain.BatchCallClient, error) {
+func (m *MockChainClient) AbstractEthClient(chainID walletcommon.ChainID) (ethclient.BatchCallClient, error) {
 	if _, ok := m.clients[chainID]; !ok {
 		panic(fmt.Sprintf("no mock client for chainID %d", chainID))
 	}
@@ -1322,7 +1335,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
-	tm := &TransactionManager{NewMultiTransactionDB(db), nil, nil, nil, nil, nil, nil, nil, nil, nil}
+	tm := &TransactionManager{NewMultiTransactionDB(db), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 
 	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
 	require.NoError(t, err)
@@ -1339,7 +1352,16 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		currentBlock:           100,
 	}
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+	config := statusRpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	client, _ := statusRpc.NewClient(config)
+
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
@@ -1463,7 +1485,16 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 			currentBlock:           100,
 		}
 
-		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+		config := statusRpc.ClientConfig{
+			Client:          nil,
+			UpstreamChainID: 1,
+			Networks:        []params.Network{},
+			DB:              db,
+			WalletFeed:      nil,
+			ProviderConfigs: nil,
+		}
+		client, _ := statusRpc.NewClient(config)
+
 		client.SetClient(tc.NetworkID(), tc)
 		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
@@ -1543,7 +1574,16 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
 	require.NoError(t, err)
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+	config := statusRpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	client, _ := statusRpc.NewClient(config)
+
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
@@ -1657,7 +1697,16 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 	}
 	//tc.printPreparedData = true
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+	config := statusRpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	client, _ := statusRpc.NewClient(config)
+
 	client.SetClient(tc.NetworkID(), tc)
 
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
@@ -1796,7 +1845,16 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db, nil)
+	config := statusRpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: 1,
+		Networks:        []params.Network{},
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	client, _ := statusRpc.NewClient(config)
+
 	maker, _ := contracts.NewContractMaker(client)
 
 	wdb := NewDB(db)

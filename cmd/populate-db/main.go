@@ -393,10 +393,6 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.NetworkID = 1
 	nodeConfig.LogLevel = "ERROR"
 	nodeConfig.DataDir = api.DefaultDataDir
-	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
-		Enabled: true,
-		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",
-	}
 
 	nodeConfig.Name = "StatusIM"
 	clusterConfig, err := params.LoadClusterConfigFromFleet("eth.prod")

@@ -1,0 +1,12 @@
+@keyUID = "0xb9515adcaa72f337f5ccbe043d5b016f22a9b76affdf91087577b1a5640bc0bd"
+@password = "1234567890"
+@kdfIterations = 256000
+
+### GET request to example server
+GET {{address}}/statusgo/LoginAccount
+
+{
+    "keyUid": {{keyUID}},
+    "password": {{password}},
+    "kdfIterations": {{kdfIterations}}
+}

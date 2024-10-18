@@ -1492,6 +1492,10 @@ func (b *GethStatusBackend) prepareNodeAccount(request *requests.CreateAccount, 
 		return nil, errors.Wrap(err, "failed to prepare settings")
 	}
 
+	if response.account.Name == "" {
+		response.account.Name = response.settings.Name
+	}
+
 	response.nodeConfig, err = b.prepareConfig(request, input, response.settings.InstallationID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to prepare node config")
