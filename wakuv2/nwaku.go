@@ -2310,6 +2310,7 @@ type WakuConfig struct {
 	Shards			     []uint16 `json:"shards,omitempty"`	
 	PeerExchange		 bool `json:"peerExchange,omitempty"`
 	PeerExchangeNode	 string `json:"peerExchangeNode,omitempty"`
+	TcpPort			     uint16 `json:"tcpPort,omitempty"`
 }
 
 type Waku struct {
