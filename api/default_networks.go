@@ -11,13 +11,10 @@ import (
 
 const (
 	mainnetChainID         uint64 = 1
-	goerliChainID          uint64 = 5
 	sepoliaChainID         uint64 = 11155111
 	optimismChainID        uint64 = 10
-	optimismGoerliChainID  uint64 = 420
 	optimismSepoliaChainID uint64 = 11155420
 	arbitrumChainID        uint64 = 42161
-	arbitrumGoerliChainID  uint64 = 421613
 	arbitrumSepoliaChainID uint64 = 421614
 	sntSymbol                     = "SNT"
 	sttSymbol                     = "STT"
@@ -32,8 +29,8 @@ func mainnet(stageName string) params.Network {
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/ethereum/mainnet/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/ethereum/mainnet/", stageName),
 		DefaultFallbackURL2:    fmt.Sprintf("https://%s.api.status.im/grove/ethereum/mainnet/", stageName),
-		RPCURL:                 "https://eth-archival.rpc.grove.city/v1/",
-		FallbackURL:            "https://mainnet.infura.io/v3/",
+		RPCURL:                 "https://mainnet.infura.io/v3/",
+		FallbackURL:            "https://eth-archival.rpc.grove.city/v1/",
 		BlockExplorerURL:       "https://etherscan.io/",
 		IconURL:                "network/Network=Ethereum",
 		ChainColor:             "#627EEA",
@@ -44,30 +41,10 @@ func mainnet(stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  1,
 		Enabled:                true,
-		RelatedChainID:         goerliChainID,
+		RelatedChainID:         sepoliaChainID,
 	}
 }
 
-func goerli(stageName string) params.Network {
-	return params.Network{
-		ChainID:                goerliChainID,
-		ChainName:              "Mainnet",
-		RPCURL:                 "https://goerli.infura.io/v3/",
-		FallbackURL:            "",
-		BlockExplorerURL:       "https://goerli.etherscan.io/",
-		IconURL:                "network/Network=Ethereum",
-		ChainColor:             "#627EEA",
-		ShortName:              "goEth",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 true,
-		Layer:                  1,
-		Enabled:                true,
-		RelatedChainID:         mainnetChainID,
-	}
-
-}
 func sepolia(stageName string) params.Network {
 	return params.Network{
 		ChainID:                sepoliaChainID,
@@ -75,8 +52,8 @@ func sepolia(stageName string) params.Network {
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/ethereum/sepolia/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/ethereum/sepolia/", stageName),
 		DefaultFallbackURL2:    fmt.Sprintf("https://%s.api.status.im/grove/ethereum/sepolia/", stageName),
-		RPCURL:                 "https://sepolia-archival.rpc.grove.city/v1/",
-		FallbackURL:            "https://sepolia.infura.io/v3/",
+		RPCURL:                 "https://sepolia.infura.io/v3/",
+		FallbackURL:            "https://sepolia-archival.rpc.grove.city/v1/",
 		BlockExplorerURL:       "https://sepolia.etherscan.io/",
 		IconURL:                "network/Network=Ethereum",
 		ChainColor:             "#627EEA",
@@ -98,8 +75,8 @@ func optimism(stageName string) params.Network {
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/optimism/mainnet/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/optimism/mainnet/", stageName),
 		DefaultFallbackURL2:    fmt.Sprintf("https://%s.api.status.im/grove/optimism/mainnet/", stageName),
-		RPCURL:                 "https://optimism-archival.rpc.grove.city/v1/",
-		FallbackURL:            "https://optimism-mainnet.infura.io/v3/",
+		RPCURL:                 "https://optimism-mainnet.infura.io/v3/",
+		FallbackURL:            "https://optimism-archival.rpc.grove.city/v1/",
 		BlockExplorerURL:       "https://optimistic.etherscan.io",
 		IconURL:                "network/Network=Optimism",
 		ChainColor:             "#E90101",
@@ -110,27 +87,7 @@ func optimism(stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  2,
 		Enabled:                true,
-		RelatedChainID:         optimismGoerliChainID,
-	}
-}
-
-func optimismGoerli(stageName string) params.Network {
-	return params.Network{
-		ChainID:                optimismGoerliChainID,
-		ChainName:              "Optimism",
-		RPCURL:                 "https://optimism-goerli.infura.io/v3/",
-		FallbackURL:            "",
-		BlockExplorerURL:       "https://goerli-optimism.etherscan.io/",
-		IconURL:                "network/Network=Optimism",
-		ChainColor:             "#E90101",
-		ShortName:              "goOpt",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 true,
-		Layer:                  2,
-		Enabled:                false,
-		RelatedChainID:         optimismChainID,
+		RelatedChainID:         optimismSepoliaChainID,
 	}
 }
 
@@ -141,8 +98,8 @@ func optimismSepolia(stageName string) params.Network {
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/optimism/sepolia/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/optimism/sepolia/", stageName),
 		DefaultFallbackURL2:    fmt.Sprintf("https://%s.api.status.im/grove/optimism/sepolia/", stageName),
-		RPCURL:                 "https://optimism-sepolia-archival.rpc.grove.city/v1/",
-		FallbackURL:            "https://optimism-sepolia.infura.io/v3/",
+		RPCURL:                 "https://optimism-sepolia.infura.io/v3/",
+		FallbackURL:            "https://optimism-sepolia-archival.rpc.grove.city/v1/",
 		BlockExplorerURL:       "https://sepolia-optimism.etherscan.io/",
 		IconURL:                "network/Network=Optimism",
 		ChainColor:             "#E90101",
@@ -164,8 +121,8 @@ func arbitrum(stageName string) params.Network {
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/arbitrum/mainnet/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/arbitrum/mainnet/", stageName),
 		DefaultFallbackURL2:    fmt.Sprintf("https://%s.api.status.im/grove/arbitrum/mainnet/", stageName),
-		RPCURL:                 "https://arbitrum-one.rpc.grove.city/v1/",
-		FallbackURL:            "https://arbitrum-mainnet.infura.io/v3/",
+		RPCURL:                 "https://arbitrum-mainnet.infura.io/v3/",
+		FallbackURL:            "https://arbitrum-one.rpc.grove.city/v1/",
 		BlockExplorerURL:       "https://arbiscan.io/",
 		IconURL:                "network/Network=Arbitrum",
 		ChainColor:             "#51D0F0",
@@ -176,27 +133,7 @@ func arbitrum(stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  2,
 		Enabled:                true,
-		RelatedChainID:         arbitrumGoerliChainID,
-	}
-}
-
-func arbitrumGoerli(stageName string) params.Network {
-	return params.Network{
-		ChainID:                arbitrumGoerliChainID,
-		ChainName:              "Arbitrum",
-		RPCURL:                 "https://arbitrum-goerli.infura.io/v3/",
-		FallbackURL:            "",
-		BlockExplorerURL:       "https://goerli.arbiscan.io/",
-		IconURL:                "network/Network=Arbitrum",
-		ChainColor:             "#51D0F0",
-		ShortName:              "goArb",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 true,
-		Layer:                  2,
-		Enabled:                false,
-		RelatedChainID:         arbitrumChainID,
+		RelatedChainID:         arbitrumSepoliaChainID,
 	}
 }
 
@@ -207,8 +144,8 @@ func arbitrumSepolia(stageName string) params.Network {
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/arbitrum/sepolia/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/arbitrum/sepolia/", stageName),
 		DefaultFallbackURL2:    fmt.Sprintf("https://%s.api.status.im/grove/arbitrum/sepolia/", stageName),
-		RPCURL:                 "https://arbitrum-sepolia-archival.rpc.grove.city/v1/",
-		FallbackURL:            "https://arbitrum-sepolia.infura.io/v3/",
+		RPCURL:                 "https://arbitrum-sepolia.infura.io/v3/",
+		FallbackURL:            "https://arbitrum-sepolia-archival.rpc.grove.city/v1/",
 		BlockExplorerURL:       "https://sepolia-explorer.arbitrum.io/",
 		IconURL:                "network/Network=Arbitrum",
 		ChainColor:             "#51D0F0",
@@ -226,13 +163,10 @@ func arbitrumSepolia(stageName string) params.Network {
 func defaultNetworks(stageName string) []params.Network {
 	return []params.Network{
 		mainnet(stageName),
-		goerli(stageName),
 		sepolia(stageName),
 		optimism(stageName),
-		optimismGoerli(stageName),
 		optimismSepolia(stageName),
 		arbitrum(stageName),
-		arbitrumGoerli(stageName),
 		arbitrumSepolia(stageName),
 	}
 }
@@ -242,35 +176,30 @@ var mainnetGanacheTokenOverrides = params.TokenOverride{
 	Address: ganacheTokenAddress,
 }
 
-var goerliGanacheTokenOverrides = params.TokenOverride{
-	Symbol:  sttSymbol,
-	Address: ganacheTokenAddress,
-}
-
 func setRPCs(networks []params.Network, request *requests.WalletSecretsConfig) []params.Network {
 
 	var networksWithRPC []params.Network
 
+	const (
+		infura = "infura.io/"
+		grove  = "grove.city/"
+	)
+
+	appendToken := func(url string) string {
+		if strings.Contains(url, infura) && request.InfuraToken != "" {
+			return url + request.InfuraToken
+		} else if strings.Contains(url, grove) && request.PoktToken != "" {
+			return url + request.PoktToken
+		}
+		return url
+	}
+
 	for _, n := range networks {
-
-		if request.InfuraToken != "" {
-			if strings.Contains(n.RPCURL, "infura") {
-				n.RPCURL += request.InfuraToken
-			}
-			if strings.Contains(n.FallbackURL, "infura") {
-				n.FallbackURL += request.InfuraToken
-			}
-		}
-
-		if request.PoktToken != "" {
-			if strings.Contains(n.RPCURL, "grove") {
-				n.RPCURL += request.PoktToken
-			}
-			if strings.Contains(n.FallbackURL, "grove") {
-				n.FallbackURL += request.PoktToken
-			}
-
-		}
+		n.DefaultRPCURL = appendToken(n.DefaultRPCURL)
+		n.DefaultFallbackURL = appendToken(n.DefaultFallbackURL)
+		n.DefaultFallbackURL2 = appendToken(n.DefaultFallbackURL2)
+		n.RPCURL = appendToken(n.RPCURL)
+		n.FallbackURL = appendToken(n.FallbackURL)
 
 		if request.GanacheURL != "" {
 			n.RPCURL = request.GanacheURL
@@ -278,10 +207,6 @@ func setRPCs(networks []params.Network, request *requests.WalletSecretsConfig) [
 			if n.ChainID == mainnetChainID {
 				n.TokenOverrides = []params.TokenOverride{
 					mainnetGanacheTokenOverrides,
-				}
-			} else if n.ChainID == goerliChainID {
-				n.TokenOverrides = []params.TokenOverride{
-					goerliGanacheTokenOverrides,
 				}
 			}
 		}

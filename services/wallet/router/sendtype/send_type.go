@@ -155,7 +155,6 @@ func (s SendType) IsAvailableFor(network *params.Network) bool {
 	// Set of network ChainIDs allowed for any type of transaction
 	allAllowedNetworks := map[uint64]bool{
 		walletCommon.EthereumMainnet: true,
-		walletCommon.EthereumGoerli:  true,
 		walletCommon.EthereumSepolia: true,
 	}
 
