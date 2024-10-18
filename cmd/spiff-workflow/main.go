@@ -455,7 +455,7 @@ func exitOnInterruptSignal(statusNode *node.StatusNode) <-chan struct{} {
 	return interruptCh
 }
 
-// startCollectingStats collects various stats about the node and other protocols like Whisper.
+// startNodeMetrics collects various stats about the node and other protocols like Whisper.
 func startNodeMetrics(interruptCh <-chan struct{}, statusNode *node.StatusNode) {
 	logger.Info("Starting collecting node metrics")
 
