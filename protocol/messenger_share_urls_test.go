@@ -497,3 +497,57 @@ func (s *MessengerShareUrlsSuite) TestShareAndParseUserURLWithData() {
 	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
 	s.Require().Equal(shortKey, urlData.Contact.PublicKey)
 }
+
+func (s *MessengerShareUrlsSuite) TestShareTransactionURL() {
+	request := &requests.TransactionShareURL{
+		TxType:  0,
+		Address: "0x1234567890abcdef",
+		Amount:  "0.123",
+		Asset:   "ETH",
+		ChainID: 123,
+		ToAsset: "SNT",
+	}
+	url, err := s.m.ShareTransactionURL(request)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(url)
+
+	data, err := s.m.prepareTransactionUrl(request)
+	s.Require().NoError(err)
+
+	expectedURL := fmt.Sprintf("%s/tx/%s", baseShareURL, data)
+	s.Require().Equal(expectedURL, url)
+}
+
+func (s *MessengerShareUrlsSuite) TestShareTransactionURLInvalid() {
+	request := &requests.TransactionShareURL{
+		TxType: -1,
+	}
+	_, err := s.m.ShareTransactionURL(request)
+	s.Require().Error(err)
+	_, err = s.m.prepareTransactionUrl(request)
+	s.Require().Error(err)
+}
+
+func (s *MessengerShareUrlsSuite) TestShareAndParseTransactionURL() {
+	request := &requests.TransactionShareURL{
+		TxType:  0,
+		Address: "0x1234567890abcdef",
+		Amount:  "0.123",
+		Asset:   "ETH",
+		ChainID: 123,
+		ToAsset: "SNT",
+	}
+	url, err := s.m.ShareTransactionURL(request)
+	s.Require().NoError(err)
+
+	urlData, err := ParseSharedURL(url)
+	s.Require().NoError(err)
+	s.Require().NotNil(urlData)
+
+	s.Require().Equal(request.TxType, urlData.Transaction.TxType)
+	s.Require().Equal(request.Address, urlData.Transaction.Address)
+	s.Require().Equal(request.Amount, urlData.Transaction.Amount)
+	s.Require().Equal(request.Asset, urlData.Transaction.Asset)
+	s.Require().Equal(request.ChainID, urlData.Transaction.ChainID)
+	s.Require().Equal(request.ToAsset, urlData.Transaction.ToAsset)
+}
