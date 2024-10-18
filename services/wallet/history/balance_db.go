@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -57,7 +59,7 @@ func (e *entry) String() string {
 }
 
 func (b *BalanceDB) add(entry *entry) error {
-	log.Debug("Adding entry to balance_history", "entry", entry)
+	logutils.ZapLogger().Debug("Adding entry to balance_history", zap.Stringer("entry", entry))
 
 	_, err := b.db.Exec("INSERT OR IGNORE INTO balance_history (chain_id, address, currency, block, timestamp, balance) VALUES (?, ?, ?, ?, ?, ?)", entry.chainID, entry.address, entry.tokenSymbol, (*bigint.SQLBigInt)(entry.block), entry.timestamp, (*bigint.SQLBigIntBytes)(entry.balance))
 	return err

@@ -6,16 +6,18 @@ import (
 	"math/big"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/router/fees"
@@ -159,7 +161,7 @@ func (s *Service) deployOwnerTokenGasUnits(ctx context.Context, chainID uint64, 
 	communityID string, signerPubKey string) (uint64, error) {
 	ethClient, err := s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
-		log.Error(err.Error())
+		logutils.ZapLogger().Error(err.Error())
 		return 0, err
 	}
 
@@ -217,14 +219,14 @@ func (s *Service) deployOwnerTokenGasUnits(ctx context.Context, chainID uint64, 
 	}
 
 	finalEstimation := estimate + uint64(float32(estimate)*0.1)
-	log.Debug("Owner token deployment gas estimation: ", finalEstimation)
+	logutils.ZapLogger().Debug("Owner token deployment estimation", zap.Uint64("gas", finalEstimation))
 	return finalEstimation, nil
 }
 
 func (s *Service) deployCollectiblesGasUnits(ctx context.Context, chainID uint64, fromAddress string) (uint64, error) {
 	ethClient, err := s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
-		log.Error(err.Error())
+		logutils.ZapLogger().Error(err.Error())
 		return 0, err
 	}
 
@@ -252,14 +254,14 @@ func (s *Service) deployCollectiblesGasUnits(ctx context.Context, chainID uint64
 	}
 
 	finalEstimation := estimate + uint64(float32(estimate)*0.1)
-	log.Debug("Collectibles deployment gas estimation: ", finalEstimation)
+	logutils.ZapLogger().Debug("Collectibles deployment estimation", zap.Uint64("gas", finalEstimation))
 	return finalEstimation, nil
 }
 
 func (s *Service) deployAssetsGasUnits(ctx context.Context, chainID uint64, fromAddress string) (uint64, error) {
 	ethClient, err := s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
-		log.Error(err.Error())
+		logutils.ZapLogger().Error(err.Error())
 		return 0, err
 	}
 
@@ -287,7 +289,7 @@ func (s *Service) deployAssetsGasUnits(ctx context.Context, chainID uint64, from
 	}
 
 	finalEstimation := estimate + uint64(float32(estimate)*0.1)
-	log.Debug("Assets deployment gas estimation: ", finalEstimation)
+	logutils.ZapLogger().Debug("Assets deployment estimation: ", zap.Uint64("gas", finalEstimation))
 	return finalEstimation, nil
 }
 
@@ -404,7 +406,7 @@ func (s *Service) estimateL1Fee(ctx context.Context, chainID uint64, sendArgs tr
 func (s *Service) estimateMethodForTokenInstance(ctx context.Context, contractInstance TokenInstance, chainID uint64, contractAddress string, fromAddress string, methodName string, args ...interface{}) (uint64, error) {
 	ethClient, err := s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
-		log.Error(err.Error())
+		logutils.ZapLogger().Error(err.Error())
 		return 0, err
 	}
 

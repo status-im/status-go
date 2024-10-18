@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/log"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 const (
@@ -132,7 +133,7 @@ func NewRequestLimiter(storage LimitsStorage) *RPCRequestLimiter {
 func (rl *RPCRequestLimiter) SetLimit(tag string, maxRequests int, interval time.Duration) error {
 	err := rl.saveToStorage(tag, maxRequests, interval, 0, time.Now())
 	if err != nil {
-		log.Error("Failed to save request data to storage", "error", err)
+		logutils.ZapLogger().Error("Failed to save request data to storage", zap.Error(err))
 		return err
 	}
 
@@ -151,7 +152,7 @@ func (rl *RPCRequestLimiter) GetLimit(tag string) (*LimitData, error) {
 func (rl *RPCRequestLimiter) DeleteLimit(tag string) error {
 	err := rl.storage.Delete(tag)
 	if err != nil {
-		log.Error("Failed to delete request data from storage", "error", err)
+		logutils.ZapLogger().Error("Failed to delete request data from storage", zap.Error(err))
 		return err
 	}
 
@@ -169,7 +170,7 @@ func (rl *RPCRequestLimiter) saveToStorage(tag string, maxRequests int, interval
 
 	err := rl.storage.Set(data)
 	if err != nil {
-		log.Error("Failed to save request data to storage", "error", err)
+		logutils.ZapLogger().Error("Failed to save request data to storage", zap.Error(err))
 		return err
 	}
 
@@ -202,12 +203,12 @@ func (rl *RPCRequestLimiter) Allow(tag string) (bool, error) {
 	// Check if a number of requests is over the limit within the interval
 	if time.Since(data.CreatedAt) < data.Period || data.Period.Milliseconds() == LimitInfinitely {
 		if data.NumReqs >= data.MaxReqs {
-			log.Info("Number of requests over limit",
-				"tag", tag,
-				"numReqs", data.NumReqs,
-				"maxReqs", data.MaxReqs,
-				"period", data.Period,
-				"createdAt", data.CreatedAt.UTC())
+			logutils.ZapLogger().Info("Number of requests over limit",
+				zap.String("tag", tag),
+				zap.Int("numReqs", data.NumReqs),
+				zap.Int("maxReqs", data.MaxReqs),
+				zap.Duration("period", data.Period),
+				zap.Time("createdAt", data.CreatedAt.UTC()))
 			return false, ErrRequestsOverLimit
 		}
 

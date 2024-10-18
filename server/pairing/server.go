@@ -9,8 +9,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
-
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/timesource"
@@ -80,7 +78,7 @@ func MakeServerConfig(config *ServerConfig) error {
 	}
 
 	now := timesource.GetCurrentTime()
-	log.Debug("pairing server generate cert", "system time", time.Now().String(), "timesource time", now.String())
+	logutils.ZapLogger().Debug("pairing server generate cert", zap.Stringer("system time", time.Now()), zap.Stringer("timesource time", now))
 	tlsCert, _, err := GenerateCertFromKey(tlsKey, now, ips, []string{})
 	if err != nil {
 		return err

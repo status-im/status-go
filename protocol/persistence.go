@@ -10,14 +10,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
 
 	"github.com/mat/besticon/besticon"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
 	userimage "github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/logutils"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 
@@ -1323,7 +1323,7 @@ func (db *sqlitePersistence) AddBookmark(bookmark browsers.Bookmark) (browsers.B
 			bookmark.ImageURL = icons[0].URL
 		}
 	} else {
-		log.Error("error getting the bookmark icon", "iconError", iconError)
+		logutils.ZapLogger().Error("error getting the bookmark icon", zap.Error(iconError))
 	}
 
 	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock)

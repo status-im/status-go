@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 )
 
 const InMemoryPath = ":memory:"
@@ -22,8 +22,7 @@ type DatabaseInitializer interface {
 // GetDBFilename takes an instance of sql.DB and returns the filename of the "main" database
 func GetDBFilename(db *sql.DB) (string, error) {
 	if db == nil {
-		logger := log.New()
-		logger.Warn("GetDBFilename was passed a nil pointer sql.DB")
+		logutils.ZapLogger().Warn("GetDBFilename was passed a nil pointer sql.DB")
 		return "", nil
 	}
 

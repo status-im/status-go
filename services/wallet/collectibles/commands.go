@@ -8,9 +8,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -252,7 +254,10 @@ func (c *loadOwnedCollectiblesCommand) sendOwnedCollectiblesChanges(removed, upd
 }
 
 func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
-	log.Debug("start loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account)
+	logutils.ZapLogger().Debug("start loadOwnedCollectiblesCommand",
+		zap.Uint64("chain", uint64(c.chainID)),
+		zap.Stringer("account", c.account),
+	)
 
 	pageNr := 0
 	cursor := thirdparty.FetchFromStartCursor
@@ -276,17 +281,32 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 			}
 
 			pageStart := time.Now()
-			log.Debug("start loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr)
+			logutils.ZapLogger().Debug("start loadOwnedCollectiblesCommand",
+				zap.Uint64("chain", uint64(c.chainID)),
+				zap.Stringer("account", c.account),
+				zap.Int("page", pageNr),
+			)
 
 			partialOwnership, err := c.manager.FetchCollectibleOwnershipByOwner(parent, c.chainID, c.account, cursor, fetchLimit, providerID)
 
 			if err != nil {
-				log.Error("failed loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "error", err)
+				logutils.ZapLogger().Error("failed loadOwnedCollectiblesCommand",
+					zap.Uint64("chain", uint64(c.chainID)),
+					zap.Stringer("account", c.account),
+					zap.Int("page", pageNr),
+					zap.Error(err),
+				)
 				c.err = err
 				break
 			}
 
-			log.Debug("partial loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "in", time.Since(pageStart), "found", len(partialOwnership.Items))
+			logutils.ZapLogger().Debug("partial loadOwnedCollectiblesCommand",
+				zap.Uint64("chain", uint64(c.chainID)),
+				zap.Stringer("account", c.account),
+				zap.Int("page", pageNr),
+				zap.Duration("duration", time.Since(pageStart)),
+				zap.Int("found", len(partialOwnership.Items)),
+			)
 
 			c.partialOwnership = append(c.partialOwnership, partialOwnership.Items...)
 
@@ -303,7 +323,11 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 
 				updateMessage.Removed, updateMessage.Updated, updateMessage.Added, err = c.ownershipDB.Update(c.chainID, c.account, balances, start.Unix())
 				if err != nil {
-					log.Error("failed updating ownershipDB in loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "error", err)
+					logutils.ZapLogger().Error("failed updating ownershipDB in loadOwnedCollectiblesCommand",
+						zap.Uint64("chain", uint64(c.chainID)),
+						zap.Stringer("account", c.account),
+						zap.Error(err),
+					)
 					c.err = err
 					break
 				}
@@ -337,6 +361,10 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 		c.triggerEvent(EventCollectiblesOwnershipUpdateFinished, c.chainID, c.account, string(encodedMessage))
 	}
 
-	log.Debug("end loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "in", time.Since(start))
+	logutils.ZapLogger().Debug("end loadOwnedCollectiblesCommand",
+		zap.Uint64("chain", uint64(c.chainID)),
+		zap.Stringer("account", c.account),
+		zap.Duration("in", time.Since(start)),
+	)
 	return nil
 }

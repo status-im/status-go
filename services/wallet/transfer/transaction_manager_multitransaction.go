@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -123,7 +124,7 @@ func (tm *TransactionManager) ProceedWithTransactionsSignatures(ctx context.Cont
 
 	_, err := tm.InsertMultiTransaction(tm.multiTransactionForKeycardSigning)
 	if err != nil {
-		log.Error("failed to insert multi transaction", "err", err)
+		logutils.ZapLogger().Error("failed to insert multi transaction", zap.Error(err))
 	}
 
 	return &MultiTransactionCommandResult{
@@ -184,7 +185,7 @@ func (tm *TransactionManager) WatchTransaction(ctx context.Context, chainID uint
 
 	status, err := tm.pendingTracker.Watch(ctx, wallet_common.ChainID(chainID), transactionHash)
 	if err == nil && *status != transactions.Pending {
-		log.Error("transaction is not pending", "status", status)
+		logutils.ZapLogger().Error("transaction is not pending", zap.String("status", *status))
 		return nil
 	}
 

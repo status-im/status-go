@@ -18,19 +18,20 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wealdtech/go-ens/v3"
 	"github.com/wealdtech/go-multicodec"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/contracts/resolver"
 	"github.com/status-im/status-go/contracts/snt"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/utils"
@@ -247,7 +248,7 @@ func (api *API) AddressOf(ctx context.Context, chainID uint64, username string) 
 }
 
 func (api *API) usernameRegistrarAddr(ctx context.Context, chainID uint64) (common.Address, error) {
-	log.Info("obtaining username registrar address")
+	logutils.ZapLogger().Info("obtaining username registrar address")
 	api.addrPerChainMutex.Lock()
 	defer api.addrPerChainMutex.Unlock()
 	addr, ok := api.addrPerChain[chainID]
@@ -279,12 +280,12 @@ func (api *API) usernameRegistrarAddr(ctx context.Context, chainID uint64) (comm
 		for {
 			select {
 			case <-api.quit:
-				log.Info("quitting ens contract subscription")
+				logutils.ZapLogger().Info("quitting ens contract subscription")
 				sub.Unsubscribe()
 				return
 			case err := <-sub.Err():
 				if err != nil {
-					log.Error("ens contract subscription error: " + err.Error())
+					logutils.ZapLogger().Error("ens contract subscription error: " + err.Error())
 				}
 				return
 			case vLog := <-logs:
@@ -365,14 +366,14 @@ func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions
 		"",
 	)
 	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
+		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
 		return "", err
 	}
 
 	err = api.Remove(ctx, chainID, fullDomainName(username))
 
 	if err != nil {
-		log.Warn("Releasing ENS username: transaction successful, but removing failed")
+		logutils.ZapLogger().Warn("Releasing ENS username: transaction successful, but removing failed")
 	}
 
 	return tx.Hash().String(), nil
@@ -494,13 +495,13 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 		"",
 	)
 	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
+		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
 		return "", err
 	}
 
 	err = api.Add(ctx, chainID, fullDomainName(username))
 	if err != nil {
-		log.Warn("Registering ENS username: transaction successful, but adding failed")
+		logutils.ZapLogger().Warn("Registering ENS username: transaction successful, but adding failed")
 	}
 
 	return tx.Hash().String(), nil
@@ -612,14 +613,14 @@ func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactio
 		"",
 	)
 	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
+		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
 		return "", err
 	}
 
 	err = api.Add(ctx, chainID, fullDomainName(username))
 
 	if err != nil {
-		log.Warn("Registering ENS username: transaction successful, but adding failed")
+		logutils.ZapLogger().Warn("Registering ENS username: transaction successful, but adding failed")
 	}
 
 	return tx.Hash().String(), nil

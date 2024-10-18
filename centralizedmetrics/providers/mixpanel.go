@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/centralizedmetrics/common"
 )
@@ -23,6 +23,8 @@ type MixpanelMetricProcessor struct {
 	appID   string
 	secret  string
 	baseURL string
+
+	logger *zap.Logger
 }
 
 // NewMixpanelMetricProcessor is a constructor for MixpanelMetricProcessor
@@ -71,7 +73,7 @@ func (amp *MixpanelMetricProcessor) sendToMixpanel(metrics []common.Metric) erro
 		return err
 	}
 
-	log.Info("sending metrics to", "url", url, "metric", mixPanelMetrics, "secret", amp.GetToken())
+	amp.logger.Info("sending metrics to", zap.String("url", url), zap.Any("metric", mixPanelMetrics), zap.String("secret", amp.GetToken()))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	if err != nil {
@@ -90,8 +92,7 @@ func (amp *MixpanelMetricProcessor) sendToMixpanel(metrics []common.Metric) erro
 
 	if resp.StatusCode != http.StatusOK {
 		body, err := io.ReadAll(resp.Body)
-		fmt.Println(resp.StatusCode, string(body), err)
-		log.Warn("failed to send metric", "status-code", resp.StatusCode, "body", resp.Body)
+		amp.logger.Warn("failed to send metric", zap.Int("status-code", resp.StatusCode), zap.String("body", string(body)), zap.Error(err))
 		return errors.New("failed to send metric to Mixpanel")
 	}
 

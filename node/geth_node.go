@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 
 	"github.com/syndtr/goleveldb/leveldb"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 )
 
@@ -33,7 +34,7 @@ var (
 )
 
 // All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/node")
+var logger = logutils.ZapLogger().Named("node")
 
 // MakeNode creates a geth node entity
 func MakeNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) (*node.Node, error) {
@@ -146,7 +147,7 @@ func parseNodes(enodes []string) []*enode.Node {
 		if err == nil {
 			nodes = append(nodes, parsedPeer)
 		} else {
-			logger.Error("Failed to parse enode", "enode", item, "err", err)
+			logger.Error("Failed to parse enode", zap.String("enode", item), zap.Error(err))
 		}
 
 	}
@@ -162,7 +163,7 @@ func parseNodesV5(enodes []string) []*discv5.Node {
 		if err == nil {
 			nodes = append(nodes, parsedPeer)
 		} else {
-			logger.Error("Failed to parse enode", "enode", enode, "err", err)
+			logger.Error("Failed to parse enode", zap.String("enode", enode), zap.Error(err))
 		}
 	}
 	return nodes

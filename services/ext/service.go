@@ -20,7 +20,6 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -35,6 +34,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -294,7 +294,7 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct{}) {
 	defer gocommon.LogOnPanic()
 	if s.config.ShhextConfig.VerifyTransactionURL == "" {
-		log.Warn("not starting transaction loop")
+		logutils.ZapLogger().Warn("not starting transaction loop")
 		return
 	}
 
@@ -308,7 +308,7 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 		case <-ticker.C:
 			accounts, err := s.accountsDB.GetActiveAccounts()
 			if err != nil {
-				log.Error("failed to retrieve accounts", "err", err)
+				logutils.ZapLogger().Error("failed to retrieve accounts", zap.Error(err))
 			}
 			var wallets []types.Address
 			for _, account := range accounts {
@@ -319,7 +319,7 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 
 			response, err := s.messenger.ValidateTransactions(ctx, wallets)
 			if err != nil {
-				log.Error("failed to validate transactions", "err", err)
+				logutils.ZapLogger().Error("failed to validate transactions", zap.Error(err))
 				continue
 			}
 			s.messenger.PublishMessengerResponse(response)
@@ -363,7 +363,7 @@ func (s *Service) Start() error {
 
 // Stop is run when a service is stopped.
 func (s *Service) Stop() error {
-	log.Info("Stopping shhext service")
+	logutils.ZapLogger().Info("Stopping shhext service")
 	if s.cancelMessenger != nil {
 		select {
 		case <-s.cancelMessenger:
@@ -376,7 +376,7 @@ func (s *Service) Stop() error {
 
 	if s.messenger != nil {
 		if err := s.messenger.Shutdown(); err != nil {
-			log.Error("failed to stop messenger", "err", err)
+			logutils.ZapLogger().Error("failed to stop messenger", zap.Error(err))
 			return err
 		}
 		s.messenger = nil

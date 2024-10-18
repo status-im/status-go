@@ -5,7 +5,9 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 // SetupIterativeDownloader configures IterativeDownloader with last known synced block.
@@ -16,7 +18,12 @@ func SetupIterativeDownloader(
 		return nil, errors.New("to or from cannot be nil")
 	}
 
-	log.Debug("iterative downloader", "from", from, "to", to, "size", size)
+	logutils.ZapLogger().Debug("iterative downloader",
+		zap.Stringer("from", from),
+		zap.Stringer("to", to),
+		zap.Stringer("size", size),
+	)
+
 	d := &IterativeDownloader{
 		client:     client,
 		batchSize:  size,
@@ -63,9 +70,17 @@ func (d *IterativeDownloader) Next(parent context.Context) ([]*DBHeader, *big.In
 		from = d.from
 	}
 	headers, err := d.downloader.GetHeadersInRange(parent, from, to)
-	log.Debug("load erc20 transfers in range", "from", from, "to", to, "batchSize", d.batchSize)
+	logutils.ZapLogger().Debug("load erc20 transfers in range",
+		zap.Stringer("from", from),
+		zap.Stringer("to", to),
+		zap.Stringer("batchSize", d.batchSize),
+	)
 	if err != nil {
-		log.Error("failed to get transfer in between two blocks", "from", from, "to", to, "error", err)
+		logutils.ZapLogger().Error("failed to get transfer in between two blocks",
+			zap.Stringer("from", from),
+			zap.Stringer("to", to),
+			zap.Error(err),
+		)
 		return nil, nil, nil, err
 	}
 

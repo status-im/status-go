@@ -3,12 +3,13 @@ package peers
 import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/db"
+	"github.com/status-im/status-go/logutils"
 )
 
 // NewCache returns instance of PeersDatabase
@@ -55,7 +56,7 @@ func (d *Cache) GetPeersRange(topic discv5.Topic, limit int) (nodes []*discv5.No
 		node := discv5.Node{}
 		value := iterator.Value()
 		if err := node.UnmarshalText(value); err != nil {
-			log.Error("can't unmarshal node", "value", value, "error", err)
+			logutils.ZapLogger().Error("can't unmarshal node", zap.Binary("value", value), zap.Error(err))
 			continue
 		}
 		nodes = append(nodes, &node)

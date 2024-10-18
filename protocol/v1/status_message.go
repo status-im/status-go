@@ -7,12 +7,13 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
@@ -166,7 +167,10 @@ func (m *StatusMessage) HandleApplicationLayer() error {
 	m.ApplicationLayer.SigPubKey = recoveredKey
 	// Calculate ID using the wrapped record
 	m.ApplicationLayer.ID = MessageID(recoveredKey, m.EncryptionLayer.Payload)
-	log.Debug("calculated ID for envelope", "envelopeHash", hexutil.Encode(m.TransportLayer.Hash), "messageId", hexutil.Encode(m.ApplicationLayer.ID))
+	logutils.ZapLogger().Debug("calculated ID for envelope",
+		zap.String("envelopeHash", hexutil.Encode(m.TransportLayer.Hash)),
+		zap.String("messageId", hexutil.Encode(m.ApplicationLayer.ID)),
+	)
 
 	m.ApplicationLayer.Payload = message.Payload
 	m.ApplicationLayer.Type = message.Type

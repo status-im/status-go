@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/account"
@@ -22,6 +22,7 @@ import (
 	communityownertokenregistry "github.com/status-im/status-go/contracts/community-tokens/registry"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/communities"
@@ -98,7 +99,7 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 		var p transactions.StatusChangedPayload
 		err := json.Unmarshal([]byte(event.Message), &p)
 		if err != nil {
-			log.Error(errors.Wrap(err, fmt.Sprintf("can't parse transaction message %v\n", event.Message)).Error())
+			logutils.ZapLogger().Error(errors.Wrap(err, fmt.Sprintf("can't parse transaction message %v\n", event.Message)).Error())
 			return
 		}
 		if p.Status == transactions.Pending {
@@ -106,7 +107,7 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 		}
 		pendingTransaction, err := s.pendingTracker.GetPendingEntry(p.ChainID, p.Hash)
 		if err != nil {
-			log.Error(errors.Wrap(err, fmt.Sprintf("no pending transaction with hash %v on chain %v\n", p.Hash, p.ChainID)).Error())
+			logutils.ZapLogger().Error(errors.Wrap(err, fmt.Sprintf("no pending transaction with hash %v on chain %v\n", p.Hash, p.ChainID)).Error())
 			return
 		}
 
@@ -131,7 +132,7 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 
 		err = s.pendingTracker.Delete(context.Background(), p.ChainID, p.Hash)
 		if err != nil {
-			log.Error(errors.Wrap(err, fmt.Sprintf("can't delete pending transaction with hash %v on chain %v\n", p.Hash, p.ChainID)).Error())
+			logutils.ZapLogger().Error(errors.Wrap(err, fmt.Sprintf("can't delete pending transaction with hash %v on chain %v\n", p.Hash, p.ChainID)).Error())
 		}
 
 		errorStr := ""
@@ -152,7 +153,7 @@ func (s *Service) handleAirdropCommunityToken(status string, pendingTransaction 
 		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
 			communityToken.Address, protobuf.CommunityTokenAction_AIRDROP)
 		if publishErr != nil {
-			log.Warn("can't publish airdrop action")
+			logutils.ZapLogger().Warn("can't publish airdrop action")
 		}
 	}
 	return communityToken, err
@@ -166,7 +167,7 @@ func (s *Service) handleRemoteDestructCollectible(status string, pendingTransact
 		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
 			communityToken.Address, protobuf.CommunityTokenAction_REMOTE_DESTRUCT)
 		if publishErr != nil {
-			log.Warn("can't publish remote destruct action")
+			logutils.ZapLogger().Warn("can't publish remote destruct action")
 		}
 	}
 	return communityToken, err
@@ -193,7 +194,7 @@ func (s *Service) handleBurnCommunityToken(status string, pendingTransaction *tr
 		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
 			communityToken.Address, protobuf.CommunityTokenAction_BURN)
 		if publishErr != nil {
-			log.Warn("can't publish burn action")
+			logutils.ZapLogger().Warn("can't publish burn action")
 		}
 	}
 	return communityToken, err
@@ -528,7 +529,7 @@ func (s *Service) SetSignerPubKey(ctx context.Context, chainID uint64, contractA
 		"",
 	)
 	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
+		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
 		return "", err
 	}
 
@@ -723,9 +724,9 @@ func (s *Service) ReTrackOwnerTokenDeploymentTransaction(ctx context.Context, ch
 			transactions.Keep,
 			"",
 		)
-		log.Debug("retracking pending transaction with hashId ", hashString)
+		logutils.ZapLogger().Debug("retracking pending transaction", zap.String("hashId", hashString))
 	} else {
-		log.Debug("pending transaction with hashId is already tracked ", hashString)
+		logutils.ZapLogger().Debug("pending transaction already tracked", zap.String("hashId", hashString))
 	}
 	return err
 }

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
 	validator "gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/static"
 	wakucommon "github.com/status-im/status-go/waku/common"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
@@ -807,7 +809,7 @@ func (c *NodeConfig) setDefaultPushNotificationsServers() error {
 
 	// If empty load defaults from the fleet
 	if len(c.ClusterConfig.PushNotificationsServers) == 0 {
-		log.Debug("empty push notification servers, setting", "fleet", c.ClusterConfig.Fleet)
+		logutils.ZapLogger().Debug("empty push notification servers, setting", zap.String("fleet", c.ClusterConfig.Fleet))
 		defaultConfig := &NodeConfig{}
 		err := loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", c.ClusterConfig.Fleet), defaultConfig)
 		if err != nil {
@@ -818,7 +820,7 @@ func (c *NodeConfig) setDefaultPushNotificationsServers() error {
 
 	// If empty set the default servers
 	if len(c.ShhextConfig.DefaultPushNotificationsServers) == 0 {
-		log.Debug("setting default push notification servers", "cluster servers", c.ClusterConfig.PushNotificationsServers)
+		logutils.ZapLogger().Debug("setting default push notification servers", zap.Strings("cluster servers", c.ClusterConfig.PushNotificationsServers))
 		for _, pk := range c.ClusterConfig.PushNotificationsServers {
 			keyBytes, err := hex.DecodeString("04" + pk)
 			if err != nil {

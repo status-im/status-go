@@ -6,10 +6,12 @@ import (
 	"strconv"
 	"time"
 
+	"go.uber.org/zap"
+
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -361,7 +363,7 @@ func (s *Service) detectNew(changeCount int) {
 		allAddresses := s.areAllAddresses(session.addresses)
 		activities, err := getActivityEntries(context.Background(), s.getDeps(), session.addresses, allAddresses, session.chainIDs, session.filter, 0, fetchLen)
 		if err != nil {
-			log.Error("Error getting activity entries", "error", err)
+			logutils.ZapLogger().Error("Error getting activity entries", zap.Error(err))
 			continue
 		}
 

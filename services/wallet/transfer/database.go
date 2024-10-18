@@ -9,10 +9,12 @@ import (
 	"math/big"
 	"reflect"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -316,7 +318,7 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, head
 			// Is that correct to set sender as account address?
 			_, err = insertTx.Exec(chainID, header.Address, header.Address, transaction.ID, (*bigint.SQLBigInt)(header.Number), header.Hash, transaction.Type, &JSONBlob{transaction.Log}, logIndex, tokenID, txValue)
 			if err != nil {
-				log.Error("error saving token transfer", "err", err)
+				logutils.ZapLogger().Error("error saving token transfer", zap.Error(err))
 				return err
 			}
 		}
@@ -491,7 +493,13 @@ func updateOrInsertTransfersDBFields(creator statementCreator, transfers []trans
 			t.receiptStatus, t.receiptType, t.txHash, t.logIndex, t.receiptBlockHash, t.cumulativeGasUsed, t.contractAddress, t.gasUsed, t.transactionIndex,
 			t.txType, t.txProtected, t.txGas, txGasPrice, txGasTipCap, txGasFeeCap, txValue, t.txNonce, t.txSize, t.tokenAddress, (*bigint.SQLBigIntBytes)(t.tokenID), t.txFrom, t.txTo)
 		if err != nil {
-			log.Error("can't save transfer", "b-hash", t.blockHash, "b-n", t.blockNumber, "a", t.address, "h", t.id)
+			logutils.ZapLogger().Error("can't save transfer",
+				zap.Stringer("b-hash", t.blockHash),
+				zap.Stringer("b-n", t.blockNumber),
+				zap.Stringer("a", t.address),
+				zap.Stringer("h", t.id),
+				zap.Error(err),
+			)
 			return err
 		}
 	}
@@ -499,7 +507,13 @@ func updateOrInsertTransfersDBFields(creator statementCreator, transfers []trans
 	for _, t := range transfers {
 		err = removeGasOnlyEthTransfer(creator, t)
 		if err != nil {
-			log.Error("can't remove gas only eth transfer", "b-hash", t.blockHash, "b-n", t.blockNumber, "a", t.address, "h", t.id, "err", err)
+			logutils.ZapLogger().Error("can't remove gas only eth transfer",
+				zap.Stringer("b-hash", t.blockHash),
+				zap.Stringer("b-n", t.blockNumber),
+				zap.Stringer("a", t.address),
+				zap.Stringer("h", t.id),
+				zap.Error(err),
+			)
 			// no return err, since it's not critical
 		}
 	}
@@ -522,7 +536,7 @@ func removeGasOnlyEthTransfer(creator statementCreator, t transferDBFields) erro
 
 		// If there's only one (or none), return without deleting
 		if count <= 1 {
-			log.Debug("Only one or no transfer found with the same tx_hash, skipping deletion.")
+			logutils.ZapLogger().Debug("Only one or no transfer found with the same tx_hash, skipping deletion.")
 			return nil
 		}
 	}
@@ -540,7 +554,7 @@ func removeGasOnlyEthTransfer(creator statementCreator, t transferDBFields) erro
 	if err != nil {
 		return err
 	}
-	log.Debug("removeGasOnlyEthTransfer rows deleted", "count", count)
+	logutils.ZapLogger().Debug("removeGasOnlyEthTransfer rows deleted", zap.Int64("count", count))
 	return nil
 }
 

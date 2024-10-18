@@ -5,11 +5,13 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/circuitbreaker"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -101,7 +103,7 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 	pm.setIsConnected(result.Error() == nil)
 
 	if result.Error() != nil {
-		log.Error("Error fetching prices", "error", result.Error())
+		logutils.ZapLogger().Error("Error fetching prices", zap.Error(result.Error()))
 		return nil, result.Error()
 	}
 
@@ -114,7 +116,7 @@ func (pm *Manager) FetchHistoricalDailyPrices(symbol string, currency string, li
 	})
 
 	if err != nil {
-		log.Error("Error fetching prices", "error", err)
+		logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
 		return nil, err
 	}
 
@@ -128,7 +130,7 @@ func (pm *Manager) FetchHistoricalHourlyPrices(symbol string, currency string, l
 	})
 
 	if err != nil {
-		log.Error("Error fetching prices", "error", err)
+		logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
 		return nil, err
 	}
 
@@ -142,7 +144,7 @@ func (pm *Manager) FetchTokenMarketValues(symbols []string, currency string) (ma
 	})
 
 	if err != nil {
-		log.Error("Error fetching prices", "error", err)
+		logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
 		return nil, err
 	}
 
@@ -231,7 +233,7 @@ func (pm *Manager) FetchTokenDetails(symbols []string) (map[string]thirdparty.To
 	})
 
 	if err != nil {
-		log.Error("Error fetching prices", "error", err)
+		logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
 		return nil, err
 	}
 
@@ -258,7 +260,7 @@ func (pm *Manager) FetchPrices(symbols []string, currencies []string) (map[strin
 	})
 
 	if err != nil {
-		log.Error("Error fetching prices", "error", err)
+		logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
 		return nil, err
 	}
 

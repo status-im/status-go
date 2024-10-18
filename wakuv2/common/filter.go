@@ -28,7 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 )
 
 // Filter represents a Waku message filter
@@ -231,7 +231,11 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 	candidates := fs.GetWatchersByTopic(recvMessage.PubsubTopic, recvMessage.ContentTopic)
 
 	if len(candidates) == 0 {
-		log.Debug("no filters available for this topic", "message", recvMessage.Hash().Hex(), "pubsubTopic", recvMessage.PubsubTopic, "contentTopic", recvMessage.ContentTopic.String())
+		logutils.ZapLogger().Debug("no filters available for this topic",
+			zap.Stringer("message", recvMessage.Hash()),
+			zap.String("pubsubTopic", recvMessage.PubsubTopic),
+			zap.Stringer("contentTopic", &recvMessage.ContentTopic),
+		)
 	}
 
 	for _, watcher := range candidates {
@@ -239,14 +243,17 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 		if decodedMsg == nil {
 			decodedMsg = recvMessage.Open(watcher)
 			if decodedMsg == nil {
-				log.Debug("processing message: failed to open", "message", recvMessage.Hash().Hex(), "filter", watcher.id)
+				logutils.ZapLogger().Debug("processing message: failed to open",
+					zap.Stringer("message", recvMessage.Hash()),
+					zap.String("filter", watcher.id),
+				)
 				continue
 			}
 		}
 
 		if watcher.MatchMessage(decodedMsg) {
 			matched = true
-			log.Debug("processing message: decrypted", "envelopeHash", recvMessage.Hash().Hex())
+			logutils.ZapLogger().Debug("processing message: decrypted", zap.Stringer("envelopeHash", recvMessage.Hash()))
 			if watcher.Src == nil || IsPubKeyEqual(decodedMsg.Src, watcher.Src) {
 				watcher.Trigger(decodedMsg)
 			}
@@ -269,7 +276,10 @@ func (f *Filter) expectsSymmetricEncryption() bool {
 func (f *Filter) Trigger(msg *ReceivedMessage) {
 	err := f.Messages.Add(msg)
 	if err != nil {
-		log.Error("failed to add msg into the filters store", "hash", msg.Hash(), "error", err)
+		logutils.ZapLogger().Error("failed to add msg into the filters store",
+			zap.Stringer("hash", msg.Hash()),
+			zap.Error(err),
+		)
 	}
 }
 
@@ -278,7 +288,7 @@ func (f *Filter) Trigger(msg *ReceivedMessage) {
 func (f *Filter) Retrieve() []*ReceivedMessage {
 	msgs, err := f.Messages.Pop()
 	if err != nil {
-		log.Error("failed to retrieve messages from filter store", "error", err)
+		logutils.ZapLogger().Error("failed to retrieve messages from filter store", zap.Error(err))
 		return nil
 	}
 	return msgs

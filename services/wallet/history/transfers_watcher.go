@@ -4,9 +4,11 @@ import (
 	"context"
 	"math/big"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -64,7 +66,7 @@ func watch(ctx context.Context, feed *event.Feed, callback TransfersLoadedCb) er
 			return nil
 		case err := <-sub.Err():
 			if err != nil {
-				log.Error("history: transfers watcher subscription failed", "error", err)
+				logutils.ZapLogger().Error("history: transfers watcher subscription failed", zap.Error(err))
 			}
 		case ev := <-ch:
 			if ev.Type == transfer.EventNewTransfers {

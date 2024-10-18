@@ -11,11 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/typeddata"
@@ -130,18 +132,24 @@ type Session struct {
 func (n *Namespace) Valid(namespaceName string, chainID *uint64) bool {
 	if chainID == nil {
 		if len(n.Chains) == 0 {
-			log.Warn("namespace doesn't refer to any chain")
+			logutils.ZapLogger().Warn("namespace doesn't refer to any chain")
 			return false
 		}
 		for _, caip2Str := range n.Chains {
 			resolvedNamespaceName, _, err := parseCaip2ChainID(caip2Str)
 			if err != nil {
-				log.Warn("namespace chain not in caip2 format", "chain", caip2Str, "error", err)
+				logutils.ZapLogger().Warn("namespace chain not in caip2 format",
+					zap.String("chain", caip2Str),
+					zap.Error(err),
+				)
 				return false
 			}
 
 			if resolvedNamespaceName != namespaceName {
-				log.Warn("namespace name doesn't match", "namespace", namespaceName, "chain", caip2Str)
+				logutils.ZapLogger().Warn("namespace name doesn't match",
+					zap.String("namespace", namespaceName),
+					zap.String("chain", caip2Str),
+				)
 				return false
 			}
 		}
@@ -156,7 +164,10 @@ func (p *Params) ValidateForProposal() bool {
 		if strings.Contains(key, ":") {
 			resolvedNamespaceName, cID, err := parseCaip2ChainID(key)
 			if err != nil {
-				log.Warn("params validation failed CAIP-2", "str", key, "error", err)
+				logutils.ZapLogger().Warn("params validation failed CAIP-2",
+					zap.String("str", key),
+					zap.Error(err),
+				)
 				return false
 			}
 			key = resolvedNamespaceName
@@ -164,7 +175,7 @@ func (p *Params) ValidateForProposal() bool {
 		}
 
 		if !isValidNamespaceName(key) {
-			log.Warn("invalid namespace name", "namespace", key)
+			logutils.ZapLogger().Warn("invalid namespace name", zap.String("namespace", key))
 			return false
 		}
 
@@ -235,7 +246,10 @@ func supportedChainsInSession(session Session) []uint64 {
 	for _, caip2Str := range caipChains {
 		_, chainID, err := parseCaip2ChainID(caip2Str)
 		if err != nil {
-			log.Warn("Failed parsing CAIP-2", "str", caip2Str, "error", err)
+			logutils.ZapLogger().Warn("Failed parsing CAIP-2",
+				zap.String("str", caip2Str),
+				zap.Error(err),
+			)
 			continue
 		}
 

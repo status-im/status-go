@@ -3,8 +3,10 @@ package requests
 import (
 	"errors"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -96,7 +98,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 	if c.Image != "" || c.Banner.ImagePath != "" {
 		ciis := make(map[string]*protobuf.IdentityImage)
 		if c.Image != "" {
-			log.Info("has-image", "image", c.Image)
+			logutils.ZapLogger().Debug("has-image", zap.String("image", c.Image))
 			imgs, err := images.GenerateIdentityImages(c.Image, c.ImageAx, c.ImageAy, c.ImageBx, c.ImageBy)
 			if err != nil {
 				return nil, err
@@ -106,7 +108,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 			}
 		}
 		if c.Banner.ImagePath != "" {
-			log.Info("has-banner", "image", c.Banner.ImagePath)
+			logutils.ZapLogger().Debug("has-banner", zap.String("image", c.Banner.ImagePath))
 			img, err := images.GenerateBannerImage(c.Banner.ImagePath, c.Banner.X, c.Banner.Y, c.Banner.X+c.Banner.Width, c.Banner.Y+c.Banner.Height)
 			if err != nil {
 				return nil, err
@@ -114,7 +116,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 			ciis[img.Name] = adaptIdentityImageToProtobuf(*img)
 		}
 		ci.Images = ciis
-		log.Info("set images", "images", ci)
+		logutils.ZapLogger().Debug("set images", zap.Any("images", ci))
 	}
 
 	description := &protobuf.CommunityDescription{

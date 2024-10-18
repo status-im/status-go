@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"unsafe"
 
+	"go.uber.org/zap"
 	validator "gopkg.in/go-playground/validator.v9"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/zxcvbn-go"
@@ -366,19 +366,19 @@ func login(accountData, password, configJSON string) error {
 	}
 
 	api.RunAsync(func() error {
-		log.Debug("start a node with account", "key-uid", account.KeyUID)
+		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.UpdateNodeConfigFleet(account, password, &conf)
 		if err != nil {
-			log.Error("failed to update node config fleet", "key-uid", account.KeyUID, "error", err)
+			logutils.ZapLogger().Error("failed to update node config fleet", zap.String("key-uid", account.KeyUID), zap.Error(err))
 			return statusBackend.LoggedIn(account.KeyUID, err)
 		}
 
 		err = statusBackend.StartNodeWithAccount(account, password, &conf, nil)
 		if err != nil {
-			log.Error("failed to start a node", "key-uid", account.KeyUID, "error", err)
+			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", account.KeyUID), zap.Error(err))
 			return err
 		}
-		log.Debug("started a node with", "key-uid", account.KeyUID)
+		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
 		return nil
 	})
 
@@ -431,13 +431,13 @@ func createAccountAndLogin(requestJSON string) string {
 	}
 
 	api.RunAsync(func() error {
-		log.Debug("starting a node and creating config")
+		logutils.ZapLogger().Debug("starting a node and creating config")
 		_, err := statusBackend.CreateAccountAndLogin(&request)
 		if err != nil {
-			log.Error("failed to create account", "error", err)
+			logutils.ZapLogger().Error("failed to create account", zap.Error(err))
 			return err
 		}
-		log.Debug("started a node, and created account")
+		logutils.ZapLogger().Debug("started a node, and created account")
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -471,10 +471,10 @@ func loginAccount(requestJSON string) string {
 	api.RunAsync(func() error {
 		err := statusBackend.LoginAccount(&request)
 		if err != nil {
-			log.Error("loginAccount failed", "error", err)
+			logutils.ZapLogger().Error("loginAccount failed", zap.Error(err))
 			return err
 		}
-		log.Debug("loginAccount started node")
+		logutils.ZapLogger().Debug("loginAccount started node")
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -497,7 +497,7 @@ func restoreAccountAndLogin(requestJSON string) string {
 	}
 
 	api.RunAsync(func() error {
-		log.Debug("starting a node and restoring account")
+		logutils.ZapLogger().Debug("starting a node and restoring account")
 
 		if request.Keycard != nil {
 			_, err = statusBackend.RestoreKeycardAccountAndLogin(&request)
@@ -506,10 +506,10 @@ func restoreAccountAndLogin(requestJSON string) string {
 		}
 
 		if err != nil {
-			log.Error("failed to restore account", "error", err)
+			logutils.ZapLogger().Error("failed to restore account", zap.Error(err))
 			return err
 		}
-		log.Debug("started a node, and restored account")
+		logutils.ZapLogger().Debug("started a node, and restored account")
 		return nil
 	})
 
@@ -546,13 +546,13 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	}
 
 	api.RunAsync(func() error {
-		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
+		logutils.ZapLogger().Debug("starting a node, and saving account with configuration", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs, nil)
 		if err != nil {
-			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
+			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", account.KeyUID), zap.Error(err))
 			return err
 		}
-		log.Debug("started a node, and saved account", "key-uid", account.KeyUID)
+		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -634,13 +634,13 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 	}
 
 	api.RunAsync(func() error {
-		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
+		logutils.ZapLogger().Debug("starting a node, and saving account with configuration", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.SaveAccountAndStartNodeWithKey(account, password, settings, &conf, subaccs, keyHex)
 		if err != nil {
-			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
+			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", account.KeyUID), zap.Error(err))
 			return err
 		}
-		log.Debug("started a node, and saved account", "key-uid", account.KeyUID)
+		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -661,13 +661,13 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		log.Debug("start a node with account", "key-uid", account.KeyUID)
+		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.StartNodeWithKey(account, password, keyHex, &conf)
 		if err != nil {
-			log.Error("failed to start a node", "key-uid", account.KeyUID, "error", err)
+			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", account.KeyUID), zap.Error(err))
 			return err
 		}
-		log.Debug("started a node with", "key-uid", account.KeyUID)
+		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -955,7 +955,7 @@ func writeHeapProfile(dataDir string) string { //nolint: deadcode
 func makeJSONResponse(err error) string {
 	errString := ""
 	if err != nil {
-		log.Error("error in makeJSONResponse", "error", err)
+		logutils.ZapLogger().Error("error in makeJSONResponse", zap.Error(err))
 		errString = err.Error()
 	}
 
@@ -1650,7 +1650,7 @@ func EncodeTransfer(to string, value string) string {
 func encodeTransfer(to string, value string) string {
 	result, err := abi_spec.EncodeTransfer(to, value)
 	if err != nil {
-		log.Error("failed to encode transfer", "to", to, "value", value, "error", err)
+		logutils.ZapLogger().Error("failed to encode transfer", zap.String("to", to), zap.String("value", value), zap.Error(err))
 		return ""
 	}
 	return result
@@ -1663,7 +1663,7 @@ func EncodeFunctionCall(method string, paramsJSON string) string {
 func encodeFunctionCall(method string, paramsJSON string) string {
 	result, err := abi_spec.Encode(method, paramsJSON)
 	if err != nil {
-		log.Error("failed to encode function call", "method", method, "paramsJSON", paramsJSON, "error", err)
+		logutils.ZapLogger().Error("failed to encode function call", zap.String("method", method), zap.String("paramsJSON", paramsJSON), zap.Error(err))
 		return ""
 	}
 	return result
@@ -1680,17 +1680,17 @@ func decodeParameters(decodeParamJSON string) string {
 	}{}
 	err := json.Unmarshal([]byte(decodeParamJSON), &decodeParam)
 	if err != nil {
-		log.Error("failed to unmarshal json when decoding parameters", "decodeParamJSON", decodeParamJSON, "error", err)
+		logutils.ZapLogger().Error("failed to unmarshal json when decoding parameters", zap.String("decodeParamJSON", decodeParamJSON), zap.Error(err))
 		return ""
 	}
 	result, err := abi_spec.Decode(decodeParam.BytesString, decodeParam.Types)
 	if err != nil {
-		log.Error("failed to decode parameters", "decodeParamJSON", decodeParamJSON, "error", err)
+		logutils.ZapLogger().Error("failed to decode parameters", zap.String("decodeParamJSON", decodeParamJSON), zap.Error(err))
 		return ""
 	}
 	bytes, err := json.Marshal(result)
 	if err != nil {
-		log.Error("failed to marshal result", "result", result, "decodeParamJSON", decodeParamJSON, "error", err)
+		logutils.ZapLogger().Error("failed to marshal result", zap.Any("result", result), zap.String("decodeParamJSON", decodeParamJSON), zap.Error(err))
 		return ""
 	}
 	return string(bytes)
@@ -1723,7 +1723,7 @@ func Utf8ToHex(str string) string {
 func utf8ToHex(str string) string {
 	hexString, err := abi_spec.Utf8ToHex(str)
 	if err != nil {
-		log.Error("failed to convert utf8 to hex", "str", str, "error", err)
+		logutils.ZapLogger().Error("failed to convert utf8 to hex", zap.String("str", str), zap.Error(err))
 	}
 	return hexString
 }
@@ -1735,7 +1735,7 @@ func HexToUtf8(hexString string) string {
 func hexToUtf8(hexString string) string {
 	str, err := abi_spec.HexToUtf8(hexString)
 	if err != nil {
-		log.Error("failed to convert hex to utf8", "hexString", hexString, "error", err)
+		logutils.ZapLogger().Error("failed to convert hex to utf8", zap.String("hexString", hexString), zap.Error(err))
 	}
 	return str
 }
@@ -1747,7 +1747,7 @@ func CheckAddressChecksum(address string) string {
 func checkAddressChecksum(address string) string {
 	valid, err := abi_spec.CheckAddressChecksum(address)
 	if err != nil {
-		log.Error("failed to invoke check address checksum", "address", address, "error", err)
+		logutils.ZapLogger().Error("failed to invoke check address checksum", zap.String("address", address), zap.Error(err))
 	}
 	result, _ := json.Marshal(valid)
 	return string(result)
@@ -1760,7 +1760,7 @@ func IsAddress(address string) string {
 func isAddress(address string) string {
 	valid, err := abi_spec.IsAddress(address)
 	if err != nil {
-		log.Error("failed to invoke IsAddress", "address", address, "error", err)
+		logutils.ZapLogger().Error("failed to invoke IsAddress", zap.String("address", address), zap.Error(err))
 	}
 	result, _ := json.Marshal(valid)
 	return string(result)
@@ -1773,7 +1773,7 @@ func ToChecksumAddress(address string) string {
 func toChecksumAddress(address string) string {
 	address, err := abi_spec.ToChecksumAddress(address)
 	if err != nil {
-		log.Error("failed to convert to checksum address", "address", address, "error", err)
+		logutils.ZapLogger().Error("failed to convert to checksum address", zap.String("address", address), zap.Error(err))
 	}
 	return address
 }
@@ -1805,7 +1805,7 @@ func InitLogging(logSettingsJSON string) string {
 	}
 
 	if err = logutils.OverrideRootLogWithConfig(logSettings.LogSettings, false); err == nil {
-		log.Info("logging initialised", "logSettings", logSettingsJSON)
+		logutils.ZapLogger().Info("logging initialised", zap.String("logSettings", logSettingsJSON))
 	}
 
 	if logSettings.LogRequestGo {

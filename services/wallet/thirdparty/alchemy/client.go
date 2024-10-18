@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/logutils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -82,7 +83,7 @@ type Client struct {
 func NewClient(apiKeys map[uint64]string) *Client {
 	for _, chainID := range walletCommon.AllChainIDs() {
 		if apiKeys[uint64(chainID)] == "" {
-			log.Warn("Alchemy API key not available for", "chainID", chainID)
+			logutils.ZapLogger().Warn("Alchemy API key not available for", zap.Stringer("chainID", chainID))
 		}
 	}
 
@@ -144,7 +145,11 @@ func (o *Client) doWithRetries(req *http.Request) (*http.Response, error) {
 
 		err = fmt.Errorf("unsuccessful request: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 		if resp.StatusCode == http.StatusTooManyRequests {
-			log.Error("doWithRetries failed with http.StatusTooManyRequests", "provider", o.ID(), "elapsed time", b.GetElapsedTime(), "next backoff", b.NextBackOff())
+			logutils.ZapLogger().Error("doWithRetries failed with http.StatusTooManyRequests",
+				zap.String("provider", o.ID()),
+				zap.Duration("elapsed time", b.GetElapsedTime()),
+				zap.Duration("next backoff", b.NextBackOff()),
+			)
 			return nil, err
 		}
 		return nil, backoff.Permanent(err)

@@ -7,9 +7,11 @@ import (
 	"math/big"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 )
 
 const genesisTimestamp = 1438269988
@@ -59,7 +61,12 @@ func NewBalance(db *BalanceDB) *Balance {
 
 // get returns the balance history for the given address from the given timestamp till now
 func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addresses []common.Address, fromTimestamp uint64) ([]*entry, error) {
-	log.Debug("Getting balance history", "chainID", chainID, "currency", currency, "address", addresses, "fromTimestamp", fromTimestamp)
+	logutils.ZapLogger().Debug("Getting balance history",
+		zap.Uint64("chainID", chainID),
+		zap.String("currency", currency),
+		zap.Stringers("address", addresses),
+		zap.Uint64("fromTimestamp", fromTimestamp),
+	)
 
 	cached, err := b.db.getNewerThan(&assetIdentity{chainID, addresses, currency}, fromTimestamp)
 	if err != nil {
@@ -70,7 +77,12 @@ func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addr
 }
 
 func (b *Balance) addEdgePoints(chainID uint64, currency string, addresses []common.Address, fromTimestamp, toTimestamp uint64, data []*entry) (res []*entry, err error) {
-	log.Debug("Adding edge points", "chainID", chainID, "currency", currency, "address", addresses, "fromTimestamp", fromTimestamp)
+	logutils.ZapLogger().Debug("Adding edge points",
+		zap.Uint64("chainID", chainID),
+		zap.String("currency", currency),
+		zap.Stringers("address", addresses),
+		zap.Uint64("fromTimestamp", fromTimestamp),
+	)
 
 	if len(addresses) == 0 {
 		return nil, errors.New("addresses must not be empty")
@@ -153,7 +165,13 @@ func timestampBoundaries(fromTimestamp, toTimestamp uint64, data []*entry) (firs
 }
 
 func addPaddingPoints(currency string, addresses []common.Address, toTimestamp uint64, data []*entry, limit int) (res []*entry, err error) {
-	log.Debug("addPaddingPoints start", "currency", currency, "address", addresses, "len(data)", len(data), "data", data, "limit", limit)
+	logutils.ZapLogger().Debug("addPaddingPoints start",
+		zap.String("currency", currency),
+		zap.Stringers("address", addresses),
+		zap.Int("len(data)", len(data)),
+		zap.Any("data", data),
+		zap.Int("limit", limit),
+	)
 
 	if len(data) < 2 { // Edge points must be added separately during the previous step
 		return nil, errors.New("slice is empty")
@@ -192,15 +210,27 @@ func addPaddingPoints(currency string, addresses []common.Address, toTimestamp u
 			}
 			res[index] = entry
 
-			log.Debug("Added padding point", "entry", entry, "timestamp", paddingTimestamp, "i", i, "j", j, "index", index)
+			logutils.ZapLogger().Debug("Added padding point",
+				zap.Stringer("entry", entry),
+				zap.Int64("timestamp", paddingTimestamp),
+				zap.Int("i", i),
+				zap.Int("j", j),
+				zap.Int("index", index),
+			)
 			i++
 		} else if paddingTimestamp >= data[j].timestamp {
-			log.Debug("Kept real point", "entry", data[j], "timestamp", paddingTimestamp, "i", i, "j", j, "index", index)
+			logutils.ZapLogger().Debug("Kept real point",
+				zap.Any("entry", data[j]),
+				zap.Int64("timestamp", paddingTimestamp),
+				zap.Int("i", i),
+				zap.Int("j", j),
+				zap.Int("index", index),
+			)
 			j++
 		}
 	}
 
-	log.Debug("addPaddingPoints end", "len(res)", len(res))
+	logutils.ZapLogger().Debug("addPaddingPoints end", zap.Int("len(res)", len(res)))
 
 	return res, nil
 }

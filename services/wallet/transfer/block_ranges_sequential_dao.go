@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"math/big"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -134,10 +136,10 @@ func (b *BlockRangeSequentialDAO) getBlockRanges(chainID uint64, addresses []com
 }
 
 func (b *BlockRangeSequentialDAO) deleteRange(account common.Address) error {
-	log.Debug("delete blocks range", "account", account)
+	logutils.ZapLogger().Debug("delete blocks range", zap.Stringer("account", account))
 	delete, err := b.db.Prepare(`DELETE FROM blocks_ranges_sequential WHERE address = ?`)
 	if err != nil {
-		log.Error("Failed to prepare deletion of sequential block range", "error", err)
+		logutils.ZapLogger().Error("Failed to prepare deletion of sequential block range", zap.Error(err))
 		return err
 	}
 
@@ -154,14 +156,16 @@ func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Add
 	ethBlockRange := prepareUpdatedBlockRange(ethTokensBlockRange.eth, newBlockRange.eth)
 	tokensBlockRange := prepareUpdatedBlockRange(ethTokensBlockRange.tokens, newBlockRange.tokens)
 
-	log.Debug("upsert eth and tokens blocks range",
-		"account", account, "chainID", chainID,
-		"eth.start", ethBlockRange.Start,
-		"eth.first", ethBlockRange.FirstKnown,
-		"eth.last", ethBlockRange.LastKnown,
-		"tokens.first", tokensBlockRange.FirstKnown,
-		"tokens.last", tokensBlockRange.LastKnown,
-		"hash", newBlockRange.balanceCheckHash)
+	logutils.ZapLogger().Debug("upsert eth and tokens blocks range",
+		zap.Stringer("account", account),
+		zap.Uint64("chainID", chainID),
+		zap.Stringer("eth.start", ethBlockRange.Start),
+		zap.Stringer("eth.first", ethBlockRange.FirstKnown),
+		zap.Stringer("eth.last", ethBlockRange.LastKnown),
+		zap.Stringer("tokens.first", tokensBlockRange.FirstKnown),
+		zap.Stringer("tokens.last", tokensBlockRange.LastKnown),
+		zap.String("hash", newBlockRange.balanceCheckHash),
+	)
 
 	var query *sql.Stmt
 
@@ -200,11 +204,14 @@ func (b *BlockRangeSequentialDAO) upsertEthRange(chainID uint64, account common.
 
 	blockRange := prepareUpdatedBlockRange(ethTokensBlockRange.eth, newBlockRange)
 
-	log.Debug("upsert eth blocks range", "account", account, "chainID", chainID,
-		"start", blockRange.Start,
-		"first", blockRange.FirstKnown,
-		"last", blockRange.LastKnown,
-		"old hash", ethTokensBlockRange.balanceCheckHash)
+	logutils.ZapLogger().Debug("upsert eth blocks range",
+		zap.Stringer("account", account),
+		zap.Uint64("chainID", chainID),
+		zap.Stringer("start", blockRange.Start),
+		zap.Stringer("first", blockRange.FirstKnown),
+		zap.Stringer("last", blockRange.LastKnown),
+		zap.String("old hash", ethTokensBlockRange.balanceCheckHash),
+	)
 
 	var query *sql.Stmt
 
@@ -237,9 +244,10 @@ func (b *BlockRangeSequentialDAO) updateTokenRange(chainID uint64, account commo
 
 	blockRange := prepareUpdatedBlockRange(ethTokensBlockRange.tokens, newBlockRange)
 
-	log.Debug("update tokens blocks range",
-		"first", blockRange.FirstKnown,
-		"last", blockRange.LastKnown)
+	logutils.ZapLogger().Debug("update tokens blocks range",
+		zap.Stringer("first", blockRange.FirstKnown),
+		zap.Stringer("last", blockRange.LastKnown),
+	)
 
 	update, err := b.db.Prepare(`UPDATE blocks_ranges_sequential SET token_blk_start = ?, token_blk_first = ?, token_blk_last = ? WHERE network_id = ? AND address = ?`)
 	if err != nil {

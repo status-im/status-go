@@ -8,7 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 const requestTimeout = 5 * time.Second
@@ -57,7 +59,7 @@ func (o *HTTPClient) doGetRequest(ctx context.Context, url string, apiKey string
 		}
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
-				log.Error("failed to close opensea request body", "err", err)
+				logutils.ZapLogger().Error("failed to close opensea request body", zap.Error(err))
 			}
 		}()
 

@@ -9,11 +9,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -1337,7 +1336,7 @@ func (m *Messenger) publishSelfContactSubscriptions(event *SelfContactChangeEven
 		select {
 		case s <- event:
 		default:
-			log.Warn("self contact subscription channel full, dropping message")
+			logutils.ZapLogger().Warn("self contact subscription channel full, dropping message")
 		}
 	}
 }

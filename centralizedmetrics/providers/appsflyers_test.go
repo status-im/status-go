@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/centralizedmetrics/common"
 )
@@ -41,8 +42,11 @@ func TestAppsflyerMetricProcessor(t *testing.T) {
 	}))
 	defer testServer.Close()
 
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
 	// Initialize the AppsflyerMetricProcessor with the test server URL
-	processor := NewAppsflyerMetricProcessor("testAppID", "testSecret", testServer.URL)
+	processor := NewAppsflyerMetricProcessor("testAppID", "testSecret", testServer.URL, logger)
 
 	// Example metrics
 	metrics := []common.Metric{

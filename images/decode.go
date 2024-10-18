@@ -15,9 +15,10 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"go.uber.org/zap"
 	"golang.org/x/image/webp"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 )
 
 var (
@@ -66,7 +67,7 @@ func DecodeFromURL(path string) (image.Image, error) {
 
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			log.Error("failed to close profile pic http request body", "err", err)
+			logutils.ZapLogger().Error("failed to close profile pic http request body", zap.Error(err))
 		}
 	}()
 

@@ -193,7 +193,7 @@ func (b *GethStatusBackend) OpenAccounts() error {
 	}
 	b.multiaccountsDB = db
 
-	b.centralizedMetrics = centralizedmetrics.NewDefaultMetricService(b.multiaccountsDB.DB())
+	b.centralizedMetrics = centralizedmetrics.NewDefaultMetricService(b.multiaccountsDB.DB(), b.logger)
 	err = b.centralizedMetrics.EnsureStarted()
 	if err != nil {
 		return err

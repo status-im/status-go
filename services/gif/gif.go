@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 )
@@ -41,7 +43,7 @@ type API struct {
 }
 
 func (api *API) SetTenorAPIKey(key string) (err error) {
-	log.Info("[GifAPI::SetTenorAPIKey]")
+	logutils.ZapLogger().Info("[GifAPI::SetTenorAPIKey]")
 	err = api.db.SaveSettingField(settings.GifAPIKey, key)
 	if err != nil {
 		return err
@@ -67,7 +69,7 @@ func (api *API) GetContentWithRetry(path string) (value string, err error) {
 		response, err = client.Get(baseURL + path + defaultParams + tenorAPIKey)
 
 		if err != nil {
-			log.Error("can't get content from path %s with %s", path, err.Error())
+			logutils.ZapLogger().Error("can't get content", zap.String("path", path), zap.Error(err))
 			currentRetry++
 			time.Sleep(100 * time.Millisecond)
 		} else {
@@ -93,12 +95,10 @@ func (api *API) GetContentWithRetry(path string) (value string, err error) {
 }
 
 func (api *API) FetchGifs(path string) (value string, err error) {
-	log.Info("[GifAPI::fetchGifs]")
 	return api.GetContentWithRetry(path)
 }
 
 func (api *API) UpdateRecentGifs(updatedGifs json.RawMessage) (err error) {
-	log.Info("[GifAPI::updateRecentGifs]")
 	recentGifsContainer := Container{}
 	err = json.Unmarshal(updatedGifs, &recentGifsContainer)
 	if err != nil {
@@ -112,7 +112,6 @@ func (api *API) UpdateRecentGifs(updatedGifs json.RawMessage) (err error) {
 }
 
 func (api *API) UpdateFavoriteGifs(updatedGifs json.RawMessage) (err error) {
-	log.Info("[GifAPI::updateFavoriteGifs]", updatedGifs)
 	favsGifsContainer := Container{}
 	err = json.Unmarshal(updatedGifs, &favsGifsContainer)
 	if err != nil {
@@ -126,7 +125,6 @@ func (api *API) UpdateFavoriteGifs(updatedGifs json.RawMessage) (err error) {
 }
 
 func (api *API) GetRecentGifs() (recentGifs []Gif, err error) {
-	log.Info("[GifAPI::getRecentGifs]")
 	gifs, err := api.db.GifRecents()
 	if err != nil {
 		return nil, err
@@ -144,7 +142,6 @@ func (api *API) GetRecentGifs() (recentGifs []Gif, err error) {
 }
 
 func (api *API) GetFavoriteGifs() (favoriteGifs []Gif, err error) {
-	log.Info("[GifAPI::getFavoriteGifs]")
 	gifs, err := api.db.GifFavorites()
 	if err != nil {
 		return nil, err

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+	"go.uber.org/zap"
 
 	// Import postgres driver
 	_ "github.com/lib/pq"
@@ -15,9 +16,9 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver/migrations"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -84,7 +85,7 @@ func (i *PostgresDB) envelopesCount() (int, error) {
 
 func (i *PostgresDB) updateArchivedEnvelopesCount() {
 	if count, err := i.envelopesCount(); err != nil {
-		log.Warn("db query for envelopes count failed", "err", err)
+		logutils.ZapLogger().Warn("db query for envelopes count failed", zap.Error(err))
 	} else {
 		archivedEnvelopesGauge.WithLabelValues(i.name).Set(float64(count))
 	}
@@ -262,7 +263,7 @@ func (i *PostgresDB) SaveEnvelope(env types.Envelope) error {
 	key := NewDBKey(env.Expiry()-env.TTL(), topic, env.Hash())
 	rawEnvelope, err := rlp.EncodeToBytes(env.Unwrap())
 	if err != nil {
-		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
+		logutils.ZapLogger().Error("rlp.EncodeToBytes failed", zap.Error(err))
 		archivedErrorsCounter.WithLabelValues(i.name).Inc()
 		return err
 	}
