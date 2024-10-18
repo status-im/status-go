@@ -18,26 +18,30 @@ import (
 	"github.com/status-im/status-go/wakuv2"
 
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
-	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	v2common "github.com/status-im/status-go/wakuv2/common"
+	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 )
 
 type TelemetryType string
 
 const (
-	ProtocolStatsMetric        TelemetryType = "ProtocolStats"
-	SentEnvelopeMetric         TelemetryType = "SentEnvelope"
-	UpdateEnvelopeMetric       TelemetryType = "UpdateEnvelope"
-	ReceivedMessagesMetric     TelemetryType = "ReceivedMessages"
-	ErrorSendingEnvelopeMetric TelemetryType = "ErrorSendingEnvelope"
-	PeerCountMetric            TelemetryType = "PeerCount"
-	PeerConnFailuresMetric     TelemetryType = "PeerConnFailure"
-	MessageCheckSuccessMetric  TelemetryType = "MessageCheckSuccess"
-	MessageCheckFailureMetric  TelemetryType = "MessageCheckFailure"
-	PeerCountByShardMetric     TelemetryType = "PeerCountByShard"
-	PeerCountByOriginMetric    TelemetryType = "PeerCountByOrigin"
-	MaxRetryCache                            = 5000
+	ProtocolStatsMetric            TelemetryType = "ProtocolStats"
+	SentEnvelopeMetric             TelemetryType = "SentEnvelope"
+	UpdateEnvelopeMetric           TelemetryType = "UpdateEnvelope"
+	ReceivedMessagesMetric         TelemetryType = "ReceivedMessages"
+	ErrorSendingEnvelopeMetric     TelemetryType = "ErrorSendingEnvelope"
+	PeerCountMetric                TelemetryType = "PeerCount"
+	PeerConnFailuresMetric         TelemetryType = "PeerConnFailure"
+	MessageCheckSuccessMetric      TelemetryType = "MessageCheckSuccess"
+	MessageCheckFailureMetric      TelemetryType = "MessageCheckFailure"
+	PeerCountByShardMetric         TelemetryType = "PeerCountByShard"
+	PeerCountByOriginMetric        TelemetryType = "PeerCountByOrigin"
+	MissedMessageMetric            TelemetryType = "MissedMessage"
+	MissedRelevantMessageMetric    TelemetryType = "MissedRelevantMessage"
+	MessageDeliveryConfirmedMetric TelemetryType = "MessageDeliveryConfirmed"
+	MaxRetryCache                                = 5000
 )
 
 type TelemetryRequest struct {
@@ -103,6 +107,18 @@ func (c *Client) PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin ma
 	}
 }
 
+func (c *Client) PushMissedMessage(ctx context.Context, envelope *v2protocol.Envelope) {
+	c.processAndPushTelemetry(ctx, MissedMessage{Envelope: envelope})
+}
+
+func (c *Client) PushMissedRelevantMessage(ctx context.Context, receivedMessage *v2common.ReceivedMessage) {
+	c.processAndPushTelemetry(ctx, MissedRelevantMessage{ReceivedMessage: receivedMessage})
+}
+
+func (c *Client) PushMessageDeliveryConfirmed(ctx context.Context, numMessages int) {
+	c.processAndPushTelemetry(ctx, MessageDeliveryConfirmed{NumMessages: numMessages})
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
@@ -134,6 +150,22 @@ type PeerCountByShard struct {
 type PeerCountByOrigin struct {
 	Origin wps.Origin
 	Count  uint
+}
+
+type StoreConfirmationFailed struct {
+	MessageHash string
+}
+
+type MissedMessage struct {
+	Envelope *v2protocol.Envelope
+}
+
+type MissedRelevantMessage struct {
+	ReceivedMessage *v2common.ReceivedMessage
+}
+
+type MessageDeliveryConfirmed struct {
+	NumMessages int
 }
 
 type Client struct {
@@ -308,6 +340,24 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			TelemetryType: PeerCountByOriginMetric,
 			TelemetryData: c.ProcessPeerCountByOrigin(v),
 		}
+	case MissedMessage:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: MissedMessageMetric,
+			TelemetryData: c.ProcessMissedMessage(v),
+		}
+	case MissedRelevantMessage:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: MissedRelevantMessageMetric,
+			TelemetryData: c.ProcessMissedRelevantMessage(v),
+		}
+	case MessageDeliveryConfirmed:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: MessageDeliveryConfirmedMetric,
+			TelemetryData: c.ProcessMessageDeliveryConfirmed(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
@@ -462,6 +512,36 @@ func (c *Client) ProcessPeerCountByOrigin(peerCountByOrigin PeerCountByOrigin) *
 	postBody := c.commonPostBody()
 	postBody["origin"] = peerCountByOrigin.Origin
 	postBody["count"] = peerCountByOrigin.Count
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessMissedMessage(missedMessage MissedMessage) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageHash"] = missedMessage.Envelope.Hash().String()
+	postBody["sentAt"] = uint32(missedMessage.Envelope.Message().GetTimestamp() / int64(time.Second))
+	postBody["pubsubTopic"] = missedMessage.Envelope.PubsubTopic()
+	postBody["contentTopic"] = missedMessage.Envelope.Message().ContentTopic
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessMissedRelevantMessage(missedMessage MissedRelevantMessage) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageHash"] = missedMessage.ReceivedMessage.Envelope.Hash().String()
+	postBody["sentAt"] = missedMessage.ReceivedMessage.Sent
+	postBody["pubsubTopic"] = missedMessage.ReceivedMessage.PubsubTopic
+	postBody["contentTopic"] = missedMessage.ReceivedMessage.ContentTopic
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessMessageDeliveryConfirmed(messageDeliveryConfirmed MessageDeliveryConfirmed) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["numMessages"] = messageDeliveryConfirmed.NumMessages
 	body, _ := json.Marshal(postBody)
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage
