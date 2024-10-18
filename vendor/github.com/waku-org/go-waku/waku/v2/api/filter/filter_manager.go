@@ -230,6 +230,7 @@ func (mgr *FilterManager) UnsubscribeFilter(filterID string) {
 		}
 		if len(af.sub.ContentFilter.ContentTopics) == 0 {
 			af.cancel()
+			delete(mgr.filterSubscriptions, filterConfig.ID)
 		} else {
 			go af.sub.Unsubscribe(filterConfig.contentFilter)
 		}
