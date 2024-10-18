@@ -17,12 +17,12 @@ pipeline {
     )
     booleanParam(
       name: 'UNIT_TEST_FAILFAST',
-      defaultValue: !isNightlyJob() && !isDevelopJob(),
+      defaultValue: isPRJob(),
       description: 'Should the job fail fast on first test failure?'
     )
     booleanParam(
       name: 'UNIT_TEST_RERUN_FAILS',
-      defaultValue: !isNightlyJob() && !isDevelopJob(),
+      defaultValue: isPRJob(),
       description: 'Should the job rerun failed tests?'
     )
     booleanParam(
@@ -55,9 +55,9 @@ pipeline {
     disableConcurrentBuilds()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
-      numToKeepStr: isNightlyJob() ? '14' : isDevelopJob() ? '10' : '5',
+      numToKeepStr: getAmountToKeep(),
       daysToKeepStr: '30',
-      artifactNumToKeepStr: isNightlyJob() ? '14' : isDevelopJob() ? '10' : '1',
+      artifactNumToKeepStr: getAmountToKeep(),
     ))
   }
 
@@ -113,7 +113,7 @@ pipeline {
 
     stage('Migration') {
       when { // https://github.com/status-im/status-go/issues/4993#issuecomment-2022685544
-        expression { !isNightlyJob() && !isDevelopJob() }
+        expression { isPRJob() }
       }
       steps { script {
         nix.shell('make migration-check', pure: false)
@@ -125,7 +125,7 @@ pipeline {
         BASE_BRANCH = "${env.BASE_BRANCH}"
       }
       when { // https://github.com/status-im/status-go/issues/4993#issuecomment-2022685544
-        expression { !isNightlyJob() && !isDevelopJob() }
+        expression { isPRJob() }
       }
       steps { script {
         nix.shell('make commit-check', pure: false)
@@ -204,7 +204,7 @@ pipeline {
       script {
         env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
-        if (isNightlyJob() || isDevelopJob()) {
+        if (!isPRJob()) {
           archiveArtifacts('report_*.xml, test_*.log, test-coverage.html, test-coverage.out, coverage/codeclimate.json')
         }
         if (params.UNIT_TEST_RERUN_FAILS) {
@@ -248,6 +248,10 @@ def isNightlyJob() { env.JOB_BASE_NAME == 'tests-nightly' }
 
 def isDevelopJob() { env.JOB_BASE_NAME == 'tests-develop' }
 
+def isPRJob() { !isNightlyJob() && !isDevelopJob() }
+
 def getDefaultUnitTestCount() { isNightlyJob() ? '20' : '1' }
 
 def getDefaultTimeout() { isNightlyJob() ? 5*60 : 50 }
+
+def getAmountToKeep() { isNightlyJob() ? '14' : isDevelopJob() ? '10' : '5' }
