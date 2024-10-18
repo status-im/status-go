@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.6'
+library 'status-jenkins-lib@v1.9.12'
 
 pipeline {
   agent { label 'linux' }
@@ -51,6 +51,12 @@ pipeline {
         } } }
         stage('Linux') { steps { script {
           linux = jenkins.Build('status-go/platforms/linux')
+        } } }
+        stage('MacOS') { steps { script {
+          linux = jenkins.Build('status-go/platforms/macos')
+        } } }
+        stage('Windows') { steps { script {
+          linux = jenkins.Build('status-go/platforms/windows')
         } } }
         stage('Docker') { steps { script {
           dock = jenkins.Build('status-go/platforms/docker')

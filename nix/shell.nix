@@ -5,6 +5,7 @@ let
   inherit (pkgs) lib stdenv callPackage;
   /* No Android SDK for Darwin aarch64. */
   isMacM1 = stdenv.isDarwin && stdenv.isAarch64;
+  isMacIntel = stdenv.isDarwin && stdenv.isx86_64;
 
   /* Lock requires Xcode verison. */
   xcodeWrapper = callPackage ./pkgs/xcodeenv/compose-xcodewrapper.nix { } {
@@ -16,6 +17,7 @@ let
     inherit xcodeWrapper;
     withAndroidPkgs = !isMacM1;
   };
+
 in pkgs.mkShell {
   name = "status-go-shell";
 
@@ -23,7 +25,11 @@ in pkgs.mkShell {
     git jq which
     go golangci-lint go-junit-report gopls go-bindata gomobileMod codecov-cli go-generate-fast
     mockgen protobuf3_20 protoc-gen-go gotestsum go-modvendor openjdk cc-test-reporter
-   ] ++ lib.optionals (stdenv.isDarwin) [ xcodeWrapper ];
+   ] ++ lib.optionals (stdenv.isDarwin) [ xcodeWrapper ]
+     ++ lib.optionals (isMacIntel) [
+   pkgs.darwin.apple_sdk.libs.xpc
+   pkgs.darwin.apple_sdk_11_0.frameworks.Security
+   ];
 
    shellHook = lib.optionalString (!isMacM1) ''
      ANDROID_HOME=${pkgs.androidPkgs.androidsdk}/libexec/android-sdk
@@ -35,4 +41,3 @@ in pkgs.mkShell {
   # https://github.com/status-im/status-mobile/pull/13912
   __noChroot = stdenv.isDarwin;
 }
-
