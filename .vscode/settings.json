@@ -8,4 +8,7 @@
   "cSpell.words": [
     "unmarshalling"
   ],
+  "gopls":{
+    "buildFlags": ["-tags=use_nwaku,gowaku_skip_migrations,gowaku_no_rln"]
+  }
 }

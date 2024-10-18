@@ -10,9 +10,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/libp2p/go-libp2p/core/peer"
 	apicommon "github.com/waku-org/go-waku/waku/v2/api/common"
+	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
@@ -29,7 +29,11 @@ type ISentCheck interface {
 	Start()
 	Add(topic string, messageID common.Hash, sentTime uint32)
 	DeleteByMessageIDs(messageIDs []common.Hash)
-	SetStorePeerID(peerID peer.ID)
+}
+
+type StorenodeMessageVerifier interface {
+	// MessagesExist returns a list of the messages it found from a list of message hashes
+	MessageHashesExist(ctx context.Context, requestID []byte, peerID peer.ID, pageSize uint64, messageHashes []pb.MessageHash) ([]pb.MessageHash, error)
 }
 
 // MessageSentCheck tracks the outgoing messages and check against store node
@@ -38,11 +42,11 @@ type ISentCheck interface {
 type MessageSentCheck struct {
 	messageIDs          map[string]map[common.Hash]uint32
 	messageIDsMu        sync.RWMutex
-	storePeerID         peer.ID
 	messageStoredChan   chan common.Hash
 	messageExpiredChan  chan common.Hash
 	ctx                 context.Context
-	store               *store.WakuStore
+	messageVerifier     StorenodeMessageVerifier
+	storenodeCycle      *history.StorenodeCycle
 	timesource          timesource.Timesource
 	logger              *zap.Logger
 	maxHashQueryLength  uint64
@@ -53,14 +57,15 @@ type MessageSentCheck struct {
 }
 
 // NewMessageSentCheck creates a new instance of MessageSentCheck with default parameters
-func NewMessageSentCheck(ctx context.Context, store *store.WakuStore, timesource timesource.Timesource, msgStoredChan chan common.Hash, msgExpiredChan chan common.Hash, logger *zap.Logger) *MessageSentCheck {
+func NewMessageSentCheck(ctx context.Context, messageVerifier StorenodeMessageVerifier, cycle *history.StorenodeCycle, timesource timesource.Timesource, msgStoredChan chan common.Hash, msgExpiredChan chan common.Hash, logger *zap.Logger) *MessageSentCheck {
 	return &MessageSentCheck{
 		messageIDs:          make(map[string]map[common.Hash]uint32),
 		messageIDsMu:        sync.RWMutex{},
 		messageStoredChan:   msgStoredChan,
 		messageExpiredChan:  msgExpiredChan,
 		ctx:                 ctx,
-		store:               store,
+		messageVerifier:     messageVerifier,
+		storenodeCycle:      cycle,
 		timesource:          timesource,
 		logger:              logger,
 		maxHashQueryLength:  DefaultMaxHashQueryLength,
@@ -139,11 +144,6 @@ func (m *MessageSentCheck) DeleteByMessageIDs(messageIDs []common.Hash) {
 	}
 }
 
-// SetStorePeerID sets the peer id of store node
-func (m *MessageSentCheck) SetStorePeerID(peerID peer.ID) {
-	m.storePeerID = peerID
-}
-
 // Start checks if the tracked outgoing messages are stored periodically
 func (m *MessageSentCheck) Start() {
 	defer utils.LogOnPanic()
@@ -211,18 +211,13 @@ func (m *MessageSentCheck) Start() {
 }
 
 func (m *MessageSentCheck) messageHashBasedQuery(ctx context.Context, hashes []common.Hash, relayTime []uint32, pubsubTopic string) []common.Hash {
-	selectedPeer := m.storePeerID
+	selectedPeer := m.storenodeCycle.GetActiveStorenode()
 	if selectedPeer == "" {
 		m.logger.Error("no store peer id available", zap.String("pubsubTopic", pubsubTopic))
 		return []common.Hash{}
 	}
 
-	var opts []store.RequestOption
 	requestID := protocol.GenerateRequestID()
-	opts = append(opts, store.WithRequestID(requestID))
-	opts = append(opts, store.WithPeer(selectedPeer))
-	opts = append(opts, store.WithPaging(false, m.maxHashQueryLength))
-	opts = append(opts, store.IncludeData(false))
 
 	messageHashes := make([]pb.MessageHash, len(hashes))
 	for i, hash := range hashes {
@@ -233,20 +228,20 @@ func (m *MessageSentCheck) messageHashBasedQuery(ctx context.Context, hashes []c
 
 	queryCtx, cancel := context.WithTimeout(ctx, m.storeQueryTimeout)
 	defer cancel()
-	result, err := m.store.QueryByHash(queryCtx, messageHashes, opts...)
+	result, err := m.messageVerifier.MessageHashesExist(queryCtx, requestID, selectedPeer, m.maxHashQueryLength, messageHashes)
 	if err != nil {
 		m.logger.Error("store.queryByHash failed", zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", selectedPeer), zap.Error(err))
 		return []common.Hash{}
 	}
 
-	m.logger.Debug("store.queryByHash result", zap.String("requestID", hexutil.Encode(requestID)), zap.Int("messages", len(result.Messages())))
+	m.logger.Debug("store.queryByHash result", zap.String("requestID", hexutil.Encode(requestID)), zap.Int("messages", len(result)))
 
 	var ackHashes []common.Hash
 	var missedHashes []common.Hash
 	for i, hash := range hashes {
 		found := false
-		for _, msg := range result.Messages() {
-			if bytes.Equal(msg.GetMessageHash(), hash.Bytes()) {
+		for _, msgHash := range result {
+			if bytes.Equal(msgHash.Bytes(), hash.Bytes()) {
 				found = true
 				break
 			}

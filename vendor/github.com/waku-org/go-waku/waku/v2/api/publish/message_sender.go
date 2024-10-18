@@ -8,8 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
@@ -37,10 +36,20 @@ func (pm PublishMethod) String() string {
 	}
 }
 
+type Publisher interface {
+	// RelayListPeers returns the list of peers for a pubsub topic
+	RelayListPeers(pubsubTopic string) ([]peer.ID, error)
+
+	// RelayPublish publishes a message via WakuRelay
+	RelayPublish(ctx context.Context, message *pb.WakuMessage, pubsubTopic string) (pb.MessageHash, error)
+
+	// LightpushPublish publishes a message via WakuLightPush
+	LightpushPublish(ctx context.Context, message *pb.WakuMessage, pubsubTopic string, maxPeers int) (pb.MessageHash, error)
+}
+
 type MessageSender struct {
 	publishMethod    PublishMethod
-	lightPush        *lightpush.WakuLightPush
-	relay            *relay.WakuRelay
+	publisher        Publisher
 	messageSentCheck ISentCheck
 	rateLimiter      *PublishRateLimiter
 	logger           *zap.Logger
@@ -65,14 +74,13 @@ func (r *Request) WithPublishMethod(publishMethod PublishMethod) *Request {
 	return r
 }
 
-func NewMessageSender(publishMethod PublishMethod, lightPush *lightpush.WakuLightPush, relay *relay.WakuRelay, logger *zap.Logger) (*MessageSender, error) {
+func NewMessageSender(publishMethod PublishMethod, publisher Publisher, logger *zap.Logger) (*MessageSender, error) {
 	if publishMethod == UnknownMethod {
 		return nil, errors.New("publish method is required")
 	}
 	return &MessageSender{
 		publishMethod: publishMethod,
-		lightPush:     lightPush,
-		relay:         relay,
+		publisher:     publisher,
 		rateLimiter:   NewPublishRateLimiter(DefaultPublishingLimiterRate, DefaultPublishingLimitBurst),
 		logger:        logger,
 	}, nil
@@ -109,26 +117,23 @@ func (ms *MessageSender) Send(req *Request) error {
 
 	switch publishMethod {
 	case LightPush:
-		if ms.lightPush == nil {
-			return errors.New("lightpush is not available")
-		}
 		logger.Info("publishing message via lightpush")
-		_, err := ms.lightPush.Publish(
+		_, err := ms.publisher.LightpushPublish(
 			req.ctx,
 			req.envelope.Message(),
-			lightpush.WithPubSubTopic(req.envelope.PubsubTopic()),
-			lightpush.WithMaxPeers(DefaultPeersToPublishForLightpush),
+			req.envelope.PubsubTopic(),
+			DefaultPeersToPublishForLightpush,
 		)
 		if err != nil {
 			return err
 		}
 	case Relay:
-		if ms.relay == nil {
-			return errors.New("relay is not available")
+		peers, err := ms.publisher.RelayListPeers(req.envelope.PubsubTopic())
+		if err != nil {
+			return err
 		}
-		peerCnt := len(ms.relay.PubSub().ListPeers(req.envelope.PubsubTopic()))
-		logger.Info("publishing message via relay", zap.Int("peerCnt", peerCnt))
-		_, err := ms.relay.Publish(req.ctx, req.envelope.Message(), relay.WithPubSubTopic(req.envelope.PubsubTopic()))
+		logger.Info("publishing message via relay", zap.Int("peerCnt", len(peers)))
+		_, err = ms.publisher.RelayPublish(req.ctx, req.envelope.Message(), req.envelope.PubsubTopic())
 		if err != nil {
 			return err
 		}
@@ -160,11 +165,5 @@ func (ms *MessageSender) PublishMethod() PublishMethod {
 func (ms *MessageSender) MessagesDelivered(messageIDs []common.Hash) {
 	if ms.messageSentCheck != nil {
 		ms.messageSentCheck.DeleteByMessageIDs(messageIDs)
-	}
-}
-
-func (ms *MessageSender) SetStorePeerID(peerID peer.ID) {
-	if ms.messageSentCheck != nil {
-		ms.messageSentCheck.SetStorePeerID(peerID)
 	}
 }
