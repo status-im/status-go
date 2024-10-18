@@ -5,8 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
+
+	mock_peer "github.com/status-im/status-go/services/peer/mock"
 )
 
 func TestPeerSuite(t *testing.T) {
@@ -17,12 +19,12 @@ type PeerSuite struct {
 	suite.Suite
 	api *PublicAPI
 	s   *Service
-	d   *MockDiscoverer
+	d   *mock_peer.MockDiscoverer
 }
 
 func (s *PeerSuite) SetupTest() {
 	ctrl := gomock.NewController(s.T())
-	s.d = NewMockDiscoverer(ctrl)
+	s.d = mock_peer.NewMockDiscoverer(ctrl)
 	s.s = New()
 	s.api = NewAPI(s.s)
 }

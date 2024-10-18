@@ -48,7 +48,7 @@ func (s *ENSReleaseProcessor) AvailableFor(params ProcessorInputParams) (bool, e
 }
 
 func (s *ENSReleaseProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
 }
 
 func (s *ENSReleaseProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
@@ -57,7 +57,8 @@ func (s *ENSReleaseProcessor) PackTxInputData(params ProcessorInputParams) ([]by
 		return []byte{}, createENSReleaseErrorResponse(err)
 	}
 
-	return registrarABI.Pack("release", ens.UsernameToLabel(params.Username))
+	name := getNameFromEnsUsername(params.Username)
+	return registrarABI.Pack("release", ens.UsernameToLabel(name))
 }
 
 func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
@@ -88,7 +89,7 @@ func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams) (uint64, 
 	msg := ethereum.CallMsg{
 		From:  params.FromAddr,
 		To:    &contractAddress,
-		Value: ZeroBigIntValue,
+		Value: walletCommon.ZeroBigIntValue(),
 		Data:  input,
 	}
 
@@ -110,6 +111,10 @@ func (s *ENSReleaseProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArg
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce)
 }
 
+func (s *ENSReleaseProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
+}
+
 func (s *ENSReleaseProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	return params.AmountIn, nil
 }
@@ -119,7 +124,7 @@ func (s *ENSReleaseProcessor) GetContractAddress(params ProcessorInputParams) (c
 	if err != nil {
 		return common.Address{}, err
 	}
-	if addr == ZeroAddress {
+	if addr == walletCommon.ZeroAddress() {
 		return common.Address{}, ErrENSRegistrarNotFound
 	}
 	return addr, nil

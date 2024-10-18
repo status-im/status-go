@@ -1,5 +1,7 @@
 package peer
 
+//go:generate mockgen -package=mock_peer -source=service.go -destination=mock/service.go
+
 import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"

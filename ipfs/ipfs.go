@@ -15,6 +15,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 )
 
@@ -83,6 +84,7 @@ func (d *Downloader) Stop() {
 }
 
 func (d *Downloader) worker() {
+	defer common.LogOnPanic()
 	for request := range d.rateLimiterChan {
 		resp, err := d.download(request.cid, request.download)
 		request.doneChan <- taskResponse{
@@ -93,6 +95,7 @@ func (d *Downloader) worker() {
 }
 
 func (d *Downloader) taskDispatcher() {
+	defer common.LogOnPanic()
 	ticker := time.NewTicker(time.Second / maxRequestsPerSecond)
 	defer ticker.Stop()
 

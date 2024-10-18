@@ -209,9 +209,18 @@ func (c *Conn) NewStream(ctx context.Context) (network.Stream, error) {
 		return nil, err
 	}
 
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, defaultNewStreamTimeout)
+		defer cancel()
+	}
+
 	s, err := c.openAndAddStream(ctx, scope)
 	if err != nil {
 		scope.Done()
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = fmt.Errorf("timed out: %w", err)
+		}
 		return nil, err
 	}
 	return s, nil

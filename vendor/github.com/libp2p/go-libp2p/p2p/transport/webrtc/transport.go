@@ -1,15 +1,5 @@
 // Package libp2pwebrtc implements the WebRTC transport for go-libp2p,
 // as described in https://github.com/libp2p/specs/tree/master/webrtc.
-//
-// At this point, this package is EXPERIMENTAL, and the WebRTC transport is not enabled by default.
-// While we're fairly confident that the implementation correctly implements the specification,
-// we're not making any guarantees regarding its security (especially regarding resource exhaustion attacks).
-// Fixes, even for security-related issues, will be conducted in the open.
-//
-// Experimentation is encouraged. Please open an issue if you encounter any problems with this transport.
-//
-// The udpmux subpackage contains the logic for multiplexing multiple WebRTC (ICE)
-// connections over a single UDP socket.
 package libp2pwebrtc
 
 import (
@@ -36,6 +26,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/sec"
 	tpt "github.com/libp2p/go-libp2p/core/transport"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
+	libp2pquic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/webrtc/pb"
 	"github.com/libp2p/go-msgio"
 
@@ -88,6 +79,8 @@ type WebRTCTransport struct {
 	noiseTpt     *noise.Transport
 	localPeerId  peer.ID
 
+	listenUDP func(network string, laddr *net.UDPAddr) (net.PacketConn, error)
+
 	// timeouts
 	peerConnectionTimeouts iceTimeouts
 
@@ -105,7 +98,9 @@ type iceTimeouts struct {
 	Keepalive  time.Duration
 }
 
-func New(privKey ic.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager, opts ...Option) (*WebRTCTransport, error) {
+type ListenUDPFn func(network string, laddr *net.UDPAddr) (net.PacketConn, error)
+
+func New(privKey ic.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager, listenUDP ListenUDPFn, opts ...Option) (*WebRTCTransport, error) {
 	if psk != nil {
 		log.Error("WebRTC doesn't support private networks yet.")
 		return nil, fmt.Errorf("WebRTC doesn't support private networks yet")
@@ -151,6 +146,7 @@ func New(privKey ic.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr 
 		noiseTpt:     noiseTpt,
 		localPeerId:  localPeerID,
 
+		listenUDP: listenUDP,
 		peerConnectionTimeouts: iceTimeouts{
 			Disconnect: DefaultDisconnectedTimeout,
 			Failed:     DefaultFailedTimeout,
@@ -165,6 +161,10 @@ func New(privKey ic.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr 
 		}
 	}
 	return transport, nil
+}
+
+func (t *WebRTCTransport) ListenOrder() int {
+	return libp2pquic.ListenOrder + 1 // We want to listen after QUIC listens so we can possibly reuse the same port.
 }
 
 func (t *WebRTCTransport) Protocols() []int {
@@ -200,7 +200,7 @@ func (t *WebRTCTransport) Listen(addr ma.Multiaddr) (tpt.Listener, error) {
 		return nil, fmt.Errorf("listener could not resolve udp address: %w", err)
 	}
 
-	socket, err := net.ListenUDP(nw, udpAddr)
+	socket, err := t.listenUDP(nw, udpAddr)
 	if err != nil {
 		return nil, fmt.Errorf("listen on udp: %w", err)
 	}
@@ -213,7 +213,7 @@ func (t *WebRTCTransport) Listen(addr ma.Multiaddr) (tpt.Listener, error) {
 	return listener, nil
 }
 
-func (t *WebRTCTransport) listenSocket(socket *net.UDPConn) (tpt.Listener, error) {
+func (t *WebRTCTransport) listenSocket(socket net.PacketConn) (tpt.Listener, error) {
 	listenerMultiaddr, err := manet.FromNetAddr(socket.LocalAddr())
 	if err != nil {
 		return nil, err
@@ -269,6 +269,7 @@ func (t *WebRTCTransport) dial(ctx context.Context, scope network.ConnManagement
 			}
 			if tConn != nil {
 				_ = tConn.Close()
+				tConn = nil
 			}
 		}
 	}()
@@ -399,6 +400,7 @@ func (t *WebRTCTransport) dial(ctx context.Context, scope network.ConnManagement
 		remotePubKey,
 		remoteMultiaddrWithoutCerthash,
 		w.IncomingDataChannels,
+		w.PeerConnectionClosedCh,
 	)
 	if err != nil {
 		return nil, err
@@ -572,9 +574,10 @@ func detachHandshakeDataChannel(ctx context.Context, dc *webrtc.DataChannel) (da
 // a small window of time where datachannels created by the peer may not surface to us and cause a
 // memory leak.
 type webRTCConnection struct {
-	PeerConnection       *webrtc.PeerConnection
-	HandshakeDataChannel *webrtc.DataChannel
-	IncomingDataChannels chan dataChannel
+	PeerConnection         *webrtc.PeerConnection
+	HandshakeDataChannel   *webrtc.DataChannel
+	IncomingDataChannels   chan dataChannel
+	PeerConnectionClosedCh chan struct{}
 }
 
 func newWebRTCConnection(settings webrtc.SettingEngine, config webrtc.Configuration) (webRTCConnection, error) {
@@ -613,10 +616,20 @@ func newWebRTCConnection(settings webrtc.SettingEngine, config webrtc.Configurat
 			}
 		})
 	})
+
+	connectionClosedCh := make(chan struct{}, 1)
+	pc.SCTP().OnClose(func(err error) {
+		// We only need one message. Closing a connection is a problem as pion might invoke the callback more than once.
+		select {
+		case connectionClosedCh <- struct{}{}:
+		default:
+		}
+	})
 	return webRTCConnection{
-		PeerConnection:       pc,
-		HandshakeDataChannel: handshakeDataChannel,
-		IncomingDataChannels: incomingDataChannels,
+		PeerConnection:         pc,
+		HandshakeDataChannel:   handshakeDataChannel,
+		IncomingDataChannels:   incomingDataChannels,
+		PeerConnectionClosedCh: connectionClosedCh,
 	}, nil
 }
 

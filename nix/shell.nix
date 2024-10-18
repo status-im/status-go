@@ -23,13 +23,12 @@ in pkgs.mkShell {
 
   buildInputs = with pkgs; [
     git jq which
-    go golangci-lint go-junit-report gopls go-bindata gomobileMod codecov-cli
+    go golangci-lint go-junit-report gopls go-bindata gomobileMod codecov-cli go-generate-fast
     mockgen protobuf3_20 protoc-gen-go gotestsum go-modvendor openjdk cc-test-reporter
    ] ++ lib.optionals (stdenv.isDarwin) [ xcodeWrapper ]
      ++ lib.optionals (isMacIntel) [
    pkgs.darwin.apple_sdk.libs.xpc
    pkgs.darwin.apple_sdk_11_0.frameworks.Security
-   pkgs.darwin.apple_sdk_11_0.frameworks.CoreServices
    ];
 
    shellHook = lib.optionalString (!isMacM1) ''
@@ -42,4 +41,3 @@ in pkgs.mkShell {
   # https://github.com/status-im/status-mobile/pull/13912
   __noChroot = stdenv.isDarwin;
 }
-

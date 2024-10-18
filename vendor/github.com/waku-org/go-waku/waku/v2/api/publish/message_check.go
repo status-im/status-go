@@ -14,6 +14,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -145,6 +146,7 @@ func (m *MessageSentCheck) SetStorePeerID(peerID peer.ID) {
 
 // Start checks if the tracked outgoing messages are stored periodically
 func (m *MessageSentCheck) Start() {
+	defer utils.LogOnPanic()
 	ticker := time.NewTicker(m.hashQueryInterval)
 	defer ticker.Stop()
 	for {

@@ -65,7 +65,6 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 }
 
 func (s *ConnectionParamsSuite) TestConnectionParams_ToString() {
-	keep229Compatibility = false
 	cp, err := s.server.MakeConnectionParams()
 	s.Require().NoError(err)
 

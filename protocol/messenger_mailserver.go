@@ -2,6 +2,8 @@ package protocol
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"sort"
@@ -12,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -68,6 +71,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 	}
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		ms := m.getActiveMailserver(chat.CommunityID)
 		_, err = m.performMailserverRequest(ms, func(mailServer mailservers.Mailserver) (*MessengerResponse, error) {
 			response, err := m.syncChatWithFilters(mailServer, chat.ID)
@@ -162,6 +166,7 @@ func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, erro
 	}
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		// split filters by community store node so we can request the filters to the correct mailserver
 		filtersByMs := m.SplitFiltersByStoreNode(filters)
 		for communityID, filtersForMs := range filtersByMs {
@@ -398,6 +403,7 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 const missingMessageCheckPeriod = 30 * time.Second
 
 func (m *Messenger) checkForMissingMessagesLoop() {
+	defer gocommon.LogOnPanic()
 	t := time.NewTicker(missingMessageCheckPeriod)
 	defer t.Stop()
 
@@ -752,14 +758,14 @@ func processMailserverBatch(
 	for _, t := range batch.Topics {
 		topicStrings = append(topicStrings, t.String())
 	}
-	logger = logger.With(zap.Any("chatIDs", batch.ChatIDs),
+	logger = logger.With(zap.String("batch hash", batch.Hash()))
+	logger.Info("syncing topic",
+		zap.Any("chatIDs", batch.ChatIDs),
 		zap.String("fromString", time.Unix(int64(batch.From), 0).Format(time.RFC3339)),
 		zap.String("toString", time.Unix(int64(batch.To), 0).Format(time.RFC3339)),
 		zap.Any("topic", topicStrings),
 		zap.Int64("from", int64(batch.From)),
 		zap.Int64("to", int64(batch.To)))
-
-	logger.Info("syncing topic")
 
 	wg := sync.WaitGroup{}
 	workWg := sync.WaitGroup{}
@@ -774,6 +780,7 @@ func processMailserverBatch(
 	// Producer
 	wg.Add(1)
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer func() {
 			logger.Debug("mailserver batch producer complete")
 			wg.Done()
@@ -804,6 +811,7 @@ func processMailserverBatch(
 		}
 
 		go func() {
+			defer gocommon.LogOnPanic()
 			workWg.Wait()
 			workCompleteCh <- struct{}{}
 		}()
@@ -831,6 +839,7 @@ loop:
 			logger.Debug("processBatch - received work")
 			semaphore <- 1
 			go func(w work) { // Consumer
+				defer gocommon.LogOnPanic()
 				defer func() {
 					workWg.Done()
 					<-semaphore
@@ -950,6 +959,12 @@ type MailserverBatch struct {
 	PubsubTopic string
 	Topics      []types.TopicType
 	ChatIDs     []string
+}
+
+func (mb *MailserverBatch) Hash() string {
+	data := fmt.Sprintf("%d%d%s%s%v%v", mb.From, mb.To, mb.Cursor, mb.PubsubTopic, mb.Topics, mb.ChatIDs)
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:4])
 }
 
 func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {

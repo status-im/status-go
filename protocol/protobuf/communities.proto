@@ -200,13 +200,15 @@ message CommunityUserKicked {
 
 message CommunityRequestToJoinResponse {
   uint64 clock = 1;
-  CommunityDescription community = 2;
+  CommunityDescription community = 2 [deprecated = true];
   bool accepted = 3;
   bytes grant = 4;
   bytes community_id = 5;
   string magnet_uri = 6;
   bytes protected_topic_private_key = 7;
   Shard shard = 8;
+  // CommunityDescription protocol message with owner signature
+  bytes community_description_protocol_message = 9;
 }
 
 message CommunityRequestToLeave {

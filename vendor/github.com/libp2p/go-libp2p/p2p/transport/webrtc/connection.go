@@ -16,6 +16,7 @@ import (
 
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pion/datachannel"
+	"github.com/pion/sctp"
 	"github.com/pion/webrtc/v3"
 )
 
@@ -30,6 +31,8 @@ var _ net.Error = &errConnectionTimeout{}
 func (errConnectionTimeout) Error() string   { return "connection timeout" }
 func (errConnectionTimeout) Timeout() bool   { return true }
 func (errConnectionTimeout) Temporary() bool { return false }
+
+var errConnClosed = errors.New("connection closed")
 
 type dataChannel struct {
 	stream  datachannel.ReadWriteCloser
@@ -74,6 +77,7 @@ func newConnection(
 	remoteKey ic.PubKey,
 	remoteMultiaddr ma.Multiaddr,
 	incomingDataChannels chan dataChannel,
+	peerConnectionClosedCh chan struct{},
 ) (*connection, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &connection{
@@ -102,6 +106,18 @@ func newConnection(
 	}
 
 	pc.OnConnectionStateChange(c.onConnectionStateChange)
+	pc.SCTP().OnClose(func(err error) {
+		if err != nil {
+			c.closeWithError(fmt.Errorf("%w: %w", errConnClosed, err))
+		}
+		c.closeWithError(errConnClosed)
+	})
+	select {
+	case <-peerConnectionClosedCh:
+		c.Close()
+		return nil, errConnClosed
+	default:
+	}
 	return c, nil
 }
 
@@ -112,27 +128,29 @@ func (c *connection) ConnState() network.ConnectionState {
 
 // Close closes the underlying peerconnection.
 func (c *connection) Close() error {
-	c.closeOnce.Do(func() { c.closeWithError(errors.New("connection closed")) })
+	c.closeWithError(errConnClosed)
 	return nil
 }
 
 // closeWithError is used to Close the connection when the underlying DTLS connection fails
 func (c *connection) closeWithError(err error) {
-	c.closeErr = err
-	// cancel must be called after closeErr is set. This ensures interested goroutines waiting on
-	// ctx.Done can read closeErr without holding the conn lock.
-	c.cancel()
-	// closing peerconnection will close the datachannels associated with the streams
-	c.pc.Close()
+	c.closeOnce.Do(func() {
+		c.closeErr = err
+		// cancel must be called after closeErr is set. This ensures interested goroutines waiting on
+		// ctx.Done can read closeErr without holding the conn lock.
+		c.cancel()
+		// closing peerconnection will close the datachannels associated with the streams
+		c.pc.Close()
 
-	c.m.Lock()
-	streams := c.streams
-	c.streams = nil
-	c.m.Unlock()
-	for _, s := range streams {
-		s.closeForShutdown(err)
-	}
-	c.scope.Done()
+		c.m.Lock()
+		streams := c.streams
+		c.streams = nil
+		c.m.Unlock()
+		for _, s := range streams {
+			s.closeForShutdown(err)
+		}
+		c.scope.Done()
+	})
 }
 
 func (c *connection) IsClosed() bool {
@@ -155,6 +173,12 @@ func (c *connection) OpenStream(ctx context.Context) (network.MuxedStream, error
 	}
 	rwc, err := c.detachChannel(ctx, dc)
 	if err != nil {
+		// There's a race between webrtc.SCTP.OnClose callback and the underlying
+		// association closing. It's nicer to close the connection here.
+		if errors.Is(err, sctp.ErrStreamClosed) {
+			c.closeWithError(errConnClosed)
+			return nil, c.closeErr
+		}
 		dc.Close()
 		return nil, fmt.Errorf("detach channel failed for stream(%d): %w", streamID, err)
 	}
@@ -209,9 +233,7 @@ func (c *connection) removeStream(id uint16) {
 
 func (c *connection) onConnectionStateChange(state webrtc.PeerConnectionState) {
 	if state == webrtc.PeerConnectionStateFailed || state == webrtc.PeerConnectionStateClosed {
-		c.closeOnce.Do(func() {
-			c.closeWithError(errConnectionTimeout{})
-		})
+		c.closeWithError(errConnectionTimeout{})
 	}
 }
 

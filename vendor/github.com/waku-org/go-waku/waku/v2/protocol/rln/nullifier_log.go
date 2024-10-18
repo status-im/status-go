@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"github.com/waku-org/go-zerokit-rln/rln"
 	"go.uber.org/zap"
 )
@@ -89,6 +90,7 @@ func (n *NullifierLog) HasDuplicate(proofMD rln.ProofMetadata) (bool, error) {
 
 // cleanup cleans up the log every time there are more than MaxEpochGap epochs stored in it
 func (n *NullifierLog) cleanup(ctx context.Context) {
+	defer utils.LogOnPanic()
 	t := time.NewTicker(1 * time.Minute) // TODO: tune this
 	defer t.Stop()
 

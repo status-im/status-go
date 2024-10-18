@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 
 	persistence "github.com/status-im/status-go/services/connector/database"
@@ -11,7 +12,7 @@ type RevokePermissionsCommand struct {
 	Db *sql.DB
 }
 
-func (c *RevokePermissionsCommand) Execute(request RPCRequest) (interface{}, error) {
+func (c *RevokePermissionsCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err

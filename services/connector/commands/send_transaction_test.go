@@ -2,13 +2,17 @@ package commands
 
 import (
 	"encoding/json"
+	"errors"
+	"math/big"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/eth-node/types"
+	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -38,77 +42,68 @@ func prepareSendTransactionRequest(dApp signal.ConnectorDApp, from types.Address
 }
 
 func TestFailToSendTransactionWithoutPermittedDApp(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	cmd := &SendTransactionCommand{Db: db}
+	state, close := setupCommand(t, Method_EthSendTransaction)
+	t.Cleanup(close)
 
 	// Don't save dApp in the database
 	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x1})
 	assert.NoError(t, err)
 
-	_, err = cmd.Execute(request)
+	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrDAppIsNotPermittedByUser, err)
 }
 
 func TestFailToSendTransactionWithWrongAddress(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
+	state, close := setupCommand(t, Method_EthSendTransaction)
+	t.Cleanup(close)
 
-	cmd := &SendTransactionCommand{Db: db}
-
-	err := PersistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
+	err := PersistDAppData(state.walletDb, testDAppData, types.Address{0x01}, uint64(0x1))
 	assert.NoError(t, err)
 
 	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x02})
 	assert.NoError(t, err)
 
-	_, err = cmd.Execute(request)
+	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrParamsFromAddressIsNotShared, err)
 }
 
 func TestSendTransactionWithSignalTimout(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
+	state, close := setupCommand(t, Method_EthSendTransaction)
+	t.Cleanup(close)
 
-	clientHandler := NewClientSideHandler()
-
-	cmd := &SendTransactionCommand{
-		Db:            db,
-		ClientHandler: clientHandler,
-	}
-
-	err := PersistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
+	accountAddress := types.Address{0x01}
+	err := PersistDAppData(state.walletDb, testDAppData, accountAddress, uint64(0x1))
 	assert.NoError(t, err)
 
-	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x01})
+	request, err := prepareSendTransactionRequest(testDAppData, accountAddress)
 	assert.NoError(t, err)
 
 	backupWalletResponseMaxInterval := WalletResponseMaxInterval
 	WalletResponseMaxInterval = 1 * time.Millisecond
 
-	_, err = cmd.Execute(request)
+	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
+	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
+	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
+	mockedChainClient.EXPECT().SuggestGasTipCap(state.ctx).Times(1).Return(big.NewInt(0), errors.New("EIP-1559 is not enabled"))
+	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
+	mockedChainClient.EXPECT().PendingNonceAt(state.ctx, common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
+
+	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrWalletResponseTimeout, err)
 	WalletResponseMaxInterval = backupWalletResponseMaxInterval
 }
 
 func TestSendTransactionWithSignalAccepted(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
+	state, close := setupCommand(t, Method_EthSendTransaction)
+	t.Cleanup(close)
 
 	fakedTransactionHash := types.Hash{0x051}
 
-	clientHandler := NewClientSideHandler()
-
-	cmd := &SendTransactionCommand{
-		Db:            db,
-		ClientHandler: clientHandler,
-	}
-
-	err := PersistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
+	accountAddress := types.Address{0x01}
+	err := PersistDAppData(state.walletDb, testDAppData, accountAddress, uint64(0x1))
 	assert.NoError(t, err)
 
-	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x01})
+	request, err := prepareSendTransactionRequest(testDAppData, accountAddress)
 	assert.NoError(t, err)
 
 	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
@@ -122,7 +117,7 @@ func TestSendTransactionWithSignalAccepted(t *testing.T) {
 			err := json.Unmarshal(evt.Event, &ev)
 			assert.NoError(t, err)
 
-			err = clientHandler.SendTransactionAccepted(SendTransactionAcceptedArgs{
+			err = state.handler.SendTransactionAccepted(SendTransactionAcceptedArgs{
 				Hash:      fakedTransactionHash,
 				RequestID: ev.RequestID,
 			})
@@ -131,26 +126,27 @@ func TestSendTransactionWithSignalAccepted(t *testing.T) {
 	}))
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
-	response, err := cmd.Execute(request)
+	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
+	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
+	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
+	mockedChainClient.EXPECT().SuggestGasTipCap(state.ctx).Times(1).Return(big.NewInt(0), errors.New("EIP-1559 is not enabled"))
+	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
+	mockedChainClient.EXPECT().PendingNonceAt(state.ctx, common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
+
+	response, err := state.cmd.Execute(state.ctx, request)
 	assert.NoError(t, err)
 	assert.Equal(t, response, fakedTransactionHash.String())
 }
 
 func TestSendTransactionWithSignalRejected(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
+	state, close := setupCommand(t, Method_EthSendTransaction)
+	t.Cleanup(close)
 
-	clientHandler := NewClientSideHandler()
-
-	cmd := &SendTransactionCommand{
-		Db:            db,
-		ClientHandler: clientHandler,
-	}
-
-	err := PersistDAppData(db, testDAppData, types.Address{0x01}, uint64(0x1))
+	accountAddress := types.Address{0x01}
+	err := PersistDAppData(state.walletDb, testDAppData, accountAddress, uint64(0x1))
 	assert.NoError(t, err)
 
-	request, err := prepareSendTransactionRequest(testDAppData, types.Address{0x01})
+	request, err := prepareSendTransactionRequest(testDAppData, accountAddress)
 	assert.NoError(t, err)
 
 	signal.SetMobileSignalHandler(signal.MobileSignalHandler(func(s []byte) {
@@ -164,7 +160,7 @@ func TestSendTransactionWithSignalRejected(t *testing.T) {
 			err := json.Unmarshal(evt.Event, &ev)
 			assert.NoError(t, err)
 
-			err = clientHandler.SendTransactionRejected(RejectedArgs{
+			err = state.handler.SendTransactionRejected(RejectedArgs{
 				RequestID: ev.RequestID,
 			})
 			assert.NoError(t, err)
@@ -172,6 +168,13 @@ func TestSendTransactionWithSignalRejected(t *testing.T) {
 	}))
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
-	_, err = cmd.Execute(request)
+	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
+	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
+	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
+	mockedChainClient.EXPECT().SuggestGasTipCap(state.ctx).Times(1).Return(big.NewInt(0), errors.New("EIP-1559 is not enabled"))
+	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
+	mockedChainClient.EXPECT().PendingNonceAt(state.ctx, common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
+
+	_, err = state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrSendTransactionRejectedByUser, err)
 }

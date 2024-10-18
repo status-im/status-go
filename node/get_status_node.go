@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -39,6 +40,7 @@ import (
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
@@ -132,6 +134,7 @@ type StatusNode struct {
 	pendingTracker         *transactions.PendingTxTracker
 	connectorSrvc          *connector.Service
 	appGeneralSrvc         *appgeneral.Service
+	ethSrvc                *eth.Service
 
 	accountsFeed event.Feed
 	walletFeed   event.Feed
@@ -329,11 +332,19 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		},
 	}
 
-	n.rpcClient, err = rpc.NewClient(gethNodeClient, n.config.NetworkID, n.config.UpstreamConfig, n.config.Networks, n.appDB, providerConfigs)
+	config := rpc.ClientConfig{
+		Client:          gethNodeClient,
+		UpstreamChainID: n.config.NetworkID,
+		Networks:        n.config.Networks,
+		DB:              n.appDB,
+		WalletFeed:      &n.walletFeed,
+		ProviderConfigs: providerConfigs,
+	}
+	n.rpcClient, err = rpc.NewClient(config)
+	n.rpcClient.Start(context.Background())
 	if err != nil {
 		return
 	}
-
 	return
 }
 
@@ -449,6 +460,7 @@ func (n *StatusNode) stop() error {
 		return err
 	}
 
+	n.rpcClient.Stop()
 	n.rpcClient = nil
 	// We need to clear `gethNode` because config is passed to `Start()`
 	// and may be completely different. Similarly with `config`.
@@ -688,10 +700,18 @@ func (n *StatusNode) SetAppDB(db *sql.DB) {
 	n.appDB = db
 }
 
+func (n *StatusNode) GetAppDB() *sql.DB {
+	return n.appDB
+}
+
 func (n *StatusNode) SetMultiaccountsDB(db *multiaccounts.Database) {
 	n.multiaccountsDB = db
 }
 
 func (n *StatusNode) SetWalletDB(db *sql.DB) {
 	n.walletDB = db
+}
+
+func (n *StatusNode) GetWalletDB() *sql.DB {
+	return n.walletDB
 }

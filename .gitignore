@@ -101,10 +101,26 @@ test-bob/
 # Nix
 /.nix-gcroots/
 
-# integration-tests
+# functional tests
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
 .envrc
 report/results.xml
+tests-functional/coverage
+tests-functional/reports
+tests-functional/*.log
+
+# generated files
+mock
+mock.go
+*.pb.go
+bindata.go
+migrations.go
+cmd/status-backend/server/endpoints.go
+protocol/messenger_handlers.go
+
+# Don't ignore generated files in the vendor/ directory
+!vendor/**/*.pb.go
+!vendor/**/migrations.go

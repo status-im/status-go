@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"
@@ -35,17 +35,19 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 
 	keyStoreDir := t.TempDir()
 
-	// Creating a dummy status node to simulate what it's done in get_status_node.go
-	upstreamConfig := params.UpstreamRPCConfig{
-		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",
-		Enabled: true,
-	}
-
 	txServiceMockCtrl := gomock.NewController(t)
 	server, _ := fake.NewTestServer(txServiceMockCtrl)
 	client := gethrpc.DialInProc(server)
 
-	rpcClient, err := statusRPC.NewClient(client, 1, upstreamConfig, nil, db, nil)
+	config := statusRPC.ClientConfig{
+		Client:          client,
+		UpstreamChainID: 1,
+		Networks:        nil,
+		DB:              db,
+		WalletFeed:      nil,
+		ProviderConfigs: nil,
+	}
+	rpcClient, err := statusRPC.NewClient(config)
 	require.NoError(t, err)
 
 	// import account keys

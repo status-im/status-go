@@ -5,6 +5,7 @@ package codecs
 
 import (
 	"github.com/pion/randutil"
+	"github.com/pion/rtp/codecs/vp9"
 )
 
 // Use global random generator to properly seed by crypto grade random.
@@ -12,24 +13,50 @@ var globalMathRandomGenerator = randutil.NewMathRandomGenerator() // nolint:goch
 
 // VP9Payloader payloads VP9 packets
 type VP9Payloader struct {
-	pictureID   uint16
-	initialized bool
+	// whether to use flexible mode or non-flexible mode.
+	FlexibleMode bool
 
 	// InitialPictureIDFn is a function that returns random initial picture ID.
 	InitialPictureIDFn func() uint16
+
+	pictureID   uint16
+	initialized bool
 }
 
 const (
-	vp9HeaderSize    = 3 // Flexible mode 15 bit picture ID
 	maxSpatialLayers = 5
 	maxVP9RefPics    = 3
 )
 
 // Payload fragments an VP9 packet across one or more byte arrays
 func (p *VP9Payloader) Payload(mtu uint16, payload []byte) [][]byte {
+	if !p.initialized {
+		if p.InitialPictureIDFn == nil {
+			p.InitialPictureIDFn = func() uint16 {
+				return uint16(globalMathRandomGenerator.Intn(0x7FFF))
+			}
+		}
+		p.pictureID = p.InitialPictureIDFn() & 0x7FFF
+		p.initialized = true
+	}
+
+	var payloads [][]byte
+	if p.FlexibleMode {
+		payloads = p.payloadFlexible(mtu, payload)
+	} else {
+		payloads = p.payloadNonFlexible(mtu, payload)
+	}
+
+	p.pictureID++
+	if p.pictureID >= 0x8000 {
+		p.pictureID = 0
+	}
+
+	return payloads
+}
+
+func (p *VP9Payloader) payloadFlexible(mtu uint16, payload []byte) [][]byte {
 	/*
-	 * https://www.ietf.org/id/draft-ietf-payload-vp9-13.txt
-	 *
 	 * Flexible mode (F=1)
 	 *        0 1 2 3 4 5 6 7
 	 *       +-+-+-+-+-+-+-+-+
@@ -46,7 +73,45 @@ func (p *VP9Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 	 *  V:   | SS            |
 	 *       | ..            |
 	 *       +-+-+-+-+-+-+-+-+
-	 *
+	 */
+
+	headerSize := 3
+	maxFragmentSize := int(mtu) - headerSize
+	payloadDataRemaining := len(payload)
+	payloadDataIndex := 0
+	var payloads [][]byte
+
+	if min(maxFragmentSize, payloadDataRemaining) <= 0 {
+		return [][]byte{}
+	}
+
+	for payloadDataRemaining > 0 {
+		currentFragmentSize := min(maxFragmentSize, payloadDataRemaining)
+		out := make([]byte, headerSize+currentFragmentSize)
+
+		out[0] = 0x90 // F=1, I=1
+		if payloadDataIndex == 0 {
+			out[0] |= 0x08 // B=1
+		}
+		if payloadDataRemaining == currentFragmentSize {
+			out[0] |= 0x04 // E=1
+		}
+
+		out[1] = byte(p.pictureID>>8) | 0x80
+		out[2] = byte(p.pictureID)
+
+		copy(out[headerSize:], payload[payloadDataIndex:payloadDataIndex+currentFragmentSize])
+		payloads = append(payloads, out)
+
+		payloadDataRemaining -= currentFragmentSize
+		payloadDataIndex += currentFragmentSize
+	}
+
+	return payloads
+}
+
+func (p *VP9Payloader) payloadNonFlexible(mtu uint16, payload []byte) [][]byte {
+	/*
 	 * Non-flexible mode (F=0)
 	 *        0 1 2 3 4 5 6 7
 	 *       +-+-+-+-+-+-+-+-+
@@ -65,50 +130,79 @@ func (p *VP9Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 	 *       +-+-+-+-+-+-+-+-+
 	 */
 
-	if !p.initialized {
-		if p.InitialPictureIDFn == nil {
-			p.InitialPictureIDFn = func() uint16 {
-				return uint16(globalMathRandomGenerator.Intn(0x7FFF))
-			}
-		}
-		p.pictureID = p.InitialPictureIDFn() & 0x7FFF
-		p.initialized = true
-	}
-	if payload == nil {
+	var h vp9.Header
+	err := h.Unmarshal(payload)
+	if err != nil {
 		return [][]byte{}
 	}
 
-	maxFragmentSize := int(mtu) - vp9HeaderSize
 	payloadDataRemaining := len(payload)
 	payloadDataIndex := 0
-
-	if min(maxFragmentSize, payloadDataRemaining) <= 0 {
-		return [][]byte{}
-	}
-
 	var payloads [][]byte
-	for payloadDataRemaining > 0 {
-		currentFragmentSize := min(maxFragmentSize, payloadDataRemaining)
-		out := make([]byte, vp9HeaderSize+currentFragmentSize)
 
-		out[0] = 0x90 // F=1 I=1
+	for payloadDataRemaining > 0 {
+		var headerSize int
+		if !h.NonKeyFrame && payloadDataIndex == 0 {
+			headerSize = 3 + 8
+		} else {
+			headerSize = 3
+		}
+
+		maxFragmentSize := int(mtu) - headerSize
+		currentFragmentSize := min(maxFragmentSize, payloadDataRemaining)
+		if currentFragmentSize <= 0 {
+			return [][]byte{}
+		}
+
+		out := make([]byte, headerSize+currentFragmentSize)
+
+		out[0] = 0x80 | 0x01 // I=1, Z=1
+
+		if h.NonKeyFrame {
+			out[0] |= 0x40 // P=1
+		}
 		if payloadDataIndex == 0 {
 			out[0] |= 0x08 // B=1
 		}
 		if payloadDataRemaining == currentFragmentSize {
 			out[0] |= 0x04 // E=1
 		}
+
 		out[1] = byte(p.pictureID>>8) | 0x80
 		out[2] = byte(p.pictureID)
-		copy(out[vp9HeaderSize:], payload[payloadDataIndex:payloadDataIndex+currentFragmentSize])
+		off := 3
+
+		if !h.NonKeyFrame && payloadDataIndex == 0 {
+			out[0] |= 0x02         // V=1
+			out[off] = 0x10 | 0x08 // N_S=0, Y=1, G=1
+			off++
+
+			width := h.Width()
+			out[off] = byte(width >> 8)
+			off++
+			out[off] = byte(width & 0xFF)
+			off++
+
+			height := h.Height()
+			out[off] = byte(height >> 8)
+			off++
+			out[off] = byte(height & 0xFF)
+			off++
+
+			out[off] = 0x01 // N_G=1
+			off++
+
+			out[off] = 1<<4 | 1<<2 // TID=0, U=1, R=1
+			off++
+
+			out[off] = 0x01 // P_DIFF=1
+		}
+
+		copy(out[headerSize:], payload[payloadDataIndex:payloadDataIndex+currentFragmentSize])
 		payloads = append(payloads, out)
 
 		payloadDataRemaining -= currentFragmentSize
 		payloadDataIndex += currentFragmentSize
-	}
-	p.pictureID++
-	if p.pictureID >= 0x8000 {
-		p.pictureID = 0
 	}
 
 	return payloads

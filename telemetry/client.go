@@ -12,10 +12,12 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/wakuv2"
 
+	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -25,15 +27,17 @@ type TelemetryType string
 
 const (
 	ProtocolStatsMetric        TelemetryType = "ProtocolStats"
-	ReceivedEnvelopeMetric     TelemetryType = "ReceivedEnvelope"
 	SentEnvelopeMetric         TelemetryType = "SentEnvelope"
 	UpdateEnvelopeMetric       TelemetryType = "UpdateEnvelope"
 	ReceivedMessagesMetric     TelemetryType = "ReceivedMessages"
 	ErrorSendingEnvelopeMetric TelemetryType = "ErrorSendingEnvelope"
 	PeerCountMetric            TelemetryType = "PeerCount"
 	PeerConnFailuresMetric     TelemetryType = "PeerConnFailure"
-
-	MaxRetryCache = 5000
+	MessageCheckSuccessMetric  TelemetryType = "MessageCheckSuccess"
+	MessageCheckFailureMetric  TelemetryType = "MessageCheckFailure"
+	PeerCountByShardMetric     TelemetryType = "PeerCountByShard"
+	PeerCountByOriginMetric    TelemetryType = "PeerCountByOrigin"
+	MaxRetryCache                            = 5000
 )
 
 type TelemetryRequest struct {
@@ -79,6 +83,26 @@ func (c *Client) PushPeerConnFailures(ctx context.Context, peerConnFailures map[
 	}
 }
 
+func (c *Client) PushMessageCheckSuccess(ctx context.Context, messageHash string) {
+	c.processAndPushTelemetry(ctx, MessageCheckSuccess{MessageHash: messageHash})
+}
+
+func (c *Client) PushMessageCheckFailure(ctx context.Context, messageHash string) {
+	c.processAndPushTelemetry(ctx, MessageCheckFailure{MessageHash: messageHash})
+}
+
+func (c *Client) PushPeerCountByShard(ctx context.Context, peerCountByShard map[uint16]uint) {
+	for shard, count := range peerCountByShard {
+		c.processAndPushTelemetry(ctx, PeerCountByShard{Shard: shard, Count: count})
+	}
+}
+
+func (c *Client) PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin map[wps.Origin]uint) {
+	for origin, count := range peerCountByOrigin {
+		c.processAndPushTelemetry(ctx, PeerCountByOrigin{Origin: origin, Count: count})
+	}
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
@@ -92,6 +116,24 @@ type PeerCount struct {
 type PeerConnFailure struct {
 	FailedPeerId string
 	FailureCount int
+}
+
+type MessageCheckSuccess struct {
+	MessageHash string
+}
+
+type MessageCheckFailure struct {
+	MessageHash string
+}
+
+type PeerCountByShard struct {
+	Shard uint16
+	Count uint
+}
+
+type PeerCountByOrigin struct {
+	Origin wps.Origin
+	Count  uint
 }
 
 type Client struct {
@@ -163,6 +205,7 @@ func (c *Client) SetDeviceType(deviceType string) {
 
 func (c *Client) Start(ctx context.Context) {
 	go func() {
+		defer common.LogOnPanic()
 		for {
 			select {
 			case telemetryRequest := <-c.telemetryCh:
@@ -175,6 +218,7 @@ func (c *Client) Start(ctx context.Context) {
 		}
 	}()
 	go func() {
+		defer common.LogOnPanic()
 		sendPeriod := c.sendPeriod
 		timer := time.NewTimer(sendPeriod)
 		defer timer.Stop()
@@ -216,12 +260,6 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			TelemetryType: ReceivedMessagesMetric,
 			TelemetryData: c.ProcessReceivedMessages(v),
 		}
-	case *v2protocol.Envelope:
-		telemetryRequest = TelemetryRequest{
-			Id:            c.nextId,
-			TelemetryType: ReceivedEnvelopeMetric,
-			TelemetryData: c.ProcessReceivedEnvelope(v),
-		}
 	case wakuv2.SentEnvelope:
 		telemetryRequest = TelemetryRequest{
 			Id:            c.nextId,
@@ -245,6 +283,30 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			Id:            c.nextId,
 			TelemetryType: PeerConnFailuresMetric,
 			TelemetryData: c.ProcessPeerConnFailure(v),
+		}
+	case MessageCheckSuccess:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: MessageCheckSuccessMetric,
+			TelemetryData: c.ProcessMessageCheckSuccess(v),
+		}
+	case MessageCheckFailure:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: MessageCheckFailureMetric,
+			TelemetryData: c.ProcessMessageCheckFailure(v),
+		}
+	case PeerCountByShard:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: PeerCountByShardMetric,
+			TelemetryData: c.ProcessPeerCountByShard(v),
+		}
+	case PeerCountByOrigin:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: PeerCountByOriginMetric,
+			TelemetryData: c.ProcessPeerCountByOrigin(v),
 		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
@@ -326,18 +388,6 @@ func (c *Client) ProcessReceivedMessages(receivedMessages ReceivedMessages) *jso
 	return &jsonRawMessage
 }
 
-func (c *Client) ProcessReceivedEnvelope(envelope *v2protocol.Envelope) *json.RawMessage {
-	postBody := c.commonPostBody()
-	postBody["messageHash"] = envelope.Hash().String()
-	postBody["sentAt"] = uint32(envelope.Message().GetTimestamp() / int64(time.Second))
-	postBody["pubsubTopic"] = envelope.PubsubTopic()
-	postBody["topic"] = envelope.Message().ContentTopic
-	postBody["receiverKeyUID"] = c.keyUID
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
-}
-
 func (c *Client) ProcessSentEnvelope(sentEnvelope wakuv2.SentEnvelope) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["messageHash"] = sentEnvelope.Envelope.Hash().String()
@@ -383,7 +433,42 @@ func (c *Client) ProcessPeerConnFailure(peerConnFailure PeerConnFailure) *json.R
 	return &jsonRawMessage
 }
 
+func (c *Client) ProcessMessageCheckSuccess(messageCheckSuccess MessageCheckSuccess) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageHash"] = messageCheckSuccess.MessageHash
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessPeerCountByShard(peerCountByShard PeerCountByShard) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["shard"] = peerCountByShard.Shard
+	postBody["count"] = peerCountByShard.Count
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessMessageCheckFailure(messageCheckFailure MessageCheckFailure) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageHash"] = messageCheckFailure.MessageHash
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
+func (c *Client) ProcessPeerCountByOrigin(peerCountByOrigin PeerCountByOrigin) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["origin"] = peerCountByOrigin.Origin
+	postBody["count"] = peerCountByOrigin.Count
+	body, _ := json.Marshal(postBody)
+	jsonRawMessage := json.RawMessage(body)
+	return &jsonRawMessage
+}
+
 func (c *Client) UpdateEnvelopeProcessingError(shhMessage *types.Message, processingError error) {
+	defer common.LogOnPanic()
 	c.logger.Debug("Pushing envelope update to telemetry server", zap.String("hash", types.EncodeHex(shhMessage.Hash)))
 	url := fmt.Sprintf("%s/update-envelope", c.serverURL)
 	var errorString = ""

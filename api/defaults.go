@@ -288,16 +288,6 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 		nodeConfig.NetworkID = nodeConfig.Networks[0].ChainID
 	}
 
-	if request.UpstreamConfig != "" {
-		nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
-			Enabled: true,
-			URL:     request.UpstreamConfig,
-		}
-	} else {
-		nodeConfig.UpstreamConfig.URL = mainnet(request.WalletSecretsConfig.StatusProxyStageName).RPCURL
-		nodeConfig.UpstreamConfig.Enabled = true
-	}
-
 	nodeConfig.Name = DefaultNodeName
 	nodeConfig.NoDiscovery = true
 	nodeConfig.MaxPeers = DefaultMaxPeers

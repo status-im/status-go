@@ -66,7 +66,17 @@ pipeline {
          }
       }
     }
-    /* Sanity-check C bindings */
+
+    stage('Generate') {
+        steps {
+            script {
+              if (env.PLATFORM != 'windows') {
+                shell('make generate')
+                }
+              }
+            }
+         }
+
     stage('Build Static Lib') {
         steps {
             script {

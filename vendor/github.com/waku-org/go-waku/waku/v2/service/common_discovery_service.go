@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/peer"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 // PeerData contains information about a peer useful in establishing connections with it.
@@ -58,6 +59,7 @@ func (sp *CommonDiscoveryService) GetListeningChan() <-chan PeerData {
 	return sp.channel
 }
 func (sp *CommonDiscoveryService) PushToChan(data PeerData) bool {
+	defer utils.LogOnPanic()
 	if err := sp.ErrOnNotRunning(); err != nil {
 		return false
 	}

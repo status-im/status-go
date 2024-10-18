@@ -132,7 +132,7 @@ func (p *chunkPayloadData) unmarshal(raw []byte) error {
 	p.beginningFragment = p.flags&payloadDataBeginingFragmentBitmask != 0
 	p.endingFragment = p.flags&payloadDataEndingFragmentBitmask != 0
 
-	if len(raw) < payloadDataHeaderSize {
+	if len(p.raw) < payloadDataHeaderSize {
 		return ErrChunkPayloadSmall
 	}
 	p.tsn = binary.BigEndian.Uint32(p.raw[0:])

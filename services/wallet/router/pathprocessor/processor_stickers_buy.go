@@ -50,7 +50,7 @@ func (s *StickersBuyProcessor) AvailableFor(params ProcessorInputParams) (bool, 
 }
 
 func (s *StickersBuyProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
 }
 
 func (s *StickersBuyProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
@@ -117,7 +117,7 @@ func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 	msg := ethereum.CallMsg{
 		From:  params.FromAddr,
 		To:    &contractAddress,
-		Value: ZeroBigIntValue,
+		Value: walletCommon.ZeroBigIntValue(),
 		Data:  input,
 	}
 
@@ -137,6 +137,10 @@ func (s *StickersBuyProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsed
 
 func (s *StickersBuyProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce)
+}
+
+func (s *StickersBuyProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
 }
 
 func (s *StickersBuyProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {

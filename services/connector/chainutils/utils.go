@@ -5,12 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc/network"
 )
-
-type NetworkManagerInterface interface {
-	GetActiveNetworks() ([]*params.Network, error)
-}
 
 var (
 	ErrNoActiveNetworks   = errors.New("no active networks available")
@@ -18,7 +14,7 @@ var (
 )
 
 // GetSupportedChainIDs retrieves the chain IDs from the provided NetworkManager.
-func GetSupportedChainIDs(networkManager NetworkManagerInterface) ([]uint64, error) {
+func GetSupportedChainIDs(networkManager *network.Manager) ([]uint64, error) {
 	activeNetworks, err := networkManager.GetActiveNetworks()
 	if err != nil {
 		return nil, err
@@ -36,7 +32,7 @@ func GetSupportedChainIDs(networkManager NetworkManagerInterface) ([]uint64, err
 	return chainIDs, nil
 }
 
-func GetDefaultChainID(networkManager NetworkManagerInterface) (uint64, error) {
+func GetDefaultChainID(networkManager *network.Manager) (uint64, error) {
 	chainIDs, err := GetSupportedChainIDs(networkManager)
 	if err != nil {
 		return 0, err

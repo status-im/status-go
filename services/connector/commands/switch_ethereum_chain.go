@@ -1,11 +1,13 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"slices"
 	"strconv"
 
+	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/connector/chainutils"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -20,7 +22,7 @@ var (
 )
 
 type SwitchEthereumChainCommand struct {
-	NetworkManager NetworkManagerInterface
+	NetworkManager *network.Manager
 	Db             *sql.DB
 }
 
@@ -53,7 +55,7 @@ func (c *SwitchEthereumChainCommand) getSupportedChainIDs() ([]uint64, error) {
 	return chainutils.GetSupportedChainIDs(c.NetworkManager)
 }
 
-func (c *SwitchEthereumChainCommand) Execute(request RPCRequest) (interface{}, error) {
+func (c *SwitchEthereumChainCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err

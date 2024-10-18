@@ -12,36 +12,33 @@ import (
 )
 
 func TestFailToRevokePermissionsWithMissingDAppFields(t *testing.T) {
-	cmd := &RequestPermissionsCommand{}
+	state, close := setupCommand(t, Method_RevokePermissions)
+	t.Cleanup(close)
 
 	// Missing DApp fields
 	request, err := ConstructRPCRequest("wallet_revokePermissions", []interface{}{}, nil)
 	assert.NoError(t, err)
 
-	result, err := cmd.Execute(request)
+	result, err := state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrRequestMissingDAppData, err)
 	assert.Empty(t, result)
 }
 
 func TestFailToRevokePermissionsForUnpermittedDApp(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	cmd := &RevokePermissionsCommand{Db: db}
+	state, close := setupCommand(t, Method_RevokePermissions)
+	t.Cleanup(close)
 
 	request, err := ConstructRPCRequest("wallet_revokePermissions", []interface{}{}, &testDAppData)
 	assert.NoError(t, err)
 
-	result, err := cmd.Execute(request)
+	result, err := state.cmd.Execute(state.ctx, request)
 	assert.Equal(t, ErrDAppIsNotPermittedByUser, err)
 	assert.Empty(t, result)
 }
 
 func TestRevokePermissionsSucceeded(t *testing.T) {
-	db, close := SetupTestDB(t)
-	defer close()
-
-	cmd := &RevokePermissionsCommand{Db: db}
+	state, close := setupCommand(t, Method_RevokePermissions)
+	t.Cleanup(close)
 
 	sharedAccount := types.BytesToAddress(types.FromHex("0x6d0aa2a774b74bb1d36f97700315adf962c69fcg"))
 	dAppPermissionRevoked := false
@@ -58,17 +55,17 @@ func TestRevokePermissionsSucceeded(t *testing.T) {
 	}))
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
-	err := PersistDAppData(db, testDAppData, sharedAccount, 0x123)
+	err := PersistDAppData(state.walletDb, testDAppData, sharedAccount, 0x123)
 	assert.NoError(t, err)
 
 	request, err := ConstructRPCRequest("wallet_revokePermissions", []interface{}{}, &testDAppData)
 	assert.NoError(t, err)
 
-	result, err := cmd.Execute(request)
+	result, err := state.cmd.Execute(state.ctx, request)
 	assert.NoError(t, err)
 	assert.Empty(t, result)
 
-	dApp, err := persistence.SelectDAppByUrl(db, testDAppData.URL)
+	dApp, err := persistence.SelectDAppByUrl(state.walletDb, testDAppData.URL)
 	assert.NoError(t, err)
 	assert.Nil(t, dApp)
 

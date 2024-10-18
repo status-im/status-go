@@ -194,6 +194,9 @@ type Dialer interface {
 	// Notify/StopNotify register and unregister a notifiee for signals
 	Notify(Notifiee)
 	StopNotify(Notifiee)
+
+	// CanDial returns whether the dialer can dial peer p at addr
+	CanDial(p peer.ID, addr ma.Multiaddr) bool
 }
 
 // AddrDelay provides an address along with the delay after which the address

@@ -29,9 +29,9 @@ help: SHELL := /bin/sh
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
-RELEASE_TAG:=$(shell ./_assets/scripts/version.sh)
-RELEASE_DIR := /tmp/release-$(RELEASE_TAG)
-GOLANGCI_BINARY=golangci-lint
+RELEASE_TAG ?= $(shell ./_assets/scripts/version.sh)
+RELEASE_DIR ?= /tmp/release-$(RELEASE_TAG)
+GOLANGCI_BINARY = golangci-lint
 IPFS_GATEWAY_URL ?= https://ipfs.status.im/
 
 ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
@@ -54,9 +54,9 @@ endif
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 export GOPATH ?= $(HOME)/go
 
-GIT_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-GIT_COMMIT := $(shell git rev-parse --short HEAD)
-GIT_AUTHOR := $(shell git config user.email || echo $$USER)
+GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
+GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
@@ -144,6 +144,7 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
+$(GO_CMD_BUILDS): generate
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
@@ -155,6 +156,7 @@ bootnode: ##@build Build discovery v5 bootnode using status-go deps
 bootnode: build/bin/bootnode
 
 node-canary: ##@build Build P2P node canary using status-go deps
+node-canary: generate
 node-canary: build/bin/node-canary
 
 statusgo: ##@build Build status-go as statusd server
@@ -170,6 +172,14 @@ spiff-workflow: build/bin/spiff-workflow
 status-cli: ##@build Build status-cli to send messages
 status-cli: build/bin/status-cli
 
+status-backend: ##@build Build status-backend to run status-go as HTTP server
+status-backend: build/bin/status-backend
+
+run-status-backend: PORT ?= 0
+run-status-backend: generate
+run-status-backend: ##@run Start status-backend server listening to localhost:PORT
+	go run ./cmd/status-backend --address localhost:${PORT}
+
 statusd-prune-docker-image: SHELL := /bin/sh
 statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 	@echo "Building docker image for ststusd-prune..."
@@ -183,6 +193,7 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld build/bin/statusgo-*
 
+statusgo-android: generate
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
 	export GO111MODULE=off; \
@@ -191,10 +202,12 @@ statusgo-android: ##@cross-compile Build status-go for Android
 		-target=android -ldflags="-s -w" \
 		-tags '$(BUILD_TAGS) disable_torrent' \
 		$(BUILD_FLAGS_MOBILE) \
+		--androidapi="23" \
 		-o build/bin/statusgo.aar \
 		github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
+statusgo-ios: generate
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
 	export GO111MODULE=off; \
@@ -207,6 +220,7 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 		github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
+statusgo-library: generate
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
@@ -221,6 +235,7 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la build/bin/libstatus.*
 
+statusgo-shared-library: generate
 statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
@@ -304,13 +319,17 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev:
 	echo "Replaced by Nix shell. Use 'make shell' or just any target as-is."
 
-generate-handlers:
-	go generate ./_assets/generate_handlers/
-generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./_assets/generate_handlers
+generate: PACKAGES ?= $$(go list -e ./... | grep -v "/contracts/")
+generate: GO_GENERATE_CMD ?= $$(which go-generate-fast || echo 'go generate')
+generate: export GO_GENERATE_FAST_DEBUG ?= false
+generate: export GO_GENERATE_FAST_RECACHE ?= false
+generate:  ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
+	@GOROOT=$$(go env GOROOT) $(GO_GENERATE_CMD) $(PACKAGES)
 
-generate-appdatabase:
-	go generate ./appdatabase/...
+generate-contracts:
+	go generate ./contracts
+download-uniswap-tokens:
+	go run ./services/wallet/token/downloader/main.go
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
@@ -330,36 +349,20 @@ lint-fix:
 		-and -not -name 'bindata*' \
 		-and -not -name 'migrations.go' \
 		-and -not -name 'messenger_handlers.go' \
+		-and -not -name '*/mock/*' \
+		-and -not -name 'mock.go' \
 		-and -not -wholename '*/vendor/*' \
 		-exec goimports \
 		-local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go,github.com/status-im/markdown' \
 		-w {} \;
 	$(MAKE) vendor
 
-mock: ##@other Regenerate mocks
-	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
-	mockgen -package=status       -destination=services/status/account_mock.go       -source=services/status/service.go
-	mockgen -package=peer         -destination=services/peer/discoverer_mock.go      -source=services/peer/service.go
-	mockgen -package=mock_transactor -destination=transactions/mock_transactor/transactor.go   -source=transactions/transactor.go
-	mockgen -package=mock_pathprocessor     -destination=services/wallet/router/pathprocessor/mock_pathprocessor/processor.go -source=services/wallet/router/pathprocessor/processor.go
-	mockgen -package=mock_bridge     -destination=services/wallet/bridge/mock_bridge/bridge.go -source=services/wallet/bridge/bridge.go
-	mockgen -package=mock_client     -destination=rpc/chain/mock/client/client.go              -source=rpc/chain/client.go
-	mockgen -package=mock_token      -destination=services/wallet/token/mock/token/tokenmanager.go -source=services/wallet/token/token.go
-	mockgen -package=mock_thirdparty -destination=services/wallet/thirdparty/mock/types.go -source=services/wallet/thirdparty/types.go
-	mockgen -package=mock_balance_persistence -destination=services/wallet/token/mock/balance_persistence/balance_persistence.go -source=services/wallet/token/balance_persistence.go
-	mockgen -package=mock_network      -destination=rpc/network/mock/network.go -source=rpc/network/network.go
-	mockgen -package=mock_rpcclient     -destination=rpc/mock/client/client.go              -source=rpc/client.go
-	mockgen -package=mock_collectibles -destination=services/wallet/collectibles/mock/collection_data_db.go -source=services/wallet/collectibles/collection_data_db.go
-	mockgen -package=mock_collectibles -destination=services/wallet/collectibles/mock/collectible_data_db.go -source=services/wallet/collectibles/collectible_data_db.go
-	mockgen -package=mock_thirdparty -destination=services/wallet/thirdparty/mock/collectible_types.go -source=services/wallet/thirdparty/collectible_types.go
-	mockgen -package=mock_paraswap -destination=services/wallet/thirdparty/paraswap/mock/types.go -source=services/wallet/thirdparty/paraswap/types.go
-	mockgen -package=mock_onramp -destination=services/wallet/onramp/mock/types.go -source=services/wallet/onramp/types.go
-
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
 
 test: test-unit ##@tests Run basic, short tests during development
 
+test-unit: generate
 test-unit: export BUILD_TAGS ?=
 test-unit: export UNIT_TEST_DRY_RUN ?= false
 test-unit: export UNIT_TEST_COUNT ?= 1
@@ -386,16 +389,21 @@ test-e2e: ##@tests Run e2e tests
 test-e2e-race: export GOTEST_EXTRAFLAGS=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
+test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
+test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
+test-functional:
+	@./_assets/scripts/run_functional_tests.sh
+
 canary-test: node-canary
 	# TODO: uncomment that!
 	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
 
-lint:
+lint: generate
 	golangci-lint run ./...
 
-ci: lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
+ci: generate lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
-ci-race: lint canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
+ci-race: generate lint canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
 
 clean: ##@other Cleanup
 	rm -fr build/bin/* mailserver-config.json
@@ -409,7 +417,7 @@ deep-clean: clean git-clean
 tidy:
 	go mod tidy
 
-vendor:
+vendor: generate
 	go mod tidy
 	go mod vendor
 	modvendor -copy="**/*.c **/*.h" -v
@@ -456,6 +464,10 @@ commit-check: SHELL := /bin/sh
 commit-check:
 	@bash _assets/scripts/commit_check.sh
 
+version: SHELL := /bin/sh
+version:
+	@./_assets/scripts/version.sh
+
 tag-version:
 	bash _assets/scripts/tag_version.sh $(TARGET_COMMIT)
 
@@ -463,6 +475,7 @@ migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := walletdatabase/migrations/sql
 migration-wallet:
 	touch $(DEFAULT_WALLET_MIGRATION_PATH)/$$(date +%s)_$(D).up.sql
 
+install-git-hooks: SHELL := /bin/sh
 install-git-hooks:
 	@ln -sf $(if $(filter $(detected_OS), Linux),-r,) \
 		$(GIT_ROOT)/_assets/hooks/* $(GIT_ROOT)/.git/hooks
@@ -487,19 +500,10 @@ build-verif-proxy-wrapper:
 test-verif-proxy-wrapper:
 	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)
 
-
-run-integration-tests: SHELL := /bin/sh
-run-integration-tests: export INTEGRATION_TESTS_DOCKER_UID ?= $(shell id -u $$USER)
-run-integration-tests:
-	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml up -d --build --remove-orphans; \
-	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml logs -f tests-rpc; \
-	exit_code=$$(docker inspect integration-tests_tests-rpc_1 -f '{{.State.ExitCode}}'); \
-	docker-compose -f integration-tests/docker-compose.anvil.yml -f integration-tests/docker-compose.test.status-go.yml down; \
-	exit $$exit_code
-
 run-anvil: SHELL := /bin/sh
 run-anvil:
-	docker-compose -f integration-tests/docker-compose.anvil.yml up --remove-orphans
+	docker-compose -f tests-functional/docker-compose.anvil.yml up --remove-orphans
 
+codecov-validate: SHELL := /bin/sh
 codecov-validate:
 	curl -X POST --data-binary @.codecov.yml https://codecov.io/validate

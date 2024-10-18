@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/communities"
 )
@@ -28,6 +29,7 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 	}
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		// Initialize interval to 0 for immediate execution
 		var interval time.Duration = 0
 
@@ -141,6 +143,7 @@ func (m *Messenger) fetchCuratedCommunities(curatedCommunities *communities.Cura
 	}
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		_ = m.fetchCommunities(unknownCommunities)
 	}()
 

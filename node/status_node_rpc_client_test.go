@@ -121,9 +121,6 @@ func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 
 	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
 		APIModules: "", // no whitelisted API modules; use only public APIs
-		UpstreamConfig: params.UpstreamRPCConfig{
-			URL:     "https://infura.io",
-			Enabled: true},
 		WakuConfig: params.WakuConfig{
 			Enabled: true,
 		},

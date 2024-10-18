@@ -1,0 +1,14 @@
+### Send 1-1 message
+# @name SendOneToOneMessage
+POST {{address}}/statusgo/CallRPC
+
+{
+    "jsonrpc": "2.0",
+    "method": "wakuext_sendOneToOneMessage",
+    "params": [
+        {
+            "id": "0xd4aae73a126fa457550d40fd79f49715559f8e41de18219e4f756e85cdce9968",
+            "message": "Status is cool!"
+        }
+    ]
+}

@@ -2,11 +2,7 @@ package timecache
 
 import (
 	"time"
-
-	logger "github.com/ipfs/go-log/v2"
 )
-
-var log = logger.Logger("pubsub/timecache")
 
 // Stategy is the TimeCache expiration strategy to use.
 type Strategy uint8

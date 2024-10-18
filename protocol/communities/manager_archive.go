@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/encryption"
@@ -316,6 +317,7 @@ func (m *ArchiveManager) CreateAndSeedHistoryArchive(communityID types.HexBytes,
 }
 
 func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, interval time.Duration) {
+	defer common.LogOnPanic()
 	id := community.IDString()
 	if _, exists := m.historyArchiveTasks.Load(id); exists {
 		m.logger.Error("history archive tasks interval already in progress", zap.String("id", id))

@@ -209,3 +209,19 @@ func (p *packet) String() string {
 	}
 	return res
 }
+
+// TryMarshalUnmarshal attempts to marshal and unmarshal a message. Added for fuzzing.
+func TryMarshalUnmarshal(msg []byte) int {
+	p := &packet{}
+	err := p.unmarshal(false, msg)
+	if err != nil {
+		return 0
+	}
+
+	_, err = p.marshal(false)
+	if err != nil {
+		return 0
+	}
+
+	return 1
+}

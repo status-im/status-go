@@ -23,7 +23,7 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/cmd/statusd/server"
+	"github.com/status-im/status-go/cmd/status-backend/server"
 	"github.com/status-im/status-go/common/dbsetup"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -178,6 +178,7 @@ func main() {
 			logger.Error("failed to start server", "error", err)
 			return
 		}
+		go srv.Serve()
 		log.Info("server started", "address", srv.Address())
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -250,15 +251,9 @@ func main() {
 			return
 		}
 
-		appDB, walletDB, err := openDatabases(config.DataDir + "/" + installationID.String())
-		if err != nil {
-			log.Error("failed to open databases")
-			return
-		}
-
 		options := []protocol.Option{
-			protocol.WithDatabase(appDB),
-			protocol.WithWalletDatabase(walletDB),
+			protocol.WithDatabase(backend.StatusNode().GetAppDB()),
+			protocol.WithWalletDatabase(backend.StatusNode().GetWalletDB()),
 			protocol.WithTorrentConfig(&config.TorrentConfig),
 			protocol.WithWalletConfig(&config.WalletConfig),
 			protocol.WithAccountManager(backend.AccountManager()),

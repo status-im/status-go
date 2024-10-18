@@ -55,7 +55,7 @@ type InitializeApplicationResponse struct {
 }
 
 func InitializeApplication(requestJSON string) string {
-	return logAndCallString(initializeApplication, requestJSON)
+	return callWithResponse(initializeApplication, requestJSON)
 }
 
 func initializeApplication(requestJSON string) string {
@@ -99,8 +99,9 @@ func initializeApplication(requestJSON string) string {
 	return string(data)
 }
 
+// Deprecated: Use InitializeApplication instead.
 func OpenAccounts(datadir string) string {
-	return logAndCallString(openAccounts, datadir)
+	return callWithResponse(openAccounts, datadir)
 }
 
 // DEPRECATED: use InitializeApplication
@@ -123,7 +124,7 @@ func openAccounts(datadir string) string {
 }
 
 func ExtractGroupMembershipSignatures(signaturePairsStr string) string {
-	return logAndCallString(extractGroupMembershipSignatures, signaturePairsStr)
+	return callWithResponse(extractGroupMembershipSignatures, signaturePairsStr)
 }
 
 // ExtractGroupMembershipSignatures extract public keys from tuples of content/signature.
@@ -150,7 +151,7 @@ func extractGroupMembershipSignatures(signaturePairsStr string) string {
 }
 
 func SignGroupMembership(content string) string {
-	return logAndCallString(signGroupMembership, content)
+	return callWithResponse(signGroupMembership, content)
 }
 
 // signGroupMembership signs a string containing group membership information.
@@ -171,7 +172,7 @@ func signGroupMembership(content string) string {
 }
 
 func GetNodeConfig() string {
-	return logAndCallString(getNodeConfig)
+	return callWithResponse(getNodeConfig)
 }
 
 // getNodeConfig returns the current config of the Status node
@@ -190,7 +191,7 @@ func getNodeConfig() string {
 }
 
 func ValidateNodeConfig(configJSON string) string {
-	return logAndCallString(validateNodeConfig, configJSON)
+	return callWithResponse(validateNodeConfig, configJSON)
 }
 
 // validateNodeConfig validates config for the Status node.
@@ -236,7 +237,7 @@ func validateNodeConfig(configJSON string) string {
 }
 
 func ResetChainData() string {
-	return logAndCallString(resetChainData)
+	return callWithResponse(resetChainData)
 }
 
 // resetChainData removes chain data from data directory.
@@ -246,7 +247,7 @@ func resetChainData() string {
 }
 
 func CallRPC(inputJSON string) string {
-	return logAndCallString(callRPC, inputJSON)
+	return callWithResponse(callRPC, inputJSON)
 }
 
 // callRPC calls public APIs via RPC.
@@ -259,7 +260,7 @@ func callRPC(inputJSON string) string {
 }
 
 func CallPrivateRPC(inputJSON string) string {
-	return logAndCallString(callPrivateRPC, inputJSON)
+	return callWithResponse(callPrivateRPC, inputJSON)
 }
 
 // callPrivateRPC calls both public and private APIs via RPC.
@@ -272,7 +273,7 @@ func callPrivateRPC(inputJSON string) string {
 }
 
 func VerifyAccountPassword(keyStoreDir, address, password string) string {
-	return logAndCallString(verifyAccountPassword, keyStoreDir, address, password)
+	return callWithResponse(verifyAccountPassword, keyStoreDir, address, password)
 }
 
 // verifyAccountPassword verifies account password.
@@ -281,8 +282,28 @@ func verifyAccountPassword(keyStoreDir, address, password string) string {
 	return makeJSONResponse(err)
 }
 
+func VerifyDatabasePasswordV2(requestJSON string) string {
+	return callWithResponse(verifyDatabasePasswordV2, requestJSON)
+}
+
+func verifyDatabasePasswordV2(requestJSON string) string {
+	var request requests.VerifyDatabasePassword
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = statusBackend.VerifyDatabasePassword(request.KeyUID, request.Password)
+	return makeJSONResponse(err)
+}
+
+// Deprecated: use VerifyDatabasePasswordV2 instead
 func VerifyDatabasePassword(keyUID, password string) string {
-	return logAndCallString(verifyDatabasePassword, keyUID, password)
+	return verifyDatabasePassword(keyUID, password)
 }
 
 // verifyDatabasePassword verifies database password.
@@ -291,8 +312,29 @@ func verifyDatabasePassword(keyUID, password string) string {
 	return makeJSONResponse(err)
 }
 
+func MigrateKeyStoreDirV2(requestJSON string) string {
+	return callWithResponse(migrateKeyStoreDirV2, requestJSON)
+}
+
+func migrateKeyStoreDirV2(requestJSON string) string {
+	var request requests.MigrateKeystoreDir
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.MigrateKeyStoreDir(request.Account, request.Password, request.OldDir, request.NewDir)
+	return makeJSONResponse(err)
+}
+
+// Deprecated: Use MigrateKeyStoreDirV2 instead
 func MigrateKeyStoreDir(accountData, password, oldDir, newDir string) string {
-	return logAndCallString(migrateKeyStoreDir, accountData, password, oldDir, newDir)
+	return migrateKeyStoreDir(accountData, password, oldDir, newDir)
 }
 
 // migrateKeyStoreDir migrates key files to a new directory
@@ -371,7 +413,7 @@ func LoginWithConfig(accountData, password, configJSON string) string {
 }
 
 func CreateAccountAndLogin(requestJSON string) string {
-	return logAndCallString(createAccountAndLogin, requestJSON)
+	return callWithResponse(createAccountAndLogin, requestJSON)
 }
 
 func createAccountAndLogin(requestJSON string) string {
@@ -402,7 +444,7 @@ func createAccountAndLogin(requestJSON string) string {
 }
 
 func LoginAccount(requestJSON string) string {
-	return logAndCallString(loginAccount, requestJSON)
+	return callWithResponse(loginAccount, requestJSON)
 }
 
 func loginAccount(requestJSON string) string {
@@ -430,7 +472,7 @@ func loginAccount(requestJSON string) string {
 }
 
 func RestoreAccountAndLogin(requestJSON string) string {
-	return logAndCallString(restoreAccountAndLogin, requestJSON)
+	return callWithResponse(restoreAccountAndLogin, requestJSON)
 }
 
 func restoreAccountAndLogin(requestJSON string) string {
@@ -508,7 +550,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 }
 
 func DeleteMultiaccount(keyUID, keyStoreDir string) string {
-	return logAndCallString(deleteMultiaccount, keyUID, keyStoreDir)
+	return callWithResponse(deleteMultiaccount, keyUID, keyStoreDir)
 }
 
 // deleteMultiaccount
@@ -517,8 +559,29 @@ func deleteMultiaccount(keyUID, keyStoreDir string) string {
 	return makeJSONResponse(err)
 }
 
+func DeleteImportedKeyV2(requestJSON string) string {
+	return callWithResponse(deleteImportedKeyV2, requestJSON)
+}
+
+func deleteImportedKeyV2(requestJSON string) string {
+	var request requests.DeleteImportedKey
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.DeleteImportedKey(request.Address, request.Password, request.KeyStoreDir)
+	return makeJSONResponse(err)
+}
+
+// Deprecated: Use DeleteImportedKeyV2 instead
 func DeleteImportedKey(address, password, keyStoreDir string) string {
-	return logAndCallString(deleteImportedKey, address, password, keyStoreDir)
+	return deleteImportedKey(address, password, keyStoreDir)
 }
 
 // deleteImportedKey
@@ -528,7 +591,7 @@ func deleteImportedKey(address, password, keyStoreDir string) string {
 }
 
 func InitKeystore(keydir string) string {
-	return logAndCallString(initKeystore, keydir)
+	return callWithResponse(initKeystore, keydir)
 }
 
 // initKeystore initialize keystore before doing any operations with keys.
@@ -602,7 +665,7 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 }
 
 func Logout() string {
-	return logAndCallString(logout)
+	return callWithResponse(logout)
 }
 
 // logout is equivalent to clearing whisper identities.
@@ -611,7 +674,7 @@ func logout() string {
 }
 
 func SignMessage(rpcParams string) string {
-	return logAndCallString(signMessage, rpcParams)
+	return callWithResponse(signMessage, rpcParams)
 }
 
 // signMessage unmarshals rpc params {data, address, password} and
@@ -629,9 +692,9 @@ func signMessage(rpcParams string) string {
 // SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
 // if password matches selected account.
 //
-//export SignTypedData
+// Deprecated: Use SignTypedDataV2 instead.
 func SignTypedData(data, address, password string) string {
-	return logAndCallString(signTypedData, data, address, password)
+	return signTypedData(data, address, password)
 }
 
 func signTypedData(data, address, password string) string {
@@ -647,11 +710,31 @@ func signTypedData(data, address, password string) string {
 	return prepareJSONResponse(result.String(), err)
 }
 
+func SignTypedDataV2(requestJSON string) string {
+	return callWithResponse(signTypedDataV2, requestJSON)
+}
+
+func signTypedDataV2(requestJSON string) string {
+	var request requests.SignTypedData
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+
+	result, err := statusBackend.SignTypedData(request.TypedData, request.Address, request.Password)
+	return prepareJSONResponse(result.String(), err)
+}
+
 // HashTypedData unmarshalls data into TypedData, validates it and hashes it.
 //
 //export HashTypedData
 func HashTypedData(data string) string {
-	return logAndCallString(hashTypedData, data)
+	return callWithResponse(hashTypedData, data)
 }
 
 func hashTypedData(data string) string {
@@ -672,7 +755,7 @@ func hashTypedData(data string) string {
 //
 //export SignTypedDataV4
 func SignTypedDataV4(data, address, password string) string {
-	return logAndCallString(signTypedDataV4, data, address, password)
+	return signTypedDataV4(data, address, password)
 }
 
 func signTypedDataV4(data, address, password string) string {
@@ -689,7 +772,7 @@ func signTypedDataV4(data, address, password string) string {
 //
 //export HashTypedDataV4
 func HashTypedDataV4(data string) string {
-	return logAndCallString(hashTypedDataV4, data)
+	return callWithResponse(hashTypedDataV4, data)
 }
 
 func hashTypedDataV4(data string) string {
@@ -703,7 +786,7 @@ func hashTypedDataV4(data string) string {
 }
 
 func Recover(rpcParams string) string {
-	return logAndCallString(recoverWithRPCParams, rpcParams)
+	return callWithResponse(recoverWithRPCParams, rpcParams)
 }
 
 // recoverWithRPCParams unmarshals rpc params {signDataString, signedData} and passes
@@ -718,8 +801,9 @@ func recoverWithRPCParams(rpcParams string) string {
 	return prepareJSONResponse(addr.String(), err)
 }
 
+// SendTransactionWithChainID converts RPC args and calls backend.SendTransactionWithChainID.
 func SendTransactionWithChainID(chainID int, txArgsJSON, password string) string {
-	return logAndCallString(sendTransactionWithChainID, chainID, txArgsJSON, password)
+	return sendTransactionWithChainID(chainID, txArgsJSON, password)
 }
 
 // sendTransactionWithChainID converts RPC args and calls backend.SendTransactionWithChainID.
@@ -738,7 +822,7 @@ func sendTransactionWithChainID(chainID int, txArgsJSON, password string) string
 }
 
 func SendTransaction(txArgsJSON, password string) string {
-	return logAndCallString(sendTransaction, txArgsJSON, password)
+	return sendTransaction(txArgsJSON, password)
 }
 
 // sendTransaction converts RPC args and calls backend.SendTransaction.
@@ -757,7 +841,7 @@ func sendTransaction(txArgsJSON, password string) string {
 }
 
 func SendTransactionWithSignature(txArgsJSON, sigString string) string {
-	return logAndCallString(sendTransactionWithSignature, txArgsJSON, sigString)
+	return callWithResponse(sendTransactionWithSignature, txArgsJSON, sigString)
 }
 
 // sendTransactionWithSignature converts RPC args and calls backend.SendTransactionWithSignature
@@ -782,7 +866,7 @@ func sendTransactionWithSignature(txArgsJSON, sigString string) string {
 }
 
 func HashTransaction(txArgsJSON string) string {
-	return logAndCallString(hashTransaction, txArgsJSON)
+	return callWithResponse(hashTransaction, txArgsJSON)
 }
 
 // hashTransaction validate the transaction and returns new txArgs and the transaction hash.
@@ -811,7 +895,7 @@ func hashTransaction(txArgsJSON string) string {
 }
 
 func HashMessage(message string) string {
-	return logAndCallString(hashMessage, message)
+	return callWithResponse(hashMessage, message)
 }
 
 // hashMessage calculates the hash of a message to be safely signed by the keycard
@@ -830,7 +914,7 @@ func hashMessage(message string) string {
 }
 
 func StartCPUProfile(dataDir string) string {
-	return logAndCallString(startCPUProfile, dataDir)
+	return callWithResponse(startCPUProfile, dataDir)
 }
 
 // startCPUProfile runs pprof for CPU.
@@ -840,7 +924,7 @@ func startCPUProfile(dataDir string) string {
 }
 
 func StopCPUProfiling() string {
-	return logAndCallString(stopCPUProfiling)
+	return callWithResponse(stopCPUProfiling)
 }
 
 // stopCPUProfiling stops pprof for cpu.
@@ -850,7 +934,7 @@ func stopCPUProfiling() string { //nolint: deadcode
 }
 
 func WriteHeapProfile(dataDir string) string {
-	return logAndCallString(writeHeapProfile, dataDir)
+	return callWithResponse(writeHeapProfile, dataDir)
 }
 
 // writeHeapProfile starts pprof for heap
@@ -875,7 +959,7 @@ func makeJSONResponse(err error) string {
 }
 
 func AddPeer(enode string) string {
-	return logAndCallString(addPeer, enode)
+	return callWithResponse(addPeer, enode)
 }
 
 // addPeer adds an enode as a peer.
@@ -885,7 +969,7 @@ func addPeer(enode string) string {
 }
 
 func ConnectionChange(typ string, expensive int) {
-	logAndCall(connectionChange, typ, expensive)
+	call(connectionChange, typ, expensive)
 }
 
 // connectionChange handles network state changes as reported
@@ -895,7 +979,7 @@ func connectionChange(typ string, expensive int) {
 }
 
 func AppStateChange(state string) {
-	logAndCall(appStateChange, state)
+	call(appStateChange, state)
 }
 
 // appStateChange handles app state changes (background/foreground).
@@ -904,7 +988,7 @@ func appStateChange(state string) {
 }
 
 func StartLocalNotifications() string {
-	return logAndCallString(startLocalNotifications)
+	return callWithResponse(startLocalNotifications)
 }
 
 // startLocalNotifications
@@ -914,7 +998,7 @@ func startLocalNotifications() string {
 }
 
 func StopLocalNotifications() string {
-	return logAndCallString(stopLocalNotifications)
+	return callWithResponse(stopLocalNotifications)
 }
 
 // stopLocalNotifications
@@ -924,7 +1008,7 @@ func stopLocalNotifications() string {
 }
 
 func SetMobileSignalHandler(handler SignalHandler) {
-	logAndCall(setMobileSignalHandler, handler)
+	call(setMobileSignalHandler, handler)
 }
 
 // setMobileSignalHandler setup geth callback to notify about new signal
@@ -938,7 +1022,7 @@ func setMobileSignalHandler(handler SignalHandler) {
 }
 
 func SetSignalEventCallback(cb unsafe.Pointer) {
-	logAndCall(setSignalEventCallback, cb)
+	call(setSignalEventCallback, cb)
 }
 
 // setSignalEventCallback setup geth callback to notify about new signal
@@ -950,7 +1034,7 @@ func setSignalEventCallback(cb unsafe.Pointer) {
 //
 //export ExportNodeLogs
 func ExportNodeLogs() string {
-	return logAndCallString(exportNodeLogs)
+	return callWithResponse(exportNodeLogs)
 }
 
 func exportNodeLogs() string {
@@ -970,7 +1054,7 @@ func exportNodeLogs() string {
 }
 
 func SignHash(hexEncodedHash string) string {
-	return logAndCallString(signHash, hexEncodedHash)
+	return callWithResponse(signHash, hexEncodedHash)
 }
 
 // signHash exposes vanilla ECDSA signing required for Swarm messages
@@ -983,7 +1067,7 @@ func signHash(hexEncodedHash string) string {
 }
 
 func GenerateAlias(pk string) string {
-	return logAndCallString(generateAlias, pk)
+	return callWithResponse(generateAlias, pk)
 }
 
 func generateAlias(pk string) string {
@@ -993,7 +1077,7 @@ func generateAlias(pk string) string {
 }
 
 func IsAlias(value string) string {
-	return logAndCallString(isAlias, value)
+	return callWithResponse(isAlias, value)
 }
 
 func isAlias(value string) string {
@@ -1001,7 +1085,7 @@ func isAlias(value string) string {
 }
 
 func Identicon(pk string) string {
-	return logAndCallString(identicon, pk)
+	return callWithResponse(identicon, pk)
 }
 
 func identicon(pk string) string {
@@ -1011,7 +1095,7 @@ func identicon(pk string) string {
 }
 
 func EmojiHash(pk string) string {
-	return logAndCallString(emojiHash, pk)
+	return callWithResponse(emojiHash, pk)
 }
 
 func emojiHash(pk string) string {
@@ -1019,7 +1103,7 @@ func emojiHash(pk string) string {
 }
 
 func ColorHash(pk string) string {
-	return logAndCallString(colorHash, pk)
+	return callWithResponse(colorHash, pk)
 }
 
 func colorHash(pk string) string {
@@ -1027,7 +1111,7 @@ func colorHash(pk string) string {
 }
 
 func ColorID(pk string) string {
-	return logAndCallString(colorID, pk)
+	return callWithResponse(colorID, pk)
 }
 
 func colorID(pk string) string {
@@ -1035,7 +1119,7 @@ func colorID(pk string) string {
 }
 
 func ValidateMnemonic(mnemonic string) string {
-	return logAndCallString(validateMnemonic, mnemonic)
+	return validateMnemonic(mnemonic)
 }
 
 func validateMnemonic(mnemonic string) string {
@@ -1059,7 +1143,7 @@ func validateMnemonic(mnemonic string) string {
 }
 
 func DecompressPublicKey(key string) string {
-	return logAndCallString(decompressPublicKey, key)
+	return callWithResponse(decompressPublicKey, key)
 }
 
 // decompressPublicKey decompresses 33-byte compressed format to uncompressed 65-byte format.
@@ -1080,7 +1164,7 @@ func decompressPublicKey(key string) string {
 }
 
 func CompressPublicKey(key string) string {
-	return logAndCallString(compressPublicKey, key)
+	return callWithResponse(compressPublicKey, key)
 }
 
 // compressPublicKey compresses uncompressed 65-byte format to 33-byte compressed format.
@@ -1093,7 +1177,7 @@ func compressPublicKey(key string) string {
 }
 
 func SerializeLegacyKey(key string) string {
-	return logAndCallString(serializeLegacyKey, key)
+	return callWithResponse(serializeLegacyKey, key)
 }
 
 // serializeLegacyKey compresses an old format public key (0x04...) to the new one zQ...
@@ -1106,7 +1190,7 @@ func serializeLegacyKey(key string) string {
 }
 
 func MultiformatSerializePublicKey(key, outBase string) string {
-	return logAndCallString(multiformatSerializePublicKey, key, outBase)
+	return callWithResponse(multiformatSerializePublicKey, key, outBase)
 }
 
 // SerializePublicKey compresses an uncompressed multibase encoded multicodec identified EC public key
@@ -1120,7 +1204,7 @@ func multiformatSerializePublicKey(key, outBase string) string {
 }
 
 func MultiformatDeserializePublicKey(key, outBase string) string {
-	return logAndCallString(multiformatDeserializePublicKey, key, outBase)
+	return callWithResponse(multiformatDeserializePublicKey, key, outBase)
 }
 
 // DeserializePublicKey decompresses a compressed multibase encoded multicodec identified EC public key
@@ -1134,7 +1218,7 @@ func multiformatDeserializePublicKey(key, outBase string) string {
 }
 
 func ExportUnencryptedDatabase(accountData, password, databasePath string) string {
-	return logAndCallString(exportUnencryptedDatabase, accountData, password, databasePath)
+	return exportUnencryptedDatabase(accountData, password, databasePath)
 }
 
 // exportUnencryptedDatabase exports the database unencrypted to the given path
@@ -1149,7 +1233,7 @@ func exportUnencryptedDatabase(accountData, password, databasePath string) strin
 }
 
 func ImportUnencryptedDatabase(accountData, password, databasePath string) string {
-	return logAndCallString(importUnencryptedDatabase, accountData, password, databasePath)
+	return importUnencryptedDatabase(accountData, password, databasePath)
 }
 
 // importUnencryptedDatabase imports the database unencrypted to the given directory
@@ -1163,18 +1247,18 @@ func importUnencryptedDatabase(accountData, password, databasePath string) strin
 	return makeJSONResponse(err)
 }
 
-func ChangeDatabasePassword(KeyUID, password, newPassword string) string {
-	return logAndCallString(changeDatabasePassword, KeyUID, password, newPassword)
+func ChangeDatabasePassword(keyUID, password, newPassword string) string {
+	return changeDatabasePassword(keyUID, password, newPassword)
 }
 
 // changeDatabasePassword changes the password of the database
-func changeDatabasePassword(KeyUID, password, newPassword string) string {
-	err := statusBackend.ChangeDatabasePassword(KeyUID, password, newPassword)
+func changeDatabasePassword(keyUID, password, newPassword string) string {
+	err := statusBackend.ChangeDatabasePassword(keyUID, password, newPassword)
 	return makeJSONResponse(err)
 }
 
 func ConvertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword string) string {
-	return logAndCallString(convertToKeycardAccount, accountData, settingsJSON, keycardUID, password, newPassword)
+	return convertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword)
 }
 
 // convertToKeycardAccount converts the account to a keycard account
@@ -1195,7 +1279,7 @@ func convertToKeycardAccount(accountData, settingsJSON, keycardUID, password, ne
 }
 
 func ConvertToRegularAccount(mnemonic, currPassword, newPassword string) string {
-	return logAndCallString(convertToRegularAccount, mnemonic, currPassword, newPassword)
+	return convertToRegularAccount(mnemonic, currPassword, newPassword)
 }
 
 // convertToRegularAccount converts the account to a regular account
@@ -1271,7 +1355,7 @@ type FleetDescription struct {
 }
 
 func Fleets() string {
-	return logAndCallString(fleets)
+	return callWithResponse(fleets)
 }
 
 func fleets() string {
@@ -1288,7 +1372,7 @@ func fleets() string {
 }
 
 func SwitchFleet(fleet string, configJSON string) string {
-	return logAndCallString(switchFleet, fleet, configJSON)
+	return callWithResponse(switchFleet, fleet, configJSON)
 }
 
 func switchFleet(fleet string, configJSON string) string {
@@ -1327,7 +1411,7 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 }
 
 func LocalPairingPreflightOutboundCheck() string {
-	return logAndCallString(localPairingPreflightOutboundCheck)
+	return callWithResponse(localPairingPreflightOutboundCheck)
 }
 
 // localPairingPreflightOutboundCheck creates a local tls server accessible via an outbound network address.
@@ -1341,7 +1425,7 @@ func localPairingPreflightOutboundCheck() string {
 }
 
 func StartSearchForLocalPairingPeers() string {
-	return logAndCallString(startSearchForLocalPairingPeers)
+	return callWithResponse(startSearchForLocalPairingPeers)
 }
 
 // startSearchForLocalPairingPeers starts a UDP multicast beacon that both listens for and broadcasts to LAN peers
@@ -1360,7 +1444,7 @@ func startSearchForLocalPairingPeers() string {
 }
 
 func GetConnectionStringForBeingBootstrapped(configJSON string) string {
-	return logAndCallString(getConnectionStringForBeingBootstrapped, configJSON)
+	return callWithResponse(getConnectionStringForBeingBootstrapped, configJSON)
 }
 
 // getConnectionStringForBeingBootstrapped starts a pairing.ReceiverServer
@@ -1392,7 +1476,7 @@ func getConnectionStringForBeingBootstrapped(configJSON string) string {
 }
 
 func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string {
-	return logAndCallString(getConnectionStringForBootstrappingAnotherDevice, configJSON)
+	return callWithResponse(getConnectionStringForBootstrappingAnotherDevice, configJSON)
 }
 
 // getConnectionStringForBootstrappingAnotherDevice starts a pairing.SenderServer
@@ -1431,7 +1515,7 @@ func (i *inputConnectionStringForBootstrappingResponse) toJSON(err error) string
 }
 
 func InputConnectionStringForBootstrapping(cs, configJSON string) string {
-	return logAndCallString(inputConnectionStringForBootstrapping, cs, configJSON)
+	return callWithResponse(inputConnectionStringForBootstrapping, cs, configJSON)
 }
 
 // inputConnectionStringForBootstrapping starts a pairing.ReceiverClient
@@ -1474,7 +1558,7 @@ func inputConnectionStringForBootstrapping(cs, configJSON string) string {
 }
 
 func InputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) string {
-	return logAndCallString(inputConnectionStringForBootstrappingAnotherDevice, cs, configJSON)
+	return callWithResponse(inputConnectionStringForBootstrappingAnotherDevice, cs, configJSON)
 }
 
 // inputConnectionStringForBootstrappingAnotherDevice starts a pairing.SendingClient
@@ -1501,7 +1585,7 @@ func inputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) s
 }
 
 func GetConnectionStringForExportingKeypairsKeystores(configJSON string) string {
-	return logAndCallString(getConnectionStringForExportingKeypairsKeystores, configJSON)
+	return callWithResponse(getConnectionStringForExportingKeypairsKeystores, configJSON)
 }
 
 // getConnectionStringForExportingKeypairsKeystores starts a pairing.SenderServer
@@ -1520,7 +1604,7 @@ func getConnectionStringForExportingKeypairsKeystores(configJSON string) string 
 }
 
 func InputConnectionStringForImportingKeypairsKeystores(cs, configJSON string) string {
-	return logAndCallString(inputConnectionStringForImportingKeypairsKeystores, cs, configJSON)
+	return callWithResponse(inputConnectionStringForImportingKeypairsKeystores, cs, configJSON)
 }
 
 // inputConnectionStringForImportingKeypairsKeystores starts a pairing.ReceiverClient
@@ -1539,7 +1623,7 @@ func inputConnectionStringForImportingKeypairsKeystores(cs, configJSON string) s
 }
 
 func ValidateConnectionString(cs string) string {
-	return logAndCallString(validateConnectionString, cs)
+	return callWithResponse(validateConnectionString, cs)
 }
 
 func validateConnectionString(cs string) string {
@@ -1551,7 +1635,7 @@ func validateConnectionString(cs string) string {
 }
 
 func EncodeTransfer(to string, value string) string {
-	return logAndCallString(encodeTransfer, to, value)
+	return callWithResponse(encodeTransfer, to, value)
 }
 
 func encodeTransfer(to string, value string) string {
@@ -1564,7 +1648,7 @@ func encodeTransfer(to string, value string) string {
 }
 
 func EncodeFunctionCall(method string, paramsJSON string) string {
-	return logAndCallString(encodeFunctionCall, method, paramsJSON)
+	return callWithResponse(encodeFunctionCall, method, paramsJSON)
 }
 
 func encodeFunctionCall(method string, paramsJSON string) string {
@@ -1604,7 +1688,7 @@ func decodeParameters(decodeParamJSON string) string {
 }
 
 func HexToNumber(hex string) string {
-	return logAndCallString(hexToNumber, hex)
+	return callWithResponse(hexToNumber, hex)
 }
 
 func hexToNumber(hex string) string {
@@ -1612,7 +1696,7 @@ func hexToNumber(hex string) string {
 }
 
 func NumberToHex(numString string) string {
-	return logAndCallString(numberToHex, numString)
+	return callWithResponse(numberToHex, numString)
 }
 
 func numberToHex(numString string) string {
@@ -1624,7 +1708,7 @@ func Sha3(str string) string {
 }
 
 func Utf8ToHex(str string) string {
-	return logAndCallString(utf8ToHex, str)
+	return callWithResponse(utf8ToHex, str)
 }
 
 func utf8ToHex(str string) string {
@@ -1636,7 +1720,7 @@ func utf8ToHex(str string) string {
 }
 
 func HexToUtf8(hexString string) string {
-	return logAndCallString(hexToUtf8, hexString)
+	return callWithResponse(hexToUtf8, hexString)
 }
 
 func hexToUtf8(hexString string) string {
@@ -1648,7 +1732,7 @@ func hexToUtf8(hexString string) string {
 }
 
 func CheckAddressChecksum(address string) string {
-	return logAndCallString(checkAddressChecksum, address)
+	return callWithResponse(checkAddressChecksum, address)
 }
 
 func checkAddressChecksum(address string) string {
@@ -1661,7 +1745,7 @@ func checkAddressChecksum(address string) string {
 }
 
 func IsAddress(address string) string {
-	return logAndCallString(isAddress, address)
+	return callWithResponse(isAddress, address)
 }
 
 func isAddress(address string) string {
@@ -1674,7 +1758,7 @@ func isAddress(address string) string {
 }
 
 func ToChecksumAddress(address string) string {
-	return logAndCallString(toChecksumAddress, address)
+	return callWithResponse(toChecksumAddress, address)
 }
 
 func toChecksumAddress(address string) string {
@@ -1686,7 +1770,7 @@ func toChecksumAddress(address string) string {
 }
 
 func DeserializeAndCompressKey(DesktopKey string) string {
-	return logAndCallString(deserializeAndCompressKey, DesktopKey)
+	return callWithResponse(deserializeAndCompressKey, DesktopKey)
 }
 
 func deserializeAndCompressKey(DesktopKey string) string {
@@ -1734,7 +1818,7 @@ func GetRandomMnemonic() string {
 }
 
 func ToggleCentralizedMetrics(requestJSON string) string {
-	return logAndCallString(toggleCentralizedMetrics, requestJSON)
+	return callWithResponse(toggleCentralizedMetrics, requestJSON)
 }
 
 func toggleCentralizedMetrics(requestJSON string) string {
@@ -1758,7 +1842,7 @@ func toggleCentralizedMetrics(requestJSON string) string {
 }
 
 func CentralizedMetricsInfo() string {
-	return logAndCallString(centralizedMetricsInfo)
+	return callWithResponse(centralizedMetricsInfo)
 }
 
 func centralizedMetricsInfo() string {
@@ -1774,7 +1858,7 @@ func centralizedMetricsInfo() string {
 }
 
 func AddCentralizedMetric(requestJSON string) string {
-	return logAndCallString(addCentralizedMetric, requestJSON)
+	return callWithResponse(addCentralizedMetric, requestJSON)
 }
 
 func addCentralizedMetric(requestJSON string) string {

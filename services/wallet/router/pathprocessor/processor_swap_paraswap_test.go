@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -56,7 +56,7 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 
 		partnerAddress, partnerFeePcnt := getPartnerAddressAndFeePcnt(chainID)
 
-		if partnerAddress != walletCommon.ZeroAddress {
+		if partnerAddress != walletCommon.ZeroAddress() {
 			require.Greater(t, partnerFeePcnt, 0.0)
 
 			expectedFee := uint64(float64(testPriceRoute.DestAmount.Uint64()) * partnerFeePcnt / 100.0)

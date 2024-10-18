@@ -1,8 +1,11 @@
+// The udpmux package contains the logic for multiplexing multiple WebRTC (ICE)
+// connections over a single UDP socket.
 package udpmux
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -141,7 +144,7 @@ func (mux *UDPMux) readLoop() {
 
 		n, addr, err := mux.socket.ReadFrom(buf)
 		if err != nil {
-			if strings.Contains(err.Error(), "use of closed network connection") {
+			if strings.Contains(err.Error(), "use of closed network connection") || errors.Is(err, context.Canceled) {
 				log.Debugf("readLoop exiting: socket %s closed", mux.socket.LocalAddr())
 			} else {
 				log.Errorf("error reading from socket %s: %v", mux.socket.LocalAddr(), err)

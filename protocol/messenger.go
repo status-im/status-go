@@ -29,6 +29,7 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appmetrics"
+	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/contracts"
@@ -907,6 +908,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if m.archiveManager.IsReady() {
 		available := m.mailserverCycle.availabilitySubscriptions.Subscribe()
 		go func() {
+			defer gocommon.LogOnPanic()
 			<-available
 			m.InitHistoryArchiveTasks(controlledCommunities)
 		}()
@@ -1459,6 +1461,7 @@ func (m *Messenger) handleInstallations(installations []*multidevice.Installatio
 // handleEncryptionLayerSubscriptions handles events from the encryption layer
 func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption.Subscriptions) {
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-subscriptions.SendContactCode:
@@ -1513,6 +1516,7 @@ func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 
 func (m *Messenger) handleENSVerificationSubscription(c chan []*ens.VerificationRecord) {
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case records, more := <-c:
@@ -1552,6 +1556,7 @@ func (m *Messenger) watchConnectionChange() {
 	}
 
 	pollConnectionStatus := func() {
+		defer gocommon.LogOnPanic()
 		func() {
 			for {
 				select {
@@ -1565,6 +1570,7 @@ func (m *Messenger) watchConnectionChange() {
 	}
 
 	subscribedConnectionStatus := func(subscription *types.ConnStatusSubscription) {
+		defer gocommon.LogOnPanic()
 		defer subscription.Unsubscribe()
 		ticker := time.NewTicker(keepAlivePeriod)
 		defer ticker.Stop()
@@ -1603,6 +1609,7 @@ func (m *Messenger) watchConnectionChange() {
 func (m *Messenger) watchChatsToUnmute() {
 	m.logger.Debug("Checking for chats to unmute every minute")
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			// Execute the check immediately upon starting
 			response := &MessengerResponse{}
@@ -1646,6 +1653,7 @@ func (m *Messenger) watchChatsToUnmute() {
 func (m *Messenger) watchCommunitiesToUnmute() {
 	m.logger.Debug("Checking for communities to unmute every minute")
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			// Execute the check immediately upon starting
 			response, err := m.CheckCommunitiesToUnmute()
@@ -1680,6 +1688,7 @@ func (m *Messenger) watchIdentityImageChanges() {
 	channel := m.multiAccounts.SubscribeToIdentityImageChanges()
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case change := <-channel:
@@ -1717,6 +1726,7 @@ func (m *Messenger) watchPendingCommunityRequestToJoin() {
 	m.logger.Debug("watching community request to join")
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-time.After(time.Minute * 10):
@@ -1751,6 +1761,7 @@ func (m *Messenger) PublishIdentityImage() error {
 // handlePushNotificationClientRegistration handles registration events
 func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			_, more := <-c
 			if !more {
@@ -1848,17 +1859,18 @@ func (m *Messenger) InitFilters() error {
 	}
 
 	communityInfo := make(map[string]*communities.Community)
+	var validChats []*Chat
 	for _, chat := range chats {
 		if err := chat.Validate(); err != nil {
 			logger.Warn("failed to validate chat", zap.Error(err))
 			continue
 		}
+		validChats = append(validChats, chat)
+	}
 
-		if err = m.initChatFirstMessageTimestamp(chat); err != nil {
-			logger.Warn("failed to init first message timestamp", zap.Error(err))
-			continue
-		}
+	m.initChatsFirstMessageTimestamp(communityInfo, validChats)
 
+	for _, chat := range validChats {
 		if !chat.Active || chat.Timeline() {
 			m.allChats.Store(chat.ID, chat)
 			continue
@@ -2032,24 +2044,84 @@ func (m *Messenger) Mailservers() ([]string, error) {
 	return nil, ErrNotImplemented
 }
 
-func (m *Messenger) initChatFirstMessageTimestamp(chat *Chat) error {
-	if !chat.CommunityChat() || chat.FirstMessageTimestamp != FirstMessageTimestampUndefined {
+func (m *Messenger) initChatsFirstMessageTimestamp(communityCache map[string]*communities.Community, chats []*Chat) {
+	communityChats, communityChatIDs := m.filterCommunityChats(chats)
+	if len(communityChatIDs) == 0 {
+		return
+	}
+
+	oldestMessageTimestamps, err := m.persistence.OldestMessageWhisperTimestampByChatIDs(communityChatIDs)
+	if err != nil {
+		m.logger.Warn("failed to get oldest message timestamps", zap.Error(err))
+		return
+	}
+
+	changedCommunities := m.processCommunityChats(communityChats, communityCache, oldestMessageTimestamps)
+	m.saveAndPublishCommunities(changedCommunities)
+}
+
+func (m *Messenger) filterCommunityChats(chats []*Chat) ([]*Chat, []string) {
+	var communityChats []*Chat
+	var communityChatIDs []string
+	for _, chat := range chats {
+		if chat.CommunityChat() && chat.FirstMessageTimestamp == FirstMessageTimestampUndefined {
+			communityChats = append(communityChats, chat)
+			communityChatIDs = append(communityChatIDs, chat.ID)
+		}
+	}
+	return communityChats, communityChatIDs
+}
+
+func (m *Messenger) processCommunityChats(communityChats []*Chat, communityCache map[string]*communities.Community, oldestMessageTimestamps map[string]uint64) []*communities.Community {
+	var changedCommunities []*communities.Community
+	for _, chat := range communityChats {
+		community := m.getCommunity(chat.CommunityID, communityCache)
+		if community == nil {
+			continue
+		}
+
+		oldestMessageTimestamp, ok := oldestMessageTimestamps[chat.ID]
+		timestamp := uint32(FirstMessageTimestampNoMessage)
+		if ok {
+			if oldestMessageTimestamp == FirstMessageTimestampUndefined {
+				continue
+			}
+			timestamp = whisperToUnixTimestamp(oldestMessageTimestamp)
+		}
+
+		changes, err := m.updateChatFirstMessageTimestampForCommunity(chat, timestamp, community)
+		if err != nil {
+			m.logger.Warn("failed to init first message timestamp", zap.Error(err), zap.String("chatID", chat.ID))
+			continue
+		}
+		if changes != nil {
+			changedCommunities = append(changedCommunities, community)
+		}
+	}
+	return changedCommunities
+}
+
+func (m *Messenger) getCommunity(communityID string, communityCache map[string]*communities.Community) *communities.Community {
+	community, ok := communityCache[communityID]
+	if ok {
+		return community
+	}
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		m.logger.Warn("failed to get community", zap.Error(err), zap.String("communityID", communityID))
 		return nil
 	}
+	communityCache[communityID] = community
+	return community
+}
 
-	oldestMessageTimestamp, hasAnyMessage, err := m.persistence.OldestMessageWhisperTimestampByChatID(chat.ID)
-	if err != nil {
-		return err
-	}
-
-	if hasAnyMessage {
-		if oldestMessageTimestamp == FirstMessageTimestampUndefined {
-			return nil
+func (m *Messenger) saveAndPublishCommunities(communities []*communities.Community) {
+	for _, community := range communities {
+		err := m.communitiesManager.SaveAndPublish(community)
+		if err != nil {
+			m.logger.Warn("failed to save and publish community", zap.Error(err), zap.String("communityID", community.IDString()))
 		}
-		return m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(oldestMessageTimestamp), &MessengerResponse{})
 	}
-
-	return m.updateChatFirstMessageTimestamp(chat, FirstMessageTimestampNoMessage, &MessengerResponse{})
 }
 
 func (m *Messenger) addMessagesAndChat(chat *Chat, messages []*common.Message, response *MessengerResponse) (*MessengerResponse, error) {
@@ -2544,6 +2616,13 @@ func (m *Messenger) updateChatFirstMessageTimestamp(chat *Chat, timestamp uint32
 	}
 
 	return nil
+}
+
+func (m *Messenger) updateChatFirstMessageTimestampForCommunity(chat *Chat, timestamp uint32, community *communities.Community) (*communities.CommunityChanges, error) {
+	if community.IsControlNode() && chat.UpdateFirstMessageTimestamp(timestamp) {
+		return m.communitiesManager.UpdateChatFirstMessageTimestamp(community, chat.ID, chat.FirstMessageTimestamp)
+	}
+	return nil, nil
 }
 
 func (m *Messenger) ShareImageMessage(request *requests.ShareImageMessage) (*MessengerResponse, error) {
@@ -3067,6 +3146,7 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 func (m *Messenger) StartRetrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
+		defer gocommon.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
 		ticker := time.NewTicker(tick)
 		defer ticker.Stop()
@@ -3135,9 +3215,10 @@ type ReceivedMessageState struct {
 	// List of contacts modified
 	ModifiedContacts *stringBoolMap
 	// All installations in memory
-	AllInstallations *installationMap
-	// List of communities modified
+	AllInstallations      *installationMap
 	ModifiedInstallations *stringBoolMap
+	// List of installations targeted to this device modified
+	TargetedInstallations *stringBoolMap
 	// Map of existing messages
 	ExistingMessagesMap map[string]bool
 	// EmojiReactions is a list of emoji reactions for the current batch
@@ -3310,6 +3391,7 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 		ModifiedContacts:      new(stringBoolMap),
 		AllInstallations:      m.allInstallations,
 		ModifiedInstallations: m.modifiedInstallations,
+		TargetedInstallations: new(stringBoolMap),
 		ExistingMessagesMap:   make(map[string]bool),
 		EmojiReactions:        make(map[string]*EmojiReaction),
 		GroupChatInvitations:  make(map[string]*GroupChatInvitation),
@@ -3622,7 +3704,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					err := m.dispatchToHandler(messageState, msg.ApplicationLayer.Payload, msg, filter, fromArchive)
 					if err != nil {
 						allMessagesProcessed = false
-						logger.Warn("failed to process protobuf", zap.Error(err))
+						logger.Warn("failed to process protobuf", zap.String("type", msg.ApplicationLayer.Type.String()), zap.Error(err))
 						if m.unhandledMessagesTracker != nil {
 							m.unhandledMessagesTracker(msg, err)
 						}
@@ -3656,6 +3738,32 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	return m.saveDataAndPrepareResponse(messageState)
+}
+
+func (m *Messenger) deleteNotification(response *MessengerResponse, installationID string) error {
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(installationID))
+	if err != nil {
+		return err
+	}
+
+	if notification == nil {
+		return nil
+	}
+
+	updatedAt := m.GetCurrentTimeInMillis()
+	notification.UpdatedAt = updatedAt
+	notification.Deleted = true
+	// we shouldn't sync deleted notification here,
+	// as the same user on different devices will receive the same message(CommunityCancelRequestToJoin) ?
+	err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(installationID), updatedAt)
+	if err != nil {
+		m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
+		return err
+	}
+
+	// sending signal to client to remove the activity center notification from UI
+	response.AddActivityCenterNotification(notification)
+	return nil
 }
 
 func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageState) (*MessengerResponse, error) {
@@ -3694,6 +3802,34 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 			err = m.setInstallationMetadata(id, installation.InstallationMetadata)
 			if err != nil {
 				return false
+			}
+		}
+
+		targeted, _ := messageState.TargetedInstallations.Load(id)
+		if targeted {
+			if installation.Enabled {
+				// Delete AC notif since the installation is now enabled
+				err = m.deleteNotification(messageState.Response, id)
+				if err != nil {
+					m.logger.Error("error deleting notification", zap.Error(err))
+					return false
+				}
+			} else if id != m.installationID {
+				// Add activity center notification when we receive a new installation
+				notification := &ActivityCenterNotification{
+					ID:             types.FromHex(id),
+					Type:           ActivityCenterNotificationTypeNewInstallationReceived,
+					InstallationID: id,
+					Timestamp:      m.getTimesource().GetCurrentTime(),
+					Read:           false,
+					Deleted:        false,
+					UpdatedAt:      m.GetCurrentTimeInMillis(),
+				}
+
+				err = m.addActivityCenterNotification(messageState.Response, notification, nil)
+				if err != nil {
+					return false
+				}
 			}
 		}
 
@@ -5697,6 +5833,7 @@ func (m *Messenger) startCleanupLoop(name string, cleanupFunc func() error) {
 	logger := m.logger.Named(name)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		// Delay by a few minutes to minimize messenger's startup time
 		var interval time.Duration = 5 * time.Minute
 		for {

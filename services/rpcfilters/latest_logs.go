@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	getRpc "github.com/ethereum/go-ethereum/rpc"
+	gocommon "github.com/status-im/status-go/common"
 )
 
 // ContextCaller provides CallContext method as ethereums rpc.Client.
@@ -18,6 +19,7 @@ type ContextCaller interface {
 }
 
 func pollLogs(client ContextCaller, chainID uint64, f *logsFilter, timeout, period time.Duration) {
+	defer gocommon.LogOnPanic()
 	query := func() {
 		ctx, cancel := context.WithTimeout(f.ctx, timeout)
 		defer cancel()

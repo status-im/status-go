@@ -1,12 +1,18 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/rpc"
 	persistence "github.com/status-im/status-go/services/connector/database"
+	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -14,9 +20,11 @@ import (
 var (
 	ErrParamsFromAddressIsNotShared = errors.New("from parameter address is not dApp's shared account")
 	ErrNoTransactionParamsFound     = errors.New("no transaction in params found")
+	ErrSendingParamsInvalid         = errors.New("sending params are invalid")
 )
 
 type SendTransactionCommand struct {
+	RpcClient     rpc.ClientInterface
 	Db            *sql.DB
 	ClientHandler ClientSideHandlerInterface
 }
@@ -45,7 +53,7 @@ func (r *RPCRequest) getSendTransactionParams() (*transactions.SendTxArgs, error
 	return &sendTxArgs, nil
 }
 
-func (c *SendTransactionCommand) Execute(request RPCRequest) (interface{}, error) {
+func (c *SendTransactionCommand) Execute(ctx context.Context, request RPCRequest) (interface{}, error) {
 	err := request.Validate()
 	if err != nil {
 		return "", err
@@ -65,8 +73,47 @@ func (c *SendTransactionCommand) Execute(request RPCRequest) (interface{}, error
 		return "", err
 	}
 
+	if !params.Valid() {
+		return "", ErrSendingParamsInvalid
+	}
+
 	if params.From != dApp.SharedAccount {
 		return "", ErrParamsFromAddressIsNotShared
+	}
+
+	if params.Value == nil {
+		params.Value = (*hexutil.Big)(big.NewInt(0))
+	}
+
+	if params.GasPrice == nil || (params.MaxFeePerGas == nil && params.MaxPriorityFeePerGas == nil) {
+		feeManager := &fees.FeeManager{
+			RPCClient: c.RpcClient,
+		}
+		fetchedFees, err := feeManager.SuggestedFees(ctx, dApp.ChainID)
+		if err != nil {
+			return "", err
+		}
+
+		if !fetchedFees.EIP1559Enabled {
+			params.GasPrice = (*hexutil.Big)(fetchedFees.GasPrice)
+		} else {
+			params.MaxFeePerGas = (*hexutil.Big)(fetchedFees.FeeFor(fees.GasFeeMedium))
+			params.MaxPriorityFeePerGas = (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas)
+		}
+	}
+
+	if params.Nonce == nil {
+		ethClient, err := c.RpcClient.EthClient(dApp.ChainID)
+		if err != nil {
+			return "", err
+		}
+
+		nonce, err := ethClient.PendingNonceAt(ctx, common.Address(dApp.SharedAccount))
+		if err != nil {
+			return "", err
+		}
+
+		params.Nonce = (*hexutil.Uint64)(&nonce)
 	}
 
 	hash, err := c.ClientHandler.RequestSendTransaction(signal.ConnectorDApp{

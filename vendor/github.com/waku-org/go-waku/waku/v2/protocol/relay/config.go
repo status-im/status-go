@@ -13,6 +13,10 @@ import (
 
 var DefaultRelaySubscriptionBufferSize int = 1024
 
+// trying to match value here https://github.com/vacp2p/nim-libp2p/pull/1077
+// note that nim-libp2p has 2 peer queues 1 for priority and other non-priority, whereas go-libp2p seems to have single peer-queue
+var DefaultPeerOutboundQSize int = 1024
+
 type RelaySubscribeParameters struct {
 	dontConsume bool
 	cacheSize   uint
@@ -109,6 +113,7 @@ func (w *WakuRelay) defaultPubsubOptions() []pubsub.Option {
 		pubsub.WithSeenMessagesTTL(2 * time.Minute),
 		pubsub.WithPeerScore(w.peerScoreParams, w.peerScoreThresholds),
 		pubsub.WithPeerScoreInspect(w.peerScoreInspector, 6*time.Second),
+		pubsub.WithPeerOutboundQueueSize(DefaultPeerOutboundQSize),
 	}
 }
 

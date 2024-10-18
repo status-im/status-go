@@ -122,7 +122,7 @@ func (p *MercuryoProvider) GetURL(ctx context.Context, parameters Parameters) (s
 		widgetSecret = "AZ5fmxmrgyrXH3zre6yHU2Vw9fPqEw82" // #nosec G101
 	)
 
-	if parameters.DestAddress == nil || *parameters.DestAddress == walletCommon.ZeroAddress {
+	if parameters.DestAddress == nil || *parameters.DestAddress == walletCommon.ZeroAddress() {
 		return "", errors.New("destination address is required")
 	}
 

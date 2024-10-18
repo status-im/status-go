@@ -133,7 +133,7 @@ func (c *channelOpen) Unmarshal(raw []byte) error {
 	labelLength := binary.BigEndian.Uint16(raw[8:])
 	protocolLength := binary.BigEndian.Uint16(raw[10:])
 
-	if expectedLen := int(channelOpenHeaderLength + labelLength + protocolLength); len(raw) != expectedLen {
+	if expectedLen := channelOpenHeaderLength + int(labelLength) + int(protocolLength); len(raw) != expectedLen {
 		return fmt.Errorf("%w expected(%d) actual(%d)", ErrExpectedAndActualLengthMismatch, expectedLen, len(raw))
 	}
 

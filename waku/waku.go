@@ -44,6 +44,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/waku/common"
@@ -225,6 +226,7 @@ func (w *Waku) SetMinimumPoW(val float64, tolerate bool) error {
 
 	if tolerate {
 		go func() {
+			defer gocommon.LogOnPanic()
 			// allow some time before all the peers have processed the notification
 			select {
 			case <-w.quit:
@@ -305,6 +307,7 @@ func (w *Waku) SetBloomFilter(bloom []byte) error {
 	w.notifyPeersAboutBloomFilterChange(b)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		// allow some time before all the peers have processed the notification
 		select {
 		case <-w.quit:
@@ -375,6 +378,7 @@ func (w *Waku) SetTopicInterest(topicInterest []common.TopicType) error {
 	w.notifyPeersAboutTopicInterestChange(topicInterest)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		// allow some time before all the peers have processed the notification
 		select {
 		case <-w.quit:
@@ -510,6 +514,7 @@ func (w *Waku) RegisterBridge(b Bridge) {
 }
 
 func (w *Waku) readBridgeLoop() {
+	defer gocommon.LogOnPanic()
 	defer w.bridgeWg.Done()
 	out, _ := w.bridge.Pipe()
 	for {
@@ -1374,6 +1379,7 @@ func (w *Waku) postEvent(envelope *common.Envelope, isP2P bool) {
 
 // processQueue delivers the messages to the watchers during the lifetime of the waku node.
 func (w *Waku) processQueue() {
+	defer gocommon.LogOnPanic()
 	for {
 		select {
 		case <-w.quit:
@@ -1390,6 +1396,7 @@ func (w *Waku) processQueue() {
 }
 
 func (w *Waku) processP2P() {
+	defer gocommon.LogOnPanic()
 	for {
 		select {
 		case <-w.quit:
@@ -1427,6 +1434,7 @@ func (w *Waku) processP2P() {
 // update loops until the lifetime of the waku node, updating its internal
 // state by expiring stale messages from the pool.
 func (w *Waku) update() {
+	defer gocommon.LogOnPanic()
 	// Start a ticker to check for expirations
 	expire := time.NewTicker(common.ExpirationCycle)
 

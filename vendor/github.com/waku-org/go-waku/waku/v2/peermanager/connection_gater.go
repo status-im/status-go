@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -77,6 +78,7 @@ func (c *ConnectionGater) InterceptUpgraded(_ network.Conn) (allow bool, reason 
 
 // NotifyDisconnect is called when a connection disconnects.
 func (c *ConnectionGater) NotifyDisconnect(addr multiaddr.Multiaddr) {
+	defer utils.LogOnPanic()
 	ip, err := manet.ToIP(addr)
 	if err != nil {
 		return

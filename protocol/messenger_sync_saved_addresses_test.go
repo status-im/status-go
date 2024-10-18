@@ -62,7 +62,7 @@ func (s *MessengerSyncSavedAddressesSuite) SetupTest() {
 	}
 	err = s.other.SetInstallationMetadata(s.other.installationID, imOther)
 	s.Require().NoError(err)
-	response, err := s.other.SendPairInstallation(context.Background(), nil)
+	response, err := s.other.SendPairInstallation(context.Background(), "", nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
@@ -74,7 +74,7 @@ func (s *MessengerSyncSavedAddressesSuite) SetupTest() {
 	)
 	s.Require().NoError(err)
 
-	err = s.main.EnableInstallation(s.other.installationID)
+	_, err = s.main.EnableInstallation(s.other.installationID)
 	s.Require().NoError(err)
 }
 

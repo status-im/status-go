@@ -48,7 +48,7 @@ func (s *ENSPublicKeyProcessor) AvailableFor(params ProcessorInputParams) (bool,
 }
 
 func (s *ENSPublicKeyProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	return ZeroBigIntValue, ZeroBigIntValue, nil
+	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
 }
 
 func (s *ENSPublicKeyProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
@@ -89,7 +89,7 @@ func (s *ENSPublicKeyProcessor) EstimateGas(params ProcessorInputParams) (uint64
 	msg := ethereum.CallMsg{
 		From:  params.FromAddr,
 		To:    &contractAddress,
-		Value: ZeroBigIntValue,
+		Value: walletCommon.ZeroBigIntValue(),
 		Data:  input,
 	}
 
@@ -111,6 +111,10 @@ func (s *ENSPublicKeyProcessor) BuildTransaction(sendArgs *MultipathProcessorTxA
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce)
 }
 
+func (s *ENSPublicKeyProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
+}
+
 func (s *ENSPublicKeyProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	return params.AmountIn, nil
 }
@@ -120,7 +124,7 @@ func (s *ENSPublicKeyProcessor) GetContractAddress(params ProcessorInputParams) 
 	if err != nil {
 		return common.Address{}, createENSPublicKeyErrorResponse(err)
 	}
-	if *addr == ZeroAddress {
+	if *addr == walletCommon.ZeroAddress() {
 		return common.Address{}, ErrENSResolverNotFound
 	}
 	return *addr, nil

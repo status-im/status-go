@@ -10,6 +10,7 @@ import (
 
 	datasyncnode "github.com/status-im/mvds/node"
 
+	gocommon "github.com/status-im/status-go/common"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -194,12 +195,14 @@ func (m *Messenger) broadcastLatestUserStatus() {
 	m.logger.Debug("broadcasting user status")
 	ctx := context.Background()
 	go func() {
+		defer gocommon.LogOnPanic()
 		// Ensure that we are connected before sending a message
 		time.Sleep(5 * time.Second)
 		m.sendCurrentUserStatus(ctx)
 	}()
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-time.After(5 * time.Minute):
@@ -319,6 +322,7 @@ func (m *Messenger) timeoutAutomaticStatusUpdates() {
 	referenceClock := uint64(time.Now().Unix()) - fiveMinutes
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		for {
 			select {
 			case <-time.After(time.Duration(waitDuration) * time.Second):

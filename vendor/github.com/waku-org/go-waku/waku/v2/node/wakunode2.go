@@ -193,7 +193,6 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.wakuFlag = enr.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableFilterFullNode, w.opts.enableStore, w.opts.enableRelay)
 	w.circuitRelayNodes = make(chan peer.AddrInfo)
 	w.metrics = newMetrics(params.prometheusReg)
-
 	w.metrics.RecordVersion(Version, GitCommit)
 
 	// Setup peerstore wrapper
@@ -214,6 +213,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
 			r := make(chan peer.AddrInfo)
 			go func() {
+				defer utils.LogOnPanic()
 				defer close(r)
 				for ; numPeers != 0; numPeers-- {
 					select {
@@ -292,7 +292,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.filterLightNode = filter.NewWakuFilterLightNode(w.bcaster, w.peermanager, w.timesource, w.opts.onlineChecker, w.opts.prometheusReg, w.log)
 	w.lightPush = lightpush.NewWakuLightPush(w.Relay(), w.peermanager, w.opts.prometheusReg, w.log, w.opts.lightpushOpts...)
 
-	w.store = store.NewWakuStore(w.peermanager, w.timesource, w.log)
+	w.store = store.NewWakuStore(w.peermanager, w.timesource, w.log, w.opts.storeRateLimit)
 
 	if params.storeFactory != nil {
 		w.storeFactory = params.storeFactory
@@ -308,6 +308,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 }
 
 func (w *WakuNode) watchMultiaddressChanges(ctx context.Context) {
+	defer utils.LogOnPanic()
 	defer w.wg.Done()
 
 	addrsSet := utils.MultiAddrSet(w.ListenAddresses()...)
@@ -550,6 +551,7 @@ func (w *WakuNode) ID() string {
 }
 
 func (w *WakuNode) watchENRChanges(ctx context.Context) {
+	defer utils.LogOnPanic()
 	defer w.wg.Done()
 
 	var prevNodeVal string
@@ -752,7 +754,9 @@ func (w *WakuNode) DialPeerWithInfo(ctx context.Context, peerInfo peer.AddrInfo)
 func (w *WakuNode) connect(ctx context.Context, info peer.AddrInfo) error {
 	err := w.host.Connect(ctx, info)
 	if err != nil {
-		w.host.Peerstore().(wps.WakuPeerstore).AddConnFailure(info.ID)
+		if w.peermanager != nil {
+			w.peermanager.HandleDialError(err, info.ID)
+		}
 		return err
 	}
 
@@ -885,6 +889,7 @@ func (w *WakuNode) PeersByContentTopic(contentTopic string) peer.IDSlice {
 }
 
 func (w *WakuNode) findRelayNodes(ctx context.Context) {
+	defer utils.LogOnPanic()
 	defer w.wg.Done()
 
 	// Feed peers more often right after the bootstrap, then backoff
