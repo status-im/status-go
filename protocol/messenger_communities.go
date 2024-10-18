@@ -2713,7 +2713,12 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 	publicFiltersToInit := make([]transport.FiltersToInitialize, 0, len(defaultFilters)+len(community.Chats()))
 
 	publicFiltersToInit = append(publicFiltersToInit, defaultFilters...)
-
+	for _, filter := range publicFiltersToInit {
+		_, err := m.transport.RemoveFilterByChatID(filter.ChatID)
+		if err != nil {
+			return err
+		}
+	}
 	for chatID := range community.Chats() {
 		communityChatID := community.IDString() + chatID
 		_, err := m.transport.RemoveFilterByChatID(communityChatID)
@@ -3949,6 +3954,10 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			for _, filter := range filters {
 				topics = append(topics, filter.ContentTopic)
 			}
+			// adding the content-topic used for member updates.
+			// since member updates would not be too frequent i.e only addition/deletion would add a new message,
+			// this shouldn't cause too much increase in size of archive generated.
+			filters = append(filters, m.transport.FilterByChatID(c.MemberUpdateChannelID()))
 
 			// First we need to know the timestamp of the latest waku message
 			// we've received for this community, so we can request messages we've
