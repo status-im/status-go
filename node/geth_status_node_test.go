@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 
@@ -21,7 +23,9 @@ import (
 func TestStatusNodeStart(t *testing.T) {
 	config, err := utils.MakeTestNodeConfigWithDataDir("", "", params.StatusChainNetworkID)
 	require.NoError(t, err)
-	n := New(nil)
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+	n := New(nil, logger)
 
 	// checks before node is started
 	require.Nil(t, n.GethNode())
@@ -33,7 +37,7 @@ func TestStatusNodeStart(t *testing.T) {
 	defer func() {
 		err := stop()
 		if err != nil {
-			n.log.Error("stopping db", err)
+			n.logger.Error("stopping db", zap.Error(err))
 		}
 	}()
 	require.NoError(t, err)
@@ -83,13 +87,13 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 	defer func() {
 		err := stop1()
 		if err != nil {
-			n.log.Error("stopping db", err)
+			n.logger.Error("stopping db", zap.Error(err))
 		}
 	}()
 	defer func() {
 		err := stop2()
 		if err != nil {
-			n.log.Error("stopping multiaccount db", err)
+			n.logger.Error("stopping multiaccount db", zap.Error(err))
 		}
 	}()
 	require.NoError(t, err)
@@ -118,13 +122,13 @@ func TestStatusNodeAddPeer(t *testing.T) {
 	defer func() {
 		err := stop1()
 		if err != nil {
-			n.log.Error("stopping db", err)
+			n.logger.Error("stopping db", zap.Error(err))
 		}
 	}()
 	defer func() {
 		err := stop2()
 		if err != nil {
-			n.log.Error("stopping multiaccount db", err)
+			n.logger.Error("stopping multiaccount db", zap.Error(err))
 		}
 	}()
 	require.NoError(t, err)
@@ -157,13 +161,13 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 	defer func() {
 		err := stop1()
 		if err != nil {
-			n.log.Error("stopping db", err)
+			n.logger.Error("stopping db", zap.Error(err))
 		}
 	}()
 	defer func() {
 		err := stop2()
 		if err != nil {
-			n.log.Error("stopping multiaccount db", err)
+			n.logger.Error("stopping multiaccount db", zap.Error(err))
 		}
 	}()
 	require.NoError(t, err)
@@ -183,13 +187,13 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 	defer func() {
 		err := stop11()
 		if err != nil {
-			n1.log.Error("stopping db", err)
+			n1.logger.Error("stopping db", zap.Error(err))
 		}
 	}()
 	defer func() {
 		err := stop12()
 		if err != nil {
-			n1.log.Error("stopping multiaccount db", err)
+			n1.logger.Error("stopping multiaccount db", zap.Error(err))
 		}
 	}()
 	require.NoError(t, err)

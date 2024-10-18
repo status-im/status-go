@@ -120,7 +120,7 @@ func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
 }
 
 func (b *GethStatusBackend) initialize() {
-	accountManager := account.NewGethManager()
+	accountManager := account.NewGethManager(b.logger)
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
 	statusNode := node.New(transactor)

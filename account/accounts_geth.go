@@ -3,6 +3,8 @@ package account
 import (
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/accounts"
 
 	"github.com/status-im/status-go/account/generator"
@@ -17,9 +19,12 @@ type GethManager struct {
 }
 
 // NewGethManager returns new node account manager.
-func NewGethManager() *GethManager {
+func NewGethManager(logger *zap.Logger) *GethManager {
 	m := &GethManager{}
-	m.DefaultManager = &DefaultManager{accountsGenerator: generator.New(m)}
+	m.DefaultManager = &DefaultManager{
+		accountsGenerator: generator.New(m),
+		logger:            logger,
+	}
 	return m
 }
 
