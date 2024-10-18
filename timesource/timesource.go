@@ -2,6 +2,7 @@ package timesource
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"sort"
 	"sync"
@@ -144,8 +145,8 @@ type NTPTimeSource struct {
 	timeQuery         ntpQuery // for ease of testing
 	now               func() time.Time
 
-	quit    chan struct{}
 	started bool
+	cancel  context.CancelFunc
 
 	mu           sync.RWMutex
 	latestOffset time.Duration
@@ -175,7 +176,7 @@ func (s *NTPTimeSource) updateOffset() error {
 
 // runPeriodically runs periodically the given function based on NTPTimeSource
 // synchronization limits (fastNTPSyncPeriod / slowNTPSyncPeriod)
-func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod bool) {
+func (s *NTPTimeSource) runPeriodically(ctx context.Context, fn func() error, starWithSlowSyncPeriod bool) {
 	if s.started {
 		return
 	}
@@ -184,7 +185,7 @@ func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod 
 	if starWithSlowSyncPeriod {
 		period = s.slowNTPSyncPeriod
 	}
-	s.quit = make(chan struct{})
+
 	go func() {
 		defer common.LogOnPanic()
 		for {
@@ -196,7 +197,7 @@ func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod 
 					period = s.fastNTPSyncPeriod
 				}
 
-			case <-s.quit:
+			case <-ctx.Done():
 				return
 			}
 		}
@@ -204,10 +205,12 @@ func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod 
 }
 
 // Start initializes the local offset and starts a goroutine that periodically updates the local offset.
-func (s *NTPTimeSource) Start() {
+func (s *NTPTimeSource) Start(ctx context.Context) error {
 	if s.started {
-		return
+		return nil
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
 
 	// Attempt to update the offset synchronously so that user can have reliable messages right away
 	err := s.updateOffset()
@@ -217,23 +220,26 @@ func (s *NTPTimeSource) Start() {
 		log.Error("failed to update offset", err)
 	}
 
-	s.runPeriodically(s.updateOffset, err == nil)
+	s.runPeriodically(ctx, s.updateOffset, err == nil)
 
 	s.started = true
-}
+	s.cancel = cancel
 
-// Stop goroutine that updates time source.
-func (s *NTPTimeSource) Stop() error {
-	if s.quit == nil {
-		return nil
-	}
-	close(s.quit)
-	s.started = false
 	return nil
 }
 
+// Stop goroutine that updates time source.
+func (s *NTPTimeSource) Stop() {
+	if s.cancel == nil {
+		return
+	}
+
+	s.cancel()
+	s.started = false
+}
+
 func (s *NTPTimeSource) GetCurrentTime() time.Time {
-	s.Start()
+	s.Start(context.Background())
 	return s.Now()
 }
 
@@ -243,7 +249,7 @@ func (s *NTPTimeSource) GetCurrentTimeInMillis() uint64 {
 
 func GetCurrentTime() time.Time {
 	ts := Default()
-	ts.Start()
+	ts.Start(context.Background())
 	return ts.Now()
 }
 
