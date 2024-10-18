@@ -2,12 +2,12 @@ import random
 
 import pytest
 
-from test_cases import StatusDTestCase
+from test_cases import StatusBackendTestCase
 
 
 @pytest.mark.accounts
 @pytest.mark.rpc
-class TestAccounts(StatusDTestCase):
+class TestAccounts(StatusBackendTestCase):
 
     @pytest.mark.parametrize(
         "method, params",
