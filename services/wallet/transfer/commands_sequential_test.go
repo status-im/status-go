@@ -1335,7 +1335,6 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
-	tm := &TransactionManager{NewMultiTransactionDB(db), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 
 	mediaServer, err := server.NewMediaServer(appdb, nil, nil, db)
 	require.NoError(t, err)
@@ -1395,20 +1394,19 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	require.NoError(t, err)
 
 	cmd := &loadBlocksAndTransfersCommand{
-		accounts:           []common.Address{address},
-		db:                 wdb,
-		blockRangeDAO:      &BlockRangeSequentialDAO{wdb.client},
-		blockDAO:           &BlockDAO{db},
-		accountsDB:         accDB,
-		chainClient:        tc,
-		feed:               &event.Feed{},
-		balanceCacher:      balance.NewCacherWithTTL(5 * time.Minute),
-		transactionManager: tm,
-		pendingTxManager:   tracker,
-		tokenManager:       tokenManager,
-		blocksLoadedCh:     blockChannel,
-		omitHistory:        true,
-		contractMaker:      tokenManager.ContractMaker,
+		accounts:         []common.Address{address},
+		db:               wdb,
+		blockRangeDAO:    &BlockRangeSequentialDAO{wdb.client},
+		blockDAO:         &BlockDAO{db},
+		accountsDB:       accDB,
+		chainClient:      tc,
+		feed:             &event.Feed{},
+		balanceCacher:    balance.NewCacherWithTTL(5 * time.Minute),
+		pendingTxManager: tracker,
+		tokenManager:     tokenManager,
+		blocksLoadedCh:   blockChannel,
+		omitHistory:      true,
+		contractMaker:    tokenManager.ContractMaker,
 	}
 
 	tc.prepareBalanceHistory(int(tc.currentBlock))
