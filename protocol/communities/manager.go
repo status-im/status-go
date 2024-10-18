@@ -2001,6 +2001,12 @@ func (m *Manager) EditChatFirstMessageTimestamp(communityID types.HexBytes, chat
 	return community, changes, nil
 }
 
+func (m *Manager) UpdateChatFirstMessageTimestamp(community *Community, chatID string, timestamp uint32) (*CommunityChanges, error) {
+	communityID := community.ID().String()
+	chatID = strings.TrimPrefix(chatID, communityID)
+	return community.UpdateChatFirstMessageTimestamp(chatID, timestamp)
+}
+
 func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories) (*Community, *CommunityChanges, error) {
 	m.communityLock.Lock(request.CommunityID)
 	defer m.communityLock.Unlock(request.CommunityID)
@@ -4428,6 +4434,10 @@ func (m *Manager) accountsHasPrivilegedPermission(preParsedCommunityPermissionDa
 		return permissionResponse.Satisfied
 	}
 	return false
+}
+
+func (m *Manager) SaveAndPublish(community *Community) error {
+	return m.saveAndPublish(community)
 }
 
 func (m *Manager) saveAndPublish(community *Community) error {
