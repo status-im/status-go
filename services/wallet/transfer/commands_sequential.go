@@ -16,7 +16,6 @@ import (
 	nodetypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/chain"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
@@ -1124,13 +1123,6 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 	}
 
 	if len(ranges) > 0 {
-		storage := rpclimiter.NewLimitsDBStorage(c.db.client)
-		limiter := rpclimiter.NewRequestLimiter(storage)
-		chainClient, _ := createChainClientWithLimiter(c.chainClient, account, limiter)
-		if chainClient == nil {
-			chainClient = c.chainClient
-		}
-
 		for _, rangeItem := range ranges {
 			log.Debug("range item", "r", rangeItem, "n", c.chainClient.NetworkID(), "a", account)
 
@@ -1139,7 +1131,7 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocksForAccount(group *asyn
 				db:                        c.db,
 				accountsDB:                c.accountsDB,
 				blockRangeDAO:             c.blockRangeDAO,
-				chainClient:               chainClient,
+				chainClient:               c.chainClient,
 				balanceCacher:             c.balanceCacher,
 				feed:                      c.feed,
 				noLimit:                   false,
@@ -1310,43 +1302,4 @@ func nextRange(maxRangeSize int, prevFrom, zeroBlockNumber *big.Int) (*big.Int, 
 	log.Debug("next range end", "from", from, "to", to, "zeroBlockNumber", zeroBlockNumber)
 
 	return from, to
-}
-
-func accountLimiterTag(account common.Address) string {
-	return transferHistoryTag + "_" + account.String()
-}
-
-func createChainClientWithLimiter(client chain.ClientInterface, account common.Address, limiter rpclimiter.RequestLimiter) (chain.ClientInterface, error) {
-	// Each account has its own limit and a global limit for all accounts
-	accountTag := accountLimiterTag(account)
-	chainClient := chain.ClientWithTag(client, accountTag, transferHistoryTag)
-
-	// Check if limit is already reached, then skip the comamnd
-	if allow, err := limiter.Allow(accountTag); !allow {
-		log.Info("fetchHistoryBlocksForAccount limit reached", "account", account, "chain", chainClient.NetworkID(), "error", err)
-		return nil, err
-	}
-
-	if allow, err := limiter.Allow(transferHistoryTag); !allow {
-		log.Info("fetchHistoryBlocksForAccount common limit reached", "chain", chainClient.NetworkID(), "error", err)
-		return nil, err
-	}
-
-	limit, _ := limiter.GetLimit(accountTag)
-	if limit == nil {
-		err := limiter.SetLimit(accountTag, transferHistoryLimitPerAccount, rpclimiter.LimitInfinitely)
-		if err != nil {
-			log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "accountTag", accountTag)
-		}
-	}
-
-	// Here total limit per day is overwriten on each app start, that still saves us RPC calls, but allows to proceed
-	// after app restart if the limit was reached. Currently there is no way to reset the limit from UI
-	err := limiter.SetLimit(transferHistoryTag, transferHistoryLimit, transferHistoryLimitPeriod)
-	if err != nil {
-		log.Error("fetchHistoryBlocksForAccount SetLimit", "error", err, "groupTag", transferHistoryTag)
-	}
-	chainClient.SetLimiter(limiter)
-
-	return chainClient, nil
 }

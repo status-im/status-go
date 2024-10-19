@@ -4,8 +4,6 @@ import (
 	"errors"
 	"testing"
 	"time"
-
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 )
 
 func TestNewRpcProviderStatus(t *testing.T) {
@@ -37,18 +35,6 @@ func TestNewRpcProviderStatus(t *testing.T) {
 				Name:      "Provider1",
 				LastError: errors.New("Some critical RPC error"),
 				Status:    StatusDown,
-			},
-		},
-		{
-			name: "Non-critical RPC error, should be up",
-			res: RpcProviderCallStatus{
-				Name:      "Provider2",
-				Timestamp: time.Now(),
-				Err:       rpclimiter.ErrRequestsOverLimit, // Assuming this is non-critical
-			},
-			expected: ProviderStatus{
-				Name:   "Provider2",
-				Status: StatusUp,
 			},
 		},
 	}

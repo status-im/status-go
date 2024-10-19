@@ -15,7 +15,6 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	statusaccounts "github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
@@ -262,12 +261,6 @@ func (c *Controller) cleanUpRemovedAccount(address common.Address) {
 	err = c.transactionManager.removeMultiTransactionByAddress(address)
 	if err != nil {
 		log.Error("Failed to delete multitransactions", "error", err)
-	}
-
-	rpcLimitsStorage := rpclimiter.NewLimitsDBStorage(c.db.client)
-	err = rpcLimitsStorage.Delete(accountLimiterTag(address))
-	if err != nil {
-		log.Error("Failed to delete limits", "error", err)
 	}
 }
 
