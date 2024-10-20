@@ -28,6 +28,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/requestlog"
+	m_requests "github.com/status-im/status-go/mobile/requests"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -1742,7 +1743,13 @@ func inputConnectionStringForBootstrapping(cs, configJSON string) string {
 		return response.toJSON(err)
 	}
 
-	err = pairing.StartUpReceivingClient(statusBackend, cs, configJSON)
+	var conf pairing.ReceiverClientConfig
+	err = json.Unmarshal([]byte(configJSON), &conf)
+	if err != nil {
+		return response.toJSON(err)
+	}
+
+	err = pairing.StartUpReceivingClient(statusBackend, cs, &conf)
 	if err != nil {
 		return response.toJSON(err)
 	}
@@ -1755,12 +1762,38 @@ func InputConnectionStringForBootstrappingV2(requestJSON string) string {
 }
 
 func inputConnectionStringForBootstrappingV2(requestJSON string) string {
-	var request requests.InputConnectionStringForBootstrapping
+	var request m_requests.InputConnectionStringForBootstrapping
 	err := json.Unmarshal([]byte(requestJSON), &request)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return inputConnectionStringForBootstrapping(request.ConnectionString, request.ConfigJSON)
+	if err := request.Validate(); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	params := &pairing.ConnectionParams{}
+	err = params.FromString(request.ConnectionString)
+	if err != nil {
+		response := &inputConnectionStringForBootstrappingResponse{}
+		return response.toJSON(fmt.Errorf("could not parse connection string"))
+	}
+	response := &inputConnectionStringForBootstrappingResponse{
+		InstallationID: params.InstallationID(),
+		KeyUID:         params.KeyUID(),
+	}
+
+	err = statusBackend.LocalPairingStateManager.StartPairing(request.ConnectionString)
+	defer func() { statusBackend.LocalPairingStateManager.StopPairing(request.ConnectionString, err) }()
+	if err != nil {
+		return response.toJSON(err)
+	}
+
+	err = pairing.StartUpReceivingClient(statusBackend, request.ConnectionString, request.ReceiverClientConfig)
+	if err != nil {
+		return response.toJSON(err)
+	}
+
+	return response.toJSON(statusBackend.Logout())
 }
 
 // Deprecated: Use InputConnectionStringForBootstrappingAnotherDeviceV2 instead.
@@ -1786,8 +1819,13 @@ func inputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) s
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	var conf pairing.SenderClientConfig
+	err = json.Unmarshal([]byte(configJSON), &conf)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
 
-	err = pairing.StartUpSendingClient(statusBackend, cs, configJSON)
+	err = pairing.StartUpSendingClient(statusBackend, cs, &conf)
 	return makeJSONResponse(err)
 }
 
@@ -1796,12 +1834,23 @@ func InputConnectionStringForBootstrappingAnotherDeviceV2(requestJSON string) st
 }
 
 func inputConnectionStringForBootstrappingAnotherDeviceV2(requestJSON string) string {
-	var request requests.InputConnectionStringForBootstrappingAnotherDevice
+	var request m_requests.InputConnectionStringForBootstrappingAnotherDevice
 	err := json.Unmarshal([]byte(requestJSON), &request)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return inputConnectionStringForBootstrappingAnotherDevice(request.ConnectionString, request.ConfigJSON)
+	if err := request.Validate(); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.LocalPairingStateManager.StartPairing(request.ConnectionString)
+	defer func() { statusBackend.LocalPairingStateManager.StopPairing(request.ConnectionString, err) }()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = pairing.StartUpSendingClient(statusBackend, request.ConnectionString, request.SenderClientConfig)
+	return makeJSONResponse(err)
 }
 
 func GetConnectionStringForExportingKeypairsKeystores(configJSON string) string {
@@ -1839,7 +1888,12 @@ func inputConnectionStringForImportingKeypairsKeystores(cs, configJSON string) s
 		return makeJSONResponse(fmt.Errorf("no config given, ReceiverClientConfig is expected"))
 	}
 
-	err := pairing.StartUpKeystoreFilesReceivingClient(statusBackend, cs, configJSON)
+	var conf pairing.KeystoreFilesReceiverClientConfig
+	err := json.Unmarshal([]byte(configJSON), &conf)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = pairing.StartUpKeystoreFilesReceivingClient(statusBackend, cs, &conf)
 	return makeJSONResponse(err)
 }
 
@@ -1848,12 +1902,16 @@ func InputConnectionStringForImportingKeypairsKeystoresV2(requestJSON string) st
 }
 
 func inputConnectionStringForImportingKeypairsKeystoresV2(requestJSON string) string {
-	var request requests.InputConnectionStringForImportingKeypairsKeystores
+	var request m_requests.InputConnectionStringForImportingKeypairsKeystores
 	err := json.Unmarshal([]byte(requestJSON), &request)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return inputConnectionStringForImportingKeypairsKeystores(request.ConnectionString, request.ConfigJSON)
+	if err := request.Validate(); err != nil {
+		return makeJSONResponse(err)
+	}
+	err = pairing.StartUpKeystoreFilesReceivingClient(statusBackend, request.ConnectionString, request.KeystoreFilesReceiverClientConfig)
+	return makeJSONResponse(err)
 }
 
 func ValidateConnectionString(cs string) string {
