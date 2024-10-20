@@ -3,9 +3,10 @@ package requests
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	protocolRequests "github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server/pairing"
-	"github.com/stretchr/testify/require"
 )
 
 func TestInputConnectionStringForBootstrapping_Validate(t *testing.T) {

@@ -1,8 +1,9 @@
 package requests
 
 import (
-	"github.com/status-im/status-go/server/pairing"
 	"gopkg.in/go-playground/validator.v9"
+
+	"github.com/status-im/status-go/server/pairing"
 )
 
 type InputConnectionStringForImportingKeypairsKeystores struct {
