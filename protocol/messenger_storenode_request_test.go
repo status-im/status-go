@@ -310,7 +310,9 @@ func (s *MessengerStoreNodeRequestSuite) fetchProfile(m *Messenger, contactID st
 }
 
 func (s *MessengerStoreNodeRequestSuite) WaitForAvailableStoreNode(messenger *Messenger) {
-	WaitForAvailableStoreNode(&s.Suite, messenger, storeNodeConnectTimeout)
+	ctx, cancel := context.WithTimeout(context.TODO(), storeNodeConnectTimeout)
+	defer cancel()
+	WaitForAvailableStoreNode(&s.Suite, messenger, ctx)
 }
 
 func (s *MessengerStoreNodeRequestSuite) setupEnvelopesWatcher(wakuNode *waku2.Waku, topic *wakuV2common.TopicType, cb func(envelope *wakuV2common.ReceivedMessage)) {

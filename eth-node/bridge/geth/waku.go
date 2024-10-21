@@ -320,10 +320,6 @@ func (w *GethWakuWrapper) GetActiveStorenode() peer.ID {
 	panic("not available in WakuV1")
 }
 
-func (w *GethWakuWrapper) OnStorenodeAvailableOneShot() <-chan struct{} {
-	panic("not available in WakuV1")
-}
-
 func (w *GethWakuWrapper) OnStorenodeChanged() <-chan peer.ID {
 	panic("not available in WakuV1")
 }
@@ -336,7 +332,7 @@ func (w *GethWakuWrapper) OnStorenodeAvailable() <-chan peer.ID {
 	panic("not available in WakuV1")
 }
 
-func (w *GethWakuWrapper) WaitForAvailableStoreNode(timeout time.Duration) bool {
+func (w *GethWakuWrapper) WaitForAvailableStoreNode(ctx context.Context) bool {
 	return false
 }
 

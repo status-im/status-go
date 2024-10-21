@@ -3293,7 +3293,7 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 		WithWaitForResponseOption(request.WaitForResponse),
 	}
 
-	community, _, err := m.storeNodeRequestsManager.FetchCommunity(communityAddress, options)
+	community, _, err := m.storeNodeRequestsManager.FetchCommunity(m.ctx, communityAddress, options)
 
 	return community, err
 }
@@ -3301,7 +3301,7 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 // fetchCommunities installs filter for community and requests its details from store node.
 // When response received it will be passed through signals handler.
 func (m *Messenger) fetchCommunities(communities []communities.CommunityShard) error {
-	return m.storeNodeRequestsManager.FetchCommunities(communities, []StoreNodeRequestOption{})
+	return m.storeNodeRequestsManager.FetchCommunities(m.ctx, communities, []StoreNodeRequestOption{})
 }
 
 // passStoredCommunityInfoToSignalHandler calls signal handler with community info
@@ -3972,7 +3972,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			}
 
 			// Request possibly missed waku messages for community
-			ms := m.getCommunityMailserver(c.ID().String())
+			ms := m.getCommunityStorenode(c.ID().String())
 			_, err = m.syncFiltersFrom(ms, filters, uint32(latestWakuMessageTimestamp))
 			if err != nil {
 				m.logger.Error("failed to request missing messages", zap.Error(err))
@@ -5158,9 +5158,9 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 	}()
 }
 
-// getCommunityMailserver returns the active mailserver if a communityID is present then it'll return the mailserver
+// getCommunityStorenode returns the active mailserver if a communityID is present then it'll return the mailserver
 // for that community if it has a mailserver setup otherwise it'll return the global mailserver
-func (m *Messenger) getCommunityMailserver(communityID ...string) peer.ID {
+func (m *Messenger) getCommunityStorenode(communityID ...string) peer.ID {
 	if m.transport.WakuVersion() != 2 {
 		return ""
 	}
@@ -5178,7 +5178,11 @@ func (m *Messenger) getCommunityMailserver(communityID ...string) peer.ID {
 		return m.transport.GetActiveStorenode()
 	}
 
-	peerID, _ := ms.PeerID()
+	peerID, err := ms.PeerID()
+	if err != nil {
+		m.logger.Error("getting storenode for community, using global", zap.String("communityID", communityID[0]), zap.Error(err))
+		return m.transport.GetActiveStorenode()
+	}
 
 	return peerID
 }

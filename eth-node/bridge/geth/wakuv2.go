@@ -314,10 +314,6 @@ func (w *gethWakuV2Wrapper) GetActiveStorenode() peer.ID {
 	return w.waku.StorenodeCycle.GetActiveStorenode()
 }
 
-func (w *gethWakuV2Wrapper) OnStorenodeAvailableOneShot() <-chan struct{} {
-	return w.waku.StorenodeCycle.StorenodeAvailableOneshotEmitter.Subscribe()
-}
-
 func (w *gethWakuV2Wrapper) OnStorenodeChanged() <-chan peer.ID {
 	return w.waku.StorenodeCycle.StorenodeChangedEmitter.Subscribe()
 }
@@ -330,8 +326,8 @@ func (w *gethWakuV2Wrapper) OnStorenodeAvailable() <-chan peer.ID {
 	return w.waku.StorenodeCycle.StorenodeAvailableEmitter.Subscribe()
 }
 
-func (w *gethWakuV2Wrapper) WaitForAvailableStoreNode(timeout time.Duration) bool {
-	return w.waku.StorenodeCycle.WaitForAvailableStoreNode(context.TODO(), timeout)
+func (w *gethWakuV2Wrapper) WaitForAvailableStoreNode(ctx context.Context) bool {
+	return w.waku.StorenodeCycle.WaitForAvailableStoreNode(ctx)
 }
 
 func (w *gethWakuV2Wrapper) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
@@ -353,8 +349,8 @@ func (w *gethWakuV2Wrapper) ProcessMailserverBatch(
 	}
 
 	criteria := store.FilterCriteria{
-		TimeStart:     proto.Int64(int64(batch.From) * int64(time.Second)),
-		TimeEnd:       proto.Int64(int64(batch.To) * int64(time.Second)),
+		TimeStart:     proto.Int64(batch.From.UnixNano()),
+		TimeEnd:       proto.Int64(batch.From.UnixNano()),
 		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
 	}
 

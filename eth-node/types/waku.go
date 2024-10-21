@@ -202,9 +202,6 @@ type Waku interface {
 	// GetActiveStorenode returns the peer ID of the currently active storenode. It will be empty if no storenode is active
 	GetActiveStorenode() peer.ID
 
-	// OnStorenodeAvailableOneShot returns a channel that will be triggered only once when a storenode becomes available
-	OnStorenodeAvailableOneShot() <-chan struct{}
-
 	// OnStorenodeChanged is triggered when a new storenode is promoted to become the active storenode or when the active storenode is removed
 	OnStorenodeChanged() <-chan peer.ID
 
@@ -214,8 +211,8 @@ type Waku interface {
 	// OnStorenodeAvailable is triggered when there is a new active storenode selected
 	OnStorenodeAvailable() <-chan peer.ID
 
-	// WaitForAvailableStoreNode will wait for a storenode to be available until `timeout` happens
-	WaitForAvailableStoreNode(timeout time.Duration) bool
+	// WaitForAvailableStoreNode will wait for a storenode to be available depending on the context
+	WaitForAvailableStoreNode(ctx context.Context) bool
 
 	// SetStorenodeConfigProvider will set the configuration provider for the storenode cycle
 	SetStorenodeConfigProvider(c history.StorenodeConfigProvider)
@@ -240,8 +237,8 @@ type Waku interface {
 }
 
 type MailserverBatch struct {
-	From        uint32
-	To          uint32
+	From        time.Time
+	To          time.Time
 	Cursor      string
 	PubsubTopic string
 	Topics      []TopicType
@@ -249,7 +246,7 @@ type MailserverBatch struct {
 }
 
 func (mb *MailserverBatch) Hash() string {
-	data := fmt.Sprintf("%d%d%s%s%v%v", mb.From, mb.To, mb.Cursor, mb.PubsubTopic, mb.Topics, mb.ChatIDs)
+	data := fmt.Sprintf("%d%d%s%s%v%v", mb.From.UnixNano(), mb.To.UnixNano(), mb.Cursor, mb.PubsubTopic, mb.Topics, mb.ChatIDs)
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:4])
 }

@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"time"
 
@@ -69,7 +68,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 
 	go func() {
 		defer gocommon.LogOnPanic()
-		peerID := m.getCommunityMailserver(chat.CommunityID)
+		peerID := m.getCommunityStorenode(chat.CommunityID)
 		_, err = m.performStorenodeTask(func() (*MessengerResponse, error) {
 			response, err := m.syncChatWithFilters(peerID, chat.ID)
 
@@ -95,6 +94,7 @@ func (m *Messenger) performStorenodeTask(task func() (*MessengerResponse, error)
 	errCh := make(chan error)
 
 	go func() {
+		defer gocommon.LogOnPanic()
 		err := m.transport.PerformStorenodeTask(func() error {
 			r, err := task()
 			if err != nil {
@@ -102,6 +102,8 @@ func (m *Messenger) performStorenodeTask(task func() (*MessengerResponse, error)
 			}
 
 			select {
+			case <-m.ctx.Done():
+				return m.ctx.Err()
 			case responseCh <- r:
 			default:
 				//
@@ -143,7 +145,7 @@ func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, erro
 		// split filters by community store node so we can request the filters to the correct mailserver
 		filtersByMs := m.SplitFiltersByStoreNode(filters)
 		for communityID, filtersForMs := range filtersByMs {
-			peerID := m.getCommunityMailserver(communityID)
+			peerID := m.getCommunityStorenode(communityID)
 			_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
 				response, err := m.syncFilters(peerID, filtersForMs)
 
@@ -166,15 +168,14 @@ func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, erro
 	return true, nil
 }
 
-func (m *Messenger) calculateMailserverTo() uint32 {
-	seconds := float64(m.GetCurrentTimeInMillis()) / 1000
-	return uint32(math.Ceil(seconds))
+func (m *Messenger) calculateMailserverTo() time.Time {
+	return time.Unix(0, int64(time.Duration(m.GetCurrentTimeInMillis())*time.Millisecond))
 }
 
-func (m *Messenger) calculateMailserverTimeBounds(duration time.Duration) (uint32, uint32) {
-	now := float64(m.GetCurrentTimeInMillis()) / 1000
-	to := uint32(math.Ceil(now))
-	from := uint32(math.Floor(now)) - uint32(duration.Seconds())
+func (m *Messenger) calculateMailserverTimeBounds(duration time.Duration) (time.Time, time.Time) {
+	now := time.Unix(0, int64(time.Duration(m.GetCurrentTimeInMillis())*time.Millisecond))
+	to := now
+	from := now.Add(-duration)
 	return from, to
 }
 
@@ -251,7 +252,7 @@ func (m *Messenger) syncBackup() error {
 	from, to := m.calculateMailserverTimeBounds(oneMonthDuration)
 
 	batch := types.MailserverBatch{From: from, To: to, Topics: []types.TopicType{filter.ContentTopic}}
-	ms := m.getCommunityMailserver(filter.ChatID)
+	ms := m.getCommunityStorenode(filter.ChatID)
 	err = m.processMailserverBatch(ms, batch)
 	if err != nil {
 		return err
@@ -347,7 +348,7 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 	filtersByMs := m.SplitFiltersByStoreNode(filters)
 	allResponses := &MessengerResponse{}
 	for communityID, filtersForMs := range filtersByMs {
-		peerID := m.getCommunityMailserver(communityID)
+		peerID := m.getCommunityStorenode(communityID)
 		if withRetries {
 			response, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
 				return m.syncFilters(peerID, filtersForMs)
@@ -402,7 +403,7 @@ func (m *Messenger) checkForMissingMessagesLoop() {
 		filters := m.transport.Filters()
 		filtersByMs := m.SplitFiltersByStoreNode(filters)
 		for communityID, filtersForMs := range filtersByMs {
-			peerID := m.getCommunityMailserver(communityID)
+			peerID := m.getCommunityStorenode(communityID)
 			if peerID == "" {
 				continue
 			}
@@ -533,7 +534,7 @@ func (m *Messenger) syncFiltersFrom(peerID peer.ID, filters []*transport.Filter,
 						return nil, err
 					}
 				}
-				batch = types.MailserverBatch{From: from, To: to}
+				batch = types.MailserverBatch{From: time.Unix(int64(from), 0), To: to}
 			}
 
 			batch.ChatIDs = append(batch.ChatIDs, chatID)
@@ -542,7 +543,7 @@ func (m *Messenger) syncFiltersFrom(peerID peer.ID, filters []*transport.Filter,
 			batches[pubsubTopic][batchID] = batch
 
 			// Set last request to the new `to`
-			topicData.LastRequest = int(to)
+			topicData.LastRequest = int(to.Unix())
 			syncedTopics = append(syncedTopics, topicData)
 		}
 	}
@@ -574,8 +575,8 @@ func (m *Messenger) syncFiltersFrom(peerID peer.ID, filters []*transport.Filter,
 					ChatIDs:     batch.ChatIDs,
 				}
 
-				from := batch.To - uint32(oneDayDuration.Seconds())
-				if from > batch.From {
+				from := batch.To.Add(-oneDayDuration)
+				if from.After(batch.From) {
 					dayBatch.From = from
 					batches24h = append(batches24h, dayBatch)
 
@@ -621,15 +622,15 @@ func (m *Messenger) syncFiltersFrom(peerID peer.ID, filters []*transport.Filter,
 				if !ok || !chat.Active || chat.Timeline() || chat.ProfileUpdates() {
 					continue
 				}
-				gap, err := m.calculateGapForChat(chat, batch.From)
+				gap, err := m.calculateGapForChat(chat, uint32(batch.From.Unix()))
 				if err != nil {
 					return nil, err
 				}
-				if chat.SyncedFrom == 0 || chat.SyncedFrom > batch.From {
-					chat.SyncedFrom = batch.From
+				if chat.SyncedFrom == 0 || chat.SyncedFrom > uint32(batch.From.Unix()) {
+					chat.SyncedFrom = uint32(batch.From.Unix())
 				}
 
-				chat.SyncedTo = to
+				chat.SyncedTo = uint32(to.Unix())
 
 				err = m.persistence.SetSyncTimestamps(chat.SyncedFrom, chat.SyncedTo, chat.ID)
 				if err != nil {
@@ -739,7 +740,7 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 		return 0, ErrChatNotFound
 	}
 
-	peerID := m.getCommunityMailserver(chat.CommunityID)
+	peerID := m.getCommunityStorenode(chat.CommunityID)
 	var from uint32
 	_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
 		canSync, err := m.canSyncWithStoreNodes()
@@ -762,8 +763,8 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 
 		batch := types.MailserverBatch{
 			ChatIDs:     []string{chatID},
-			To:          chat.SyncedFrom,
-			From:        chat.SyncedFrom - defaultSyncPeriod,
+			To:          time.Unix(int64(chat.SyncedFrom), 0),
+			From:        time.Unix(int64(chat.SyncedFrom-defaultSyncPeriod), 0),
 			PubsubTopic: pubsubTopic,
 			Topics:      topics,
 		}
@@ -779,14 +780,14 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 		if m.config.messengerSignalsHandler != nil {
 			m.config.messengerSignalsHandler.HistoryRequestCompleted()
 		}
-		if chat.SyncedFrom == 0 || chat.SyncedFrom > batch.From {
-			chat.SyncedFrom = batch.From
+		if chat.SyncedFrom == 0 || chat.SyncedFrom > uint32(batch.From.Unix()) {
+			chat.SyncedFrom = uint32(batch.From.Unix())
 		}
 
-		m.logger.Debug("setting sync timestamps", zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
+		m.logger.Debug("setting sync timestamps", zap.Int64("from", int64(batch.From.Unix())), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
 
-		err = m.persistence.SetSyncTimestamps(batch.From, chat.SyncedTo, chat.ID)
-		from = batch.From
+		err = m.persistence.SetSyncTimestamps(uint32(batch.From.Unix()), chat.SyncedTo, chat.ID)
+		from = uint32(batch.From.Unix())
 		return nil, err
 	}, history.WithPeerID(peerID))
 	if err != nil {
@@ -830,8 +831,8 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 
 	batch := types.MailserverBatch{
 		ChatIDs:     []string{chatID},
-		To:          highestTo,
-		From:        lowestFrom,
+		To:          time.Unix(int64(highestTo), 0),
+		From:        time.Unix(int64(lowestFrom), 0),
 		PubsubTopic: pubsubTopic,
 		Topics:      topics,
 	}
@@ -840,7 +841,7 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 	}
 
-	peerID := m.getCommunityMailserver(chat.CommunityID)
+	peerID := m.getCommunityStorenode(chat.CommunityID)
 	err = m.processMailserverBatch(peerID, batch)
 	if err != nil {
 		return err
@@ -907,7 +908,7 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 		return 0, ErrChatNotFound
 	}
 
-	peerID := m.getCommunityMailserver(chat.CommunityID)
+	peerID := m.getCommunityStorenode(chat.CommunityID)
 	_, err := m.performStorenodeTask(func() (*MessengerResponse, error) {
 		canSync, err := m.canSyncWithStoreNodes()
 		if err != nil {
@@ -917,7 +918,7 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 			return nil, nil
 		}
 
-		m.logger.Debug("fetching messages", zap.String("chatID", chatID), zap.Stringer("storenodeID", peerID))
+		m.logger.Debug("fetching messages", zap.String("chatID", chatID), zap.Stringer("peerID", peerID))
 		pubsubTopic, topics, err := m.topicsForChat(chatID)
 		if err != nil {
 			return nil, nil
@@ -942,13 +943,13 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 		if m.config.messengerSignalsHandler != nil {
 			m.config.messengerSignalsHandler.HistoryRequestCompleted()
 		}
-		if chat.SyncedFrom == 0 || chat.SyncedFrom > batch.From {
-			chat.SyncedFrom = batch.From
+		if chat.SyncedFrom == 0 || chat.SyncedFrom > uint32(batch.From.Second()) {
+			chat.SyncedFrom = uint32(batch.From.Second())
 		}
 
-		m.logger.Debug("setting sync timestamps", zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
+		m.logger.Debug("setting sync timestamps", zap.Int64("from", batch.From.Unix()), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
 
-		err = m.persistence.SetSyncTimestamps(batch.From, chat.SyncedTo, chat.ID)
+		err = m.persistence.SetSyncTimestamps(uint32(batch.From.Unix()), chat.SyncedTo, chat.ID)
 		from = batch.From
 		return nil, err
 	}, history.WithPeerID(peerID))
@@ -956,5 +957,5 @@ func (m *Messenger) fetchMessages(chatID string, duration time.Duration) (uint32
 		return 0, err
 	}
 
-	return from, nil
+	return uint32(from.Unix()), nil
 }

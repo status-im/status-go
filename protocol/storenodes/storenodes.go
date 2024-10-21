@@ -62,10 +62,8 @@ func (m *CommunityStorenodes) IsCommunityStoreNode(peerID peer.ID) bool {
 	for _, data := range m.storenodesByCommunityID {
 		for _, snode := range data.storenodes {
 			commStorenodeID, err := utils.GetPeerID(snode.Address)
-			if err == nil {
-				if commStorenodeID == peerID {
-					return true
-				}
+			if err == nil && commStorenodeID == peerID {
+				return true
 			}
 		}
 	}
