@@ -34,6 +34,10 @@ func (t TopicType) String() string {
 	return EncodeHex(t[:])
 }
 
+func (t TopicType) Bytes() []byte {
+	return TopicTypeToByteArray(t)
+}
+
 // MarshalText returns the hex representation of t.
 func (t TopicType) MarshalText() ([]byte, error) {
 	return HexBytes(t[:]).MarshalText()

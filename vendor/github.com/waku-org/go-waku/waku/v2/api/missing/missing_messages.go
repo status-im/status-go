@@ -178,7 +178,7 @@ func (m *MissingMessageVerifier) fetchHistory(c chan<- *protocol.Envelope, inter
 	}
 }
 
-func (m *MissingMessageVerifier) storeQueryWithRetry(ctx context.Context, queryFunc func(ctx context.Context) (*store.Result, error), logger *zap.Logger, logMsg string) (*store.Result, error) {
+func (m *MissingMessageVerifier) storeQueryWithRetry(ctx context.Context, queryFunc func(ctx context.Context) (store.Result, error), logger *zap.Logger, logMsg string) (store.Result, error) {
 	retry := true
 	count := 1
 	for retry && count <= m.params.maxAttemptsToRetrieveHistory {
@@ -212,7 +212,7 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 		logging.Epoch("to", now),
 	)
 
-	result, err := m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (*store.Result, error) {
+	result, err := m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (store.Result, error) {
 		return m.store.Query(ctx, store.FilterCriteria{
 			ContentFilter: protocol.NewContentFilter(interest.contentFilter.PubsubTopic, contentTopics[batchFrom:batchTo]...),
 			TimeStart:     proto.Int64(interest.lastChecked.Add(-m.params.delay).UnixNano()),
@@ -243,7 +243,7 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 			missingHashes = append(missingHashes, hash)
 		}
 
-		result, err = m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (*store.Result, error) {
+		result, err = m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (store.Result, error) {
 			if err = result.Next(ctx); err != nil {
 				return nil, err
 			}
@@ -282,7 +282,7 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 			defer utils.LogOnPanic()
 			defer wg.Wait()
 
-			result, err := m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (*store.Result, error) {
+			result, err := m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (store.Result, error) {
 				queryCtx, cancel := context.WithTimeout(ctx, m.params.storeQueryTimeout)
 				defer cancel()
 				return m.store.QueryByHash(queryCtx, messageHashes, store.WithPeer(interest.peerID), store.WithPaging(false, maxMsgHashesPerRequest))
@@ -303,7 +303,7 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 					}
 				}
 
-				result, err = m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (*store.Result, error) {
+				result, err = m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (store.Result, error) {
 					if err = result.Next(ctx); err != nil {
 						return nil, err
 					}
