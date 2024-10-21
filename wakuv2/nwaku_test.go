@@ -335,7 +335,7 @@ func TestPeerExchange(t *testing.T) {
 		Shards: []uint16{64},
 		PeerExchange: false,
 		Discv5UdpPort: 9001,
-		TcpPort: 62000,
+		TcpPort: 60001,
 	}
 
 	discV5Node, err := New(nil, "", &discV5NodeConfig, logger.Named("discV5Node"), nil, nil, nil, nil)
@@ -363,28 +363,30 @@ func TestPeerExchange(t *testing.T) {
 		PeerExchange: true,
 		Discv5UdpPort: 9000,
 		Discv5BootstrapNodes: []string{discv5NodeEnr.String()},
-		TcpPort: 61000,
+		TcpPort: 60002,
 	}
 
 	pxServerNode, err := New(nil, "", &pxServerConfig, logger.Named("pxServerNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, pxServerNode.Start())
 
+	fmt.Println("------ GABRIEL started big sleep")
 	time.Sleep(10 * time.Second)
+	fmt.Println("------ GABRIEL finished big sleep")
 
 	serverNodeMa, err := pxServerNode.ListenAddresses()
 	require.NoError(t, err)
 	require.NotNil(t, serverNodeMa)
 
-	// Sanity check, not great, but it's probably helpful
-	options := func(b *backoff.ExponentialBackOff) {
-		b.MaxElapsedTime = 30 * time.Second
-	}
-
 	discv5Peers, err := discV5Node.GetPeerIdsFromPeerStore()
 	require.NoError(t, err)
 	fmt.Println("------ GABRIEL discV5Node peers: ", discv5Peers)
 
+	// Sanity check, not great, but it's probably helpful
+	options := func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 30 * time.Second
+	}
+	
 	// Check that pxServerNode has discV5Node in its Peer Store
 	err = tt.RetryWithBackOff(func() error {
 		peers, err := pxServerNode.GetPeerIdsFromPeerStore()
@@ -403,8 +405,6 @@ func TestPeerExchange(t *testing.T) {
 	}, options)
 	require.NoError(t, err)
 
-	time.Sleep(1 * time.Second)
-
 	// start light node which use PeerExchange to discover peers	
 	pxClientConfig := WakuConfig{
 		EnableRelay: false,
@@ -414,7 +414,7 @@ func TestPeerExchange(t *testing.T) {
 		Shards: []uint16{64},
 		PeerExchange: true,
 		Discv5UdpPort: 9002,
-		TcpPort: 62000,
+		TcpPort: 60003,
 		PeerExchangeNode: serverNodeMa[0].String(),
 	}
 
@@ -422,6 +422,7 @@ func TestPeerExchange(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, lightNode.Start())
 
+	time.Sleep(1 * time.Second)
 
 	pxServerPeerId, err := pxServerNode.PeerID()
 	require.NoError(t, err)
