@@ -149,7 +149,7 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAd
 }
 
 func (s *MessengerStoreNodeCommunitySuite) createCommunityWithChat(m *Messenger) (*communities.Community, *Chat) {
-	WaitForAvailableStoreNode(&s.Suite, m, 500*time.Millisecond)
+	WaitForAvailableStoreNode(&s.Suite, m, context.TODO())
 
 	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(nil)
 
@@ -197,7 +197,7 @@ func (s *MessengerStoreNodeCommunitySuite) fetchCommunity(m *Messenger, communit
 		WithWaitForResponseOption(true),
 	}
 
-	fetchedCommunity, stats, err := m.storeNodeRequestsManager.FetchCommunity(communityShard, options)
+	fetchedCommunity, stats, err := m.storeNodeRequestsManager.FetchCommunity(context.TODO(), communityShard, options)
 
 	s.Require().NoError(err)
 	s.requireCommunitiesEqual(fetchedCommunity, expectedCommunity)

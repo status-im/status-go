@@ -365,6 +365,8 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, tim
 }
 
 func WaitForAvailableStoreNode(s *suite.Suite, m *Messenger, ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
 	available := m.transport.WaitForAvailableStoreNode(ctx)
 	s.Require().True(available)
 }
