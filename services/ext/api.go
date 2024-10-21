@@ -1687,6 +1687,10 @@ func (api *PublicAPI) ShareUserURLWithData(pubKey string) (string, error) {
 	return api.service.messenger.ShareUserURLWithData(pubKey)
 }
 
+func (api *PublicAPI) ShareTransactionURL(txData *requests.TransactionShareURL) (string, error) {
+	return api.service.messenger.ShareTransactionURL(txData)
+}
+
 func (api *PublicAPI) ParseSharedURL(url string) (*protocol.URLDataResponse, error) {
 	return protocol.ParseSharedURL(url)
 }
