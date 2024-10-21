@@ -862,7 +862,13 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if m.archiveManager.IsReady() {
 		go func() {
 			defer gocommon.LogOnPanic()
-			<-m.transport.OnStorenodeAvailableOneShot()
+
+			select {
+			case <-m.ctx.Done():
+				return
+			case <-m.transport.OnStorenodeAvailable():
+			}
+
 			m.InitHistoryArchiveTasks(controlledCommunities)
 		}()
 	}

@@ -639,10 +639,6 @@ func (t *Transport) DisconnectActiveStorenode(ctx context.Context, backoffReason
 	t.waku.DisconnectActiveStorenode(ctx, backoffReason, shouldCycle)
 }
 
-func (t *Transport) OnStorenodeAvailableOneShot() <-chan struct{} {
-	return t.waku.OnStorenodeAvailableOneShot()
-}
-
 func (t *Transport) OnStorenodeChanged() <-chan peer.ID {
 	return t.waku.OnStorenodeChanged()
 }
@@ -655,8 +651,8 @@ func (t *Transport) OnStorenodeAvailable() <-chan peer.ID {
 	return t.waku.OnStorenodeAvailable()
 }
 
-func (t *Transport) WaitForAvailableStoreNode(timeout time.Duration) bool {
-	return t.waku.WaitForAvailableStoreNode(timeout)
+func (t *Transport) WaitForAvailableStoreNode(ctx context.Context) bool {
+	return t.waku.WaitForAvailableStoreNode(ctx)
 }
 
 func (t *Transport) IsStorenodeAvailable(peerID peer.ID) bool {
