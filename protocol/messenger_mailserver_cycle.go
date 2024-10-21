@@ -156,6 +156,8 @@ func (m *Messenger) Storenodes() ([]peer.ID, error) {
 }
 
 func (m *Messenger) checkForStorenodeCycleSignals() {
+	defer gocommon.LogOnPanic()
+
 	if m.transport.WakuVersion() != 2 {
 		return
 	}

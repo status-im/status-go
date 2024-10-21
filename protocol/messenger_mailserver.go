@@ -90,35 +90,25 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 }
 
 func (m *Messenger) performStorenodeTask(task func() (*MessengerResponse, error), opts ...history.StorenodeTaskOption) (*MessengerResponse, error) {
-	responseCh := make(chan *MessengerResponse)
-	errCh := make(chan error)
-
-	go func() {
-		defer gocommon.LogOnPanic()
-		err := m.transport.PerformStorenodeTask(func() error {
-			r, err := task()
-			if err != nil {
-				return err
-			}
-
-			select {
-			case <-m.ctx.Done():
-				return m.ctx.Err()
-			case responseCh <- r:
-			default:
-				//
-			}
-
-			return nil
-		}, opts...)
+	responseCh := make(chan *MessengerResponse, 1)
+	err := m.transport.PerformStorenodeTask(func() error {
+		r, err := task()
 		if err != nil {
-			errCh <- err
+			return err
 		}
-	}()
+
+		select {
+		case <-m.ctx.Done():
+			return m.ctx.Err()
+		case responseCh <- r:
+			return nil
+		}
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
 
 	select {
-	case err := <-errCh:
-		return nil, err
 	case r := <-responseCh:
 		if r != nil {
 			return r, nil
@@ -784,7 +774,7 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 			chat.SyncedFrom = uint32(batch.From.Unix())
 		}
 
-		m.logger.Debug("setting sync timestamps", zap.Int64("from", int64(batch.From.Unix())), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
+		m.logger.Debug("setting sync timestamps", zap.Int64("from", batch.From.Unix()), zap.Int64("to", int64(chat.SyncedTo)), zap.String("chatID", chatID))
 
 		err = m.persistence.SetSyncTimestamps(uint32(batch.From.Unix()), chat.SyncedTo, chat.ID)
 		from = uint32(batch.From.Unix())

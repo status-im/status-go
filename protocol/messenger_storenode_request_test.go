@@ -290,7 +290,7 @@ func (s *MessengerStoreNodeRequestSuite) fetchCommunity(m *Messenger, communityS
 		WithWaitForResponseOption(true),
 	}
 
-	fetchedCommunity, stats, err := m.storeNodeRequestsManager.FetchCommunity(communityShard, options)
+	fetchedCommunity, stats, err := m.storeNodeRequestsManager.FetchCommunity(context.TODO(), communityShard, options)
 
 	s.Require().NoError(err)
 	s.requireCommunitiesEqual(fetchedCommunity, expectedCommunity)
@@ -808,7 +808,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 	}
 
 	// Fetch the community
-	fetchedCommunity, _, err := s.bob.storeNodeRequestsManager.FetchCommunity(community.CommunityShard(), options)
+	fetchedCommunity, _, err := s.bob.storeNodeRequestsManager.FetchCommunity(context.TODO(), community.CommunityShard(), options)
 	s.Require().NoError(err)
 	s.requireCommunitiesEqual(fetchedCommunity, community)
 
@@ -1162,7 +1162,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 			}
 			storeNodeRequestOptions = append(storeNodeRequestOptions, exampleToRun.CustomOptions...)
 
-			fetchedCommunity, stats, err := user.storeNodeRequestsManager.FetchCommunity(communityAddress, storeNodeRequestOptions)
+			fetchedCommunity, stats, err := user.storeNodeRequestsManager.FetchCommunity(context.TODO(), communityAddress, storeNodeRequestOptions)
 
 			result.EnvelopesCount = stats.FetchedEnvelopesCount
 			result.FetchedCommunity = fetchedCommunity
