@@ -16,7 +16,11 @@ report_to_codecov() {
     report_files_args+="--file ${file} "
   done
 
-  codecov do-upload --token "${CODECOV_TOKEN}" --report-type test_results ${report_files_args}
+  # Don't upload test results to Codecov while we re-run tests on failure.
+  # This results in having both failure and success results in the same report, which Codecov treats as a failure
+  # and doesn't report coverage to Github. More details here: https://github.com/status-im/status-go/issues/5963
+  #  codecov do-upload --token "${CODECOV_TOKEN}" --report-type test_results ${report_files_args}
+
   codecov upload-process --token "${CODECOV_TOKEN}" -f ${coverage_report} -F "${flag}"
 }
 
