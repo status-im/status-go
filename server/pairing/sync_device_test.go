@@ -276,16 +276,19 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 	clientKeystorePath := filepath.Join(clientTmpDir, api.DefaultKeystoreRelativePath, clientActiveAccount.KeyUID)
-	clientPayloadSourceConfig := SenderClientConfig{
-		SenderConfig: &SenderConfig{
-			KeystorePath: clientKeystorePath,
-			DeviceType:   "android",
-			KeyUID:       clientActiveAccount.KeyUID,
-			Password:     s.password,
-		},
-		ClientConfig: new(ClientConfig),
+
+	makeNewSenderClientConfig := func() *SenderClientConfig {
+		return &SenderClientConfig{
+			SenderConfig: &SenderConfig{
+				KeystorePath: clientKeystorePath,
+				DeviceType:   "android",
+				KeyUID:       clientActiveAccount.KeyUID,
+				Password:     s.password,
+			},
+			ClientConfig: new(ClientConfig),
+		}
 	}
-	err = StartUpSendingClient(clientBackend, cs, &clientPayloadSourceConfig)
+	err = StartUpSendingClient(clientBackend, cs, makeNewSenderClientConfig())
 	require.NoError(s.T(), err)
 
 	// check that the server has the same data as the client
@@ -334,7 +337,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	// repeat local pairing, we should expect no error after receiver logged in
 	cs, err = StartUpReceiverServer(serverBackend, string(serverConfigBytes))
 	require.NoError(s.T(), err)
-	err = StartUpSendingClient(clientBackend, cs, &clientPayloadSourceConfig)
+	err = StartUpSendingClient(clientBackend, cs, makeNewSenderClientConfig())
 	require.NoError(s.T(), err)
 	require.True(s.T(), clientMessenger.HasPairedDevices())
 	require.True(s.T(), serverMessenger.HasPairedDevices())
@@ -343,7 +346,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), serverBackend.Logout())
 	cs, err = StartUpReceiverServer(serverBackend, string(serverConfigBytes))
 	require.NoError(s.T(), err)
-	err = StartUpSendingClient(clientBackend, cs, &clientPayloadSourceConfig)
+	err = StartUpSendingClient(clientBackend, cs, makeNewSenderClientConfig())
 	require.NoError(s.T(), err)
 }
 
@@ -413,17 +416,19 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	err = clientBackend.OpenAccounts()
 	require.NoError(s.T(), err)
 
-	clientPayloadSourceConfig := ReceiverClientConfig{
-		ReceiverConfig: &ReceiverConfig{
-			CreateAccount: &requests.CreateAccount{
-				RootDataDir:   clientTmpDir,
-				KdfIterations: expectedKDFIterations,
-				DeviceName:    "device-1",
+	makeNewReceiverClientConfig := func() *ReceiverClientConfig {
+		return &ReceiverClientConfig{
+			ReceiverConfig: &ReceiverConfig{
+				CreateAccount: &requests.CreateAccount{
+					RootDataDir:   clientTmpDir,
+					KdfIterations: expectedKDFIterations,
+					DeviceName:    "device-1",
+				},
 			},
-		},
-		ClientConfig: new(ClientConfig),
+			ClientConfig: new(ClientConfig),
+		}
 	}
-	err = StartUpReceivingClient(clientBackend, cs, &clientPayloadSourceConfig)
+	err = StartUpReceivingClient(clientBackend, cs, makeNewReceiverClientConfig())
 	require.NoError(s.T(), err)
 
 	// check that the client has the same data as the server
@@ -471,7 +476,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	// repeat local pairing, we should expect no error after receiver logged in
 	cs, err = StartUpSenderServer(serverBackend, string(configBytes))
 	require.NoError(s.T(), err)
-	err = StartUpReceivingClient(clientBackend, cs, &clientPayloadSourceConfig)
+	err = StartUpReceivingClient(clientBackend, cs, makeNewReceiverClientConfig())
 	require.NoError(s.T(), err)
 	require.True(s.T(), serverMessenger.HasPairedDevices())
 	require.True(s.T(), clientMessenger.HasPairedDevices())
@@ -480,7 +485,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), clientBackend.Logout())
 	cs, err = StartUpSenderServer(serverBackend, string(configBytes))
 	require.NoError(s.T(), err)
-	err = StartUpReceivingClient(clientBackend, cs, &clientPayloadSourceConfig)
+	err = StartUpReceivingClient(clientBackend, cs, makeNewReceiverClientConfig())
 	require.NoError(s.T(), err)
 }
 
