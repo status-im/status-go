@@ -1,5 +1,6 @@
 .PHONY: statusgo statusd-prune all test clean help
 .PHONY: statusgo-android statusgo-ios
+.PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
 
 # Clear any GOROOT set outside of the Nix shell
 export GOROOT=
@@ -60,6 +61,10 @@ GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
+
+ifeq ($(USE_NWAKU), true)
+BUILD_TAGS += use_nwaku
+endif
 
 BUILD_FLAGS ?= -ldflags="-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
@@ -235,8 +240,19 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la build/bin/libstatus.*
 
-statusgo-shared-library: generate
-statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
+
+LIBWAKU := third_party/nwaku/build/libwaku.$(GOBIN_SHARED_LIB_EXT)
+$(LIBWAKU):
+	@echo "Building libwaku"
+	$(MAKE) -C third_party/nwaku update || { echo "nwaku make update failed"; exit 1; }
+	$(MAKE) -C ./third_party/nwaku libwaku
+
+build-libwaku: $(LIBWAKU)
+
+statusgo-shared-library: generate ##@cross-compile Build status-go as shared library for current platform
+ifeq ($(USE_NWAKU),true)
+	$(MAKE) $(LIBWAKU)
+endif
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
@@ -357,8 +373,37 @@ lint-fix:
 		-w {} \;
 	$(MAKE) vendor
 
+mock: ##@other Regenerate mocks
+	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
+	mockgen -package=status       -destination=services/status/account_mock.go       -source=services/status/service.go
+	mockgen -package=peer         -destination=services/peer/discoverer_mock.go      -source=services/peer/service.go
+	mockgen -package=mock_transactor -destination=transactions/mock_transactor/transactor.go   -source=transactions/transactor.go
+	mockgen -package=mock_pathprocessor     -destination=services/wallet/router/pathprocessor/mock_pathprocessor/processor.go -source=services/wallet/router/pathprocessor/processor.go
+	mockgen -package=mock_bridge     -destination=services/wallet/bridge/mock_bridge/bridge.go -source=services/wallet/bridge/bridge.go
+	mockgen -package=mock_client     -destination=rpc/chain/mock/client/client.go              -source=rpc/chain/client.go
+	mockgen -package=mock_token      -destination=services/wallet/token/mock/token/tokenmanager.go -source=services/wallet/token/token.go
+	mockgen -package=mock_thirdparty -destination=services/wallet/thirdparty/mock/types.go -source=services/wallet/thirdparty/types.go
+	mockgen -package=mock_balance_persistence -destination=services/wallet/token/mock/balance_persistence/balance_persistence.go -source=services/wallet/token/balance_persistence.go
+	mockgen -package=mock_network      -destination=rpc/network/mock/network.go -source=rpc/network/network.go
+	mockgen -package=mock_rpcclient     -destination=rpc/mock/client/client.go              -source=rpc/client.go
+	mockgen -package=mock_collectibles -destination=services/wallet/collectibles/mock/collection_data_db.go -source=services/wallet/collectibles/collection_data_db.go
+	mockgen -package=mock_collectibles -destination=services/wallet/collectibles/mock/collectible_data_db.go -source=services/wallet/collectibles/collectible_data_db.go
+	mockgen -package=mock_thirdparty -destination=services/wallet/thirdparty/mock/collectible_types.go -source=services/wallet/thirdparty/collectible_types.go
+	mockgen -package=mock_paraswap -destination=services/wallet/thirdparty/paraswap/mock/types.go -source=services/wallet/thirdparty/paraswap/types.go
+	mockgen -package=mock_onramp -destination=services/wallet/onramp/mock/types.go -source=services/wallet/onramp/types.go
+
+
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
+
+test-libwaku: | $(LIBWAKU)
+	go test -tags '$(BUILD_TAGS) use_nwaku' -run TestBasicWakuV2 ./wakuv2/... -count 1 -v -json | jq -r '.Output'
+
+clean-libwaku:
+	@echo "Removing libwaku"
+	rm $(LIBWAKU)
+
+rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
 test: test-unit ##@tests Run basic, short tests during development
 
