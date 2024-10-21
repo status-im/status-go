@@ -22,7 +22,7 @@ class TestRpc(StatusDTestCase):
         _id = str(random.randint(1, 8888))
 
         response = self.rpc_client.rpc_valid_request(method, params, _id, url=option.rpc_url_2)
-        self.rpc_client.verify_json_schema(response, method)
+        self.rpc_client.verify_response_schema(response, method)
 
 
 @pytest.mark.skip("to be reworked via status-backend")
