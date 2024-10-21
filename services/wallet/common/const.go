@@ -61,6 +61,10 @@ func ZeroBigIntValue() *big.Int {
 	return big.NewInt(0)
 }
 
+func ZeroHash() ethCommon.Hash {
+	return ethCommon.Hash{}
+}
+
 func (c ChainID) String() string {
 	return strconv.FormatUint(uint64(c), 10)
 }

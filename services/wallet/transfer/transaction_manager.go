@@ -44,17 +44,25 @@ type TransactionDescription struct {
 }
 
 type RouterTransactionDetails struct {
-	routerPath         *routes.Path
-	txArgs             *transactions.SendTxArgs
-	tx                 *ethTypes.Transaction
-	txHashToSign       types.Hash
-	txSignature        []byte
-	txSentHash         types.Hash
-	approvalTxArgs     *transactions.SendTxArgs
-	approvalTx         *ethTypes.Transaction
-	approvalHashToSign types.Hash
-	approvalSignature  []byte
-	approvalTxSentHash types.Hash
+	RouterPath         *routes.Path
+	TxArgs             *transactions.SendTxArgs
+	Tx                 *ethTypes.Transaction
+	TxHashToSign       types.Hash
+	TxSignature        []byte
+	TxSentHash         types.Hash
+	ApprovalTxArgs     *transactions.SendTxArgs
+	ApprovalTx         *ethTypes.Transaction
+	ApprovalHashToSign types.Hash
+	ApprovalSignature  []byte
+	ApprovalTxSentHash types.Hash
+}
+
+func (rtd *RouterTransactionDetails) IsTxPlaced() bool {
+	return rtd.TxSentHash != types.Hash(wallet_common.ZeroHash())
+}
+
+func (rtd *RouterTransactionDetails) IsApprovalPlaced() bool {
+	return rtd.ApprovalTxSentHash != types.Hash(wallet_common.ZeroHash())
 }
 
 type TransactionManager struct {
