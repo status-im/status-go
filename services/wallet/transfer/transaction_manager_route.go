@@ -315,12 +315,12 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiT
 			var approvalTxWithSignature *ethTypes.Transaction
 			approvalTxWithSignature, err = tm.transactor.AddSignatureToTransaction(desc.ApprovalTxArgs.FromChainID, desc.ApprovalTx, desc.ApprovalSignature)
 			if err != nil {
-				return nil, err
+				return
 			}
 
 			desc.ApprovalTxSentHash, err = tm.transactor.SendTransactionWithSignature(common.Address(desc.ApprovalTxArgs.From), desc.ApprovalTxArgs.FromTokenID, multiTx.ID, approvalTxWithSignature)
 			if err != nil {
-				return nil, err
+				return
 			}
 
 			transactions = append(transactions, responses.NewRouterSentTransaction(desc.ApprovalTxArgs, desc.ApprovalTxSentHash, true))
@@ -335,12 +335,12 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiT
 			var txWithSignature *ethTypes.Transaction
 			txWithSignature, err = tm.transactor.AddSignatureToTransaction(desc.TxArgs.FromChainID, desc.Tx, desc.TxSignature)
 			if err != nil {
-				return nil, err
+				return
 			}
 
 			desc.TxSentHash, err = tm.transactor.SendTransactionWithSignature(common.Address(desc.TxArgs.From), desc.TxArgs.FromTokenID, multiTx.ID, txWithSignature)
 			if err != nil {
-				return nil, err
+				return
 			}
 
 			transactions = append(transactions, responses.NewRouterSentTransaction(desc.TxArgs, desc.TxSentHash, false))

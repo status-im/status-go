@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/eth-node/types"
 
@@ -173,16 +174,18 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 
 		response.SentTransactions, err = m.transactionManager.SendRouterTransactions(ctx, multiTx)
 		if err != nil {
+			log.Error("Error sending router transactions", "error", err)
 			// TODO #16556: Handle partially successful Tx sends?
-			return
+			// Don't return, store whichever transactions were successfully sent
 		}
 
+		// don't overwrite err since we want to process it in the deferred function
+		var tmpErr error
 		routerTransactions := m.transactionManager.GetRouterTransactions()
-
 		routeData := NewRouteData(&routeInputParams, m.buildInputParams, routerTransactions)
-		err = m.db.PutRouteData(routeData)
-		if err != nil {
-			return
+		tmpErr = m.db.PutRouteData(routeData)
+		if tmpErr != nil {
+			log.Error("Error storing route data", "error", tmpErr)
 		}
 
 		var (
@@ -193,13 +196,17 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			chainIDs = append(chainIDs, tx.FromChain)
 			addresses = append(addresses, common.Address(tx.FromAddress))
 			go func(chainId uint64, txHash common.Hash) {
-				err = m.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
-				if err != nil {
+				tmpErr = m.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
+				if tmpErr != nil {
+					log.Error("Error watching transaction", "error", tmpErr)
 					return
 				}
 			}(tx.FromChain, common.Hash(tx.Hash))
 		}
-		err = m.transferController.CheckRecentHistory(chainIDs, addresses)
+		tmpErr = m.transferController.CheckRecentHistory(chainIDs, addresses)
+		if tmpErr != nil {
+			log.Error("Error checking recent history", "error", tmpErr)
+		}
 	}()
 }
 

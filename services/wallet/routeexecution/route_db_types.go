@@ -79,10 +79,6 @@ func NewRouteData(routeInputParams *requests.RouteInputParams,
 
 		var pathData *PathData
 		var ok bool
-
-		fmt.Println(td.RouterPath.ProcessorName)
-		fmt.Println(pathDataPerProcessorName[td.RouterPath.ProcessorName])
-
 		if pathData, ok = pathDataPerProcessorName[td.RouterPath.ProcessorName]; !ok {
 			pathData = &PathData{
 				Path:             td.RouterPath,

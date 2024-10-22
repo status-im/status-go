@@ -30,7 +30,3 @@ func Test_PutRouteData(t *testing.T) {
 		})
 	}
 }
-
-func Test_simpleCacheAll(t *testing.T) {
-	t.Skip("Not implemented")
-}
