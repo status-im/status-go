@@ -5,9 +5,13 @@ import (
 	"database/sql"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 
 	status_common "github.com/status-im/status-go/common"
 	statusErrors "github.com/status-im/status-go/errors"
@@ -177,16 +181,18 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 
 		response.SentTransactions, err = m.transactionManager.SendRouterTransactions(ctx, multiTx)
 		if err != nil {
+			log.Error("Error sending router transactions", "error", err)
 			// TODO #16556: Handle partially successful Tx sends?
-			return
+			// Don't return, store whichever transactions were successfully sent
 		}
 
+		// don't overwrite err since we want to process it in the deferred function
+		var tmpErr error
 		routerTransactions := m.transactionManager.GetRouterTransactions()
-
 		routeData := NewRouteData(&routeInputParams, m.buildInputParams, routerTransactions)
-		err = m.db.PutRouteData(routeData)
-		if err != nil {
-			return
+		tmpErr = m.db.PutRouteData(routeData)
+		if tmpErr != nil {
+			log.Error("Error storing route data", "error", tmpErr)
 		}
 
 		var (
@@ -198,13 +204,17 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			addresses = append(addresses, common.Address(tx.FromAddress))
 			go func(chainId uint64, txHash common.Hash) {
 				defer status_common.LogOnPanic()
-				err = m.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
-				if err != nil {
+				tmpErr = m.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
+				if tmpErr != nil {
+					logutils.ZapLogger().Error("Error watching transaction", zap.Error(tmpErr))
 					return
 				}
 			}(tx.FromChain, common.Hash(tx.Hash))
 		}
-		err = m.transferController.CheckRecentHistory(chainIDs, addresses)
+		tmpErr = m.transferController.CheckRecentHistory(chainIDs, addresses)
+		if tmpErr != nil {
+			logutils.ZapLogger().Error("Error checking recent history", zap.Error(tmpErr))
+		}
 	}()
 }
 

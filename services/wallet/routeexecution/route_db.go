@@ -318,7 +318,7 @@ func getPaths(creator sqlite.StatementCreator, uuid string) ([]*routes.Path, err
 }
 
 func getPathTransactions(creator sqlite.StatementCreator, uuid string, pathIdx int) ([]*TransactionData, error) {
-	var txs []*TransactionData
+	txs := make([]*TransactionData, 0)
 	q := sq.Select("is_approval", "chain_id", "tx_hash", "tx_args_json", "tx_json").
 		From("route_path_transactions").
 		Where(sq.Eq{"uuid": uuid, "path_idx": pathIdx}).
