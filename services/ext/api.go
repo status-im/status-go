@@ -11,14 +11,15 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -154,7 +155,7 @@ type MessagesResponse struct {
 type PublicAPI struct {
 	service  *Service
 	eventSub mailservers.EnvelopeEventSubscriber
-	log      log.Logger
+	logger   *zap.Logger
 }
 
 // NewPublicAPI returns instance of the public API.
@@ -162,7 +163,7 @@ func NewPublicAPI(s *Service, eventSub mailservers.EnvelopeEventSubscriber) *Pub
 	return &PublicAPI{
 		service:  s,
 		eventSub: eventSub,
-		log:      log.New("package", "status-go/services/sshext.PublicAPI"),
+		logger:   logutils.ZapLogger().Named("sshextService"),
 	}
 }
 
@@ -340,14 +341,14 @@ func (api *PublicAPI) UnmuteChat(parent context.Context, chatID string) error {
 }
 
 func (api *PublicAPI) BlockContact(ctx context.Context, contactID string) (*protocol.MessengerResponse, error) {
-	api.log.Info("blocking contact", "contact", contactID)
+	api.logger.Info("blocking contact", zap.String("contact", contactID))
 	return api.service.messenger.BlockContact(ctx, contactID, false)
 }
 
 // This function is the same as the one above, but used only on the desktop side, since at the end it doesn't set
 // `Added` flag to `false`, but only `Blocked` to `true`
 func (api *PublicAPI) BlockContactDesktop(ctx context.Context, contactID string) (*protocol.MessengerResponse, error) {
-	api.log.Info("blocking contact", "contact", contactID)
+	api.logger.Info("blocking contact", zap.String("contact", contactID))
 	return api.service.messenger.BlockContactDesktop(ctx, contactID)
 }
 
