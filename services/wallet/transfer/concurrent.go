@@ -200,8 +200,8 @@ func checkRangesWithStartBlock(parent context.Context, client balance.Reader, ca
 					logutils.ZapLogger().Debug("transaction count is also equal",
 						zap.Stringer("from", from),
 						zap.Stringer("to", to),
-						zap.Int64("ln", *ln),
-						zap.Int64("hn", *hn),
+						zap.Any("ln", ln),
+						zap.Any("hn", hn),
 					)
 					return nil
 				}

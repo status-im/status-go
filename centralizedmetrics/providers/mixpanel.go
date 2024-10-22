@@ -28,11 +28,12 @@ type MixpanelMetricProcessor struct {
 }
 
 // NewMixpanelMetricProcessor is a constructor for MixpanelMetricProcessor
-func NewMixpanelMetricProcessor(appID, secret, baseURL string) *MixpanelMetricProcessor {
+func NewMixpanelMetricProcessor(appID, secret, baseURL string, logger *zap.Logger) *MixpanelMetricProcessor {
 	return &MixpanelMetricProcessor{
 		appID:   appID,
 		secret:  secret,
 		baseURL: baseURL,
+		logger:  logger,
 	}
 }
 

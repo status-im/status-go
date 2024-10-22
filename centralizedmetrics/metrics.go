@@ -41,7 +41,7 @@ type MetricService struct {
 
 func NewDefaultMetricService(db *sql.DB, logger *zap.Logger) *MetricService {
 	repository := NewSQLiteMetricRepository(db)
-	processor := providers.NewMixpanelMetricProcessor(providers.MixpanelAppID, providers.MixpanelToken, providers.MixpanelBaseURL)
+	processor := providers.NewMixpanelMetricProcessor(providers.MixpanelAppID, providers.MixpanelToken, providers.MixpanelBaseURL, logger)
 	return NewMetricService(repository, processor, defaultPollInterval, logger)
 }
 

@@ -179,8 +179,8 @@ func (c *findNewBlocksCommand) detectNonceChange(parent context.Context, to *big
 		}
 
 		logutils.ZapLogger().Debug("Comparing nonces",
-			zap.Int64("oldNonce", *oldNonce),
-			zap.Int64("newNonce", *newNonce),
+			zap.Any("oldNonce", oldNonce),
+			zap.Any("newNonce", newNonce),
 			zap.Stringer("to", to),
 			zap.Stringer("acc", account),
 		)
@@ -340,7 +340,7 @@ func (c *findNewBlocksCommand) findAndSaveEthBlocks(parent context.Context, from
 				zap.Int("len", len(headers)),
 				zap.Stringer("lastBlockNumber", headNum),
 				zap.Stringer("balance", c.balanceCacher.Cache().GetBalance(account, c.chainClient.NetworkID(), headNum)),
-				zap.Int64("nonce", *c.balanceCacher.Cache().GetNonce(account, c.chainClient.NetworkID(), headNum)),
+				zap.Any("nonce", c.balanceCacher.Cache().GetNonce(account, c.chainClient.NetworkID(), headNum)),
 			)
 
 			err := c.db.SaveBlocks(c.chainClient.NetworkID(), headers)
@@ -765,7 +765,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 				zap.Int("len", len(headers)),
 				zap.Stringer("lastBlockNumber", to),
 				zap.Stringer("balance", c.balanceCacher.Cache().GetBalance(account, c.chainClient.NetworkID(), to)),
-				zap.Int64("nonce", *c.balanceCacher.Cache().GetNonce(account, c.chainClient.NetworkID(), to)),
+				zap.Any("nonce", c.balanceCacher.Cache().GetNonce(account, c.chainClient.NetworkID(), to)),
 			)
 
 			err = c.db.SaveBlocks(c.chainClient.NetworkID(), headers)
