@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/common"
 )
 
 type FeedSubscription struct {
@@ -20,6 +21,7 @@ func NewFeedSubscription(feed *event.Feed) *FeedSubscription {
 	subscription := feed.Subscribe(events)
 
 	go func() {
+		defer common.LogOnPanic()
 		<-done
 		subscription.Unsubscribe()
 		close(events)

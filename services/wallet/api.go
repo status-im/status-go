@@ -42,6 +42,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
+	common2 "github.com/status-im/status-go/common"
 )
 
 func NewAPI(s *Service) *API {
@@ -779,6 +780,7 @@ func (api *API) BuildTransactionsFromRoute(ctx context.Context, buildInputParams
 	log.Debug("[WalletAPI::BuildTransactionsFromRoute] builds transactions from the generated best route", "uuid", buildInputParams.Uuid)
 
 	go func() {
+		defer common2.LogOnPanic()
 		api.router.StopSuggestedRoutesAsyncCalculation()
 
 		var err error
@@ -841,6 +843,7 @@ func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signature
 func (api *API) SendRouterTransactionsWithSignatures(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
 	log.Debug("[WalletAPI:: SendRouterTransactionsWithSignatures] sign with signatures and send")
 	go func() {
+		defer common2.LogOnPanic()
 
 		var (
 			err              error
@@ -927,6 +930,7 @@ func (api *API) SendRouterTransactionsWithSignatures(ctx context.Context, sendIn
 			chainIDs = append(chainIDs, tx.FromChain)
 			addresses = append(addresses, common.Address(tx.FromAddress))
 			go func(chainId uint64, txHash common.Hash) {
+				defer common2.LogOnPanic()
 				err = api.s.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
 				if err != nil {
 					return

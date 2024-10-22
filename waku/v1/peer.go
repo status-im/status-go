@@ -481,6 +481,8 @@ func (p *Peer) handshake() error {
 // update executes periodic operations on the peer, including message transmission
 // and expiration.
 func (p *Peer) update() {
+	defer gocommon.LogOnPanic()
+
 	// Start the tickers for the updates
 	expire := time.NewTicker(common.ExpirationCycle)
 	transmit := time.NewTicker(common.TransmissionCycle)
