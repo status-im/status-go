@@ -581,7 +581,7 @@ func NewMessenger(
 		if c.wakuService != nil {
 			c.wakuService.SetStatusTelemetryClient(telemetryClient)
 		}
-		go telemetryClient.Start(ctx)
+		telemetryClient.Start(ctx)
 	}
 
 	messenger = &Messenger{
@@ -916,7 +916,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 	for _, c := range controlledCommunities {
 		if c.Joined() && c.HasTokenPermissions() {
-			go m.communitiesManager.StartMembersReevaluationLoop(c.ID(), false)
+			m.communitiesManager.StartMembersReevaluationLoop(c.ID(), false)
 		}
 	}
 

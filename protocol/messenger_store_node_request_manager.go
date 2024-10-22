@@ -500,6 +500,8 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32
 }
 
 func (r *storeNodeRequest) routine() {
+	defer gocommon.LogOnPanic()
+
 	r.manager.logger.Info("starting store node request",
 		zap.Any("requestID", r.requestID),
 		zap.String("pubsubTopic", r.pubsubTopic),

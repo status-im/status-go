@@ -11,6 +11,8 @@ import (
 
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/status-im/status-go/common"
 )
 
 // Server runs and controls a HTTP pprof interface.
@@ -55,5 +57,6 @@ func Handler(reg metrics.Registry) http.Handler {
 
 // Listen starts the HTTP server in the background.
 func (p *Server) Listen() {
+	defer common.LogOnPanic()
 	log.Info("metrics server stopped", "err", p.server.ListenAndServe())
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager/aggregator"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 )
@@ -72,6 +73,7 @@ func (b *BlockchainHealthManager) RegisterProvidersHealthManager(ctx context.Con
 	statusCh := phm.Subscribe()
 	b.wg.Add(1)
 	go func(phm *ProvidersHealthManager, statusCh chan struct{}, providerCtx context.Context) {
+		defer gocommon.LogOnPanic()
 		defer func() {
 			phm.Unsubscribe(statusCh)
 			b.wg.Done()
