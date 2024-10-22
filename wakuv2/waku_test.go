@@ -790,7 +790,7 @@ func TestTelemetryFormat(t *testing.T) {
 	m[legacy_store.StoreID_v20beta4] = s
 	m[lightpush.LightPushID_v20beta1] = s
 
-	requestBody := tc.getTelemetryRequestBody(m)
+	requestBody := tc.getTelemetryRequestBody(m, s)
 	_, err := json.Marshal(requestBody)
 	require.NoError(t, err)
 }

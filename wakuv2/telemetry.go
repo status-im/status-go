@@ -45,7 +45,7 @@ func getStatsPerProtocol(protocolID protocol.ID, stats map[protocol.ID]metrics.S
 	}
 }
 
-func (c *BandwidthTelemetryClient) getTelemetryRequestBody(stats map[protocol.ID]metrics.Stats) map[string]interface{} {
+func (c *BandwidthTelemetryClient) getTelemetryRequestBody(stats map[protocol.ID]metrics.Stats, totals metrics.Stats) map[string]interface{} {
 	return map[string]interface{}{
 		"hostID":           c.hostID,
 		"relay":            getStatsPerProtocol(relay.WakuRelayID_v200, stats),
@@ -53,13 +53,19 @@ func (c *BandwidthTelemetryClient) getTelemetryRequestBody(stats map[protocol.ID
 		"filter-push":      getStatsPerProtocol(filter.FilterPushID_v20beta1, stats),
 		"filter-subscribe": getStatsPerProtocol(filter.FilterSubscribeID_v20beta1, stats),
 		"lightpush":        getStatsPerProtocol(lightpush.LightPushID_v20beta1, stats),
+		"total": map[string]interface{}{
+			"rateIn":   totals.RateIn,
+			"rateOut":  totals.RateOut,
+			"totalIn":  totals.TotalIn,
+			"totalOut": totals.TotalOut,
+		},
 	}
 }
 
-func (c *BandwidthTelemetryClient) PushProtocolStats(stats map[protocol.ID]metrics.Stats) {
+func (c *BandwidthTelemetryClient) PushProtocolStats(stats map[protocol.ID]metrics.Stats, totals metrics.Stats) {
 	defer gocommon.LogOnPanic()
 	url := fmt.Sprintf("%s/protocol-stats", c.serverURL)
-	body, _ := json.Marshal(c.getTelemetryRequestBody(stats))
+	body, _ := json.Marshal(c.getTelemetryRequestBody(stats, totals))
 	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		c.logger.Error("Error sending message to telemetry server", zap.Error(err))
