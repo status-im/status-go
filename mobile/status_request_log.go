@@ -72,8 +72,9 @@ func call(fn any, params ...any) any {
 	}()
 
 	var startTime time.Time
+	requestLogEnabled := requestlog.IsRequestLoggingEnabled()
 
-	if requestlog.IsRequestLoggingEnabled() {
+	if requestLogEnabled {
 		startTime = time.Now()
 	}
 
@@ -96,7 +97,7 @@ func call(fn any, params ...any) any {
 		resp = results[0].Interface()
 	}
 
-	if requestlog.IsRequestLoggingEnabled() {
+	if requestLogEnabled {
 		duration := time.Since(startTime)
 		methodName := getShortFunctionName(fn)
 		paramsString := removeSensitiveInfo(fmt.Sprintf("%+v", params))
