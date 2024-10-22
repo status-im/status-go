@@ -6,9 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
 

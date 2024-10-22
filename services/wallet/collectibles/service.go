@@ -349,7 +349,7 @@ func (s *Service) sendResponseEvent(requestID *int32, eventType walletevent.Even
 	}
 
 	logutils.ZapLogger().Debug("wallet.api.collectibles.Service RESPONSE",
-		zap.Int32("requestID", *requestID),
+		zap.Any("requestID", requestID),
 		zap.String("eventType", string(eventType)),
 		zap.Int("payload.len", len(payload)),
 		zap.Error(err),
