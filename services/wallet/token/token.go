@@ -381,7 +381,10 @@ func (tm *Manager) MarkAsPreviouslyOwnedToken(token *Token, owner common.Address
 	} else {
 		for _, t := range tokens[owner] {
 			if t.Address == token.Address && t.ChainID == token.ChainID && t.Symbol == token.Symbol {
-				logutils.ZapLogger().Info("Token already marked as previously owned", "token", token, "owner", owner)
+				logutils.ZapLogger().Info("Token already marked as previously owned",
+					zap.Any("token", token),
+					zap.Stringer("owner", owner),
+				)
 				return false, nil
 			}
 		}

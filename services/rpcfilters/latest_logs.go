@@ -42,7 +42,7 @@ func pollLogs(client ContextCaller, chainID uint64, f *logsFilter, timeout, peri
 		case <-latest.C:
 			query()
 		case <-f.done:
-			logutils.ZapLogger().Debug("Filter was stopped", zap.String("ID", f.id), zap.Any("crit", f.crit))
+			logutils.ZapLogger().Debug("Filter was stopped", zap.String("ID", string(f.id)), zap.Any("crit", f.crit))
 			return
 		}
 	}

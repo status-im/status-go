@@ -235,7 +235,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 			}
 			if tx.ChainId().Cmp(big.NewInt(0)) != 0 && tx.ChainId().Cmp(d.chainClient.ToBigInt()) != 0 {
 				logutils.ZapLogger().Info("chain id mismatch",
-					zap.Stringer("tx hash", tx),
+					zap.Stringer("tx hash", tx.Hash()),
 					zap.Stringer("tx chain id", tx.ChainId()),
 					zap.Uint64("expected chain id", d.chainClient.NetworkID()),
 				)

@@ -398,7 +398,7 @@ func (p *PeerPool) handleDroppedPeer(server *p2p.Server, nodeID enode.ID) (any b
 				logutils.ZapLogger().Debug("added peer from local table", zap.Stringer("ID", newPeer.ID))
 			}
 		}
-		logutils.ZapLogger().Debug("search", zap.Stringer("topic", t.Topic()), zap.Bool("below min", t.BelowMin()))
+		logutils.ZapLogger().Debug("search", zap.String("topic", string(t.Topic())), zap.Bool("below min", t.BelowMin()))
 		if t.BelowMin() && !t.SearchRunning() {
 			any = true
 		}

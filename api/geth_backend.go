@@ -123,7 +123,7 @@ func (b *GethStatusBackend) initialize() {
 	accountManager := account.NewGethManager(b.logger)
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
-	statusNode := node.New(transactor)
+	statusNode := node.New(transactor, b.logger)
 
 	b.statusNode = statusNode
 	b.accountManager = accountManager
