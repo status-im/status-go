@@ -15,7 +15,6 @@ import (
 	validator "gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
 
@@ -410,8 +409,6 @@ type NodeConfig struct {
 	// MaxPendingPeers is the maximum number of peers that can be pending in the
 	// handshake phase, counted separately for inbound and outbound connections.
 	MaxPendingPeers int
-
-	log log.Logger
 
 	// LogEnabled enables the logger
 	LogEnabled bool `json:"LogEnabled"`
@@ -931,7 +928,6 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		MaxPeers:               25,
 		MaxPendingPeers:        0,
 		IPCFile:                "geth.ipc",
-		log:                    log.New("package", "status-go/params.NodeConfig"),
 		LogFile:                "",
 		LogLevel:               "ERROR",
 		NoDiscovery:            true,
@@ -1161,7 +1157,6 @@ func (c *NodeConfig) Save() error {
 		return err
 	}
 
-	c.log.Info("config file saved", "path", configFilePath)
 	return nil
 }
 
