@@ -194,6 +194,35 @@ func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...Requ
 	return result, nil
 }
 
+func (s *WakuStore) RequestRaw(ctx context.Context, peerID peer.ID, storeRequest *pb.StoreQueryRequest) (Result, error) {
+	err := storeRequest.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	var params Parameters
+	params.selectedPeer = peerID
+	if params.selectedPeer == "" {
+		return nil, ErrMustSelectPeer
+	}
+
+	response, err := s.queryFrom(ctx, storeRequest, &params)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &resultImpl{
+		store:         s,
+		messages:      response.Messages,
+		storeRequest:  storeRequest,
+		storeResponse: response,
+		peerID:        params.selectedPeer,
+		cursor:        response.PaginationCursor,
+	}
+
+	return result, nil
+}
+
 // Query retrieves all the messages that match a criteria. Use the options to indicate whether to return the message themselves or not.
 func (s *WakuStore) Query(ctx context.Context, criteria FilterCriteria, opts ...RequestOption) (Result, error) {
 	return s.Request(ctx, criteria, opts...)
@@ -263,7 +292,7 @@ func (s *WakuStore) next(ctx context.Context, r Result, opts ...RequestOption) (
 }
 
 func (s *WakuStore) queryFrom(ctx context.Context, storeRequest *pb.StoreQueryRequest, params *Parameters) (*pb.StoreQueryResponse, error) {
-	logger := s.log.With(logging.HostID("peer", params.selectedPeer), zap.String("requestId", hex.EncodeToString([]byte(storeRequest.RequestId))))
+	logger := s.log.With(logging.HostID("peer", params.selectedPeer), zap.String("requestId", storeRequest.RequestId))
 
 	logger.Debug("sending store request")
 
