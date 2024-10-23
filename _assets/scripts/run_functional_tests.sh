@@ -60,5 +60,5 @@ if [[ ${FUNCTIONAL_TESTS_REPORT_CODECOV} == 'true' ]]; then
   report_to_codecov "${test_results_path}/*.xml" "${full_coverage_profile}" "functional"
 fi
 
-echo -e "${GRN}Testing finished${RST}"
+echo -e "${GRN}Testing finished${RST}: exit_code=$exit_code"
 exit $exit_code
