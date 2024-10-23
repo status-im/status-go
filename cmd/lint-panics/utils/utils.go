@@ -1,7 +1,6 @@
 package utils
 
 import (
-	gotoken "go/token"
 	"strconv"
 
 	"fmt"
@@ -10,10 +9,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
-
-func PositionURI(pos gotoken.Position) string {
-	return URI(pos.Filename, pos.Line)
-}
 
 func URI(path string, line int) string {
 	return path + ":" + strconv.Itoa(line)

@@ -34,7 +34,7 @@ func NewGoplsClient(ctx context.Context, logger *zap.Logger, rootDir string) *Co
 
 	client := NewDummyClient(logger)
 
-	// Create a JSON-RPC connection using stdin and stdout
+	// Step 1: Create a JSON-RPC connection using stdin and stdout
 	gopls.cmd = exec.Command("gopls", "serve")
 
 	stdin, err := gopls.cmd.StdinPipe()
@@ -60,8 +60,10 @@ func NewGoplsClient(ctx context.Context, logger *zap.Logger, rootDir string) *Co
 		stdout: stdout,
 	})
 
+	// Step 2: Create a client for the running gopls server
 	ctx, gopls.conn, gopls.server = protocol.NewClient(ctx, client, stream, logger)
 
+	// Step 3: Initialize the gopls server
 	initParams := protocol.InitializeParams{
 		RootURI: uri.From("file", "", rootDir, "", ""),
 		InitializationOptions: map[string]interface{}{
@@ -75,7 +77,7 @@ func NewGoplsClient(ctx context.Context, logger *zap.Logger, rootDir string) *Co
 		panic(err)
 	}
 
-	// Step 2: Send 'initialized' notification
+	// Step 4: Send 'initialized' notification
 	err = gopls.server.Initialized(ctx, &protocol.InitializedParams{})
 	if err != nil {
 		logger.Error("Error during initialized", zap.Error(err))
