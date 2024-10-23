@@ -1,6 +1,5 @@
 package wakuv2
 
-/* TODO-nwaku
 import (
 	"errors"
 
@@ -93,6 +92,7 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 		err = w.messageSender.Send(publish.NewRequest(w.ctx, envelope))
 	}
 
+	/* TODO-nwaku
 	if w.statusTelemetryClient != nil {
 		if err == nil {
 			w.statusTelemetryClient.PushSentEnvelope(w.ctx, SentEnvelope{Envelope: envelope, PublishMethod: w.messageSender.PublishMethod()})
@@ -100,6 +100,7 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 			w.statusTelemetryClient.PushErrorSendingEnvelope(w.ctx, ErrorSendingEnvelope{Error: err, SentEnvelope: SentEnvelope{Envelope: envelope, PublishMethod: w.messageSender.PublishMethod()}})
 		}
 	}
+	*/
 
 	if err != nil {
 		logger.Error("could not send message", zap.Error(err))
@@ -117,4 +118,3 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 		})
 	}
 }
-*/

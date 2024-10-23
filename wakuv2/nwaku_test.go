@@ -163,6 +163,11 @@ func TestBasicWakuV2(t *testing.T) {
 	storeNodeInfo, err := GetNwakuInfo(nil, &extNodeRestPort)
 	require.NoError(t, err)
 
+	wakuConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+
 	nwakuConfig := WakuConfig{
 		Port:            30303,
 		NodeKey:         "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
@@ -176,7 +181,7 @@ func TestBasicWakuV2(t *testing.T) {
 		Shards:          []uint16{64},
 	}
 
-	w, err := New(nil, "", &nwakuConfig, nil, nil, nil, nil, nil)
+	w, err := New(nil, "", &wakuConfig, &nwakuConfig, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
