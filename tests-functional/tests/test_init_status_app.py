@@ -2,7 +2,6 @@ import pytest
 
 from test_cases import StatusBackendTestCase
 
-
 @pytest.mark.create_account
 @pytest.mark.rpc
 class TestInitialiseApp(StatusBackendTestCase):
@@ -13,12 +12,12 @@ class TestInitialiseApp(StatusBackendTestCase):
 
         backend_client = init_status_backend
         assert backend_client is not None
-        mediaserver_started = backend_client.wait_for_signal(
-            "mediaserver.started")
-
-        port = mediaserver_started['event']['port']
-        assert type(port) is int, f"Port is not an integer, found {type(port)}"
-
-        backend_client.wait_for_signal("node.started")
-        backend_client.wait_for_signal("node.ready")
-        backend_client.wait_for_signal("node.login")
+        
+        backend_client.verify_json_schema(
+            backend_client.wait_for_signal("mediaserver.started"), "signal_mediaserver_started")
+        backend_client.verify_json_schema(
+            backend_client.wait_for_signal("node.started"), "signal_node_started")
+        backend_client.verify_json_schema(
+            backend_client.wait_for_signal("node.ready"), "signal_node_ready")
+        backend_client.verify_json_schema(
+            backend_client.wait_for_signal("node.login"), "signal_node_login")
