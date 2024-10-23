@@ -29,7 +29,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
 	mock_fake "github.com/status-im/status-go/transactions/fake"
@@ -49,6 +49,7 @@ type TransactorSuite struct {
 	nodeConfig        *params.NodeConfig
 
 	manager *Transactor
+	cleanup func()
 }
 
 func (s *TransactorSuite) SetupTest() {
@@ -59,19 +60,18 @@ func (s *TransactorSuite) SetupTest() {
 
 	// expected by simulated backend
 	chainID := gethparams.AllEthashProtocolChanges.ChainID.Uint64()
-	db, err := sqlite.OpenUnecryptedDB(sqlite.InMemoryPath) // dummy to make rpc.Client happy
-	s.Require().NoError(err)
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(s.T())
 
 	config := statusRpc.ClientConfig{
 		Client:          s.client,
 		UpstreamChainID: chainID,
 		Networks:        nil,
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
 	rpcClient, _ := statusRpc.NewClient(config)
-
 	rpcClient.UpstreamChainID = chainID
 
 	ethClients := []ethclient.RPSLimitedEthClientInterface{
@@ -88,12 +88,15 @@ func (s *TransactorSuite) SetupTest() {
 	s.manager.sendTxTimeout = time.Second
 	s.manager.SetNetworkID(chainID)
 	s.manager.SetRPC(rpcClient, time.Second)
+
+	s.cleanup = cleanup
 }
 
 func (s *TransactorSuite) TearDownTest() {
 	s.txServiceMockCtrl.Finish()
 	s.server.Stop()
 	s.client.Close()
+	s.cleanup()
 }
 
 var (

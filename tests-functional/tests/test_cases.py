@@ -87,8 +87,7 @@ class TransactionTestCase(WalletTestCase):
 
 class EthRpcTestCase(WalletTestCase):
 
-    @pytest.fixture(autouse=True, scope='class')
-    def tx_data(self):
+    def init_tx_data(self):
         self.rpc_client = RpcClient(
             option.rpc_url_statusd
         )

@@ -316,11 +316,8 @@ func TestGetTokenHistoricalBalance(t *testing.T) {
 }
 
 func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
 	accountsDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
@@ -336,7 +333,8 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 		Client:          client,
 		UpstreamChainID: chainID,
 		Networks:        nil,
-		DB:              appDB,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}

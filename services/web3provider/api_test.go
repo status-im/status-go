@@ -1,7 +1,6 @@
 package web3provider
 
 import (
-	"database/sql"
 	"encoding/json"
 	"testing"
 
@@ -9,7 +8,6 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -23,15 +21,9 @@ import (
 	statusRPC "github.com/status-im/status-go/rpc"
 )
 
-func createDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "provider-tests-")
-	require.NoError(t, err)
-	return db, func() { require.NoError(t, cleanup()) }
-}
-
 func setupTestAPI(t *testing.T) (*API, func()) {
 	t.Skip("skip test using infura")
-	db, cancel := createDB(t)
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
 
 	keyStoreDir := t.TempDir()
 
@@ -43,7 +35,8 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 		Client:          client,
 		UpstreamChainID: 1,
 		Networks:        nil,
-		DB:              db,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
@@ -61,10 +54,10 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 		NetworkID:   1,
 	}
 
-	accDB, err := accounts.NewDB(db)
+	accDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 
-	service := NewService(db, accDB, rpcClient, nodeConfig, accManager, nil, nil)
+	service := NewService(appDB, accDB, rpcClient, nodeConfig, accManager, nil, nil)
 
 	networks := json.RawMessage("{}")
 	settings := settings.Settings{
@@ -81,7 +74,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 
 	return &API{
 		s: service,
-	}, cancel
+	}, cleanup
 }
 
 func TestRequestPermission(t *testing.T) {

@@ -15,14 +15,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
-	"github.com/status-im/status-go/walletdatabase"
 )
 
 func Test_entriesToDataPoints(t *testing.T) {
@@ -388,11 +386,8 @@ func Test_entriesToDataPoints(t *testing.T) {
 }
 
 func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
-	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	require.NoError(t, err)
-
-	walletDB, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
-	require.NoError(t, err)
+	appDB, walletDB, cleanup := helpers.SetupTestMemorySQLAppDBs(t)
+	defer cleanup()
 
 	accountsDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
@@ -409,7 +404,8 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 		Client:          client,
 		UpstreamChainID: chainID,
 		Networks:        nil,
-		DB:              appDB,
+		AppDB:           appDB,
+		WalletDB:        walletDB,
 		WalletFeed:      nil,
 		ProviderConfigs: nil,
 	}
