@@ -398,6 +398,7 @@ test-e2e: ##@tests Run e2e tests
 test-e2e-race: export GOTEST_EXTRAFLAGS=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
+test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
