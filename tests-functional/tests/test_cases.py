@@ -7,7 +7,7 @@ from collections import namedtuple
 import pytest
 
 from clients.signals import SignalClient
-from clients.status_backend import RpcClient
+from clients.status_backend import RpcClient, StatusBackend
 from conftest import option
 from constants import user_1, user_2
 
@@ -21,14 +21,17 @@ class StatusDTestCase:
         )
 
 
-class WalletTestCase(StatusDTestCase):
+class StatusBackendTestCase:
+    def setup_class(self):
+        self.rpc_client = StatusBackend()
+        self.network_id = 31337
 
-    def setup_method(self):
-        super().setup_method()
+
+class WalletTestCase(StatusBackendTestCase):
 
     def wallet_create_multi_transaction(self, **kwargs):
         method = "wallet_createMultiTransaction"
-        transferTx_data = {
+        transfer_tx_data = {
             "data": "",
             "from": user_1.address,
             "gas": "0x5BBF",
@@ -40,8 +43,8 @@ class WalletTestCase(StatusDTestCase):
             "value": "0x5af3107a4000",
         }
         for key, new_value in kwargs.items():
-            if key in transferTx_data:
-                transferTx_data[key] = new_value
+            if key in transfer_tx_data:
+                transfer_tx_data[key] = new_value
             else:
                 logging.info(
                     f"Warning: The key '{key}' does not exist in the transferTx parameters and will be ignored.")
@@ -58,7 +61,7 @@ class WalletTestCase(StatusDTestCase):
                 {
                     "bridgeName": "Transfer",
                     "chainID": 31337,
-                    "transferTx": transferTx_data
+                    "transferTx": transfer_tx_data
                 }
             ],
             f"{option.password}",
@@ -81,7 +84,6 @@ class WalletTestCase(StatusDTestCase):
 class TransactionTestCase(WalletTestCase):
 
     def setup_method(self):
-        super().setup_method()
         self.tx_hash = self.send_valid_multi_transaction()
 
 
@@ -89,10 +91,6 @@ class EthRpcTestCase(WalletTestCase):
 
     @pytest.fixture(autouse=True, scope='class')
     def tx_data(self):
-        self.rpc_client = RpcClient(
-            option.rpc_url_statusd
-        )
-
         tx_hash = self.send_valid_multi_transaction()
         self.wait_until_tx_not_pending(tx_hash)
 
@@ -103,8 +101,8 @@ class EthRpcTestCase(WalletTestCase):
         except (KeyError, json.JSONDecodeError):
             raise Exception(receipt.content)
 
-        TxData = namedtuple("TxData", ["tx_hash", "block_number", "block_hash"])
-        return TxData(tx_hash, block_number, block_hash)
+        tx_data = namedtuple("TxData", ["tx_hash", "block_number", "block_hash"])
+        return tx_data(tx_hash, block_number, block_hash)
 
     def get_block_header(self, block_number):
         method = "ethclient_headerByNumber"
@@ -142,9 +140,3 @@ class SignalTestCase(StatusDTestCase):
         websocket_thread = threading.Thread(target=self.signal_client._connect)
         websocket_thread.daemon = True
         websocket_thread.start()
-
-
-class StatusBackendTestCase:
-
-    def setup_method(self):
-        pass
