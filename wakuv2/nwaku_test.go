@@ -6,7 +6,6 @@ package wakuv2
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -192,9 +191,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		
 		numConnected, err := w.GetNumConnectedPeers()
-		fmt.Println("numConnected: ", numConnected)
 		if err != nil {
 			return err
 		}
@@ -335,14 +332,12 @@ func TestPeerExchange(t *testing.T) {
 		Shards: []uint16{64},
 		PeerExchange: false,
 		Discv5UdpPort: 9001,
-		TcpPort: 60001,
+		TcpPort: 60010,
 	}
 
 	discV5Node, err := New(nil, "", &discV5NodeConfig, logger.Named("discV5Node"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, discV5Node.Start())
-
-	fmt.Println("--------- GABRIEL started discV5Node")
 
 	time.Sleep(1 * time.Second)
 
@@ -351,7 +346,6 @@ func TestPeerExchange(t *testing.T) {
 
 	discv5NodeEnr, err := discV5Node.ENR()
 	require.NoError(t, err)
-	
 	
 	// start node which serves as PeerExchange server
 	pxServerConfig := WakuConfig{
@@ -363,24 +357,18 @@ func TestPeerExchange(t *testing.T) {
 		PeerExchange: true,
 		Discv5UdpPort: 9000,
 		Discv5BootstrapNodes: []string{discv5NodeEnr.String()},
-		TcpPort: 60002,
+		TcpPort: 60011,
 	}
 
 	pxServerNode, err := New(nil, "", &pxServerConfig, logger.Named("pxServerNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, pxServerNode.Start())
 
-	fmt.Println("------ GABRIEL started big sleep")
-	time.Sleep(10 * time.Second)
-	fmt.Println("------ GABRIEL finished big sleep")
+	time.Sleep(1 * time.Second)
 
 	serverNodeMa, err := pxServerNode.ListenAddresses()
 	require.NoError(t, err)
 	require.NotNil(t, serverNodeMa)
-
-	discv5Peers, err := discV5Node.GetPeerIdsFromPeerStore()
-	require.NoError(t, err)
-	fmt.Println("------ GABRIEL discV5Node peers: ", discv5Peers)
 
 	// Sanity check, not great, but it's probably helpful
 	options := func(b *backoff.ExponentialBackOff) {
@@ -390,9 +378,7 @@ func TestPeerExchange(t *testing.T) {
 	// Check that pxServerNode has discV5Node in its Peer Store
 	err = tt.RetryWithBackOff(func() error {
 		peers, err := pxServerNode.GetPeerIdsFromPeerStore()
-		
-		fmt.Println("------ GABRIEL pxServerNode peers: ", peers)
-		
+				
 		if err != nil {
 			return err
 		}
@@ -414,7 +400,7 @@ func TestPeerExchange(t *testing.T) {
 		Shards: []uint16{64},
 		PeerExchange: true,
 		Discv5UdpPort: 9002,
-		TcpPort: 60003,
+		TcpPort: 60012,
 		PeerExchangeNode: serverNodeMa[0].String(),
 	}
 
@@ -429,7 +415,6 @@ func TestPeerExchange(t *testing.T) {
 	
 	err = tt.RetryWithBackOff(func() error {
 		peers, err := lightNode.GetPeerIdsFromPeerStore()
-		fmt.Println("------ GABRIEL lightnode peers: ", peers)
 		if err != nil {
 			return err
 		}
@@ -440,6 +425,21 @@ func TestPeerExchange(t *testing.T) {
 		return errors.New("lightnode is missing peers")
 	}, options)
 	require.NoError(t, err)
+
+	// Now perform the PX request manually to see if it also works
+	err = tt.RetryWithBackOff(func() error {
+		numPeersReceived, err := lightNode.WakuPeerExchangeRequest(1)
+		if err != nil {
+			return err
+		}
+
+		if numPeersReceived == 1 {
+			return nil
+		}
+		return errors.New("Peer Exchange is not returning peers")
+	}, options)
+	require.NoError(t, err)
+
 
 	require.NoError(t, lightNode.Stop())
 	require.NoError(t, pxServerNode.Stop())

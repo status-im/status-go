@@ -2160,18 +2160,22 @@ func (self *Waku) wakuStoreQuery(
 	return "", errors.New(errMsg)
 }
 
-func (self *Waku) WakuPeerExchangeRequest(numPeers uint64) (string, error) {
+func (self *Waku) WakuPeerExchangeRequest(numPeers uint64) (uint64, error) {
 	var resp = C.allocResp()
 	defer C.freeResp(resp)
 
 	C.cGoWakuPeerExchangeQuery(self.wakuCtx, C.uint64_t(numPeers), resp)
 	if C.getRet(resp) == C.RET_OK {
-		msg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		return msg, nil
+		numRecvPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		numRecvPeers, err := strconv.ParseUint(numRecvPeersStr, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return numRecvPeers, nil
 	}
 	errMsg := "error WakuPeerExchangeRequest: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return "", errors.New(errMsg)
+	return 0, errors.New(errMsg)
 }
 
 func (self *Waku) WakuConnect(peerMultiAddr string, timeoutMs int) error {
