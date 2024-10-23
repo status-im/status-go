@@ -238,8 +238,8 @@ pipeline {
       }
     }
     cleanup {
-      dir(env.TMPDIR) { deleteDir() }
-      sh "make git-clean"
+      cleanWs()
+      dir("${env.WORKSPACE}@tmp") { deleteDir() }
     }
   } // post
 } // pipeline
