@@ -377,19 +377,23 @@ type WakuPubsubTopic = string
 type WakuContentTopic = string
 
 type WakuConfig struct {
-	Host                 string   `json:"host,omitempty"`
-	Port                 int      `json:"port,omitempty"`
-	NodeKey              string   `json:"key,omitempty"`
-	EnableRelay          bool     `json:"relay"`
-	LogLevel             string   `json:"logLevel"`
-	DnsDiscovery         bool     `json:"dnsDiscovery,omitempty"`
-	DnsDiscoveryUrl      string   `json:"dnsDiscoveryUrl,omitempty"`
-	MaxMessageSize       string   `json:"maxMessageSize,omitempty"`
+	Host        		 string `json:"host,omitempty"`
+	Port        		 int    `json:"port,omitempty"`
+	NodeKey     		 string `json:"key,omitempty"`
+	EnableRelay  		 bool   `json:"relay"`
+	LogLevel     		 string `json:"logLevel"`
+	DnsDiscovery 		 bool `json:"dnsDiscovery,omitempty"`
+	DnsDiscoveryUrl 	 string `json:"dnsDiscoveryUrl,omitempty"`
+	MaxMessageSize		 string `json:"maxMessageSize,omitempty"`
 	Staticnodes          []string `json:"staticnodes,omitempty"`
 	Discv5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
-	Discv5Discovery      bool     `json:"discv5Discovery,omitempty"`
-	ClusterID            uint16   `json:"clusterId,omitempty"`
-	Shards               []uint16 `json:"shards,omitempty"`
+	Discv5Discovery		 bool `json:"discv5Discovery,omitempty"`
+	Discv5UdpPort		 uint16 `json:"discv5UdpPort,omitempty"`
+	ClusterID			 uint16 `json:"clusterId,omitempty"`
+	Shards			     []uint16 `json:"shards,omitempty"`	
+	PeerExchange		 bool `json:"peerExchange,omitempty"`
+	PeerExchangeNode	 string `json:"peerExchangeNode,omitempty"`
+	TcpPort			     uint16 `json:"tcpPort,omitempty"`
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -505,9 +509,11 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuCon
 		return nil, err
 	}
 
-	err = node.WakuRelaySubscribe(defaultPubsubTopic)
-	if err != nil {
-		return nil, err
+	if cfg.EnableRelay {
+		err = node.WakuRelaySubscribe(defaultPubsubTopic)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	node.WakuSetEventCallback()
@@ -2207,7 +2213,7 @@ func (w *Waku) PeerID() (peer.ID, error) {
 	if C.getRet(resp) == C.RET_OK {
 		
 		peerIdStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))		
-		id, err := peermod.Decode(peerIdStr)
+		id, err := peer.Decode(peerIdStr)
 		if err != nil {
 			errMsg := "WakuGetMyPeerId - error decoding peerId: " + err.Error()
 			return "", errors.New(errMsg)
@@ -2287,108 +2293,6 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 func (w *Waku) LegacyStoreNode() legacy_store.Store {
 	// return w.node.LegacyStore()
 	return nil
-}
-
-type WakuMessageHash = string
-type WakuPubsubTopic = string
-type WakuContentTopic = string
-
-type WakuConfig struct {
-	Host        		 string `json:"host,omitempty"`
-	Port        		 int    `json:"port,omitempty"`
-	NodeKey     		 string `json:"key,omitempty"`
-	EnableRelay  		 bool   `json:"relay"`
-	LogLevel     		 string `json:"logLevel"`
-	DnsDiscovery 		 bool `json:"dnsDiscovery,omitempty"`
-	DnsDiscoveryUrl 	 string `json:"dnsDiscoveryUrl,omitempty"`
-	MaxMessageSize		 string `json:"maxMessageSize,omitempty"`
-	Staticnodes          []string `json:"staticnodes,omitempty"`
-	Discv5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
-	Discv5Discovery		 bool `json:"discv5Discovery,omitempty"`
-	Discv5UdpPort		 uint16 `json:"discv5UdpPort,omitempty"`
-	ClusterID			 uint16 `json:"clusterId,omitempty"`
-	Shards			     []uint16 `json:"shards,omitempty"`	
-	PeerExchange		 bool `json:"peerExchange,omitempty"`
-	PeerExchangeNode	 string `json:"peerExchangeNode,omitempty"`
-	TcpPort			     uint16 `json:"tcpPort,omitempty"`
-}
-
-type Waku struct {
-	wakuCtx unsafe.Pointer
-
-	appDB *sql.DB
-
-	dnsAddressCache     map[string][]dnsdisc.DiscoveredNode // Map to store the multiaddresses returned by dns discovery
-	dnsAddressCacheLock *sync.RWMutex                       // lock to handle access to the map
-
-	// Filter-related
-	filters       *common.Filters // Message filters installed with Subscribe function
-	filterManager *filterapi.FilterManager
-
-	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
-	symKeys     map[string][]byte            // Symmetric key storage
-	keyMu       sync.RWMutex                 // Mutex associated with key stores
-
-	envelopeCache *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] // Pool of envelopes currently tracked by this node
-	poolMu        sync.RWMutex                                              // Mutex to sync the message and expiration pools
-
-	bandwidthCounter *metrics.BandwidthCounter
-
-	protectedTopicStore *persistence.ProtectedTopicsStore
-
-	sendQueue *publish.MessageQueue
-	limiter   *publish.PublishRateLimiter
-
-	missingMsgVerifier *missing.MissingMessageVerifier
-
-	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
-
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-
-	cfg		*WakuConfig
-	options []node.WakuNodeOption
-
-	envelopeFeed event.Feed
-
-	storeMsgIDs   map[gethcommon.Hash]bool // Map of the currently processing ids
-	storeMsgIDsMu sync.RWMutex
-
-	messageSentCheck *publish.MessageSentCheck
-
-	topicHealthStatusChan   chan peermanager.TopicHealthStatus
-	connectionNotifChan     chan node.PeerConnection
-	connStatusSubscriptions map[string]*types.ConnStatusSubscription
-	connStatusMu            sync.Mutex
-	onlineChecker           *onlinechecker.DefaultOnlineChecker
-	state                   connection.State
-
-	logger *zap.Logger
-
-	// NTP Synced timesource
-	timesource *timesource.NTPTimeSource
-
-	// seededBootnodesForDiscV5 indicates whether we manage to retrieve discovery
-	// bootnodes successfully
-	seededBootnodesForDiscV5 bool
-
-	// goingOnline is channel that notifies when connectivity has changed from offline to online
-	goingOnline chan struct{}
-
-	// discV5BootstrapNodes is the ENR to be used to fetch bootstrap nodes for discovery
-	discV5BootstrapNodes []string
-
-	onHistoricMessagesRequestFailed func([]byte, peer.ID, error)
-	onPeerStats                     func(types.ConnStatus)
-
-	// statusTelemetryClient ITelemetryClient
-
-	defaultShardInfo protocol.RelayShards
-}
-
-func (w *Waku) Stop() error {
-	return w.WakuStop()
 }
 
 func WakuSetup() {
@@ -2895,8 +2799,8 @@ func (self *Waku) GetPeerIdsFromPeerStore() (peer.IDSlice, error) {
 		itemsPeerIds := strings.Split(peersStr, ",")
 
 		var peers peer.IDSlice
-		for _, peer := range itemsPeerIds {
-			id, err := peermod.Decode(peer)
+		for _, peerId := range itemsPeerIds {
+			id, err := peer.Decode(peerId)
 			if err != nil {
 				errMsg := "GetPeerIdsFromPeerStore - error decoding peerId: " + err.Error()
 				return nil, errors.New(errMsg)
