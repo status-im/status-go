@@ -324,7 +324,6 @@ func makeTestTree(domain string, nodes []*enode.Node, links []string) (*ethdnsdi
 }
 
 func TestPeerExchange(t *testing.T) {
-	
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 	
@@ -396,7 +395,7 @@ func TestPeerExchange(t *testing.T) {
 	}, options)
 	require.NoError(t, err)
 
-	// start light node which use PeerExchange to discover peers	
+	// start light node which uses PeerExchange to discover peers	
 	pxClientConfig := WakuConfig{
 		EnableRelay: false,
 		LogLevel:    "DEBUG",
@@ -418,6 +417,7 @@ func TestPeerExchange(t *testing.T) {
 	pxServerPeerId, err := pxServerNode.PeerID()
 	require.NoError(t, err)
 	
+	// Check that the light node discovered the discV5Node and has both nodes in its peer store
 	err = tt.RetryWithBackOff(func() error {
 		peers, err := lightNode.GetPeerIdsFromPeerStore()
 		if err != nil {
@@ -446,6 +446,7 @@ func TestPeerExchange(t *testing.T) {
 	require.NoError(t, err)
 
 
+	// Stop nodes
 	require.NoError(t, lightNode.Stop())
 	require.NoError(t, pxServerNode.Stop())
 	require.NoError(t, discV5Node.Stop())
