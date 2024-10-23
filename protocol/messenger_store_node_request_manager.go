@@ -9,14 +9,14 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/transport"
-	"github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 const (
@@ -57,7 +57,7 @@ type StoreNodeRequestManager struct {
 	// activeRequestsLock should be locked each time activeRequests is being accessed or changed.
 	activeRequestsLock sync.RWMutex
 
-	onPerformingBatch func(MailserverBatch)
+	onPerformingBatch func(types.MailserverBatch)
 }
 
 func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
@@ -82,7 +82,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 		zap.Any("community", community),
 		zap.Any("config", cfg))
 
-	requestCommunity := func(communityID string, shard *shard.Shard) (*communities.Community, StoreNodeRequestStats, error) {
+	requestCommunity := func(communityID string, shard *wakuv2.Shard) (*communities.Community, StoreNodeRequestStats, error) {
 		channel, err := m.subscribeToRequest(storeNodeCommunityRequest, communityID, shard, cfg)
 		if err != nil {
 			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a request for community: %w", err)
@@ -100,7 +100,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 	communityShard := community.Shard
 	if communityShard == nil {
 		id := transport.CommunityShardInfoTopic(community.CommunityID)
-		fetchedShard, err := m.subscribeToRequest(storeNodeShardRequest, id, shard.DefaultNonProtectedShard(), cfg)
+		fetchedShard, err := m.subscribeToRequest(storeNodeShardRequest, id, wakuv2.DefaultNonProtectedShard(), cfg)
 		if err != nil {
 			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a shard info request: %w", err)
 		}
@@ -178,7 +178,7 @@ func (m *StoreNodeRequestManager) FetchContact(contactID string, opts []StoreNod
 // subscribeToRequest checks if a request for given community/contact is already in progress, creates and installs
 // a new one if not found, and returns a subscription to the result of the found/started request.
 // The subscription can then be used to get the result of the request, this could be either a community/contact or an error.
-func (m *StoreNodeRequestManager) subscribeToRequest(requestType storeNodeRequestType, dataID string, shard *shard.Shard, cfg StoreNodeRequestConfig) (storeNodeResponseSubscription, error) {
+func (m *StoreNodeRequestManager) subscribeToRequest(requestType storeNodeRequestType, dataID string, shard *wakuv2.Shard, cfg StoreNodeRequestConfig) (storeNodeResponseSubscription, error) {
 	// It's important to unlock only after getting the subscription channel.
 	// We also lock `activeRequestsLock` during finalizing the requests. This ensures that the subscription
 	// created in this function will get the result even if the requests proceeds faster than this function ends.
@@ -232,7 +232,7 @@ func (m *StoreNodeRequestManager) newStoreNodeRequest() *storeNodeRequest {
 
 // getFilter checks if a filter for a given community is already created and creates one of not found.
 // Returns the found/created filter, a flag if the filter was created by the function and an error.
-func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, dataID string, shard *shard.Shard) (*transport.Filter, bool, error) {
+func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, dataID string, shard *wakuv2.Shard) (*transport.Filter, bool, error) {
 	// First check if such filter already exists.
 	filter := m.messenger.transport.FilterByChatID(dataID)
 	if filter != nil {
@@ -334,7 +334,7 @@ type storeNodeRequestResult struct {
 	// One of data fields (community or contact) will be present depending on request type
 	community *communities.Community
 	contact   *Contact
-	shard     *shard.Shard
+	shard     *wakuv2.Shard
 }
 
 type storeNodeResponseSubscription = chan storeNodeRequestResult
@@ -374,7 +374,7 @@ func (r *storeNodeRequest) finalize() {
 	}
 }
 
-func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32) {
+func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64) {
 	logger := r.manager.logger.With(
 		zap.Any("requestID", r.requestID),
 		zap.Int("envelopesCount", envelopesCount))
@@ -522,13 +522,13 @@ func (r *storeNodeRequest) routine() {
 	communityID := r.requestID.getCommunityID()
 
 	if r.requestID.RequestType != storeNodeCommunityRequest || !r.manager.messenger.communityStorenodes.HasStorenodeSetup(communityID) {
-		if !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
+		if !r.manager.messenger.transport.WaitForAvailableStoreNode(storeNodeAvailableTimeout) {
 			r.result.err = fmt.Errorf("store node is not available")
 			return
 		}
 	}
 
-	storeNode := r.manager.messenger.getActiveMailserver(communityID)
+	storeNode := r.manager.messenger.getCommunityMailserver(communityID)
 
 	// Check if community already exists locally and get Clock.
 	if r.requestID.RequestType == storeNodeCommunityRequest {
@@ -541,8 +541,8 @@ func (r *storeNodeRequest) routine() {
 	// Start store node request
 	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
 
-	_, err := r.manager.messenger.performMailserverRequest(storeNode, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
-		batch := MailserverBatch{
+	_, err := r.manager.messenger.performStorenodeTask(func() (*MessengerResponse, error) {
+		batch := types.MailserverBatch{
 			From:        from,
 			To:          to,
 			PubsubTopic: r.pubsubTopic,
@@ -553,8 +553,8 @@ func (r *storeNodeRequest) routine() {
 			r.manager.onPerformingBatch(batch)
 		}
 
-		return nil, r.manager.messenger.processMailserverBatchWithOptions(ms, batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
-	})
+		return nil, r.manager.messenger.processMailserverBatchWithOptions(storeNode, batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
+	}, history.WithPeerID(storeNode))
 
 	r.result.err = err
 }

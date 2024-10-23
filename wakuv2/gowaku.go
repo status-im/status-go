@@ -1,3 +1,6 @@
+//go:build !use_nwaku
+// +build !use_nwaku
+
 // Copyright 2019 The Waku Library Authors.
 //
 // The Waku library is free software: you can redistribute it and/or modify
@@ -54,9 +57,9 @@ import (
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
-	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
+	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"github.com/waku-org/go-waku/waku/v2/api/missing"
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
@@ -166,6 +169,9 @@ type Waku struct {
 	connStatusMu            sync.Mutex
 	onlineChecker           *onlinechecker.DefaultOnlineChecker
 	state                   connection.State
+
+	StorenodeCycle   *history.StorenodeCycle
+	HistoryRetriever *history.HistoryRetriever
 
 	logger *zap.Logger
 
@@ -352,6 +358,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 	}
 
 	waku.options = opts
+
 	waku.logger.Info("setup the go-waku node successfully")
 
 	return waku, nil
@@ -1025,61 +1032,6 @@ func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
 	w.messageSender.MessagesDelivered(hashes)
 }
 
-func (w *Waku) SetStorePeerID(peerID peer.ID) {
-	w.messageSender.SetStorePeerID(peerID)
-}
-
-func (w *Waku) Query(ctx context.Context, peerID peer.ID, query store.FilterCriteria, cursor []byte, opts []store.RequestOption, processEnvelopes bool) ([]byte, int, error) {
-	requestID := protocol.GenerateRequestID()
-
-	opts = append(opts,
-		store.WithRequestID(requestID),
-		store.WithPeer(peerID),
-		store.WithCursor(cursor))
-
-	logger := w.logger.With(zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", peerID))
-
-	logger.Debug("store.query",
-		logutils.WakuMessageTimestamp("startTime", query.TimeStart),
-		logutils.WakuMessageTimestamp("endTime", query.TimeEnd),
-		zap.Strings("contentTopics", query.ContentTopics.ToList()),
-		zap.String("pubsubTopic", query.PubsubTopic),
-		zap.String("cursor", hexutil.Encode(cursor)),
-	)
-
-	queryStart := time.Now()
-	result, err := w.node.Store().Query(ctx, query, opts...)
-	queryDuration := time.Since(queryStart)
-	if err != nil {
-		logger.Error("error querying storenode", zap.Error(err))
-
-		if w.onHistoricMessagesRequestFailed != nil {
-			w.onHistoricMessagesRequestFailed(requestID, peerID, err)
-		}
-		return nil, 0, err
-	}
-
-	messages := result.Messages()
-	envelopesCount := len(messages)
-	w.logger.Debug("store.query response", zap.Duration("queryDuration", queryDuration), zap.Int("numMessages", envelopesCount), zap.Bool("hasCursor", result.IsComplete() && result.Cursor() != nil))
-	for _, mkv := range messages {
-		msg := mkv.Message
-
-		// Temporarily setting RateLimitProof to nil so it matches the WakuMessage protobuffer we are sending
-		// See https://github.com/vacp2p/rfc/issues/563
-		mkv.Message.RateLimitProof = nil
-
-		envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), query.PubsubTopic)
-
-		err = w.OnNewEnvelopes(envelope, common.StoreMessageType, processEnvelopes)
-		if err != nil {
-			return nil, 0, err
-		}
-	}
-
-	return result.Cursor(), envelopesCount, nil
-}
-
 // OnNewEnvelope is an interface from Waku FilterManager API that gets invoked when any new message is received by Filter.
 func (w *Waku) OnNewEnvelope(env *protocol.Envelope) error {
 	return w.OnNewEnvelopes(env, common.RelayedMessageType, false)
@@ -1102,6 +1054,11 @@ func (w *Waku) Start() error {
 	if err = w.node.Start(w.ctx); err != nil {
 		return fmt.Errorf("failed to start go-waku node: %v", err)
 	}
+
+	w.StorenodeCycle = history.NewStorenodeCycle(w.logger)
+	w.HistoryRetriever = history.NewHistoryRetriever(w.node.Store(), NewHistoryProcessorWrapper(w), w.logger)
+
+	w.StorenodeCycle.Start(w.ctx, w.node.Host())
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.node.Host().ID()))
 
@@ -1168,7 +1125,7 @@ func (w *Waku) Start() error {
 	if w.cfg.EnableMissingMessageVerification {
 
 		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
-			w.node.Store(),
+			missing.NewDefaultStorenodeRequestor(w.node.Store()),
 			w,
 			w.node.Timesource(),
 			w.logger)
@@ -1313,7 +1270,7 @@ func (w *Waku) startMessageSender() error {
 		publishMethod = publish.LightPush
 	}
 
-	sender, err := publish.NewMessageSender(publishMethod, w.node.Lightpush(), w.node.Relay(), w.logger)
+	sender, err := publish.NewMessageSender(publishMethod, publish.NewDefaultPublisher(w.node.Lightpush(), w.node.Relay()), w.logger)
 	if err != nil {
 		w.logger.Error("failed to create message sender", zap.Error(err))
 		return err
@@ -1322,7 +1279,7 @@ func (w *Waku) startMessageSender() error {
 	if w.cfg.EnableStoreConfirmationForMessagesSent {
 		msgStoredChan := make(chan gethcommon.Hash, 1000)
 		msgExpiredChan := make(chan gethcommon.Hash, 1000)
-		messageSentCheck := publish.NewMessageSentCheck(w.ctx, w.node.Store(), w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
+		messageSentCheck := publish.NewMessageSentCheck(w.ctx, publish.NewDefaultStorenodeMessageVerifier(w.node.Store()), w.StorenodeCycle, w.node.Timesource(), msgStoredChan, msgExpiredChan, w.logger)
 		sender.WithMessageSentCheck(messageSentCheck)
 
 		w.wg.Add(1)
@@ -1621,8 +1578,8 @@ func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 	}, nil
 }
 
-func (w *Waku) ListenAddresses() []multiaddr.Multiaddr {
-	return w.node.ListenAddresses()
+func (w *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
+	return w.node.ListenAddresses(), nil
 }
 
 func (w *Waku) ENR() (*enode.Node, error) {
@@ -1924,19 +1881,6 @@ func (w *Waku) PeerID() peer.ID {
 	return w.node.Host().ID()
 }
 
-func (w *Waku) PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error) {
-	pingResultCh := ping.Ping(ctx, w.node.Host(), peerID)
-	select {
-	case <-ctx.Done():
-		return 0, ctx.Err()
-	case r := <-pingResultCh:
-		if r.Error != nil {
-			return 0, r.Error
-		}
-		return r.RTT, nil
-	}
-}
-
 func (w *Waku) Peerstore() peerstore.Peerstore {
 	return w.node.Host().Peerstore()
 }
@@ -2005,4 +1949,9 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 
 func (w *Waku) LegacyStoreNode() legacy_store.Store {
 	return w.node.LegacyStore()
+}
+
+func (w *Waku) ListPeersInMesh(pubsubTopic string) (int, error) {
+	listPeers := w.node.Relay().PubSub().ListPeers(pubsubTopic)
+	return len(listPeers), nil
 }

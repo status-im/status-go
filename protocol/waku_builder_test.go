@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/t/helpers"
 	waku2 "github.com/status-im/status-go/wakuv2"
 )
@@ -62,7 +61,7 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 
 	err = wakuNode.Start()
 	if cfg.enableStore {
-		err := wakuNode.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
+		err := wakuNode.SubscribeToPubsubTopic(waku2.DefaultNonProtectedPubsubTopic(), nil)
 		s.Require().NoError(err)
 	}
 	s.Require().NoError(err)
@@ -78,7 +77,7 @@ func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []s
 		nodes[i] = NewTestWakuV2(s, testWakuV2Config{
 			logger:      parentLogger.Named("waku-" + name),
 			enableStore: false,
-			clusterID:   shard.MainStatusShardCluster,
+			clusterID:   waku2.MainStatusShardCluster,
 		})
 	}
 
@@ -89,9 +88,10 @@ func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []s
 				continue
 			}
 
-			addrs := nodes[j].ListenAddresses()
+			addrs, err := nodes[j].ListenAddresses()
+			s.Require().NoError(err)
 			s.Require().Greater(len(addrs), 0)
-			_, err := nodes[i].AddRelayPeer(addrs[0])
+			_, err = nodes[i].AddRelayPeer(addrs[0])
 			s.Require().NoError(err)
 			err = nodes[i].DialPeer(addrs[0])
 			s.Require().NoError(err)

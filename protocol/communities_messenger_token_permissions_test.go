@@ -25,13 +25,13 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 const testChainID1 = 1
@@ -488,11 +488,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	cfg := testWakuV2Config{
 		logger:      s.logger.Named("store-node-waku"),
 		enableStore: false,
-		clusterID:   shard.MainStatusShardCluster,
+		clusterID:   wakuv2.MainStatusShardCluster,
 	}
 	wakuStoreNode := NewTestWakuV2(&s.Suite, cfg)
 
-	storeNodeListenAddresses := wakuStoreNode.ListenAddresses()
+	storeNodeListenAddresses, err := wakuStoreNode.ListenAddresses()
+	s.Require().NoError(err)
 	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
 
 	storeNodeAddress := storeNodeListenAddresses[0]

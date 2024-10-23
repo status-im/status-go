@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 const (
@@ -141,7 +141,7 @@ func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitia
 }
 
 type CommunityFilterToInitialize struct {
-	Shard   *shard.Shard
+	Shard   *wakuv2.Shard
 	PrivKey *ecdsa.PrivateKey
 }
 
@@ -158,7 +158,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 		}
 
 		topics := make([]string, 0)
-		topics = append(topics, shard.DefaultNonProtectedPubsubTopic())
+		topics = append(topics, wakuv2.DefaultNonProtectedPubsubTopic())
 		topics = append(topics, communityFilter.Shard.PubsubTopic())
 
 		for _, pubsubTopic := range topics {

@@ -15,11 +15,11 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/utils"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 type CommunityURLData struct {
@@ -49,7 +49,7 @@ type URLDataResponse struct {
 	Community *CommunityURLData        `json:"community"`
 	Channel   *CommunityChannelURLData `json:"channel"`
 	Contact   *ContactURLData          `json:"contact"`
-	Shard     *shard.Shard             `json:"shard,omitempty"`
+	Shard     *wakuv2.Shard            `json:"shard,omitempty"`
 }
 
 const baseShareURL = "https://status.app"
@@ -204,7 +204,7 @@ func parseCommunityURLWithData(data string, chatKey string) (*URLDataResponse, e
 			TagIndices:   tagIndices,
 			CommunityID:  types.EncodeHex(communityID),
 		},
-		Shard: shard.FromProtobuff(urlDataProto.Shard),
+		Shard: wakuv2.FromProtobuff(urlDataProto.Shard),
 	}, nil
 }
 
@@ -380,7 +380,7 @@ func parseCommunityChannelURLWithData(data string, chatKey string) (*URLDataResp
 			Color:       channelProto.Color,
 			ChannelUUID: channelProto.Uuid,
 		},
-		Shard: shard.FromProtobuff(urlDataProto.Shard),
+		Shard: wakuv2.FromProtobuff(urlDataProto.Shard),
 	}, nil
 }
 
