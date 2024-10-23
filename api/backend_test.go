@@ -855,6 +855,7 @@ func TestLoginAccount(t *testing.T) {
 	acc, err := b.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
 	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
+	require.True(t, acc.HasAcceptedTerms)
 
 	waitForLogin(c)
 	require.NoError(t, b.Logout())
@@ -1682,6 +1683,30 @@ func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, account)
 	require.NotEmpty(t, account.Name)
+}
+
+func TestAcceptTerms(t *testing.T) {
+	tmpdir := t.TempDir()
+	b := NewGethStatusBackend()
+	conf, err := params.NewNodeConfig(tmpdir, 1777)
+	require.NoError(t, err)
+	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
+	b.UpdateRootDataDir(conf.DataDir)
+	require.NoError(t, b.OpenAccounts())
+	nameserver := "8.8.8.8"
+	createAccountRequest := &requests.CreateAccount{
+		DisplayName:        "some-display-name",
+		CustomizationColor: "#ffffff",
+		Password:           "some-password",
+		RootDataDir:        tmpdir,
+		LogFilePath:        tmpdir + "/log",
+		WakuV2Nameserver:   &nameserver,
+		WakuV2Fleet:        "status.staging",
+	}
+	_, err = b.CreateAccountAndLogin(createAccountRequest)
+	require.NoError(t, err)
+	err = b.AcceptTerms()
+	require.NoError(t, err)
 }
 
 func TestCreateAccountPathsValidation(t *testing.T) {
