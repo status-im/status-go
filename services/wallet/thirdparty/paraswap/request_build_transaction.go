@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
@@ -56,10 +57,15 @@ func (c *ClientV5) BuildTransaction(ctx context.Context, srcTokenAddress common.
 	}
 
 	url := fmt.Sprintf(transactionsURL, c.chainID)
+
+	log.Info("BuildTransaction", "url", url)
+	log.Info("BuildTransaction", "params", params)
+	log.Info("BuildTransaction", "priceRoute", string(priceRoute))
 	response, err := c.httpClient.DoPostRequest(ctx, url, params, nil)
 	if err != nil {
 		return Transaction{}, err
 	}
+	log.Info("BuildTransaction", "response", string(response))
 
 	tx, err := handleBuildTransactionResponse(response)
 	if err != nil {

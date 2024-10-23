@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
@@ -53,10 +54,13 @@ func (c *ClientV5) FetchPriceRoute(ctx context.Context, srcTokenAddress common.A
 	params.Add("version", "6.2")
 
 	url := pricesURL
+	log.Info("FetchPriceRoute", "url", url)
+	log.Info("FetchPriceRoute", "params", params)
 	response, err := c.httpClient.DoGetRequest(ctx, url, params, nil)
 	if err != nil {
 		return Route{}, err
 	}
+	log.Info("FetchPriceRoute", "response", string(response))
 
 	return handlePriceRouteResponse(response)
 }
