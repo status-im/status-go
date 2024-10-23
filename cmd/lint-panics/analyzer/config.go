@@ -32,7 +32,13 @@ func (c *Config) ParseFlags() (flag.FlagSet, error) {
 	// We parse the flags here to have `rootDir` before the call to `singlechecker.Main(analyzer)`
 	// For same reasons we discard the output and skip the undefined flag error.
 	err := flags.Parse(os.Args[1:])
-	if err != nil && strings.Contains(err.Error(), "flag provided but not defined") {
+	if err == nil {
+		return *flags, nil
+	}
+
+	if strings.Contains(err.Error(), "flag provided but not defined") {
+		err = nil
+	} else if strings.Contains(err.Error(), "help requested") {
 		err = nil
 	}
 

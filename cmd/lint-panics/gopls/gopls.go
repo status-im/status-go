@@ -55,7 +55,7 @@ func NewGoplsClient(ctx context.Context, logger *zap.Logger, rootDir string) *Co
 		panic(err)
 	}
 
-	stream := jsonrpc2.NewStream(&CombinedReadWriteCloser{
+	stream := jsonrpc2.NewStream(&IOStream{
 		stdin:  stdin,
 		stdout: stdout,
 	})

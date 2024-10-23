@@ -18,7 +18,7 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/account"
-	common2 "github.com/status-im/status-go/common"
+	status_common "github.com/status-im/status-go/common"
 	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -780,7 +780,7 @@ func (api *API) BuildTransactionsFromRoute(ctx context.Context, buildInputParams
 	log.Debug("[WalletAPI::BuildTransactionsFromRoute] builds transactions from the generated best route", "uuid", buildInputParams.Uuid)
 
 	go func() {
-		defer common2.LogOnPanic()
+		defer status_common.LogOnPanic()
 		api.router.StopSuggestedRoutesAsyncCalculation()
 
 		var err error
@@ -843,7 +843,7 @@ func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signature
 func (api *API) SendRouterTransactionsWithSignatures(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
 	log.Debug("[WalletAPI:: SendRouterTransactionsWithSignatures] sign with signatures and send")
 	go func() {
-		defer common2.LogOnPanic()
+		defer status_common.LogOnPanic()
 
 		var (
 			err              error
@@ -930,7 +930,7 @@ func (api *API) SendRouterTransactionsWithSignatures(ctx context.Context, sendIn
 			chainIDs = append(chainIDs, tx.FromChain)
 			addresses = append(addresses, common.Address(tx.FromAddress))
 			go func(chainId uint64, txHash common.Hash) {
-				defer common2.LogOnPanic()
+				defer status_common.LogOnPanic()
 				err = api.s.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
 				if err != nil {
 					return

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go/ast"
 	"os"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -18,7 +17,7 @@ import (
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
 
-	gopls2 "github.com/status-im/status-go/cmd/lint-panics/gopls"
+	"github.com/status-im/status-go/cmd/lint-panics/gopls"
 	"github.com/status-im/status-go/cmd/lint-panics/utils"
 )
 
@@ -43,15 +42,17 @@ func New(ctx context.Context, logger *zap.Logger) (*analysis.Analyzer, error) {
 
 	logger.Info("creating analyzer", zap.String("root", cfg.RootDir))
 
-	gopls := gopls2.NewGoplsClient(ctx, logger, cfg.RootDir)
-	processor := newAnalyzer(logger, gopls, &cfg)
+	goplsClient := gopls.NewGoplsClient(ctx, logger, cfg.RootDir)
+	processor := newAnalyzer(logger, goplsClient, &cfg)
 
 	analyzer := &analysis.Analyzer{
 		Name:     "logpanics",
 		Doc:      fmt.Sprintf("reports missing defer call to %s", Pattern),
-		Run:      processor.Run,
 		Flags:    flags,
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
+		Run: func(pass *analysis.Pass) (interface{}, error) {
+			return processor.Run(ctx, pass)
+		},
 	}
 
 	return analyzer, nil
@@ -65,21 +66,18 @@ func newAnalyzer(logger *zap.Logger, lsp LSP, cfg *Config) *Analyzer {
 	}
 }
 
-func (p *Analyzer) Run(pass *analysis.Pass) (interface{}, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
+func (p *Analyzer) Run(ctx context.Context, pass *analysis.Pass) (interface{}, error) {
 	inspected, ok := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 	if !ok {
 		return nil, errors.New("analyzer is not type *inspector.Inspector")
 	}
 
-	// Check if the node is a GoStmt (which represents a 'go' statement)
+	// Create a nodes filter for goroutines (GoStmt represents a 'go' statement)
 	nodeFilter := []ast.Node{
 		(*ast.GoStmt)(nil),
 	}
 
-	// Traverse the AST to find goroutines
+	// Inspect go statements
 	inspected.Preorder(nodeFilter, func(n ast.Node) {
 		p.ProcessNode(ctx, pass, n)
 	})
