@@ -3,6 +3,8 @@ package wakuv2
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
+	"github.com/status-im/status-go/wakuv2/common"
+
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 )
@@ -16,9 +18,7 @@ func NewHistoryProcessorWrapper(waku *Waku) history.HistoryProcessor {
 }
 
 func (hr *HistoryProcessorWrapper) OnEnvelope(env *protocol.Envelope, processEnvelopes bool) error {
-	// TODO-nwaku
-	// return hr.waku.OnNewEnvelopes(env, common.StoreMessageType, processEnvelopes)
-	return nil
+	return hr.waku.OnNewEnvelopes(env, common.StoreMessageType, processEnvelopes)
 }
 
 func (hr *HistoryProcessorWrapper) OnRequestFailed(requestID []byte, peerID peer.ID, err error) {

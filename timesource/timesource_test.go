@@ -1,6 +1,7 @@
 package timesource
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -214,7 +215,7 @@ func TestRunningPeriodically(t *testing.T) {
 		// on NTPTimeSource specified periods (fastNTPSyncPeriod & slowNTPSyncPeriod)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
-		source.runPeriodically(func() error {
+		source.runPeriodically(context.TODO(), func() error {
 			mu.Lock()
 			periods = append(periods, time.Since(lastCall))
 			mu.Unlock()

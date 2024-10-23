@@ -18,7 +18,6 @@
 
 package wakuv2
 
-/* TODO-nwaku
 import (
 	"context"
 	"crypto/ecdsa"
@@ -513,4 +512,4 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 	api.mu.Unlock()
 
 	return id, nil
-} */
+}
