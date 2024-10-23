@@ -188,6 +188,7 @@ func (c *Client) Stop() {
 }
 
 func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
+	defer appCommon.LogOnPanic()
 	sendFullStatusEventFunc := func() {
 		blockchainStatus := c.healthMgr.GetFullStatus()
 		encodedMessage, err := json.Marshal(blockchainStatus)

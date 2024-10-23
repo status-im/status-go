@@ -408,7 +408,10 @@ canary-test: node-canary
 	# TODO: uncomment that!
 	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
 
-lint: generate
+lint-panics: generate
+	go run ./cmd/lint-panics -root="$(call sh, pwd)" -skip=./cmd -test=false ./...
+
+lint: generate lint-panics
 	golangci-lint run ./...
 
 ci: generate lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once

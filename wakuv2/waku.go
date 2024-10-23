@@ -196,7 +196,10 @@ func (w *Waku) SetStatusTelemetryClient(client ITelemetryClient) {
 
 func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
 	cache := ttlcache.New[gethcommon.Hash, *common.ReceivedMessage](ttlcache.WithTTL[gethcommon.Hash, *common.ReceivedMessage](cacheTTL))
-	go cache.Start()
+	go func() {
+		defer gocommon.LogOnPanic()
+		cache.Start()
+	}()
 	return cache
 }
 
@@ -1219,7 +1222,10 @@ func (w *Waku) Start() error {
 	w.wg.Add(1)
 	go w.broadcast()
 
-	go w.sendQueue.Start(w.ctx)
+	go func() {
+		defer gocommon.LogOnPanic()
+		w.sendQueue.Start(w.ctx)
+	}()
 
 	err = w.startMessageSender()
 	if err != nil {
@@ -1718,7 +1724,10 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 	isOnline := !state.Offline
 	if w.cfg.LightClient {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
-		go w.filterManager.OnConnectionStatusChange("", isOnline)
+		go func() {
+			defer gocommon.LogOnPanic()
+			w.filterManager.OnConnectionStatusChange("", isOnline)
+		}()
 		w.handleNetworkChangeFromApp(state)
 	} else {
 		// for lightClient state update and onlineChange is handled in filterManager.
