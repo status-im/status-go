@@ -409,14 +409,10 @@ func (m *StorenodeCycle) SetStorenodeConfigProvider(provider StorenodeConfigProv
 	m.storenodeConfigProvider = provider
 }
 
-func (m *StorenodeCycle) WaitForAvailableStoreNode(ctx context.Context, timeout time.Duration) bool {
-	// Add 1 second to timeout, because the storenode cycle has 1 second ticker, which doesn't tick on start.
+func (m *StorenodeCycle) WaitForAvailableStoreNode(ctx context.Context) bool {
+	// Note: Add 1 second to timeout, because the storenode cycle has 1 second ticker, which doesn't tick on start.
 	// This can be improved after merging https://github.com/status-im/status-go/pull/4380.
 	// NOTE: https://stackoverflow.com/questions/32705582/how-to-get-time-tick-to-tick-immediately
-	timeout += time.Second
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -426,7 +422,18 @@ func (m *StorenodeCycle) WaitForAvailableStoreNode(ctx context.Context, timeout 
 			select {
 			case <-m.StorenodeAvailableOneshotEmitter.Subscribe():
 			case <-ctx.Done():
+				if errors.Is(ctx.Err(), context.Canceled) {
+					return
+				}
+
+				// Wait for an additional second, but handle cancellation
+				select {
+				case <-time.After(1 * time.Second):
+				case <-ctx.Done(): // context was cancelled
+				}
+
 				return
+
 			}
 		}
 	}()
@@ -434,6 +441,11 @@ func (m *StorenodeCycle) WaitForAvailableStoreNode(ctx context.Context, timeout 
 	select {
 	case <-waitForWaitGroup(&wg):
 	case <-ctx.Done():
+		// Wait for an additional second, but handle cancellation
+		select {
+		case <-time.After(1 * time.Second):
+		case <-ctx.Done(): // context was cancelled o
+		}
 	}
 
 	return m.IsStorenodeAvailable(m.activeStorenode)
