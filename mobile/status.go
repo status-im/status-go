@@ -443,6 +443,15 @@ func createAccountAndLogin(requestJSON string) string {
 	return makeJSONResponse(nil)
 }
 
+func AcceptTerms() string {
+	return callWithResponse(acceptTerms)
+}
+
+func acceptTerms() string {
+	err := statusBackend.AcceptTerms()
+	return makeJSONResponse(err)
+}
+
 func LoginAccount(requestJSON string) string {
 	return callWithResponse(loginAccount, requestJSON)
 }
