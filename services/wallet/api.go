@@ -137,6 +137,10 @@ func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) 
 	return api.reader.GetWalletToken(ctx, clients, addresses, currency)
 }
 
+func (api *API) GetLastWalletTokenUpdate() map[common.Address]time.Time {
+	return api.reader.GetLastTokenUpdateTimestamps()
+}
+
 // GetBalancesByChain return a map with key as chain id and value as map of account address and map of token address and balance
 // [chainID][account][token]balance
 func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addresses, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
