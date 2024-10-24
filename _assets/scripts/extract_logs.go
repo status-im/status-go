@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"regexp"
@@ -12,22 +13,36 @@ import (
 
 var logPattern = regexp.MustCompile(`(?P<timestamp>[\d-]+T[\d:]+\.\d+Z).*(?P<action>sent-message:.*)\s+(?P<logData>{.*})`)
 
-func main() {
-	if len(os.Args) != 2 {
-		fmt.Println("Usage: go run script.go <filename>")
-		os.Exit(1)
+const (
+	filtersNotMatched = "filters did match"
+	filtersMatched    = "filters did not match"
+	storeNodeMessage  = "received waku2 store message"
+)
+
+func receivedMessageCountInfo(scanner *bufio.Scanner) {
+	fmt.Printf("Matching\tNot matching\tStore node\tLive\tTotal\n")
+	filtersNotMatchedCount := 0
+	filtersMatchedCount := 0
+	storeNodeReceivedMessageCount := 0
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Check if the line contains "sent-message"
+		if strings.Contains(line, filtersNotMatched) {
+			filtersNotMatchedCount++
+		} else if strings.Contains(line, filtersMatched) {
+			filtersMatchedCount++
+		} else if strings.Contains(line, storeNodeMessage) {
+			storeNodeReceivedMessageCount++
+		}
+		// Print the required information
 	}
+	fmt.Printf("%d\t%d\t%d\t%d\t%d\n", filtersNotMatchedCount, filtersMatchedCount, storeNodeReceivedMessageCount, filtersNotMatchedCount+filtersMatchedCount-storeNodeReceivedMessageCount, filtersNotMatchedCount+filtersMatchedCount)
 
-	filename := os.Args[1]
-	file, err := os.Open(filename)
-	if err != nil {
-		fmt.Printf("Error opening file: %s\n", err)
-		os.Exit(1)
-	}
-	defer file.Close()
+}
 
-	scanner := bufio.NewScanner(file)
-
+func messagesInfo(scanner *bufio.Scanner) {
 	fmt.Printf("Timestamp\tMessageType\tContentType\tMessageID\tHashes\tRecipients\n")
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -57,6 +72,39 @@ func main() {
 				fmt.Printf("Warning: Line does not match expected format: %s\n", line)
 			}
 		}
+	}
+}
+
+func main() {
+	messagesFlag := flag.Bool("messages", false, "Process sent messages in the log file")
+	receivedMessageCountFlag := flag.Bool("received-message-count", false, "Count the number of sent messages in the log file")
+
+	// Parse the flags
+	flag.Parse()
+
+	if flag.NArg() != 1 {
+		fmt.Println("Usage: go run script.go -messages -received-message-count <filename>")
+		os.Exit(1)
+	}
+
+	filename := flag.Arg(0)
+	file, err := os.Open(filename)
+	if err != nil {
+		fmt.Printf("Error opening file: %s\n", err)
+		os.Exit(1)
+	}
+	defer file.Close()
+
+	if !*messagesFlag && !*receivedMessageCountFlag {
+		*messagesFlag = true
+	}
+
+	scanner := bufio.NewScanner(file)
+
+	if *messagesFlag {
+		messagesInfo(scanner)
+	} else if *receivedMessageCountFlag {
+		receivedMessageCountInfo(scanner)
 	}
 
 	if err := scanner.Err(); err != nil {
