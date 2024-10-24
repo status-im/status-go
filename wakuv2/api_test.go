@@ -68,4 +68,5 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	if !found {
 		t.Fatalf("Could not find filter with both topics")
 	}
-} */
+}
+*/
