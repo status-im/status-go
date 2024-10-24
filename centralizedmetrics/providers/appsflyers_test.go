@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/centralizedmetrics/common"
+	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestAppsflyerMetricProcessor(t *testing.T) {
@@ -42,7 +43,7 @@ func TestAppsflyerMetricProcessor(t *testing.T) {
 	defer testServer.Close()
 
 	// Initialize the AppsflyerMetricProcessor with the test server URL
-	processor := NewAppsflyerMetricProcessor("testAppID", "testSecret", testServer.URL)
+	processor := NewAppsflyerMetricProcessor("testAppID", "testSecret", testServer.URL, tt.MustCreateTestLogger())
 
 	// Example metrics
 	metrics := []common.Metric{

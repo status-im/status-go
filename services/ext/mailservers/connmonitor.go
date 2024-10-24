@@ -4,10 +4,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 )
 
 // NewLastUsedConnectionMonitor returns pointer to the instance of LastUsedConnectionMonitor.
@@ -45,7 +46,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 			case <-mon.quit:
 				return
 			case err := <-sub.Err():
-				log.Error("retry after error suscribing to eventSub events", "error", err)
+				logutils.ZapLogger().Error("retry after error suscribing to eventSub events", zap.Error(err))
 				return
 			case ev := <-events:
 				node := mon.ps.Get(ev.Peer)
@@ -55,7 +56,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 				if ev.Event == types.EventMailServerRequestCompleted {
 					err := mon.updateRecord(ev.Peer)
 					if err != nil {
-						log.Error("unable to update storage", "peer", ev.Peer, "error", err)
+						logutils.ZapLogger().Error("unable to update storage", zap.Stringer("peer", ev.Peer), zap.Error(err))
 					}
 				}
 			}

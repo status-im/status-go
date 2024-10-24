@@ -10,15 +10,17 @@ import (
 	"math/big"
 	"time"
 
+	"go.uber.org/zap"
+
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -68,14 +70,14 @@ type Transactor struct {
 	sendTxTimeout  time.Duration
 	rpcCallTimeout time.Duration
 	networkID      uint64
-	log            log.Logger
+	logger         *zap.Logger
 }
 
 // NewTransactor returns a new Manager.
 func NewTransactor() *Transactor {
 	return &Transactor{
 		sendTxTimeout: sendTxTimeout,
-		log:           log.New("package", "status-go/transactions.Manager"),
+		logger:        logutils.ZapLogger().Named("transactor"),
 	}
 }
 
@@ -547,21 +549,21 @@ func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int,
 }
 
 func (t *Transactor) logNewTx(args SendTxArgs, gas uint64, gasPrice *big.Int, value *big.Int) {
-	t.log.Info("New transaction",
-		"From", args.From,
-		"To", *args.To,
-		"Gas", gas,
-		"GasPrice", gasPrice,
-		"Value", value,
+	t.logger.Info("New transaction",
+		zap.Stringer("From", args.From),
+		zap.Stringer("To", args.To),
+		zap.Uint64("Gas", gas),
+		zap.Stringer("GasPrice", gasPrice),
+		zap.Stringer("Value", value),
 	)
 }
 
 func (t *Transactor) logNewContract(args SendTxArgs, gas uint64, gasPrice *big.Int, value *big.Int, nonce uint64) {
-	t.log.Info("New contract",
-		"From", args.From,
-		"Gas", gas,
-		"GasPrice", gasPrice,
-		"Value", value,
-		"Contract address", crypto.CreateAddress(args.From, nonce),
+	t.logger.Info("New contract",
+		zap.Stringer("From", args.From),
+		zap.Uint64("Gas", gas),
+		zap.Stringer("GasPrice", gasPrice),
+		zap.Stringer("Value", value),
+		zap.Stringer("Contract address", crypto.CreateAddress(args.From, nonce)),
 	)
 }

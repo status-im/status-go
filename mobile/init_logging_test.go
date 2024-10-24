@@ -22,7 +22,7 @@ func TestInitLogging(t *testing.T) {
 	require.Equal(t, `{"error":""}`, response)
 	_, err := os.Stat(gethLogFile)
 	require.NoError(t, err)
-	require.True(t, requestlog.IsRequestLoggingEnabled())
+	require.NotNil(t, requestlog.GetRequestLogger())
 
 	// requests log file should not be created yet
 	_, err = os.Stat(requestsLogFile)

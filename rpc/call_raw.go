@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"go.uber.org/zap"
+
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -101,7 +103,7 @@ func (c *Client) callBatchMethods(ctx context.Context, msgs json.RawMessage) str
 
 	data, err := json.Marshal(responses)
 	if err != nil {
-		c.log.Error("Failed to marshal batch responses:", "error", err)
+		c.logger.Error("Failed to marshal batch responses:", zap.Error(err))
 		return newErrorResponse(errInvalidMessageCode, err, defaultMsgID)
 	}
 

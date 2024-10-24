@@ -3,10 +3,11 @@ package ext
 import (
 	"sync"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/ext/mailservers"
 )
 
@@ -113,7 +114,7 @@ func (m *MailRequestMonitor) handleEventMailServerRequestCompleted(event types.E
 	if !ok || state != MailServerRequestSent {
 		return
 	}
-	log.Debug("mailserver response received", "hash", event.Hash)
+	logutils.ZapLogger().Debug("mailserver response received", zap.Stringer("hash", event.Hash))
 	delete(m.cache, event.Hash)
 	if m.handler != nil {
 		if resp, ok := event.Data.(*types.MailServerResponse); ok {
@@ -130,7 +131,7 @@ func (m *MailRequestMonitor) handleEventMailServerRequestExpired(event types.Env
 	if !ok || state != MailServerRequestSent {
 		return
 	}
-	log.Debug("mailserver response expired", "hash", event.Hash)
+	logutils.ZapLogger().Debug("mailserver response expired", zap.Stringer("hash", event.Hash))
 	delete(m.cache, event.Hash)
 	if m.handler != nil {
 		m.handler.MailServerRequestExpired(event.Hash)

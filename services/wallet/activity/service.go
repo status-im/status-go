@@ -10,10 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/collectibles"
@@ -248,11 +250,14 @@ func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*E
 		return nil, nil
 	}
 
-	log.Debug("wallet.activity.Service lazyLoadDetails", "entries.len", len(entries), "ids.len", len(ids))
+	logutils.ZapLogger().Debug("wallet.activity.Service lazyLoadDetails",
+		zap.Int("entries.len", len(entries)),
+		zap.Int("ids.len", len(ids)),
+	)
 
 	colData, err := s.collectibles.FetchAssetsByCollectibleUniqueID(ctx, ids, true)
 	if err != nil {
-		log.Error("Error fetching collectible details", "error", err)
+		logutils.ZapLogger().Error("Error fetching collectible details", zap.Error(err))
 		return nil, err
 	}
 
@@ -397,7 +402,7 @@ func (s *Service) getDeps() FilterDependencies {
 func sendResponseEvent(eventFeed *event.Feed, requestID *int32, eventType walletevent.EventType, payloadObj interface{}, resErr error) {
 	payload, err := json.Marshal(payloadObj)
 	if err != nil {
-		log.Error("Error marshaling response: %v; result error: %w", err, resErr)
+		logutils.ZapLogger().Error("Error marshaling", zap.NamedError("response", err), zap.NamedError("result", resErr))
 	} else {
 		err = resErr
 	}
@@ -406,7 +411,12 @@ func sendResponseEvent(eventFeed *event.Feed, requestID *int32, eventType wallet
 	if requestID != nil {
 		requestIDStr = strconv.Itoa(int(*requestID))
 	}
-	log.Debug("wallet.api.activity.Service RESPONSE", "requestID", requestIDStr, "eventType", eventType, "error", err, "payload.len", len(payload))
+	logutils.ZapLogger().Debug("wallet.api.activity.Service RESPONSE",
+		zap.String("requestID", requestIDStr),
+		zap.String("eventType", string(eventType)),
+		zap.Error(err),
+		zap.Int("payload.len", len(payload)),
+	)
 
 	event := walletevent.Event{
 		Type:    eventType,
@@ -439,7 +449,7 @@ func (s *Service) areAllAddresses(addresses []common.Address) bool {
 	// Compare with addresses in accountsDB
 	walletAddresses, err := s.getWalletAddreses()
 	if err != nil {
-		log.Error("Error getting wallet addresses", "error", err)
+		logutils.ZapLogger().Error("Error getting wallet addresses", zap.Error(err))
 		return false
 	}
 

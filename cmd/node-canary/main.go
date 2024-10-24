@@ -156,7 +156,7 @@ func startClientNode() (*api.GethStatusBackend, error) {
 	if err != nil {
 		return nil, err
 	}
-	clientBackend := api.NewGethStatusBackend()
+	clientBackend := api.NewGethStatusBackend(logutils.ZapLogger())
 	err = clientBackend.AccountManager().InitKeystore(config.KeyStoreDir)
 	if err != nil {
 		return nil, err

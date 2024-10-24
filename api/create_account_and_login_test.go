@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestCreateAccountAndLogin(t *testing.T) {
@@ -43,7 +44,7 @@ func TestCreateAccountAndLogin(t *testing.T) {
 	var request requests.CreateAccount
 	err := json.Unmarshal([]byte(requestJSON), &request)
 	require.NoError(t, err)
-	statusBackend := NewGethStatusBackend()
+	statusBackend := NewGethStatusBackend(tt.MustCreateTestLogger())
 	_, err = statusBackend.CreateAccountAndLogin(&request)
 	require.NoError(t, err)
 	t.Logf("TestCreateAccountAndLogin: create account user1 and login successfully")

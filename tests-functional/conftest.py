@@ -82,6 +82,6 @@ def init_status_backend():
     websocket_thread.start()
 
     backend_client.init_status_backend()
-    backend_client.create_account_and_login()
+    backend_client.restore_account_and_wait_for_rpc_client_to_start()
 
     yield backend_client

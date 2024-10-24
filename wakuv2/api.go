@@ -26,14 +26,16 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/wakuv2/common"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"google.golang.org/protobuf/proto"
@@ -360,7 +362,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 				if filter := api.w.GetFilter(id); filter != nil {
 					for _, rpcMessage := range toMessage(filter.Retrieve()) {
 						if err := notifier.Notify(rpcSub.ID, rpcMessage); err != nil {
-							log.Error("Failed to send notification", "err", err)
+							logutils.ZapLogger().Error("Failed to send notification", zap.Error(err))
 						}
 					}
 				}

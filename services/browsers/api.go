@@ -3,7 +3,9 @@ package browsers
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 func NewAPI(db *Database) *API {
@@ -16,36 +18,36 @@ type API struct {
 }
 
 func (api *API) GetBookmarks(ctx context.Context) ([]*Bookmark, error) {
-	log.Debug("call to get bookmarks")
+	logutils.ZapLogger().Debug("call to get bookmarks")
 	rst, err := api.db.GetBookmarks()
-	log.Debug("result from database for bookmarks", "len", len(rst))
+	logutils.ZapLogger().Debug("result from database for bookmarks", zap.Int("len", len(rst)))
 	return rst, err
 }
 
 func (api *API) StoreBookmark(ctx context.Context, bookmark Bookmark) (Bookmark, error) {
-	log.Debug("call to create a bookmark")
+	logutils.ZapLogger().Debug("call to create a bookmark")
 	bookmarkResult, err := api.db.StoreBookmark(bookmark)
-	log.Debug("result from database for creating a bookmark", "err", err)
+	logutils.ZapLogger().Debug("result from database for creating a bookmark", zap.Error(err))
 	return bookmarkResult, err
 }
 
 func (api *API) UpdateBookmark(ctx context.Context, originalURL string, bookmark Bookmark) error {
-	log.Debug("call to update a bookmark")
+	logutils.ZapLogger().Debug("call to update a bookmark")
 	err := api.db.UpdateBookmark(originalURL, bookmark)
-	log.Debug("result from database for updating a bookmark", "err", err)
+	logutils.ZapLogger().Debug("result from database for updating a bookmark", zap.Error(err))
 	return err
 }
 
 func (api *API) DeleteBookmark(ctx context.Context, url string) error {
-	log.Debug("call to remove a bookmark")
+	logutils.ZapLogger().Debug("call to remove a bookmark")
 	err := api.db.DeleteBookmark(url)
-	log.Debug("result from database for remove a bookmark", "err", err)
+	logutils.ZapLogger().Debug("result from database for remove a bookmark", zap.Error(err))
 	return err
 }
 
 func (api *API) RemoveBookmark(ctx context.Context, url string) error {
-	log.Debug("call to remove a bookmark logically")
+	logutils.ZapLogger().Debug("call to remove a bookmark logically")
 	err := api.db.RemoveBookmark(url)
-	log.Debug("result from database for remove a bookmark logically", "err", err)
+	logutils.ZapLogger().Debug("result from database for remove a bookmark logically", zap.Error(err))
 	return err
 }

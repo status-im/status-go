@@ -73,6 +73,7 @@ func (p *Publisher) Stop() {
 }
 
 func (p *Publisher) tickerLoop() {
+	defer gocommon.LogOnPanic()
 	ticker := time.NewTicker(tickerInterval * time.Second)
 
 	go func() {

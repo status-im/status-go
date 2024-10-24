@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 // All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/metrics/node")
+var logger = logutils.ZapLogger().Named("metrics.node")
 
 // SubscribeServerEvents subscribes to server and listens to
 // PeerEventTypeAdd and PeerEventTypeDrop events.
@@ -50,13 +52,13 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 				go func() {
 					defer common.LogOnPanic()
 					if err := updateNodeMetrics(node, event.Type); err != nil {
-						logger.Error("failed to update node metrics", "err", err)
+						logger.Error("failed to update node metrics", zap.Error(err))
 					}
 				}()
 			}
 		case err := <-subscription.Err():
 			if err != nil {
-				logger.Error("Subscription failed", "err", err)
+				logger.Error("Subscription failed", zap.Error(err))
 			}
 			return err
 		case <-ctx.Done():

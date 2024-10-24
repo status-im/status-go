@@ -1,16 +1,16 @@
-package statusgo
+package callog
 
 import (
 	"fmt"
 	"reflect"
 	"regexp"
 	"runtime"
-	"runtime/debug"
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/logutils/requestlog"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 var sensitiveKeys = []string{
@@ -46,7 +46,7 @@ func getShortFunctionName(fn any) string {
 	return parts[len(parts)-1]
 }
 
-// call executes the given function and logs request details if logging is enabled
+// Call executes the given function and logs request details if logging is enabled
 //
 // Parameters:
 //   - fn: The function to be executed
@@ -58,21 +58,21 @@ func getShortFunctionName(fn any) string {
 // Functionality:
 // 1. Sets up panic recovery to log and re-panic
 // 2. Records start time if request logging is enabled
-// 3. Uses reflection to call the given function
+// 3. Uses reflection to Call the given function
 // 4. If request logging is enabled, logs method name, parameters, response, and execution duration
 // 5. Removes sensitive information before logging
-func call(fn any, params ...any) any {
+func Call(logger *zap.Logger, fn any, params ...any) any {
 	defer func() {
 		if r := recover(); r != nil {
-			// we're not sure if request logging is enabled here, so we log it use default logger
-			log.Error("panic found in call", "error", r, "stacktrace", string(debug.Stack()))
+			logutils.ZapLogger().Error("panic found in call", zap.Any("error", r), zap.Stack("stacktrace"))
 			panic(r)
 		}
 	}()
 
 	var startTime time.Time
 
-	if requestlog.IsRequestLoggingEnabled() {
+	requestLoggingEnabled := logger != nil
+	if requestLoggingEnabled {
 		startTime = time.Now()
 	}
 
@@ -95,19 +95,25 @@ func call(fn any, params ...any) any {
 		resp = results[0].Interface()
 	}
 
-	if requestlog.IsRequestLoggingEnabled() {
+	if requestLoggingEnabled {
 		duration := time.Since(startTime)
 		methodName := getShortFunctionName(fn)
 		paramsString := removeSensitiveInfo(fmt.Sprintf("%+v", params))
 		respString := removeSensitiveInfo(fmt.Sprintf("%+v", resp))
-		requestlog.GetRequestLogger().Debug(methodName, "params", paramsString, "resp", respString, "duration", duration)
+
+		logger.Debug("call",
+			zap.String("method", methodName),
+			zap.String("params", paramsString),
+			zap.String("resp", respString),
+			zap.Duration("duration", duration),
+		)
 	}
 
 	return resp
 }
 
-func callWithResponse(fn any, params ...any) string {
-	resp := call(fn, params...)
+func CallWithResponse(logger *zap.Logger, fn any, params ...any) string {
+	resp := Call(logger, fn, params...)
 	if resp == nil {
 		return ""
 	}

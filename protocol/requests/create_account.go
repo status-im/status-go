@@ -66,7 +66,7 @@ type CreateAccount struct {
 	// If you want to use non-default network, use NetworkID.
 	CurrentNetwork       string           `json:"currentNetwork"`
 	NetworkID            *uint64          `json:"networkId"`
-	TestOverrideNetworks []params.Network `json:"-"` // This is used for testing purposes only
+	TestOverrideNetworks []params.Network `json:"networksOverride"` // This is used for testing purposes only
 
 	TestNetworksEnabled bool `json:"testNetworksEnabled"`
 

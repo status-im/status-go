@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 
@@ -71,7 +73,7 @@ func calculatePeerCounts(server *p2p.Server) {
 	for _, p := range peers {
 		labels, err := labelsFromNodeName(p.Fullname())
 		if err != nil {
-			logger.Warn("failed parsing peer name", "error", err, "name", p.Name())
+			logger.Warn("failed parsing peer name", zap.String("name", p.Name()), zap.Error(err))
 			continue
 		}
 		nodePeersGauge.With(labels).Inc()

@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/cenkalti/backoff/v3"
 	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -332,8 +330,7 @@ func makeTestTree(domain string, nodes []*enode.Node, links []string) (*ethdnsdi
 }
 
 func TestPeerExchange(t *testing.T) {
-	logger, err := zap.NewDevelopment()
-	require.NoError(t, err)
+	logger := tt.MustCreateTestLogger()
 	// start node which serve as PeerExchange server
 	config := &Config{}
 	config.ClusterID = 16
@@ -683,8 +680,7 @@ func TestOnlineChecker(t *testing.T) {
 }
 
 func TestLightpushRateLimit(t *testing.T) {
-	logger, err := zap.NewDevelopment()
-	require.NoError(t, err)
+	logger := tt.MustCreateTestLogger()
 
 	config0 := &Config{}
 	setDefaultConfig(config0, false)
@@ -784,10 +780,7 @@ func TestLightpushRateLimit(t *testing.T) {
 }
 
 func TestTelemetryFormat(t *testing.T) {
-	logger, err := zap.NewDevelopment()
-	require.NoError(t, err)
-
-	tc := NewBandwidthTelemetryClient(logger, "#")
+	tc := NewBandwidthTelemetryClient(tt.MustCreateTestLogger(), "#")
 
 	s := metrics.Stats{
 		TotalIn:  10,
@@ -804,6 +797,6 @@ func TestTelemetryFormat(t *testing.T) {
 	m[lightpush.LightPushID_v20beta1] = s
 
 	requestBody := tc.getTelemetryRequestBody(m)
-	_, err = json.Marshal(requestBody)
+	_, err := json.Marshal(requestBody)
 	require.NoError(t, err)
 }

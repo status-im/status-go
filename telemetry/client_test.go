@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/wakuv2"
+	"github.com/status-im/status-go/wakuv2/common"
 )
 
 var (
@@ -288,22 +289,37 @@ func TestRetryCacheCleanup(t *testing.T) {
 	ctx := context.Background()
 
 	client := createClient(t, "")
-	client.Start(ctx)
 
 	for i := 0; i < 6000; i++ {
-		sendEnvelope(ctx, client)
+		go sendEnvelope(ctx, client)
+		telemetryRequest := <-client.telemetryCh
+		client.telemetryCache = append(client.telemetryCache, telemetryRequest)
 	}
 
-	time.Sleep(110 * time.Millisecond)
+	err := client.pushTelemetryRequest(client.telemetryCache)
+	// For this test case an error when pushing to the server is fine
+	require.Error(t, err)
 
+	client.telemetryCache = nil
 	require.Equal(t, 6000, len(client.telemetryRetryCache))
 
-	sendEnvelope(ctx, client)
+	go sendEnvelope(ctx, client)
+	telemetryRequest := <-client.telemetryCh
+	client.telemetryCache = append(client.telemetryCache, telemetryRequest)
 
-	time.Sleep(210 * time.Millisecond)
+	err = client.pushTelemetryRequest(client.telemetryCache)
+	require.Error(t, err)
+
+	telemetryRequests := make([]TelemetryRequest, len(client.telemetryCache))
+	copy(telemetryRequests, client.telemetryCache)
+	client.telemetryCache = nil
+
+	err = client.pushTelemetryRequest(telemetryRequests)
+	require.Error(t, err)
 
 	require.Equal(t, 5001, len(client.telemetryRetryCache))
 }
+
 func setDefaultConfig(config *wakuv2.Config, lightMode bool) {
 	config.ClusterID = 16
 
@@ -452,4 +468,132 @@ func TestPeerCountByOrigin(t *testing.T) {
 
 		require.NotEqual(t, 0, len(w.Peers()))
 	})
+}
+
+type testCase struct {
+	name           string
+	input          interface{}
+	expectedType   TelemetryType
+	expectedFields map[string]interface{}
+}
+
+func runTestCase(t *testing.T, tc testCase) {
+	ctx := context.Background()
+	client := createClient(t, "")
+
+	go client.processAndPushTelemetry(ctx, tc.input)
+
+	telemetryRequest := <-client.telemetryCh
+
+	require.Equal(t, tc.expectedType, telemetryRequest.TelemetryType, "Unexpected telemetry type")
+
+	var telemetryData map[string]interface{}
+	err := json.Unmarshal(*telemetryRequest.TelemetryData, &telemetryData)
+	require.NoError(t, err, "Failed to unmarshal telemetry data")
+
+	for key, value := range tc.expectedFields {
+		require.Equal(t, value, telemetryData[key], "Unexpected value for %s", key)
+	}
+
+	require.Contains(t, telemetryData, "nodeName", "Missing nodeName in telemetry data")
+	require.Contains(t, telemetryData, "peerId", "Missing peerId in telemetry data")
+	require.Contains(t, telemetryData, "statusVersion", "Missing statusVersion in telemetry data")
+	require.Contains(t, telemetryData, "deviceType", "Missing deviceType in telemetry data")
+	require.Contains(t, telemetryData, "timestamp", "Missing timestamp in telemetry data")
+
+	// Simulate pushing the telemetry request
+	client.telemetryCache = append(client.telemetryCache, telemetryRequest)
+
+	err = client.pushTelemetryRequest(client.telemetryCache)
+	// For this test case, we expect an error when pushing to the server
+	require.Error(t, err)
+
+	// Verify that the request is now in the retry cache
+	require.Equal(t, 1, len(client.telemetryRetryCache), "Expected one item in telemetry retry cache")
+}
+
+func TestProcessMessageDeliveryConfirmed(t *testing.T) {
+	tc := testCase{
+		name: "MessageDeliveryConfirmed",
+		input: MessageDeliveryConfirmed{
+			MessageHash: "0x1234567890abcdef",
+		},
+		expectedType: MessageDeliveryConfirmedMetric,
+		expectedFields: map[string]interface{}{
+			"messageHash": "0x1234567890abcdef",
+		},
+	}
+	runTestCase(t, tc)
+}
+
+func TestProcessMissedRelevantMessage(t *testing.T) {
+	now := time.Now()
+	message := common.NewReceivedMessage(
+		v2protocol.NewEnvelope(
+			&pb.WakuMessage{
+				Payload:      []byte{1, 2, 3, 4, 5},
+				ContentTopic: testContentTopic,
+				Version:      proto.Uint32(0),
+				Timestamp:    proto.Int64(now.Unix()),
+			}, 0, ""),
+		common.MissingMessageType,
+	)
+	tc := testCase{
+		name: "MissedRelevantMessage",
+		input: MissedRelevantMessage{
+			ReceivedMessage: message,
+		},
+		expectedType: MissedRelevantMessageMetric,
+		expectedFields: map[string]interface{}{
+			"messageHash":  message.Envelope.Hash().String(),
+			"pubsubTopic":  "",
+			"contentTopic": "0x12345679",
+		},
+	}
+	runTestCase(t, tc)
+}
+
+func TestProcessMissedMessage(t *testing.T) {
+	now := time.Now()
+	message := common.NewReceivedMessage(
+		v2protocol.NewEnvelope(
+			&pb.WakuMessage{
+				Payload:      []byte{1, 2, 3, 4, 5},
+				ContentTopic: testContentTopic,
+				Version:      proto.Uint32(0),
+				Timestamp:    proto.Int64(now.Unix()),
+			}, 0, ""),
+		common.MissingMessageType,
+	)
+	tc := testCase{
+		name: "MissedMessage",
+		input: MissedMessage{
+			Envelope: message.Envelope,
+		},
+		expectedType: MissedMessageMetric,
+		expectedFields: map[string]interface{}{
+			"messageHash":  message.Envelope.Hash().String(),
+			"pubsubTopic":  "",
+			"contentTopic": message.Envelope.Message().ContentTopic,
+		},
+	}
+	runTestCase(t, tc)
+}
+
+func TestProcessDialFailure(t *testing.T) {
+	tc := testCase{
+		name: "DialFailure",
+		input: DialFailure{
+			ErrorType: common.ErrorUnknown,
+			ErrorMsg:  "test error message",
+			Protocols: "test-protocols",
+		},
+		expectedType: DialFailureMetric,
+		expectedFields: map[string]interface{}{
+			"errorType": float64(common.ErrorUnknown),
+			"errorMsg":  "test error message",
+			"protocols": "test-protocols",
+		},
+	}
+	runTestCase(t, tc)
 }

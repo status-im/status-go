@@ -12,10 +12,11 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/logutils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -91,11 +92,11 @@ type Client struct {
 
 func NewClient(mainnetAPIKey string, testnetAPIKey string) *Client {
 	if mainnetAPIKey == "" {
-		log.Warn("Rarible API key not available for Mainnet")
+		logutils.ZapLogger().Warn("Rarible API key not available for Mainnet")
 	}
 
 	if testnetAPIKey == "" {
-		log.Warn("Rarible API key not available for Testnet")
+		logutils.ZapLogger().Warn("Rarible API key not available for Testnet")
 	}
 
 	return &Client{
@@ -168,7 +169,11 @@ func (o *Client) doWithRetries(req *http.Request, apiKey string) (*http.Response
 
 		err = fmt.Errorf("unsuccessful request: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 		if resp.StatusCode == http.StatusTooManyRequests {
-			log.Error("doWithRetries failed with http.StatusTooManyRequests", "provider", o.ID(), "elapsed time", b.GetElapsedTime(), "next backoff", b.NextBackOff())
+			logutils.ZapLogger().Error("doWithRetries failed with http.StatusTooManyRequests",
+				zap.String("provider", o.ID()),
+				zap.Duration("elapsed time", b.GetElapsedTime()),
+				zap.Duration("next backoff", b.NextBackOff()),
+			)
 			return nil, err
 		}
 		return nil, backoff.Permanent(err)

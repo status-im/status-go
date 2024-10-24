@@ -3,9 +3,11 @@ package accountsevent
 import (
 	"context"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/async"
 )
@@ -51,7 +53,7 @@ func onAccountsChange(accountsDB *accounts.Database, callback AccountsChangeCb, 
 	currentEthAddresses, err := accountsDB.GetWalletAddresses()
 
 	if err != nil {
-		log.Error("failed getting wallet addresses", "error", err)
+		logutils.ZapLogger().Error("failed getting wallet addresses", zap.Error(err))
 		return
 	}
 
@@ -76,7 +78,7 @@ func watch(ctx context.Context, accountsDB *accounts.Database, accountFeed *even
 			return nil
 		case err := <-sub.Err():
 			if err != nil {
-				log.Error("accounts watcher subscription failed", "error", err)
+				logutils.ZapLogger().Error("accounts watcher subscription failed", zap.Error(err))
 			}
 		case ev := <-ch:
 			onAccountsChange(accountsDB, callback, ev.Accounts, ev.Type)

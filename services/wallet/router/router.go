@@ -8,10 +8,12 @@ import (
 	"strings"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
@@ -597,7 +599,13 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 	}
 
 	appendProcessorErrorFn := func(processorName string, sendType sendtype.SendType, fromChainID uint64, toChainID uint64, amount *big.Int, err error) {
-		log.Error("router.resolveCandidates error", "processor", processorName, "sendType", sendType, "fromChainId: ", fromChainID, "toChainId", toChainID, "amount", amount, "err", err)
+		logutils.ZapLogger().Error("router.resolveCandidates error",
+			zap.String("processor", processorName),
+			zap.Int("sendType", int(sendType)),
+			zap.Uint64("fromChainId", fromChainID),
+			zap.Uint64("toChainId", toChainID),
+			zap.Stringer("amount", amount),
+			zap.Error(err))
 		mu.Lock()
 		defer mu.Unlock()
 		processorErrors = append(processorErrors, &ProcessorError{

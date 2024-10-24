@@ -89,6 +89,9 @@ pipeline {
   post {
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    cleanup { sh 'make deep-clean' }
+    cleanup {
+      cleanWs()
+      dir("${env.WORKSPACE}@tmp") { deleteDir() }
+    }
   } // post
 } // pipeline

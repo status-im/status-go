@@ -11,8 +11,8 @@ import (
 	"github.com/hashicorp/go-version"
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/log"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/signal"
 )
@@ -37,13 +37,13 @@ func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVe
 
 		current, err := version.NewVersion(currentVersion)
 		if err != nil {
-			log.Error("invalid current version", "err", err)
+			logutils.ZapLogger().Error("invalid current version", zap.Error(err))
 			return
 		}
 
 		uri, err := api.ensService.API().ResourceURL(ctx, chainID, ens)
 		if err != nil || uri.Host == "" {
-			log.Error("can't get obtain the updates content hash url", "ens", ens)
+			logutils.ZapLogger().Error("can't get obtain the updates content hash url", zap.String("ens", ens))
 			signal.SendUpdateAvailable(false, "", "")
 			return
 		}
@@ -52,21 +52,21 @@ func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVe
 		versionURL := url + "VERSION"
 		response, err := api.httpClient.Get(versionURL)
 		if err != nil {
-			log.Error("can't get content", zap.String("any", versionURL))
+			logutils.ZapLogger().Error("can't get content", zap.String("any", versionURL))
 			signal.SendUpdateAvailable(false, "", "")
 			return
 		}
 
 		defer response.Body.Close()
 		if response.StatusCode != http.StatusOK {
-			log.Error(fmt.Sprintf("version verification response status error: %v", response.StatusCode))
+			logutils.ZapLogger().Error(fmt.Sprintf("version verification response status error: %v", response.StatusCode))
 			signal.SendUpdateAvailable(false, "", "")
 			return
 		}
 
 		data, err := ioutil.ReadAll(response.Body)
 		if err != nil {
-			log.Error("version verification body err", "err", err)
+			logutils.ZapLogger().Error("version verification body err", zap.Error(err))
 			signal.SendUpdateAvailable(false, "", "")
 			return
 		}
@@ -74,7 +74,7 @@ func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVe
 		c := make(map[string]interface{})
 		err = json.Unmarshal(data, &c)
 		if err != nil {
-			log.Error("invalid json", "err", err)
+			logutils.ZapLogger().Error("invalid json", zap.Error(err))
 			signal.SendUpdateAvailable(false, "", "")
 			return
 		}
@@ -84,14 +84,14 @@ func (api *API) Check(ctx context.Context, chainID uint64, ens string, currentVe
 		case string:
 			latestStr = c["version"].(string)
 		default:
-			log.Error("invalid latest version", "val", c["version"])
+			logutils.ZapLogger().Error("invalid latest version", zap.Any("val", c["version"]))
 			signal.SendUpdateAvailable(false, "", "")
 			return
 		}
 
 		latest, err := version.NewVersion(latestStr)
 		if err != nil {
-			log.Error("invalid latest version", "err", err)
+			logutils.ZapLogger().Error("invalid latest version", zap.Error(err))
 			signal.SendUpdateAvailable(false, "", "")
 			return
 		}
