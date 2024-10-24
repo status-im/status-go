@@ -18,8 +18,6 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/account"
-	status_common "github.com/status-im/status-go/common"
-	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -32,71 +30,24 @@ import (
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/requests"
-	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
-	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
-	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
 
 func NewAPI(s *Service) *API {
-	rpcClient := s.GetRPCClient()
-	transactor := s.GetTransactor()
-	tokenManager := s.GetTokenManager()
-	ensService := s.GetEnsService()
-	stickersService := s.GetStickersService()
-	featureFlags := s.FeatureFlags()
-
-	router := router.NewRouter(rpcClient, transactor, tokenManager, s.GetMarketManager(), s.GetCollectiblesService(),
-		s.GetCollectiblesManager(), ensService, stickersService)
-
-	transfer := pathprocessor.NewTransferProcessor(rpcClient, transactor)
-	router.AddPathProcessor(transfer)
-
-	erc721Transfer := pathprocessor.NewERC721Processor(rpcClient, transactor)
-	router.AddPathProcessor(erc721Transfer)
-
-	erc1155Transfer := pathprocessor.NewERC1155Processor(rpcClient, transactor)
-	router.AddPathProcessor(erc1155Transfer)
-
-	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager, rpcClient.NetworkManager)
-	router.AddPathProcessor(hop)
-
-	if featureFlags.EnableCelerBridge {
-		// TODO: Celar Bridge is out of scope for 2.30, check it thoroughly once we decide to include it again
-		cbridge := pathprocessor.NewCelerBridgeProcessor(rpcClient, transactor, tokenManager)
-		router.AddPathProcessor(cbridge)
-	}
-
-	paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
-	router.AddPathProcessor(paraswap)
-
-	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensService)
-	router.AddPathProcessor(ensRegister)
-
-	ensRelease := pathprocessor.NewENSReleaseProcessor(rpcClient, transactor, ensService)
-	router.AddPathProcessor(ensRelease)
-
-	ensPublicKey := pathprocessor.NewENSPublicKeyProcessor(rpcClient, transactor, ensService)
-	router.AddPathProcessor(ensPublicKey)
-
-	buyStickers := pathprocessor.NewStickersBuyProcessor(rpcClient, transactor, stickersService)
-	router.AddPathProcessor(buyStickers)
-
-	return &API{s, s.reader, router}
+	return &API{s, s.reader}
 }
 
 // API is class with methods available over RPC.
 type API struct {
 	s      *Service
 	reader *Reader
-	router *router.Router
 }
 
 func (api *API) StartWallet(ctx context.Context) error {
@@ -104,7 +55,6 @@ func (api *API) StartWallet(ctx context.Context) error {
 }
 
 func (api *API) StopWallet(ctx context.Context) error {
-	api.router.Stop()
 	return api.s.Stop()
 }
 
@@ -476,7 +426,7 @@ func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[st
 
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*fees.SuggestedFeesGwei, error) {
 	log.Debug("call to GetSuggestedFees")
-	return api.router.GetFeesManager().SuggestedFeesGwei(ctx, chainID)
+	return api.s.router.GetFeesManager().SuggestedFeesGwei(ctx, chainID)
 }
 
 func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint64) (uint64, error) {
@@ -486,7 +436,7 @@ func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint6
 
 func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (fees.TransactionEstimation, error) {
 	log.Debug("call to getTransactionEstimatedTime")
-	return api.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, gweiToWei(maxFeePerGas)), nil
+	return api.s.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, gweiToWei(maxFeePerGas)), nil
 }
 
 func gweiToWei(val *big.Float) *big.Int {
@@ -497,25 +447,25 @@ func gweiToWei(val *big.Float) *big.Int {
 func (api *API) GetSuggestedRoutes(ctx context.Context, input *requests.RouteInputParams) (*router.SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
 
-	return api.router.SuggestedRoutes(ctx, input)
+	return api.s.router.SuggestedRoutes(ctx, input)
 }
 
 func (api *API) GetSuggestedRoutesAsync(ctx context.Context, input *requests.RouteInputParams) {
 	log.Debug("call to GetSuggestedRoutesAsync")
 
-	api.router.SuggestedRoutesAsync(input)
+	api.s.router.SuggestedRoutesAsync(input)
 }
 
 func (api *API) StopSuggestedRoutesAsyncCalculation(ctx context.Context) {
 	log.Debug("call to StopSuggestedRoutesAsyncCalculation")
 
-	api.router.StopSuggestedRoutesAsyncCalculation()
+	api.s.router.StopSuggestedRoutesAsyncCalculation()
 }
 
 func (api *API) StopSuggestedRoutesCalculation(ctx context.Context) {
 	log.Debug("call to StopSuggestedRoutesCalculation")
 
-	api.router.StopSuggestedRoutesCalculation()
+	api.s.router.StopSuggestedRoutesCalculation()
 }
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
@@ -740,7 +690,7 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionComm
 			return nil, err
 		}
 
-		cmdRes, err := api.s.transactionManager.SendTransactions(ctx, cmd, data, api.router.GetPathProcessors(), selectedAccount)
+		cmdRes, err := api.s.transactionManager.SendTransactions(ctx, cmd, data, api.s.router.GetPathProcessors(), selectedAccount)
 		if err != nil {
 			return nil, err
 		}
@@ -753,77 +703,12 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionComm
 		return cmdRes, nil
 	}
 
-	return nil, api.s.transactionManager.SendTransactionForSigningToKeycard(ctx, cmd, data, api.router.GetPathProcessors())
-}
-
-func updateFields(sd *responses.SendDetails, inputParams requests.RouteInputParams) {
-	sd.SendType = int(inputParams.SendType)
-	sd.FromAddress = types.Address(inputParams.AddrFrom)
-	sd.ToAddress = types.Address(inputParams.AddrTo)
-	sd.FromToken = inputParams.TokenID
-	sd.ToToken = inputParams.ToTokenID
-	if inputParams.AmountIn != nil {
-		sd.FromAmount = inputParams.AmountIn.String()
-	}
-	if inputParams.AmountOut != nil {
-		sd.ToAmount = inputParams.AmountOut.String()
-	}
-	sd.OwnerTokenBeingSent = inputParams.TokenIDIsOwnerToken
-	sd.Username = inputParams.Username
-	sd.PublicKey = inputParams.PublicKey
-	if inputParams.PackID != nil {
-		sd.PackID = inputParams.PackID.String()
-	}
+	return nil, api.s.transactionManager.SendTransactionForSigningToKeycard(ctx, cmd, data, api.s.router.GetPathProcessors())
 }
 
 func (api *API) BuildTransactionsFromRoute(ctx context.Context, buildInputParams *requests.RouterBuildTransactionsParams) {
 	log.Debug("[WalletAPI::BuildTransactionsFromRoute] builds transactions from the generated best route", "uuid", buildInputParams.Uuid)
-
-	go func() {
-		defer status_common.LogOnPanic()
-		api.router.StopSuggestedRoutesAsyncCalculation()
-
-		var err error
-		response := &responses.RouterTransactionsForSigning{
-			SendDetails: &responses.SendDetails{
-				Uuid: buildInputParams.Uuid,
-			},
-		}
-
-		defer func() {
-			if err != nil {
-				api.s.transactionManager.ClearLocalRouterTransactionsData()
-				err = statusErrors.CreateErrorResponseFromError(err)
-				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
-			}
-			signal.SendWalletEvent(signal.SignRouterTransactions, response)
-		}()
-
-		route, routeInputParams := api.router.GetBestRouteAndAssociatedInputParams()
-		if routeInputParams.Uuid != buildInputParams.Uuid {
-			// should never be here
-			err = ErrCannotResolveRouteId
-			return
-		}
-
-		updateFields(response.SendDetails, routeInputParams)
-
-		// notify client that sending transactions started (has 3 steps, building txs, signing txs, sending txs)
-		signal.SendWalletEvent(signal.RouterSendingTransactionsStarted, response.SendDetails)
-
-		response.SigningDetails, err = api.s.transactionManager.BuildTransactionsFromRoute(
-			route,
-			api.router.GetPathProcessors(),
-			transfer.BuildRouteExtraParams{
-				AddressFrom:        routeInputParams.AddrFrom,
-				AddressTo:          routeInputParams.AddrTo,
-				Username:           routeInputParams.Username,
-				PublicKey:          routeInputParams.PublicKey,
-				PackID:             routeInputParams.PackID.ToInt(),
-				SlippagePercentage: buildInputParams.SlippagePercentage,
-			},
-		)
-	}()
+	api.s.routeExecutionManager.BuildTransactionsFromRoute(ctx, buildInputParams)
 }
 
 // Deprecated: `ProceedWithTransactionsSignatures` is the endpoint used in the old way of sending transactions and should not be used anymore.
@@ -842,103 +727,7 @@ func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signature
 
 func (api *API) SendRouterTransactionsWithSignatures(ctx context.Context, sendInputParams *requests.RouterSendTransactionsParams) {
 	log.Debug("[WalletAPI:: SendRouterTransactionsWithSignatures] sign with signatures and send")
-	go func() {
-		defer status_common.LogOnPanic()
-
-		var (
-			err              error
-			routeInputParams requests.RouteInputParams
-		)
-		response := &responses.RouterSentTransactions{
-			SendDetails: &responses.SendDetails{
-				Uuid: sendInputParams.Uuid,
-			},
-		}
-
-		defer func() {
-			clearLocalData := true
-			if routeInputParams.SendType == sendtype.Swap {
-				// in case of swap don't clear local data if an approval is placed, but swap tx is not sent yet
-				if api.s.transactionManager.ApprovalRequiredForPath(pathprocessor.ProcessorSwapParaswapName) &&
-					api.s.transactionManager.ApprovalPlacedForPath(pathprocessor.ProcessorSwapParaswapName) &&
-					!api.s.transactionManager.TxPlacedForPath(pathprocessor.ProcessorSwapParaswapName) {
-					clearLocalData = false
-				}
-			}
-
-			if clearLocalData {
-				api.s.transactionManager.ClearLocalRouterTransactionsData()
-			}
-
-			if err != nil {
-				err = statusErrors.CreateErrorResponseFromError(err)
-				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
-			}
-			signal.SendWalletEvent(signal.RouterTransactionsSent, response)
-		}()
-
-		_, routeInputParams = api.router.GetBestRouteAndAssociatedInputParams()
-		if routeInputParams.Uuid != sendInputParams.Uuid {
-			err = ErrCannotResolveRouteId
-			return
-		}
-
-		updateFields(response.SendDetails, routeInputParams)
-
-		err = api.s.transactionManager.ValidateAndAddSignaturesToRouterTransactions(sendInputParams.Signatures)
-		if err != nil {
-			return
-		}
-
-		//////////////////////////////////////////////////////////////////////////////
-		// prepare multitx
-		var mtType transfer.MultiTransactionType = transfer.MultiTransactionSend
-		if routeInputParams.SendType == sendtype.Bridge {
-			mtType = transfer.MultiTransactionBridge
-		} else if routeInputParams.SendType == sendtype.Swap {
-			mtType = transfer.MultiTransactionSwap
-		}
-
-		multiTx := transfer.NewMultiTransaction(
-			/* Timestamp:     */ uint64(time.Now().Unix()),
-			/* FromNetworkID: */ 0,
-			/* ToNetworkID:	  */ 0,
-			/* FromTxHash:    */ common.Hash{},
-			/* ToTxHash:      */ common.Hash{},
-			/* FromAddress:   */ routeInputParams.AddrFrom,
-			/* ToAddress:     */ routeInputParams.AddrTo,
-			/* FromAsset:     */ routeInputParams.TokenID,
-			/* ToAsset:       */ routeInputParams.ToTokenID,
-			/* FromAmount:    */ routeInputParams.AmountIn,
-			/* ToAmount:      */ routeInputParams.AmountOut,
-			/* Type:		  */ mtType,
-			/* CrossTxID:	  */ "",
-		)
-
-		_, err = api.s.transactionManager.InsertMultiTransaction(multiTx)
-		if err != nil {
-			return
-		}
-		//////////////////////////////////////////////////////////////////////////////
-
-		response.SentTransactions, err = api.s.transactionManager.SendRouterTransactions(ctx, multiTx)
-		var (
-			chainIDs  []uint64
-			addresses []common.Address
-		)
-		for _, tx := range response.SentTransactions {
-			chainIDs = append(chainIDs, tx.FromChain)
-			addresses = append(addresses, common.Address(tx.FromAddress))
-			go func(chainId uint64, txHash common.Hash) {
-				defer status_common.LogOnPanic()
-				err = api.s.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
-				if err != nil {
-					return
-				}
-			}(tx.FromChain, common.Hash(tx.Hash))
-		}
-		err = api.s.transferController.CheckRecentHistory(chainIDs, addresses)
-	}()
+	api.s.routeExecutionManager.SendRouterTransactionsWithSignatures(ctx, sendInputParams)
 }
 
 func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []wcommon.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {
