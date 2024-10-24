@@ -331,7 +331,9 @@ func (w *gethWakuV2Wrapper) OnStorenodeAvailable() <-chan peer.ID {
 }
 
 func (w *gethWakuV2Wrapper) WaitForAvailableStoreNode(timeout time.Duration) bool {
-	return w.waku.StorenodeCycle.WaitForAvailableStoreNode(context.TODO(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return w.waku.StorenodeCycle.WaitForAvailableStoreNode(ctx)
 }
 
 func (w *gethWakuV2Wrapper) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {

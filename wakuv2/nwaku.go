@@ -208,6 +208,10 @@ package wakuv2
 		WAKU_CALL (waku_get_my_enr(ctx, (WakuCallBack) callback, resp) );
 	}
 
+	static void cGoWakuPingPeer(void* ctx, char* peerAddr, int timeoutMs, void* resp) {
+		WAKU_CALL (waku_ping_peer(ctx, peerAddr, timeoutMs, (WakuCallBack) callback, resp) );
+	}
+
 	static void cGoWakuListPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
 		WAKU_CALL (waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
@@ -1360,10 +1364,10 @@ func (w *Waku) Start() error {
 		return fmt.Errorf("failed to start go-waku node: %v", err)
 	}
 	*/
-	w.StorenodeCycle = history.NewStorenodeCycle(w.logger)
+	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, newPinger(w.wakuCtx))
 
 	w.HistoryRetriever = history.NewHistoryRetriever(newStorenodeRequestor(w.wakuCtx, w.logger), NewHistoryProcessorWrapper(w), w.logger)
-	w.StorenodeCycle.Start(w.ctx, newPinger(w.wakuCtx))
+	w.StorenodeCycle.Start(w.ctx)
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.PeerID()))
 
@@ -3007,16 +3011,46 @@ func (d *storenodeMessageVerifier) MessageHashesExist(ctx context.Context, reque
 	return result, nil
 }
 
-func newStorenodeRequestor(wakuCtx unsafe.Pointer, logger *zap.Logger) commonapi.StorenodeRequestor {
-	return &storenodeRequestor{
+type pinger struct {
+	wakuCtx unsafe.Pointer
+}
+
+func newPinger(wakuCtx unsafe.Pointer) commonapi.Pinger {
+	return &pinger{
 		wakuCtx: wakuCtx,
-		logger:  logger.Named("storenodeRequestor"),
 	}
+}
+
+func (p *pinger) PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error) {
+	var resp = C.allocResp()
+	var cPeerId = C.CString(peerID.String())
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPeerId))
+
+	C.cGoWakuPingPeer(p.wakuCtx, cPeerId, C.int(time.Minute.Milliseconds()), resp)
+	if C.getRet(resp) == C.RET_OK {
+		rttStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		rttInt, err := strconv.ParseInt(rttStr, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return time.Duration(rttInt), nil
+	}
+
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return 0, fmt.Errorf("PingPeer: %s", errMsg)
 }
 
 type storenodeRequestor struct {
 	wakuCtx unsafe.Pointer
 	logger  *zap.Logger
+}
+
+func newStorenodeRequestor(wakuCtx unsafe.Pointer, logger *zap.Logger) commonapi.StorenodeRequestor {
+	return &storenodeRequestor{
+		wakuCtx: wakuCtx,
+		logger:  logger.Named("storenodeRequestor"),
+	}
 }
 
 func (s *storenodeRequestor) GetMessagesByHash(ctx context.Context, peerID peer.ID, pageSize uint64, messageHashes []pb.MessageHash) (commonapi.StoreRequestResult, error) {
