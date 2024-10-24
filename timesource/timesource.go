@@ -239,7 +239,11 @@ func (s *NTPTimeSource) Stop() {
 }
 
 func (s *NTPTimeSource) GetCurrentTime() time.Time {
-	s.Start(context.Background())
+	err := s.Start(context.Background())
+	if err != nil {
+		panic("could not obtain timesource")
+	}
+
 	return s.Now()
 }
 
@@ -249,7 +253,11 @@ func (s *NTPTimeSource) GetCurrentTimeInMillis() uint64 {
 
 func GetCurrentTime() time.Time {
 	ts := Default()
-	ts.Start(context.Background())
+	err := ts.Start(context.Background())
+	if err != nil {
+		panic("could not obtain timesource")
+	}
+
 	return ts.Now()
 }
 
