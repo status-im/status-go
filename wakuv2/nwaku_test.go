@@ -327,8 +327,13 @@ func TestPeerExchange(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 	
+	discV5NodeConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+	
 	// start node that will be discovered by PeerExchange
-	discV5NodeConfig := WakuConfig{
+	discV5NodeWakuConfig := WakuConfig{
 		EnableRelay: true,
 		LogLevel:    "DEBUG",
 		Discv5Discovery: true,
@@ -339,7 +344,7 @@ func TestPeerExchange(t *testing.T) {
 		TcpPort: 60010,
 	}
 
-	discV5Node, err := New(nil, "", &discV5NodeConfig, logger.Named("discV5Node"), nil, nil, nil, nil)
+	discV5Node, err := New(nil, "", &discV5NodeConfig, &discV5NodeWakuConfig, logger.Named("discV5Node"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, discV5Node.Start())
 
@@ -351,8 +356,13 @@ func TestPeerExchange(t *testing.T) {
 	discv5NodeEnr, err := discV5Node.ENR()
 	require.NoError(t, err)
 	
+	pxServerConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+
 	// start node which serves as PeerExchange server
-	pxServerConfig := WakuConfig{
+	pxServerWakuConfig := WakuConfig{
 		EnableRelay: true,
 		LogLevel:    "DEBUG",
 		Discv5Discovery: true,
@@ -364,7 +374,7 @@ func TestPeerExchange(t *testing.T) {
 		TcpPort: 60011,
 	}
 
-	pxServerNode, err := New(nil, "", &pxServerConfig, logger.Named("pxServerNode"), nil, nil, nil, nil)
+	pxServerNode, err := New(nil, "", &pxServerConfig, &pxServerWakuConfig, logger.Named("pxServerNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, pxServerNode.Start())
 
@@ -396,8 +406,13 @@ func TestPeerExchange(t *testing.T) {
 	}, options)
 	require.NoError(t, err)
 
+	pxClientConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+	
 	// start light node which uses PeerExchange to discover peers	
-	pxClientConfig := WakuConfig{
+	pxClientWakuConfig := WakuConfig{
 		EnableRelay: false,
 		LogLevel:    "DEBUG",
 		Discv5Discovery: false,
@@ -409,7 +424,7 @@ func TestPeerExchange(t *testing.T) {
 		PeerExchangeNode: serverNodeMa[0].String(),
 	}
 
-	lightNode, err := New(nil, "", &pxClientConfig, logger.Named("lightNode"), nil, nil, nil, nil)
+	lightNode, err := New(nil, "", &pxClientConfig, &pxClientWakuConfig, logger.Named("lightNode"), nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, lightNode.Start())
 
