@@ -235,7 +235,7 @@ func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *za
 }
 
 func (s *MessengerStoreNodeRequestSuite) createCommunity(m *Messenger) *communities.Community {
-	s.waitForAvailableStoreNode(m)
+	s.WaitForAvailableStoreNode(m)
 
 	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(nil)
 
@@ -290,7 +290,7 @@ func (s *MessengerStoreNodeRequestSuite) fetchCommunity(m *Messenger, communityS
 		WithWaitForResponseOption(true),
 	}
 
-	fetchedCommunity, stats, err := m.storeNodeRequestsManager.FetchCommunity(communityShard, options)
+	fetchedCommunity, stats, err := m.storeNodeRequestsManager.FetchCommunity(context.TODO(), communityShard, options)
 
 	s.Require().NoError(err)
 	s.requireCommunitiesEqual(fetchedCommunity, expectedCommunity)
@@ -309,8 +309,10 @@ func (s *MessengerStoreNodeRequestSuite) fetchProfile(m *Messenger, contactID st
 	}
 }
 
-func (s *MessengerStoreNodeRequestSuite) waitForAvailableStoreNode(messenger *Messenger) {
-	WaitForAvailableStoreNode(&s.Suite, messenger, storeNodeConnectTimeout)
+func (s *MessengerStoreNodeRequestSuite) WaitForAvailableStoreNode(messenger *Messenger) {
+	ctx, cancel := context.WithTimeout(context.TODO(), storeNodeConnectTimeout)
+	defer cancel()
+	WaitForAvailableStoreNode(&s.Suite, messenger, ctx)
 }
 
 func (s *MessengerStoreNodeRequestSuite) setupEnvelopesWatcher(wakuNode *waku2.Waku, topic *wakuV2common.TopicType, cb func(envelope *wakuV2common.ReceivedMessage)) {
@@ -419,11 +421,11 @@ func (s *MessengerStoreNodeRequestSuite) TestSimultaneousCommunityInfoRequests()
 	community := s.createCommunity(s.owner)
 
 	storeNodeRequestsCount := 0
-	s.bob.storeNodeRequestsManager.onPerformingBatch = func(batch MailserverBatch) {
+	s.bob.storeNodeRequestsManager.onPerformingBatch = func(batch types.MailserverBatch) {
 		storeNodeRequestsCount++
 	}
 
-	s.waitForAvailableStoreNode(s.bob)
+	s.WaitForAvailableStoreNode(s.bob)
 
 	wg := sync.WaitGroup{}
 
@@ -453,7 +455,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestNonExistentCommunity() {
 
 	s.createBob()
 
-	s.waitForAvailableStoreNode(s.bob)
+	s.WaitForAvailableStoreNode(s.bob)
 	fetchedCommunity, err := s.bob.FetchCommunity(&request)
 
 	s.Require().NoError(err)
@@ -722,7 +724,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestShardAndCommunityInfo() {
 
 	s.waitForEnvelopes(storeNodeSubscription, 1)
 
-	s.waitForAvailableStoreNode(s.bob)
+	s.WaitForAvailableStoreNode(s.bob)
 
 	communityShard := community.CommunityShard()
 
@@ -806,7 +808,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 	}
 
 	// Fetch the community
-	fetchedCommunity, _, err := s.bob.storeNodeRequestsManager.FetchCommunity(community.CommunityShard(), options)
+	fetchedCommunity, _, err := s.bob.storeNodeRequestsManager.FetchCommunity(context.TODO(), community.CommunityShard(), options)
 	s.Require().NoError(err)
 	s.requireCommunitiesEqual(fetchedCommunity, community)
 
@@ -1160,7 +1162,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 			}
 			storeNodeRequestOptions = append(storeNodeRequestOptions, exampleToRun.CustomOptions...)
 
-			fetchedCommunity, stats, err := user.storeNodeRequestsManager.FetchCommunity(communityAddress, storeNodeRequestOptions)
+			fetchedCommunity, stats, err := user.storeNodeRequestsManager.FetchCommunity(context.TODO(), communityAddress, storeNodeRequestOptions)
 
 			result.EnvelopesCount = stats.FetchedEnvelopesCount
 			result.FetchedCommunity = fetchedCommunity
@@ -1195,7 +1197,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingCommunityWithOwnerToken() {
 	s.createOwner()
 	s.createBob()
 
-	s.waitForAvailableStoreNode(s.owner)
+	s.WaitForAvailableStoreNode(s.owner)
 	community := s.createCommunity(s.owner)
 
 	// owner mints owner token
@@ -1228,7 +1230,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingCommunityWithOwnerToken() {
 	s.Require().NoError(err)
 	s.Require().Len(community.TokenPermissions(), 1)
 
-	s.waitForAvailableStoreNode(s.bob)
+	s.WaitForAvailableStoreNode(s.bob)
 
 	s.fetchCommunity(s.bob, community.CommunityShard(), community)
 }

@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -10,13 +11,13 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/transport"
-	"github.com/status-im/status-go/services/mailservers"
 )
 
 const (
@@ -57,7 +58,7 @@ type StoreNodeRequestManager struct {
 	// activeRequestsLock should be locked each time activeRequests is being accessed or changed.
 	activeRequestsLock sync.RWMutex
 
-	onPerformingBatch func(MailserverBatch)
+	onPerformingBatch func(types.MailserverBatch)
 }
 
 func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
@@ -75,7 +76,7 @@ func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
 // the function will also wait for the store node response and return the fetched community.
 // Automatically waits for an available store node.
 // When a `nil` community and `nil` error is returned, that means the community wasn't found at the store node.
-func (m *StoreNodeRequestManager) FetchCommunity(community communities.CommunityShard, opts []StoreNodeRequestOption) (*communities.Community, StoreNodeRequestStats, error) {
+func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, community communities.CommunityShard, opts []StoreNodeRequestOption) (*communities.Community, StoreNodeRequestStats, error) {
 	cfg := buildStoreNodeRequestConfig(opts)
 
 	m.logger.Info("requesting community from store node",
@@ -83,7 +84,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 		zap.Any("config", cfg))
 
 	requestCommunity := func(communityID string, shard *shard.Shard) (*communities.Community, StoreNodeRequestStats, error) {
-		channel, err := m.subscribeToRequest(storeNodeCommunityRequest, communityID, shard, cfg)
+		channel, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, communityID, shard, cfg)
 		if err != nil {
 			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a request for community: %w", err)
 		}
@@ -100,7 +101,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 	communityShard := community.Shard
 	if communityShard == nil {
 		id := transport.CommunityShardInfoTopic(community.CommunityID)
-		fetchedShard, err := m.subscribeToRequest(storeNodeShardRequest, id, shard.DefaultNonProtectedShard(), cfg)
+		fetchedShard, err := m.subscribeToRequest(ctx, storeNodeShardRequest, id, shard.DefaultNonProtectedShard(), cfg)
 		if err != nil {
 			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a shard info request: %w", err)
 		}
@@ -134,7 +135,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(community communities.Community
 // those content topics is spammed with to many envelopes, then on each iteration we will have to fetch all
 // of this spam first to get the envelopes in other content topics. To avoid this we keep independent requests
 // for each content topic.
-func (m *StoreNodeRequestManager) FetchCommunities(communities []communities.CommunityShard, opts []StoreNodeRequestOption) error {
+func (m *StoreNodeRequestManager) FetchCommunities(ctx context.Context, communities []communities.CommunityShard, opts []StoreNodeRequestOption) error {
 	m.logger.Info("requesting communities from store node", zap.Any("communities", communities))
 
 	// when fetching multiple communities we don't wait for the response
@@ -143,7 +144,7 @@ func (m *StoreNodeRequestManager) FetchCommunities(communities []communities.Com
 	var outErr error
 
 	for _, community := range communities {
-		_, _, err := m.FetchCommunity(community, opts)
+		_, _, err := m.FetchCommunity(ctx, community, opts)
 		if err != nil {
 			outErr = fmt.Errorf("%sfailed to create a request for community %s: %w", outErr, community.CommunityID, err)
 		}
@@ -154,7 +155,7 @@ func (m *StoreNodeRequestManager) FetchCommunities(communities []communities.Com
 
 // FetchContact - similar to FetchCommunity
 // If a `nil` contact and a `nil` error are returned, it means that the contact wasn't found at the store node.
-func (m *StoreNodeRequestManager) FetchContact(contactID string, opts []StoreNodeRequestOption) (*Contact, StoreNodeRequestStats, error) {
+func (m *StoreNodeRequestManager) FetchContact(ctx context.Context, contactID string, opts []StoreNodeRequestOption) (*Contact, StoreNodeRequestStats, error) {
 
 	cfg := buildStoreNodeRequestConfig(opts)
 
@@ -162,7 +163,7 @@ func (m *StoreNodeRequestManager) FetchContact(contactID string, opts []StoreNod
 		zap.Any("contactID", contactID),
 		zap.Any("config", cfg))
 
-	channel, err := m.subscribeToRequest(storeNodeContactRequest, contactID, nil, cfg)
+	channel, err := m.subscribeToRequest(ctx, storeNodeContactRequest, contactID, nil, cfg)
 	if err != nil {
 		return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a request for community: %w", err)
 	}
@@ -178,7 +179,7 @@ func (m *StoreNodeRequestManager) FetchContact(contactID string, opts []StoreNod
 // subscribeToRequest checks if a request for given community/contact is already in progress, creates and installs
 // a new one if not found, and returns a subscription to the result of the found/started request.
 // The subscription can then be used to get the result of the request, this could be either a community/contact or an error.
-func (m *StoreNodeRequestManager) subscribeToRequest(requestType storeNodeRequestType, dataID string, shard *shard.Shard, cfg StoreNodeRequestConfig) (storeNodeResponseSubscription, error) {
+func (m *StoreNodeRequestManager) subscribeToRequest(ctx context.Context, requestType storeNodeRequestType, dataID string, shard *shard.Shard, cfg StoreNodeRequestConfig) (storeNodeResponseSubscription, error) {
 	// It's important to unlock only after getting the subscription channel.
 	// We also lock `activeRequestsLock` during finalizing the requests. This ensures that the subscription
 	// created in this function will get the result even if the requests proceeds faster than this function ends.
@@ -206,7 +207,7 @@ func (m *StoreNodeRequestManager) subscribeToRequest(requestType storeNodeReques
 			return nil, fmt.Errorf("failed to create community filter: %w", err)
 		}
 
-		request = m.newStoreNodeRequest()
+		request = m.newStoreNodeRequest(ctx)
 		request.config = cfg
 		request.pubsubTopic = filter.PubsubTopic
 		request.requestID = requestID
@@ -223,9 +224,10 @@ func (m *StoreNodeRequestManager) subscribeToRequest(requestType storeNodeReques
 }
 
 // newStoreNodeRequest creates a new storeNodeRequest struct
-func (m *StoreNodeRequestManager) newStoreNodeRequest() *storeNodeRequest {
+func (m *StoreNodeRequestManager) newStoreNodeRequest(ctx context.Context) *storeNodeRequest {
 	return &storeNodeRequest{
 		manager:       m,
+		ctx:           ctx,
 		subscriptions: make([]storeNodeResponseSubscription, 0),
 	}
 }
@@ -306,6 +308,7 @@ const (
 // For a valid storeNodeRequest to be performed, the user must set all the struct fields and call start method.
 type storeNodeRequest struct {
 	requestID storeNodeRequestID
+	ctx       context.Context
 
 	// request parameters
 	pubsubTopic      string
@@ -374,7 +377,7 @@ func (r *storeNodeRequest) finalize() {
 	}
 }
 
-func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint32) {
+func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64) {
 	logger := r.manager.logger.With(
 		zap.Any("requestID", r.requestID),
 		zap.Int("envelopesCount", envelopesCount))
@@ -524,13 +527,15 @@ func (r *storeNodeRequest) routine() {
 	communityID := r.requestID.getCommunityID()
 
 	if r.requestID.RequestType != storeNodeCommunityRequest || !r.manager.messenger.communityStorenodes.HasStorenodeSetup(communityID) {
-		if !r.manager.messenger.waitForAvailableStoreNode(storeNodeAvailableTimeout) {
+		ctx, cancel := context.WithTimeout(r.ctx, storeNodeAvailableTimeout)
+		defer cancel()
+		if !r.manager.messenger.transport.WaitForAvailableStoreNode(ctx) {
 			r.result.err = fmt.Errorf("store node is not available")
 			return
 		}
 	}
 
-	storeNode := r.manager.messenger.getActiveMailserver(communityID)
+	storeNode := r.manager.messenger.getCommunityStorenode(communityID)
 
 	// Check if community already exists locally and get Clock.
 	if r.requestID.RequestType == storeNodeCommunityRequest {
@@ -543,8 +548,8 @@ func (r *storeNodeRequest) routine() {
 	// Start store node request
 	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
 
-	_, err := r.manager.messenger.performMailserverRequest(storeNode, func(ms mailservers.Mailserver) (*MessengerResponse, error) {
-		batch := MailserverBatch{
+	_, err := r.manager.messenger.performStorenodeTask(func() (*MessengerResponse, error) {
+		batch := types.MailserverBatch{
 			From:        from,
 			To:          to,
 			PubsubTopic: r.pubsubTopic,
@@ -555,8 +560,8 @@ func (r *storeNodeRequest) routine() {
 			r.manager.onPerformingBatch(batch)
 		}
 
-		return nil, r.manager.messenger.processMailserverBatchWithOptions(ms, batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
-	})
+		return nil, r.manager.messenger.processMailserverBatchWithOptions(storeNode, batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
+	}, history.WithPeerID(storeNode))
 
 	r.result.err = err
 }

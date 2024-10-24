@@ -6,6 +6,10 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/waku-org/go-waku/waku/v2/utils"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/mailservers"
 )
@@ -51,13 +55,14 @@ func (m *CommunityStorenodes) GetStorenodeByCommunityID(communityID string) (mai
 	return toMailserver(msData.storenodes[0]), nil
 }
 
-func (m *CommunityStorenodes) IsCommunityStoreNode(id string) bool {
+func (m *CommunityStorenodes) IsCommunityStoreNode(peerID peer.ID) bool {
 	m.storenodesByCommunityIDMutex.RLock()
 	defer m.storenodesByCommunityIDMutex.RUnlock()
 
 	for _, data := range m.storenodesByCommunityID {
 		for _, snode := range data.storenodes {
-			if snode.StorenodeID == id {
+			commStorenodeID, err := utils.GetPeerID(snode.Address)
+			if err == nil && commStorenodeID == peerID {
 				return true
 			}
 		}

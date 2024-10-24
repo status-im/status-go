@@ -16,6 +16,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -40,6 +41,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -3291,7 +3293,7 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 		WithWaitForResponseOption(request.WaitForResponse),
 	}
 
-	community, _, err := m.storeNodeRequestsManager.FetchCommunity(communityAddress, options)
+	community, _, err := m.storeNodeRequestsManager.FetchCommunity(m.ctx, communityAddress, options)
 
 	return community, err
 }
@@ -3299,7 +3301,7 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 // fetchCommunities installs filter for community and requests its details from store node.
 // When response received it will be passed through signals handler.
 func (m *Messenger) fetchCommunities(communities []communities.CommunityShard) error {
-	return m.storeNodeRequestsManager.FetchCommunities(communities, []StoreNodeRequestOption{})
+	return m.storeNodeRequestsManager.FetchCommunities(m.ctx, communities, []StoreNodeRequestOption{})
 }
 
 // passStoredCommunityInfoToSignalHandler calls signal handler with community info
@@ -3970,8 +3972,8 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			}
 
 			// Request possibly missed waku messages for community
-			ms := m.getActiveMailserver(c.ID().String())
-			_, err = m.syncFiltersFrom(*ms, filters, uint32(latestWakuMessageTimestamp))
+			ms := m.getCommunityStorenode(c.ID().String())
+			_, err = m.syncFiltersFrom(ms, filters, uint32(latestWakuMessageTimestamp))
 			if err != nil {
 				m.logger.Error("failed to request missing messages", zap.Error(err))
 				continue
@@ -5154,4 +5156,33 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 			}
 		}
 	}()
+}
+
+// getCommunityStorenode returns the active mailserver if a communityID is present then it'll return the mailserver
+// for that community if it has a mailserver setup otherwise it'll return the global mailserver
+func (m *Messenger) getCommunityStorenode(communityID ...string) peer.ID {
+	if m.transport.WakuVersion() != 2 {
+		return ""
+	}
+
+	if len(communityID) == 0 || communityID[0] == "" {
+		return m.transport.GetActiveStorenode()
+	}
+
+	ms, err := m.communityStorenodes.GetStorenodeByCommunityID(communityID[0])
+	if err != nil {
+		if !errors.Is(err, storenodes.ErrNotFound) {
+			m.logger.Error("getting storenode for community, using global", zap.String("communityID", communityID[0]), zap.Error(err))
+		}
+		// if we don't find a specific mailserver for the community, we just use the regular mailserverCycle's one
+		return m.transport.GetActiveStorenode()
+	}
+
+	peerID, err := ms.PeerID()
+	if err != nil {
+		m.logger.Error("getting storenode for community, using global", zap.String("communityID", communityID[0]), zap.Error(err))
+		return m.transport.GetActiveStorenode()
+	}
+
+	return peerID
 }

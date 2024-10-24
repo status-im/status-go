@@ -149,7 +149,7 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAd
 }
 
 func (s *MessengerStoreNodeCommunitySuite) createCommunityWithChat(m *Messenger) (*communities.Community, *Chat) {
-	WaitForAvailableStoreNode(&s.Suite, m, 500*time.Millisecond)
+	WaitForAvailableStoreNode(&s.Suite, m, context.TODO())
 
 	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(nil)
 
@@ -197,7 +197,7 @@ func (s *MessengerStoreNodeCommunitySuite) fetchCommunity(m *Messenger, communit
 		WithWaitForResponseOption(true),
 	}
 
-	fetchedCommunity, stats, err := m.storeNodeRequestsManager.FetchCommunity(communityShard, options)
+	fetchedCommunity, stats, err := m.storeNodeRequestsManager.FetchCommunity(context.TODO(), communityShard, options)
 
 	s.Require().NoError(err)
 	s.requireCommunitiesEqual(fetchedCommunity, expectedCommunity)
@@ -351,10 +351,10 @@ func (s *MessengerStoreNodeCommunitySuite) TestToggleUseMailservers() {
 	// Enable use of mailservers
 	err := s.owner.ToggleUseMailservers(true)
 	s.Require().NoError(err)
-	s.Require().NotNil(s.owner.mailserverCycle.activeMailserver)
+	s.Require().NotNil(s.owner.transport.GetActiveStorenode())
 
 	// Disable use of mailservers
 	err = s.owner.ToggleUseMailservers(false)
 	s.Require().NoError(err)
-	s.Require().Nil(s.owner.mailserverCycle.activeMailserver)
+	s.Require().Nil(s.owner.transport.GetActiveStorenode())
 }

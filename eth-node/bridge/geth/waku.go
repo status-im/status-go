@@ -9,6 +9,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
+	"github.com/waku-org/go-waku/waku/v2/api/history"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	gocommon "github.com/status-im/status-go/common"
@@ -274,10 +276,6 @@ func (w *GethWakuWrapper) MarkP2PMessageAsProcessed(hash common.Hash) {
 	w.waku.MarkP2PMessageAsProcessed(hash)
 }
 
-func (w *GethWakuWrapper) RequestStoreMessages(ctx context.Context, peerID peer.ID, r types.MessagesRequest, processEnvelopes bool) (types.StoreRequestCursor, int, error) {
-	return nil, 0, errors.New("not implemented")
-}
-
 func (w *GethWakuWrapper) ConnectionChanged(_ connection.State) {}
 
 func (w *GethWakuWrapper) ClearEnvelopesCache() {
@@ -314,13 +312,55 @@ func (w *wakuFilterWrapper) ID() string {
 func (w *GethWakuWrapper) ConfirmMessageDelivered(hashes []common.Hash) {
 }
 
-func (w *GethWakuWrapper) SetStorePeerID(peerID peer.ID) {
-}
-
 func (w *GethWakuWrapper) PeerID() peer.ID {
-	panic("not implemented")
+	panic("not available in WakuV1")
 }
 
-func (w *GethWakuWrapper) PingPeer(context.Context, peer.ID) (time.Duration, error) {
-	return 0, errors.New("not available in WakuV1")
+func (w *GethWakuWrapper) GetActiveStorenode() peer.ID {
+	panic("not available in WakuV1")
+}
+
+func (w *GethWakuWrapper) OnStorenodeChanged() <-chan peer.ID {
+	panic("not available in WakuV1")
+}
+
+func (w *GethWakuWrapper) OnStorenodeNotWorking() <-chan struct{} {
+	panic("not available in WakuV1")
+}
+
+func (w *GethWakuWrapper) OnStorenodeAvailable() <-chan peer.ID {
+	panic("not available in WakuV1")
+}
+
+func (w *GethWakuWrapper) WaitForAvailableStoreNode(ctx context.Context) bool {
+	return false
+}
+
+func (w *GethWakuWrapper) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
+	panic("not available in WakuV1")
+}
+
+func (w *GethWakuWrapper) ProcessMailserverBatch(
+	ctx context.Context,
+	batch types.MailserverBatch,
+	storenodeID peer.ID,
+	pageLimit uint64,
+	shouldProcessNextPage func(int) (bool, uint64),
+	processEnvelopes bool,
+) error {
+	return errors.New("not available in WakuV1")
+}
+
+func (w *GethWakuWrapper) IsStorenodeAvailable(peerID peer.ID) bool {
+	panic("not available in WakuV1")
+
+}
+
+func (w *GethWakuWrapper) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
+	panic("not available in WakuV1")
+
+}
+
+func (w *GethWakuWrapper) DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool) {
+	panic("not available in WakuV1")
 }

@@ -139,7 +139,6 @@ type Messenger struct {
 	allInstallations           *installationMap
 	modifiedInstallations      *stringBoolMap
 	installationID             string
-	mailserverCycle            mailserverCycle
 	communityStorenodes        *storenodes.CommunityStorenodes
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
@@ -172,7 +171,6 @@ type Messenger struct {
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex                     sync.Mutex
-	mailPeersMutex            sync.RWMutex
 	handleMessagesMutex       sync.Mutex
 	handleImportMessagesMutex sync.Mutex
 
@@ -197,50 +195,6 @@ type Messenger struct {
 	peersyncingRequests map[string]uint64
 
 	mvdsStatusChangeEvent chan datasyncnode.PeerStatusChangeEvent
-}
-
-type connStatus int
-
-const (
-	disconnected connStatus = iota + 1
-	connected
-)
-
-type peerStatus struct {
-	status                connStatus
-	canConnectAfter       time.Time
-	lastConnectionAttempt time.Time
-	mailserver            mailserversDB.Mailserver
-}
-type mailserverCycle struct {
-	sync.RWMutex
-	allMailservers            []mailserversDB.Mailserver
-	activeMailserver          *mailserversDB.Mailserver
-	peers                     map[string]peerStatus
-	availabilitySubscriptions *availabilitySubscriptions
-}
-
-type availabilitySubscriptions struct {
-	sync.Mutex
-	subscriptions []chan struct{}
-}
-
-func (s *availabilitySubscriptions) Subscribe() <-chan struct{} {
-	s.Lock()
-	defer s.Unlock()
-	c := make(chan struct{})
-	s.subscriptions = append(s.subscriptions, c)
-	return c
-}
-
-func (s *availabilitySubscriptions) EmitMailserverAvailable() {
-	s.Lock()
-	defer s.Unlock()
-
-	for _, subs := range s.subscriptions {
-		close(subs)
-	}
-	s.subscriptions = nil
 }
 
 type EnvelopeEventsInterceptor struct {
@@ -624,19 +578,15 @@ func NewMessenger(
 		peerStore:               peerStore,
 		mvdsStatusChangeEvent:   make(chan datasyncnode.PeerStatusChangeEvent, 5),
 		verificationDatabase:    verification.NewPersistence(database),
-		mailserverCycle: mailserverCycle{
-			peers:                     make(map[string]peerStatus),
-			availabilitySubscriptions: &availabilitySubscriptions{},
-		},
-		mailserversDatabase:  c.mailserversDatabase,
-		communityStorenodes:  storenodes.NewCommunityStorenodes(storenodes.NewDB(database), logger),
-		account:              c.account,
-		quit:                 make(chan struct{}),
-		ctx:                  ctx,
-		cancel:               cancel,
-		importingCommunities: make(map[string]bool),
-		importingChannels:    make(map[string]bool),
-		importRateLimiter:    rate.NewLimiter(rate.Every(importSlowRate), 1),
+		mailserversDatabase:     c.mailserversDatabase,
+		communityStorenodes:     storenodes.NewCommunityStorenodes(storenodes.NewDB(database), logger),
+		account:                 c.account,
+		quit:                    make(chan struct{}),
+		ctx:                     ctx,
+		cancel:                  cancel,
+		importingCommunities:    make(map[string]bool),
+		importingChannels:       make(map[string]bool),
+		importRateLimiter:       rate.NewLimiter(rate.Every(importSlowRate), 1),
 		importDelayer: struct {
 			wait chan struct{}
 			once sync.Once
@@ -883,22 +833,26 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	response := &MessengerResponse{}
 
-	mailservers, err := m.allMailservers()
+	storenodes, err := m.AllMailservers()
 	if err != nil {
 		return nil, err
 	}
 
-	response.Mailservers = mailservers
-	err = m.StartMailserverCycle(mailservers)
+	err = m.setupStorenodes(storenodes)
 	if err != nil {
 		return nil, err
 	}
+
+	response.Mailservers = storenodes
+
+	m.transport.SetStorenodeConfigProvider(m)
 
 	if err := m.communityStorenodes.ReloadFromDB(); err != nil {
 		return nil, err
 	}
 
 	go m.checkForMissingMessagesLoop()
+	go m.checkForStorenodeCycleSignals()
 
 	controlledCommunities, err := m.communitiesManager.Controlled()
 	if err != nil {
@@ -906,10 +860,15 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	if m.archiveManager.IsReady() {
-		available := m.mailserverCycle.availabilitySubscriptions.Subscribe()
 		go func() {
 			defer gocommon.LogOnPanic()
-			<-available
+
+			select {
+			case <-m.ctx.Done():
+				return
+			case <-m.transport.OnStorenodeAvailable():
+			}
+
 			m.InitHistoryArchiveTasks(controlledCommunities)
 		}()
 	}
