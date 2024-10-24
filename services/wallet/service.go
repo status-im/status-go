@@ -190,13 +190,13 @@ func NewService(
 	}
 
 	router := router.NewRouter(rpcClient, transactor, tokenManager, marketManager, collectibles,
-		collectiblesManager, ens)
-	pathProcessors := buildPathProcessors(rpcClient, transactor, tokenManager, ens, featureFlags)
+		collectiblesManager, ens, stickers)
+	pathProcessors := buildPathProcessors(rpcClient, transactor, tokenManager, ens, stickers, featureFlags)
 	for _, processor := range pathProcessors {
 		router.AddPathProcessor(processor)
 	}
 
-	routeExecutionManager := routeexecution.NewManager(db, router, transactionManager, transferController)
+	routeExecutionManager := routeexecution.NewManager(router, transactionManager, transferController)
 
 	return &Service{
 		db:                    db,
@@ -236,6 +236,7 @@ func buildPathProcessors(
 	transactor *transactions.Transactor,
 	tokenManager *token.Manager,
 	ens *ens.Service,
+	stickers *stickers.Service,
 	featureFlags *protocolCommon.FeatureFlags,
 ) []pathprocessor.PathProcessor {
 	ret := make([]pathprocessor.PathProcessor, 0)
@@ -266,12 +267,6 @@ func buildPathProcessors(
 
 	ensRelease := pathprocessor.NewENSReleaseProcessor(rpcClient, transactor, ens)
 	ret = append(ret, ensRelease)
-
-	ensPublicKey := pathprocessor.NewENSPublicKeyProcessor(rpcClient, transactor, ens)
-	ret = append(ret, ensPublicKey)
-
-	buyStickers := pathprocessor.NewStickersBuyProcessor(rpcClient, transactor)
-	ret = append(ret, buyStickers)
 
 	return ret
 }

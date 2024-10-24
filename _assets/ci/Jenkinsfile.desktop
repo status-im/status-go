@@ -110,14 +110,18 @@ pipeline {
             }
         }
     }
+    stage('Cleanup') {
+        steps {
+            script {
+                cleanTmp()
+                }
+            }
+        }
 } // stages
   post {
      success { script { github.notifyPR(true) } }
      failure { script { github.notifyPR(false) } }
-     cleanup {
-       cleanWs()
-       cleanTmp()
-     }
+     cleanup { cleanWs() }
   } // post
 } // pipeline
 
@@ -154,8 +158,9 @@ def shell(cmd) {
 }
 
 def cleanTmp() {
-    /* Fails on windows due to Durable Task plugin failure. */
-    if (env.PLATFORM != 'windows') {
+    if (env.PLATFORM == 'windows') {
+        sh "rm -rf ${env.WORKSPACE}@tmp"
+    } else {
         dir("${env.WORKSPACE}@tmp") { deleteDir() }
     }
 }

@@ -273,6 +273,13 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 					logutils.ZapLogger().Error("saveAndConfirmPending error", zap.Error(err))
 					return err
 				}
+
+				// Check if multi transaction needs to be created
+				err = c.processMultiTransactions(ctx, allTransfers)
+				if err != nil {
+					logutils.ZapLogger().Error("processMultiTransactions error", zap.Error(err))
+					return err
+				}
 			} else {
 				// If no transfers found, that is suspecting, because downloader returned this block as containing transfers
 				logutils.ZapLogger().Error("no transfers found in block",

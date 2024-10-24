@@ -254,4 +254,4 @@ def getDefaultUnitTestCount() { isNightlyJob() ? '20' : '1' }
 
 def getDefaultTimeout() { isNightlyJob() ? 5*60 : 50 }
 
-def getAmountToKeep() { isNightlyJob() ? '14' : isDevelopJob() ? '30' : '5' }
+def getAmountToKeep() { isNightlyJob() ? '14' : isDevelopJob() ? '10' : '5' }

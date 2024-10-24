@@ -88,12 +88,11 @@ type PendingTxTracker struct {
 
 func NewPendingTxTracker(db *sql.DB, rpcClient rpc.ClientInterface, rpcFilter *rpcfilters.Service, eventFeed *event.Feed, checkInterval time.Duration) *PendingTxTracker {
 	tm := &PendingTxTracker{
-		db:          db,
-		trackedTxDB: NewDB(db),
-		rpcClient:   rpcClient,
-		eventFeed:   eventFeed,
-		rpcFilter:   rpcFilter,
-		logger:      logutils.ZapLogger().Named("PendingTxTracker"),
+		db:        db,
+		rpcClient: rpcClient,
+		eventFeed: eventFeed,
+		rpcFilter: rpcFilter,
+		logger:    logutils.ZapLogger().Named("PendingTxTracker"),
 	}
 	tm.taskRunner = NewConditionalRepeater(checkInterval, func(ctx context.Context) bool {
 		return tm.fetchAndUpdateDB(ctx)
