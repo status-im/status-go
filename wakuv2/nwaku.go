@@ -2215,14 +2215,13 @@ func (w *Waku) PeerID() (peer.ID, error) {
 		peerIdStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))		
 		id, err := peer.Decode(peerIdStr)
 		if err != nil {
-			errMsg := "WakuGetMyPeerId - error decoding peerId: " + err.Error()
-			return "", errors.New(errMsg)
+			errMsg := "WakuGetMyPeerId - decoding peerId: %w"
+			return "",  fmt.Errorf(errMsg, err)
 		}
 		return id, nil
 	}
-	errMsg := "error WakuGetMyPeerId: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return "", errors.New(errMsg)
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return "", fmt.Errorf("WakuGetMyPeerId: %s",  errMsg)
 }
 
 // validatePrivateKey checks the format of the given private key.
@@ -2650,9 +2649,8 @@ func (self *Waku) WakuPeerExchangeRequest(numPeers uint64) (uint64, error) {
 		}
 		return numRecvPeers, nil
 	}
-	errMsg := "error WakuPeerExchangeRequest: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return 0, errors.New(errMsg)
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return 0, fmt.Errorf("WakuPeerExchangeRequest: %w", errMsg)
 }
 
 func (self *Waku) WakuConnect(peerMultiAddr string, timeoutMs int) error {
@@ -2802,17 +2800,15 @@ func (self *Waku) GetPeerIdsFromPeerStore() (peer.IDSlice, error) {
 		for _, peerId := range itemsPeerIds {
 			id, err := peer.Decode(peerId)
 			if err != nil {
-				errMsg := "GetPeerIdsFromPeerStore - error decoding peerId: " + err.Error()
-				return nil, errors.New(errMsg)
+				return nil, fmt.Errorf("GetPeerIdsFromPeerStore - decoding peerId: %w", err)
 			}
 			peers = append(peers, id)
 		}
 
 		return peers, nil
 	}
-	errMsg := "error GetPeerIdsFromPeerStore: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return nil, errors.New(errMsg)
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, fmt.Errorf("GetPeerIdsFromPeerStore: %w", errMsg)
 }
 
 func (self *Waku) GetPeerIdsByProtocol(protocol string) (peer.IDSlice, error) {
@@ -2835,8 +2831,7 @@ func (self *Waku) GetPeerIdsByProtocol(protocol string) (peer.IDSlice, error) {
 		for _, p := range itemsPeerIds {
 			id, err := peer.Decode(p)
 			if err != nil {
-				errMsg := "GetPeerIdsByProtocol - error decoding peerId: " + err.Error()
-				return nil, errors.New(errMsg)
+				return nil, fmt.Errorf("GetPeerIdsByProtocol - decoding peerId: %w", err)
 			}
 			peers = append(peers, id)
 		}
