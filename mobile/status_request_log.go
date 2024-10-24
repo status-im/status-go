@@ -65,8 +65,12 @@ func getShortFunctionName(fn any) string {
 func call(fn any, params ...any) any {
 	defer func() {
 		if r := recover(); r != nil {
-			// we're not sure if request logging is enabled here, so we log it use default logger
-			logutils.ZapLogger().Error("panic found in call", zap.Any("error", r), zap.Stack("stacktrace"))
+			// if request logging is enabled, use the request logger, otherwise fallback to the default logger
+			logger := logutils.ZapLogger()
+			if requestlog.IsRequestLoggingEnabled() {
+				logger = requestlog.GetRequestLogger()
+			}
+			logger.Error("panic found in call", zap.Any("error", r), zap.Stack("stacktrace"))
 			panic(r)
 		}
 	}()
@@ -101,7 +105,13 @@ func call(fn any, params ...any) any {
 		methodName := getShortFunctionName(fn)
 		paramsString := removeSensitiveInfo(fmt.Sprintf("%+v", params))
 		respString := removeSensitiveInfo(fmt.Sprintf("%+v", resp))
-		requestlog.GetRequestLogger().Debug(methodName, "params", paramsString, "resp", respString, "duration", duration)
+
+		requestlog.GetRequestLogger().Debug("call",
+			zap.String("method", methodName),
+			zap.String("params", paramsString),
+			zap.String("resp", respString),
+			zap.Duration("duration", duration),
+		)
 	}
 
 	return resp

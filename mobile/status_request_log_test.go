@@ -2,7 +2,7 @@ package statusgo
 
 import (
 	"encoding/json"
-	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -12,8 +12,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/signal"
-
-	"github.com/ethereum/go-ethereum/log"
 )
 
 func TestRemoveSensitiveInfo(t *testing.T) {
@@ -60,17 +58,16 @@ func TestRemoveSensitiveInfo(t *testing.T) {
 }
 
 func TestCall(t *testing.T) {
-	// Enable request logging
-	requestlog.EnableRequestLogging(true)
+	// Create a temporary file for logging
+	tempLogFile, err := os.CreateTemp(t.TempDir(), "TestCall*.log")
+	require.NoError(t, err)
 
-	// Create a mock logger to capture log output
-	var logOutput string
-	mockLogger := log.New()
-	mockLogger.SetHandler(log.FuncHandler(func(r *log.Record) error {
-		logOutput += r.Msg + fmt.Sprintf("%s", r.Ctx...)
-		return nil
-	}))
-	requestlog.NewRequestLogger().SetHandler(mockLogger.GetHandler())
+	// Enable request logging
+	requestlog.ConfigureAndEnableRequestLogging(tempLogFile.Name())
+
+	// Logger must not be nil after enabling
+	logger := requestlog.GetRequestLogger()
+	require.NotNil(t, logger)
 
 	// Test case 1: Normal execution
 	testFunc := func(param string) string {
@@ -86,6 +83,11 @@ func TestCall(t *testing.T) {
 		t.Errorf("Expected result %s, got %s", expectedResult, result)
 	}
 
+	// Read the log file
+	logData, err := os.ReadFile(tempLogFile.Name())
+	require.NoError(t, err)
+	logOutput := string(logData)
+
 	// Check if the log contains expected information
 	expectedLogParts := []string{getShortFunctionName(testFunc), "params", testParam, "resp", expectedResult}
 	for _, part := range expectedLogParts {
@@ -95,11 +97,10 @@ func TestCall(t *testing.T) {
 	}
 
 	// Test case 2: Panic -> recovery -> re-panic
-	oldRootHandler := log.Root().GetHandler()
-	defer log.Root().SetHandler(oldRootHandler)
-	log.Root().SetHandler(mockLogger.GetHandler())
-	// Clear log output for next test
-	logOutput = ""
+	// Clear log file for next test
+	err = os.Truncate(tempLogFile.Name(), 0)
+	require.NoError(t, err)
+
 	e := "test panic"
 	panicFunc := func() {
 		panic(e)
@@ -108,6 +109,11 @@ func TestCall(t *testing.T) {
 	require.PanicsWithValue(t, e, func() {
 		call(panicFunc)
 	})
+
+	// Read the log file
+	logData, err = os.ReadFile(tempLogFile.Name())
+	require.NoError(t, err)
+	logOutput = string(logData)
 
 	// Check if the panic was logged
 	if !strings.Contains(logOutput, "panic found in call") {
