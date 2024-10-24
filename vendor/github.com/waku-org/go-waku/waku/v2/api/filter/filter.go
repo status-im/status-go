@@ -52,6 +52,7 @@ type Sub struct {
 type subscribeParameters struct {
 	batchInterval          time.Duration
 	multiplexChannelBuffer int
+	preferredPeers         peer.IDSlice
 }
 
 type SubscribeOptions func(*subscribeParameters)
@@ -72,6 +73,12 @@ func defaultOptions() []SubscribeOptions {
 	return []SubscribeOptions{
 		WithBatchInterval(5 * time.Second),
 		WithMultiplexChannelBuffer(100),
+	}
+}
+
+func WithPreferredServiceNodes(peers peer.IDSlice) SubscribeOptions {
+	return func(params *subscribeParameters) {
+		params.preferredPeers = peers
 	}
 }
 
@@ -197,7 +204,16 @@ func (apiSub *Sub) subscribe(contentFilter protocol.ContentFilter, peerCount int
 	options := make([]filter.FilterSubscribeOption, 0)
 	options = append(options, filter.WithMaxPeersPerContentFilter(int(peerCount)))
 	for _, p := range apiSub.Config.Peers {
-		options = append(options, filter.WithPeer(p))
+		isExcludedPeer := false
+		for _, px := range peersToExclude { // configured peer can be excluded if sub fails with it.
+			if p == px {
+				isExcludedPeer = true
+				break
+			}
+		}
+		if !isExcludedPeer {
+			options = append(options, filter.WithPeer(p))
+		}
 	}
 	if len(peersToExclude) > 0 {
 		apiSub.log.Debug("subscribing with peers to exclude", zap.Stringers("excluded-peers", peersToExclude))

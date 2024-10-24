@@ -529,7 +529,6 @@ func (w *Waku) discoverAndConnectPeers() {
 				w.logger.Warn("invalid peer multiaddress", zap.String("ma", addrString), zap.Error(err))
 				continue
 			}
-
 			peerInfo, err := peer.AddrInfoFromP2pAddr(addr)
 			if err != nil {
 				w.logger.Warn("invalid peer multiaddress", zap.Stringer("addr", addr), zap.Error(err))
@@ -1205,7 +1204,8 @@ func (w *Waku) Start() error {
 			w.cfg.MinPeersForFilter,
 			w,
 			w.node.FilterLightnode(),
-			filterapi.WithBatchInterval(300*time.Millisecond))
+			filterapi.WithBatchInterval(300*time.Millisecond),
+			filterapi.WithPreferredServiceNodes(w.GetPreferredServiceNodes()))
 	}
 
 	err = w.setupRelaySubscriptions()
@@ -1706,6 +1706,31 @@ func (w *Waku) StopDiscV5() error {
 
 	w.node.DiscV5().Stop()
 	return nil
+}
+
+func (w *Waku) GetPreferredServiceNodes() peer.IDSlice {
+	var bootnodes peer.IDSlice
+	for _, addrString := range w.cfg.WakuNodes {
+		addrString := addrString
+		if strings.HasPrefix(addrString, "enrtree://") {
+			continue
+		} else {
+			// It is a normal multiaddress
+			addr, err := multiaddr.NewMultiaddr(addrString)
+			if err != nil {
+				w.logger.Warn("invalid peer multiaddress", zap.String("ma", addrString), zap.Error(err))
+				continue
+			}
+			_, id := peer.SplitAddr(addr)
+			if id == "" {
+				w.logger.Warn("peer multiaddress doesn't contain peerID", zap.Stringer("addr", addr))
+				continue
+			}
+			bootnodes = append(bootnodes, id)
+			w.logger.Debug("adding peer to bootnodes for filter", zap.Stringer("id", id))
+		}
+	}
+	return bootnodes
 }
 
 func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
