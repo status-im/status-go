@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  schedule:
+    - cron:  '0 0 * * *'
+  workflow_dispatch:
+
+env:
+  FORCE_COLOR: "1"
+
+jobs:
+
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        cache: 'pip' 
+  
+    - run: pip install -r requirements.txt
+
+    - name: Checkout status-go repository
+      uses: actions/checkout@v4
+      with:
+        repository: status-im/status-go
+        path: status-go
+
+    - name: Set up Nix
+      uses: cachix/install-nix-action@v27
+
+    - name: Build status-cli
+      run: |
+        cd status-go
+        make status-backend
+
+    - name: Copy status-cli binary to test repo root
+      run: cp status-go/build/bin/status-cli .
+
+    - name: Run tests
+      run: |
+        pytest tests/ --alluredir=allure-results
+
+    - name: Get allure history
+      if: always()
+      uses: actions/checkout@v4
+      with:
+        ref: gh-pages
+        path: gh-pages
+
+    - name: Setup allure report
+      uses: simple-elf/allure-report-action@master
+      if: always()
+      id: allure-report
+      with:
+        allure_results: allure-results
+        gh_pages: gh-pages
+        allure_history: allure-history
+        keep_reports: 30
+
+    - name: Deploy report to Github Pages
+      uses: peaceiris/actions-gh-pages@v3
+      if: always()
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: allure-history
+
+    - name: Create job summary
+      if: always()
+      env:
+        JOB_STATUS: ${{ job.status }}
+      run: |
+        echo "## Run Information" >> $GITHUB_STEP_SUMMARY
+        echo "- **Event**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "Allure report will be available at: https://status-im.github.io/status-cli-tests/${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        {
+          echo 'JOB_SUMMARY<<EOF'
+          cat $GITHUB_STEP_SUMMARY
+          echo EOF
+        } >> $GITHUB_ENV
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: test_results
