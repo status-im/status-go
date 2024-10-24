@@ -2,58 +2,49 @@ package requestlog
 
 import (
 	"errors"
-	"sync/atomic"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/protocol/zaputil"
 )
 
 var (
-	// requestLogger is the request logger object
-	requestLogger log.Logger
-	// isRequestLoggingEnabled controls whether request logging is enabled
-	isRequestLoggingEnabled atomic.Bool
+	requestLogger *zap.Logger
 )
-
-// NewRequestLogger creates a new request logger object
-func NewRequestLogger(ctx ...interface{}) log.Logger {
-	requestLogger = log.New(ctx...)
-	return requestLogger
-}
-
-// EnableRequestLogging enables or disables RPC logging
-func EnableRequestLogging(enable bool) {
-	if enable {
-		isRequestLoggingEnabled.Store(true)
-	} else {
-		isRequestLoggingEnabled.Store(false)
-	}
-}
 
 // IsRequestLoggingEnabled returns whether RPC logging is enabled
 func IsRequestLoggingEnabled() bool {
-	return isRequestLoggingEnabled.Load()
+	return requestLogger != nil
 }
 
 // GetRequestLogger returns the RPC logger object
-func GetRequestLogger() log.Logger {
+func GetRequestLogger() *zap.Logger {
 	return requestLogger
 }
 
 func ConfigureAndEnableRequestLogging(file string) error {
-	log.Info("initialising request logger", "log file", file)
-	requestLogger := NewRequestLogger()
-	if file == "" {
-		return errors.New("log file path is required")
+	if len(file) == 0 {
+		return errors.New("file is required")
 	}
+
+	if IsRequestLoggingEnabled() {
+		return errors.New("request logging is already enabled")
+	}
+
 	fileOpts := logutils.FileOptions{
 		Filename:   file,
 		MaxBackups: 1,
 	}
-	handler := logutils.FileHandlerWithRotation(fileOpts, log.LogfmtFormat())
-	filteredHandler := log.LvlFilterHandler(log.LvlDebug, handler)
-	requestLogger.SetHandler(filteredHandler)
-	EnableRequestLogging(true)
+
+	core := zapcore.NewCore(
+		zaputil.NewConsoleHexEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.AddSync(logutils.ZapSyncerWithRotation(fileOpts)),
+		zap.DebugLevel,
+	)
+
+	requestLogger = zap.New(core).Named("RequestLogger")
+
 	return nil
 }
