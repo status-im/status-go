@@ -8,8 +8,8 @@ import (
 	"github.com/jellydator/ttlcache/v3"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 var (

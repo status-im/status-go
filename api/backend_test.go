@@ -1722,7 +1722,8 @@ func TestRestoreAccountAndLoginWithoutDisplayName(t *testing.T) {
 
 func TestAcceptTerms(t *testing.T) {
 	tmpdir := t.TempDir()
-	b := NewGethStatusBackend()
+	b, err := newGethStatusBackend()
+	require.NoError(t, err)
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
