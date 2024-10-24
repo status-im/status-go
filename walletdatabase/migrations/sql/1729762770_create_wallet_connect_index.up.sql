@@ -1,0 +1,5 @@
+CREATE INDEX wallet_connect_sessions_idx_644f3e58 ON wallet_connect_sessions(disconnected, expiry);
+CREATE INDEX wallet_connect_sessions_idx_b4647399 ON wallet_connect_sessions(disconnected, test_chains, expiry);
+CREATE INDEX wallet_connect_sessions_idx_c4f5be6a ON wallet_connect_sessions(created_timestamp DESC);
+CREATE INDEX wallet_connect_sessions_idx_5dcb13c8 ON wallet_connect_sessions(pairing_topic);
+CREATE INDEX wallet_connect_sessions_idx_200629ef ON wallet_connect_sessions(dapp_url);
