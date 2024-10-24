@@ -31,7 +31,7 @@ services:
     stop_signal: SIGINT
 
   status-backend:
-    user: ${INTEGRATION_TESTS_DOCKER_UID}
+    user: ${FUNCTIONAL_TESTS_DOCKER_UID}
     build:
       context: ../
       dockerfile: _assets/build/Dockerfile
