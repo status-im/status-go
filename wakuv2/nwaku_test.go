@@ -368,7 +368,8 @@ func TestPeerExchange(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, pxServerNode.Start())
 
-	time.Sleep(1 * time.Second)
+	// Adding an extra second to make sure PX cache is not empty
+	time.Sleep(2 * time.Second)
 
 	serverNodeMa, err := pxServerNode.ListenAddresses()
 	require.NoError(t, err)
