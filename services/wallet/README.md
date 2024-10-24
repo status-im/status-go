@@ -24,7 +24,7 @@ Wallet service provides RPC API for checking transfers history and other methods
 
 ### wallet_getTransfersByAddress
 
-Returns avaiable transfers in a given range.
+Returns available transfers in a given range.
 
 #### Parameters
 
@@ -78,7 +78,7 @@ Returns avaiable transfers in a given range.
 
 ### GetTransfersByAddressAndChainID
 
-Returns avaiable transfers in a given range.
+Returns available transfers in a given range.
 
 #### Parameters
 
@@ -293,7 +293,7 @@ First level keys accounts, second level keys are tokens.
 
 ### `wallet_storePendingTransaction`
 
-Stores pending transation in the database.
+Stores pending transition in the database.
 
 #### Parameters
 

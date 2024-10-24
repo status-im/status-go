@@ -14,7 +14,7 @@ API
 
 #### Parameters
 
-- `type`: `string` - configuratin type. if not unique error is raised.
+- `type`: `string` - configuration type. if not unique error is raised.
 - `conf`: `bytes` - raw json.
 
 ### settings_getConfig
