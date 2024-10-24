@@ -1778,18 +1778,20 @@ func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 // InitFilters analyzes chats and contacts in order to setup filters
 // which are responsible for retrieving messages.
 func (m *Messenger) InitFilters() error {
-
 	// Seed the for color generation
 	rand.Seed(time.Now().Unix())
 
 	logger := m.logger.With(zap.String("site", "Init"))
 
+	t1 := time.Now()
 	// Community requests will arrive in this pubsub topic
 	err := m.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
 	if err != nil {
 		return err
 	}
+	m.logger.Info("StartMessenger: SubscribeToPubsubTopic", zap.Duration("duration", time.Since(t1)))
 
+	t1 = time.Now()
 	var (
 		filtersToInit []transport.FiltersToInitialize
 		publicKeys    []*ecdsa.PublicKey
@@ -1799,6 +1801,10 @@ func (m *Messenger) InitFilters() error {
 	if err != nil {
 		return err
 	}
+	m.logger.Info("StartMessenger: Get joined communities", zap.Duration("duration", time.Since(t1)))
+
+	t1 = time.Now()
+	m.logger.Info("StartMessenger: joinedCommunities", zap.Any("joinedCommunities", joinedCommunities))
 	for _, org := range joinedCommunities {
 		// the org advertise on the public topic derived by the pk
 		filtersToInit = append(filtersToInit, m.DefaultFilters(org)...)
@@ -1842,7 +1848,9 @@ func (m *Messenger) InitFilters() error {
 			}
 		}
 	}
+	m.logger.Info("StartMessenger: Process joined communities", zap.Duration("duration", time.Since(t1)))
 
+	t1 = time.Now()
 	spectatedCommunities, err := m.communitiesManager.Spectated()
 	if err != nil {
 		return err
@@ -1850,14 +1858,18 @@ func (m *Messenger) InitFilters() error {
 	for _, org := range spectatedCommunities {
 		filtersToInit = append(filtersToInit, m.DefaultFilters(org)...)
 	}
+	m.logger.Info("StartMessenger: Process spectated communities", zap.Duration("duration", time.Since(t1)))
 
+	t1 = time.Now()
 	// Get chat IDs and public keys from the existing chats.
 	// TODO: Get only active chats by the query.
 	chats, err := m.persistence.Chats()
 	if err != nil {
 		return err
 	}
+	m.logger.Info("StartMessenger: Get chats", zap.Duration("duration", time.Since(t1)))
 
+	t1 = time.Now()
 	communityInfo := make(map[string]*communities.Community)
 	var validChats []*Chat
 	for _, chat := range chats {
@@ -1867,9 +1879,13 @@ func (m *Messenger) InitFilters() error {
 		}
 		validChats = append(validChats, chat)
 	}
+	m.logger.Info("StartMessenger: Validate chats", zap.Duration("duration", time.Since(t1)))
 
+	t1 = time.Now()
 	m.initChatsFirstMessageTimestamp(communityInfo, validChats)
+	m.logger.Info("StartMessenger: Init chats first message timestamp", zap.Duration("duration", time.Since(t1)))
 
+	t1 = time.Now()
 	for _, chat := range validChats {
 		if !chat.Active || chat.Timeline() {
 			m.allChats.Store(chat.ID, chat)
@@ -1921,7 +1937,9 @@ func (m *Messenger) InitFilters() error {
 
 		m.allChats.Store(chat.ID, chat)
 	}
+	m.logger.Info("StartMessenger: Process chats", zap.Duration("duration", time.Since(t1)))
 
+	t1 = time.Now()
 	// Timeline and profile chats are deprecated.
 	// This code can be removed after some reasonable time.
 
@@ -1940,7 +1958,9 @@ func (m *Messenger) InitFilters() error {
 			return err
 		}
 	}
+	m.logger.Info("StartMessenger: Ensure timeline and profile chats", zap.Duration("duration", time.Since(t1)))
 
+	t1 = time.Now()
 	// Get chat IDs and public keys from the contacts.
 	contacts, err := m.persistence.Contacts()
 	if err != nil {
@@ -1962,12 +1982,16 @@ func (m *Messenger) InitFilters() error {
 		}
 		publicKeys = append(publicKeys, publicKey)
 	}
+	m.logger.Info("StartMessenger: Process contacts", zap.Duration("duration", time.Since(t1)))
 
+	t1 = time.Now()
 	_, err = m.transport.InitFilters(filtersToInit, publicKeys)
 	if err != nil {
 		return err
 	}
+	m.logger.Info("StartMessenger: Init filters", zap.Duration("duration", time.Since(t1)))
 
+	t1 = time.Now()
 	// Init filters for the communities we control
 	var communityFiltersToInitialize []transport.CommunityFilterToInitialize
 	controlledCommunities, err := m.communitiesManager.Controlled()
@@ -1986,6 +2010,7 @@ func (m *Messenger) InitFilters() error {
 	if err != nil {
 		return err
 	}
+	m.logger.Info("StartMessenger: Init community filters", zap.Duration("duration", time.Since(t1)))
 
 	return nil
 }
