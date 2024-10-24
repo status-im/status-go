@@ -333,11 +333,20 @@ func (wf *WakuFilterLightNode) handleFilterSubscribeOptions(ctx context.Context,
 		params.selectedPeers = append(params.selectedPeers, pData.AddrInfo.ID)
 	}
 	reqPeerCount := params.maxPeers - len(params.selectedPeers)
+	for _, p := range params.selectedPeers {
+		if params.peersToExclude == nil {
+			params.peersToExclude = make(peermanager.PeerSet)
+		}
+		//exclude peers that are preferredpeers so that they don't get selected again.
+		if _, ok := params.peersToExclude[p]; !ok {
+			params.peersToExclude[p] = struct{}{}
+		}
+	}
 
 	if params.pm != nil && reqPeerCount > 0 {
 
 		wf.log.Debug("handleFilterSubscribeOptions", zap.Int("peerCount", reqPeerCount), zap.Int("excludePeersLen", len(params.peersToExclude)))
-		params.selectedPeers, err = wf.pm.SelectPeers(
+		selectedPeers, err := wf.pm.SelectPeers(
 			peermanager.PeerSelectionCriteria{
 				SelectionType: params.peerSelectionType,
 				Proto:         FilterSubscribeID_v20beta1,
@@ -350,7 +359,12 @@ func (wf *WakuFilterLightNode) handleFilterSubscribeOptions(ctx context.Context,
 		)
 		if err != nil {
 			wf.log.Error("peer selection returned err", zap.Error(err))
-			return nil, nil, err
+			if len(params.selectedPeers) == 0 {
+				return nil, nil, err
+			}
+		}
+		if len(selectedPeers) > 0 {
+			params.selectedPeers = append(params.selectedPeers, selectedPeers...)
 		}
 	}
 	wf.log.Debug("handleFilterSubscribeOptions exit", zap.Int("selectedPeerCount", len(params.selectedPeers)))

@@ -2,10 +2,12 @@ package filter
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
@@ -61,7 +63,8 @@ type EnevelopeProcessor interface {
 	OnNewEnvelope(env *protocol.Envelope) error
 }
 
-func NewFilterManager(ctx context.Context, logger *zap.Logger, minPeersPerFilter int, envProcessor EnevelopeProcessor, node *filter.WakuFilterLightNode, opts ...SubscribeOptions) *FilterManager {
+func NewFilterManager(ctx context.Context, logger *zap.Logger, minPeersPerFilter int,
+	envProcessor EnevelopeProcessor, node *filter.WakuFilterLightNode, opts ...SubscribeOptions) *FilterManager {
 	// This fn is being mocked in test
 	mgr := new(FilterManager)
 	mgr.ctx = ctx
@@ -162,6 +165,12 @@ func (mgr *FilterManager) subscribeAndRunLoop(f filterConfig) {
 	defer utils.LogOnPanic()
 	ctx, cancel := context.WithCancel(mgr.ctx)
 	config := FilterConfig{MaxPeers: mgr.minPeersPerFilter}
+	if len(mgr.params.preferredPeers) > 0 {
+		//use one peer which is from preferred peers.
+		randomIndex := rand.Intn(len(mgr.params.preferredPeers) - 1)
+		randomPreferredPeer := mgr.params.preferredPeers[randomIndex]
+		config.Peers = []peer.ID{randomPreferredPeer}
+	}
 	sub, err := Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger, mgr.params)
 	mgr.Lock()
 	mgr.filterSubscriptions[f.ID] = SubDetails{cancel, sub}
