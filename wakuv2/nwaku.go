@@ -377,23 +377,23 @@ type WakuPubsubTopic = string
 type WakuContentTopic = string
 
 type WakuConfig struct {
-	Host        		 string `json:"host,omitempty"`
-	Port        		 int    `json:"port,omitempty"`
-	NodeKey     		 string `json:"key,omitempty"`
-	EnableRelay  		 bool   `json:"relay"`
-	LogLevel     		 string `json:"logLevel"`
-	DnsDiscovery 		 bool `json:"dnsDiscovery,omitempty"`
-	DnsDiscoveryUrl 	 string `json:"dnsDiscoveryUrl,omitempty"`
-	MaxMessageSize		 string `json:"maxMessageSize,omitempty"`
+	Host                 string   `json:"host,omitempty"`
+	Port                 int      `json:"port,omitempty"`
+	NodeKey              string   `json:"key,omitempty"`
+	EnableRelay          bool     `json:"relay"`
+	LogLevel             string   `json:"logLevel"`
+	DnsDiscovery         bool     `json:"dnsDiscovery,omitempty"`
+	DnsDiscoveryUrl      string   `json:"dnsDiscoveryUrl,omitempty"`
+	MaxMessageSize       string   `json:"maxMessageSize,omitempty"`
 	Staticnodes          []string `json:"staticnodes,omitempty"`
 	Discv5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
-	Discv5Discovery		 bool `json:"discv5Discovery,omitempty"`
-	Discv5UdpPort		 uint16 `json:"discv5UdpPort,omitempty"`
-	ClusterID			 uint16 `json:"clusterId,omitempty"`
-	Shards			     []uint16 `json:"shards,omitempty"`	
-	PeerExchange		 bool `json:"peerExchange,omitempty"`
-	PeerExchangeNode	 string `json:"peerExchangeNode,omitempty"`
-	TcpPort			     uint16 `json:"tcpPort,omitempty"`
+	Discv5Discovery      bool     `json:"discv5Discovery,omitempty"`
+	Discv5UdpPort        uint16   `json:"discv5UdpPort,omitempty"`
+	ClusterID            uint16   `json:"clusterId,omitempty"`
+	Shards               []uint16 `json:"shards,omitempty"`
+	PeerExchange         bool     `json:"peerExchange,omitempty"`
+	PeerExchangeNode     string   `json:"peerExchangeNode,omitempty"`
+	TcpPort              uint16   `json:"tcpPort,omitempty"`
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -2211,17 +2211,17 @@ func (w *Waku) PeerID() (peer.ID, error) {
 	C.cGoWakuGetMyPeerId(w.wakuCtx, resp)
 
 	if C.getRet(resp) == C.RET_OK {
-		
-		peerIdStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))		
+
+		peerIdStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		id, err := peer.Decode(peerIdStr)
 		if err != nil {
 			errMsg := "WakuGetMyPeerId - decoding peerId: %w"
-			return "",  fmt.Errorf(errMsg, err)
+			return "", fmt.Errorf(errMsg, err)
 		}
 		return id, nil
 	}
 	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return "", fmt.Errorf("WakuGetMyPeerId: %s",  errMsg)
+	return "", fmt.Errorf("WakuGetMyPeerId: %s", errMsg)
 }
 
 // validatePrivateKey checks the format of the given private key.
