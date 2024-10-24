@@ -188,7 +188,11 @@ func (t *Transactor) SendRawTransaction(chainID uint64, rawTx string) error {
 }
 
 func createPendingTransaction(from common.Address, symbol string, chainID uint64, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (pTx *PendingTransaction) {
-
+	fmt.Printf("erc1155StoreAndTrackPendingTx reached1: %v\n", tx.Hash())
+	fmt.Printf("erc1155StoreAndTrackPendingTx reached2: %v\n", tx.Value())
+	fmt.Printf("erc1155StoreAndTrackPendingTx reached3: %v\n", *tx.To())
+	fmt.Printf("erc1155StoreAndTrackPendingTx reached4: %v\n", tx.Nonce())
+	fmt.Printf("erc1155StoreAndTrackPendingTx reached5: %v\n", tx.Data())
 	pTx = &PendingTransaction{
 		Hash:               tx.Hash(),
 		Timestamp:          uint64(time.Now().Unix()),
@@ -203,17 +207,21 @@ func createPendingTransaction(from common.Address, symbol string, chainID uint64
 		Symbol:             symbol,
 		AutoDelete:         new(bool),
 	}
+	fmt.Printf("erc1155StoreAndTrackPendingTx reached6")
 	// Transaction downloader will delete pending transaction as soon as it is confirmed
 	*pTx.AutoDelete = false
+	fmt.Printf("erc1155StoreAndTrackPendingTx reached7")
 	return
 }
 
 func (t *Transactor) StoreAndTrackPendingTx(from common.Address, symbol string, chainID uint64, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) error {
+	fmt.Printf("erc1155StoreAndTrackPendingTx reached0")
 	if t.pendingTracker == nil {
 		return nil
 	}
-
+	fmt.Printf("erc1155StoreAndTrackPendingTx reached1")
 	pTx := createPendingTransaction(from, symbol, chainID, multiTransactionID, tx)
+	fmt.Printf("erc1155StoreAndTrackPendingTx reached10")
 	return t.pendingTracker.StoreAndTrackPendingTx(pTx)
 }
 

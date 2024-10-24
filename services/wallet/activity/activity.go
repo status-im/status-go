@@ -263,7 +263,10 @@ func multiTransactionTypeToActivityType(mtType transfer.MultiTransactionType) Ty
 	} else if mtType == transfer.MultiTransactionApprove {
 		return ApproveAT
 	}
-	panic("unknown multi transaction type")
+	fmt.Printf("unknown multi transaction type is: %v\n", mtType)
+	fmt.Printf("SEND IS: %v\n", transfer.MultiTransactionSend)
+	return SendAT
+	//panic("unknown multi transaction type")
 }
 
 func sliceContains[T constraints.Ordered](slice []T, item T) bool {
