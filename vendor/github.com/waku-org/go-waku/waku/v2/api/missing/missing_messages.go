@@ -14,6 +14,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/common"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
@@ -31,17 +32,12 @@ type MessageTracker interface {
 	MessageExists(pb.MessageHash) (bool, error)
 }
 
-type StorenodeRequestor interface {
-	GetMessagesByHash(ctx context.Context, peerID peer.ID, pageSize uint64, messageHashes []pb.MessageHash) (common.StoreRequestResult, error)
-	QueryWithCriteria(ctx context.Context, peerID peer.ID, pageSize uint64, pubsubTopic string, contentTopics []string, from *int64, to *int64) (common.StoreRequestResult, error)
-}
-
 // MissingMessageVerifier is used to periodically retrieve missing messages from store nodes that have some specific criteria
 type MissingMessageVerifier struct {
 	ctx    context.Context
 	params missingMessageVerifierParams
 
-	storenodeRequestor StorenodeRequestor
+	storenodeRequestor common.StorenodeRequestor
 	messageTracker     MessageTracker
 
 	criteriaInterest   map[string]criteriaInterest // Track message verification requests and when was the last time a pubsub topic was verified for missing messages
@@ -54,7 +50,7 @@ type MissingMessageVerifier struct {
 }
 
 // NewMissingMessageVerifier creates an instance of a MissingMessageVerifier
-func NewMissingMessageVerifier(storenodeRequester StorenodeRequestor, messageTracker MessageTracker, timesource timesource.Timesource, logger *zap.Logger, options ...MissingMessageVerifierOption) *MissingMessageVerifier {
+func NewMissingMessageVerifier(storenodeRequester common.StorenodeRequestor, messageTracker MessageTracker, timesource timesource.Timesource, logger *zap.Logger, options ...MissingMessageVerifierOption) *MissingMessageVerifier {
 	options = append(defaultMissingMessagesVerifierOptions, options...)
 	params := missingMessageVerifierParams{}
 	for _, opt := range options {
@@ -219,14 +215,19 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 	)
 
 	result, err := m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (common.StoreRequestResult, error) {
-		return m.storenodeRequestor.QueryWithCriteria(
+		storeQueryRequest := &storepb.StoreQueryRequest{
+			RequestId:       hex.EncodeToString(protocol.GenerateRequestID()),
+			PubsubTopic:     &interest.contentFilter.PubsubTopic,
+			ContentTopics:   contentTopics[batchFrom:batchTo],
+			TimeStart:       proto.Int64(interest.lastChecked.Add(-m.params.delay).UnixNano()),
+			TimeEnd:         proto.Int64(now.Add(-m.params.delay).UnixNano()),
+			PaginationLimit: proto.Uint64(messageFetchPageSize),
+		}
+
+		return m.storenodeRequestor.Query(
 			ctx,
 			interest.peerID,
-			messageFetchPageSize,
-			interest.contentFilter.PubsubTopic,
-			contentTopics[batchFrom:batchTo],
-			proto.Int64(interest.lastChecked.Add(-m.params.delay).UnixNano()),
-			proto.Int64(now.Add(-m.params.delay).UnixNano()),
+			storeQueryRequest,
 		)
 	}, logger, "retrieving history to check for missing messages")
 	if err != nil {
@@ -295,7 +296,20 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 			result, err := m.storeQueryWithRetry(interest.ctx, func(ctx context.Context) (common.StoreRequestResult, error) {
 				queryCtx, cancel := context.WithTimeout(ctx, m.params.storeQueryTimeout)
 				defer cancel()
-				return m.storenodeRequestor.GetMessagesByHash(queryCtx, interest.peerID, maxMsgHashesPerRequest, messageHashes)
+
+				var messageHashesBytes [][]byte
+				for _, m := range messageHashes {
+					messageHashesBytes = append(messageHashesBytes, m.Bytes())
+				}
+
+				storeQueryRequest := &storepb.StoreQueryRequest{
+					RequestId:       hex.EncodeToString(protocol.GenerateRequestID()),
+					IncludeData:     true,
+					MessageHashes:   messageHashesBytes,
+					PaginationLimit: proto.Uint64(maxMsgHashesPerRequest),
+				}
+
+				return m.storenodeRequestor.Query(queryCtx, interest.peerID, storeQueryRequest)
 			}, logger, "retrieving missing messages")
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {

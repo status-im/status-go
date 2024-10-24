@@ -2,6 +2,7 @@ package history
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"math"
 	"sync"
@@ -10,8 +11,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/api/common"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
+	"google.golang.org/protobuf/proto"
+
 	"go.uber.org/zap"
 )
 
@@ -25,7 +30,7 @@ type work struct {
 }
 
 type HistoryRetriever struct {
-	store            Store
+	store            common.StorenodeRequestor
 	logger           *zap.Logger
 	historyProcessor HistoryProcessor
 }
@@ -35,11 +40,7 @@ type HistoryProcessor interface {
 	OnRequestFailed(requestID []byte, peerID peer.ID, err error)
 }
 
-type Store interface {
-	Query(ctx context.Context, criteria store.FilterCriteria, opts ...store.RequestOption) (store.Result, error)
-}
-
-func NewHistoryRetriever(store Store, historyProcessor HistoryProcessor, logger *zap.Logger) *HistoryRetriever {
+func NewHistoryRetriever(store common.StorenodeRequestor, historyProcessor HistoryProcessor, logger *zap.Logger) *HistoryRetriever {
 	return &HistoryRetriever{
 		store:            store,
 		logger:           logger.Named("history-retriever"),
@@ -257,12 +258,6 @@ func (hr *HistoryRetriever) requestStoreMessages(ctx context.Context, peerID pee
 	requestID := protocol.GenerateRequestID()
 	logger := hr.logger.With(zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", peerID))
 
-	opts := []store.RequestOption{
-		store.WithPaging(false, limit),
-		store.WithRequestID(requestID),
-		store.WithPeer(peerID),
-		store.WithCursor(cursor)}
-
 	logger.Debug("store.query",
 		logging.Timep("startTime", criteria.TimeStart),
 		logging.Timep("endTime", criteria.TimeEnd),
@@ -271,8 +266,19 @@ func (hr *HistoryRetriever) requestStoreMessages(ctx context.Context, peerID pee
 		zap.String("cursor", hexutil.Encode(cursor)),
 	)
 
+	storeQueryRequest := &pb.StoreQueryRequest{
+		RequestId:        hex.EncodeToString(requestID),
+		IncludeData:      true,
+		PubsubTopic:      &criteria.PubsubTopic,
+		ContentTopics:    criteria.ContentTopicsList(),
+		TimeStart:        criteria.TimeStart,
+		TimeEnd:          criteria.TimeEnd,
+		PaginationCursor: cursor,
+		PaginationLimit:  proto.Uint64(limit),
+	}
+
 	queryStart := time.Now()
-	result, err := hr.store.Query(ctx, criteria, opts...)
+	result, err := hr.store.Query(ctx, peerID, storeQueryRequest)
 	queryDuration := time.Since(queryStart)
 	if err != nil {
 		logger.Error("error querying storenode", zap.Error(err))

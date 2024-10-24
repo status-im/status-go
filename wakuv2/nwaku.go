@@ -208,6 +208,10 @@ package wakuv2
 		WAKU_CALL (waku_get_my_enr(ctx, (WakuCallBack) callback, resp) );
 	}
 
+	static void cGoWakuPingPeer(void* ctx, char* peerAddr, int timeoutMs, void* resp) {
+		WAKU_CALL (waku_ping_peer(ctx, peerAddr, timeoutMs, (WakuCallBack) callback, resp) );
+	}
+
 	static void cGoWakuListPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
 		WAKU_CALL (waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
@@ -1359,14 +1363,15 @@ func (w *Waku) Start() error {
 	if err = w.node.Start(w.ctx); err != nil {
 		return fmt.Errorf("failed to start go-waku node: %v", err)
 	}
+	*/
+	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, newPinger(w.wakuCtx))
 
-	w.StorenodeCycle = history.NewStorenodeCycle(w.logger)
-	w.HistoryRetriever = history.NewHistoryRetriever(w.node.Store(), NewHistoryProcessorWrapper(w), w.logger)
+	w.HistoryRetriever = history.NewHistoryRetriever(newStorenodeRequestor(w.wakuCtx, w.logger), NewHistoryProcessorWrapper(w), w.logger)
+	w.StorenodeCycle.Start(w.ctx)
 
-	w.StorenodeCycle.Start(w.ctx, w.node.Host())
+	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.PeerID()))
 
-	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.node.Host().ID()))
-
+	/* TODO-nwaku
 	w.discoverAndConnectPeers()
 
 	if w.cfg.EnableDiscV5 {
@@ -2953,16 +2958,16 @@ func (p *nwakuPublisher) LightpushPublish(ctx context.Context, message *pb.WakuM
 }
 
 func newStorenodeMessageVerifier(wakuCtx unsafe.Pointer) publish.StorenodeMessageVerifier {
-	return &defaultStorenodeMessageVerifier{
+	return &storenodeMessageVerifier{
 		wakuCtx: wakuCtx,
 	}
 }
 
-type defaultStorenodeMessageVerifier struct {
+type storenodeMessageVerifier struct {
 	wakuCtx unsafe.Pointer
 }
 
-func (d *defaultStorenodeMessageVerifier) MessageHashesExist(ctx context.Context, requestID []byte, peerID peer.ID, pageSize uint64, messageHashes []pb.MessageHash) ([]pb.MessageHash, error) {
+func (d *storenodeMessageVerifier) MessageHashesExist(ctx context.Context, requestID []byte, peerID peer.ID, pageSize uint64, messageHashes []pb.MessageHash) ([]pb.MessageHash, error) {
 	requestIDStr := hex.EncodeToString(requestID)
 	storeRequest := &storepb.StoreQueryRequest{
 		RequestId:         requestIDStr,
@@ -3006,16 +3011,46 @@ func (d *defaultStorenodeMessageVerifier) MessageHashesExist(ctx context.Context
 	return result, nil
 }
 
-func newStorenodeRequestor(wakuCtx unsafe.Pointer, logger *zap.Logger) missing.StorenodeRequestor {
-	return &storenodeRequestor{
+type pinger struct {
+	wakuCtx unsafe.Pointer
+}
+
+func newPinger(wakuCtx unsafe.Pointer) commonapi.Pinger {
+	return &pinger{
 		wakuCtx: wakuCtx,
-		logger:  logger.Named("storenodeRequestor"),
 	}
+}
+
+func (p *pinger) PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error) {
+	var resp = C.allocResp()
+	var cPeerId = C.CString(peerID.String())
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPeerId))
+
+	C.cGoWakuPingPeer(p.wakuCtx, cPeerId, C.int(time.Minute.Milliseconds()), resp)
+	if C.getRet(resp) == C.RET_OK {
+		rttStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		rttInt, err := strconv.ParseInt(rttStr, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return time.Duration(rttInt), nil
+	}
+
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return 0, fmt.Errorf("PingPeer: %s", errMsg)
 }
 
 type storenodeRequestor struct {
 	wakuCtx unsafe.Pointer
 	logger  *zap.Logger
+}
+
+func newStorenodeRequestor(wakuCtx unsafe.Pointer, logger *zap.Logger) commonapi.StorenodeRequestor {
+	return &storenodeRequestor{
+		wakuCtx: wakuCtx,
+		logger:  logger.Named("storenodeRequestor"),
+	}
 }
 
 func (s *storenodeRequestor) GetMessagesByHash(ctx context.Context, peerID peer.ID, pageSize uint64, messageHashes []pb.MessageHash) (commonapi.StoreRequestResult, error) {
@@ -3062,25 +3097,7 @@ func (s *storenodeRequestor) GetMessagesByHash(ctx context.Context, peerID peer.
 	return newStoreResultImpl(s.wakuCtx, peerID, storeRequest, storeResponse), nil
 }
 
-func (s *storenodeRequestor) QueryWithCriteria(ctx context.Context, peerID peer.ID, pageSize uint64, pubsubTopic string, contentTopics []string, from *int64, to *int64) (commonapi.StoreRequestResult, error) {
-	requestIDStr := hex.EncodeToString(protocol.GenerateRequestID())
-
-	logger := s.logger.With(zap.Stringer("peerID", peerID), zap.String("requestID", requestIDStr))
-
-	logger.Debug("sending store request")
-
-	storeRequest := &storepb.StoreQueryRequest{
-		RequestId:         requestIDStr,
-		PubsubTopic:       proto.String(pubsubTopic),
-		ContentTopics:     contentTopics,
-		TimeStart:         from,
-		TimeEnd:           to,
-		IncludeData:       false,
-		PaginationCursor:  nil,
-		PaginationForward: false,
-		PaginationLimit:   proto.Uint64(pageSize),
-	}
-
+func (s *storenodeRequestor) Query(ctx context.Context, peerID peer.ID, storeRequest *storepb.StoreQueryRequest) (commonapi.StoreRequestResult, error) {
 	jsonQuery, err := json.Marshal(storeRequest)
 	if err != nil {
 		return nil, err
@@ -3099,7 +3116,7 @@ func (s *storenodeRequestor) QueryWithCriteria(ctx context.Context, peerID peer.
 	}
 
 	if storeResponse.GetStatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("could not query storenode: %s %d %s", requestIDStr, storeResponse.GetStatusCode(), storeResponse.GetStatusDesc())
+		return nil, fmt.Errorf("could not query storenode: %s %d %s", storeRequest.RequestId, storeResponse.GetStatusCode(), storeResponse.GetStatusDesc())
 	}
 
 	return newStoreResultImpl(s.wakuCtx, peerID, storeRequest, storeResponse), nil
