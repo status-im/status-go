@@ -567,8 +567,9 @@ func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
 			return
 		case <-ticker.C:
 			bandwidthPerProtocol := w.bandwidthCounter.GetBandwidthByProtocol()
+			totals := w.bandwidthCounter.GetBandwidthTotals()
 			w.bandwidthCounter.Reset()
-			go telemetry.PushProtocolStats(bandwidthPerProtocol)
+			go telemetry.PushProtocolStats(bandwidthPerProtocol, totals)
 		}
 	}
 }
