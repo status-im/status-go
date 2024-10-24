@@ -2650,7 +2650,7 @@ func (self *Waku) WakuPeerExchangeRequest(numPeers uint64) (uint64, error) {
 		return numRecvPeers, nil
 	}
 	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return 0, fmt.Errorf("WakuPeerExchangeRequest: %w", errMsg)
+	return 0, fmt.Errorf("WakuPeerExchangeRequest: %s", errMsg)
 }
 
 func (self *Waku) WakuConnect(peerMultiAddr string, timeoutMs int) error {
@@ -2808,7 +2808,7 @@ func (self *Waku) GetPeerIdsFromPeerStore() (peer.IDSlice, error) {
 		return peers, nil
 	}
 	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return nil, fmt.Errorf("GetPeerIdsFromPeerStore: %w", errMsg)
+	return nil, fmt.Errorf("GetPeerIdsFromPeerStore: %s", errMsg)
 }
 
 func (self *Waku) GetPeerIdsByProtocol(protocol string) (peer.IDSlice, error) {
