@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
@@ -657,7 +659,7 @@ func (b *StatusNode) StopLocalNotifications() error {
 	if b.localNotificationsSrvc.IsStarted() {
 		err := b.localNotificationsSrvc.Stop()
 		if err != nil {
-			b.log.Error("LocalNotifications service stop failed on StopLocalNotifications", "error", err)
+			b.logger.Error("LocalNotifications service stop failed on StopLocalNotifications", zap.Error(err))
 			return nil
 		}
 	}
@@ -678,7 +680,7 @@ func (b *StatusNode) StartLocalNotifications() error {
 		err := b.localNotificationsSrvc.Start()
 
 		if err != nil {
-			b.log.Error("LocalNotifications service start failed on StartLocalNotifications", "error", err)
+			b.logger.Error("LocalNotifications service start failed on StartLocalNotifications", zap.Error(err))
 			return nil
 		}
 	}
@@ -686,7 +688,7 @@ func (b *StatusNode) StartLocalNotifications() error {
 	err := b.localNotificationsSrvc.SubscribeWallet(&b.walletFeed)
 
 	if err != nil {
-		b.log.Error("LocalNotifications service could not subscribe to wallet on StartLocalNotifications", "error", err)
+		b.logger.Error("LocalNotifications service could not subscribe to wallet on StartLocalNotifications", zap.Error(err))
 		return nil
 	}
 

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
@@ -21,7 +23,9 @@ const testPassword = "test-password"
 const newTestPassword = "new-test-password"
 
 func TestVerifyAccountPassword(t *testing.T) {
-	accManager := NewGethManager()
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+	accManager := NewGethManager(logger)
 	keyStoreDir := t.TempDir()
 	emptyKeyStoreDir := t.TempDir()
 
@@ -103,7 +107,9 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	err := utils.ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
 	require.NoError(t, err)
 
-	accManager := NewGethManager()
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+	accManager := NewGethManager(logger)
 
 	address := types.HexToAddress(utils.TestConfig.Account3.WalletAddress)
 	_, err = accManager.VerifyAccountPassword(keyStoreDir, address.Hex(), utils.TestConfig.Account3.Password)
@@ -133,7 +139,9 @@ type testAccount struct {
 // SetupTest is used here for reinitializing the mock before every
 // test function to avoid faulty execution.
 func (s *ManagerTestSuite) SetupTest() {
-	s.accManager = NewGethManager()
+	logger, err := zap.NewDevelopment()
+	s.Require().NoError(err)
+	s.accManager = NewGethManager(logger)
 
 	keyStoreDir := s.T().TempDir()
 	s.Require().NoError(s.accManager.InitKeystore(keyStoreDir))

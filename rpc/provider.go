@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/params"
 )
 
@@ -72,7 +74,7 @@ func (c *Client) prepareProviders(network *params.Network) []Provider {
 	// Retrieve the proxy provider configuration
 	proxyProvider, err := getProviderConfig(c.providerConfigs, ProviderStatusProxy)
 	if err != nil {
-		c.log.Warn("could not find provider config for status-proxy", "error", err)
+		c.logger.Warn("could not find provider config for status-proxy", zap.Error(err))
 	}
 
 	// Add main and fallback providers

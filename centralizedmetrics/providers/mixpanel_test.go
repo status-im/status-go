@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/centralizedmetrics/common"
 )
@@ -54,8 +55,10 @@ func TestMixpanelMetricProcessor(t *testing.T) {
 	}))
 	defer testServer.Close()
 
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
 	// Initialize the MixpanelMetricProcessor with the test server URL
-	processor := NewMixpanelMetricProcessor("testAppID", "testSecret", testServer.URL)
+	processor := NewMixpanelMetricProcessor("testAppID", "testSecret", testServer.URL, logger)
 
 	// Example metrics
 	metrics := []common.Metric{

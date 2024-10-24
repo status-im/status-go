@@ -30,10 +30,12 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 )
 
 // MessageParams specifies the exact way a message should be wrapped
@@ -211,7 +213,7 @@ func (msg *SentMessage) appendPadding(params *MessageParams) error {
 func (msg *SentMessage) sign(key *ecdsa.PrivateKey) error {
 	if IsMessageSigned(msg.Raw[0]) {
 		// this should not happen, but no reason to panic
-		log.Error("failed to sign the message: already signed")
+		logutils.ZapLogger().Error("failed to sign the message: already signed")
 		return nil
 	}
 
@@ -371,7 +373,7 @@ func (msg *ReceivedMessage) SigToPubKey() *ecdsa.PublicKey {
 
 	pub, err := crypto.SigToPub(msg.hash(), msg.Signature)
 	if err != nil {
-		log.Error("failed to recover public key from signature", "err", err)
+		logutils.ZapLogger().Error("failed to recover public key from signature", zap.Error(err))
 		return nil
 	}
 	return pub

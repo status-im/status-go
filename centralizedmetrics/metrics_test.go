@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/centralizedmetrics/common"
 	"github.com/status-im/status-go/protocol/tt"
@@ -15,11 +16,17 @@ import (
 
 var testMetric = common.Metric{ID: "user-id", EventName: "test-name", EventValue: map[string]interface{}{"test-name": "test-value"}, Platform: "android", AppVersion: "2.30.0"}
 
+func newMetricService(t *testing.T, repository MetricRepository, processor common.MetricProcessor, interval time.Duration) *MetricService {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+	return NewMetricService(repository, processor, interval, logger)
+}
+
 // TestMetricService covers the main functionalities of MetricService
 func TestMetricService(t *testing.T) {
 	repository := &TestMetricRepository{}
 	processor := &TestMetricProcessor{}
-	service := NewMetricService(repository, processor, 1*time.Second)
+	service := newMetricService(t, repository, processor, 1*time.Second)
 
 	// Start the service
 	service.Start()
@@ -111,7 +118,7 @@ func (p *TestMetricProcessor) Process(metrics []common.Metric) error {
 func TestAddMetric(t *testing.T) {
 	repository := &TestMetricRepository{}
 	processor := &TestMetricProcessor{}
-	service := NewMetricService(repository, processor, 1*time.Second)
+	service := newMetricService(t, repository, processor, 1*time.Second)
 
 	err := service.AddMetric(testMetric)
 	if err != nil {
@@ -132,7 +139,7 @@ func TestAddMetric(t *testing.T) {
 func TestProcessMetrics(t *testing.T) {
 	repository := &TestMetricRepository{}
 	processor := &TestMetricProcessor{}
-	service := NewMetricService(repository, processor, 1*time.Second)
+	service := newMetricService(t, repository, processor, 1*time.Second)
 
 	// Add metrics directly to repository for polling
 	require.NoError(t, repository.Add(common.Metric{ID: "3", EventValue: map[string]interface{}{"price": 6.28}}))
@@ -154,7 +161,7 @@ func TestProcessMetrics(t *testing.T) {
 func TestStartStop(t *testing.T) {
 	repository := &TestMetricRepository{}
 	processor := &TestMetricProcessor{}
-	service := NewMetricService(repository, processor, 1*time.Second)
+	service := newMetricService(t, repository, processor, 1*time.Second)
 
 	service.Start()
 	require.True(t, service.started)
@@ -173,7 +180,7 @@ func TestStartStop(t *testing.T) {
 func TestServiceWithoutMetrics(t *testing.T) {
 	repository := &TestMetricRepository{}
 	processor := &TestMetricProcessor{}
-	service := NewMetricService(repository, processor, 1*time.Second)
+	service := newMetricService(t, repository, processor, 1*time.Second)
 
 	service.Start()
 	defer service.Stop()
@@ -187,7 +194,7 @@ func TestServiceWithoutMetrics(t *testing.T) {
 func TestServiceEnabled(t *testing.T) {
 	repository := &TestMetricRepository{}
 	processor := &TestMetricProcessor{}
-	service := NewMetricService(repository, processor, 1*time.Second)
+	service := newMetricService(t, repository, processor, 1*time.Second)
 
 	err := service.ToggleEnabled(true)
 	require.NoError(t, err)
@@ -201,7 +208,7 @@ func TestServiceEnabled(t *testing.T) {
 func TestServiceEnsureStarted(t *testing.T) {
 	repository := &TestMetricRepository{}
 	processor := &TestMetricProcessor{}
-	service := NewMetricService(repository, processor, 1*time.Second)
+	service := newMetricService(t, repository, processor, 1*time.Second)
 
 	err := service.EnsureStarted()
 	require.NoError(t, err)

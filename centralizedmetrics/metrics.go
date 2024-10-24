@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/centralizedmetrics/common"
 	"github.com/status-im/status-go/centralizedmetrics/providers"
@@ -35,20 +35,23 @@ type MetricService struct {
 	started    bool
 	wg         sync.WaitGroup
 	interval   time.Duration
+
+	logger *zap.Logger
 }
 
-func NewDefaultMetricService(db *sql.DB) *MetricService {
+func NewDefaultMetricService(db *sql.DB, logger *zap.Logger) *MetricService {
 	repository := NewSQLiteMetricRepository(db)
-	processor := providers.NewMixpanelMetricProcessor(providers.MixpanelAppID, providers.MixpanelToken, providers.MixpanelBaseURL)
-	return NewMetricService(repository, processor, defaultPollInterval)
+	processor := providers.NewMixpanelMetricProcessor(providers.MixpanelAppID, providers.MixpanelToken, providers.MixpanelBaseURL, logger)
+	return NewMetricService(repository, processor, defaultPollInterval, logger)
 }
 
-func NewMetricService(repository MetricRepository, processor common.MetricProcessor, interval time.Duration) *MetricService {
+func NewMetricService(repository MetricRepository, processor common.MetricProcessor, interval time.Duration, logger *zap.Logger) *MetricService {
 	return &MetricService{
 		repository: repository,
 		processor:  processor,
 		interval:   interval,
 		done:       make(chan bool),
+		logger:     logger.Named("MetricService"),
 	}
 }
 
@@ -116,27 +119,27 @@ func (s *MetricService) AddMetric(metric common.Metric) error {
 }
 
 func (s *MetricService) processMetrics() {
-	log.Info("processing metrics")
+	s.logger.Info("processing metrics")
 	metrics, err := s.repository.Poll()
 	if err != nil {
-		log.Warn("error polling metrics", "error", err)
+		s.logger.Warn("error polling metrics", zap.Error(err))
 		return
 	}
-	log.Info("polled metrics")
+	s.logger.Info("polled metrics")
 
 	if len(metrics) == 0 {
 		return
 	}
-	log.Info("processing metrics")
+	s.logger.Info("processing metrics")
 
 	if err := s.processor.Process(metrics); err != nil {
-		log.Warn("error processing metrics", "error", err)
+		s.logger.Warn("error processing metrics", zap.Error(err))
 		return
 	}
 
-	log.Info("deleting metrics")
+	s.logger.Info("deleting metrics")
 	if err := s.repository.Delete(metrics); err != nil {
-		log.Warn("error deleting metrics", "error", err)
+		s.logger.Warn("error deleting metrics", zap.Error(err))
 	}
-	log.Info("done metrics")
+	s.logger.Info("done metrics")
 }

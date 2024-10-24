@@ -12,7 +12,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 var globalMediaCertificate *tls.Certificate = nil
@@ -83,7 +85,11 @@ func generateMediaTLSCert() error {
 	now := time.Now()
 	notBefore := now.Add(-365 * 24 * time.Hour * 100)
 	notAfter := now.Add(365 * 24 * time.Hour * 100)
-	log.Debug("generate media cert", "system time", time.Now().String(), "cert notBefore", notBefore.String(), "cert notAfter", notAfter.String())
+	logutils.ZapLogger().Debug("generate media cert",
+		zap.String("system time", time.Now().String()),
+		zap.String("cert notBefore", notBefore.String()),
+		zap.String("cert notAfter", notAfter.String()),
+	)
 	finalCert, certPem, err := GenerateTLSCert(notBefore, notAfter, []net.IP{}, []string{Localhost})
 	if err != nil {
 		return err

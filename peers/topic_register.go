@@ -3,11 +3,13 @@ package peers
 import (
 	"sync"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/discovery"
+	"github.com/status-im/status-go/logutils"
 )
 
 // Register manages register topic queries
@@ -34,9 +36,9 @@ func (r *Register) Start() error {
 		r.wg.Add(1)
 		go func(t discv5.Topic) {
 			defer common.LogOnPanic()
-			log.Debug("v5 register topic", "topic", t)
+			logutils.ZapLogger().Debug("v5 register topic", zap.String("topic", string(t)))
 			if err := r.discovery.Register(string(t), r.quit); err != nil {
-				log.Error("error registering topic", "topic", t, "error", err)
+				logutils.ZapLogger().Error("error registering topic", zap.String("topic", string(t)), zap.Error(err))
 			}
 			r.wg.Done()
 		}(topic)
@@ -55,6 +57,6 @@ func (r *Register) Stop() {
 	default:
 		close(r.quit)
 	}
-	log.Debug("waiting for register queries to exit")
+	logutils.ZapLogger().Debug("waiting for register queries to exit")
 	r.wg.Wait()
 }

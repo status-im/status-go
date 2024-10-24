@@ -6,18 +6,19 @@ import (
 	"time"
 
 	"github.com/zenthangplus/goccm"
+	"go.uber.org/zap"
 	"olympos.io/encoding/edn"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/ipfs"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
@@ -291,7 +292,9 @@ func (api *API) fetchStickerPacks(chainID uint64, resultChan chan<- *StickerPack
 
 			stickerPack, err := api.fetchPackData(stickerType, packID, true)
 			if err != nil {
-				log.Warn("Could not retrieve stickerpack data", "packID", packID, "error", err)
+				logutils.ZapLogger().Warn("Could not retrieve stickerpack data",
+					zap.Uint64("packID", packID.Uint64()),
+					zap.Error(err))
 				errChan <- err
 				return
 			}

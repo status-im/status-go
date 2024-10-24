@@ -5,8 +5,9 @@ import (
 	"database/sql"
 
 	"github.com/mat/besticon/besticon"
+	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 )
 
 // Database sql wrapper for operations with browser objects.
@@ -82,7 +83,7 @@ func (db *Database) StoreBookmark(bookmark Bookmark) (Bookmark, error) {
 			bookmark.ImageURL = icons[0].URL
 		}
 	} else {
-		log.Error("error getting the bookmark icon", "iconError", iconError)
+		logutils.ZapLogger().Error("error getting the bookmark icon", zap.Error(iconError))
 	}
 
 	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, bookmark.Removed, bookmark.Clock, bookmark.DeletedAt)

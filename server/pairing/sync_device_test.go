@@ -107,7 +107,7 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *ap
 }
 
 func (s *SyncDeviceSuite) prepareBackendWithoutAccount(tmpdir string) *api.GethStatusBackend {
-	backend := api.NewGethStatusBackend()
+	backend := api.NewGethStatusBackend(s.logger)
 	backend.UpdateRootDataDir(tmpdir)
 	return backend
 }

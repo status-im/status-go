@@ -8,14 +8,15 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
+	"go.uber.org/zap"
 
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/filters"
-	"github.com/ethereum/go-ethereum/log"
 	getrpc "github.com/ethereum/go-ethereum/rpc"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 const (
@@ -146,7 +147,7 @@ func (api *PublicAPI) NewBlockFilter() getrpc.ID {
 			select {
 			case hash := <-s:
 				if err := f.add(hash); err != nil {
-					log.Error("error adding value to filter", "hash", hash, "error", err)
+					logutils.ZapLogger().Error("error adding value to filter", zap.Stringer("hash", hash), zap.Error(err))
 				}
 			case <-f.done:
 				return
@@ -182,7 +183,7 @@ func (api *PublicAPI) NewPendingTransactionFilter() getrpc.ID {
 			select {
 			case hash := <-s:
 				if err := f.add(hash); err != nil {
-					log.Error("error adding value to filter", "hash", hash, "error", err)
+					logutils.ZapLogger().Error("error adding value to filter", zap.Any("hash", hash), zap.Error(err))
 				}
 			case <-f.done:
 				return

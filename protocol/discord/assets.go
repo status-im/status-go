@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/logutils"
 )
 
 func DownloadAvatarAsset(url string) ([]byte, error) {
@@ -26,7 +28,7 @@ func DownloadAsset(url string) ([]byte, string, error) {
 	}
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			log.Error("failed to close message asset http request body", "err", err)
+			logutils.ZapLogger().Error("failed to close message asset http request body", zap.Error(err))
 		}
 	}()
 

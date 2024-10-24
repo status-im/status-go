@@ -5,11 +5,12 @@ import (
 	"errors"
 	"reflect"
 	"regexp"
-	"runtime/debug"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -89,7 +90,7 @@ func IsNil(i interface{}) bool {
 
 func LogOnPanic() {
 	if err := recover(); err != nil {
-		log.Error("panic in goroutine", "error", err, "stacktrace", string(debug.Stack()))
+		logutils.ZapLogger().Error("panic in goroutine", zap.Any("error", err), zap.Stack("stacktrace"))
 		panic(err)
 	}
 }

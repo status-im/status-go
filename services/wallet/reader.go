@@ -7,13 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/market"
@@ -269,7 +270,7 @@ func (r *Reader) FetchOrGetCachedWalletBalances(ctx context.Context, clients map
 	if needFetch {
 		_, err := r.FetchBalances(ctx, clients, addresses)
 		if err != nil {
-			log.Error("FetchOrGetCachedWalletBalances error", "err", err)
+			logutils.ZapLogger().Error("FetchOrGetCachedWalletBalances error", zap.Error(err))
 		}
 	}
 
@@ -334,7 +335,7 @@ func tokensToBalancesPerChain(cachedTokens map[common.Address][]token.StorageTok
 func (r *Reader) fetchBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address, tokenAddresses []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
 	latestBalances, err := r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
 	if err != nil {
-		log.Error("tokenManager.GetBalancesByChain error", "err", err)
+		logutils.ZapLogger().Error("tokenManager.GetBalancesByChain error", zap.Error(err))
 		return nil, err
 	}
 
@@ -381,7 +382,7 @@ func toChainBalance(
 func (r *Reader) getBalance1DayAgo(balance *token.ChainBalance, dayAgoTimestamp int64, symbol string, address common.Address) (*big.Int, error) {
 	balance1DayAgo, err := r.tokenManager.GetTokenHistoricalBalance(address, balance.ChainID, symbol, dayAgoTimestamp)
 	if err != nil {
-		log.Error("tokenManager.GetTokenHistoricalBalance error", "err", err)
+		logutils.ZapLogger().Error("tokenManager.GetTokenHistoricalBalance error", zap.Error(err))
 		return nil, err
 	}
 
@@ -489,7 +490,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 	group.Add(func(parent context.Context) error {
 		prices, err = r.marketManager.GetOrFetchPrices(tokenSymbols, currencies, market.MaxAgeInSecondsForBalances)
 		if err != nil {
-			log.Info("marketManager.GetOrFetchPrices err", err)
+			logutils.ZapLogger().Info("marketManager.GetOrFetchPrices", zap.Error(err))
 		}
 		return nil
 	})
@@ -497,7 +498,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 	group.Add(func(parent context.Context) error {
 		tokenDetails, err = r.marketManager.FetchTokenDetails(tokenSymbols)
 		if err != nil {
-			log.Info("marketManager.FetchTokenDetails err", err)
+			logutils.ZapLogger().Info("marketManager.FetchTokenDetails", zap.Error(err))
 		}
 		return nil
 	})
@@ -505,7 +506,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 	group.Add(func(parent context.Context) error {
 		tokenMarketValues, err = r.marketManager.GetOrFetchTokenMarketValues(tokenSymbols, currency, market.MaxAgeInSecondsForBalances)
 		if err != nil {
-			log.Info("marketManager.GetOrFetchTokenMarketValues err", err)
+			logutils.ZapLogger().Info("marketManager.GetOrFetchTokenMarketValues", zap.Error(err))
 		}
 		return nil
 	})
@@ -598,7 +599,7 @@ func (r *Reader) FetchBalances(ctx context.Context, clients map[uint64]chain.Cli
 	tokenAddresses := getTokenAddresses(allTokens)
 	balances, err := r.fetchBalances(ctx, clients, addresses, tokenAddresses)
 	if err != nil {
-		log.Error("failed to update balances", "err", err)
+		logutils.ZapLogger().Error("failed to update balances", zap.Error(err))
 		return nil, err
 	}
 
@@ -611,7 +612,7 @@ func (r *Reader) FetchBalances(ctx context.Context, clients map[uint64]chain.Cli
 
 	err = r.persistence.SaveTokens(tokens)
 	if err != nil {
-		log.Error("failed to save tokens", "err", err) // Do not return error, as it is not critical
+		logutils.ZapLogger().Error("failed to save tokens", zap.Error(err)) // Do not return error, as it is not critical
 	}
 
 	r.updateTokenUpdateTimestamp(addresses)

@@ -8,12 +8,14 @@ import (
 	"math/big"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 )
@@ -206,7 +208,10 @@ func (tm *TransactionManager) removeMultiTransactionByAddress(address common.Add
 			}
 			counterpartyExists, err := tm.accountsDB.AddressExists(types.Address(addressToCheck))
 			if err != nil {
-				log.Error("Failed to query accounts db for a given address", "address", address, "error", err)
+				logutils.ZapLogger().Error("Failed to query accounts db for a given address",
+					zap.Stringer("address", address),
+					zap.Error(err),
+				)
 				continue
 			}
 
@@ -223,7 +228,7 @@ func (tm *TransactionManager) removeMultiTransactionByAddress(address common.Add
 		for _, id := range ids {
 			err = tm.storage.DeleteMultiTransaction(id)
 			if err != nil {
-				log.Error("Failed to delete multi transaction", "id", id, "error", err)
+				logutils.ZapLogger().Error("Failed to delete multi transaction", zap.Int64("id", int64(id)), zap.Error(err))
 			}
 		}
 	}

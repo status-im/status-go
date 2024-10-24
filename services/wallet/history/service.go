@@ -11,12 +11,14 @@ import (
 	"sort"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 
 	statustypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	statusrpc "github.com/status-im/status-go/rpc"
@@ -102,7 +104,7 @@ func (s *Service) triggerEvent(eventType walletevent.EventType, account statusty
 }
 
 func (s *Service) Start() {
-	log.Debug("Starting balance history service")
+	logutils.ZapLogger().Debug("Starting balance history service")
 
 	s.startTransfersWatcher()
 	s.startAccountWatcher()
@@ -122,7 +124,12 @@ func (s *Service) Start() {
 }
 
 func (s *Service) mergeChainsBalances(chainIDs []uint64, addresses []common.Address, tokenSymbol string, fromTimestamp uint64, data map[uint64][]*entry) ([]*DataPoint, error) {
-	log.Debug("Merging balances", "address", addresses, "tokenSymbol", tokenSymbol, "fromTimestamp", fromTimestamp, "len(data)", len(data))
+	logutils.ZapLogger().Debug("Merging balances",
+		zap.Stringers("address", addresses),
+		zap.String("tokenSymbol", tokenSymbol),
+		zap.Uint64("fromTimestamp", fromTimestamp),
+		zap.Int("len(data)", len(data)),
+	)
 
 	toTimestamp := uint64(time.Now().UTC().Unix())
 	allData := make([]*entry, 0)
@@ -246,7 +253,13 @@ func appendPointToSlice(slice []*DataPoint, point *DataPoint) []*DataPoint {
 
 // GetBalanceHistory returns token count balance
 func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, addresses []common.Address, tokenSymbol string, currencySymbol string, fromTimestamp uint64) ([]*ValuePoint, error) {
-	log.Debug("GetBalanceHistory", "chainIDs", chainIDs, "address", addresses, "tokenSymbol", tokenSymbol, "currencySymbol", currencySymbol, "fromTimestamp", fromTimestamp)
+	logutils.ZapLogger().Debug("GetBalanceHistory",
+		zap.Uint64s("chainIDs", chainIDs),
+		zap.Stringers("address", addresses),
+		zap.String("tokenSymbol", tokenSymbol),
+		zap.String("currencySymbol", currencySymbol),
+		zap.Uint64("fromTimestamp", fromTimestamp),
+	)
 
 	chainDataMap := make(map[uint64][]*entry)
 	for _, chainID := range chainIDs {
@@ -292,13 +305,22 @@ func (s *Service) dataPointsToValuePoints(chainIDs []uint64, tokenSymbol string,
 	if err != nil {
 		err := s.exchange.FetchAndCacheMissingRates(tokenSymbol, currencySymbol)
 		if err != nil {
-			log.Error("Error fetching exchange rates", "tokenSymbol", tokenSymbol, "currencySymbol", currencySymbol, "err", err)
+			logutils.ZapLogger().Error("Error fetching exchange rates",
+				zap.String("tokenSymbol", tokenSymbol),
+				zap.String("currencySymbol", currencySymbol),
+				zap.Error(err),
+			)
 			return nil, err
 		}
 
 		lastDayValue, err = s.exchange.GetExchangeRateForDay(tokenSymbol, currencySymbol, lastDayTime)
 		if err != nil {
-			log.Error("Exchange rate missing for", "tokenSymbol", tokenSymbol, "currencySymbol", currencySymbol, "lastDayTime", lastDayTime, "err", err)
+			logutils.ZapLogger().Error("Exchange rate missing for",
+				zap.String("tokenSymbol", tokenSymbol),
+				zap.String("currencySymbol", currencySymbol),
+				zap.Time("lastDayTime", lastDayTime),
+				zap.Error(err),
+			)
 			return nil, err
 		}
 	}
@@ -318,13 +340,20 @@ func (s *Service) dataPointsToValuePoints(chainIDs []uint64, tokenSymbol string,
 			if lastDayValue > 0 {
 				dayValue = lastDayValue
 			} else {
-				log.Warn("Exchange rate missing for", "dayTime", dayTime, "err", err)
+				logutils.ZapLogger().Warn("Exchange rate missing for",
+					zap.Time("dayTime", dayTime),
+					zap.Error(err),
+				)
 				continue
 			}
 		} else {
 			dayValue, err = s.exchange.GetExchangeRateForDay(tokenSymbol, currencySymbol, dayTime)
 			if err != nil {
-				log.Warn("Exchange rate missing for", "dayTime", dayTime, "err", err)
+				logutils.ZapLogger().Warn(
+					"Exchange rate missing for",
+					zap.Time("dayTime", dayTime),
+					zap.Error(err),
+				)
 				continue
 			}
 		}
@@ -370,7 +399,7 @@ func tokenToValue(tokenCount *big.Int, mainDenominationValue float32, weisInOneM
 //
 // expects ctx to have cancellation support and processing to be cancelled by the caller
 func (s *Service) updateBalanceHistory(ctx context.Context) error {
-	log.Debug("updateBalanceHistory started")
+	logutils.ZapLogger().Debug("updateBalanceHistory started")
 
 	addresses, err := s.accountsDB.GetWalletAddresses()
 	if err != nil {
@@ -398,15 +427,27 @@ func (s *Service) updateBalanceHistory(ctx context.Context) error {
 
 			entries, err := s.balance.db.getEntriesWithoutBalances(network.ChainID, common.Address(address))
 			if err != nil {
-				log.Error("Error getting blocks without balances", "chainID", network.ChainID, "address", address.String(), "err", err)
+				logutils.ZapLogger().Error("Error getting blocks without balances",
+					zap.Uint64("chainID", network.ChainID),
+					zap.Stringer("address", address),
+					zap.Error(err),
+				)
 				return err
 			}
 
-			log.Debug("Blocks without balances", "chainID", network.ChainID, "address", address.String(), "entries", entries)
+			logutils.ZapLogger().Debug("Blocks without balances",
+				zap.Uint64("chainID", network.ChainID),
+				zap.Stringer("address", address),
+				zap.Any("entries", entries),
+			)
 
 			client, err := s.rpcClient.EthClient(network.ChainID)
 			if err != nil {
-				log.Error("Error getting client", "chainID", network.ChainID, "address", address.String(), "err", err)
+				logutils.ZapLogger().Error("Error getting client",
+					zap.Uint64("chainID", network.ChainID),
+					zap.Stringer("address", address),
+					zap.Error(err),
+				)
 				return err
 			}
 
@@ -418,7 +459,7 @@ func (s *Service) updateBalanceHistory(ctx context.Context) error {
 		s.triggerEvent(EventBalanceHistoryUpdateFinished, address, "")
 	}
 
-	log.Debug("updateBalanceHistory finished")
+	logutils.ZapLogger().Debug("updateBalanceHistory finished")
 	return nil
 }
 
@@ -429,12 +470,22 @@ func (s *Service) addEntriesToDB(ctx context.Context, client chain.ClientInterfa
 		if (entry.tokenAddress == common.Address{}) {
 			// Check in cache
 			balance = s.balanceCache.GetBalance(common.Address(address), network.ChainID, entry.block)
-			log.Debug("Balance from cache", "chainID", network.ChainID, "address", address.String(), "block", entry.block, "balance", balance)
+			logutils.ZapLogger().Debug("Balance from cache",
+				zap.Uint64("chainID", network.ChainID),
+				zap.Stringer("address", address),
+				zap.Uint64("block", entry.block.Uint64()),
+				zap.Stringer("balance", balance),
+			)
 
 			if balance == nil {
 				balance, err = client.BalanceAt(ctx, common.Address(address), entry.block)
 				if err != nil {
-					log.Error("Error getting balance", "chainID", network.ChainID, "address", address.String(), "err", err, "unwrapped", errors.Unwrap(err))
+					logutils.ZapLogger().Error("Error getting balance",
+						zap.Uint64("chainID", network.ChainID),
+						zap.Stringer("address", address),
+						zap.Error(err),
+						zap.NamedError("unwrapped", errors.Unwrap(err)),
+					)
 					return err
 				}
 				time.Sleep(50 * time.Millisecond) // TODO Remove this sleep after fixing exceeding rate limit
@@ -444,7 +495,11 @@ func (s *Service) addEntriesToDB(ctx context.Context, client chain.ClientInterfa
 			// Check token first if it is supported
 			token := s.tokenManager.FindTokenByAddress(network.ChainID, entry.tokenAddress)
 			if token == nil {
-				log.Warn("Token not found", "chainID", network.ChainID, "address", address.String(), "tokenAddress", entry.tokenAddress.String())
+				logutils.ZapLogger().Warn("Token not found",
+					zap.Uint64("chainID", network.ChainID),
+					zap.Stringer("address", address),
+					zap.Stringer("tokenAddress", entry.tokenAddress),
+				)
 				// TODO Add "supported=false" flag to such tokens to avoid checking them again and again
 				continue // Skip token that we don't have symbol for. For example we don't have tokens in store for sepolia optimism
 			} else {
@@ -453,10 +508,20 @@ func (s *Service) addEntriesToDB(ctx context.Context, client chain.ClientInterfa
 
 			// Check balance for token
 			balance, err = s.tokenManager.GetTokenBalanceAt(ctx, client, common.Address(address), entry.tokenAddress, entry.block)
-			log.Debug("Balance from token manager", "chainID", network.ChainID, "address", address.String(), "block", entry.block, "balance", balance)
+			logutils.ZapLogger().Debug("Balance from token manager",
+				zap.Uint64("chainID", network.ChainID),
+				zap.Stringer("address", address),
+				zap.Uint64("block", entry.block.Uint64()),
+				zap.Stringer("balance", balance),
+			)
 
 			if err != nil {
-				log.Error("Error getting token balance", "chainID", network.ChainID, "address", address.String(), "tokenAddress", entry.tokenAddress.String(), "err", err)
+				logutils.ZapLogger().Error("Error getting token balance",
+					zap.Uint64("chainID", network.ChainID),
+					zap.Stringer("address", address),
+					zap.Stringer("tokenAddress", entry.tokenAddress),
+					zap.Error(err),
+				)
 				return err
 			}
 		}
@@ -464,7 +529,11 @@ func (s *Service) addEntriesToDB(ctx context.Context, client chain.ClientInterfa
 		entry.balance = balance
 		err = s.balance.db.add(entry)
 		if err != nil {
-			log.Error("Error adding balance", "chainID", network.ChainID, "address", address.String(), "err", err)
+			logutils.ZapLogger().Error("Error adding balance",
+				zap.Uint64("chainID", network.ChainID),
+				zap.Stringer("address", address),
+				zap.Error(err),
+			)
 			return err
 		}
 	}
@@ -478,17 +547,24 @@ func (s *Service) startTransfersWatcher() {
 	}
 
 	transferLoadedCb := func(chainID uint64, addresses []common.Address, block *big.Int) {
-		log.Debug("Balance history watcher: transfer loaded:", "chainID", chainID, "addresses", addresses, "block", block.Uint64())
+		logutils.ZapLogger().Debug("Balance history watcher: transfer loaded:",
+			zap.Uint64("chainID", chainID),
+			zap.Stringers("addresses", addresses),
+			zap.Uint64("block", block.Uint64()),
+		)
 
 		client, err := s.rpcClient.EthClient(chainID)
 		if err != nil {
-			log.Error("Error getting client", "chainID", chainID, "err", err)
+			logutils.ZapLogger().Error("Error getting client",
+				zap.Uint64("chainID", chainID),
+				zap.Error(err),
+			)
 			return
 		}
 
 		network := s.networkManager.Find(chainID)
 		if network == nil {
-			log.Error("Network not found", "chainID", chainID)
+			logutils.ZapLogger().Error("Network not found", zap.Uint64("chainID", chainID))
 			return
 		}
 
@@ -497,22 +573,37 @@ func (s *Service) startTransfersWatcher() {
 		for _, address := range addresses {
 			transfers, err := transferDB.GetTransfersByAddressAndBlock(chainID, address, block, 1500) // 1500 is quite arbitrary and far from real, but should be enough to cover all transfers in a block
 			if err != nil {
-				log.Error("Error getting transfers", "chainID", chainID, "address", address.String(), "err", err)
+				logutils.ZapLogger().Error("Error getting transfers",
+					zap.Uint64("chainID", chainID),
+					zap.Stringer("address", address),
+					zap.Error(err),
+				)
 				continue
 			}
 
 			if len(transfers) == 0 {
-				log.Debug("No transfers found", "chainID", chainID, "address", address.String(), "block", block.Uint64())
+				logutils.ZapLogger().Debug("No transfers found",
+					zap.Uint64("chainID", chainID),
+					zap.Stringer("address", address),
+					zap.Uint64("block", block.Uint64()),
+				)
 				continue
 			}
 
 			entries := transfersToEntries(address, block, transfers) // TODO Remove address and block after testing that they match
 			unique := removeDuplicates(entries)
-			log.Debug("Entries after filtering", "entries", entries, "unique", unique)
+			logutils.ZapLogger().Debug("Entries after filtering",
+				zap.Any("entries", entries),
+				zap.Any("unique", unique),
+			)
 
 			err = s.addEntriesToDB(s.serviceContext, client, network, statustypes.Address(address), unique)
 			if err != nil {
-				log.Error("Error adding entries to DB", "chainID", chainID, "address", address.String(), "err", err)
+				logutils.ZapLogger().Error("Error adding entries to DB",
+					zap.Uint64("chainID", chainID),
+					zap.Stringer("address", address),
+					zap.Error(err),
+				)
 				continue
 			}
 
@@ -588,7 +679,10 @@ func (s *Service) onAccountsChanged(changedAddresses []common.Address, eventType
 		for _, address := range changedAddresses {
 			err := s.balance.db.removeBalanceHistory(address)
 			if err != nil {
-				log.Error("Error removing balance history", "address", address, "err", err)
+				logutils.ZapLogger().Error("Error removing balance history",
+					zap.String("address", address.String()),
+					zap.Error(err),
+				)
 			}
 		}
 	}

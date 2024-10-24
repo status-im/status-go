@@ -6,13 +6,14 @@ import (
 	"math/big"
 	"time"
 
+	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
@@ -80,8 +81,13 @@ func (c *ethHistoricalCommand) Command() async.Command {
 }
 
 func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
-	log.Debug("eth historical downloader start", "chainID", c.chainClient.NetworkID(), "address", c.address,
-		"from", c.from.Number, "to", c.to, "noLimit", c.noLimit)
+	logutils.ZapLogger().Debug("eth historical downloader start",
+		zap.Uint64("chainID", c.chainClient.NetworkID()),
+		zap.Stringer("address", c.address),
+		zap.Stringer("from", c.from.Number),
+		zap.Stringer("to", c.to),
+		zap.Bool("noLimit", c.noLimit),
+	)
 
 	start := time.Now()
 	if c.from.Number != nil && c.from.Balance != nil {
@@ -95,8 +101,13 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 
 	if err != nil {
 		c.error = err
-		log.Error("failed to find blocks with transfers", "error", err, "chainID", c.chainClient.NetworkID(),
-			"address", c.address, "from", c.from.Number, "to", c.to)
+		logutils.ZapLogger().Error("failed to find blocks with transfers",
+			zap.Uint64("chainID", c.chainClient.NetworkID()),
+			zap.Stringer("address", c.address),
+			zap.Stringer("from", c.from.Number),
+			zap.Stringer("to", c.to),
+			zap.Error(err),
+		)
 		return nil
 	}
 
@@ -104,8 +115,14 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	c.resultingFrom = from
 	c.startBlock = startBlock
 
-	log.Debug("eth historical downloader finished successfully", "chain", c.chainClient.NetworkID(),
-		"address", c.address, "from", from, "to", c.to, "total blocks", len(headers), "time", time.Since(start))
+	logutils.ZapLogger().Debug("eth historical downloader finished successfully",
+		zap.Uint64("chainID", c.chainClient.NetworkID()),
+		zap.Stringer("address", c.address),
+		zap.Stringer("from", from),
+		zap.Stringer("to", c.to),
+		zap.Int("totalBlocks", len(headers)),
+		zap.Duration("time", time.Since(start)),
+	)
 
 	return nil
 }
@@ -146,8 +163,11 @@ func getErc20BatchSize(chainID uint64) *big.Int {
 }
 
 func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
-	log.Debug("wallet historical downloader for erc20 transfers start", "chainID", c.chainClient.NetworkID(),
-		"from", c.from, "to", c.to)
+	logutils.ZapLogger().Debug("wallet historical downloader for erc20 transfers start",
+		zap.Uint64("chainID", c.chainClient.NetworkID()),
+		zap.Stringer("from", c.from),
+		zap.Stringer("to", c.to),
+	)
 
 	start := time.Now()
 	if c.iterator == nil {
@@ -155,20 +175,28 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 			c.chainClient,
 			c.erc20, getErc20BatchSize(c.chainClient.NetworkID()), c.to, c.from)
 		if err != nil {
-			log.Error("failed to setup historical downloader for erc20")
+			logutils.ZapLogger().Error("failed to setup historical downloader for erc20")
 			return err
 		}
 	}
 	for !c.iterator.Finished() {
 		headers, _, _, err := c.iterator.Next(ctx)
 		if err != nil {
-			log.Error("failed to get next batch", "error", err, "chainID", c.chainClient.NetworkID()) // TODO: stop inifinite command in case of an error that we can't fix like missing trie node
+			logutils.ZapLogger().Error("failed to get next batch",
+				zap.Uint64("chainID", c.chainClient.NetworkID()),
+				zap.Error(err),
+			) // TODO: stop inifinite command in case of an error that we can't fix like missing trie node
 			return err
 		}
 		c.foundHeaders = append(c.foundHeaders, headers...)
 	}
-	log.Debug("wallet historical downloader for erc20 transfers finished", "chainID", c.chainClient.NetworkID(),
-		"from", c.from, "to", c.to, "time", time.Since(start), "headers", len(c.foundHeaders))
+	logutils.ZapLogger().Debug("wallet historical downloader for erc20 transfers finished",
+		zap.Uint64("chainID", c.chainClient.NetworkID()),
+		zap.Stringer("from", c.from),
+		zap.Stringer("to", c.to),
+		zap.Duration("time", time.Since(start)),
+		zap.Int("headers", len(c.foundHeaders)),
+	)
 	return nil
 }
 
@@ -211,7 +239,11 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	// Take blocks from cache if available and disrespect the limit
 	// If no blocks are available in cache, take blocks from DB respecting the limit
 	// If no limit is set, take all blocks from DB
-	log.Debug("start transfersCommand", "chain", c.chainClient.NetworkID(), "address", c.address, "blockNums", c.blockNums)
+	logutils.ZapLogger().Debug("start transfersCommand",
+		zap.Uint64("chain", c.chainClient.NetworkID()),
+		zap.Stringer("address", c.address),
+		zap.Stringers("blockNums", c.blockNums),
+	)
 	startTs := time.Now()
 
 	for {
@@ -221,11 +253,15 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 		}
 
 		for _, blockNum := range blocks {
-			log.Debug("transfersCommand block start", "chain", c.chainClient.NetworkID(), "address", c.address, "block", blockNum)
+			logutils.ZapLogger().Debug("transfersCommand block start",
+				zap.Uint64("chain", c.chainClient.NetworkID()),
+				zap.Stringer("address", c.address),
+				zap.Stringer("blockNum", blockNum),
+			)
 
 			allTransfers, err := c.eth.GetTransfersByNumber(ctx, blockNum)
 			if err != nil {
-				log.Error("getTransfersByBlocks error", "error", err)
+				logutils.ZapLogger().Error("getTransfersByBlocks error", zap.Error(err))
 				return err
 			}
 
@@ -235,23 +271,27 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 				// First, try to match to any pre-existing pending/multi-transaction
 				err := c.saveAndConfirmPending(allTransfers, blockNum)
 				if err != nil {
-					log.Error("saveAndConfirmPending error", "error", err)
+					logutils.ZapLogger().Error("saveAndConfirmPending error", zap.Error(err))
 					return err
 				}
 
 				// Check if multi transaction needs to be created
 				err = c.processMultiTransactions(ctx, allTransfers)
 				if err != nil {
-					log.Error("processMultiTransactions error", "error", err)
+					logutils.ZapLogger().Error("processMultiTransactions error", zap.Error(err))
 					return err
 				}
 			} else {
 				// If no transfers found, that is suspecting, because downloader returned this block as containing transfers
-				log.Error("no transfers found in block", "chain", c.chainClient.NetworkID(), "address", c.address, "block", blockNum)
+				logutils.ZapLogger().Error("no transfers found in block",
+					zap.Uint64("chain", c.chainClient.NetworkID()),
+					zap.Stringer("address", c.address),
+					zap.Stringer("block", blockNum),
+				)
 
 				err = markBlocksAsLoaded(c.chainClient.NetworkID(), c.db.client, c.address, []*big.Int{blockNum})
 				if err != nil {
-					log.Error("Mark blocks loaded error", "error", err)
+					logutils.ZapLogger().Error("Mark blocks loaded error", zap.Error(err))
 					return err
 				}
 			}
@@ -264,20 +304,34 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 			c.notifyOfLatestTransfers(allTransfers, w_common.Erc721Transfer)
 			c.notifyOfLatestTransfers(allTransfers, w_common.Erc1155Transfer)
 
-			log.Debug("transfersCommand block end", "chain", c.chainClient.NetworkID(), "address", c.address,
-				"block", blockNum, "tranfers.len", len(allTransfers), "fetchedTransfers.len", len(c.fetchedTransfers))
+			logutils.ZapLogger().Debug("transfersCommand block end",
+				zap.Uint64("chain", c.chainClient.NetworkID()),
+				zap.Stringer("address", c.address),
+				zap.Stringer("blockNum", blockNum),
+				zap.Int("transfersLen", len(allTransfers)),
+				zap.Int("fetchedTransfersLen", len(c.fetchedTransfers)),
+			)
 		}
 
 		if c.blockNums != nil || len(blocks) == 0 ||
 			(c.blocksLimit > noBlockLimit && len(blocks) >= c.blocksLimit) {
-			log.Debug("loadTransfers breaking loop on block limits reached or 0 blocks", "chain", c.chainClient.NetworkID(),
-				"address", c.address, "limit", c.blocksLimit, "blocks", len(blocks))
+			logutils.ZapLogger().Debug("loadTransfers breaking loop on block limits reached or 0 blocks",
+				zap.Uint64("chain", c.chainClient.NetworkID()),
+				zap.Stringer("address", c.address),
+				zap.Int("limit", c.blocksLimit),
+				zap.Int("blocks", len(blocks)),
+			)
 			break
 		}
 	}
 
-	log.Debug("end transfersCommand", "chain", c.chainClient.NetworkID(), "address", c.address,
-		"blocks.len", len(c.blockNums), "transfers.len", len(c.fetchedTransfers), "in", time.Since(startTs))
+	logutils.ZapLogger().Debug("end transfersCommand",
+		zap.Uint64("chain", c.chainClient.NetworkID()),
+		zap.Stringer("address", c.address),
+		zap.Int("blocks.len", len(c.blockNums)),
+		zap.Int("transfers.len", len(c.fetchedTransfers)),
+		zap.Duration("in", time.Since(startTs)),
+	)
 
 	return nil
 }
@@ -295,7 +349,7 @@ func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockN
 		if resErr == nil {
 			commitErr := tx.Commit()
 			if commitErr != nil {
-				log.Error("failed to commit", "error", commitErr)
+				logutils.ZapLogger().Error("failed to commit", zap.Error(commitErr))
 			}
 			for _, notify := range notifyFunctions {
 				notify()
@@ -303,14 +357,14 @@ func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockN
 		} else {
 			rollbackErr := tx.Rollback()
 			if rollbackErr != nil {
-				log.Error("failed to rollback", "error", rollbackErr)
+				logutils.ZapLogger().Error("failed to rollback", zap.Error(rollbackErr))
 			}
 		}
 	}()
 
 	resErr = saveTransfersMarkBlocksLoaded(tx, c.chainClient.NetworkID(), c.address, allTransfers, []*big.Int{blockNum})
 	if resErr != nil {
-		log.Error("SaveTransfers error", "error", resErr)
+		logutils.ZapLogger().Error("SaveTransfers error", zap.Error(resErr))
 	}
 
 	return resErr
@@ -321,7 +375,7 @@ func externalTransactionOrError(err error, mTID int64) bool {
 		// External transaction downloaded, ignore it
 		return true
 	} else if err != nil {
-		log.Warn("GetOwnedMultiTransactionID", "error", err)
+		logutils.ZapLogger().Warn("GetOwnedMultiTransactionID", zap.Error(err))
 		return true
 	} else if mTID <= 0 {
 		// Existing external transaction, ignore it
@@ -350,7 +404,7 @@ func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers [
 				mTID = w_common.NewAndSet(existingMTID)
 			}
 		} else if err != nil {
-			log.Warn("GetOwnedPendingStatus", "error", err)
+			logutils.ZapLogger().Warn("GetOwnedPendingStatus", zap.Error(err))
 			continue
 		}
 
@@ -360,7 +414,7 @@ func (c *transfersCommand) confirmPendingTransactions(tx *sql.Tx, allTransfers [
 		if txType != nil && *txType == transactions.WalletTransfer {
 			notify, err := c.pendingTxManager.DeleteBySQLTx(tx, chainID, txHash)
 			if err != nil && err != transactions.ErrStillPending {
-				log.Error("DeleteBySqlTx error", "error", err)
+				logutils.ZapLogger().Error("DeleteBySqlTx error", zap.Error(err))
 			}
 			notifyFunctions = append(notifyFunctions, notify)
 		}
@@ -571,7 +625,10 @@ func loadTransfers(ctx context.Context, blockDAO *BlockDAO, db *Database,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager, feed *event.Feed) error {
 
-	log.Debug("loadTransfers start", "chain", chainClient.NetworkID(), "limit", blocksLimitPerAccount)
+	logutils.ZapLogger().Debug("loadTransfers start",
+		zap.Uint64("chain", chainClient.NetworkID()),
+		zap.Int("limit", blocksLimitPerAccount),
+	)
 
 	start := time.Now()
 	group := async.NewGroup(ctx)
@@ -600,9 +657,15 @@ func loadTransfers(ctx context.Context, blockDAO *BlockDAO, db *Database,
 
 	select {
 	case <-ctx.Done():
-		log.Debug("loadTransfers cancelled", "chain", chainClient.NetworkID(), "error", ctx.Err())
+		logutils.ZapLogger().Debug("loadTransfers cancelled",
+			zap.Uint64("chain", chainClient.NetworkID()),
+			zap.Error(ctx.Err()),
+		)
 	case <-group.WaitAsync():
-		log.Debug("loadTransfers finished for account", "in", time.Since(start), "chain", chainClient.NetworkID())
+		logutils.ZapLogger().Debug("loadTransfers finished for account",
+			zap.Duration("in", time.Since(start)),
+			zap.Uint64("chain", chainClient.NetworkID()),
+		)
 	}
 	return nil
 }

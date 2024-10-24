@@ -8,10 +8,12 @@ import (
 	"math/big"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/network"
 
@@ -341,12 +343,17 @@ func (s *Service) Stop() {
 func (s *Service) sendResponseEvent(requestID *int32, eventType walletevent.EventType, payloadObj interface{}, resErr error) {
 	payload, err := json.Marshal(payloadObj)
 	if err != nil {
-		log.Error("Error marshaling response: %v; result error: %w", err, resErr)
+		logutils.ZapLogger().Error("Error marshaling", zap.NamedError("response", err), zap.NamedError("result", resErr))
 	} else {
 		err = resErr
 	}
 
-	log.Debug("wallet.api.collectibles.Service RESPONSE", "requestID", requestID, "eventType", eventType, "error", err, "payload.len", len(payload))
+	logutils.ZapLogger().Debug("wallet.api.collectibles.Service RESPONSE",
+		zap.Any("requestID", requestID),
+		zap.String("eventType", string(eventType)),
+		zap.Int("payload.len", len(payload)),
+		zap.Error(err),
+	)
 
 	event := walletevent.Event{
 		Type:    eventType,
@@ -443,7 +450,7 @@ func (s *Service) onCollectiblesTransfer(account common.Address, chainID walletC
 		}
 		err := s.manager.SetCollectibleTransferID(account, id, transfer.ID, true)
 		if err != nil {
-			log.Error("Error setting transfer ID for collectible", "error", err)
+			logutils.ZapLogger().Error("Error setting transfer ID for collectible", zap.Error(err))
 		}
 	}
 }
@@ -462,7 +469,7 @@ func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectib
 	for _, id := range ownedCollectibles.ids {
 		transfer, err := s.transferDB.GetLatestCollectibleTransfer(ownedCollectibles.account, id)
 		if err != nil {
-			log.Error("Error fetching latest collectible transfer", "error", err)
+			logutils.ZapLogger().Error("Error fetching latest collectible transfer", zap.Error(err))
 			continue
 		}
 		if transfer != nil {
@@ -472,7 +479,7 @@ func (s *Service) lookupTransferForCollectibles(ownedCollectibles OwnedCollectib
 			}
 			err = s.manager.SetCollectibleTransferID(ownedCollectibles.account, id, transfer.ID, false)
 			if err != nil {
-				log.Error("Error setting transfer ID for collectible", "error", err)
+				logutils.ZapLogger().Error("Error setting transfer ID for collectible", zap.Error(err))
 			}
 		}
 	}
@@ -489,7 +496,7 @@ func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCol
 
 	collectiblesData, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, ownedCollectibles.ids, false)
 	if err != nil {
-		log.Error("Error fetching collectibles data", "error", err)
+		logutils.ZapLogger().Error("Error fetching collectibles data", zap.Error(err))
 		return
 	}
 

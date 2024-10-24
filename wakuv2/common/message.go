@@ -6,12 +6,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 
+	"github.com/status-im/status-go/logutils"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // MessageType represents where this message comes from
@@ -105,7 +108,10 @@ type MemoryMessageStore struct {
 func NewReceivedMessage(env *protocol.Envelope, msgType MessageType) *ReceivedMessage {
 	ct, err := ExtractTopicFromContentTopic(env.Message().ContentTopic)
 	if err != nil {
-		log.Debug("failed to extract content topic from message", "topic", env.Message().ContentTopic, "err", err)
+		logutils.ZapLogger().Debug("failed to extract content topic from message",
+			zap.String("topic", env.Message().ContentTopic),
+			zap.Error(err),
+		)
 		return nil
 	}
 
@@ -176,7 +182,7 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	raw, err := payload.DecodePayload(msg.Envelope.Message(), keyInfo)
 
 	if err != nil {
-		log.Error("failed to decode message", "err", err)
+		logutils.ZapLogger().Error("failed to decode message", zap.Error(err))
 		return nil
 	}
 
@@ -191,7 +197,7 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 
 	ct, err := ExtractTopicFromContentTopic(msg.Envelope.Message().ContentTopic)
 	if err != nil {
-		log.Error("failed to decode message", "err", err)
+		logutils.ZapLogger().Error("failed to decode message", zap.Error(err))
 		return nil
 	}
 

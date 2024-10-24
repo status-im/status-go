@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
+	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 var (
@@ -55,7 +56,11 @@ func (c *ttlCache[K, V]) init() {
 		ttlcache.WithTTL[K, V](defaultTTLValue),
 	)
 	c.cache.OnEviction(func(ctx context.Context, reason ttlcache.EvictionReason, item *ttlcache.Item[K, V]) {
-		log.Debug("Evicting item from balance/nonce cache", "reason", reason, "key", item.Key, "value", item.Value)
+		logutils.ZapLogger().Debug("Evicting item from balance/nonce cache",
+			zap.Int("reason", int(reason)),
+			zap.Any("key", item.Key),
+			zap.Any("value", item.Value),
+		)
 	})
 	go func() { // starts automatic expired item deletion
 		defer common.LogOnPanic()

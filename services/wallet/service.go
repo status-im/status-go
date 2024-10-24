@@ -9,11 +9,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	protocolCommon "github.com/status-im/status-go/protocol/common"
@@ -271,7 +271,7 @@ func (s *Service) SetWalletCommunityInfoProvider(provider thirdparty.CommunityIn
 
 // Stop reactor and close db.
 func (s *Service) Stop() error {
-	log.Info("wallet will be stopped")
+	logutils.ZapLogger().Info("wallet will be stopped")
 	s.signals.Stop()
 	s.transferController.Stop()
 	s.currency.Stop()
@@ -281,7 +281,7 @@ func (s *Service) Stop() error {
 	s.collectibles.Stop()
 	s.tokenManager.Stop()
 	s.started = false
-	log.Info("wallet stopped")
+	logutils.ZapLogger().Info("wallet stopped")
 	return nil
 }
 

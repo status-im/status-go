@@ -4,9 +4,11 @@ import (
 	"errors"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 type PendingTxInfo struct {
@@ -71,7 +73,7 @@ func (e *transactionSentToUpstreamEvent) processTransactionSentToUpstream(transa
 		select {
 		case channel <- transactionInfo:
 		default:
-			log.Error("dropping messages %s for subscriotion %d because the channel is full", transactionInfo, id)
+			logutils.ZapLogger().Error("dropping messages because the channel is full", zap.Any("transactionInfo", transactionInfo), zap.Int("id", id))
 		}
 	}
 }

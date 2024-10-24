@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
@@ -33,7 +35,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 
 	ethClient, err := r.rpcClient.EthClient(chainID)
 	if err != nil {
-		log.Error("Failed to get eth client", "error", err)
+		logutils.ZapLogger().Error("Failed to get eth client", zap.Error(err))
 		return err
 	}
 
@@ -75,19 +77,19 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 				var blockNumber uint64
 				blockNumber, err := ethClient.BlockNumber(ctx)
 				if err != nil {
-					log.Error("Failed to get block number", "error", err)
+					logutils.ZapLogger().Error("Failed to get block number", zap.Error(err))
 					continue
 				}
 
 				val, ok := r.clientsForUpdatesPerChains.Load(chainID)
 				if !ok {
-					log.Error("Failed to get fetchingLastBlock", "chain", chainID)
+					logutils.ZapLogger().Error("Failed to get fetchingLastBlock", zap.Uint64("chain", chainID))
 					continue
 				}
 
 				flbLoaded, ok := val.(fetchingLastBlock)
 				if !ok {
-					log.Error("Failed to get fetchingLastBlock", "chain", chainID)
+					logutils.ZapLogger().Error("Failed to get fetchingLastBlock", zap.Uint64("chain", chainID))
 					continue
 				}
 
@@ -97,7 +99,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 
 					fees, err := r.feesManager.SuggestedFees(ctx, chainID)
 					if err != nil {
-						log.Error("Failed to get suggested fees", "error", err)
+						logutils.ZapLogger().Error("Failed to get suggested fees", zap.Error(err))
 						continue
 					}
 
@@ -110,7 +112,7 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 						for _, path := range r.activeRoutes.Best {
 							err = r.cacluateFees(ctx, path, fees, false, 0)
 							if err != nil {
-								log.Error("Failed to calculate fees", "error", err)
+								logutils.ZapLogger().Error("Failed to calculate fees", zap.Error(err))
 								continue
 							}
 						}
@@ -152,7 +154,7 @@ func (r *Router) unsubscribeFeesUpdateAccrossAllChains() {
 	r.clientsForUpdatesPerChains.Range(func(key, value interface{}) bool {
 		flb, ok := value.(fetchingLastBlock)
 		if !ok {
-			log.Error("Failed to get fetchingLastBlock", "chain", key)
+			logutils.ZapLogger().Error("Failed to get fetchingLastBlock", zap.Any("chain", key))
 			return false
 		}
 

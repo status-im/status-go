@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"
@@ -54,7 +55,9 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	utils.Init()
 	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount1PKFile()))
 
-	accManager := account.NewGethManager()
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+	accManager := account.NewGethManager(logger)
 
 	nodeConfig := &params.NodeConfig{
 		KeyStoreDir: keyStoreDir,

@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/metrics"
 	gethprom "github.com/ethereum/go-ethereum/metrics/prometheus"
+	"github.com/status-im/status-go/logutils"
 
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -38,7 +40,7 @@ func healthHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte("OK"))
 		if err != nil {
-			log.Error("health handler error", "err", err)
+			logutils.ZapLogger().Error("health handler error", zap.Error(err))
 		}
 	})
 }
@@ -58,5 +60,5 @@ func Handler(reg metrics.Registry) http.Handler {
 // Listen starts the HTTP server in the background.
 func (p *Server) Listen() {
 	defer common.LogOnPanic()
-	log.Info("metrics server stopped", "err", p.server.ListenAndServe())
+	logutils.ZapLogger().Info("metrics server stopped", zap.Error(p.server.ListenAndServe()))
 }

@@ -4,13 +4,15 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -53,7 +55,7 @@ func (t transactionBody) MarshalJSON() ([]byte, error) {
 }
 
 func (s *Service) buildTransactionNotification(rawTransfer transfer.Transfer) *Notification {
-	log.Info("Handled a new transfer in buildTransactionNotification", "info", rawTransfer)
+	logutils.ZapLogger().Debug("Handled a new transfer in buildTransactionNotification", zap.Any("info", rawTransfer))
 
 	var deeplink string
 	var state transactionState
@@ -71,13 +73,13 @@ func (s *Service) buildTransactionNotification(rawTransfer transfer.Transfer) *N
 	from, err := s.accountsDB.GetAccountByAddress(types.Address(transfer.From))
 
 	if err != nil {
-		log.Debug("Could not select From account by address", "error", err)
+		logutils.ZapLogger().Debug("Could not select From account by address", zap.Error(err))
 	}
 
 	to, err := s.accountsDB.GetAccountByAddress(types.Address(transfer.To))
 
 	if err != nil {
-		log.Debug("Could not select To account by address", "error", err)
+		logutils.ZapLogger().Debug("Could not select To account by address", zap.Error(err))
 	}
 
 	if from != nil {
@@ -108,16 +110,16 @@ func (s *Service) buildTransactionNotification(rawTransfer transfer.Transfer) *N
 }
 
 func (s *Service) transactionsHandler(payload TransactionEvent) {
-	log.Info("Handled a new transaction", "info", payload)
+	logutils.ZapLogger().Info("Handled a new transaction", zap.Any("info", payload))
 
 	limit := 20
 	if payload.BlockNumber != nil {
 		for _, address := range payload.Accounts {
 			if payload.BlockNumber.Cmp(payload.MaxKnownBlocks[address]) >= 0 {
-				log.Info("Handled transfer for address", "info", address)
+				logutils.ZapLogger().Info("Handled transfer for address", zap.Stringer("info", address))
 				transfers, err := s.walletDB.GetTransfersByAddressAndBlock(s.chainID, address, payload.BlockNumber, int64(limit))
 				if err != nil {
-					log.Error("Could not fetch transfers", "error", err)
+					logutils.ZapLogger().Error("Could not fetch transfers", zap.Error(err))
 				}
 
 				for _, transaction := range transfers {
@@ -136,7 +138,7 @@ func (s *Service) SubscribeWallet(publisher *event.Feed) error {
 	preference, err := s.db.GetWalletPreference()
 
 	if err != nil {
-		log.Error("Failed to get wallet preference", "error", err)
+		logutils.ZapLogger().Error("Failed to get wallet preference", zap.Error(err))
 		s.WatchingEnabled = false
 	} else {
 		s.WatchingEnabled = preference.Enabled
@@ -155,7 +157,7 @@ func (s *Service) StartWalletWatcher() {
 	}
 
 	if s.walletTransmitter.publisher == nil {
-		log.Error("wallet publisher was not initialized")
+		logutils.ZapLogger().Error("wallet publisher was not initialized")
 		return
 	}
 
@@ -179,7 +181,7 @@ func (s *Service) StartWalletWatcher() {
 				// technically event.Feed cannot send an error to subscription.Err channel.
 				// the only time we will get an event is when that channel is closed.
 				if err != nil {
-					log.Error("wallet signals transmitter failed with", "error", err)
+					logutils.ZapLogger().Error("wallet signals transmitter failed with", zap.Error(err))
 				}
 				return
 			case event := <-events:

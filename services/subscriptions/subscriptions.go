@@ -5,22 +5,24 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 type Subscriptions struct {
 	mu          sync.Mutex
 	subs        map[SubscriptionID]*Subscription
 	checkPeriod time.Duration
-	log         log.Logger
+	logger      *zap.Logger
 }
 
 func NewSubscriptions(period time.Duration) *Subscriptions {
 	return &Subscriptions{
 		subs:        make(map[SubscriptionID]*Subscription),
 		checkPeriod: period,
-		log:         log.New("package", "status-go/services/subsriptions.Subscriptions"),
+		logger:      logutils.ZapLogger().Named("subscriptionsService"),
 	}
 }
 
@@ -34,7 +36,7 @@ func (s *Subscriptions) Create(namespace string, filter filter) (SubscriptionID,
 		defer gocommon.LogOnPanic()
 		err := newSub.Start(s.checkPeriod)
 		if err != nil {
-			s.log.Error("error while starting subscription", "err", err)
+			s.logger.Error("error while starting subscription", zap.Error(err))
 		}
 	}()
 

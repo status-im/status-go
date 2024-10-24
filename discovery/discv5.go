@@ -6,8 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/status-im/status-go/logutils"
 )
 
 // NewDiscV5 creates instances of discovery v5 facade.
@@ -40,7 +42,7 @@ func (d *DiscV5) Running() bool {
 func (d *DiscV5) Start() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	log.Debug("Starting discovery", "listen address", d.laddr)
+	logutils.ZapLogger().Debug("Starting discovery", zap.String("listen address", d.laddr))
 	addr, err := net.ResolveUDPAddr("udp", d.laddr)
 	if err != nil {
 		return err

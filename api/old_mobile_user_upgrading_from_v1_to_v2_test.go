@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.uber.org/zap"
+
 	d_common "github.com/status-im/status-go/common"
 
 	"github.com/status-im/status-go/appdatabase"
@@ -47,6 +49,7 @@ const (
 type OldMobileUserUpgradingFromV1ToV2Test struct {
 	suite.Suite
 	tmpdir string
+	logger *zap.Logger
 }
 
 type PostLoginCheckCallback func(b *GethStatusBackend)
@@ -55,6 +58,10 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) SetupTest() {
 	utils.Init()
 	s.tmpdir = s.T().TempDir()
 	copyDir(srcFolder, s.tmpdir, s.T())
+
+	var err error
+	s.logger, err = zap.NewDevelopment()
+	s.Require().NoError(err)
 }
 
 func TestOldMobileUserUpgradingFromV1ToV2(t *testing.T) {
@@ -62,7 +69,7 @@ func TestOldMobileUserUpgradingFromV1ToV2(t *testing.T) {
 }
 
 func (s *OldMobileUserUpgradingFromV1ToV2Test) loginMobileUser(check PostLoginCheckCallback) {
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(s.logger)
 	b.UpdateRootDataDir(s.tmpdir)
 	s.Require().NoError(b.OpenAccounts())
 	s.Require().NoError(b.Login(oldMobileUserKeyUID, oldMobileUserPasswd))
@@ -159,7 +166,7 @@ func (s *OldMobileUserUpgradingFromV1ToV2Test) TestLoginAndMigrationsStillWorkWi
 
 // TestAddWalletAccount we should be able to add a wallet account after upgrading from mobile v1
 func (s *OldMobileUserUpgradingFromV1ToV2Test) TestAddWalletAccountAfterUpgradingFromMobileV1() {
-	b := NewGethStatusBackend()
+	b := NewGethStatusBackend(s.logger)
 	b.UpdateRootDataDir(s.tmpdir)
 	s.Require().NoError(b.OpenAccounts())
 	s.Require().NoError(b.Login(oldMobileUserKeyUID, oldMobileUserPasswd))

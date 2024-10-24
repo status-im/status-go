@@ -6,14 +6,16 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/discovery"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers/verifier"
 	"github.com/status-im/status-go/signal"
@@ -205,7 +207,7 @@ func (p *PeerPool) stopDiscovery(server *p2p.Server) {
 	}
 
 	if err := p.discovery.Stop(); err != nil {
-		log.Error("discovery errored when stopping", "err", err)
+		logutils.ZapLogger().Error("discovery errored when stopping", zap.Error(err))
 	}
 	for _, t := range p.topics {
 		t.StopSearch(server)
@@ -224,7 +226,7 @@ func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 		if err := p.startDiscovery(); err != nil {
 			return err
 		}
-		log.Debug("restarted discovery from peer pool")
+		logutils.ZapLogger().Debug("restarted discovery from peer pool")
 	}
 	for _, t := range p.topics {
 		if !t.BelowMin() || t.SearchRunning() {
@@ -232,7 +234,7 @@ func (p *PeerPool) restartDiscovery(server *p2p.Server) error {
 		}
 		err := t.StartSearch(server)
 		if err != nil {
-			log.Error("search failed to start", "error", err)
+			logutils.ZapLogger().Error("search failed to start", zap.Error(err))
 		}
 	}
 	return nil
@@ -283,15 +285,15 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 
 		select {
 		case <-p.quit:
-			log.Debug("stopping DiscV5 because of quit")
+			logutils.ZapLogger().Debug("stopping DiscV5 because of quit")
 			p.stopDiscovery(server)
 			return
 		case <-timeout:
-			log.Info("DiscV5 timed out")
+			logutils.ZapLogger().Info("DiscV5 timed out")
 			p.stopDiscovery(server)
 		case <-retryDiscv5:
 			if err := p.restartDiscovery(server); err != nil {
-				log.Error("starting discv5 failed", "error", err, "retry", discoveryRestartTimeout)
+				logutils.ZapLogger().Error("starting discv5 failed", zap.Duration("retry", discoveryRestartTimeout), zap.Error(err))
 				queueRetry(discoveryRestartTimeout)
 			}
 		case <-stopDiscv5:
@@ -320,12 +322,12 @@ func (p *PeerPool) handlePeerEventType(server *p2p.Server, event *p2p.PeerEvent,
 	var shouldStop bool
 	switch event.Type {
 	case p2p.PeerEventTypeDrop:
-		log.Debug("confirm peer dropped", "ID", event.Peer)
+		logutils.ZapLogger().Debug("confirm peer dropped", zap.Stringer("ID", event.Peer))
 		if p.handleDroppedPeer(server, event.Peer) {
 			shouldRetry = true
 		}
 	case p2p.PeerEventTypeAdd: // skip other events
-		log.Debug("confirm peer added", "ID", event.Peer)
+		logutils.ZapLogger().Debug("confirm peer added", zap.Stringer("ID", event.Peer))
 		p.handleAddedPeer(server, event.Peer)
 		shouldStop = true
 	default:
@@ -366,7 +368,7 @@ func (p *PeerPool) handleStopTopics(server *p2p.Server) {
 		}
 	}
 	if p.allTopicsStopped() {
-		log.Debug("closing discv5 connection because all topics reached max limit")
+		logutils.ZapLogger().Debug("closing discv5 connection because all topics reached max limit")
 		p.stopDiscovery(server)
 	}
 }
@@ -393,10 +395,10 @@ func (p *PeerPool) handleDroppedPeer(server *p2p.Server, nodeID enode.ID) (any b
 		if confirmed {
 			newPeer := t.AddPeerFromTable(server)
 			if newPeer != nil {
-				log.Debug("added peer from local table", "ID", newPeer.ID)
+				logutils.ZapLogger().Debug("added peer from local table", zap.Stringer("ID", newPeer.ID))
 			}
 		}
-		log.Debug("search", "topic", t.Topic(), "below min", t.BelowMin())
+		logutils.ZapLogger().Debug("search", zap.String("topic", string(t.Topic())), zap.Bool("below min", t.BelowMin()))
 		if t.BelowMin() && !t.SearchRunning() {
 			any = true
 		}
@@ -415,7 +417,7 @@ func (p *PeerPool) Stop() {
 	case <-p.quit:
 		return
 	default:
-		log.Debug("started closing peer pool")
+		logutils.ZapLogger().Debug("started closing peer pool")
 		close(p.quit)
 	}
 	p.serverSubscription.Unsubscribe()

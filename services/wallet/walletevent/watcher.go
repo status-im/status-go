@@ -3,8 +3,10 @@ package walletevent
 import (
 	"context"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/async"
 )
 
@@ -54,7 +56,7 @@ func watch(ctx context.Context, feed *event.Feed, callback EventCb) error {
 			return nil
 		case err := <-sub.Err():
 			if err != nil {
-				log.Error("wallet event watcher subscription failed", "error", err)
+				logutils.ZapLogger().Error("wallet event watcher subscription failed", zap.Error(err))
 			}
 		case ev := <-ch:
 			if callback != nil {

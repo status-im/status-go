@@ -6,11 +6,11 @@ import (
 	"math/big"
 
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/utils"
@@ -109,7 +110,7 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 
 	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
-		log.Error(err.Error())
+		logutils.ZapLogger().Error(err.Error())
 		return DeploymentDetails{}, err
 	}
 	address, tx, _, err := collectibles.DeployCollectibles(transactOpts, ethClient, deploymentParameters.Name,
@@ -118,7 +119,7 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 		deploymentParameters.TokenURI, common.HexToAddress(deploymentParameters.OwnerTokenAddress),
 		common.HexToAddress(deploymentParameters.MasterTokenAddress))
 	if err != nil {
-		log.Error(err.Error())
+		logutils.ZapLogger().Error(err.Error())
 		return DeploymentDetails{}, err
 	}
 
@@ -132,7 +133,7 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 		"",
 	)
 	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
+		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
 		return DeploymentDetails{}, err
 	}
 
@@ -223,16 +224,16 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 		return DeploymentDetails{}, err
 	}
 
-	log.Debug("Signature:", communitySignature)
+	logutils.ZapLogger().Debug("Prepare deployment", zap.Any("signature", communitySignature))
 
 	tx, err := deployerContractInst.Deploy(transactOpts, ownerTokenConfig, masterTokenConfig, communitySignature, common.FromHex(signerPubKey))
 
 	if err != nil {
-		log.Error(err.Error())
+		logutils.ZapLogger().Error(err.Error())
 		return DeploymentDetails{}, err
 	}
 
-	log.Debug("Contract deployed hash:", tx.Hash().String())
+	logutils.ZapLogger().Debug("Contract deployed", zap.Stringer("hash", tx.Hash()))
 
 	err = api.s.pendingTracker.TrackPendingTransaction(
 		wcommon.ChainID(chainID),
@@ -244,7 +245,7 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 		"",
 	)
 	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
+		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
 		return DeploymentDetails{}, err
 	}
 
@@ -282,7 +283,7 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 
 	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
-		log.Error(err.Error())
+		logutils.ZapLogger().Error(err.Error())
 		return DeploymentDetails{}, err
 	}
 
@@ -293,7 +294,7 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		common.HexToAddress(deploymentParameters.OwnerTokenAddress),
 		common.HexToAddress(deploymentParameters.MasterTokenAddress))
 	if err != nil {
-		log.Error(err.Error())
+		logutils.ZapLogger().Error(err.Error())
 		return DeploymentDetails{}, err
 	}
 
@@ -307,7 +308,7 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		"",
 	)
 	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
+		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
 		return DeploymentDetails{}, err
 	}
 
@@ -404,7 +405,7 @@ func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress 
 		"",
 	)
 	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
+		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
 		return "", err
 	}
 
@@ -471,7 +472,7 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 		additionalData,
 	)
 	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
+		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
 		return "", err
 	}
 
@@ -523,7 +524,7 @@ func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string
 		"",
 	)
 	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
+		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
 		return "", err
 	}
 
