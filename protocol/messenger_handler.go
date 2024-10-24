@@ -603,7 +603,8 @@ func (m *Messenger) HandleSyncInstallationContactV2(state *ReceivedMessageState,
 
 	contact, contactFound := state.AllContacts.Load(message.Id)
 	if !contactFound {
-		if message.Removed && !message.Blocked {
+		fromPairedDevice := statusMessage != nil
+		if fromPairedDevice && message.Removed && !message.Blocked {
 			// Nothing to do in case if contact doesn't exist
 			return nil
 		}
