@@ -218,7 +218,19 @@ func (b *GethStatusBackend) ToggleCentralizedMetrics(isEnabled bool) error {
 		return errors.New("centralized metrics nil")
 	}
 
-	return b.centralizedMetrics.ToggleEnabled(isEnabled)
+	var err error
+	if isEnabled {
+		if !b.centralizedMetrics.IsRunning() {
+			// it was stopped, we need to recreate service
+			fmt.Println("!!! restart")
+			b.centralizedMetrics = centralizedmetrics.NewDefaultMetricService(b.multiaccountsDB.DB())
+		}
+		err = b.centralizedMetrics.Start()
+	} else {
+		err = b.centralizedMetrics.Stop()
+	}
+
+	return err
 }
 
 func (b *GethStatusBackend) AddCentralizedMetric(metric centralizedmetricscommon.Metric) error {
@@ -226,7 +238,6 @@ func (b *GethStatusBackend) AddCentralizedMetric(metric centralizedmetricscommon
 		return errors.New("centralized metrics nil")
 	}
 	return b.centralizedMetrics.AddMetric(metric)
-
 }
 
 func (b *GethStatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
