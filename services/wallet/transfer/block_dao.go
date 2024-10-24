@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"math/big"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -69,7 +71,11 @@ func (b *BlockDAO) mergeRanges(chainID uint64, account common.Address) (err erro
 		return err
 	}
 
-	log.Info("merge old ranges", "account", account, "network", chainID, "ranges", len(ranges))
+	logutils.ZapLogger().Info("merge old ranges",
+		zap.Stringer("account", account),
+		zap.Uint64("network", chainID),
+		zap.Int("ranges", len(ranges)),
+	)
 
 	if len(ranges) <= 1 {
 		return nil
@@ -108,7 +114,15 @@ func (b *BlockDAO) mergeRanges(chainID uint64, account common.Address) (err erro
 }
 
 func (b *BlockDAO) insertRange(chainID uint64, account common.Address, from, to, balance *big.Int, nonce uint64) error {
-	log.Debug("insert blocks range", "account", account, "network id", chainID, "from", from, "to", to, "balance", balance, "nonce", nonce)
+	logutils.ZapLogger().Debug(
+		"insert blocks range",
+		zap.Stringer("account", account),
+		zap.Uint64("network id", chainID),
+		zap.Stringer("from", from),
+		zap.Stringer("to", to),
+		zap.Stringer("balance", balance),
+		zap.Uint64("nonce", nonce),
+	)
 	insert, err := b.db.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to, balance, nonce) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
@@ -294,7 +308,7 @@ func (b *BlockDAO) GetLastKnownBlockByAddresses(chainID uint64, addresses []comm
 	for _, address := range addresses {
 		block, err := b.GetLastKnownBlockByAddress(chainID, address)
 		if err != nil {
-			log.Info("Can't get last block", "error", err)
+			logutils.ZapLogger().Info("Can't get last block", zap.Error(err))
 			return nil, nil, err
 		}
 
@@ -333,7 +347,10 @@ func getNewRanges(ranges []*BlocksRange) ([]*BlocksRange, []*BlocksRange) {
 					to:   prevTo,
 				})
 			}
-			log.Info("blocks ranges gap detected", "from", prevTo, "to", blocksRange.from)
+			logutils.ZapLogger().Info("blocks ranges gap detected",
+				zap.Stringer("from", prevTo),
+				zap.Stringer("to", blocksRange.from),
+			)
 			hasMergedRanges = false
 
 			prevFrom = blocksRange.from
@@ -353,14 +370,19 @@ func getNewRanges(ranges []*BlocksRange) ([]*BlocksRange, []*BlocksRange) {
 }
 
 func deleteRange(chainID uint64, creator statementCreator, account common.Address, from *big.Int, to *big.Int) error {
-	log.Info("delete blocks range", "account", account, "network", chainID, "from", from, "to", to)
+	logutils.ZapLogger().Info("delete blocks range",
+		zap.Stringer("account", account),
+		zap.Uint64("network", chainID),
+		zap.Stringer("from", from),
+		zap.Stringer("to", to),
+	)
 	delete, err := creator.Prepare(`DELETE FROM blocks_ranges
                                         WHERE address = ?
                                         AND network_id = ?
                                         AND blk_from = ?
                                         AND blk_to = ?`)
 	if err != nil {
-		log.Info("some error", "error", err)
+		logutils.ZapLogger().Info("some error", zap.Error(err))
 		return err
 	}
 
@@ -379,7 +401,12 @@ func deleteAllRanges(creator statementCreator, account common.Address) error {
 }
 
 func insertRange(chainID uint64, creator statementCreator, account common.Address, from *big.Int, to *big.Int) error {
-	log.Info("insert blocks range", "account", account, "network", chainID, "from", from, "to", to)
+	logutils.ZapLogger().Info("insert blocks range",
+		zap.Stringer("account", account),
+		zap.Uint64("network", chainID),
+		zap.Stringer("from", from),
+		zap.Stringer("to", to),
+	)
 	insert, err := creator.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		return err

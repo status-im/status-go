@@ -8,10 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
@@ -836,7 +835,7 @@ func (db *Database) postChangesToSubscribers(change *SyncSettingField) {
 		select {
 		case s <- change:
 		default:
-			log.Warn("settings changes subscription channel full, dropping message")
+			logutils.ZapLogger().Warn("settings changes subscription channel full, dropping message")
 		}
 	}
 }

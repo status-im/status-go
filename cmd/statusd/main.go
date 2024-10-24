@@ -187,7 +187,7 @@ func main() {
 		}()
 	}
 
-	backend := api.NewGethStatusBackend()
+	backend := api.NewGethStatusBackend(logutils.ZapLogger())
 	if config.NodeKey == "" {
 		logger.Error("node key needs to be set if running a push notification server")
 		return

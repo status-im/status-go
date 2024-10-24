@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/logutils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -61,7 +61,7 @@ type ClientV2 struct {
 // new opensea v2 client.
 func NewClientV2(apiKey string, httpClient *HTTPClient) *ClientV2 {
 	if apiKey == "" {
-		log.Warn("OpenseaV2 API key not available")
+		logutils.ZapLogger().Warn("OpenseaV2 API key not available")
 	}
 
 	return &ClientV2{

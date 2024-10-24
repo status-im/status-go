@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"math/big"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 )
 
 // Type type of transaction
@@ -176,18 +178,18 @@ func ParseWETHDepositLog(ethlog *types.Log) (src common.Address, amount *big.Int
 	amount = new(big.Int)
 
 	if len(ethlog.Topics) < 2 {
-		log.Warn("not enough topics for WETH deposit", "topics", ethlog.Topics)
+		logutils.ZapLogger().Warn("not enough topics for WETH deposit", zap.Stringers("topics", ethlog.Topics))
 		return
 	}
 
 	if len(ethlog.Topics[1]) != 32 {
-		log.Warn("second topic is not padded to 32 byte address", "topic", ethlog.Topics[1])
+		logutils.ZapLogger().Warn("second topic is not padded to 32 byte address", zap.Stringer("topic", ethlog.Topics[1]))
 		return
 	}
 	copy(src[:], ethlog.Topics[1][12:])
 
 	if len(ethlog.Data) != 32 {
-		log.Warn("data is not padded to 32 byte big int", "data", ethlog.Data)
+		logutils.ZapLogger().Warn("data is not padded to 32 byte big int", zap.Binary("data", ethlog.Data))
 		return
 	}
 	amount.SetBytes(ethlog.Data)
@@ -199,18 +201,18 @@ func ParseWETHWithdrawLog(ethlog *types.Log) (dst common.Address, amount *big.In
 	amount = new(big.Int)
 
 	if len(ethlog.Topics) < 2 {
-		log.Warn("not enough topics for WETH withdraw", "topics", ethlog.Topics)
+		logutils.ZapLogger().Warn("not enough topics for WETH withdraw", zap.Stringers("topics", ethlog.Topics))
 		return
 	}
 
 	if len(ethlog.Topics[1]) != 32 {
-		log.Warn("second topic is not padded to 32 byte address", "topic", ethlog.Topics[1])
+		logutils.ZapLogger().Warn("second topic is not padded to 32 byte address", zap.Stringer("topic", ethlog.Topics[1]))
 		return
 	}
 	copy(dst[:], ethlog.Topics[1][12:])
 
 	if len(ethlog.Data) != 32 {
-		log.Warn("data is not padded to 32 byte big int", "data", ethlog.Data)
+		logutils.ZapLogger().Warn("data is not padded to 32 byte big int", zap.Binary("data", ethlog.Data))
 		return
 	}
 	amount.SetBytes(ethlog.Data)
@@ -221,18 +223,18 @@ func ParseWETHWithdrawLog(ethlog *types.Log) (dst common.Address, amount *big.In
 func ParseErc20TransferLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
 	amount = new(big.Int)
 	if len(ethlog.Topics) < erc20TransferEventIndexedParameters {
-		log.Warn("not enough topics for erc20 transfer", "topics", ethlog.Topics)
+		logutils.ZapLogger().Warn("not enough topics for erc20 transfer", zap.Stringers("topics", ethlog.Topics))
 		return
 	}
 	var err error
 	from, to, err = getFromToAddresses(*ethlog)
 	if err != nil {
-		log.Error("log_parser::ParseErc20TransferLog", err)
+		logutils.ZapLogger().Error("log_parser::ParseErc20TransferLog", zap.Error(err))
 		return
 	}
 
 	if len(ethlog.Data) != 32 {
-		log.Warn("data is not padded to 32 byts big int", "data", ethlog.Data)
+		logutils.ZapLogger().Warn("data is not padded to 32 byts big int", zap.Binary("data", ethlog.Data))
 		return
 	}
 	amount.SetBytes(ethlog.Data)
@@ -243,14 +245,14 @@ func ParseErc20TransferLog(ethlog *types.Log) (from, to common.Address, amount *
 func ParseErc721TransferLog(ethlog *types.Log) (from, to common.Address, tokenID *big.Int) {
 	tokenID = new(big.Int)
 	if len(ethlog.Topics) < erc721TransferEventIndexedParameters {
-		log.Warn("not enough topics for erc721 transfer", "topics", ethlog.Topics)
+		logutils.ZapLogger().Warn("not enough topics for erc721 transfer", zap.Stringers("topics", ethlog.Topics))
 		return
 	}
 
 	var err error
 	from, to, err = getFromToAddresses(*ethlog)
 	if err != nil {
-		log.Error("log_parser::ParseErc721TransferLog", err)
+		logutils.ZapLogger().Error("log_parser::ParseErc721TransferLog", zap.Error(err))
 		return
 	}
 	tokenID.SetBytes(ethlog.Topics[3][:])
@@ -277,7 +279,7 @@ func checkTopicsLength(ethlog types.Log, startIdx, endIdx int) (err error) {
 	for i := startIdx; i < endIdx; i++ {
 		if len(ethlog.Topics[i]) != common.HashLength {
 			err = fmt.Errorf("topic %d is not padded to %d byte address, topic=%s", i, common.HashLength, ethlog.Topics[i])
-			log.Error("log_parser::checkTopicsLength", err)
+			logutils.ZapLogger().Error("log_parser::checkTopicsLength", zap.Error(err))
 			return
 		}
 	}
@@ -340,7 +342,7 @@ func ParseTransferLog(ethlog types.Log) (from, to common.Address, txIDs []common
 func ParseErc1155TransferLog(ethlog *types.Log, evType EventType) (operator, from, to common.Address, ids, amounts []*big.Int, err error) {
 	if len(ethlog.Topics) < erc1155TransferEventIndexedParameters {
 		err = fmt.Errorf("not enough topics for erc1155 transfer %s, %v", "topics", ethlog.Topics)
-		log.Error("log_parser::ParseErc1155TransferLog", "err", err)
+		logutils.ZapLogger().Error("log_parser::ParseErc1155TransferLog", zap.Error(err))
 		return
 	}
 
@@ -353,20 +355,23 @@ func ParseErc1155TransferLog(ethlog *types.Log, evType EventType) (operator, fro
 	copy(operator[:], ethlog.Topics[1][addressIdx:])
 	from, to, err = getFromToAddresses(*ethlog)
 	if err != nil {
-		log.Error("log_parser::ParseErc1155TransferLog", "err", err)
+		logutils.ZapLogger().Error("log_parser::ParseErc1155TransferLog", zap.Error(err))
 		return
 	}
 
 	if len(ethlog.Data) == 0 || len(ethlog.Data)%(common.HashLength*2) != 0 {
 		err = fmt.Errorf("data is not padded to 64 bytes %s, %v", "data", ethlog.Data)
-		log.Error("log_parser::ParseErc1155TransferLog", "err", err)
+		logutils.ZapLogger().Error("log_parser::ParseErc1155TransferLog", zap.Error(err))
 		return
 	}
 
 	if evType == Erc1155TransferSingleEventType {
 		ids = append(ids, new(big.Int).SetBytes(ethlog.Data[:common.HashLength]))
 		amounts = append(amounts, new(big.Int).SetBytes(ethlog.Data[common.HashLength:]))
-		log.Debug("log_parser::ParseErc1155TransferSingleLog", "ids", ids, "amounts", amounts)
+		logutils.ZapLogger().Debug("log_parser::ParseErc1155TransferSingleLog",
+			zap.Any("ids", ids),
+			zap.Any("amounts", amounts),
+		)
 	} else {
 		// idTypeSize := new(big.Int).SetBytes(ethlog.Data[:common.HashLength]).Uint64() // Left for knowledge
 		// valueTypeSize := new(big.Int).SetBytes(ethlog.Data[common.HashLength : common.HashLength*2]).Uint64() // Left for knowledge
@@ -380,14 +385,17 @@ func ParseErc1155TransferLog(ethlog *types.Log, evType EventType) (operator, fro
 
 		if idsArraySize != valuesArraySize {
 			err = fmt.Errorf("ids and values sizes don't match %d, %d", idsArraySize, valuesArraySize)
-			log.Error("log_parser::ParseErc1155TransferBatchLog", "err", err)
+			logutils.ZapLogger().Error("log_parser::ParseErc1155TransferBatchLog", zap.Error(err))
 			return
 		}
 
 		initialOffset = initialOffset + int(idsArraySize+1)*common.HashLength
 		for i := 0; i < int(valuesArraySize); i++ {
 			amounts = append(amounts, new(big.Int).SetBytes(ethlog.Data[initialOffset+i*common.HashLength:initialOffset+(i+1)*common.HashLength]))
-			log.Debug("log_parser::ParseErc1155TransferBatchLog", "id", ids[i], "amount", amounts[i])
+			logutils.ZapLogger().Debug("log_parser::ParseErc1155TransferBatchLog",
+				zap.Any("id", ids[i]),
+				zap.Any("amount", amounts[i]),
+			)
 		}
 	}
 
@@ -408,7 +416,7 @@ func ParseUniswapV2Log(ethlog *types.Log) (pairAddress common.Address, from comm
 	pairAddress = ethlog.Address
 	from, to, err = getFromToAddresses(*ethlog)
 	if err != nil {
-		log.Error("log_parser::ParseUniswapV2Log", err)
+		logutils.ZapLogger().Error("log_parser::ParseUniswapV2Log", zap.Error(err))
 		return
 	}
 	if len(ethlog.Data) != 32*4 {
@@ -448,7 +456,7 @@ func ParseUniswapV3Log(ethlog *types.Log) (poolAddress common.Address, sender co
 	poolAddress = ethlog.Address
 	sender, recipient, err = getFromToAddresses(*ethlog)
 	if err != nil {
-		log.Error("log_parser::ParseUniswapV3Log", err)
+		logutils.ZapLogger().Error("log_parser::ParseUniswapV3Log", zap.Error(err))
 		return
 	}
 	if len(ethlog.Data) != 32*5 {
@@ -509,7 +517,7 @@ func ParseHopBridgeTransferFromL1CompletedLog(ethlog *types.Log) (recipient comm
 
 	recipient, relayer, err = getFromToAddresses(*ethlog)
 	if err != nil {
-		log.Error("log_parser::ParseHopBridgeTransferFromL1CompletedLog", err)
+		logutils.ZapLogger().Error("log_parser::ParseHopBridgeTransferFromL1CompletedLog", zap.Error(err))
 		return
 	}
 

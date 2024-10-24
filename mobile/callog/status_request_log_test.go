@@ -1,19 +1,16 @@
-package statusgo
+package callog
 
 import (
-	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/logutils/requestlog"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/signal"
-
-	"github.com/ethereum/go-ethereum/log"
 )
 
 func TestRemoveSensitiveInfo(t *testing.T) {
@@ -60,17 +57,14 @@ func TestRemoveSensitiveInfo(t *testing.T) {
 }
 
 func TestCall(t *testing.T) {
-	// Enable request logging
-	requestlog.EnableRequestLogging(true)
+	// Create a temporary file for logging
+	tempLogFile, err := os.CreateTemp(t.TempDir(), "TestCall*.log")
+	require.NoError(t, err)
 
-	// Create a mock logger to capture log output
-	var logOutput string
-	mockLogger := log.New()
-	mockLogger.SetHandler(log.FuncHandler(func(r *log.Record) error {
-		logOutput += r.Msg + fmt.Sprintf("%s", r.Ctx...)
-		return nil
-	}))
-	requestlog.NewRequestLogger().SetHandler(mockLogger.GetHandler())
+	// Enable request logging
+	logger, err := requestlog.CreateRequestLogger(tempLogFile.Name())
+	require.NoError(t, err)
+	require.NotNil(t, logger)
 
 	// Test case 1: Normal execution
 	testFunc := func(param string) string {
@@ -79,12 +73,17 @@ func TestCall(t *testing.T) {
 	testParam := "test input"
 	expectedResult := "test result: test input"
 
-	result := callWithResponse(testFunc, testParam)
+	result := CallWithResponse(logger, testFunc, testParam)
 
 	// Check the result
 	if result != expectedResult {
 		t.Errorf("Expected result %s, got %s", expectedResult, result)
 	}
+
+	// Read the log file
+	logData, err := os.ReadFile(tempLogFile.Name())
+	require.NoError(t, err)
+	logOutput := string(logData)
 
 	// Check if the log contains expected information
 	expectedLogParts := []string{getShortFunctionName(testFunc), "params", testParam, "resp", expectedResult}
@@ -94,19 +93,27 @@ func TestCall(t *testing.T) {
 		}
 	}
 
+	// Create a mock logger to capture log output
+	mockLogger := log.New()
+	mockLogger.SetHandler(log.FuncHandler(func(r *log.Record) error {
+		logOutput += r.Msg + fmt.Sprintf("%s", r.Ctx...)
+		return nil
+	}))
+
 	// Test case 2: Panic -> recovery -> re-panic
 	oldRootHandler := log.Root().GetHandler()
 	defer log.Root().SetHandler(oldRootHandler)
 	log.Root().SetHandler(mockLogger.GetHandler())
 	// Clear log output for next test
 	logOutput = ""
+
 	e := "test panic"
 	panicFunc := func() {
 		panic(e)
 	}
 
 	require.PanicsWithValue(t, e, func() {
-		call(panicFunc)
+		Call(logger, panicFunc)
 	})
 
 	// Check if the panic was logged
@@ -121,35 +128,11 @@ func TestCall(t *testing.T) {
 	}
 }
 
+func initializeApplication(requestJSON string) string {
+	return ""
+}
+
 func TestGetFunctionName(t *testing.T) {
 	fn := getShortFunctionName(initializeApplication)
 	require.Equal(t, "initializeApplication", fn)
-}
-
-type testSignalHandler struct {
-	receivedSignal string
-}
-
-func (t *testSignalHandler) HandleSignal(data string) {
-	t.receivedSignal = data
-}
-
-func TestSetMobileSignalHandler(t *testing.T) {
-	// Setup
-	handler := &testSignalHandler{}
-	SetMobileSignalHandler(handler)
-	t.Cleanup(signal.ResetMobileSignalHandler)
-
-	// Test data
-	testAccount := &multiaccounts.Account{Name: "test"}
-	testSettings := &settings.Settings{KeyUID: "0x1"}
-	testEnsUsernames := json.RawMessage(`{"test": "test"}`)
-
-	// Action
-	signal.SendLoggedIn(testAccount, testSettings, testEnsUsernames, nil)
-
-	// Assertions
-	require.Contains(t, handler.receivedSignal, `"key-uid":"0x1"`, "Signal should contain the correct KeyUID")
-	require.Contains(t, handler.receivedSignal, `"name":"test"`, "Signal should contain the correct account name")
-	require.Contains(t, handler.receivedSignal, `"ensUsernames":{"test":"test"}`, "Signal should contain the correct ENS usernames")
 }

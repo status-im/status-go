@@ -11,17 +11,19 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/circuitbreaker"
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
 	"github.com/status-im/status-go/rpc/chain/tagger"
@@ -805,10 +807,10 @@ func (c *ClientWithFallback) toggleConnectionState(err error) {
 	connected := true
 	if err != nil {
 		if !isNotFoundError(err) && !isVMError(err) && !errors.Is(err, rpclimiter.ErrRequestsOverLimit) && !errors.Is(err, context.Canceled) {
-			log.Warn("Error not in chain call", "error", err, "chain", c.ChainID)
+			logutils.ZapLogger().Warn("Error not in chain call", zap.Uint64("chain", c.ChainID), zap.Error(err))
 			connected = false
 		} else {
-			log.Warn("Error in chain call", "error", err)
+			logutils.ZapLogger().Warn("Error in chain call", zap.Error(err))
 		}
 	}
 	c.SetIsConnected(connected)

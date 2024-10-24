@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/tt"
 
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +29,7 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 		return
 	}
 
-	backend = NewGethStatusBackend()
+	backend = NewGethStatusBackend(tt.MustCreateTestLogger())
 	backend.UpdateRootDataDir(tmpdir)
 
 	err = backend.AccountManager().InitKeystore(filepath.Join(tmpdir, "keystore"))

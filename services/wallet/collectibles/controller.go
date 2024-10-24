@@ -7,9 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/rpc/network"
@@ -152,7 +154,7 @@ func (c *Controller) startPeriodicalOwnershipFetch() error {
 	for _, addr := range addresses {
 		err := c.startPeriodicalOwnershipFetchForAccount(common.Address(addr))
 		if err != nil {
-			log.Error("Error starting periodical collectibles fetch for accpunt", "address", addr, "error", err)
+			logutils.ZapLogger().Error("Error starting periodical collectibles fetch for accpunt", zap.Stringer("address", addr), zap.Error(err))
 			return err
 		}
 	}
@@ -182,7 +184,7 @@ func (c *Controller) stopPeriodicalOwnershipFetch() {
 
 // Starts (or restarts) periodical fetching for the given account address for all chains
 func (c *Controller) startPeriodicalOwnershipFetchForAccount(address common.Address) error {
-	log.Debug("wallet.api.collectibles.Controller Start periodical fetching", "address", address)
+	logutils.ZapLogger().Debug("wallet.api.collectibles.Controller Start periodical fetching", zap.Stringer("address", address))
 
 	networks, err := c.networkManager.Get(false)
 	if err != nil {
@@ -211,7 +213,11 @@ func (c *Controller) startPeriodicalOwnershipFetchForAccount(address common.Addr
 
 // Starts (or restarts) periodical fetching for the given account address for all chains
 func (c *Controller) startPeriodicalOwnershipFetchForAccountAndChainID(address common.Address, chainID walletCommon.ChainID, delayed bool) error {
-	log.Debug("wallet.api.collectibles.Controller Start periodical fetching", "address", address, "chainID", chainID, "delayed", delayed)
+	logutils.ZapLogger().Debug("wallet.api.collectibles.Controller Start periodical fetching",
+		zap.Stringer("address", address),
+		zap.Stringer("chainID", chainID),
+		zap.Bool("delayed", delayed),
+	)
 
 	if !c.isPeriodicalOwnershipFetchRunning() {
 		return errors.New("periodical fetch not initialized")
@@ -247,7 +253,7 @@ func (c *Controller) startPeriodicalOwnershipFetchForAccountAndChainID(address c
 
 // Stop periodical fetching for the given account address for all chains
 func (c *Controller) stopPeriodicalOwnershipFetchForAccount(address common.Address) error {
-	log.Debug("wallet.api.collectibles.Controller Stop periodical fetching", "address", address)
+	logutils.ZapLogger().Debug("wallet.api.collectibles.Controller Stop periodical fetching", zap.Stringer("address", address))
 
 	if !c.isPeriodicalOwnershipFetchRunning() {
 		return errors.New("periodical fetch not initialized")
@@ -267,7 +273,10 @@ func (c *Controller) stopPeriodicalOwnershipFetchForAccount(address common.Addre
 }
 
 func (c *Controller) stopPeriodicalOwnershipFetchForAccountAndChainID(address common.Address, chainID walletCommon.ChainID) error {
-	log.Debug("wallet.api.collectibles.Controller Stop periodical fetching", "address", address, "chainID", chainID)
+	logutils.ZapLogger().Debug("wallet.api.collectibles.Controller Stop periodical fetching",
+		zap.Stringer("address", address),
+		zap.Stringer("chainID", chainID),
+	)
 
 	if !c.isPeriodicalOwnershipFetchRunning() {
 		return errors.New("periodical fetch not initialized")
@@ -300,14 +309,14 @@ func (c *Controller) startAccountsWatcher() {
 			for _, address := range changedAddresses {
 				err := c.startPeriodicalOwnershipFetchForAccount(address)
 				if err != nil {
-					log.Error("Error starting periodical collectibles fetch", "address", address, "error", err)
+					logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Stringer("address", address), zap.Error(err))
 				}
 			}
 		} else if eventType == accountsevent.EventTypeRemoved {
 			for _, address := range changedAddresses {
 				err := c.stopPeriodicalOwnershipFetchForAccount(address)
 				if err != nil {
-					log.Error("Error starting periodical collectibles fetch", "address", address, "error", err)
+					logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Stringer("address", address), zap.Error(err))
 				}
 			}
 		}
@@ -370,7 +379,7 @@ func (c *Controller) startSettingsWatcher() {
 			c.stopPeriodicalOwnershipFetch()
 			err := c.startPeriodicalOwnershipFetch()
 			if err != nil {
-				log.Error("Error starting periodical collectibles fetch", "error", err)
+				logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Error(err))
 			}
 		}
 	}
@@ -393,7 +402,7 @@ func (c *Controller) refetchOwnershipIfRecentTransfer(account common.Address, ch
 	timestamp, err := c.ownershipDB.GetOwnershipUpdateTimestamp(account, chainID)
 
 	if err != nil {
-		log.Error("Error getting ownership update timestamp", "error", err)
+		logutils.ZapLogger().Error("Error getting ownership update timestamp", zap.Error(err))
 		return
 	}
 	if timestamp == InvalidTimestamp {
@@ -412,7 +421,7 @@ func (c *Controller) refetchOwnershipIfRecentTransfer(account common.Address, ch
 		err := c.startPeriodicalOwnershipFetchForAccountAndChainID(account, chainID, true)
 		c.commandsLock.Unlock()
 		if err != nil {
-			log.Error("Error starting periodical collectibles fetch", "address", account, "error", err)
+			logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Stringer("address", account), zap.Error(err))
 		}
 	}
 }

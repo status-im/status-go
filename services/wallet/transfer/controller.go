@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"math/big"
 
+	"go.uber.org/zap"
 	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 	statusaccounts "github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain/rpclimiter"
@@ -154,12 +155,12 @@ func (c *Controller) onAccountsChanged(changedAddresses []common.Address, eventT
 	}
 
 	if c.reactor == nil {
-		log.Warn("reactor is not initialized")
+		logutils.ZapLogger().Warn("reactor is not initialized")
 		return
 	}
 
 	if eventType == accountsevent.EventTypeAdded || eventType == accountsevent.EventTypeRemoved {
-		log.Debug("list of accounts was changed from a previous version. reactor will be restarted", "new", currentAddresses)
+		logutils.ZapLogger().Debug("list of accounts was changed from a previous version. reactor will be restarted", zap.Stringers("new", currentAddresses))
 
 		chainClients, err := c.rpcClient.EthClients(chainIDs)
 		if err != nil {
@@ -168,7 +169,7 @@ func (c *Controller) onAccountsChanged(changedAddresses []common.Address, eventT
 
 		err = c.reactor.restart(chainClients, currentAddresses)
 		if err != nil {
-			log.Error("failed to restart reactor with new accounts", "error", err)
+			logutils.ZapLogger().Error("failed to restart reactor with new accounts", zap.Error(err))
 		}
 	}
 }
@@ -217,7 +218,7 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 
 	rst, err := c.reactor.getTransfersByAddress(ctx, chainID, address, toBlock, limit)
 	if err != nil {
-		log.Error("[WalletAPI:: GetTransfersByAddress] can't fetch transfers", "err", err)
+		logutils.ZapLogger().Error("[WalletAPI:: GetTransfersByAddress] can't fetch transfers", zap.Error(err))
 		return nil, err
 	}
 
@@ -227,7 +228,7 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 func (c *Controller) GetTransfersForIdentities(ctx context.Context, identities []TransactionIdentity) ([]View, error) {
 	rst, err := c.db.GetTransfersForIdentities(ctx, identities)
 	if err != nil {
-		log.Error("[transfer.Controller.GetTransfersForIdentities] DB err", err)
+		logutils.ZapLogger().Error("[transfer.Controller.GetTransfersForIdentities] DB err", zap.Error(err))
 		return nil, err
 	}
 
@@ -247,27 +248,27 @@ func (c *Controller) cleanUpRemovedAccount(address common.Address) {
 	// Transfers will be deleted by foreign key constraint by cascade
 	err := deleteBlocks(c.db.client, address)
 	if err != nil {
-		log.Error("Failed to delete blocks", "error", err)
+		logutils.ZapLogger().Error("Failed to delete blocks", zap.Error(err))
 	}
 	err = deleteAllRanges(c.db.client, address)
 	if err != nil {
-		log.Error("Failed to delete old blocks ranges", "error", err)
+		logutils.ZapLogger().Error("Failed to delete old blocks ranges", zap.Error(err))
 	}
 
 	err = c.blockRangesSeqDAO.deleteRange(address)
 	if err != nil {
-		log.Error("Failed to delete blocks ranges sequential", "error", err)
+		logutils.ZapLogger().Error("Failed to delete blocks ranges sequential", zap.Error(err))
 	}
 
 	err = c.transactionManager.removeMultiTransactionByAddress(address)
 	if err != nil {
-		log.Error("Failed to delete multitransactions", "error", err)
+		logutils.ZapLogger().Error("Failed to delete multitransactions", zap.Error(err))
 	}
 
 	rpcLimitsStorage := rpclimiter.NewLimitsDBStorage(c.db.client)
 	err = rpcLimitsStorage.Delete(accountLimiterTag(address))
 	if err != nil {
-		log.Error("Failed to delete limits", "error", err)
+		logutils.ZapLogger().Error("Failed to delete limits", zap.Error(err))
 	}
 }
 
@@ -275,7 +276,7 @@ func (c *Controller) cleanupAccountsLeftovers() error {
 	// We clean up accounts that were deleted and soft removed
 	accounts, err := c.accountsDB.GetWalletAddresses()
 	if err != nil {
-		log.Error("Failed to get accounts", "error", err)
+		logutils.ZapLogger().Error("Failed to get accounts", zap.Error(err))
 		return err
 	}
 
@@ -286,7 +287,7 @@ func (c *Controller) cleanupAccountsLeftovers() error {
 
 	addressesInWalletDB, err := getAddresses(c.db.client)
 	if err != nil {
-		log.Error("Failed to get addresses from wallet db", "error", err)
+		logutils.ZapLogger().Error("Failed to get addresses from wallet db", zap.Error(err))
 		return err
 	}
 

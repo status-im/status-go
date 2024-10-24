@@ -9,11 +9,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	protocolCommon "github.com/status-im/status-go/protocol/common"
@@ -30,6 +30,9 @@ import (
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/onramp"
+	"github.com/status-im/status-go/services/wallet/routeexecution"
+	"github.com/status-im/status-go/services/wallet/router"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/coingecko"
@@ -188,6 +191,15 @@ func NewService(
 		featureFlags.EnableCelerBridge = true
 	}
 
+	router := router.NewRouter(rpcClient, transactor, tokenManager, marketManager, collectibles,
+		collectiblesManager, ens, stickers)
+	pathProcessors := buildPathProcessors(rpcClient, transactor, tokenManager, ens, stickers, featureFlags)
+	for _, processor := range pathProcessors {
+		router.AddPathProcessor(processor)
+	}
+
+	routeExecutionManager := routeexecution.NewManager(router, transactionManager, transferController)
+
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -217,7 +229,49 @@ func NewService(
 		keycardPairings:       NewKeycardPairings(),
 		config:                config,
 		featureFlags:          featureFlags,
+		router:                router,
+		routeExecutionManager: routeExecutionManager,
 	}
+}
+
+func buildPathProcessors(
+	rpcClient *rpc.Client,
+	transactor *transactions.Transactor,
+	tokenManager *token.Manager,
+	ens *ens.Service,
+	stickers *stickers.Service,
+	featureFlags *protocolCommon.FeatureFlags,
+) []pathprocessor.PathProcessor {
+	ret := make([]pathprocessor.PathProcessor, 0)
+
+	transfer := pathprocessor.NewTransferProcessor(rpcClient, transactor)
+	ret = append(ret, transfer)
+
+	erc721Transfer := pathprocessor.NewERC721Processor(rpcClient, transactor)
+	ret = append(ret, erc721Transfer)
+
+	erc1155Transfer := pathprocessor.NewERC1155Processor(rpcClient, transactor)
+	ret = append(ret, erc1155Transfer)
+
+	hop := pathprocessor.NewHopBridgeProcessor(rpcClient, transactor, tokenManager, rpcClient.NetworkManager)
+	ret = append(ret, hop)
+
+	if featureFlags.EnableCelerBridge {
+		// TODO: Celar Bridge is out of scope for 2.30, check it thoroughly once we decide to include it again
+		cbridge := pathprocessor.NewCelerBridgeProcessor(rpcClient, transactor, tokenManager)
+		ret = append(ret, cbridge)
+	}
+
+	paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
+	ret = append(ret, paraswap)
+
+	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ens)
+	ret = append(ret, ensRegister)
+
+	ensRelease := pathprocessor.NewENSReleaseProcessor(rpcClient, transactor, ens)
+	ret = append(ret, ensRelease)
+
+	return ret
 }
 
 // Service is a wallet service.
@@ -251,6 +305,8 @@ type Service struct {
 	keycardPairings       *KeycardPairings
 	config                *params.NodeConfig
 	featureFlags          *protocolCommon.FeatureFlags
+	router                *router.Router
+	routeExecutionManager *routeexecution.Manager
 }
 
 // Start signals transmitter.
@@ -271,7 +327,8 @@ func (s *Service) SetWalletCommunityInfoProvider(provider thirdparty.CommunityIn
 
 // Stop reactor and close db.
 func (s *Service) Stop() error {
-	log.Info("wallet will be stopped")
+	logutils.ZapLogger().Info("wallet will be stopped")
+	s.router.Stop()
 	s.signals.Stop()
 	s.transferController.Stop()
 	s.currency.Stop()
@@ -281,7 +338,7 @@ func (s *Service) Stop() error {
 	s.collectibles.Stop()
 	s.tokenManager.Stop()
 	s.started = false
-	log.Info("wallet stopped")
+	logutils.ZapLogger().Info("wallet stopped")
 	return nil
 }
 

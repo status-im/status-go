@@ -4,8 +4,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 const (
@@ -38,7 +40,7 @@ func newDBCleaner(db DB, retention time.Duration) *dbCleaner {
 
 // Start starts a loop that cleans up old messages.
 func (c *dbCleaner) Start() {
-	log.Info("Starting cleaning envelopes", "period", c.period, "retention", c.retention)
+	logutils.ZapLogger().Info("Starting cleaning envelopes", zap.Duration("period", c.period), zap.Duration("retention", c.retention))
 
 	cancel := make(chan struct{})
 
@@ -71,9 +73,9 @@ func (c *dbCleaner) schedule(period time.Duration, cancel <-chan struct{}) {
 		case <-t.C:
 			count, err := c.PruneEntriesOlderThan(time.Now().Add(-c.retention))
 			if err != nil {
-				log.Error("failed to prune data", "err", err)
+				logutils.ZapLogger().Error("failed to prune data", zap.Error(err))
 			}
-			log.Info("Prunned some some messages successfully", "count", count)
+			logutils.ZapLogger().Info("Prunned some some messages successfully", zap.Int("count", count))
 		case <-cancel:
 			return
 		}

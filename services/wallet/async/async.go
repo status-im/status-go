@@ -5,8 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 type Command func(context.Context) error
@@ -173,7 +175,11 @@ func (d *AtomicGroup) Add(cmd Command) {
 		if err != nil {
 			// do not overwrite original error by context errors
 			if d.error != nil {
-				log.Info("async.Command failed", "error", err, "d.error", d.error, "group", d.Name())
+				logutils.ZapLogger().Info("async.Command failed",
+					zap.String("group", d.Name()),
+					zap.NamedError("error", err),
+					zap.NamedError("d.error", d.error),
+				)
 				return
 			}
 			d.error = err
@@ -284,7 +290,11 @@ type ErrorCounter struct {
 
 // Returns false in case of counter overflow
 func (ec *ErrorCounter) SetError(err error) bool {
-	log.Debug("ErrorCounter setError", "msg", ec.msg, "err", err, "cnt", ec.cnt)
+	logutils.ZapLogger().Debug("ErrorCounter setError",
+		zap.String("msg", ec.msg),
+		zap.Error(err),
+		zap.Int("cnt", ec.cnt),
+	)
 
 	ec.cnt++
 
@@ -294,7 +304,7 @@ func (ec *ErrorCounter) SetError(err error) bool {
 	}
 
 	if ec.cnt >= ec.maxErrors {
-		log.Error("ErrorCounter overflow", "msg", ec.msg)
+		logutils.ZapLogger().Error("ErrorCounter overflow", zap.String("msg", ec.msg))
 		return false
 	}
 

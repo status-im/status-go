@@ -16,8 +16,8 @@ import (
 
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -564,7 +564,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 					return at, toAddress
 				}
 			}
-			log.Warn(fmt.Sprintf("unexpected activity type. Missing from [%s] or to [%s] in addresses?", fromAddress, toAddress))
+			logutils.ZapLogger().Warn(fmt.Sprintf("unexpected activity type. Missing from [%s] or to [%s] in addresses?", fromAddress, toAddress))
 			return ReceiveAT, toAddress
 		}
 
@@ -720,7 +720,7 @@ func getTrInAndOutAmounts(activityType Type, trAmount sql.NullString, pTrAmount 
 		amount = pTrAmount
 		ok = true
 	} else {
-		log.Warn(fmt.Sprintf("invalid transaction amount for type %d", activityType))
+		logutils.ZapLogger().Warn(fmt.Sprintf("invalid transaction amount for type %d", activityType))
 	}
 
 	if ok {
@@ -740,10 +740,10 @@ func getTrInAndOutAmounts(activityType Type, trAmount sql.NullString, pTrAmount 
 			outAmount = (*hexutil.Big)(big.NewInt(0))
 			return
 		default:
-			log.Warn(fmt.Sprintf("unexpected activity type %d", activityType))
+			logutils.ZapLogger().Warn(fmt.Sprintf("unexpected activity type %d", activityType))
 		}
 	} else {
-		log.Warn(fmt.Sprintf("could not parse amount %s", trAmount.String))
+		logutils.ZapLogger().Warn(fmt.Sprintf("could not parse amount %s", trAmount.String))
 	}
 
 	inAmount = (*hexutil.Big)(big.NewInt(0))
@@ -764,9 +764,9 @@ func getMtInAndOutAmounts(dbFromAmount sql.NullString, dbToAmount sql.NullString
 				return
 			}
 		}
-		log.Warn(fmt.Sprintf("could not parse amounts %s %s", fromHexStr, toHexStr))
+		logutils.ZapLogger().Warn(fmt.Sprintf("could not parse amounts %s %s", fromHexStr, toHexStr))
 	} else {
-		log.Warn("invalid transaction amounts")
+		logutils.ZapLogger().Warn("invalid transaction amounts")
 	}
 	inAmount = (*hexutil.Big)(big.NewInt(0))
 	outAmount = (*hexutil.Big)(big.NewInt(0))
@@ -804,7 +804,7 @@ func transferTypeToTokenType(transferType *TransferType) TokenType {
 	case TransferTypeErc1155:
 		return Erc1155
 	default:
-		log.Error(fmt.Sprintf("unexpected transfer type %d", transferType))
+		logutils.ZapLogger().Error(fmt.Sprintf("unexpected transfer type %d", transferType))
 	}
 	return Native
 }

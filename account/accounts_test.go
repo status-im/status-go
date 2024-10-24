@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/utils"
 
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,7 @@ const testPassword = "test-password"
 const newTestPassword = "new-test-password"
 
 func TestVerifyAccountPassword(t *testing.T) {
-	accManager := NewGethManager()
+	accManager := NewGethManager(tt.MustCreateTestLogger())
 	keyStoreDir := t.TempDir()
 	emptyKeyStoreDir := t.TempDir()
 
@@ -103,7 +104,7 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	err := utils.ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
 	require.NoError(t, err)
 
-	accManager := NewGethManager()
+	accManager := NewGethManager(tt.MustCreateTestLogger())
 
 	address := types.HexToAddress(utils.TestConfig.Account3.WalletAddress)
 	_, err = accManager.VerifyAccountPassword(keyStoreDir, address.Hex(), utils.TestConfig.Account3.Password)
@@ -133,7 +134,7 @@ type testAccount struct {
 // SetupTest is used here for reinitializing the mock before every
 // test function to avoid faulty execution.
 func (s *ManagerTestSuite) SetupTest() {
-	s.accManager = NewGethManager()
+	s.accManager = NewGethManager(tt.MustCreateTestLogger())
 
 	keyStoreDir := s.T().TempDir()
 	s.Require().NoError(s.accManager.InitKeystore(keyStoreDir))

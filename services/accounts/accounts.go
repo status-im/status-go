@@ -8,9 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/params"
@@ -39,7 +39,7 @@ type DerivedAddress struct {
 }
 
 func (api *API) SaveAccount(ctx context.Context, account *accounts.Account) error {
-	log.Info("[AccountsAPI::SaveAccount]")
+	logutils.ZapLogger().Info("[AccountsAPI::SaveAccount]")
 	err := (*api.messenger).SaveOrUpdateAccount(account)
 	if err != nil {
 		return err
@@ -54,7 +54,7 @@ func (api *API) SaveAccount(ctx context.Context, account *accounts.Account) erro
 
 // Setting `Keypair` without `Accounts` will update keypair only, `Keycards` won't be saved/updated this way.
 func (api *API) SaveKeypair(ctx context.Context, keypair *accounts.Keypair) error {
-	log.Info("[AccountsAPI::SaveKeypair]")
+	logutils.ZapLogger().Info("[AccountsAPI::SaveKeypair]")
 	err := (*api.messenger).SaveOrUpdateKeypair(keypair)
 	if err != nil {
 		return err

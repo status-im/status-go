@@ -111,5 +111,5 @@ class TestTransactionFromRoute(SignalTestCase):
         tx_details = response.json()["result"]
 
         assert tx_details["value"] == amount_in
-        assert tx_details["to"] == user_2.address
-        assert tx_details["from"] == user_1.address
+        assert tx_details["to"].upper() == user_2.address.upper()
+        assert tx_details["from"].upper() == user_1.address.upper()

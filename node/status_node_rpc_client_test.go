@@ -10,10 +10,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -66,13 +68,13 @@ func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
 }
 
 func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
-	statusNode := New(nil)
+	statusNode := New(nil, tt.MustCreateTestLogger())
 
 	appDB, walletDB, stop, err := setupTestDBs()
 	defer func() {
 		err := stop()
 		if err != nil {
-			statusNode.log.Error("stopping db", err)
+			statusNode.logger.Error("stopping db", zap.Error(err))
 		}
 	}()
 	if err != nil {
@@ -85,7 +87,7 @@ func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
 	defer func() {
 		err := stop2()
 		if err != nil {
-			statusNode.log.Error("stopping multiaccount db", err)
+			statusNode.logger.Error("stopping multiaccount db", zap.Error(err))
 		}
 	}()
 	if err != nil {
@@ -106,7 +108,7 @@ func createStatusNode() (*StatusNode, func() error, func() error, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	statusNode := New(nil)
+	statusNode := New(nil, tt.MustCreateTestLogger())
 	statusNode.SetAppDB(appDB)
 	statusNode.SetWalletDB(walletDB)
 

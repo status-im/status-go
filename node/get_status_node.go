@@ -12,10 +12,10 @@ import (
 	"sync"
 
 	"github.com/syndtr/goleveldb/leveldb"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -95,7 +95,7 @@ type StatusNode struct {
 	peerPool  *peers.PeerPool
 	db        *leveldb.DB // used as a cache for PeerPool
 
-	log log.Logger
+	logger *zap.Logger
 
 	gethAccountManager *account.GethManager
 	accountsManager    *accounts.Manager
@@ -141,11 +141,12 @@ type StatusNode struct {
 }
 
 // New makes new instance of StatusNode.
-func New(transactor *transactions.Transactor) *StatusNode {
+func New(transactor *transactions.Transactor, logger *zap.Logger) *StatusNode {
+	logger = logger.Named("StatusNode")
 	return &StatusNode{
-		gethAccountManager: account.NewGethManager(),
+		gethAccountManager: account.NewGethManager(logger),
 		transactor:         transactor,
-		log:                log.New("package", "status-go/node.StatusNode"),
+		logger:             logger,
 		publicMethods:      make(map[string]bool),
 	}
 }
@@ -204,7 +205,7 @@ type StartOptions struct {
 // The server can only handle requests that don't require appdb or IPFS downloader
 func (n *StatusNode) StartMediaServerWithoutDB() error {
 	if n.isRunning() {
-		n.log.Debug("node is already running, no need to StartMediaServerWithoutDB")
+		n.logger.Debug("node is already running, no need to StartMediaServerWithoutDB")
 		return nil
 	}
 
@@ -235,13 +236,13 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 	defer n.mu.Unlock()
 
 	if n.isRunning() {
-		n.log.Debug("node is already running")
+		n.logger.Debug("node is already running")
 		return ErrNodeRunning
 	}
 
 	n.accountsManager = options.AccountsManager
 
-	n.log.Debug("starting with options", "ClusterConfig", config.ClusterConfig)
+	n.logger.Debug("starting with options", zap.Stringer("ClusterConfig", &config.ClusterConfig))
 
 	db, err := db.Create(config.DataDir, params.StatusDatabase)
 	if err != nil {
@@ -259,7 +260,7 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 
 	if err != nil {
 		if dberr := db.Close(); dberr != nil {
-			n.log.Error("error while closing leveldb after node crash", "error", dberr)
+			n.logger.Error("error while closing leveldb after node crash", zap.Error(dberr))
 		}
 		n.db = nil
 		return err
@@ -364,7 +365,7 @@ func (n *StatusNode) discoverNode() (*enode.Node, error) {
 		return discNode, nil
 	}
 
-	n.log.Info("Using AdvertiseAddr for rendezvous", "addr", n.config.AdvertiseAddr)
+	n.logger.Info("Using AdvertiseAddr for rendezvous", zap.String("addr", n.config.AdvertiseAddr))
 
 	r := discNode.Record()
 	r.Set(enr.IP(net.ParseIP(n.config.AdvertiseAddr)))
@@ -406,11 +407,10 @@ func (n *StatusNode) startDiscovery() error {
 	} else {
 		n.discovery = discoveries[0]
 	}
-	log.Debug(
-		"using discovery",
-		"instance", reflect.TypeOf(n.discovery),
-		"registerTopics", n.config.RegisterTopics,
-		"requireTopics", n.config.RequireTopics,
+	n.logger.Debug("using discovery",
+		zap.Any("instance", reflect.TypeOf(n.discovery)),
+		zap.Any("registerTopics", n.config.RegisterTopics),
+		zap.Any("requireTopics", n.config.RequireTopics),
 	)
 	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
 	options := peers.NewDefaultOptions()
@@ -449,7 +449,7 @@ func (n *StatusNode) Stop() error {
 func (n *StatusNode) stop() error {
 	if n.isDiscoveryRunning() {
 		if err := n.stopDiscovery(); err != nil {
-			n.log.Error("Error stopping the discovery components", "error", err)
+			n.logger.Error("Error stopping the discovery components", zap.Error(err))
 		}
 		n.register = nil
 		n.peerPool = nil
@@ -478,7 +478,7 @@ func (n *StatusNode) stop() error {
 
 	if n.db != nil {
 		if err = n.db.Close(); err != nil {
-			n.log.Error("Error closing the leveldb of status node", "error", err)
+			n.logger.Error("Error closing the leveldb of status node", zap.Error(err))
 			return err
 		}
 		n.db = nil
@@ -509,7 +509,7 @@ func (n *StatusNode) stop() error {
 	n.publicMethods = make(map[string]bool)
 	n.pendingTracker = nil
 	n.appGeneralSrvc = nil
-	n.log.Debug("status node stopped")
+	n.logger.Debug("status node stopped")
 	return nil
 }
 
@@ -538,7 +538,7 @@ func (n *StatusNode) ResetChainData(config *params.NodeConfig) error {
 	}
 	err := os.RemoveAll(chainDataDir)
 	if err == nil {
-		n.log.Info("Chain data has been removed", "dir", chainDataDir)
+		n.logger.Info("Chain data has been removed", zap.String("dir", chainDataDir))
 	}
 	return err
 }
@@ -558,16 +558,16 @@ func (n *StatusNode) isRunning() bool {
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
 func (n *StatusNode) populateStaticPeers() error {
 	if !n.config.ClusterConfig.Enabled {
-		n.log.Info("Static peers are disabled")
+		n.logger.Info("Static peers are disabled")
 		return nil
 	}
 
 	for _, enode := range n.config.ClusterConfig.StaticNodes {
 		if err := n.addPeer(enode); err != nil {
-			n.log.Error("Static peer addition failed", "error", err)
+			n.logger.Error("Static peer addition failed", zap.Error(err))
 			return err
 		}
-		n.log.Info("Static peer added", "enode", enode)
+		n.logger.Info("Static peer added", zap.String("enode", enode))
 	}
 
 	return nil
@@ -575,16 +575,16 @@ func (n *StatusNode) populateStaticPeers() error {
 
 func (n *StatusNode) removeStaticPeers() error {
 	if !n.config.ClusterConfig.Enabled {
-		n.log.Info("Static peers are disabled")
+		n.logger.Info("Static peers are disabled")
 		return nil
 	}
 
 	for _, enode := range n.config.ClusterConfig.StaticNodes {
 		if err := n.removePeer(enode); err != nil {
-			n.log.Error("Static peer deletion failed", "error", err)
+			n.logger.Error("Static peer deletion failed", zap.Error(err))
 			return err
 		}
-		n.log.Info("Static peer deleted", "enode", enode)
+		n.logger.Info("Static peer deleted", zap.String("enode", enode))
 	}
 	return nil
 }

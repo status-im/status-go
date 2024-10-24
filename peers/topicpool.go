@@ -6,13 +6,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/discovery"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 )
 
@@ -315,7 +317,7 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 	peerInfoItem, ok := t.pendingPeers[nodeID]
 	inbound := !ok || !peerInfoItem.added
 
-	log.Debug("peer added event", "peer", nodeID.String(), "inbound", inbound)
+	logutils.ZapLogger().Debug("peer added event", zap.Stringer("peer", nodeID), zap.Bool("inbound", inbound))
 
 	if inbound {
 		return
@@ -326,13 +328,13 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 	// established connection means that the node
 	// is a viable candidate for a connection and can be cached
 	if err := t.cache.AddPeer(peer.node, t.topic); err != nil {
-		log.Error("failed to persist a peer", "error", err)
+		logutils.ZapLogger().Error("failed to persist a peer", zap.Error(err))
 	}
 
 	t.movePeerFromPoolToConnected(nodeID)
 	// if the upper limit is already reached, drop this peer
 	if len(t.connectedPeers) > t.limits.Max {
-		log.Debug("max limit is reached drop the peer", "ID", nodeID, "topic", t.topic)
+		logutils.ZapLogger().Debug("max limit is reached drop the peer", zap.Stringer("ID", nodeID), zap.String("topic", string(t.topic)))
 		peer.dismissed = true
 		t.removeServerPeer(server, peer)
 		return
@@ -364,7 +366,7 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID enode.ID) bool {
 		return false
 	}
 
-	log.Debug("disconnect", "ID", nodeID, "dismissed", peer.dismissed)
+	logutils.ZapLogger().Debug("disconnect", zap.Stringer("ID", nodeID), zap.Bool("dismissed", peer.dismissed))
 
 	delete(t.connectedPeers, nodeID)
 	// Peer was removed by us because exceeded the limit.
@@ -382,7 +384,7 @@ func (t *TopicPool) ConfirmDropped(server *p2p.Server, nodeID enode.ID) bool {
 	t.removeServerPeer(server, peer)
 
 	if err := t.cache.RemovePeer(nodeID, t.topic); err != nil {
-		log.Error("failed to remove peer from cache", "error", err)
+		logutils.ZapLogger().Error("failed to remove peer from cache", zap.Error(err))
 	}
 
 	// As we removed a peer, update a sync strategy if needed.
@@ -437,7 +439,7 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 	lookup := make(chan bool, 10)       // sufficiently buffered channel, just prevents blocking because of lookup
 
 	for _, peer := range t.cache.GetPeersRange(t.topic, 5) {
-		log.Debug("adding a peer from cache", "peer", peer)
+		logutils.ZapLogger().Debug("adding a peer from cache", zap.Stringer("peer", peer))
 		found <- peer
 	}
 
@@ -445,7 +447,7 @@ func (t *TopicPool) StartSearch(server *p2p.Server) error {
 	go func() {
 		defer common.LogOnPanic()
 		if err := t.discovery.Discover(string(t.topic), t.period, found, lookup); err != nil {
-			log.Error("error searching foro", "topic", t.topic, "err", err)
+			logutils.ZapLogger().Error("error searching foro", zap.String("topic", string(t.topic)), zap.Error(err))
 		}
 		t.discWG.Done()
 	}()
@@ -471,7 +473,7 @@ func (t *TopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.No
 				continue
 			}
 			if err := t.processFoundNode(server, node); err != nil {
-				log.Error("failed to process found node", "node", node, "error", err)
+				logutils.ZapLogger().Error("failed to process found node", zap.Stringer("node", node), zap.Error(err))
 			}
 		}
 	}
@@ -493,7 +495,7 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) erro
 
 	nodeID := enode.PubkeyToIDV4(pk)
 
-	log.Debug("peer found", "ID", nodeID, "topic", t.topic)
+	logutils.ZapLogger().Debug("peer found", zap.Stringer("ID", nodeID), zap.String("topic", string(t.topic)))
 
 	// peer is already connected so update only discoveredTime
 	if peer, ok := t.connectedPeers[nodeID]; ok {
@@ -510,9 +512,9 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) erro
 			publicKey:      pk,
 		})
 	}
-	log.Debug(
-		"adding peer to a server", "peer", node.ID.String(),
-		"connected", len(t.connectedPeers), "max", t.maxCachedPeers)
+	logutils.ZapLogger().Debug(
+		"adding peer to a server", zap.Stringer("peer", node.ID),
+		zap.Int("connected", len(t.connectedPeers)), zap.Int("max", t.maxCachedPeers))
 
 	// This can happen when the monotonic clock is not precise enough and
 	// multiple peers gets added at the same clock time, resulting in all
@@ -525,7 +527,7 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) erro
 	// This has been reported on windows builds
 	// only https://github.com/status-im/nim-status-client/issues/522
 	if t.pendingPeers[nodeID] == nil {
-		log.Debug("peer added has just been removed", "peer", nodeID)
+		logutils.ZapLogger().Debug("peer added has just been removed", zap.Stringer("peer", nodeID))
 		return nil
 	}
 
@@ -570,7 +572,7 @@ func (t *TopicPool) StopSearch(server *p2p.Server) {
 		return
 	default:
 	}
-	log.Debug("stoping search", "topic", t.topic)
+	logutils.ZapLogger().Debug("stoping search", zap.String("topic", string(t.topic)))
 	close(t.quit)
 	t.mu.Lock()
 	if t.fastModeTimeoutCancel != nil {

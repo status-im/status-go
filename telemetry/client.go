@@ -18,27 +18,48 @@ import (
 	"github.com/status-im/status-go/wakuv2"
 
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
-	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	v2common "github.com/status-im/status-go/wakuv2/common"
+	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 )
 
 type TelemetryType string
 
 const (
-	ProtocolStatsMetric        TelemetryType = "ProtocolStats"
-	SentEnvelopeMetric         TelemetryType = "SentEnvelope"
-	UpdateEnvelopeMetric       TelemetryType = "UpdateEnvelope"
-	ReceivedMessagesMetric     TelemetryType = "ReceivedMessages"
+	// Bandwidth as reported by libp2p
+	ProtocolStatsMetric TelemetryType = "ProtocolStats"
+	// Envelopes sent by this node
+	SentEnvelopeMetric TelemetryType = "SentEnvelope"
+	// Change in status of a sent envelope (usually processing errors)
+	UpdateEnvelopeMetric TelemetryType = "UpdateEnvelope"
+	// Messages received by this node
+	ReceivedMessagesMetric TelemetryType = "ReceivedMessages"
+	// Errors encountered when sending envelopes
 	ErrorSendingEnvelopeMetric TelemetryType = "ErrorSendingEnvelope"
-	PeerCountMetric            TelemetryType = "PeerCount"
-	PeerConnFailuresMetric     TelemetryType = "PeerConnFailure"
-	MessageCheckSuccessMetric  TelemetryType = "MessageCheckSuccess"
-	MessageCheckFailureMetric  TelemetryType = "MessageCheckFailure"
-	PeerCountByShardMetric     TelemetryType = "PeerCountByShard"
-	PeerCountByOriginMetric    TelemetryType = "PeerCountByOrigin"
-	MaxRetryCache                            = 5000
+	// Total connections for this node at a given time
+	PeerCountMetric TelemetryType = "PeerCount"
+	// Number of failed peer connections for this node at a given time
+	PeerConnFailuresMetric TelemetryType = "PeerConnFailure"
+	// Store confirmation for a sent message successful
+	MessageCheckSuccessMetric TelemetryType = "MessageCheckSuccess"
+	// Store confirmation for a sent message failed
+	MessageCheckFailureMetric TelemetryType = "MessageCheckFailure"
+	// Total connections for this node per shard at a given time
+	PeerCountByShardMetric TelemetryType = "PeerCountByShard"
+	// Total connections for this node per discovery origin at a given time
+	PeerCountByOriginMetric TelemetryType = "PeerCountByOrigin"
+	// Error encountered when attempting to dial a peer
+	DialFailureMetric TelemetryType = "DialFailure"
+	// Missed message as detected by periodic store query
+	MissedMessageMetric TelemetryType = "MissedMessages"
+	// Missed message with a relevant filter
+	MissedRelevantMessageMetric TelemetryType = "MissedRelevantMessages"
+	// MVDS ack received for a sent message
+	MessageDeliveryConfirmedMetric TelemetryType = "MessageDeliveryConfirmed"
 )
+
+const MaxRetryCache = 5000
 
 type TelemetryRequest struct {
 	Id            int              `json:"id"`
@@ -103,6 +124,26 @@ func (c *Client) PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin ma
 	}
 }
 
+func (c *Client) PushDialFailure(ctx context.Context, dialFailure v2common.DialError) {
+	var errorMessage string = ""
+	if dialFailure.ErrType == v2common.ErrorUnknown {
+		errorMessage = dialFailure.ErrMsg
+	}
+	c.processAndPushTelemetry(ctx, DialFailure{ErrorType: dialFailure.ErrType, ErrorMsg: errorMessage, Protocols: dialFailure.Protocols})
+}
+
+func (c *Client) PushMissedMessage(ctx context.Context, envelope *v2protocol.Envelope) {
+	c.processAndPushTelemetry(ctx, MissedMessage{Envelope: envelope})
+}
+
+func (c *Client) PushMissedRelevantMessage(ctx context.Context, receivedMessage *v2common.ReceivedMessage) {
+	c.processAndPushTelemetry(ctx, MissedRelevantMessage{ReceivedMessage: receivedMessage})
+}
+
+func (c *Client) PushMessageDeliveryConfirmed(ctx context.Context, messageHash string) {
+	c.processAndPushTelemetry(ctx, MessageDeliveryConfirmed{MessageHash: messageHash})
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
@@ -134,6 +175,24 @@ type PeerCountByShard struct {
 type PeerCountByOrigin struct {
 	Origin wps.Origin
 	Count  uint
+}
+
+type DialFailure struct {
+	ErrorType v2common.DialErrorType
+	ErrorMsg  string
+	Protocols string
+}
+
+type MissedMessage struct {
+	Envelope *v2protocol.Envelope
+}
+
+type MissedRelevantMessage struct {
+	ReceivedMessage *v2common.ReceivedMessage
+}
+
+type MessageDeliveryConfirmed struct {
+	MessageHash string
 }
 
 type Client struct {
@@ -308,6 +367,30 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			TelemetryType: PeerCountByOriginMetric,
 			TelemetryData: c.ProcessPeerCountByOrigin(v),
 		}
+	case DialFailure:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: DialFailureMetric,
+			TelemetryData: c.ProcessDialFailure(v),
+		}
+	case MissedMessage:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: MissedMessageMetric,
+			TelemetryData: c.ProcessMissedMessage(v),
+		}
+	case MissedRelevantMessage:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: MissedRelevantMessageMetric,
+			TelemetryData: c.ProcessMissedRelevantMessage(v),
+		}
+	case MessageDeliveryConfirmed:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: MessageDeliveryConfirmedMetric,
+			TelemetryData: c.ProcessMessageDeliveryConfirmed(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
@@ -396,9 +479,7 @@ func (c *Client) ProcessSentEnvelope(sentEnvelope wakuv2.SentEnvelope) *json.Raw
 	postBody["topic"] = sentEnvelope.Envelope.Message().ContentTopic
 	postBody["senderKeyUID"] = c.keyUID
 	postBody["publishMethod"] = sentEnvelope.PublishMethod.String()
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSendingEnvelope) *json.RawMessage {
@@ -410,17 +491,13 @@ func (c *Client) ProcessErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSe
 	postBody["senderKeyUID"] = c.keyUID
 	postBody["publishMethod"] = errorSendingEnvelope.SentEnvelope.PublishMethod.String()
 	postBody["error"] = errorSendingEnvelope.Error.Error()
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessPeerCount(peerCount PeerCount) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["peerCount"] = peerCount.PeerCount
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessPeerConnFailure(peerConnFailure PeerConnFailure) *json.RawMessage {
@@ -428,41 +505,74 @@ func (c *Client) ProcessPeerConnFailure(peerConnFailure PeerConnFailure) *json.R
 	postBody["failedPeerId"] = peerConnFailure.FailedPeerId
 	postBody["failureCount"] = peerConnFailure.FailureCount
 	postBody["nodeKeyUID"] = c.keyUID
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessMessageCheckSuccess(messageCheckSuccess MessageCheckSuccess) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["messageHash"] = messageCheckSuccess.MessageHash
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessPeerCountByShard(peerCountByShard PeerCountByShard) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["shard"] = peerCountByShard.Shard
 	postBody["count"] = peerCountByShard.Count
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessMessageCheckFailure(messageCheckFailure MessageCheckFailure) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["messageHash"] = messageCheckFailure.MessageHash
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessPeerCountByOrigin(peerCountByOrigin PeerCountByOrigin) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["origin"] = peerCountByOrigin.Origin
 	postBody["count"] = peerCountByOrigin.Count
-	body, _ := json.Marshal(postBody)
+	return c.marshalPostBody(postBody)
+}
+
+func (c *Client) ProcessDialFailure(dialFailure DialFailure) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["errorType"] = dialFailure.ErrorType
+	postBody["errorMsg"] = dialFailure.ErrorMsg
+	postBody["protocols"] = dialFailure.Protocols
+	return c.marshalPostBody(postBody)
+}
+
+func (c *Client) ProcessMissedMessage(missedMessage MissedMessage) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageHash"] = missedMessage.Envelope.Hash().String()
+	postBody["sentAt"] = uint32(missedMessage.Envelope.Message().GetTimestamp() / int64(time.Second))
+	postBody["pubsubTopic"] = missedMessage.Envelope.PubsubTopic()
+	postBody["contentTopic"] = missedMessage.Envelope.Message().ContentTopic
+	return c.marshalPostBody(postBody)
+}
+
+func (c *Client) ProcessMissedRelevantMessage(missedMessage MissedRelevantMessage) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageHash"] = missedMessage.ReceivedMessage.Envelope.Hash().String()
+	postBody["sentAt"] = missedMessage.ReceivedMessage.Sent
+	postBody["pubsubTopic"] = missedMessage.ReceivedMessage.PubsubTopic
+	postBody["contentTopic"] = missedMessage.ReceivedMessage.ContentTopic
+	return c.marshalPostBody(postBody)
+}
+
+func (c *Client) ProcessMessageDeliveryConfirmed(messageDeliveryConfirmed MessageDeliveryConfirmed) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageHash"] = messageDeliveryConfirmed.MessageHash
+	return c.marshalPostBody(postBody)
+}
+
+// Helper function to marshal post body and handle errors
+func (c *Client) marshalPostBody(postBody map[string]interface{}) *json.RawMessage {
+	body, err := json.Marshal(postBody)
+	if err != nil {
+		c.logger.Error("Error marshaling post body", zap.Error(err))
+		return nil
+	}
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage
 }

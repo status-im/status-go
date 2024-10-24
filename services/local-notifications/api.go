@@ -3,7 +3,7 @@ package localnotifications
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 )
 
 func NewAPI(s *Service) *API {
@@ -19,7 +19,7 @@ func (api *API) NotificationPreferences(ctx context.Context) ([]NotificationPref
 }
 
 func (api *API) SwitchWalletNotifications(ctx context.Context, preference bool) error {
-	log.Debug("Switch Transaction Notification")
+	logutils.ZapLogger().Debug("Switch Transaction Notification")
 	err := api.s.db.ChangeWalletPreference(preference)
 	if err != nil {
 		return err

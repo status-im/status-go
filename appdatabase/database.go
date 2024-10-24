@@ -6,13 +6,15 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"go.uber.org/zap"
+
 	d_common "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/appdatabase/migrations"
 	migrationsprevnodecfg "github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
@@ -94,7 +96,7 @@ func OptimizeMobileWakuV2SettingsForMobileV1(sqlTx *sql.Tx) error {
 	if d_common.IsMobilePlatform() {
 		_, err := sqlTx.Exec(`UPDATE wakuv2_config SET light_client = ?, enable_store_confirmation_for_messages_sent = ?`, true, false)
 		if err != nil {
-			log.Error("failed to enable light client and disable store confirmation for mobile v1", "err", err.Error())
+			logutils.ZapLogger().Error("failed to enable light client and disable store confirmation for mobile v1", zap.Error(err))
 			return err
 		}
 	}
@@ -104,7 +106,7 @@ func OptimizeMobileWakuV2SettingsForMobileV1(sqlTx *sql.Tx) error {
 func FixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 	rows, err := sqlTx.Query(`SELECT address,pubkey FROM accounts WHERE pubkey IS NOT NULL AND type != '' AND type != 'generated'`)
 	if err != nil {
-		log.Error("Migrating accounts: failed to query accounts", "err", err.Error())
+		logutils.ZapLogger().Error("Migrating accounts: failed to query accounts", zap.Error(err))
 		return err
 	}
 	defer rows.Close()
@@ -113,19 +115,19 @@ func FixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 		var pubkey e_types.HexBytes
 		err = rows.Scan(&address, &pubkey)
 		if err != nil {
-			log.Error("Migrating accounts: failed to scan records", "err", err.Error())
+			logutils.ZapLogger().Error("Migrating accounts: failed to scan records", zap.Error(err))
 			return err
 		}
 		pk, err := crypto.UnmarshalPubkey(pubkey)
 		if err != nil {
-			log.Error("Migrating accounts: failed to unmarshal pubkey", "err", err.Error(), "pubkey", string(pubkey))
+			logutils.ZapLogger().Error("Migrating accounts: failed to unmarshal pubkey", zap.String("pubkey", string(pubkey)), zap.Error(err))
 			return err
 		}
 		pkBytes := sha256.Sum256(crypto.FromECDSAPub(pk))
 		keyUIDHex := hexutil.Encode(pkBytes[:])
 		_, err = sqlTx.Exec(`UPDATE accounts SET key_uid = ? WHERE address = ?`, keyUIDHex, address)
 		if err != nil {
-			log.Error("Migrating accounts: failed to update key_uid for imported accounts", "err", err.Error())
+			logutils.ZapLogger().Error("Migrating accounts: failed to update key_uid for imported accounts", zap.Error(err))
 			return err
 		}
 	}
@@ -134,23 +136,23 @@ func FixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 	err = sqlTx.QueryRow(`SELECT wallet_root_address FROM settings WHERE synthetic_id='id'`).Scan(&walletRootAddress)
 	if err == sql.ErrNoRows {
 		// we shouldn't reach here, but if we do, it probably happened from the test
-		log.Warn("Migrating accounts: no wallet_root_address found in settings")
+		logutils.ZapLogger().Warn("Migrating accounts: no wallet_root_address found in settings")
 		return nil
 	}
 	if err != nil {
-		log.Error("Migrating accounts: failed to get wallet_root_address", "err", err.Error())
+		logutils.ZapLogger().Error("Migrating accounts: failed to get wallet_root_address", zap.Error(err))
 		return err
 	}
 	_, err = sqlTx.Exec(`UPDATE accounts SET key_uid = ?, derived_from = ? WHERE type = '' OR type = 'generated'`, CurrentAppDBKeyUID, walletRootAddress.Hex())
 	if err != nil {
-		log.Error("Migrating accounts: failed to update key_uid/derived_from", "err", err.Error())
+		logutils.ZapLogger().Error("Migrating accounts: failed to update key_uid/derived_from", zap.Error(err))
 		return err
 	}
 	// fix the default wallet account color issue https://github.com/status-im/status-mobile/issues/20476
 	// we don't care the other type of account's color
 	_, err = sqlTx.Exec(`UPDATE accounts SET color = 'blue',emoji='🐳' WHERE wallet = 1`)
 	if err != nil {
-		log.Error("Migrating accounts: failed to update default wallet account's color to blue", "err", err.Error())
+		logutils.ZapLogger().Error("Migrating accounts: failed to update default wallet account's color to blue", zap.Error(err))
 		return err
 	}
 	return nil
@@ -192,7 +194,7 @@ func migrateEnsUsernames(sqlTx *sql.Tx) error {
 	rows, err := sqlTx.Query(`SELECT usernames FROM settings`)
 
 	if err != nil {
-		log.Error("Migrating ens usernames: failed to query 'settings.usernames'", "err", err.Error())
+		logutils.ZapLogger().Error("Migrating ens usernames: failed to query 'settings.usernames'", zap.Error(err))
 		return err
 	}
 
@@ -240,7 +242,7 @@ func migrateEnsUsernames(sqlTx *sql.Tx) error {
 
 		_, err = sqlTx.Exec(`INSERT INTO ens_usernames (username, chain_id) VALUES (?, ?)`, username, defaultChainID)
 		if err != nil {
-			log.Error("Migrating ens usernames: failed to insert username into new database", "ensUsername", username, "err", err.Error())
+			logutils.ZapLogger().Error("Migrating ens usernames: failed to insert username into new database", zap.String("ensUsername", username), zap.Error(err))
 		}
 	}
 

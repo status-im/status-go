@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/status-im/status-go/server/pairing"
 	"github.com/status-im/status-go/timesource"
 
@@ -40,7 +38,10 @@ func preflightHandler(w http.ResponseWriter, r *http.Request) {
 
 func makeCert(address net.IP) (*tls.Certificate, []byte, error) {
 	now := timesource.GetCurrentTime()
-	log.Debug("makeCert", "system time", time.Now().String(), "timesource time", now.String())
+	logutils.ZapLogger().Debug("makeCert",
+		logutils.UnixTimeMs("system time", time.Now()),
+		logutils.UnixTimeMs("timesource time", now),
+	)
 	notBefore := now.Add(-pairing.CertificateMaxClockDrift)
 	notAfter := now.Add(pairing.CertificateMaxClockDrift)
 	return server.GenerateTLSCert(notBefore, notAfter, []net.IP{address}, []string{})

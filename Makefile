@@ -193,6 +193,11 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld build/bin/statusgo-*
 
+status-go-deps:
+	go install go.uber.org/mock/mockgen@v0.4.0
+	go install github.com/kevinburke/go-bindata/v4/...@v4.0.2
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
+
 statusgo-android: generate
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
@@ -398,6 +403,7 @@ test-e2e: ##@tests Run e2e tests
 test-e2e-race: export GOTEST_EXTRAFLAGS=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
+test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
@@ -407,7 +413,10 @@ canary-test: node-canary
 	# TODO: uncomment that!
 	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
 
-lint: generate
+lint-panics: generate
+	go run ./cmd/lint-panics -root="$(call sh, pwd)" -skip=./cmd -test=false ./...
+
+lint: generate lint-panics
 	golangci-lint run ./...
 
 ci: generate lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once

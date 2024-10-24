@@ -5,12 +5,14 @@ import (
 	"math/big"
 	"time"
 
+	"go.uber.org/zap"
+
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 	getRpc "github.com/ethereum/go-ethereum/rpc"
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
 )
 
 // ContextCaller provides CallContext method as ethereums rpc.Client.
@@ -25,11 +27,11 @@ func pollLogs(client ContextCaller, chainID uint64, f *logsFilter, timeout, peri
 		defer cancel()
 		logs, err := getLogs(ctx, client, chainID, f.criteria())
 		if err != nil {
-			log.Error("Error fetch logs", "criteria", f.crit, "error", err)
+			logutils.ZapLogger().Error("Error fetch logs", zap.Any("criteria", f.crit), zap.Error(err))
 			return
 		}
 		if err := f.add(logs); err != nil {
-			log.Error("Error adding logs", "logs", logs, "error", err)
+			logutils.ZapLogger().Error("Error adding logs", zap.Any("logs", logs), zap.Error(err))
 		}
 	}
 	query()
@@ -40,7 +42,7 @@ func pollLogs(client ContextCaller, chainID uint64, f *logsFilter, timeout, peri
 		case <-latest.C:
 			query()
 		case <-f.done:
-			log.Debug("Filter was stopped", "ID", f.id, "crit", f.crit)
+			logutils.ZapLogger().Debug("Filter was stopped", zap.String("ID", string(f.id)), zap.Any("crit", f.crit))
 			return
 		}
 	}

@@ -1,4 +1,4 @@
-package wallet
+package routeexecution
 
 import (
 	"github.com/status-im/status-go/errors"

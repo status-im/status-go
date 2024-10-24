@@ -6,14 +6,15 @@ import (
 	"math/big"
 	"time"
 
+	"go.uber.org/zap"
 	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 )
@@ -202,7 +203,10 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 
 		areSubTxsCheckedForTxHash := make(map[common.Hash]bool)
 
-		log.Debug("getTransfersInBlock", "block", blk.Number(), "transactionsToLoad", len(transactionsToLoad))
+		logutils.ZapLogger().Debug("getTransfersInBlock",
+			zap.Stringer("block", blk.Number()),
+			zap.Int("transactionsToLoad", len(transactionsToLoad)),
+		)
 
 		for _, t := range transactionsToLoad {
 			receipt, err := getReceipt(address, t.Log.TxHash)
@@ -217,7 +221,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 
 			subtransactions, err := d.subTransactionsFromPreloaded(t, tx, receipt, blk)
 			if err != nil {
-				log.Error("can't fetch subTxs for erc20/erc721/erc1155 transfer", "error", err)
+				logutils.ZapLogger().Error("can't fetch subTxs for erc20/erc721/erc1155 transfer", zap.Error(err))
 				return nil, err
 			}
 			rst = append(rst, subtransactions...)
@@ -230,14 +234,22 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 				continue
 			}
 			if tx.ChainId().Cmp(big.NewInt(0)) != 0 && tx.ChainId().Cmp(d.chainClient.ToBigInt()) != 0 {
-				log.Info("chain id mismatch", "tx hash", tx.Hash(), "tx chain id", tx.ChainId(), "expected chain id", d.chainClient.NetworkID())
+				logutils.ZapLogger().Info("chain id mismatch",
+					zap.Stringer("tx hash", tx.Hash()),
+					zap.Stringer("tx chain id", tx.ChainId()),
+					zap.Uint64("expected chain id", d.chainClient.NetworkID()),
+				)
 				continue
 			}
 			from, err := types.Sender(d.signer, tx)
 
 			if err != nil {
 				if err == core.ErrTxTypeNotSupported {
-					log.Error("Tx Type not supported", "tx chain id", tx.ChainId(), "type", tx.Type(), "error", err)
+					logutils.ZapLogger().Error("Tx Type not supported",
+						zap.Stringer("tx chain id", tx.ChainId()),
+						zap.Uint8("type", tx.Type()),
+						zap.Error(err),
+					)
 					continue
 				}
 				return nil, err
@@ -266,7 +278,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 				if !areSubTxsCheckedForTxHash[tx.Hash()] {
 					subtransactions, err := d.subTransactionsFromTransactionData(address, from, tx, receipt, blk)
 					if err != nil {
-						log.Error("can't fetch subTxs for eth transfer", "error", err)
+						logutils.ZapLogger().Error("can't fetch subTxs for eth transfer", zap.Error(err))
 						return nil, err
 					}
 					rst = append(rst, subtransactions...)
@@ -293,7 +305,11 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 			}
 		}
 	}
-	log.Debug("getTransfersInBlock found", "block", blk.Number(), "len", len(rst), "time", time.Since(startTs))
+	logutils.ZapLogger().Debug("getTransfersInBlock found",
+		zap.Stringer("block", blk.Number()),
+		zap.Int("len", len(rst)),
+		zap.Duration("time", time.Since(startTs)),
+	)
 	// TODO(dshulyak) test that balance difference was covered by transactions
 	return rst, nil
 }
@@ -377,7 +393,12 @@ func (d *ETHDownloader) fetchTransaction(parent context.Context, txHash common.H
 }
 
 func (d *ETHDownloader) subTransactionsFromPreloaded(preloadedTx *PreloadedTransaction, tx *types.Transaction, receipt *types.Receipt, blk *types.Block) ([]Transfer, error) {
-	log.Debug("subTransactionsFromPreloaded start", "txHash", tx.Hash().Hex(), "address", preloadedTx.Address, "tokenID", preloadedTx.TokenID, "value", preloadedTx.Value)
+	logutils.ZapLogger().Debug("subTransactionsFromPreloaded start",
+		zap.Stringer("txHash", tx.Hash()),
+		zap.Stringer("address", preloadedTx.Address),
+		zap.Stringer("tokenID", preloadedTx.TokenID),
+		zap.Stringer("value", preloadedTx.Value),
+	)
 	address := preloadedTx.Address
 	txLog := preloadedTx.Log
 
@@ -398,7 +419,15 @@ func (d *ETHDownloader) subTransactionsFromPreloaded(preloadedTx *PreloadedTrans
 	case w_common.Erc20TransferEventType,
 		w_common.Erc721TransferEventType,
 		w_common.Erc1155TransferSingleEventType, w_common.Erc1155TransferBatchEventType:
-		log.Debug("subTransactionsFromPreloaded transfer", "eventType", eventType, "logIdx", txLog.Index, "txHash", tx.Hash().Hex(), "address", address.Hex(), "tokenID", preloadedTx.TokenID, "value", preloadedTx.Value, "baseFee", blk.BaseFee().String())
+		logutils.ZapLogger().Debug("subTransactionsFromPreloaded transfer",
+			zap.String("eventType", string(eventType)),
+			zap.Uint("logIdx", txLog.Index),
+			zap.Stringer("txHash", tx.Hash()),
+			zap.Stringer("address", address),
+			zap.Stringer("tokenID", preloadedTx.TokenID),
+			zap.Stringer("value", preloadedTx.Value),
+			zap.Stringer("baseFee", blk.BaseFee()),
+		)
 
 		transfer := Transfer{
 			Type:               w_common.EventTypeToSubtransactionType(eventType),
@@ -422,12 +451,20 @@ func (d *ETHDownloader) subTransactionsFromPreloaded(preloadedTx *PreloadedTrans
 		rst = append(rst, transfer)
 	}
 
-	log.Debug("subTransactionsFromPreloaded end", "txHash", tx.Hash().Hex(), "address", address.Hex(), "tokenID", preloadedTx.TokenID, "value", preloadedTx.Value)
+	logutils.ZapLogger().Debug("subTransactionsFromPreloaded end",
+		zap.Stringer("txHash", tx.Hash()),
+		zap.Stringer("address", address),
+		zap.Stringer("tokenID", preloadedTx.TokenID),
+		zap.Stringer("value", preloadedTx.Value),
+	)
 	return rst, nil
 }
 
 func (d *ETHDownloader) subTransactionsFromTransactionData(address, from common.Address, tx *types.Transaction, receipt *types.Receipt, blk *types.Block) ([]Transfer, error) {
-	log.Debug("subTransactionsFromTransactionData start", "txHash", tx.Hash().Hex(), "address", address)
+	logutils.ZapLogger().Debug("subTransactionsFromTransactionData start",
+		zap.Stringer("txHash", tx.Hash()),
+		zap.Stringer("address", address),
+	)
 
 	rst := make([]Transfer, 0, 1)
 
@@ -458,7 +495,10 @@ func (d *ETHDownloader) subTransactionsFromTransactionData(address, from common.
 		}
 	}
 
-	log.Debug("subTransactionsFromTransactionData end", "txHash", tx.Hash().Hex(), "address", address.Hex())
+	logutils.ZapLogger().Debug("subTransactionsFromTransactionData end",
+		zap.Stringer("txHash", tx.Hash()),
+		zap.Stringer("address", address),
+	)
 	return rst, nil
 }
 
@@ -475,7 +515,11 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 		var address common.Address
 		from, to, txIDs, tokenIDs, values, err := w_common.ParseTransferLog(l)
 		if err != nil {
-			log.Error("failed to parse transfer log", "log", l, "address", d.accounts, "error", err)
+			logutils.ZapLogger().Error("failed to parse transfer log",
+				zap.Any("log", l),
+				zap.Stringers("address", d.accounts),
+				zap.Error(err),
+			)
 			continue
 		}
 
@@ -485,7 +529,10 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 		} else if slices.Contains(d.accounts, to) {
 			address = to
 		} else {
-			log.Error("from/to address mismatch", "log", l, "addresses", d.accounts)
+			logutils.ZapLogger().Error("from/to address mismatch",
+				zap.Any("log", l),
+				zap.Stringers("addresses", d.accounts),
+			)
 			continue
 		}
 
@@ -493,7 +540,12 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 		logType := w_common.EventTypeToSubtransactionType(eventType)
 
 		for i, txID := range txIDs {
-			log.Debug("block from logs", "block", l.BlockNumber, "log", l, "logType", logType, "txID", txID)
+			logutils.ZapLogger().Debug("block from logs",
+				zap.Uint64("block", l.BlockNumber),
+				zap.Any("log", l),
+				zap.String("logType", string(logType)),
+				zap.Stringer("txID", txID),
+			)
 
 			// For ERC20 there is no tokenID, so we use nil
 			var tokenID *big.Int
@@ -533,11 +585,21 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 // time to get logs for 100000 blocks = 1.144686979s. with 249 events in the result set.
 func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, from, to *big.Int) ([]*DBHeader, error) {
 	start := time.Now()
-	log.Debug("get erc20 transfers in range start", "chainID", d.client.NetworkID(), "from", from, "to", to, "accounts", d.accounts)
+	logutils.ZapLogger().Debug("get erc20 transfers in range start",
+		zap.Uint64("chainID", d.client.NetworkID()),
+		zap.Stringer("from", from),
+		zap.Stringer("to", to),
+		zap.Stringers("accounts", d.accounts),
+	)
 
 	// TODO #16062: Figure out real root cause of invalid range
 	if from != nil && to != nil && from.Cmp(to) > 0 {
-		log.Error("invalid range", "chainID", d.client.NetworkID(), "from", from, "to", to, "accounts", d.accounts)
+		logutils.ZapLogger().Error("invalid range",
+			zap.Uint64("chainID", d.client.NetworkID()),
+			zap.Stringer("from", from),
+			zap.Stringer("to", to),
+			zap.Stringers("accounts", d.accounts),
+		)
 		return nil, errors.New("invalid range")
 	}
 
@@ -586,7 +648,7 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 	logs := concatLogs(outbound, inboundOrMixed, inbound1155)
 
 	if len(logs) == 0 {
-		log.Debug("no logs found for account")
+		logutils.ZapLogger().Debug("no logs found for account")
 		return nil, nil
 	}
 
@@ -595,15 +657,31 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 		return nil, err
 	}
 	if len(rst) == 0 {
-		log.Warn("no headers found in logs for account", "chainID", d.client.NetworkID(), "addresses", d.accounts, "from", from, "to", to)
+		logutils.ZapLogger().Warn("no headers found in logs for account",
+			zap.Uint64("chainID", d.client.NetworkID()),
+			zap.Stringers("addresses", d.accounts),
+			zap.Stringer("from", from),
+			zap.Stringer("to", to),
+		)
 	} else {
 		headers = append(headers, rst...)
-		log.Debug("found erc20 transfers for account", "chainID", d.client.NetworkID(), "addresses", d.accounts,
-			"from", from, "to", to, "headers", len(headers))
+		logutils.ZapLogger().Debug("found erc20 transfers for account",
+			zap.Uint64("chainID", d.client.NetworkID()),
+			zap.Stringers("addresses", d.accounts),
+			zap.Stringer("from", from),
+			zap.Stringer("to", to),
+			zap.Int("headers", len(headers)),
+		)
 	}
 
-	log.Debug("get erc20 transfers in range end", "chainID", d.client.NetworkID(),
-		"from", from, "to", to, "headers", len(headers), "accounts", d.accounts, "took", time.Since(start))
+	logutils.ZapLogger().Debug("get erc20 transfers in range end",
+		zap.Uint64("chainID", d.client.NetworkID()),
+		zap.Stringer("from", from),
+		zap.Stringer("to", to),
+		zap.Int("headers", len(headers)),
+		zap.Stringers("accounts", d.accounts),
+		zap.Duration("took", time.Since(start)),
+	)
 	return headers, nil
 }
 

@@ -16,9 +16,6 @@ services:
       "--password", "Strong12345",
       "--dir", "/tmp/status-go-data", # Keep in sync with `config.json/DataDir` value. Later this arg will not be needed.
     ]
-    ports:
-      - 3333:3333
-      # - 8354:8354 # use for local debbuging only
     healthcheck:
       test: ["CMD-SHELL", "curl -X POST --data '{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":1}' -H 'Content-Type: application/json' http://0.0.0.0:3333 || exit 1"]
       interval: 5s

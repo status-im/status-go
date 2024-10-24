@@ -2,12 +2,12 @@ import random
 
 import pytest
 
-from test_cases import StatusDTestCase
+from test_cases import StatusBackendTestCase
 
 
 @pytest.mark.accounts
 @pytest.mark.rpc
-class TestAccounts(StatusDTestCase):
+class TestAccounts(StatusBackendTestCase):
 
     @pytest.mark.parametrize(
         "method, params",
@@ -22,4 +22,4 @@ class TestAccounts(StatusDTestCase):
         _id = str(random.randint(1, 8888))
 
         response = self.rpc_client.rpc_valid_request(method, params, _id)
-        self.rpc_client.verify_json_schema(response, method)
+        self.rpc_client.verify_json_schema(response.json(), method)

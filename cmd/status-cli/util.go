@@ -55,7 +55,7 @@ func start(p StartParams, logger *zap.SugaredLogger) (*StatusCLI, error) {
 	setupLogger(p.Name)
 	logger.Info("starting messenger")
 
-	backend := api.NewGethStatusBackend()
+	backend := api.NewGethStatusBackend(logutils.ZapLogger())
 	if p.KeyUID != "" {
 		if err := getAccountAndLogin(backend, p.Name, rootDataDir, password, p.KeyUID); err != nil {
 			return nil, err
@@ -81,7 +81,7 @@ func start(p StartParams, logger *zap.SugaredLogger) (*StatusCLI, error) {
 		}
 		waku := backend.StatusNode().WakuV2Service()
 		telemetryClient := telemetry.NewClient(telemetryLogger, p.TelemetryURL, backend.SelectedAccountKeyID(), p.Name, "cli", telemetry.WithPeerID(waku.PeerID().String()))
-		go telemetryClient.Start(context.Background())
+		telemetryClient.Start(context.Background())
 		backend.StatusNode().WakuV2Service().SetStatusTelemetryClient(telemetryClient)
 	}
 	wakuAPI := wakuv2ext.NewPublicAPI(wakuService)

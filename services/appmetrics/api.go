@@ -5,8 +5,8 @@ import (
 
 	"github.com/pborman/uuid"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/appmetrics"
+	"github.com/status-im/status-go/logutils"
 )
 
 func NewAPI(db *appmetrics.Database) *API {
@@ -19,16 +19,16 @@ type API struct {
 }
 
 func (api *API) ValidateAppMetrics(ctx context.Context, appMetrics []appmetrics.AppMetric) error {
-	log.Debug("[AppMetricsAPI::ValidateAppMetrics]")
+	logutils.ZapLogger().Debug("[AppMetricsAPI::ValidateAppMetrics]")
 	return api.db.ValidateAppMetrics(appMetrics)
 }
 
 func (api *API) SaveAppMetrics(ctx context.Context, appMetrics []appmetrics.AppMetric) error {
-	log.Debug("[AppMetricsAPI::SaveAppMetrics]")
+	logutils.ZapLogger().Debug("[AppMetricsAPI::SaveAppMetrics]")
 	return api.db.SaveAppMetrics(appMetrics, api.sessionID)
 }
 
 func (api *API) GetAppMetrics(ctx context.Context, limit int, offset int) (appmetrics.Page, error) {
-	log.Debug("[AppMetricsAPI::GetAppMetrics]")
+	logutils.ZapLogger().Debug("[AppMetricsAPI::GetAppMetrics]")
 	return api.db.GetAppMetrics(limit, offset)
 }
