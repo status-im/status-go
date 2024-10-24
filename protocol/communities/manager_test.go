@@ -452,7 +452,7 @@ func (s *ManagerSuite) TestGetControlledCommunitiesChatIDs() {
 	controlledChatIDs, err := s.manager.GetOwnedCommunitiesChatIDs()
 
 	s.Require().NoError(err)
-	s.Require().Len(controlledChatIDs, 1)
+	s.Require().Len(controlledChatIDs, 2)
 }
 
 func (s *ManagerSuite) TestStartAndStopTorrentClient() {

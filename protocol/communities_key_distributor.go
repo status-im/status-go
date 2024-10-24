@@ -96,6 +96,7 @@ func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *comm
 		MessageType:           protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		HashRatchetGroupID:    hashRatchetGroupID,
 		PubsubTopic:           community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		//ContentTopicOverride:  community.MemberUpdateChannelID(), //TODO: Confirm if this is correct, could not figure out where LocalChatID is set in this flow
 	}
 	_, err := ckd.sender.SendCommunityMessage(context.Background(), &rawMessage)
 
