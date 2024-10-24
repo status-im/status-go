@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -311,18 +310,13 @@ func (c *SenderClient) receiveInstallationData() error {
 }
 
 // setupSendingClient creates a new SenderClient after parsing string inputs
-func setupSendingClient(backend *api.GethStatusBackend, cs, configJSON string) (*SenderClient, error) {
+func setupSendingClient(backend *api.GethStatusBackend, cs string, conf *SenderClientConfig) (*SenderClient, error) {
 	ccp := new(ConnectionParams)
 	err := ccp.FromString(cs)
 	if err != nil {
 		return nil, err
 	}
 
-	conf := NewSenderClientConfig()
-	err = json.Unmarshal([]byte(configJSON), conf)
-	if err != nil {
-		return nil, err
-	}
 	err = validateAndVerifyPassword(conf, conf.SenderConfig)
 	if err != nil {
 		return nil, err
@@ -334,8 +328,8 @@ func setupSendingClient(backend *api.GethStatusBackend, cs, configJSON string) (
 }
 
 // StartUpSendingClient creates a SenderClient and triggers all `send` calls in sequence to the ReceiverServer
-func StartUpSendingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
-	c, err := setupSendingClient(backend, cs, configJSON)
+func StartUpSendingClient(backend *api.GethStatusBackend, cs string, conf *SenderClientConfig) error {
+	c, err := setupSendingClient(backend, cs, conf)
 	if err != nil {
 		return err
 	}
@@ -514,15 +508,9 @@ func (c *ReceiverClient) sendInstallationData() error {
 }
 
 // setupReceivingClient creates a new ReceiverClient after parsing string inputs
-func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) (*ReceiverClient, error) {
+func setupReceivingClient(backend *api.GethStatusBackend, cs string, conf *ReceiverClientConfig) (*ReceiverClient, error) {
 	ccp := new(ConnectionParams)
 	err := ccp.FromString(cs)
-	if err != nil {
-		return nil, err
-	}
-
-	conf := NewReceiverClientConfig()
-	err = json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {
 		return nil, err
 	}
@@ -548,8 +536,8 @@ func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string)
 }
 
 // StartUpReceivingClient creates a ReceiverClient and triggers all `receive` calls in sequence to the SenderServer
-func StartUpReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
-	c, err := setupReceivingClient(backend, cs, configJSON)
+func StartUpReceivingClient(backend *api.GethStatusBackend, cs string, conf *ReceiverClientConfig) error {
+	c, err := setupReceivingClient(backend, cs, conf)
 	if err != nil {
 		return err
 	}
@@ -652,18 +640,13 @@ func (c *KeystoreFilesReceiverClient) receiveKeystoreFilesData() error {
 }
 
 // setupKeystoreFilesReceivingClient creates a new ReceiverClient after parsing string inputs
-func setupKeystoreFilesReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) (*KeystoreFilesReceiverClient, error) {
+func setupKeystoreFilesReceivingClient(backend *api.GethStatusBackend, cs string, conf *KeystoreFilesReceiverClientConfig) (*KeystoreFilesReceiverClient, error) {
 	ccp := new(ConnectionParams)
 	err := ccp.FromString(cs)
 	if err != nil {
 		return nil, err
 	}
 
-	conf := NewKeystoreFilesReceiverClientConfig()
-	err = json.Unmarshal([]byte(configJSON), conf)
-	if err != nil {
-		return nil, err
-	}
 	err = validateKeystoreFilesConfig(backend, conf)
 	if err != nil {
 		return nil, err
@@ -673,8 +656,8 @@ func setupKeystoreFilesReceivingClient(backend *api.GethStatusBackend, cs, confi
 }
 
 // StartUpKeystoreFilesReceivingClient creates a KeystoreFilesReceiverClient and triggers all `receive` calls in sequence to the KeystoreFilesSenderServer
-func StartUpKeystoreFilesReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
-	c, err := setupKeystoreFilesReceivingClient(backend, cs, configJSON)
+func StartUpKeystoreFilesReceivingClient(backend *api.GethStatusBackend, cs string, conf *KeystoreFilesReceiverClientConfig) error {
+	c, err := setupKeystoreFilesReceivingClient(backend, cs, conf)
 	if err != nil {
 		return err
 	}

@@ -1189,7 +1189,7 @@ func replaceDBFile(dbPath string, newDBPath string) (cleanup func(), err error) 
 	return
 }
 
-func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, keycardUID string, password string, newPassword string) error {
+func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, keycardUID string, oldPassword string, newPassword string) error {
 	messenger := b.Messenger()
 	if messenger == nil {
 		return errors.New("cannot resolve messenger instance")
@@ -1200,7 +1200,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	err = b.ensureDBsOpened(account, password)
+	err = b.ensureDBsOpened(account, oldPassword)
 	if err != nil {
 		return err
 	}
@@ -1293,7 +1293,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	err = b.ChangeDatabasePassword(account.KeyUID, password, newPassword)
+	err = b.ChangeDatabasePassword(account.KeyUID, oldPassword, newPassword)
 	if err != nil {
 		return err
 	}
