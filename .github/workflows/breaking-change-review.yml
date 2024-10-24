@@ -1,0 +1,155 @@
+name: PR Review Workflow
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - labeled
+      - unlabeled
+      - synchronize
+
+jobs:
+  check_breaking_change:
+    name: Require QA review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Check for breaking change label
+        id: check_label
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const hasBreakingChange = labels.some(label => label.name === 'breaking change');
+            console.log(`Has breaking change label: ${hasBreakingChange}`);
+            return hasBreakingChange;
+
+      - name: Set random QA reviewers
+        if: steps.check_label.outputs.result == 'true'
+        id: set_reviewers
+        run: |
+          mobile_qa_required=$(yq eval '.mobile_qa.reviewers_required' .github/qa-teams.yml)
+          desktop_qa_required=$(yq eval '.desktop_qa.reviewers_required' .github/qa-teams.yml)
+          
+          mobile_qa_members=$(yq eval '.mobile_qa.members[]' .github/qa-teams.yml | tr '\n' ' ')
+          desktop_qa_members=$(yq eval '.desktop_qa.members[]' .github/qa-teams.yml | tr '\n' ' ')
+          
+          mobile_qa=$(echo $mobile_qa_members | tr ' ' '\n' | shuf -n $mobile_qa_required | tr '\n' ',' | sed 's/,$//')
+          desktop_qa=$(echo $desktop_qa_members | tr ' ' '\n' | shuf -n $desktop_qa_required | tr '\n' ',' | sed 's/,$//')
+          
+          echo "mobile_qa=$mobile_qa" >> $GITHUB_OUTPUT
+          echo "desktop_qa=$desktop_qa" >> $GITHUB_OUTPUT
+
+      - name: Request QA reviews
+        if: steps.check_label.outputs.result == 'true'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const mobileQA = '${{ steps.set_reviewers.outputs.mobile_qa }}'.split(',');
+            const desktopQA = '${{ steps.set_reviewers.outputs.desktop_qa }}'.split(',');
+            const reviewers = [...mobileQA, ...desktopQA];
+            
+            console.log('Requesting reviews from:', reviewers);
+            
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              reviewers: reviewers
+            });
+
+      - name: Check QA approvals
+        if: steps.check_label.outputs.result == 'true'
+        id: check_approvals
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            
+            const mobileQA = '${{ steps.set_reviewers.outputs.mobile_qa }}'.split(',');
+            const desktopQA = '${{ steps.set_reviewers.outputs.desktop_qa }}'.split(',');
+            
+            const mobileQAApproved = reviews.some(review => 
+              review.state === 'APPROVED' && mobileQA.includes(review.user.login)
+            );
+            const desktopQAApproved = reviews.some(review => 
+              review.state === 'APPROVED' && desktopQA.includes(review.user.login)
+            );
+            
+            console.log(`Mobile QA approved: ${mobileQAApproved}`);
+            console.log(`Desktop QA approved: ${desktopQAApproved}`);
+            
+            core.setOutput('mobile-qa-approved', mobileQAApproved);
+            core.setOutput('desktop-qa-approved', desktopQAApproved);
+            
+            return mobileQAApproved && desktopQAApproved;
+
+      - name: Block PR if conditions not met
+        if: steps.check_label.outputs.result == 'true' && steps.check_approvals.outputs.result != 'true'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const mobileQAApproved = ${{ steps.check_approvals.outputs.mobile-qa-approved }};
+            const desktopQAApproved = ${{ steps.check_approvals.outputs.desktop-qa-approved }};
+            
+            let message = 'This PR has the breaking change label and requires approval from both mobile-qa and desktop-qa teams before it can be merged.\n\n';
+            
+            message += `- ${mobileQAApproved ? '[ ]' : '[x]'} Mobile QA team review\n`
+            message += `- ${desktopQAApproved ? '[ ]' : '[x]'} Desktop QA team review`
+            
+            
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'QA Approval Check',
+              head_sha: context.payload.pull_request.head.sha,
+              status: 'completed',
+              conclusion: 'failure',
+              output: {
+                title: 'QA Approval Required',
+                summary: message
+              }
+            });
+
+      - name: Allow PR merge if conditions are met
+        if: steps.check_label.outputs.result == 'true' && steps.check_approvals.outputs.result == 'true'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const { data: reviews } = await github.rest.pulls.listReviews({
+             owner: context.repo.owner,
+             repo: context.repo.repo,
+             pull_number: context.issue.number,
+            });
+            
+            const botApprovalExists = reviews.some(review => 
+             review.user.login === 'github-actions[bot]' && review.state === 'APPROVED'
+            );
+            
+            if (!botApprovalExists) {
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                event: 'APPROVE',
+                body: 'Breaking changes have been approved by Mobile and Desktop QA. This PR can now be merged.'
+              });
+            } else {
+              console.log('Bot approval already exists. No action taken.');
+            }

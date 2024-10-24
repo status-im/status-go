@@ -1,0 +1,18 @@
+# QA Teams Configuration
+mobile_qa:
+  reviewers_required: 2
+  members:
+    - churik
+    - yevh-berdnyk
+    - VolodLytvynenko
+    - pavloburykh
+    - mariia-skrypnyk
+    - Horupa-Olena
+
+desktop_qa:
+  reviewers_required: 2
+  members:
+    - anastasiyaig
+    - virginiabalducci
+    - glitchminer
+    - antdanchenko
