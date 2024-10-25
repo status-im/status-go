@@ -179,6 +179,20 @@ package wakuv2
 						resp) );
 	}
 
+	static void cGoWakuDialPeer(void* wakuCtx,
+									char* peerMultiAddr,
+									char* protocol,
+									int timeoutMs,
+									void* resp) {
+
+		WAKU_CALL( waku_dial_peer(wakuCtx,
+						peerMultiAddr,
+						protocol,
+						timeoutMs,
+						(WakuCallBack) callback,
+						resp) );
+	}
+
 	static void cGoWakuDialPeerById(void* wakuCtx,
 									char* peerId,
 									char* protocol,
@@ -2164,12 +2178,7 @@ func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 }
 
 func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
-	// TODO-nwaku
-	/*
-		ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
-		defer cancel()
-		return w.node.DialPeerWithMultiAddress(ctx, address) */
-	return nil
+	return w.WakuDialPeer(address, string(relay.WakuRelayID_v200), 1000)
 }
 
 func (w *Waku) DialPeerByID(peerID peer.ID) error {
@@ -2674,6 +2683,24 @@ func (self *Waku) WakuConnect(peerMultiAddr string, timeoutMs int) error {
 		return nil
 	}
 	errMsg := "error WakuConnect: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (self *Waku) WakuDialPeer(peerMultiAddr multiaddr.Multiaddr, protocol string, timeoutMs int) error {
+	var resp = C.allocResp()
+	var cPeerMultiAddr = C.CString(peerMultiAddr.String())
+	var cProtocol = C.CString(protocol)
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPeerMultiAddr))
+	defer C.free(unsafe.Pointer(cProtocol))
+
+	C.cGoWakuDialPeer(self.wakuCtx, cPeerMultiAddr, cProtocol, C.int(timeoutMs), resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error DialPeer: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return errors.New(errMsg)
 }
