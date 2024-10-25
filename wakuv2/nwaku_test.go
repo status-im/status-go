@@ -219,7 +219,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
 
 	// Disconnect from the store node
-	err = w.DisconnectPeerById(storeNode.ID)
+	err = w.DropPeer(storeNode.ID)
 	require.NoError(t, err)
 
 	// Check that we are indeed disconnected
