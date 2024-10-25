@@ -208,12 +208,20 @@ package wakuv2
 		WAKU_CALL (waku_get_my_enr(ctx, (WakuCallBack) callback, resp) );
 	}
 
+	static void cGoWakuGetMyPeerId(void* ctx, void* resp) {
+		WAKU_CALL (waku_get_my_peerid(ctx, (WakuCallBack) callback, resp) );
+	}
+
 	static void cGoWakuListPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
 		WAKU_CALL (waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
 
 	static void cGoWakuGetNumConnectedPeers(void* ctx, char* pubSubTopic, void* resp) {
 		WAKU_CALL (waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
+	}
+
+	static void cGoWakuGetPeerIdsFromPeerStore(void* wakuCtx, void* resp) {
+		WAKU_CALL (waku_get_peerids_from_peerstore(wakuCtx, (WakuCallBack) callback, resp) );
 	}
 
 	static void cGoWakuLightpushPublish(void* wakuCtx,
@@ -380,8 +388,12 @@ type WakuConfig struct {
 	Staticnodes          []string `json:"staticnodes,omitempty"`
 	Discv5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
 	Discv5Discovery      bool     `json:"discv5Discovery,omitempty"`
+	Discv5UdpPort        uint16   `json:"discv5UdpPort,omitempty"`
 	ClusterID            uint16   `json:"clusterId,omitempty"`
 	Shards               []uint16 `json:"shards,omitempty"`
+	PeerExchange         bool     `json:"peerExchange,omitempty"`
+	PeerExchangeNode     string   `json:"peerExchangeNode,omitempty"`
+	TcpPort              uint16   `json:"tcpPort,omitempty"`
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -497,9 +509,11 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuCon
 		return nil, err
 	}
 
-	err = node.WakuRelaySubscribe(defaultPubsubTopic)
-	if err != nil {
-		return nil, err
+	if nwakuCfg.EnableRelay {
+		err = node.WakuRelaySubscribe(defaultPubsubTopic)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	node.WakuSetEventCallback()
@@ -2191,10 +2205,23 @@ func (w *Waku) Clean() error {
 	return nil
 }
 
-// TODO-nwaku
-func (w *Waku) PeerID() peer.ID {
-	// return w.node.Host().ID()
-	return ""
+func (w *Waku) PeerID() (peer.ID, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+	C.cGoWakuGetMyPeerId(w.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+
+		peerIdStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		id, err := peer.Decode(peerIdStr)
+		if err != nil {
+			errMsg := "WakuGetMyPeerId - decoding peerId: %w"
+			return "", fmt.Errorf(errMsg, err)
+		}
+		return id, nil
+	}
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return "", fmt.Errorf("WakuGetMyPeerId: %s", errMsg)
 }
 
 // validatePrivateKey checks the format of the given private key.
@@ -2609,18 +2636,21 @@ func wakuStoreQuery(
 	return "", errors.New(errMsg)
 }
 
-func (self *Waku) WakuPeerExchangeRequest(numPeers uint64) (string, error) {
+func (self *Waku) WakuPeerExchangeRequest(numPeers uint64) (uint64, error) {
 	var resp = C.allocResp()
 	defer C.freeResp(resp)
 
 	C.cGoWakuPeerExchangeQuery(self.wakuCtx, C.uint64_t(numPeers), resp)
 	if C.getRet(resp) == C.RET_OK {
-		msg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		return msg, nil
+		numRecvPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		numRecvPeers, err := strconv.ParseUint(numRecvPeersStr, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return numRecvPeers, nil
 	}
-	errMsg := "error WakuPeerExchangeRequest: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return "", errors.New(errMsg)
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return 0, fmt.Errorf("WakuPeerExchangeRequest: %s", errMsg)
 }
 
 func (self *Waku) WakuConnect(peerMultiAddr string, timeoutMs int) error {
@@ -2753,6 +2783,34 @@ func (self *Waku) GetNumConnectedPeers(paramPubsubTopic ...string) (int, error) 
 	return 0, errors.New(errMsg)
 }
 
+func (self *Waku) GetPeerIdsFromPeerStore() (peer.IDSlice, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+	C.cGoWakuGetPeerIdsFromPeerStore(self.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		if peersStr == "" {
+			return peer.IDSlice{}, nil
+		}
+		// peersStr contains a comma-separated list of peer ids
+		itemsPeerIds := strings.Split(peersStr, ",")
+
+		var peers peer.IDSlice
+		for _, peerId := range itemsPeerIds {
+			id, err := peer.Decode(peerId)
+			if err != nil {
+				return nil, fmt.Errorf("GetPeerIdsFromPeerStore - decoding peerId: %w", err)
+			}
+			peers = append(peers, id)
+		}
+
+		return peers, nil
+	}
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, fmt.Errorf("GetPeerIdsFromPeerStore: %s", errMsg)
+}
+
 func (self *Waku) GetPeerIdsByProtocol(protocol string) (peer.IDSlice, error) {
 	var resp = C.allocResp()
 	var cProtocol = C.CString(protocol)
@@ -2773,8 +2831,7 @@ func (self *Waku) GetPeerIdsByProtocol(protocol string) (peer.IDSlice, error) {
 		for _, p := range itemsPeerIds {
 			id, err := peer.Decode(p)
 			if err != nil {
-				errMsg := "GetPeerIdsByProtocol - error converting string to int: " + err.Error()
-				return nil, errors.New(errMsg)
+				return nil, fmt.Errorf("GetPeerIdsByProtocol - decoding peerId: %w", err)
 			}
 			peers = append(peers, id)
 		}
