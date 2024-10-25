@@ -1905,10 +1905,9 @@ func (w *Waku) ClearEnvelopesCache() {
 	w.envelopeCache = newTTLCache()
 }
 
-// TODO-nwaku
 func (w *Waku) PeerCount() int {
-	return 0
-	// return w.node.PeerCount()
+	peerCount, _ := w.GetNumConnectedPeers()
+	return peerCount
 }
 
 // TODO-nwaku
@@ -2176,10 +2175,20 @@ func (w *Waku) DialPeerByID(peerID peer.ID) error {
 	return w.WakuDialPeerById(peerID, string(relay.WakuRelayID_v200), 1000)
 }
 
-func (w *Waku) DropPeer(peerID peer.ID) error {
-	// TODO-nwaku
-	// return w.node.ClosePeerById(peerID)
-	return nil
+func (self *Waku) DropPeer(peerId peer.ID) error {
+	var resp = C.allocResp()
+	var cPeerId = C.CString(peerId.String())
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPeerId))
+
+	C.cGoWakuDisconnectPeerById(self.wakuCtx, cPeerId, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error DisconnectPeerById: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
 }
 
 func (w *Waku) ProcessingP2PMessages() bool {
@@ -2840,22 +2849,6 @@ func (self *Waku) GetPeerIdsByProtocol(protocol string) (peer.IDSlice, error) {
 	errMsg := "error GetPeerIdsByProtocol: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return nil, errors.New(errMsg)
-}
-
-func (self *Waku) DisconnectPeerById(peerId peer.ID) error {
-	var resp = C.allocResp()
-	var cPeerId = C.CString(peerId.String())
-	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cPeerId))
-
-	C.cGoWakuDisconnectPeerById(self.wakuCtx, cPeerId, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error DisconnectPeerById: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
 }
 
 // func main() {
