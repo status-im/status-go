@@ -113,6 +113,10 @@ type ITelemetryClient interface {
 	PushMessageCheckFailure(ctx context.Context, messageHash string)
 	PushPeerCountByShard(ctx context.Context, peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin map[wps.Origin]uint)
+	PushDialFailure(ctx context.Context, dialFailure common.DialError)
+	PushMissedMessage(ctx context.Context, envelope *protocol.Envelope)
+	PushMissedRelevantMessage(ctx context.Context, message *common.ReceivedMessage)
+	PushMessageDeliveryConfirmed(ctx context.Context, messageHash string)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -1026,6 +1030,11 @@ func (w *Waku) SkipPublishToTopic(value bool) {
 
 func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
 	w.messageSender.MessagesDelivered(hashes)
+	if w.statusTelemetryClient != nil {
+		for _, hash := range hashes {
+			w.statusTelemetryClient.PushMessageDeliveryConfirmed(w.ctx, hash.String())
+		}
+	}
 }
 
 func (w *Waku) SetStorePeerID(peerID peer.ID) {
@@ -1149,12 +1158,24 @@ func (w *Waku) Start() error {
 			peerTelemetryTicker := time.NewTicker(peerTelemetryTickerInterval)
 			defer peerTelemetryTicker.Stop()
 
+			sub, err := w.node.Host().EventBus().Subscribe(new(utils.DialError))
+			if err != nil {
+				w.logger.Error("failed to subscribe to dial errors", zap.Error(err))
+				return
+			}
+			defer sub.Close()
+
 			for {
 				select {
 				case <-w.ctx.Done():
 					return
 				case <-peerTelemetryTicker.C:
 					w.reportPeerMetrics()
+				case dialErr := <-sub.Out():
+					errors := common.ParseDialErrors(dialErr.(utils.DialError).Err.Error())
+					for _, dialError := range errors {
+						w.statusTelemetryClient.PushDialFailure(w.ctx, common.DialError{ErrType: dialError.ErrType, ErrMsg: dialError.ErrMsg, Protocols: dialError.Protocols})
+					}
 				}
 			}
 		}()
@@ -1169,7 +1190,6 @@ func (w *Waku) Start() error {
 	go w.runPeerExchangeLoop()
 
 	if w.cfg.EnableMissingMessageVerification {
-
 		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
 			w.node.Store(),
 			w,
@@ -1450,6 +1470,12 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 		return nil
 	}
 
+	if w.statusTelemetryClient != nil {
+		if msgType == common.MissingMessageType {
+			w.statusTelemetryClient.PushMissedMessage(w.ctx, envelope)
+		}
+	}
+
 	logger := w.logger.With(
 		zap.String("messageType", msgType),
 		zap.Stringer("envelopeHash", envelope.Hash()),
@@ -1568,6 +1594,9 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 		w.storeMsgIDsMu.Unlock()
 	} else {
 		logger.Debug("filters did match")
+		if w.statusTelemetryClient != nil && e.MsgType == common.MissingMessageType {
+			w.statusTelemetryClient.PushMissedRelevantMessage(w.ctx, e)
+		}
 		e.Processed.Store(true)
 	}
 
