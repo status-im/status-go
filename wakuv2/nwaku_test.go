@@ -545,6 +545,84 @@ func TestPeerExchange(t *testing.T) {
 	require.NoError(t, discV5Node.Stop()) */
 }
 
+func TestDial(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	dialerNodeConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+
+	// start node that will initiate the dial
+	dialerNodeWakuConfig := WakuConfig{
+		EnableRelay:     true,
+		LogLevel:        "DEBUG",
+		Discv5Discovery: false,
+		ClusterID:       16,
+		Shards:          []uint16{64},
+		Discv5UdpPort:   9020,
+		TcpPort:         60020,
+	}
+
+	dialerNode, err := New(nil, "", &dialerNodeConfig, &dialerNodeWakuConfig, logger.Named("dialerNode"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, dialerNode.Start())
+
+	time.Sleep(1 * time.Second)
+
+	receiverNodeConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+
+	// start node that will receive the dial
+	receiverNodeWakuConfig := WakuConfig{
+		EnableRelay:     true,
+		LogLevel:        "DEBUG",
+		Discv5Discovery: false,
+		ClusterID:       16,
+		Shards:          []uint16{64},
+		Discv5UdpPort:   9021,
+		TcpPort:         60021,
+	}
+
+	receiverNode, err := New(nil, "", &receiverNodeConfig, &receiverNodeWakuConfig, logger.Named("receiverNode"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, receiverNode.Start())
+
+	time.Sleep(1 * time.Second)
+
+	receiverMultiaddr, err := receiverNode.ListenAddresses()
+	require.NoError(t, err)
+	require.NotNil(t, receiverMultiaddr)
+
+	// Check that both nodes start with no connected peers
+	dialerPeerCount := dialerNode.PeerCount()
+	require.True(t, dialerPeerCount == 0, "Dialer node should have no connected peers")
+
+	receiverPeerCount := receiverNode.PeerCount()
+	require.True(t, receiverPeerCount == 0, "Receiver node should have no connected peers")
+
+	// Dial
+	err = dialerNode.DialPeer(receiverMultiaddr[0])
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	// Check that both nodes now have one connected peer
+	dialerPeerCount = dialerNode.PeerCount()
+	require.True(t, dialerPeerCount == 1, "Dialer node should have 1 peer")
+
+	receiverPeerCount = receiverNode.PeerCount()
+	require.True(t, receiverPeerCount == 0, "Receiver node should have 1 peer")
+
+	// Stop nodes
+	require.NoError(t, dialerNode.Stop())
+	require.NoError(t, receiverNode.Stop())
+
+}
+
 /*
 
 func TestWakuV2Filter(t *testing.T) {
