@@ -830,24 +830,27 @@ func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, su
 	}
 }
 
+*/
+
 func (w *Waku) discoverAndConnectPeers() {
-	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
-		defer wg.Done()
-		if len(d.PeerInfo.Addrs) != 0 {
-			go w.connect(d.PeerInfo, d.ENR, wps.DNSDiscovery)
-		}
-	}
+	var addrsToConnect []multiaddr.Multiaddr
+	nameserver := "1.1.1.1"
+	timeout := int(requestTimeout / time.Millisecond)
 
 	for _, addrString := range w.cfg.WakuNodes {
 		addrString := addrString
 		if strings.HasPrefix(addrString, "enrtree://") {
+
 			// Use DNS Discovery
-			go func() {
-				defer gocommon.LogOnPanic()
-				if err := w.dnsDiscover(w.ctx, addrString, fnApply, false); err != nil {
-					w.logger.Error("could not obtain dns discovery peers for ClusterConfig.WakuNodes", zap.Error(err), zap.String("dnsDiscURL", addrString))
-				}
-			}()
+			res, err := w.WakuDnsDiscovery(addrString, nameserver, timeout)
+			if err != nil {
+				w.logger.Error("could not obtain dns discovery peers for ClusterConfig.WakuNodes", zap.Error(err), zap.String("dnsDiscURL", addrString))
+				continue
+			}
+			for _, ma := range res {
+				addrsToConnect = append(addrsToConnect, ma)
+			}
+
 		} else {
 			// It is a normal multiaddress
 			addr, err := multiaddr.NewMultiaddr(addrString)
@@ -855,17 +858,16 @@ func (w *Waku) discoverAndConnectPeers() {
 				w.logger.Warn("invalid peer multiaddress", zap.String("ma", addrString), zap.Error(err))
 				continue
 			}
-
-			peerInfo, err := peer.AddrInfoFromP2pAddr(addr)
-			if err != nil {
-				w.logger.Warn("invalid peer multiaddress", zap.Stringer("addr", addr), zap.Error(err))
-				continue
-			}
-
-			go w.connect(*peerInfo, nil, wps.Static)
+			addrsToConnect = append(addrsToConnect, addr)
 		}
 	}
-} */
+
+	// Now connect to all the Multiaddresses
+	for _, ma := range addrsToConnect {
+		w.WakuConnect(ma.String(), timeout)
+	}
+
+}
 
 func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origin) {
 	defer gocommon.LogOnPanic()
