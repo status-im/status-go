@@ -6,11 +6,12 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 )
 
 type Pinger interface {
-	PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error)
+	PingPeer(ctx context.Context, peerInfo peer.AddrInfo) (time.Duration, error)
 }
 
 type defaultPingImpl struct {
@@ -23,8 +24,9 @@ func NewDefaultPinger(host host.Host) Pinger {
 	}
 }
 
-func (d *defaultPingImpl) PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error) {
-	pingResultCh := ping.Ping(ctx, d.host, peerID)
+func (d *defaultPingImpl) PingPeer(ctx context.Context, peerInfo peer.AddrInfo) (time.Duration, error) {
+	d.host.Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
+	pingResultCh := ping.Ping(ctx, d.host, peerInfo.ID)
 	select {
 	case <-ctx.Done():
 		return 0, ctx.Err()

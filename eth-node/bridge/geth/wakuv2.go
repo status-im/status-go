@@ -206,10 +206,6 @@ func (w *gethWakuV2Wrapper) RemovePubsubTopicKey(topic string) error {
 	return w.waku.RemovePubsubTopicKey(topic)
 }
 
-func (w *gethWakuV2Wrapper) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	return w.waku.AddStorePeer(address)
-}
-
 func (w *gethWakuV2Wrapper) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return w.waku.AddRelayPeer(address)
 }

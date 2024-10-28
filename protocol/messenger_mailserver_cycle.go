@@ -4,8 +4,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
-	"github.com/waku-org/go-waku/waku/v2/utils"
-
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/mailservers"
@@ -37,28 +35,6 @@ func (m *Messenger) AllMailservers() ([]mailservers.Mailserver, error) {
 	}
 
 	return allMailservers, nil
-}
-
-func (m *Messenger) setupStorenodes(storenodes []mailservers.Mailserver) error {
-	if m.transport.WakuVersion() != 2 {
-		return nil
-	}
-
-	for _, storenode := range storenodes {
-
-		peerInfo, err := storenode.PeerInfo()
-		if err != nil {
-			return err
-		}
-
-		for _, addr := range utils.EncapsulatePeerID(peerInfo.ID, peerInfo.Addrs...) {
-			_, err := m.transport.AddStorePeer(addr)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func (m *Messenger) getFleet() (string, error) {
@@ -93,63 +69,64 @@ func (m *Messenger) asyncRequestAllHistoricMessages() {
 	}()
 }
 
-func (m *Messenger) GetPinnedStorenode() (peer.ID, error) {
+func (m *Messenger) GetPinnedStorenode() (peer.AddrInfo, error) {
 	fleet, err := m.getFleet()
 	if err != nil {
-		return "", err
+		return peer.AddrInfo{}, err
 	}
 
 	pinnedMailservers, err := m.settings.GetPinnedMailservers()
 	if err != nil {
-		return "", err
+		return peer.AddrInfo{}, err
 	}
 
 	pinnedMailserver, ok := pinnedMailservers[fleet]
 	if !ok {
-		return "", nil
+		return peer.AddrInfo{}, nil
 	}
 
 	fleetMailservers := mailservers.DefaultMailservers()
 
 	for _, c := range fleetMailservers {
 		if c.Fleet == fleet && c.ID == pinnedMailserver {
-			return c.PeerID()
+			return c.PeerInfo()
 		}
 	}
 
 	if m.mailserversDatabase != nil {
 		customMailservers, err := m.mailserversDatabase.Mailservers()
 		if err != nil {
-			return "", err
+			return peer.AddrInfo{}, err
 		}
 
 		for _, c := range customMailservers {
 			if c.Fleet == fleet && c.ID == pinnedMailserver {
-				return c.PeerID()
+				return c.PeerInfo()
 			}
 		}
 	}
 
-	return "", nil
+	return peer.AddrInfo{}, nil
 }
 
 func (m *Messenger) UseStorenodes() (bool, error) {
 	return m.settings.CanUseMailservers()
 }
 
-func (m *Messenger) Storenodes() ([]peer.ID, error) {
+func (m *Messenger) Storenodes() ([]peer.AddrInfo, error) {
 	mailservers, err := m.AllMailservers()
 	if err != nil {
 		return nil, err
 	}
 
-	var result []peer.ID
+	var result []peer.AddrInfo
 	for _, m := range mailservers {
-		peerID, err := m.PeerID()
+
+		peerInfo, err := m.PeerInfo()
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, peerID)
+		result = append(result, peerInfo)
 	}
 
 	return result, nil

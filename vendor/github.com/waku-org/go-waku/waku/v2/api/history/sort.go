@@ -7,7 +7,7 @@ import (
 )
 
 type SortedStorenode struct {
-	Storenode       peer.ID
+	Storenode       peer.AddrInfo
 	RTT             time.Duration
 	CanConnectAfter time.Time
 }

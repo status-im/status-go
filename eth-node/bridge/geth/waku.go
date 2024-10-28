@@ -63,11 +63,6 @@ func (w *GethWakuWrapper) StopDiscV5() error {
 	return errors.New("not available in WakuV1")
 }
 
-// PeerCount function only added for compatibility with waku V2
-func (w *GethWakuWrapper) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	return "", errors.New("not available in WakuV1")
-}
-
 // SubscribeToPubsubTopic function only added for compatibility with waku V2
 func (w *GethWakuWrapper) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
 	// not available in WakuV1

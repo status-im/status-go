@@ -1383,7 +1383,12 @@ func (w *Waku) Start() error {
 	w.HistoryRetriever = history.NewHistoryRetriever(newStorenodeRequestor(w.wakuCtx, w.logger), NewHistoryProcessorWrapper(w), w.logger)
 	w.StorenodeCycle.Start(w.ctx)
 
-	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.PeerID()))
+	peerID, err := w.PeerID()
+	if err != nil {
+		return err
+	}
+
+	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", peerID))
 
 	/* TODO-nwaku
 	w.discoverAndConnectPeers()
@@ -2141,17 +2146,6 @@ func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
 	return w.node.SetDiscV5Bootnodes(bootnodes)
 }
 */
-
-func (w *Waku) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	// TODO-nwaku
-	/*
-		peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, store.StoreQueryID_v300)
-		if err != nil {
-			return "", err
-		}
-		return peerID, nil */
-	return "", nil
-}
 
 func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
@@ -3078,9 +3072,14 @@ func newPinger(wakuCtx unsafe.Pointer) commonapi.Pinger {
 	}
 }
 
-func (p *pinger) PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error) {
+func (p *pinger) PingPeer(ctx context.Context, peerInfo peer.AddrInfo) (time.Duration, error) {
+	addrs := make([]string, len(peerInfo.Addrs))
+	for i, addr := range utils.EncapsulatePeerID(peerInfo.ID, peerInfo.Addrs...) {
+		addrs[i] = addr.String()
+	}
+
 	var resp = C.allocResp()
-	var cPeerId = C.CString(peerID.String())
+	var cPeerId = C.CString(strings.Join(addrs, ","))
 	defer C.freeResp(resp)
 	defer C.free(unsafe.Pointer(cPeerId))
 
