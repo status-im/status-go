@@ -582,6 +582,33 @@ func (r *Router) getSelectedChains(input *requests.RouteInputParams) (selectedFr
 	return selectedFromChains, selectedToChains, nil
 }
 
+func mapRouteInputParamsToProcessorInputParams(input *requests.RouteInputParams, amountOption amountOption, fromChain *params.Network,
+	toChain *params.Network, token *walletToken.Token, toToken *walletToken.Token) pathprocessor.ProcessorInputParams {
+	processorInputParams := pathprocessor.ProcessorInputParams{
+		FromChain: fromChain,
+		ToChain:   toChain,
+		FromToken: token,
+		ToToken:   toToken,
+		ToAddr:    input.AddrTo,
+		FromAddr:  input.AddrFrom,
+		AmountIn:  amountOption.amount,
+		AmountOut: input.AmountOut.ToInt(),
+
+		Username:  input.Username,
+		PublicKey: input.PublicKey,
+		PackID:    input.PackID.ToInt(),
+	}
+	if input.TestsMode {
+		processorInputParams.TestsMode = input.TestsMode
+		processorInputParams.TestEstimationMap = input.TestParams.EstimationMap
+		processorInputParams.TestBonderFeeMap = input.TestParams.BonderFeeMap
+		processorInputParams.TestApprovalGasEstimation = input.TestParams.ApprovalGasEstimation
+		processorInputParams.TestApprovalL1Fee = input.TestParams.ApprovalL1Fee
+	}
+
+	return processorInputParams
+}
+
 func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInputParams, selectedFromChains []*params.Network,
 	selectedToChains []*params.Network) (candidates routes.Route, processorErrors []*ProcessorError, err error) {
 	var (
@@ -694,114 +721,13 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 							continue
 						}
 
-						processorInputParams := pathprocessor.ProcessorInputParams{
-							FromChain: network,
-							ToChain:   dest,
-							FromToken: token,
-							ToToken:   toToken,
-							ToAddr:    input.AddrTo,
-							FromAddr:  input.AddrFrom,
-							AmountIn:  amountOption.amount,
-							AmountOut: input.AmountOut.ToInt(),
-
-							Username:  input.Username,
-							PublicKey: input.PublicKey,
-							PackID:    input.PackID.ToInt(),
-						}
-						if input.TestsMode {
-							processorInputParams.TestsMode = input.TestsMode
-							processorInputParams.TestEstimationMap = input.TestParams.EstimationMap
-							processorInputParams.TestBonderFeeMap = input.TestParams.BonderFeeMap
-							processorInputParams.TestApprovalGasEstimation = input.TestParams.ApprovalGasEstimation
-							processorInputParams.TestApprovalL1Fee = input.TestParams.ApprovalL1Fee
-						}
-
-						can, err := pProcessor.AvailableFor(processorInputParams)
+						processorInputParams := mapRouteInputParamsToProcessorInputParams(input, amountOption, network, dest, token, toToken)
+						path, err := r.resolvePath(ctx, input.SendType, input.GasFeeMode, amountOption.locked, amountOption.subtractFees, processorInputParams, pProcessor, fetchedFees)
 						if err != nil {
 							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
 							continue
 						}
-						if !can {
-							continue
-						}
-
-						bonderFees, tokenFees, err := pProcessor.CalculateFees(processorInputParams)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-							continue
-						}
-
-						gasLimit, err := pProcessor.EstimateGas(processorInputParams)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-							continue
-						}
-
-						approvalContractAddress, err := pProcessor.GetContractAddress(processorInputParams)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-							continue
-						}
-						approvalRequired, approvalAmountRequired, err := r.requireApproval(ctx, input.SendType, &approvalContractAddress, processorInputParams)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-							continue
-						}
-
-						var approvalGasLimit uint64
-						if approvalRequired {
-							if processorInputParams.TestsMode {
-								approvalGasLimit = processorInputParams.TestApprovalGasEstimation
-							} else {
-								approvalGasLimit, err = r.estimateGasForApproval(processorInputParams, &approvalContractAddress)
-								if err != nil {
-									appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-									continue
-								}
-							}
-						}
-
-						amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
-							continue
-						}
-
-						maxFeesPerGas := fetchedFees.FeeFor(input.GasFeeMode)
-
-						estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFeesPerGas)
-						if approvalRequired && estimatedTime < fees.MoreThanFiveMinutes {
-							estimatedTime += 1
-						}
-
-						path := &routes.Path{
-							ProcessorName:  pProcessor.Name(),
-							FromChain:      network,
-							ToChain:        dest,
-							FromToken:      token,
-							ToToken:        toToken,
-							AmountIn:       (*hexutil.Big)(amountOption.amount),
-							AmountInLocked: amountOption.locked,
-							AmountOut:      (*hexutil.Big)(amountOut),
-
-							// set params that we don't want to be recalculated with every new block creation
-							TxGasAmount:  gasLimit,
-							TxBonderFees: (*hexutil.Big)(bonderFees),
-							TxTokenFees:  (*hexutil.Big)(tokenFees),
-
-							ApprovalRequired:        approvalRequired,
-							ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
-							ApprovalContractAddress: &approvalContractAddress,
-							ApprovalGasAmount:       approvalGasLimit,
-
-							EstimatedTime: estimatedTime,
-
-							SubtractFees: amountOption.subtractFees,
-						}
-
-						err = r.cacluateFees(ctx, path, fetchedFees, processorInputParams.TestsMode, processorInputParams.TestApprovalL1Fee)
-						if err != nil {
-							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
+						if path == nil {
 							continue
 						}
 
@@ -821,6 +747,92 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 
 	group.Wait()
 	return candidates, processorErrors, nil
+}
+
+func (r *Router) resolvePath(ctx context.Context, sendType sendtype.SendType, gasFeeMode fees.GasFeeMode, amountInLocked bool, subtractFees bool,
+	processorInputParams pathprocessor.ProcessorInputParams, pProcessor pathprocessor.PathProcessor, fetchedFees *fees.SuggestedFees) (*routes.Path, error) {
+	can, err := pProcessor.AvailableFor(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+	if !can {
+		return nil, nil
+	}
+
+	bonderFees, tokenFees, err := pProcessor.CalculateFees(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	gasLimit, err := pProcessor.EstimateGas(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	approvalContractAddress, err := pProcessor.GetContractAddress(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+	approvalRequired, approvalAmountRequired, err := r.requireApproval(ctx, sendType, &approvalContractAddress, processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	var approvalGasLimit uint64
+	if approvalRequired {
+		if processorInputParams.TestsMode {
+			approvalGasLimit = processorInputParams.TestApprovalGasEstimation
+		} else {
+			approvalGasLimit, err = r.estimateGasForApproval(processorInputParams, &approvalContractAddress)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	amountOut, err := pProcessor.CalculateAmountOut(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	maxFeesPerGas := fetchedFees.FeeFor(gasFeeMode)
+
+	estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, processorInputParams.FromChain.ChainID, maxFeesPerGas)
+	if approvalRequired && estimatedTime < fees.MoreThanFiveMinutes {
+		estimatedTime += 1
+	}
+
+	path := &routes.Path{
+		ProcessorName:  pProcessor.Name(),
+		FromChain:      processorInputParams.FromChain,
+		ToChain:        processorInputParams.ToChain,
+		FromToken:      processorInputParams.FromToken,
+		ToToken:        processorInputParams.ToToken,
+		AmountIn:       (*hexutil.Big)(processorInputParams.AmountIn),
+		AmountInLocked: amountInLocked,
+		AmountOut:      (*hexutil.Big)(amountOut),
+
+		// set params that we don't want to be recalculated with every new block creation
+		TxGasAmount:  gasLimit,
+		TxBonderFees: (*hexutil.Big)(bonderFees),
+		TxTokenFees:  (*hexutil.Big)(tokenFees),
+
+		ApprovalRequired:        approvalRequired,
+		ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
+		ApprovalContractAddress: &approvalContractAddress,
+		ApprovalGasAmount:       approvalGasLimit,
+
+		EstimatedTime: estimatedTime,
+
+		SubtractFees: subtractFees,
+	}
+
+	err = r.cacluateFees(ctx, path, fetchedFees, processorInputParams.TestsMode, processorInputParams.TestApprovalL1Fee)
+	if err != nil {
+		return nil, err
+	}
+
+	return path, nil
 }
 
 func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute routes.Route) (hasPositiveBalance bool, err error) {

@@ -10,13 +10,20 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/services/wallet/router/sendtype"
 )
 
 var (
 	newBlockCheckIntervalMainnet      = 3 * time.Second
-	newBlockCheckIntervalOptimism     = 1 * time.Second
-	newBlockCheckIntervalArbitrum     = 200 * time.Millisecond
+	newBlockCheckIntervalOptimism     = 2 * time.Second
+	newBlockCheckIntervalArbitrum     = 1 * time.Second
 	newBlockCheckIntervalAnvilMainnet = 2 * time.Second
+
+	paraswapProposalCheckIntervalMainnet      = 12 * time.Second
+	paraswapProposalCheckIntervalOptimism     = 3 * time.Second
+	paraswapProposalCheckIntervalArbitrum     = 3 * time.Second
+	paraswapProposalCheckIntervalAnvilMainnet = 2 * time.Second
 
 	feeRecalculationTimeout      = 5 * time.Minute
 	feeRecalculationAnvilTimeout = 5 * time.Second
@@ -52,20 +59,30 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 	}
 	r.startTimeoutForUpdates(flb.closeCh, timeout)
 
-	var ticker *time.Ticker
+	var (
+		duration time.Duration
+		step     time.Duration
+		limit    time.Duration
+	)
 	switch chainID {
 	case walletCommon.EthereumMainnet,
 		walletCommon.EthereumSepolia:
-		ticker = time.NewTicker(newBlockCheckIntervalMainnet)
+		step = newBlockCheckIntervalMainnet
+		limit = paraswapProposalCheckIntervalMainnet
 	case walletCommon.OptimismMainnet,
 		walletCommon.OptimismSepolia:
-		ticker = time.NewTicker(newBlockCheckIntervalOptimism)
+		step = newBlockCheckIntervalOptimism
+		limit = paraswapProposalCheckIntervalOptimism
 	case walletCommon.ArbitrumMainnet,
 		walletCommon.ArbitrumSepolia:
-		ticker = time.NewTicker(newBlockCheckIntervalArbitrum)
+		step = newBlockCheckIntervalArbitrum
+		limit = paraswapProposalCheckIntervalArbitrum
 	case walletCommon.AnvilMainnet:
-		ticker = time.NewTicker(newBlockCheckIntervalAnvilMainnet)
+		step = newBlockCheckIntervalAnvilMainnet
+		limit = paraswapProposalCheckIntervalAnvilMainnet
 	}
+
+	ticker := time.NewTicker(step)
 
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
@@ -74,6 +91,13 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 		for {
 			select {
 			case <-ticker.C:
+				refreshParaswapProposal := false
+				duration += step
+				if duration >= limit {
+					refreshParaswapProposal = true
+					duration = 0
+				}
+
 				var blockNumber uint64
 				blockNumber, err := ethClient.BlockNumber(ctx)
 				if err != nil {
@@ -103,23 +127,37 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 						continue
 					}
 
-					r.lastInputParamsMutex.Lock()
-					uuid := r.lastInputParams.Uuid
-					r.lastInputParamsMutex.Unlock()
+					_, inputParams := r.GetBestRouteAndAssociatedInputParams()
 
 					r.activeRoutesMutex.Lock()
 					if r.activeRoutes != nil && r.activeRoutes.Best != nil && len(r.activeRoutes.Best) > 0 {
-						for _, path := range r.activeRoutes.Best {
-							err = r.cacluateFees(ctx, path, fees, false, 0)
-							if err != nil {
-								logutils.ZapLogger().Error("Failed to calculate fees", zap.Error(err))
-								continue
+						for i, path := range r.activeRoutes.Best {
+							if path.ProcessorName == pathprocessor.ProcessorSwapParaswapName && refreshParaswapProposal {
+								amountOption := amountOption{
+									amount:       path.AmountIn.ToInt(),
+									locked:       path.AmountInLocked,
+									subtractFees: path.SubtractFees,
+								}
+								processorInputParams := mapRouteInputParamsToProcessorInputParams(&inputParams, amountOption, path.FromChain, path.ToChain, path.FromToken, path.ToToken)
+								swapProcessor := r.pathProcessors[path.ProcessorName]
+								newPath, err := r.resolvePath(ctx, sendtype.Swap, inputParams.GasFeeMode, amountOption.locked, amountOption.subtractFees, processorInputParams, swapProcessor, fees)
+								if err != nil {
+									logutils.ZapLogger().Error("Failed to calculate fees", zap.Error(err))
+									continue
+								}
+								r.activeRoutes.Best[i] = newPath
+							} else {
+								err = r.cacluateFees(ctx, path, fees, false, 0)
+								if err != nil {
+									logutils.ZapLogger().Error("Failed to calculate fees", zap.Error(err))
+									continue
+								}
 							}
 						}
 
 						_, err = r.checkBalancesForTheBestRoute(ctx, r.activeRoutes.Best)
 
-						sendRouterResult(uuid, r.activeRoutes, err)
+						sendRouterResult(inputParams.Uuid, r.activeRoutes, err)
 					}
 					r.activeRoutesMutex.Unlock()
 				}
