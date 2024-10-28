@@ -24,23 +24,23 @@ mkdir -p "${merged_coverage_reports_path}"
 mkdir -p "${test_results_path}"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.test.status-go.yml"
-timestamp=$(date +%s)
+project_name="status-go-func-tests-$(date +%s)"
 
 # Run functional tests
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
-docker-compose -p ${timestamp} ${all_compose_files} up -d --build --remove-orphans
+docker compose -p ${project_name} ${all_compose_files} up -d --build --remove-orphans
 
 echo -e "${GRN}Running tests-rpc${RST}" # Follow the logs, wait for them to finish
-docker-compose -p ${timestamp} ${all_compose_files} logs -f tests-rpc > "${root_path}/tests-rpc.log"
+docker compose -p ${project_name} ${all_compose_files} logs -f tests-rpc > "${root_path}/tests-rpc.log"
 
 # Stop containers
 echo -e "${GRN}Stopping docker containers${RST}"
-docker-compose -p ${timestamp} ${all_compose_files} stop
+docker compose -p ${project_name} ${all_compose_files} stop
 
 # Save logs
 echo -e "${GRN}Saving logs${RST}"
-docker-compose -p ${timestamp} ${all_compose_files} logs status-go > "${root_path}/statusd.log"
-docker-compose -p ${timestamp} ${all_compose_files} logs status-backend > "${root_path}/status-backend.log"
+docker compose -p ${project_name} ${all_compose_files} logs status-go > "${root_path}/statusd.log"
+docker compose -p ${project_name} ${all_compose_files} logs status-backend > "${root_path}/status-backend.log"
 
 if [ "$(uname)" = "Darwin" ]; then
     separator="-"
@@ -49,11 +49,11 @@ else
 fi
 
 # Retrieve exit code
-exit_code=$(docker inspect ${timestamp}${separator}tests-rpc${separator}1 -f '{{.State.ExitCode}}');
+exit_code=$(docker inspect ${project_name}${separator}tests-rpc${separator}1 -f '{{.State.ExitCode}}');
 
 # Cleanup containers
 echo -e "${GRN}Removing docker containers${RST}"
-docker-compose -p ${timestamp} ${all_compose_files} down
+docker compose -p ${project_name} ${all_compose_files} down
 
 # Collect coverage reports
 echo -e "${GRN}Collecting code coverage reports${RST}"
