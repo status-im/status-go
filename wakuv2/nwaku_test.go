@@ -655,7 +655,8 @@ func TestDnsDiscover(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	sampleEnrTree := "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im"
 	nameserver := "1.1.1.1"
-	res, err := node.WakuDnsDiscovery(sampleEnrTree, nameserver, 1000)
+
+	res, err := node.WakuDnsDiscovery(sampleEnrTree, nameserver, int(requestTimeout/time.Millisecond))
 	require.NoError(t, err)
 
 	require.True(t, len(res) > 1, "multiple nodes should be returned from the DNS Discovery query")
