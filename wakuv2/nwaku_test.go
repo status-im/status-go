@@ -6,7 +6,6 @@ package wakuv2
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -613,12 +612,10 @@ func TestDial(t *testing.T) {
 
 	// Check that both nodes now have one connected peer
 	dialerPeerCount = dialerNode.PeerCount()
-	peerIds, _ := dialerNode.GetPeerIdsFromPeerStore()
-	fmt.Println("------------- dialerNode.GetPeerIdsFromPeerStore(): ", peerIds)
 	require.True(t, dialerPeerCount == 1, "Dialer node should have 1 peer")
 
 	receiverPeerCount = receiverNode.PeerCount()
-	require.True(t, receiverPeerCount == 0, "Receiver node should have 1 peer")
+	require.True(t, receiverPeerCount == 1, "Receiver node should have 1 peer")
 
 	// Stop nodes
 	require.NoError(t, dialerNode.Stop())
