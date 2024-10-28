@@ -233,6 +233,8 @@ func TestBasicWakuV2(t *testing.T) {
 	err = w.DialPeerByID(storeNode.ID)
 	require.NoError(t, err)
 
+	time.Sleep(1 * time.Second)
+
 	// Check that we are connected again
 	connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
 	require.NoError(t, err)
