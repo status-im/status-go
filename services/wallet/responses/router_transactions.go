@@ -43,7 +43,8 @@ type RouterSentTransaction struct {
 	ToChain     uint64        `json:"toChain"`
 	FromToken   string        `json:"fromToken"`
 	ToToken     string        `json:"toToken"`
-	Amount      string        `json:"amount"` // amount of the transaction
+	Amount      string        `json:"amount"`    // amount sent
+	AmountOut   string        `json:"amountOut"` // amount that will be received
 	Hash        types.Hash    `json:"hash"`
 	ApprovalTx  bool          `json:"approvalTx"`
 }
@@ -66,6 +67,7 @@ func NewRouterSentTransaction(sendArgs *transactions.SendTxArgs, hash types.Hash
 		FromToken:   sendArgs.FromTokenID,
 		ToToken:     sendArgs.ToTokenID,
 		Amount:      sendArgs.Value.String(),
+		AmountOut:   sendArgs.ValueOut.String(),
 		Hash:        hash,
 		ApprovalTx:  approvalTx,
 	}
