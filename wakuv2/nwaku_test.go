@@ -6,7 +6,6 @@ package wakuv2
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -601,10 +600,12 @@ func TestDial(t *testing.T) {
 	require.NotNil(t, receiverMultiaddr)
 
 	// Check that both nodes start with no connected peers
-	dialerPeerCount := dialerNode.PeerCount()
+	dialerPeerCount, err := dialerNode.PeerCount()
+	require.NoError(t, err)
 	require.True(t, dialerPeerCount == 0, "Dialer node should have no connected peers")
 
-	receiverPeerCount := receiverNode.PeerCount()
+	receiverPeerCount, err := receiverNode.PeerCount()
+	require.NoError(t, err)
 	require.True(t, receiverPeerCount == 0, "Receiver node should have no connected peers")
 
 	// Dial
@@ -614,13 +615,13 @@ func TestDial(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Check that both nodes now have one connected peer
-	dialerPeerCount = dialerNode.PeerCount()
-	peerIds, _ := dialerNode.GetPeerIdsFromPeerStore()
-	fmt.Println("------------- dialerNode.GetPeerIdsFromPeerStore(): ", peerIds)
+	dialerPeerCount, err = dialerNode.PeerCount()
+	require.NoError(t, err)
 	require.True(t, dialerPeerCount == 1, "Dialer node should have 1 peer")
 
-	receiverPeerCount = receiverNode.PeerCount()
-	require.True(t, receiverPeerCount == 0, "Receiver node should have 1 peer")
+	receiverPeerCount, err = receiverNode.PeerCount()
+	require.NoError(t, err)
+	require.True(t, receiverPeerCount == 1, "Receiver node should have 1 peer")
 
 	// Stop nodes
 	require.NoError(t, dialerNode.Stop())
