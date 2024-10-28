@@ -1912,9 +1912,13 @@ func (w *Waku) ClearEnvelopesCache() {
 	w.envelopeCache = newTTLCache()
 }
 
-func (w *Waku) PeerCount() int {
-	peerCount, _ := w.GetNumConnectedPeers()
-	return peerCount
+func (w *Waku) PeerCount() (int, error) {
+	peerCount, err := w.GetNumConnectedPeers()
+	if err != nil {
+		return 0, err
+	}
+
+	return peerCount, nil
 }
 
 // TODO-nwaku
@@ -2181,11 +2185,11 @@ func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 }
 
 func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
-	return w.WakuDialPeer(address, "", 1000)
+	return w.WakuDialPeer(address, "", int(requestTimeout/time.Millisecond))
 }
 
 func (w *Waku) DialPeerByID(peerID peer.ID) error {
-	return w.WakuDialPeerById(peerID, "", 1000)
+	return w.WakuDialPeerById(peerID, "", int(requestTimeout/time.Millisecond))
 }
 
 func (self *Waku) DropPeer(peerId peer.ID) error {
