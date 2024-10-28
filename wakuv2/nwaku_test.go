@@ -323,6 +323,89 @@ func makeTestTree(domain string, nodes []*enode.Node, links []string) (*ethdnsdi
 	return tree, url
 }
 
+func TestRelay(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	relayerNodeConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+
+	// start node that will relay the messages between sender and receiver
+	relayerNodeWakuConfig := WakuConfig{
+		EnableRelay:     true,
+		LogLevel:        "DEBUG",
+		Discv5Discovery: false,
+		ClusterID:       16,
+		Shards:          []uint16{0, 64},
+		Discv5UdpPort:   9030,
+		TcpPort:         60030,
+	}
+
+	relayerNode, err := New(nil, "", &relayerNodeConfig, &relayerNodeWakuConfig, logger.Named("dialerNode"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, relayerNode.Start())
+
+	time.Sleep(1 * time.Second)
+
+	relayerMultiaddr, err := relayerNode.ListenAddresses()
+	require.NoError(t, err)
+	require.NotNil(t, relayerMultiaddr)
+
+	senderNodeConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+
+	// start node that will send the messages
+	senderNodeWakuConfig := WakuConfig{
+		EnableRelay:     true,
+		LogLevel:        "DEBUG",
+		Discv5Discovery: false,
+		ClusterID:       16,
+		Shards:          []uint16{64},
+		Staticnodes:     []string{relayerMultiaddr[0].String()},
+		Discv5UdpPort:   9031,
+		TcpPort:         60031,
+	}
+
+	senderNode, err := New(nil, "", &senderNodeConfig, &senderNodeWakuConfig, logger.Named("dialerNode"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, senderNode.Start())
+
+	time.Sleep(1 * time.Second)
+
+	receiverNodeConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+
+	// start node that will receive the dial
+	receiverNodeWakuConfig := WakuConfig{
+		EnableRelay:     true,
+		LogLevel:        "DEBUG",
+		Discv5Discovery: false,
+		ClusterID:       16,
+		Shards:          []uint16{0},
+		Staticnodes:     []string{relayerMultiaddr[0].String()},
+		Discv5UdpPort:   9032,
+		TcpPort:         60032,
+	}
+
+	receiverNode, err := New(nil, "", &receiverNodeConfig, &receiverNodeWakuConfig, logger.Named("receiverNode"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, receiverNode.Start())
+
+	time.Sleep(1 * time.Second)
+
+	// Stop nodes
+	require.NoError(t, relayerNode.Stop())
+	require.NoError(t, senderNode.Stop())
+	require.NoError(t, receiverNode.Stop())
+
+}
+
 func TestPeerExchange(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
