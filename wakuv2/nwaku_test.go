@@ -6,7 +6,6 @@ package wakuv2
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -577,7 +576,7 @@ func TestDnsDiscover(t *testing.T) {
 	res, err := node.WakuDnsDiscovery(sampleEnrTree, nameserver, 1000)
 	require.NoError(t, err)
 
-	fmt.Println("-------- dnsDiscovery response: ", res)
+	require.True(t, len(res) > 1, "multiple nodes should be returned from the DNS Discovery query")
 
 	// Stop nodes
 	require.NoError(t, node.Stop())
