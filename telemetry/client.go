@@ -479,9 +479,7 @@ func (c *Client) ProcessSentEnvelope(sentEnvelope wakuv2.SentEnvelope) *json.Raw
 	postBody["topic"] = sentEnvelope.Envelope.Message().ContentTopic
 	postBody["senderKeyUID"] = c.keyUID
 	postBody["publishMethod"] = sentEnvelope.PublishMethod.String()
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSendingEnvelope) *json.RawMessage {
@@ -493,17 +491,13 @@ func (c *Client) ProcessErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSe
 	postBody["senderKeyUID"] = c.keyUID
 	postBody["publishMethod"] = errorSendingEnvelope.SentEnvelope.PublishMethod.String()
 	postBody["error"] = errorSendingEnvelope.Error.Error()
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessPeerCount(peerCount PeerCount) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["peerCount"] = peerCount.PeerCount
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessPeerConnFailure(peerConnFailure PeerConnFailure) *json.RawMessage {
@@ -511,43 +505,33 @@ func (c *Client) ProcessPeerConnFailure(peerConnFailure PeerConnFailure) *json.R
 	postBody["failedPeerId"] = peerConnFailure.FailedPeerId
 	postBody["failureCount"] = peerConnFailure.FailureCount
 	postBody["nodeKeyUID"] = c.keyUID
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessMessageCheckSuccess(messageCheckSuccess MessageCheckSuccess) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["messageHash"] = messageCheckSuccess.MessageHash
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessPeerCountByShard(peerCountByShard PeerCountByShard) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["shard"] = peerCountByShard.Shard
 	postBody["count"] = peerCountByShard.Count
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessMessageCheckFailure(messageCheckFailure MessageCheckFailure) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["messageHash"] = messageCheckFailure.MessageHash
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessPeerCountByOrigin(peerCountByOrigin PeerCountByOrigin) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["origin"] = peerCountByOrigin.Origin
 	postBody["count"] = peerCountByOrigin.Count
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessDialFailure(dialFailure DialFailure) *json.RawMessage {
@@ -555,9 +539,7 @@ func (c *Client) ProcessDialFailure(dialFailure DialFailure) *json.RawMessage {
 	postBody["errorType"] = dialFailure.ErrorType
 	postBody["errorMsg"] = dialFailure.ErrorMsg
 	postBody["protocols"] = dialFailure.Protocols
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessMissedMessage(missedMessage MissedMessage) *json.RawMessage {
@@ -566,9 +548,7 @@ func (c *Client) ProcessMissedMessage(missedMessage MissedMessage) *json.RawMess
 	postBody["sentAt"] = uint32(missedMessage.Envelope.Message().GetTimestamp() / int64(time.Second))
 	postBody["pubsubTopic"] = missedMessage.Envelope.PubsubTopic()
 	postBody["contentTopic"] = missedMessage.Envelope.Message().ContentTopic
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessMissedRelevantMessage(missedMessage MissedRelevantMessage) *json.RawMessage {
@@ -577,15 +557,22 @@ func (c *Client) ProcessMissedRelevantMessage(missedMessage MissedRelevantMessag
 	postBody["sentAt"] = missedMessage.ReceivedMessage.Sent
 	postBody["pubsubTopic"] = missedMessage.ReceivedMessage.PubsubTopic
 	postBody["contentTopic"] = missedMessage.ReceivedMessage.ContentTopic
-	body, _ := json.Marshal(postBody)
-	jsonRawMessage := json.RawMessage(body)
-	return &jsonRawMessage
+	return c.marshalPostBody(postBody)
 }
 
 func (c *Client) ProcessMessageDeliveryConfirmed(messageDeliveryConfirmed MessageDeliveryConfirmed) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["messageHash"] = messageDeliveryConfirmed.MessageHash
-	body, _ := json.Marshal(postBody)
+	return c.marshalPostBody(postBody)
+}
+
+// Helper function to marshal post body and handle errors
+func (c *Client) marshalPostBody(postBody map[string]interface{}) *json.RawMessage {
+	body, err := json.Marshal(postBody)
+	if err != nil {
+		c.logger.Error("Error marshaling post body", zap.Error(err))
+		return nil
+	}
 	jsonRawMessage := json.RawMessage(body)
 	return &jsonRawMessage
 }
