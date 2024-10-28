@@ -230,7 +230,7 @@ package wakuv2
 		WAKU_CALL (waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
 
-	static void cGoWakuGetNumConnectedPeers(void* ctx, char* pubSubTopic, void* resp) {
+	static void cGoWakuGetNumConnectedRelayPeers(void* ctx, char* pubSubTopic, void* resp) {
 		WAKU_CALL (waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
 
@@ -338,7 +338,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/utils"
@@ -2178,11 +2177,11 @@ func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 }
 
 func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
-	return w.WakuDialPeer(address, string(relay.WakuRelayID_v200), 1000)
+	return w.WakuDialPeer(address, "", 1000)
 }
 
 func (w *Waku) DialPeerByID(peerID peer.ID) error {
-	return w.WakuDialPeerById(peerID, string(relay.WakuRelayID_v200), 1000)
+	return w.WakuDialPeerById(peerID, "", 1000)
 }
 
 func (self *Waku) DropPeer(peerId peer.ID) error {
@@ -2790,7 +2789,7 @@ func (self *Waku) ListPeersInMesh(pubsubTopic string) (int, error) {
 	return 0, errors.New(errMsg)
 }
 
-func (self *Waku) GetNumConnectedPeers(paramPubsubTopic ...string) (int, error) {
+func (self *Waku) GetNumConnectedRelayPeers(paramPubsubTopic ...string) (int, error) {
 	var pubsubTopic string
 	if len(paramPubsubTopic) == 0 {
 		pubsubTopic = ""
@@ -2803,18 +2802,18 @@ func (self *Waku) GetNumConnectedPeers(paramPubsubTopic ...string) (int, error) 
 	defer C.freeResp(resp)
 	defer C.free(unsafe.Pointer(cPubsubTopic))
 
-	C.cGoWakuGetNumConnectedPeers(self.wakuCtx, cPubsubTopic, resp)
+	C.cGoWakuGetNumConnectedRelayPeers(self.wakuCtx, cPubsubTopic, resp)
 
 	if C.getRet(resp) == C.RET_OK {
 		numPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		numPeers, err := strconv.Atoi(numPeersStr)
 		if err != nil {
-			errMsg := "GetNumConnectedPeers - error converting string to int: " + err.Error()
+			errMsg := "GetNumConnectedRelayPeers - error converting string to int: " + err.Error()
 			return 0, errors.New(errMsg)
 		}
 		return numPeers, nil
 	}
-	errMsg := "error GetNumConnectedPeers: " +
+	errMsg := "error GetNumConnectedRelayPeers: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return 0, errors.New(errMsg)
 }
