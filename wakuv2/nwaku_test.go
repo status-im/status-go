@@ -6,6 +6,7 @@ package wakuv2
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -196,7 +197,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		numConnected, err := w.GetNumConnectedPeers()
+		numConnected, err := w.GetNumConnectedRelayPeers()
 		if err != nil {
 			return err
 		}
@@ -612,6 +613,8 @@ func TestDial(t *testing.T) {
 
 	// Check that both nodes now have one connected peer
 	dialerPeerCount = dialerNode.PeerCount()
+	peerIds, _ := dialerNode.GetPeerIdsFromPeerStore()
+	fmt.Println("------------- dialerNode.GetPeerIdsFromPeerStore(): ", peerIds)
 	require.True(t, dialerPeerCount == 1, "Dialer node should have 1 peer")
 
 	receiverPeerCount = receiverNode.PeerCount()
