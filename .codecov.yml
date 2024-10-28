@@ -2,7 +2,7 @@
 #  make codecov-validate
 
 codecov:
-  require_ci_to_pass: false
+  require_ci_to_pass: true
   notify:
     wait_for_ci: true
 
@@ -16,25 +16,25 @@ ignore:
 coverage:
   status:
     project:
-      default:
-        informational: true
       unit-tests:
         target: auto
+        threshold: 1
         flags:
           - unit
       functional-tests:
+        threshold: 0.1
         target: auto
         flags:
           - functional
     patch:
       default:
-        informational: true
+        target: 50
       unit-tests:
-        target: auto
+        informational: true
         flags:
           - unit
       functional-tests:
-        target: auto
+        informational: true
         flags:
           - functional
 
