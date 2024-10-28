@@ -86,6 +86,7 @@ func (tm *TransactionManager) buildApprovalTxForPath(path *routes.Path, addressF
 		Gas:                  (*hexutil.Uint64)(&path.ApprovalGasAmount),
 		MaxFeePerGas:         path.MaxFeesPerGas,
 		MaxPriorityFeePerGas: path.ApprovalPriorityFee,
+		ValueOut:             (*hexutil.Big)(big.NewInt(0)),
 
 		// additional fields version 1
 		FromChainID: path.FromChain.ChainID,
