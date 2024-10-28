@@ -11,14 +11,14 @@ checks:
   # Excessive lines of code within a single file
   file-lines:
     config:
-      threshold: 900
+      threshold: 1500
   # Functions or methods that may be hard to understand. This is disabled as it doesn't appear to be a reliable metric.
   method-complexity:
     enabled: false
   # Classes defined with a high number of functions or methods.
   method-count:
     config:
-      threshold: 21
+      threshold: 40
   # Excessive lines of code within a single function or method
   method-lines:
     config:
@@ -41,15 +41,4 @@ exclude_patterns:
   - "vendor/"
   - "static/"
   - "t/"
-  - "mailserver/migrations"
-  - "**/*/bindata.go"
-  - "protocol/protobuf/*.pb.go"
-  - "protocol/communities/migrations/migrations.go"
-  - "protocol/encryption/migrations/migrations.go"
-  - "protocol/internal/sqlite/migrations.go"
-  - "protocol/migrations/migrations.go"
-  - "protocol/pushnotificationclient/migrations/migrations.go"
-  - "protocol/pushnotificationserver/migrations/migrations.go"
-  - "protocol/transport/migrations/migrations.go"
-  - "protocol/encryption/protocol_message.pb.go"
   - "images/qr-assets.go"
