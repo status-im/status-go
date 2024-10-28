@@ -64,7 +64,7 @@ pipeline {
   environment {
     PLATFORM    = 'tests'
     DB_CONT     = "status-go-test-db-${env.EXECUTOR_NUMBER.toInteger() + 1}"
-    DB_PORT     = "${5432 + env.EXECUTOR_NUMBER.toInteger()}"
+    DB_PORT     = "${54321 + env.EXECUTOR_NUMBER.toInteger()}"
     TMPDIR      = "${WORKSPACE_TMP}"
     GOPATH      = "${WORKSPACE_TMP}/go"
     GOCACHE     = "${WORKSPACE_TMP}/gocache"
