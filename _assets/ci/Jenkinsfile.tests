@@ -22,7 +22,7 @@ pipeline {
     )
     booleanParam(
       name: 'UNIT_TEST_RERUN_FAILS',
-      defaultValue: isPRJob(),
+      defaultValue: !isNightlyJob(),
       description: 'Should the job rerun failed tests?'
     )
     booleanParam(
@@ -56,7 +56,7 @@ pipeline {
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
       numToKeepStr: getAmountToKeep(),
-      daysToKeepStr: '30',
+      daysToKeepStr: '-1',
       artifactNumToKeepStr: getAmountToKeep(),
     ))
   }
@@ -254,4 +254,4 @@ def getDefaultUnitTestCount() { isNightlyJob() ? '20' : '1' }
 
 def getDefaultTimeout() { isNightlyJob() ? 5*60 : 50 }
 
-def getAmountToKeep() { isNightlyJob() ? '14' : isDevelopJob() ? '10' : '5' }
+def getAmountToKeep() { isNightlyJob() ? '14' : isDevelopJob() ? '30' : '5' }

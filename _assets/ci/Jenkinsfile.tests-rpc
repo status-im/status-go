@@ -24,9 +24,9 @@ pipeline {
     disableConcurrentBuilds()
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
-      numToKeepStr: '5',
-      daysToKeepStr: '30',
-      artifactNumToKeepStr: '1',
+      numToKeepStr: getAmountToKeep(),
+      daysToKeepStr: '-1',
+      artifactNumToKeepStr: getAmountToKeep(),
     ))
   }
 
@@ -74,3 +74,7 @@ pipeline {
     cleanup { sh 'make git-clean' }
   } // post
 } // pipeline
+
+def isDevelopJob() { env.JOB_BASE_NAME == 'tests-rpc-develop' }
+
+def getAmountToKeep() { isDevelopJob() ? '30' : '5' }
