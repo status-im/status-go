@@ -190,14 +190,14 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams) (uint64
 		return 0, createSwapParaswapErrorResponse(err)
 	}
 
-	key := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol)
+	key := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol, params.AmountIn)
 	s.priceRoute.Store(key, &priceRoute)
 
 	return priceRoute.GasCost.Uint64(), nil
 }
 
 func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) (address common.Address, err error) {
-	key := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol)
+	key := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol, params.AmountIn)
 	priceRouteIns, ok := s.priceRoute.Load(key)
 	if !ok {
 		err = ErrPriceRouteNotFound
@@ -212,7 +212,7 @@ func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) 
 func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {
 	slippageBP := uint(sendArgs.SwapTx.SlippagePercentage * 100) // convert to basis points
 
-	key := makeKey(sendArgs.SwapTx.ChainID, sendArgs.SwapTx.ChainIDTo, sendArgs.SwapTx.TokenIDFrom, sendArgs.SwapTx.TokenIDTo)
+	key := makeKey(sendArgs.SwapTx.ChainID, sendArgs.SwapTx.ChainIDTo, sendArgs.SwapTx.TokenIDFrom, sendArgs.SwapTx.TokenIDTo, sendArgs.SwapTx.Value.ToInt())
 	priceRouteIns, ok := s.priceRoute.Load(key)
 	if !ok {
 		return ErrPriceRouteNotFound
@@ -258,7 +258,7 @@ func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorT
 func (s *SwapParaswapProcessor) prepareTransactionV2(sendArgs *transactions.SendTxArgs) error {
 	slippageBP := uint(sendArgs.SlippagePercentage * 100) // convert to basis points
 
-	key := makeKey(sendArgs.FromChainID, sendArgs.ToChainID, sendArgs.FromTokenID, sendArgs.ToTokenID)
+	key := makeKey(sendArgs.FromChainID, sendArgs.ToChainID, sendArgs.FromTokenID, sendArgs.ToTokenID, sendArgs.Value.ToInt())
 	priceRouteIns, ok := s.priceRoute.Load(key)
 	if !ok {
 		return ErrPriceRouteNotFound
@@ -326,7 +326,7 @@ func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUse
 }
 
 func (s *SwapParaswapProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
-	key := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol)
+	key := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol, params.AmountIn)
 	priceRouteIns, ok := s.priceRoute.Load(key)
 	if !ok {
 		return nil, ErrPriceRouteNotFound

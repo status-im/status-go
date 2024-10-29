@@ -44,7 +44,7 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 	chainIDs := []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.UnknownChainID}
 
 	for _, chainID := range chainIDs {
-		key := makeKey(chainID, chainID, fromToken.Symbol, toToken.Symbol)
+		key := makeKey(chainID, chainID, fromToken.Symbol, toToken.Symbol, testPriceRoute.SrcAmount.Int)
 		processor.priceRoute.Store(key, testPriceRoute)
 
 		testInputParams := ProcessorInputParams{
@@ -52,6 +52,7 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 			ToChain:   &params.Network{ChainID: chainID},
 			FromToken: &fromToken,
 			ToToken:   &toToken,
+			AmountIn:  testPriceRoute.SrcAmount.Int,
 		}
 
 		partnerAddress, partnerFeePcnt := getPartnerAddressAndFeePcnt(chainID)

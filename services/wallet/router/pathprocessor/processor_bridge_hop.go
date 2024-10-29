@@ -201,7 +201,7 @@ func (h *HopBridgeProcessor) packTxInputDataInternally(params ProcessorInputPara
 		return []byte{}, createBridgeHopErrorResponse(err)
 	}
 
-	bonderKey := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "")
+	bonderKey := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "", params.AmountIn)
 	bonderFeeIns, ok := h.bonderFee.Load(bonderKey)
 	if !ok {
 		return nil, ErrNoBonderFeeFound
@@ -319,7 +319,7 @@ func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, sig
 		return tx, createBridgeHopErrorResponse(err)
 	}
 
-	bonderKey := makeKey(sendArgs.HopTx.ChainID, sendArgs.HopTx.ChainIDTo, "", "")
+	bonderKey := makeKey(sendArgs.HopTx.ChainID, sendArgs.HopTx.ChainIDTo, "", "", (*big.Int)(sendArgs.HopTx.Amount))
 	bonderFeeIns, ok := h.bonderFee.Load(bonderKey)
 	if !ok {
 		return nil, ErrNoBonderFeeFound
@@ -386,7 +386,7 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *transactions.SendTxArgs, si
 		return tx, createBridgeHopErrorResponse(err)
 	}
 
-	bonderKey := makeKey(sendArgs.FromChainID, sendArgs.ToChainID, "", "")
+	bonderKey := makeKey(sendArgs.FromChainID, sendArgs.ToChainID, "", "", (*big.Int)(sendArgs.Value))
 	bonderFeeIns, ok := h.bonderFee.Load(bonderKey)
 	if !ok {
 		return nil, ErrNoBonderFeeFound
@@ -427,6 +427,9 @@ func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNo
 
 func (h *HopBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	tx, err := h.sendOrBuild(sendArgs, nil, lastUsedNonce)
+	if err != nil {
+		return nil, 0, createBridgeHopErrorResponse(err)
+	}
 	return tx, tx.Nonce(), createBridgeHopErrorResponse(err)
 }
 
@@ -439,7 +442,7 @@ func (h *HopBridgeProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArg
 }
 
 func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	bonderKey := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "")
+	bonderKey := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "", params.AmountIn)
 	if params.TestsMode {
 		if val, ok := params.TestBonderFeeMap[params.FromToken.Symbol]; ok {
 			res := new(big.Int).Sub(params.AmountIn, val)
@@ -504,7 +507,7 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 }
 
 func (h *HopBridgeProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
-	bonderKey := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "")
+	bonderKey := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "", params.AmountIn)
 	bonderFeeIns, ok := h.bonderFee.Load(bonderKey)
 	if !ok {
 		return nil, ErrNoBonderFeeFound

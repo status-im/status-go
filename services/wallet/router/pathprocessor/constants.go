@@ -1,7 +1,7 @@
 package pathprocessor
 
 const (
-	IncreaseEstimatedGasFactor = 1.1
+	IncreaseEstimatedGasFactor = 1.2
 	SevenDaysInSeconds         = 60 * 60 * 24 * 7
 
 	StatusDomain = ".stateofus.eth"
