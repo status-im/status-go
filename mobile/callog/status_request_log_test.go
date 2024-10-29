@@ -1,7 +1,6 @@
-package statusgo
+package callog
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -12,9 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/logutils/requestlog"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/signal"
 )
 
 func TestRemoveSensitiveInfo(t *testing.T) {
@@ -66,11 +62,8 @@ func TestCall(t *testing.T) {
 	require.NoError(t, err)
 
 	// Enable request logging
-	err = requestlog.ConfigureAndEnableRequestLogging(tempLogFile.Name())
+	logger, err := requestlog.CreateRequestLogger(tempLogFile.Name())
 	require.NoError(t, err)
-
-	// Logger must not be nil after enabling
-	logger := requestlog.GetRequestLogger()
 	require.NotNil(t, logger)
 
 	// Test case 1: Normal execution
@@ -80,7 +73,7 @@ func TestCall(t *testing.T) {
 	testParam := "test input"
 	expectedResult := "test result: test input"
 
-	result := callWithResponse(testFunc, testParam)
+	result := CallWithResponse(logger, testFunc, testParam)
 
 	// Check the result
 	if result != expectedResult {
@@ -120,7 +113,7 @@ func TestCall(t *testing.T) {
 	}
 
 	require.PanicsWithValue(t, e, func() {
-		call(panicFunc)
+		Call(logger, panicFunc)
 	})
 
 	// Check if the panic was logged
@@ -135,35 +128,11 @@ func TestCall(t *testing.T) {
 	}
 }
 
+func initializeApplication(requestJSON string) string {
+	return ""
+}
+
 func TestGetFunctionName(t *testing.T) {
 	fn := getShortFunctionName(initializeApplication)
 	require.Equal(t, "initializeApplication", fn)
-}
-
-type testSignalHandler struct {
-	receivedSignal string
-}
-
-func (t *testSignalHandler) HandleSignal(data string) {
-	t.receivedSignal = data
-}
-
-func TestSetMobileSignalHandler(t *testing.T) {
-	// Setup
-	handler := &testSignalHandler{}
-	SetMobileSignalHandler(handler)
-	t.Cleanup(signal.ResetMobileSignalHandler)
-
-	// Test data
-	testAccount := &multiaccounts.Account{Name: "test"}
-	testSettings := &settings.Settings{KeyUID: "0x1"}
-	testEnsUsernames := json.RawMessage(`{"test": "test"}`)
-
-	// Action
-	signal.SendLoggedIn(testAccount, testSettings, testEnsUsernames, nil)
-
-	// Assertions
-	require.Contains(t, handler.receivedSignal, `"key-uid":"0x1"`, "Signal should contain the correct KeyUID")
-	require.Contains(t, handler.receivedSignal, `"name":"test"`, "Signal should contain the correct account name")
-	require.Contains(t, handler.receivedSignal, `"ensUsernames":{"test":"test"}`, "Signal should contain the correct ENS usernames")
 }

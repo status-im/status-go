@@ -14,23 +14,14 @@ var (
 	requestLogger *zap.Logger
 )
 
-// IsRequestLoggingEnabled returns whether RPC logging is enabled
-func IsRequestLoggingEnabled() bool {
-	return requestLogger != nil
-}
-
 // GetRequestLogger returns the RPC logger object
 func GetRequestLogger() *zap.Logger {
 	return requestLogger
 }
 
-func ConfigureAndEnableRequestLogging(file string) error {
+func CreateRequestLogger(file string) (*zap.Logger, error) {
 	if len(file) == 0 {
-		return errors.New("file is required")
-	}
-
-	if IsRequestLoggingEnabled() {
-		return errors.New("request logging is already enabled")
+		return nil, errors.New("file is required")
 	}
 
 	fileOpts := logutils.FileOptions{
@@ -44,7 +35,16 @@ func ConfigureAndEnableRequestLogging(file string) error {
 		zap.DebugLevel,
 	)
 
-	requestLogger = zap.New(core).Named("RequestLogger")
+	return zap.New(core).Named("RequestLogger"), nil
+}
+
+func ConfigureAndEnableRequestLogging(file string) error {
+	logger, err := CreateRequestLogger(file)
+	if err != nil {
+		return err
+	}
+
+	requestLogger = logger
 
 	return nil
 }

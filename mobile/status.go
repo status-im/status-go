@@ -47,7 +47,17 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
+
+	"github.com/status-im/status-go/mobile/callog"
 )
+
+func call(fn any, params ...any) any {
+	return callog.Call(requestlog.GetRequestLogger(), fn, params...)
+}
+
+func callWithResponse(fn any, params ...any) string {
+	return callog.CallWithResponse(requestlog.GetRequestLogger(), fn, params...)
+}
 
 type InitializeApplicationResponse struct {
 	Accounts               []multiaccounts.Account         `json:"accounts"`
