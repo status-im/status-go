@@ -11,10 +11,6 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
-func (m *Messenger) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	return m.transport.AddStorePeer(address)
-}
-
 func (m *Messenger) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return m.transport.AddRelayPeer(address)
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	gocommon "github.com/status-im/status-go/common"
+	rcommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -95,6 +96,8 @@ func (m *Messenger) performStorenodeTask(task func() (*MessengerResponse, error)
 	errCh := make(chan error)
 
 	go func() {
+		defer rcommon.LogOnPanic()
+
 		err := m.transport.PerformStorenodeTask(func() error {
 			r, err := task()
 			if err != nil {
