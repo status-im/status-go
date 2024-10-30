@@ -1,5 +1,9 @@
 package signal
 
+import (
+	"github.com/status-im/status-go/eth-node/types"
+)
+
 const (
 	EventConnectorSendRequestAccounts   = "connector.sendRequestAccounts"
 	EventConnectorSendTransaction       = "connector.sendTransaction"
@@ -27,6 +31,12 @@ type ConnectorSendTransactionSignal struct {
 	RequestID string `json:"requestId"`
 	ChainID   uint64 `json:"chainId"`
 	TxArgs    string `json:"txArgs"`
+}
+
+type ConnectorSendDappPermissionGrantedSignal struct {
+	ConnectorDApp
+	Chains        []uint64      `json:"chains"`
+	SharedAccount types.Address `json:"sharedAccount"`
 }
 
 type ConnectorPersonalSignSignal struct {
@@ -66,8 +76,12 @@ func SendConnectorPersonalSign(dApp ConnectorDApp, requestID, challenge, address
 	})
 }
 
-func SendConnectorDAppPermissionGranted(dApp ConnectorDApp) {
-	send(EventConnectorDAppPermissionGranted, dApp)
+func SendConnectorDAppPermissionGranted(dApp ConnectorDApp, account types.Address, chains []uint64) {
+	send(EventConnectorDAppPermissionGranted, ConnectorSendDappPermissionGrantedSignal{
+		ConnectorDApp: dApp,
+		Chains:        chains,
+		SharedAccount: account,
+	})
 }
 
 func SendConnectorDAppPermissionRevoked(dApp ConnectorDApp) {

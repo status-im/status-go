@@ -62,7 +62,7 @@ func (c *RequestAccountsCommand) Execute(ctx context.Context, request RPCRequest
 		if err != nil {
 			return "", err
 		}
-		signal.SendConnectorDAppPermissionGranted(connectorDApp)
+		signal.SendConnectorDAppPermissionGranted(connectorDApp, account, []uint64{chainID})
 	}
 
 	return FormatAccountAddressToResponse(dApp.SharedAccount), nil
