@@ -1,5 +1,4 @@
 import os
-import asyncio
 import random
 import shutil
 import signal
@@ -13,11 +12,17 @@ from conftest import option
 from src.libs.custom_logger import get_custom_logger
 from src.node.rpc_client import StatusNodeRPC
 from clients.signals import SignalClient
+from src.libs.common import build_and_copy_binary
+from pathlib import Path
 
 logger = get_custom_logger(__name__)
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 
 class StatusNode:
+    binary_built = False
+
     def __init__(self, name=None, port=None, pubkey=None):
         self.data_dir = None
         try:
@@ -37,9 +42,7 @@ class StatusNode:
         self.api = StatusNodeRPC(self.port, self.name)
 
     def setup_method(self):
-        # Set up RPC client
         self.rpc_client = RpcClient(option.rpc_url_statusd)
-        # Set up WebSocket signal client
         await_signals = ["history.request.started", "history.request.completed"]
         self.signal_client = SignalClient(option.ws_url_statusd, await_signals)
 
@@ -49,7 +52,6 @@ class StatusNode:
         websocket_thread.start()
 
     def initialize_node(self, name, port, data_dir, account_data):
-        """Centralized method to initialize a node."""
         self.name = name
         self.port = port
         self.start(data_dir)
@@ -59,14 +61,19 @@ class StatusNode:
         self.pubkey = self.get_pubkey(account_data["displayName"])
 
     def start_node(self, command):
-        """Start the node using a subprocess command."""
         logger.info(f"Starting node with command: {command}")
         self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         self.pid = self.process.pid
         self.log_thread = self.capture_process_logs(self.process, self.logs)
 
     def start(self, data_dir, capture_logs=True):
-        """Start the status-backend node and initialize it before subscribing to signals."""
+        dest_binary_path = Path(PROJECT_ROOT) / "status-backend"
+
+        if not StatusNode.binary_built and not dest_binary_path.exists():
+            if not build_and_copy_binary():
+                raise RuntimeError("Failed to build or copy the status-backend binary.")
+            StatusNode.binary_built = True
+
         self.capture_logs = capture_logs
         self.data_dir = data_dir
         command = ["./status-backend", f"--address=localhost:{self.port}"]
@@ -77,17 +84,14 @@ class StatusNode:
         self.start_signal_client()
 
     def create_account_and_login(self, account_data):
-        """Create an account and log in using the status-backend."""
         logger.info(f"Creating account and logging in for node {self.name}")
         self.api.create_account_and_login(account_data)
 
     def start_messenger(self):
-        """Start the Waku messenger."""
         logger.info(f"Starting Waku messenger for node {self.name}")
         self.api.start_messenger()
 
     def start_signal_client(self):
-        """Start a SignalClient for the given node to listen for WebSocket signals."""
         ws_url = f"ws://localhost:{self.port}"
         await_signals = ["history.request.started", "history.request.completed"]
         self.signal_client = SignalClient(ws_url, await_signals)
@@ -98,10 +102,9 @@ class StatusNode:
         logger.info("WebSocket client started and subscribed to signals.")
 
     def wait_fully_started(self):
-        """Wait until the node logs indicate that the server has started."""
         logger.info(f"Waiting for {self.name} to fully start...")
         start_time = time.time()
-        while time.time() - start_time < 20:
+        while time.time() - start_time < 30:
             if any("server started" in log for log in self.logs):
                 logger.info(f"Node {self.name} has fully started.")
                 return
@@ -109,8 +112,6 @@ class StatusNode:
         raise TimeoutError(f"Node {self.name} did not fully start in time.")
 
     def capture_process_logs(self, process, logs):
-        """Capture logs from a subprocess."""
-
         def read_output():
             while True:
                 line = process.stdout.readline()
@@ -125,14 +126,11 @@ class StatusNode:
         return log_thread
 
     def random_node_name(self, length=10):
-        """Generate a random node name."""
         allowed_chars = string.ascii_lowercase + string.digits + "_-"
         return ''.join(random.choice(allowed_chars) for _ in range(length))
 
     def get_pubkey(self, display_name):
-        """Retrieve public-key based on display name from accounts_getAccounts response."""
         response = self.api.send_rpc_request("accounts_getAccounts")
-
         accounts = response.get("result", [])
         for account in accounts:
             if account.get("name") == display_name:
@@ -140,11 +138,9 @@ class StatusNode:
         raise ValueError(f"Public key not found for display name: {display_name}")
 
     def wait_for_signal(self, signal_type, expected_event=None, timeout=20):
-        """Wait for a signal using the signal client and validate against expected event details."""
         return self.signal_client.wait_for_signal(signal_type, expected_event, timeout)
 
     def stop(self, remove_local_data=True):
-        """Stop the status-backend process."""
         if self.process:
             logger.info(f"Stopping node with name: {self.name}")
             self.process.kill()

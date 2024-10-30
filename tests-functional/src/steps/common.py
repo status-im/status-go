@@ -13,19 +13,6 @@ logger = get_custom_logger(__name__)
 
 class StepsCommon:
     @pytest.fixture(scope="function", autouse=False)
-    def start_1_node(self):
-        account_data = {
-            **ACCOUNT_PAYLOAD_DEFAULTS,
-            "rootDataDir": LOCAL_DATA_DIR1,
-            "displayName": "first_node_user"
-        }
-        random_port = str(random.randint(1024, 65535))
-
-        self.first_node = StatusNode()
-        self.first_node.initialize_node("first_node", random_port, LOCAL_DATA_DIR1, account_data)
-        self.first_node_pubkey = self.first_node.get_pubkey()
-
-    @pytest.fixture(scope="function", autouse=False)
     def start_2_nodes(self):
         logger.debug(f"Running fixture setup: {inspect.currentframe().f_code.co_name}")
 
@@ -64,7 +51,6 @@ class StepsCommon:
 
     @contextmanager
     def add_latency(self):
-        """Add network latency"""
         logger.debug("Adding network latency")
         subprocess.Popen(LATENCY_CMD, shell=True)
         try:
@@ -75,7 +61,6 @@ class StepsCommon:
 
     @contextmanager
     def add_packet_loss(self):
-        """Add packet loss"""
         logger.debug("Adding packet loss")
         subprocess.Popen(PACKET_LOSS_CMD, shell=True)
         try:
@@ -86,7 +71,6 @@ class StepsCommon:
 
     @contextmanager
     def add_low_bandwidth(self):
-        """Add low bandwidth"""
         logger.debug("Adding low bandwidth")
         subprocess.Popen(LOW_BANDWIDTH_CMD, shell=True)
         try:
@@ -108,10 +92,12 @@ class StepsCommon:
     def send_with_timestamp(self, send_method, id, message):
         timestamp = datetime.now().strftime("%H:%M:%S")
         response = send_method(id, message)
-        response_messages = response["result"]["messages"]
+        response_messages = response.get("result", {}).get("messages", [])
         message_id = None
+
         for m in response_messages:
             if m["text"] == message:
                 message_id = m["id"]
                 break
-        return timestamp, message_id
+
+        return timestamp, message_id, response

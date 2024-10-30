@@ -8,7 +8,8 @@ def log_length_filter(max_length):
         def filter(self, record):
             if len(record.getMessage()) > max_length:
                 logging.getLogger(record.name).log(
-                    record.levelno, f"Log line was discarded because it's longer than max_log_line_length={max_log_line_length}"
+                    record.levelno,
+                    f"Log line was discarded because it's longer than max_log_line_length={max_log_line_length}"
                 )
                 return False
             return True

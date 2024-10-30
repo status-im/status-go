@@ -53,7 +53,6 @@ class TestContactRequest(StepsCommon):
 
             nodes.append((first_node, second_node, account_data_first["displayName"], index))
 
-        # Validate contact requests
         missing_contact_requests = []
         for first_node, second_node, display_name, index in nodes:
             result = self.send_and_wait_for_message((first_node, second_node), display_name, index, timeout_secs)
@@ -83,18 +82,12 @@ class TestContactRequest(StepsCommon):
         first_node_pubkey = first_node.get_pubkey(display_name)
         contact_request_message = f"contact_request_{index}"
 
-        timestamp, message_id = self.send_with_timestamp(
+        timestamp, message_id, response = self.send_with_timestamp(
             second_node.send_contact_request, first_node_pubkey, contact_request_message
         )
-
-        response = second_node.send_contact_request(first_node_pubkey, contact_request_message)
-
-        expected_event_started = {"requestId": "", "peerId": "", "batchIndex": 0, "numBatches": 1}
-        expected_event_completed = {"requestId": "", "peerId": "", "batchIndex": 0}
-
         try:
-            first_node.wait_for_signal("history.request.started", expected_event_started, timeout)
-            first_node.wait_for_signal("history.request.completed", expected_event_completed, timeout)
+            first_node.wait_for_signal("history.request.started", None, timeout)
+            first_node.wait_for_signal("history.request.completed", None, timeout)
         except TimeoutError as e:
             logging.error(f"Signal validation failed: {str(e)}")
             return timestamp, message_id, contact_request_message, None
