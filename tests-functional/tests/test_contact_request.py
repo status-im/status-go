@@ -14,13 +14,14 @@ class TestContactRequest(StepsCommon):
         num_contact_requests = NUM_CONTACT_REQUESTS
         project_root = get_project_root()
         nodes = []
+        LOCAL_DATA = "tests-functional/local"
 
         for index in range(num_contact_requests):
             first_node = StatusNode(name=f"first_node_{index}")
             second_node = StatusNode(name=f"second_node_{index}")
 
-            data_dir_first = create_unique_data_dir(os.path.join(project_root, "tests-functional/local"), index)
-            data_dir_second = create_unique_data_dir(os.path.join(project_root, "tests-functional/local"), index)
+            data_dir_first = create_unique_data_dir(os.path.join(project_root, LOCAL_DATA), index)
+            data_dir_second = create_unique_data_dir(os.path.join(project_root, LOCAL_DATA), index)
 
             delay(2)
             first_node.start(data_dir=data_dir_first)
