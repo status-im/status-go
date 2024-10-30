@@ -12,6 +12,7 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"go.uber.org/zap"
 
@@ -229,7 +230,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.True(t, isDisconnected, "nwaku should be disconnected from the store node")
 
 	// Re-connect
-	err = w.DialPeerByID(storeNode.ID)
+	err = w.DialPeerByID(storeNode.ID, ping.ID)
 	require.NoError(t, err)
 
 	time.Sleep(1 * time.Second)
@@ -609,7 +610,7 @@ func TestDial(t *testing.T) {
 	require.True(t, receiverPeerCount == 0, "Receiver node should have no connected peers")
 
 	// Dial
-	err = dialerNode.DialPeer(receiverMultiaddr[0])
+	err = dialerNode.DialPeer(receiverMultiaddr[0], ping.ID)
 	require.NoError(t, err)
 
 	time.Sleep(1 * time.Second)

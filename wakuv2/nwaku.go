@@ -238,6 +238,10 @@ package wakuv2
 		WAKU_CALL (waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
 
+	static void cGoWakuGetConnectedPeers(void* wakuCtx, void* resp) {
+		WAKU_CALL (waku_get_connected_peers(wakuCtx, (WakuCallBack) callback, resp) );
+	}
+
 	static void cGoWakuGetPeerIdsFromPeerStore(void* wakuCtx, void* resp) {
 		WAKU_CALL (waku_get_peerids_from_peerstore(wakuCtx, (WakuCallBack) callback, resp) );
 	}
@@ -2819,6 +2823,42 @@ func (self *Waku) GetNumConnectedRelayPeers(paramPubsubTopic ...string) (int, er
 	errMsg := "error GetNumConnectedRelayPeers: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return 0, errors.New(errMsg)
+}
+
+func (self *Waku) GetConnectedPeers() (peer.IDSlice, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+	C.cGoWakuGetConnectedPeers(self.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		if peersStr == "" {
+			return peer.IDSlice{}, nil
+		}
+		// peersStr contains a comma-separated list of peer ids
+		itemsPeerIds := strings.Split(peersStr, ",")
+
+		var peers peer.IDSlice
+		for _, peerId := range itemsPeerIds {
+			id, err := peer.Decode(peerId)
+			if err != nil {
+				return nil, fmt.Errorf("GetConnectedPeers - decoding peerId: %w", err)
+			}
+			peers = append(peers, id)
+		}
+
+		return peers, nil
+	}
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, fmt.Errorf("GetConnectedPeers: %s", errMsg)
+}
+
+func (self *Waku) GetNumConnectedPeers() (int, error) {
+	connecterPeers, err := self.GetConnectedPeers()
+	if err != nil {
+		return 0, err
+	}
+	return len(connecterPeers), nil
 }
 
 func (self *Waku) GetPeerIdsFromPeerStore() (peer.IDSlice, error) {
