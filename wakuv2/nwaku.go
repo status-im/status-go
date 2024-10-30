@@ -2183,11 +2183,7 @@ func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return "", nil
 }
 
-func (w *Waku) DialPeer(address multiaddr.Multiaddr, protocol string) error {
-	return w.WakuDialPeer(address, protocol, int(requestTimeout/time.Millisecond))
-}
-
-func (w *Waku) ConnectPeer(address multiaddr.Multiaddr) error {
+func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
 	return w.WakuConnect(address.String(), int(requestTimeout/time.Millisecond))
 }
 
