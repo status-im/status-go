@@ -508,17 +508,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuCon
 		return nil, err
 	}
 
-	defaultPubsubTopic, err := node.WakuDefaultPubsubTopic()
-	if err != nil {
-		return nil, err
-	}
-
-	if nwakuCfg.EnableRelay {
-		err = node.WakuRelaySubscribe(defaultPubsubTopic)
-		if err != nil {
-			return nil, err
-		}
-	}
+	node.filters = common.NewFilters(node.cfg.DefaultShardPubsubTopic, node.logger)
 
 	node.WakuSetEventCallback()
 
@@ -574,7 +564,6 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuCon
 			sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
 		}
 
-		waku.filters = common.NewFilters(waku.cfg.DefaultShardPubsubTopic, waku.logger)
 		waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
 		if nodeKey == nil {
@@ -957,17 +946,9 @@ func (w *Waku) GetPubsubTopic(topic string) string {
 	return topic
 }
 
-/* TODO-nwaku
 func (w *Waku) unsubscribeFromPubsubTopicWithWakuRelay(topic string) error {
 	topic = w.GetPubsubTopic(topic)
-
-	if !w.node.Relay().IsSubscribed(topic) {
-		return nil
-	}
-
-	contentFilter := protocol.NewContentFilter(topic)
-
-	return w.node.Relay().Unsubscribe(w.ctx, contentFilter)
+	return w.WakuRelayUnsubscribe(topic)
 }
 
 func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.PublicKey) error {
@@ -977,20 +958,16 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 
 	topic = w.GetPubsubTopic(topic)
 
-	if w.node.Relay().IsSubscribed(topic) {
-		return nil
-	}
-
+	/* TODO-nwaku
 	if pubkey != nil {
 		err := w.node.Relay().AddSignedTopicValidator(topic, pubkey)
 		if err != nil {
 			return err
 		}
 	}
+	*/
 
-	contentFilter := protocol.NewContentFilter(topic)
-
-	sub, err := w.node.Relay().Subscribe(w.ctx, contentFilter)
+	err := w.WakuRelaySubscribe(topic)
 	if err != nil {
 		return err
 	}
@@ -1002,23 +979,25 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 		for {
 			select {
 			case <-w.ctx.Done():
-				err := w.node.Relay().Unsubscribe(w.ctx, contentFilter)
+				err := w.WakuRelayUnsubscribe(topic)
 				if err != nil && !errors.Is(err, context.Canceled) {
 					w.logger.Error("could not unsubscribe", zap.Error(err))
 				}
 				return
-			case env := <-sub[0].Ch:
-				err := w.OnNewEnvelopes(env, common.RelayedMessageType, false)
-				if err != nil {
-					w.logger.Error("OnNewEnvelopes error", zap.Error(err))
-				}
+				// TODO-nwaku
+				/*
+					case env := <-sub[0].Ch:
+						err := w.OnNewEnvelopes(env, common.RelayedMessageType, false)
+						if err != nil {
+							w.logger.Error("OnNewEnvelopes error", zap.Error(err))
+						}
+				*/
 			}
 		}
 	}()
 
 	return nil
 }
-*/
 
 // MaxMessageSize returns the maximum accepted message size.
 func (w *Waku) MaxMessageSize() uint32 {
@@ -1491,6 +1470,7 @@ func (w *Waku) Start() error {
 			w.node.FilterLightnode(),
 			filterapi.WithBatchInterval(300*time.Millisecond))
 	}
+	*/
 
 	err = w.setupRelaySubscriptions()
 	if err != nil {
@@ -1502,7 +1482,6 @@ func (w *Waku) Start() error {
 		w.wg.Add(1)
 		go w.processQueueLoop()
 	}
-	*/
 
 	w.wg.Add(1)
 
@@ -1670,7 +1649,6 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
 }
 
-/* TODO-nwaku
 func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic string, contentTopics []string) {
 	if !w.cfg.EnableMissingMessageVerification {
 		return
@@ -1705,7 +1683,7 @@ func (w *Waku) setupRelaySubscriptions() error {
 	}
 
 	return nil
-} */
+}
 
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Waku protocol.
@@ -1928,6 +1906,7 @@ func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 		AllPeers:      w.node.Relay().PubSub().ListPeers(topic),
 	}, nil
 }
+*/
 
 func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) error {
 	topic = w.GetPubsubTopic(topic)
@@ -1953,6 +1932,7 @@ func (w *Waku) UnsubscribeFromPubsubTopic(topic string) error {
 	return nil
 }
 
+/* TODO-nwaku
 func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 	topic = w.GetPubsubTopic(topic)
 	if w.protectedTopicStore == nil {
@@ -2555,6 +2535,8 @@ func (self *Waku) WakuRelaySubscribe(pubsubTopic string) error {
 	if self.wakuCtx == nil {
 		return errors.New("wakuCtx is nil")
 	}
+
+	// TODO-nwaku
 	// if self.cPubsubTopic == nil {
 	// 	fmt.Println("cPubsubTopic is nil")
 	// }

@@ -302,7 +302,7 @@ func (w *gethWakuV2Wrapper) ConfirmMessageDelivered(hashes []common.Hash) {
 	w.waku.ConfirmMessageDelivered(hashes)
 }
 
-func (w *gethWakuV2Wrapper) PeerID() peer.ID {
+func (w *gethWakuV2Wrapper) PeerID() (peer.ID, error) {
 	return w.waku.PeerID()
 }
 

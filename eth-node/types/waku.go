@@ -195,7 +195,7 @@ type Waku interface {
 	ConfirmMessageDelivered(hash []common.Hash)
 
 	// PeerID returns node's PeerID
-	PeerID() peer.ID
+	PeerID() (peer.ID, error)
 
 	// GetActiveStorenode returns the peer ID of the currently active storenode. It will be empty if no storenode is active
 	GetActiveStorenode() peer.ID

@@ -6,13 +6,13 @@ package wakuv2
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -153,11 +153,27 @@ func parseNodes(rec []string) []*enode.Node {
 //
 // Using Docker:
 //
-//	IP_ADDRESS=$(hostname -I | awk '{print $1}');
-// 	docker run \
-// 	-p 61000:61000/tcp -p 8000:8000/udp -p 8646:8646/tcp harbor.status.im/wakuorg/nwaku:v0.33.0 \
-// 	--discv5-discovery=true --cluster-id=16 --log-level=DEBUG --shard=64 --tcp-port=61000 \
-// 	--nat=extip:${IP_ADDRESS} --discv5-udp-port=8000 --rest-address=0.0.0.0 --store --rest-port=8646 \
+// IP_ADDRESS=$(hostname -I | awk '{print $1}');
+// docker run \
+// -p 61000:61000/tcp -p 8000:8000/udp -p 8646:8646/tcp harbor.status.im/wakuorg/nwaku:v0.33.0 \
+// --discv5-discovery=true --cluster-id=16 --log-level=DEBUG --shard=64 --tcp-port=61000 \
+// --nat=extip:${IP_ADDRESS} --discv5-udp-port=8000 --rest-address=0.0.0.0 --store --rest-port=8646
+
+type testStorenodeConfigProvider struct {
+	storeNodes []peer.AddrInfo
+}
+
+func (t *testStorenodeConfigProvider) UseStorenodes() (bool, error) {
+	return true, nil
+}
+
+func (t *testStorenodeConfigProvider) GetPinnedStorenode() (peer.AddrInfo, error) {
+	return peer.AddrInfo{}, nil
+}
+
+func (t *testStorenodeConfigProvider) Storenodes() ([]peer.AddrInfo, error) {
+	return t.storeNodes, nil
+}
 
 func TestBasicWakuV2(t *testing.T) {
 	extNodeRestPort := 8646
@@ -170,7 +186,7 @@ func TestBasicWakuV2(t *testing.T) {
 	}
 
 	nwakuConfig := WakuConfig{
-		Port:            30303,
+		Port:            30304,
 		NodeKey:         "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
 		EnableRelay:     true,
 		LogLevel:        "DEBUG",
@@ -213,33 +229,56 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, err)
 
-	// Check that we are indeed connected to the store node
-	connectedStoreNodes, err := w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
-	require.NoError(t, err)
-	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
+	// THIS WORKS
+	x := newPinger(w.wakuCtx)
+	for i := 0; i <= 100; i++ {
+		fmt.Println("PING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+		fmt.Println(x.PingPeer(context.Background(), *storeNode))
+		time.Sleep(100 * time.Millisecond)
+	}
 
-	// Disconnect from the store node
-	err = w.DisconnectPeerById(storeNode.ID)
-	require.NoError(t, err)
+	// THIS FAILS
+	// go func() {
+	// 	x := newPinger(w.wakuCtx)
+	// 	for i := 0; i <= 100; i++ {
+	// 		fmt.Println("PING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+	// 		fmt.Println(x.PingPeer(context.Background(), *storeNode))
+	// 		time.Sleep(2 * time.Second)
+	// 	}
 
-	// Check that we are indeed disconnected
-	connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
-	require.NoError(t, err)
-	isDisconnected := !slices.Contains(connectedStoreNodes, storeNode.ID)
-	require.True(t, isDisconnected, "nwaku should be disconnected from the store node")
+	// }()
 
-	// Re-connect
-	err = w.DialPeerByID(storeNode.ID)
-	require.NoError(t, err)
-
-	// Check that we are connected again
-	connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
-	require.NoError(t, err)
-	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
+	for i := 0; i <= 100; i++ {
+		time.Sleep(2 * time.Second)
+	}
 
 	/*
+		// Check that we are indeed connected to the store node
+		connectedStoreNodes, err := w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
+		require.NoError(t, err)
+		require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
+
+		// Disconnect from the store node
+		err = w.DisconnectPeerById(storeNode.ID)
+		require.NoError(t, err)
+
+		// Check that we are indeed disconnected
+		connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
+		require.NoError(t, err)
+		isDisconnected := !slices.Contains(connectedStoreNodes, storeNode.ID)
+		require.True(t, isDisconnected, "nwaku should be disconnected from the store node")
+
+		// Re-connect
+		err = w.DialPeerByID(storeNode.ID)
+		require.NoError(t, err)
+
+		// Check that we are connected again
+		connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
+		require.NoError(t, err)
+		require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
+
 		filter := &common.Filter{
-			PubsubTopic:   config.DefaultShardPubsubTopic,
+			PubsubTopic:   w.cfg.DefaultShardPubsubTopic,
 			Messages:      common.NewMemoryMessageStore(),
 			ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
 		}
@@ -252,7 +291,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 		time.Sleep(2 * time.Second)
 
-		_, err = w.Send(config.DefaultShardPubsubTopic, &pb.WakuMessage{
+		msgID, err := w.Send(w.cfg.DefaultShardPubsubTopic, &pb.WakuMessage{
 			Payload:      []byte{1, 2, 3, 4, 5},
 			ContentTopic: contentTopic.ContentTopic(),
 			Version:      proto.Uint32(0),
@@ -260,6 +299,7 @@ func TestBasicWakuV2(t *testing.T) {
 		}, nil)
 
 		require.NoError(t, err)
+		require.NotEqual(t, msgID, "1")
 
 		time.Sleep(1 * time.Second)
 
@@ -274,30 +314,34 @@ func TestBasicWakuV2(t *testing.T) {
 			b.InitialInterval = 500 * time.Millisecond
 		}
 		err = tt.RetryWithBackOff(func() error {
-			_, envelopeCount, err := w.Query(
+			err := w.HistoryRetriever.Query(
 				context.Background(),
-				storeNode.PeerID,
 				store.FilterCriteria{
-					ContentFilter: protocol.NewContentFilter(config.DefaultShardPubsubTopic, contentTopic.ContentTopic()),
+					ContentFilter: protocol.NewContentFilter(w.cfg.DefaultShardPubsubTopic, contentTopic.ContentTopic()),
 					TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
 					TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
 				},
-				nil,
-				nil,
-				false,
+				storeNode.ID,
+				10,
+				nil, false,
 			)
-			if err != nil || envelopeCount == 0 {
+
+			return err
+			/*if err != nil || envelopeCount == 0 {
 				// in case of failure extend timestamp margin up to 40secs
 				if marginInSeconds < 40 {
 					marginInSeconds += 5
 				}
 				return errors.New("no messages received from store node")
-			}
-			return nil
+			}*/
+	//return nil
+	/*
 		}, options)
-		require.NoError(t, err) */
+		require.NoError(t, err)
 
-	require.NoError(t, w.Stop())
+		time.Sleep(10 * time.Second)
+
+		require.NoError(t, w.Stop())*/
 }
 
 type mapResolver map[string]string

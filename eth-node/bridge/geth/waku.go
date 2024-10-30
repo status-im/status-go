@@ -307,8 +307,8 @@ func (w *wakuFilterWrapper) ID() string {
 func (w *GethWakuWrapper) ConfirmMessageDelivered(hashes []common.Hash) {
 }
 
-func (w *GethWakuWrapper) PeerID() peer.ID {
-	panic("not available in WakuV1")
+func (w *GethWakuWrapper) PeerID() (peer.ID, error) {
+	return "", errors.New("not available in WakuV1")
 }
 
 func (w *GethWakuWrapper) GetActiveStorenode() peer.ID {

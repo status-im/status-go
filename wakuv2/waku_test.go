@@ -754,7 +754,10 @@ func TestLightpushRateLimit(t *testing.T) {
 	//Use this instead of DialPeer to make sure the peer is added to PeerStore and can be selected for Lighpush
 	addresses, err := w1.ListenAddresses()
 	require.NoError(t, err)
-	w2.node.AddDiscoveredPeer(w1.PeerID(), addresses, wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
+
+	peerID, err := w1.PeerID()
+	require.NoError(t, err)
+	w2.node.AddDiscoveredPeer(peerID, addresses, wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
 
 	waitForPeerConnectionWithTimeout(t, w2.node.Host().ID(), w1PeersCh, 5*time.Second)
 

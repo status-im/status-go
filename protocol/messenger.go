@@ -354,7 +354,11 @@ func NewMessenger(
 		if err != nil || wakuV2 == nil {
 			return nil, errors.Wrap(err, "failed to find Whisper and Waku V1/V2 services")
 		}
-		peerId = wakuV2.PeerID()
+		peerId, err = wakuV2.PeerID()
+		if err != nil {
+			return nil, err
+		}
+
 		transp, err = transport.NewTransport(
 			wakuV2,
 			identity,
@@ -832,7 +836,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 	response := &MessengerResponse{}
-
 	response.Mailservers, err = m.AllMailservers()
 	if err != nil {
 		return nil, err

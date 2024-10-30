@@ -1914,8 +1914,8 @@ func (w *Waku) Clean() error {
 	return nil
 }
 
-func (w *Waku) PeerID() peer.ID {
-	return w.node.Host().ID()
+func (w *Waku) PeerID() (peer.ID, error) {
+	return w.node.Host().ID(), nil
 }
 
 func (w *Waku) Peerstore() peerstore.Peerstore {
