@@ -17,7 +17,6 @@ class StatusNodeRPC(BaseAPIClient):
         reraise=True
     )
     def send_rpc_request(self, method, params=None, timeout=API_REQUEST_TIMEOUT):
-        """Send JSON-RPC requests, used for standard JSON-RPC API calls."""
         payload = {"jsonrpc": "2.0", "method": method, "params": params or [], "id": 1}
         logger.info(f"Sending JSON-RPC request to {self.base_url} with payload: {payload}")
 
@@ -35,7 +34,6 @@ class StatusNodeRPC(BaseAPIClient):
         reraise=True
     )
     def initialize_application(self, data_dir, timeout=API_REQUEST_TIMEOUT):
-        """Send a direct POST request to the InitializeApplication endpoint."""
         payload = {"dataDir": data_dir}
         logger.info(f"Sending direct POST request to InitializeApplication with payload: {payload}")
 
@@ -53,7 +51,6 @@ class StatusNodeRPC(BaseAPIClient):
         reraise=True
     )
     def create_account_and_login(self, account_data, timeout=API_REQUEST_TIMEOUT):
-        """Send a direct POST request to CreateAccountAndLogin endpoint."""
         payload = {
             "rootDataDir": account_data.get("rootDataDir"),
             "displayName": account_data.get("displayName", "test1"),
@@ -76,7 +73,6 @@ class StatusNodeRPC(BaseAPIClient):
         reraise=True
     )
     def start_messenger(self, timeout=API_REQUEST_TIMEOUT):
-        """Send JSON-RPC request to start Waku messenger."""
         payload = {
             "jsonrpc": "2.0",
             "method": "wakuext_startMessenger",

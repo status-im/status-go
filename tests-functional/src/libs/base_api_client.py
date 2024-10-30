@@ -5,6 +5,7 @@ from src.libs.custom_logger import get_custom_logger
 
 logger = get_custom_logger(__name__)
 
+
 class BaseAPIClient:
     def __init__(self, base_url):
         self.base_url = base_url

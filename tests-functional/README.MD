@@ -1,7 +1,3 @@
-Here’s the updated README with the additional prerequisites and instructions:
-
----
-
 ## Overview
 
 Functional tests for `status-go`
@@ -22,15 +18,11 @@ Functional tests for `status-go`
 3. **Set up a virtual environment (recommended):**
    - In `./tests-functional`, run:
      ```bash
-     python -m venv .venv
+     python3 -m venv .venv
      source .venv/bin/activate
      pip install -r requirements.txt
      ```
    - **Optional (for test development)**: Use Python virtual environment for better dependency management. You can follow the guide [here](https://akrabat.com/creating-virtual-environments-with-pyenv/)
-4. Install pre-commit hooks (optional):
-   ```bash
-   pre-commit install
-   ```
 
 ## How to Run
 
@@ -86,7 +78,7 @@ To run the tests:
 
 ## Build Status Backend
 
-You can build the binary with the following command in the `status-go` root directory:
+You can manually build the binary with the following command in the `status-go` root directory:
 
 ```bash
 make status-backend
@@ -98,6 +90,4 @@ For further details on building and setting up `status-go` and `status-backend`,
 
 Location of the binary: `cmd/status-backend/status-backend`
 
---- 
-
-This README should cover your additional setup, installation, and testing instructions with clear steps for users. Let me know if there are any further modifications needed!
+In test build is automatically being build and placed in right path. If build already exists then new build is not generated.

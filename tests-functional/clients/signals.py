@@ -1,9 +1,11 @@
 import json
 import logging
 import time
+from src.libs.common import write_signal_to_file
 
 import websocket
 
+logger = logging.getLogger(__name__)
 
 class SignalClient:
 
@@ -13,16 +15,13 @@ class SignalClient:
         self.received_signals = {signal: [] for signal in self.await_signals}
 
     def on_message(self, ws, signal):
-        logger = logging.getLogger(__name__)
-
         signal_data = json.loads(signal)
         signal_type = signal_data.get("type")
 
-        logger.info(f"Received signal: {signal_data}")
+        write_signal_to_file(signal_data)
 
         if signal_type in self.await_signals:
             self.received_signals[signal_type].append(signal_data)
-            # logger.debug(f"Signal {signal_type} stored: {signal_data}")
 
     def wait_for_signal(self, signal_type, expected_event=None, timeout=20):
         logger = logging.getLogger(__name__)
