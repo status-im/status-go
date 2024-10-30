@@ -2179,12 +2179,12 @@ func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return "", nil
 }
 
-func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
-	return w.WakuDialPeer(address, "", int(requestTimeout/time.Millisecond))
+func (w *Waku) DialPeer(address multiaddr.Multiaddr, protocol string) error {
+	return w.WakuDialPeer(address, protocol, int(requestTimeout/time.Millisecond))
 }
 
-func (w *Waku) DialPeerByID(peerID peer.ID) error {
-	return w.WakuDialPeerById(peerID, "", int(requestTimeout/time.Millisecond))
+func (w *Waku) DialPeerByID(peerID peer.ID, protocol string) error {
+	return w.WakuDialPeerById(peerID, protocol, int(requestTimeout/time.Millisecond))
 }
 
 func (self *Waku) DropPeer(peerId peer.ID) error {
