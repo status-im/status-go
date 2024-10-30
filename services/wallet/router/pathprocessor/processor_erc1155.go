@@ -151,54 +151,6 @@ func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signe
 	return tx, nil
 }
 
-func (s *ERC1155Processor) sendOrBuildV2(sendArgs *transactions.SendTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
-	ethClient, err := s.rpcClient.EthClient(sendArgs.FromChainID)
-	if err != nil {
-		return tx, createERC1155ErrorResponse(err)
-	}
-
-	contract, err := ierc1155.NewIerc1155(common.Address(sendArgs.ToContractAddress), ethClient)
-	if err != nil {
-		return tx, createERC1155ErrorResponse(err)
-	}
-
-	id, err := walletCommon.GetTokenIdFromSymbol(sendArgs.FromTokenID)
-	if err != nil {
-		return tx, createERC1155ErrorResponse(err)
-	}
-
-	var nonce uint64
-	if lastUsedNonce < 0 {
-		nonce, err = s.transactor.NextNonce(s.rpcClient, sendArgs.FromChainID, sendArgs.From)
-		if err != nil {
-			return tx, createERC1155ErrorResponse(err)
-		}
-	} else {
-		nonce = uint64(lastUsedNonce) + 1
-	}
-
-	argNonce := hexutil.Uint64(nonce)
-	sendArgs.Nonce = &argNonce
-	txOpts := sendArgs.ToTransactOpts(signerFn)
-	from := common.Address(sendArgs.From)
-	tx, err = contract.SafeTransferFrom(
-		txOpts,
-		from,
-		common.Address(*sendArgs.To),
-		id,
-		sendArgs.Value.ToInt(),
-		[]byte{},
-	)
-	if err != nil {
-		return tx, createERC1155ErrorResponse(err)
-	}
-	err = s.transactor.StoreAndTrackPendingTx(from, sendArgs.FromTokenID, sendArgs.FromChainID, sendArgs.MultiTransactionID, tx)
-	if err != nil {
-		return tx, createERC1155ErrorResponse(err)
-	}
-	return tx, nil
-}
-
 func (s *ERC1155Processor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
 	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC1155TransferTx.From, verifiedAccount), lastUsedNonce)
 	if err != nil {
@@ -213,8 +165,7 @@ func (s *ERC1155Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, 
 }
 
 func (s *ERC1155Processor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
-	tx, err := s.sendOrBuildV2(sendArgs, nil, lastUsedNonce)
-	return tx, tx.Nonce(), err
+	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
 }
 
 func (s *ERC1155Processor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
