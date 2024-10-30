@@ -9,7 +9,6 @@ class ContactRequestValidator:
         self.response = response
 
     def validate_response_structure(self):
-        """Check the overall structure of the response."""
         assert self.response.get("jsonrpc") == "2.0", "Invalid JSON-RPC version"
         assert "result" in self.response, "Missing 'result' in response"
 
