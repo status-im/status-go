@@ -12,6 +12,7 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"go.uber.org/zap"
 
@@ -196,7 +197,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		numConnected, err := w.GetNumConnectedPeers()
+		numConnected, err := w.GetNumConnectedRelayPeers()
 		if err != nil {
 			return err
 		}
@@ -219,7 +220,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
 
 	// Disconnect from the store node
-	err = w.DisconnectPeerById(storeNode.ID)
+	err = w.DropPeer(storeNode.ID)
 	require.NoError(t, err)
 
 	// Check that we are indeed disconnected
@@ -228,9 +229,14 @@ func TestBasicWakuV2(t *testing.T) {
 	isDisconnected := !slices.Contains(connectedStoreNodes, storeNode.ID)
 	require.True(t, isDisconnected, "nwaku should be disconnected from the store node")
 
-	// Re-connect
-	err = w.DialPeerByID(storeNode.ID)
+	storeNodeMultiadd, err := multiaddr.NewMultiaddr(storeNodeInfo.ListenAddresses[0])
 	require.NoError(t, err)
+
+	// Re-connect
+	err = w.DialPeer(storeNodeMultiadd)
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
 
 	// Check that we are connected again
 	connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
@@ -543,6 +549,88 @@ func TestPeerExchange(t *testing.T) {
 	require.NoError(t, lightNode.Stop())
 	require.NoError(t, pxServerNode.Stop())
 	require.NoError(t, discV5Node.Stop()) */
+}
+
+func TestDial(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	dialerNodeConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+
+	// start node that will initiate the dial
+	dialerNodeWakuConfig := WakuConfig{
+		EnableRelay:     true,
+		LogLevel:        "DEBUG",
+		Discv5Discovery: false,
+		ClusterID:       16,
+		Shards:          []uint16{64},
+		Discv5UdpPort:   9020,
+		TcpPort:         60020,
+	}
+
+	dialerNode, err := New(nil, "", &dialerNodeConfig, &dialerNodeWakuConfig, logger.Named("dialerNode"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, dialerNode.Start())
+
+	time.Sleep(1 * time.Second)
+
+	receiverNodeConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+
+	// start node that will receive the dial
+	receiverNodeWakuConfig := WakuConfig{
+		EnableRelay:     true,
+		LogLevel:        "DEBUG",
+		Discv5Discovery: false,
+		ClusterID:       16,
+		Shards:          []uint16{64},
+		Discv5UdpPort:   9021,
+		TcpPort:         60021,
+	}
+
+	receiverNode, err := New(nil, "", &receiverNodeConfig, &receiverNodeWakuConfig, logger.Named("receiverNode"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, receiverNode.Start())
+
+	time.Sleep(1 * time.Second)
+
+	receiverMultiaddr, err := receiverNode.ListenAddresses()
+	require.NoError(t, err)
+	require.NotNil(t, receiverMultiaddr)
+
+	// Check that both nodes start with no connected peers
+	dialerPeerCount, err := dialerNode.PeerCount()
+	require.NoError(t, err)
+	require.True(t, dialerPeerCount == 0, "Dialer node should have no connected peers")
+
+	receiverPeerCount, err := receiverNode.PeerCount()
+	require.NoError(t, err)
+	require.True(t, receiverPeerCount == 0, "Receiver node should have no connected peers")
+
+	// Dial
+	err = dialerNode.DialPeer(receiverMultiaddr[0])
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	// Check that both nodes now have one connected peer
+	dialerPeerCount, err = dialerNode.PeerCount()
+	require.NoError(t, err)
+	require.True(t, dialerPeerCount == 1, "Dialer node should have 1 peer")
+
+	receiverPeerCount, err = receiverNode.PeerCount()
+	require.NoError(t, err)
+	require.True(t, receiverPeerCount == 1, "Receiver node should have 1 peer")
+
+	// Stop nodes
+	require.NoError(t, dialerNode.Stop())
+	require.NoError(t, receiverNode.Stop())
+
 }
 
 /*

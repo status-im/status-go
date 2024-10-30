@@ -179,6 +179,20 @@ package wakuv2
 						resp) );
 	}
 
+	static void cGoWakuDialPeer(void* wakuCtx,
+									char* peerMultiAddr,
+									char* protocol,
+									int timeoutMs,
+									void* resp) {
+
+		WAKU_CALL( waku_dial_peer(wakuCtx,
+						peerMultiAddr,
+						protocol,
+						timeoutMs,
+						(WakuCallBack) callback,
+						resp) );
+	}
+
 	static void cGoWakuDialPeerById(void* wakuCtx,
 									char* peerId,
 									char* protocol,
@@ -220,8 +234,12 @@ package wakuv2
 		WAKU_CALL (waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
 	}
 
-	static void cGoWakuGetNumConnectedPeers(void* ctx, char* pubSubTopic, void* resp) {
+	static void cGoWakuGetNumConnectedRelayPeers(void* ctx, char* pubSubTopic, void* resp) {
 		WAKU_CALL (waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) callback, resp) );
+	}
+
+	static void cGoWakuGetConnectedPeers(void* wakuCtx, void* resp) {
+		WAKU_CALL (waku_get_connected_peers(wakuCtx, (WakuCallBack) callback, resp) );
 	}
 
 	static void cGoWakuGetPeerIdsFromPeerStore(void* wakuCtx, void* resp) {
@@ -328,7 +346,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/utils"
@@ -1905,10 +1922,13 @@ func (w *Waku) ClearEnvelopesCache() {
 	w.envelopeCache = newTTLCache()
 }
 
-// TODO-nwaku
-func (w *Waku) PeerCount() int {
-	return 0
-	// return w.node.PeerCount()
+func (w *Waku) PeerCount() (int, error) {
+	peerCount, err := w.GetNumConnectedPeers()
+	if err != nil {
+		return 0, err
+	}
+
+	return peerCount, nil
 }
 
 // TODO-nwaku
@@ -2164,22 +2184,24 @@ func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 }
 
 func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
-	// TODO-nwaku
-	/*
-		ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
-		defer cancel()
-		return w.node.DialPeerWithMultiAddress(ctx, address) */
-	return nil
+	// Using WakuConnect so it matches the go-waku's behavior and terminology
+	return w.WakuConnect(address.String(), int(requestTimeout/time.Millisecond))
 }
 
-func (w *Waku) DialPeerByID(peerID peer.ID) error {
-	return w.WakuDialPeerById(peerID, string(relay.WakuRelayID_v200), 1000)
-}
+func (self *Waku) DropPeer(peerId peer.ID) error {
+	var resp = C.allocResp()
+	var cPeerId = C.CString(peerId.String())
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPeerId))
 
-func (w *Waku) DropPeer(peerID peer.ID) error {
-	// TODO-nwaku
-	// return w.node.ClosePeerById(peerID)
-	return nil
+	C.cGoWakuDisconnectPeerById(self.wakuCtx, cPeerId, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error DisconnectPeerById: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
 }
 
 func (w *Waku) ProcessingP2PMessages() bool {
@@ -2668,6 +2690,24 @@ func (self *Waku) WakuConnect(peerMultiAddr string, timeoutMs int) error {
 	return errors.New(errMsg)
 }
 
+func (self *Waku) WakuDialPeer(peerMultiAddr multiaddr.Multiaddr, protocol string, timeoutMs int) error {
+	var resp = C.allocResp()
+	var cPeerMultiAddr = C.CString(peerMultiAddr.String())
+	var cProtocol = C.CString(protocol)
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPeerMultiAddr))
+	defer C.free(unsafe.Pointer(cProtocol))
+
+	C.cGoWakuDialPeer(self.wakuCtx, cPeerMultiAddr, cProtocol, C.int(timeoutMs), resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error DialPeer: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
 func (self *Waku) WakuDialPeerById(peerId peer.ID, protocol string, timeoutMs int) error {
 	var resp = C.allocResp()
 	var cPeerId = C.CString(peerId.String())
@@ -2753,7 +2793,7 @@ func (self *Waku) ListPeersInMesh(pubsubTopic string) (int, error) {
 	return 0, errors.New(errMsg)
 }
 
-func (self *Waku) GetNumConnectedPeers(paramPubsubTopic ...string) (int, error) {
+func (self *Waku) GetNumConnectedRelayPeers(paramPubsubTopic ...string) (int, error) {
 	var pubsubTopic string
 	if len(paramPubsubTopic) == 0 {
 		pubsubTopic = ""
@@ -2766,20 +2806,56 @@ func (self *Waku) GetNumConnectedPeers(paramPubsubTopic ...string) (int, error) 
 	defer C.freeResp(resp)
 	defer C.free(unsafe.Pointer(cPubsubTopic))
 
-	C.cGoWakuGetNumConnectedPeers(self.wakuCtx, cPubsubTopic, resp)
+	C.cGoWakuGetNumConnectedRelayPeers(self.wakuCtx, cPubsubTopic, resp)
 
 	if C.getRet(resp) == C.RET_OK {
 		numPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		numPeers, err := strconv.Atoi(numPeersStr)
 		if err != nil {
-			errMsg := "GetNumConnectedPeers - error converting string to int: " + err.Error()
+			errMsg := "GetNumConnectedRelayPeers - error converting string to int: " + err.Error()
 			return 0, errors.New(errMsg)
 		}
 		return numPeers, nil
 	}
-	errMsg := "error GetNumConnectedPeers: " +
+	errMsg := "error GetNumConnectedRelayPeers: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return 0, errors.New(errMsg)
+}
+
+func (self *Waku) GetConnectedPeers() (peer.IDSlice, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+	C.cGoWakuGetConnectedPeers(self.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		if peersStr == "" {
+			return peer.IDSlice{}, nil
+		}
+		// peersStr contains a comma-separated list of peer ids
+		itemsPeerIds := strings.Split(peersStr, ",")
+
+		var peers peer.IDSlice
+		for _, peerId := range itemsPeerIds {
+			id, err := peer.Decode(peerId)
+			if err != nil {
+				return nil, fmt.Errorf("GetConnectedPeers - decoding peerId: %w", err)
+			}
+			peers = append(peers, id)
+		}
+
+		return peers, nil
+	}
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, fmt.Errorf("GetConnectedPeers: %s", errMsg)
+}
+
+func (self *Waku) GetNumConnectedPeers() (int, error) {
+	connecterPeers, err := self.GetConnectedPeers()
+	if err != nil {
+		return 0, err
+	}
+	return len(connecterPeers), nil
 }
 
 func (self *Waku) GetPeerIdsFromPeerStore() (peer.IDSlice, error) {
@@ -2840,22 +2916,6 @@ func (self *Waku) GetPeerIdsByProtocol(protocol string) (peer.IDSlice, error) {
 	errMsg := "error GetPeerIdsByProtocol: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return nil, errors.New(errMsg)
-}
-
-func (self *Waku) DisconnectPeerById(peerId peer.ID) error {
-	var resp = C.allocResp()
-	var cPeerId = C.CString(peerId.String())
-	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cPeerId))
-
-	C.cGoWakuDisconnectPeerById(self.wakuCtx, cPeerId, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error DisconnectPeerById: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
 }
 
 // func main() {
