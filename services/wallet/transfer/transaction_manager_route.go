@@ -171,7 +171,9 @@ func (tm *TransactionManager) buildTxForPath(path *routes.Path, pathProcessors m
 				path.ProcessorName == pathprocessor.ProcessorStickersBuyName ||
 				path.ProcessorName == pathprocessor.ProcessorENSRegisterName ||
 				path.ProcessorName == pathprocessor.ProcessorENSReleaseName ||
-				path.ProcessorName == pathprocessor.ProcessorENSPublicKeyName {
+				path.ProcessorName == pathprocessor.ProcessorENSPublicKeyName ||
+				path.ProcessorName == pathprocessor.ProcessorERC721Name ||
+				path.ProcessorName == pathprocessor.ProcessorERC1155Name {
 				// TODO: update functions from `TransactorIface` to use `ToContractAddress` (as an address of the contract a transaction should be sent to)
 				// and `To` (as the destination address, recipient) of `SendTxArgs` struct appropriately
 				toContractAddr := types.Address(path.FromToken.Address)
