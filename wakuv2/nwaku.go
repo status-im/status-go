@@ -2184,11 +2184,8 @@ func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 }
 
 func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
+	// Using WakuConnect so it matches the go-waku's behavior and terminology
 	return w.WakuConnect(address.String(), int(requestTimeout/time.Millisecond))
-}
-
-func (w *Waku) DialPeerByID(peerID peer.ID, protocol string) error {
-	return w.WakuDialPeerById(peerID, protocol, int(requestTimeout/time.Millisecond))
 }
 
 func (self *Waku) DropPeer(peerId peer.ID) error {
