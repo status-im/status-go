@@ -59,17 +59,17 @@ var (
 
 var (
 	// rpcUserAgentName the user agent
-	rpcUserAgentName         = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS", params.Version)
-	rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, "no-GOOS", params.Version)
+	rpcUserAgentName         = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS", params.Version())
+	rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, "no-GOOS", params.Version())
 )
 
 func init() {
 	if appCommon.IsMobilePlatform() {
-		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, mobile, params.Version)
-		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, mobile, params.Version)
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, mobile, params.Version())
+		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, mobile, params.Version())
 	} else {
-		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, desktop, params.Version)
-		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, desktop, params.Version)
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, desktop, params.Version())
+		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, desktop, params.Version())
 	}
 }
 

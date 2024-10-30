@@ -919,7 +919,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		DataDir:                dataDir,
 		KeyStoreDir:            keyStoreDir,
 		KeycardPairingDataFile: keycardPairingDataFile,
-		Version:                Version,
+		Version:                Version(),
 		HTTPHost:               "localhost",
 		HTTPPort:               8545,
 		HTTPVirtualHosts:       []string{"localhost"},

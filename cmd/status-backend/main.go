@@ -11,6 +11,7 @@ import (
 
 	"github.com/status-im/status-go/cmd/status-backend/server"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/params"
 )
 
 var (
@@ -42,7 +43,11 @@ func main() {
 		return
 	}
 
-	log.Info("server started", "address", srv.Address())
+	log.Info("status-backend started",
+		"address", srv.Address(),
+		"version", params.Version(),
+		"gitCommit", params.GitCommit(),
+	)
 	srv.RegisterMobileAPI()
 	srv.Serve()
 }

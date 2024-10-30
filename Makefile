@@ -32,7 +32,6 @@ help: ##@other Show this help
 RELEASE_TAG ?= $(shell ./_assets/scripts/version.sh)
 RELEASE_DIR ?= /tmp/release-$(RELEASE_TAG)
 GOLANGCI_BINARY = golangci-lint
-IPFS_GATEWAY_URL ?= https://ipfs.status.im/
 
 ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
  detected_OS := Windows
@@ -61,14 +60,8 @@ GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
 
-BUILD_FLAGS ?= -ldflags="-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
-	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
-	-X github.com/status-im/status-go/params.IpfsGatewayURL=$(IPFS_GATEWAY_URL) \
-	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)"
-
-BUILD_FLAGS_MOBILE ?= -ldflags="-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
-	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
-	-X github.com/status-im/status-go/params.IpfsGatewayURL=$(IPFS_GATEWAY_URL)"
+BUILD_FLAGS ?= -ldflags="-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)"
+BUILD_FLAGS_MOBILE ?=
 
 networkid ?= StatusChain
 
