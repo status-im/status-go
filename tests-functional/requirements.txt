@@ -1,3 +1,4 @@
+deepdiff==5.5.0
 genson==1.2.2
 jsonschema==3.2.0
 pytest==6.2.4
