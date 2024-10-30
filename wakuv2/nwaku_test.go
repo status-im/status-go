@@ -12,6 +12,7 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"go.uber.org/zap"
 
@@ -228,8 +229,11 @@ func TestBasicWakuV2(t *testing.T) {
 	isDisconnected := !slices.Contains(connectedStoreNodes, storeNode.ID)
 	require.True(t, isDisconnected, "nwaku should be disconnected from the store node")
 
+	storeNodeMultiadd, err := multiaddr.NewMultiaddr(storeNodeInfo.ListenAddresses[0])
+	require.NoError(t, err)
+
 	// Re-connect
-	err = w.DialPeer(storeNode.Addrs[0])
+	err = w.DialPeer(storeNodeMultiadd)
 	require.NoError(t, err)
 
 	time.Sleep(1 * time.Second)
