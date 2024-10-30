@@ -21,7 +21,7 @@ const (
 )
 
 // backupTickerInterval is how often we should check for backups
-var backupTickerInterval = 120 * time.Second
+var backupTickerInterval = 30 * time.Second
 
 // backupIntervalSeconds is the amount of seconds we should allow between
 // backups

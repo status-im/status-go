@@ -35,6 +35,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/sentry"
 	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
@@ -2118,6 +2119,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("node crashed on start: %v", err)
+			sentry.RecoverError(err)
 		}
 	}()
 

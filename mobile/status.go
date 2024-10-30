@@ -49,6 +49,7 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 
+	"github.com/status-im/status-go/internal/sentry"
 	"github.com/status-im/status-go/mobile/callog"
 )
 
@@ -99,6 +100,18 @@ func initializeApplication(requestJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+
+	// initialize sentry
+	if centralizedMetricsInfo.Enabled {
+		err = sentry.Init(
+			sentry.WithDSN(request.SentryDSN),
+			sentry.WithDefaultContext(),
+		)
+		if err != nil {
+			return makeJSONResponse(err)
+		}
+	}
+
 	response := &InitializeApplicationResponse{
 		Accounts:               accs,
 		CentralizedMetricsInfo: centralizedMetricsInfo,

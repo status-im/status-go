@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/internal/sentry"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -89,8 +90,16 @@ func IsNil(i interface{}) bool {
 }
 
 func LogOnPanic() {
-	if err := recover(); err != nil {
-		logutils.ZapLogger().Error("panic in goroutine", zap.Any("error", err), zap.Stack("stacktrace"))
-		panic(err)
+	err := recover()
+	if err == nil {
+		return
 	}
+
+	logutils.ZapLogger().Error("panic in goroutine",
+		zap.Any("error", err),
+		zap.Stack("stacktrace"))
+
+	sentry.RecoverError(err)
+
+	panic(err)
 }

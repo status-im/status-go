@@ -119,6 +119,9 @@ cmd/status-backend/server/endpoints.go
 protocol/messenger_handlers.go
 internal/version/VERSION
 internal/version/GIT_COMMIT
+internal/sentry/SENTRY_CONTEXT_NAME
+internal/sentry/SENTRY_CONTEXT_VERSION
+internal/sentry/SENTRY_PRODUCTION
 
 # Don't ignore generated files in the vendor/ directory
 !vendor/**/*.pb.go

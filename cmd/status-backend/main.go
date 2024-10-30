@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/cmd/status-backend/server"
+	"github.com/status-im/status-go/internal/sentry"
 	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
 )
@@ -32,6 +33,12 @@ func init() {
 }
 
 func main() {
+	sentry.MustInit(
+		sentry.WithEnvironmentDSN(),
+		sentry.WithContext("status-backend", version.Version()),
+	)
+	defer sentry.Recover()
+
 	flag.Parse()
 
 	srv := server.NewServer()
