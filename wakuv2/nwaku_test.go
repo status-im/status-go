@@ -633,6 +633,37 @@ func TestDial(t *testing.T) {
 
 }
 
+func TestDnsDiscover(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+	nodeConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+		Nameserver:          "8.8.8.8",
+	}
+	nodeWakuConfig := WakuConfig{
+		EnableRelay:   true,
+		LogLevel:      "DEBUG",
+		ClusterID:     16,
+		Shards:        []uint16{64},
+		Discv5UdpPort: 9040,
+		TcpPort:       60040,
+	}
+	node, err := New(nil, "", &nodeConfig, &nodeWakuConfig, logger.Named("node"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, node.Start())
+	time.Sleep(1 * time.Second)
+	sampleEnrTree := "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im"
+
+	res, err := node.WakuDnsDiscovery(sampleEnrTree, nodeConfig.Nameserver, int(requestTimeout/time.Millisecond))
+	require.NoError(t, err)
+
+	require.True(t, len(res) > 1, "multiple nodes should be returned from the DNS Discovery query")
+
+	// Stop nodes
+	require.NoError(t, node.Stop())
+}
+
 /*
 
 func TestWakuV2Filter(t *testing.T) {
