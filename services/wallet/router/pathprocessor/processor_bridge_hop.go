@@ -432,6 +432,9 @@ func (h *HopBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs
 
 func (h *HopBridgeProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	tx, err := h.sendOrBuildV2(sendArgs, nil, lastUsedNonce)
+	if err != nil {
+		return nil, 0, createBridgeHopErrorResponse(err)
+	}
 	return tx, tx.Nonce(), createBridgeHopErrorResponse(err)
 }
 

@@ -101,7 +101,7 @@ func setupRouter(t *testing.T) (*Router, func()) {
 	}
 	client, _ := rpc.NewClient(config)
 
-	router := NewRouter(client, nil, nil, nil, nil, nil, nil, nil)
+	router := NewRouter(client, nil, nil, nil, nil, nil, nil)
 
 	transfer := pathprocessor.NewTransferProcessor(nil, nil)
 	router.AddPathProcessor(transfer)
@@ -127,7 +127,7 @@ func setupRouter(t *testing.T) (*Router, func()) {
 	ensPublicKey := pathprocessor.NewENSPublicKeyProcessor(nil, nil, nil)
 	router.AddPathProcessor(ensPublicKey)
 
-	buyStickers := pathprocessor.NewStickersBuyProcessor(nil, nil, nil)
+	buyStickers := pathprocessor.NewStickersBuyProcessor(nil, nil)
 	router.AddPathProcessor(buyStickers)
 
 	return router, cleanTmpDb

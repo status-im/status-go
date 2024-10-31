@@ -29,7 +29,7 @@ func TestKeycardPairingsFile(t *testing.T) {
 
 	accountFeed := &event.Feed{}
 
-	service := NewService(db, accountsDb, appDB, &rpc.Client{NetworkManager: network.NewManager(db)}, accountFeed, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, nil, "")
+	service := NewService(db, accountsDb, appDB, &rpc.Client{NetworkManager: network.NewManager(db)}, accountFeed, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, "")
 
 	data, err := service.KeycardPairings().GetPairingsJSONFileContent()
 	require.NoError(t, err)
