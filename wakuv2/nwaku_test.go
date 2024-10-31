@@ -639,6 +639,7 @@ func TestDnsDiscover(t *testing.T) {
 	nodeConfig := Config{
 		UseThrottledPublish: true,
 		ClusterID:           16,
+		Nameserver:          "8.8.8.8",
 	}
 	nodeWakuConfig := WakuConfig{
 		EnableRelay:   true,
@@ -653,9 +654,8 @@ func TestDnsDiscover(t *testing.T) {
 	require.NoError(t, node.Start())
 	time.Sleep(1 * time.Second)
 	sampleEnrTree := "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im"
-	nameserver := "1.1.1.1"
 
-	res, err := node.WakuDnsDiscovery(sampleEnrTree, nameserver, int(requestTimeout/time.Millisecond))
+	res, err := node.WakuDnsDiscovery(sampleEnrTree, nodeConfig.Nameserver, int(requestTimeout/time.Millisecond))
 	require.NoError(t, err)
 
 	require.True(t, len(res) > 1, "multiple nodes should be returned from the DNS Discovery query")

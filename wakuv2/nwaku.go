@@ -855,7 +855,10 @@ func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, su
 
 func (w *Waku) discoverAndConnectPeers() {
 	var addrsToConnect []multiaddr.Multiaddr
-	nameserver := "1.1.1.1"
+	nameserver := w.cfg.Nameserver
+	if nameserver == "" {
+		nameserver = "8.8.8.8"
+	}
 	timeout := int(requestTimeout / time.Millisecond)
 
 	for _, addrString := range w.cfg.WakuNodes {
