@@ -24,7 +24,6 @@ class SignalClient:
             self.received_signals[signal_type].append(signal_data)
 
     def wait_for_signal(self, signal_type, expected_event=None, timeout=20):
-        logger = logging.getLogger(__name__)
         start_time = time.time()
         while time.time() - start_time < timeout:
             if self.received_signals.get(signal_type):
@@ -45,15 +44,12 @@ class SignalClient:
         raise TimeoutError(f"Signal {signal_type} with event {expected_event} not received in {timeout} seconds")
 
     def _on_error(self, ws, error):
-        logger = logging.getLogger(__name__)
         logger.error(f"WebSocket error: {error}")
 
     def _on_close(self, ws, close_status_code, close_msg):
-        logger = logging.getLogger(__name__)
         logger.info(f"WebSocket connection closed: {close_status_code}, {close_msg}")
 
     def _on_open(self, ws):
-        logger = logging.getLogger(__name__)
         logger.info("WebSocket connection opened")
 
     def _connect(self):
