@@ -164,7 +164,10 @@ func (tm *TransactionManager) buildTxForPath(path *routes.Path, pathProcessors m
 		// special handling for transfer tx if selected token is not ETH
 		// TODO: we should fix that in the trasactor, but till then, the best place to handle it is here
 		if !path.FromToken.IsNative() {
-			sendArgs.Value = (*hexutil.Big)(big.NewInt(0))
+
+			if path.ProcessorName != pathprocessor.ProcessorERC1155Name {
+				sendArgs.Value = (*hexutil.Big)(big.NewInt(0))
+			}
 
 			if path.ProcessorName == pathprocessor.ProcessorTransferName ||
 				path.ProcessorName == pathprocessor.ProcessorStickersBuyName ||
