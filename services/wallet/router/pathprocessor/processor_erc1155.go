@@ -214,6 +214,9 @@ func (s *ERC1155Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, 
 
 func (s *ERC1155Processor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	tx, err := s.sendOrBuildV2(sendArgs, nil, lastUsedNonce)
+	if err != nil {
+		return nil, 0, createERC1155ErrorResponse(err)
+	}
 	return tx, tx.Nonce(), err
 }
 

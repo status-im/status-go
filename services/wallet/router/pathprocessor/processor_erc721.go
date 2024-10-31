@@ -294,6 +294,9 @@ func (s *ERC721Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, l
 
 func (s *ERC721Processor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	tx, err := s.sendOrBuildV2(sendArgs, nil, lastUsedNonce)
+	if err != nil {
+		return nil, 0, createERC721ErrorResponse(err)
+	}
 	return tx, tx.Nonce(), err
 }
 
