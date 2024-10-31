@@ -41,16 +41,6 @@ class StatusNode:
         self.last_response = None
         self.api = StatusNodeRPC(self.port, self.name)
 
-    def setup_method(self):
-        self.rpc_client = RpcClient(option.rpc_url_statusd)
-        await_signals = ["history.request.started", "history.request.completed"]
-        self.signal_client = SignalClient(option.ws_url_statusd, await_signals)
-
-        # Start WebSocket connection in a separate thread
-        websocket_thread = threading.Thread(target=self.signal_client._connect)
-        websocket_thread.daemon = True
-        websocket_thread.start()
-
     def initialize_node(self, name, port, data_dir, account_data):
         self.name = name
         self.port = port
@@ -93,7 +83,7 @@ class StatusNode:
 
     def start_signal_client(self):
         ws_url = f"ws://localhost:{self.port}"
-        await_signals = ["history.request.started", "history.request.completed"]
+        await_signals = ["history.request.started", "history.request.completed","messages.new"]
         self.signal_client = SignalClient(ws_url, await_signals)
 
         websocket_thread = threading.Thread(target=self.signal_client._connect)
@@ -158,6 +148,10 @@ class StatusNode:
     def send_contact_request(self, pubkey, message):
         params = [{"id": pubkey, "message": message}]
         return self.api.send_rpc_request("wakuext_sendContactRequest", params)
+
+    def send_message(self, pubkey, message):
+        params = [{"id": pubkey, "message": message}]
+        return self.api.send_rpc_request("wakuext_sendOneToOneMessage", params)
 
     def pause_process(self):
         if self.pid:

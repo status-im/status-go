@@ -10,7 +10,7 @@ from validators.contact_request_validator import ContactRequestValidator
 
 class TestContactRequest(StepsCommon):
     def test_contact_request_baseline(self):
-        timeout_secs = 180
+        timeout_secs = 10
         num_contact_requests = NUM_CONTACT_REQUESTS
         project_root = get_project_root()
         nodes = []
@@ -78,7 +78,7 @@ class TestContactRequest(StepsCommon):
                 + "\n".join(formatted_missing_requests)
             )
 
-    def send_and_wait_for_message(self, nodes, display_name, index, timeout=45):
+    def send_and_wait_for_message(self, nodes, display_name, index, timeout=10):
         first_node, second_node = nodes
         first_node_pubkey = first_node.get_pubkey(display_name)
         contact_request_message = f"contact_request_{index}"

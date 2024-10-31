@@ -2,6 +2,8 @@ from contextlib import contextmanager
 import inspect
 import subprocess
 import pytest
+from tenacity import retry
+
 from src.libs.common import delay
 from src.libs.custom_logger import get_custom_logger
 from src.node.status_node import StatusNode
@@ -101,3 +103,12 @@ class StepsCommon:
                 break
 
         return timestamp, message_id, response
+
+    # @retry(stop=stop_after_delay(40), wait=wait_fixed(0.5), reraise=True)
+    def accept_contact_request(self, sending_node=None, receiving_node_pk=None):
+        if not sending_node:
+            sending_node = self.second_node
+        if not receiving_node_pk:
+            receiving_node_pk = self.first_node_pubkey
+        sending_node.send_contact_request(receiving_node_pk, "hi")
+        # assert sending_node.wait_for_signal(["accepted your contact request"], timeout=10)
