@@ -1,6 +1,9 @@
 package params
 
-import _ "embed"
+import (
+	_ "embed"
+	"strings"
+)
 
 // Use go:generate script to get the version and git commit.
 // VERSION and GIT_COMMIT files are used in further `go:embed` commands to load values to the variables.
@@ -21,6 +24,11 @@ var (
 
 // IpfsGatewayURL is the Gateway URL to use for IPFS
 const IpfsGatewayURL = "https://ipfs.status.im/"
+
+func init() {
+	version = strings.TrimSpace(version)
+	gitCommit = strings.TrimSpace(gitCommit)
+}
 
 func Version() string {
 	return version
