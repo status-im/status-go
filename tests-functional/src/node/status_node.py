@@ -7,8 +7,6 @@ import subprocess
 import threading
 import time
 
-from clients.status_backend import RpcClient
-from conftest import option
 from src.libs.custom_logger import get_custom_logger
 from src.node.rpc_client import StatusNodeRPC
 from clients.signals import SignalClient
