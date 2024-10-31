@@ -640,7 +640,6 @@ func TestDnsDiscover(t *testing.T) {
 		UseThrottledPublish: true,
 		ClusterID:           16,
 	}
-	// start node that will initiate t
 	nodeWakuConfig := WakuConfig{
 		EnableRelay:   true,
 		LogLevel:      "DEBUG",
