@@ -16,24 +16,21 @@ import (
 	stickersContracts "github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/stickers"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
 
 type StickersBuyProcessor struct {
-	contractMaker   *contracts.ContractMaker
-	transactor      transactions.TransactorIface
-	stickersService *stickers.Service
+	contractMaker *contracts.ContractMaker
+	transactor    transactions.TransactorIface
 }
 
-func NewStickersBuyProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, stickersService *stickers.Service) *StickersBuyProcessor {
+func NewStickersBuyProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface) *StickersBuyProcessor {
 	return &StickersBuyProcessor{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
 		},
-		transactor:      transactor,
-		stickersService: stickersService,
+		transactor: transactor,
 	}
 }
 

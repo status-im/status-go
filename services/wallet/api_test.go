@@ -159,7 +159,7 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	chainClient.SetWalletNotifier(func(chainID uint64, message string) {})
 	c.SetWalletNotifier(func(chainID uint64, message string) {})
 
-	service := NewService(db, accountsDb, appDB, c, accountFeed, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, nil, "")
+	service := NewService(db, accountsDb, appDB, c, accountFeed, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil, "")
 
 	api := &API{
 		s: service,
