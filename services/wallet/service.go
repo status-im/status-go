@@ -20,7 +20,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
@@ -58,7 +57,6 @@ func NewService(
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
 	ens *ens.Service,
-	stickers *stickers.Service,
 	pendingTxManager *transactions.PendingTxTracker,
 	feed *event.Feed,
 	mediaServer *server.MediaServer,
@@ -205,7 +203,6 @@ func NewService(
 		marketManager:         marketManager,
 		transactor:            transactor,
 		ens:                   ens,
-		stickers:              stickers,
 		feed:                  feed,
 		signals:               signals,
 		reader:                reader,
@@ -239,7 +236,6 @@ type Service struct {
 	gethManager           *account.GethManager
 	transactor            *transactions.Transactor
 	ens                   *ens.Service
-	stickers              *stickers.Service
 	feed                  *event.Feed
 	signals               *walletevent.SignalsTransmitter
 	reader                *Reader
@@ -344,8 +340,4 @@ func (s *Service) GetCollectiblesManager() *collectibles.Manager {
 
 func (s *Service) GetEnsService() *ens.Service {
 	return s.ens
-}
-
-func (s *Service) GetStickersService() *stickers.Service {
-	return s.stickers
 }

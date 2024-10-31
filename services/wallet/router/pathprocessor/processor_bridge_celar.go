@@ -443,6 +443,9 @@ func (s *CelerBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxAr
 
 func (s *CelerBridgeProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	tx, err := s.sendOrBuildV2(sendArgs, nil, lastUsedNonce)
+	if err != nil {
+		return nil, 0, createBridgeCellerErrorResponse(err)
+	}
 	return tx, tx.Nonce(), err
 }
 
