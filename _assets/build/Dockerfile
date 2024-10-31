@@ -5,7 +5,7 @@ FROM golang:1.21-alpine3.18 as builder
 ENV CC=clang
 ENV CXX=clang++
 
-RUN apk add --no-cache git make llvm clang musl-dev linux-headers protobuf-dev~3.21
+RUN apk add --no-cache git bash make llvm clang musl-dev linux-headers protobuf-dev~3.21
 
 ARG build_tags
 ARG build_flags

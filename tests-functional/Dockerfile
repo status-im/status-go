@@ -1,7 +1,7 @@
 FROM ghcr.io/foundry-rs/foundry:latest
 
 RUN apk update && \
-    apk add git
+    apk add git bash
 
 WORKDIR /app
 
