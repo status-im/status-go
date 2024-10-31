@@ -49,11 +49,10 @@ func NewAPI(s *Service) *API {
 	transactor := s.GetTransactor()
 	tokenManager := s.GetTokenManager()
 	ensService := s.GetEnsService()
-	stickersService := s.GetStickersService()
 	featureFlags := s.FeatureFlags()
 
 	router := router.NewRouter(rpcClient, transactor, tokenManager, s.GetMarketManager(), s.GetCollectiblesService(),
-		s.GetCollectiblesManager(), ensService, stickersService)
+		s.GetCollectiblesManager(), ensService)
 
 	transfer := pathprocessor.NewTransferProcessor(rpcClient, transactor)
 	router.AddPathProcessor(transfer)
@@ -85,7 +84,7 @@ func NewAPI(s *Service) *API {
 	ensPublicKey := pathprocessor.NewENSPublicKeyProcessor(rpcClient, transactor, ensService)
 	router.AddPathProcessor(ensPublicKey)
 
-	buyStickers := pathprocessor.NewStickersBuyProcessor(rpcClient, transactor, stickersService)
+	buyStickers := pathprocessor.NewStickersBuyProcessor(rpcClient, transactor)
 	router.AddPathProcessor(buyStickers)
 
 	return &API{s, s.reader, router}
