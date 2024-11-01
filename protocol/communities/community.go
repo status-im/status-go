@@ -2444,7 +2444,8 @@ func (o *Community) CreateDeepCopy() *Community {
 			PubsubTopicPrivateKey:               o.config.PubsubTopicPrivateKey,
 			LastOpenedAt:                        o.config.LastOpenedAt,
 		},
-		timesource: o.timesource,
+		timesource:  o.timesource,
+		mediaServer: o.mediaServer,
 	}
 }
 
