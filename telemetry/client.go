@@ -19,9 +19,10 @@ import (
 
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 
+	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
+
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	v2common "github.com/status-im/status-go/wakuv2/common"
-	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 )
 
 type TelemetryType string

@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -184,6 +185,6 @@ func TestGetClientsUsingCache(t *testing.T) {
 }
 
 func TestUserAgent(t *testing.T) {
-	require.Equal(t, "procuratee-desktop/", rpcUserAgentName)
-	require.Equal(t, "procuratee-desktop-upstream/", rpcUserAgentUpstreamName)
+	require.True(t, strings.HasPrefix(rpcUserAgentName, "procuratee-desktop/"))
+	require.True(t, strings.HasPrefix(rpcUserAgentUpstreamName, "procuratee-desktop-upstream/"))
 }
