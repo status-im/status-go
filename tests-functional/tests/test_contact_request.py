@@ -1,4 +1,3 @@
-import logging
 from uuid import uuid4
 from constants import *
 from src.libs.common import delay
@@ -9,6 +8,7 @@ from src.libs.common import create_unique_data_dir, get_project_root
 from validators.contact_request_validator import ContactRequestValidator
 
 logger = get_custom_logger(__name__)
+
 
 class TestContactRequest(StepsCommon):
     def test_contact_request_baseline(self):
@@ -112,7 +112,7 @@ class TestContactRequest(StepsCommon):
                         )
                         break
                     except AssertionError as validation_error:
-                        logging.error(f"Validation failed for event: {messages_new_event}, Error: {validation_error}")
+                        logger.error(f"Validation failed for event: {messages_new_event}, Error: {validation_error}")
                         continue
 
             if messages_new_event is None:
@@ -120,7 +120,7 @@ class TestContactRequest(StepsCommon):
             first_node.wait_for_signal("history.request.completed", timeout)
 
         except (TimeoutError, ValueError) as e:
-            logging.error(f"Signal validation failed: {str(e)}")
+            logger.error(f"Signal validation failed: {str(e)}")
             return timestamp, message_id, contact_request_message, None
 
         first_node.stop()
