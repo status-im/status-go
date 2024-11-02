@@ -81,7 +81,7 @@ class StatusNode:
 
     def start_signal_client(self):
         ws_url = f"ws://localhost:{self.port}"
-        await_signals = ["history.request.started", "history.request.completed","messages.new"]
+        await_signals = ["history.request.started", "messages.new", "history.request.completed"]
         self.signal_client = SignalClient(ws_url, await_signals)
 
         websocket_thread = threading.Thread(target=self.signal_client._connect)
@@ -125,8 +125,11 @@ class StatusNode:
                 return account.get("public-key")
         raise ValueError(f"Public key not found for display name: {display_name}")
 
-    def wait_for_signal(self, signal_type, expected_event=None, timeout=20):
-        return self.signal_client.wait_for_signal(signal_type, expected_event, timeout)
+    def wait_for_signal(self, signal_type, timeout=20):
+        return self.signal_client.wait_for_signal(signal_type, timeout)
+
+    def wait_for_complete_signal(self, signal_type, timeout=20):
+        return self.signal_client.wait_for_complete_signal(signal_type, timeout)
 
     def stop(self, remove_local_data=True):
         if self.process:
