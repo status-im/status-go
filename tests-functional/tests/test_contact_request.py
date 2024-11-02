@@ -2,15 +2,17 @@ import logging
 from uuid import uuid4
 from constants import *
 from src.libs.common import delay
-from src.node.status_node import StatusNode, logger
+from src.libs.custom_logger import get_custom_logger
+from src.node.status_node import StatusNode
 from src.steps.common import StepsCommon
 from src.libs.common import create_unique_data_dir, get_project_root
 from validators.contact_request_validator import ContactRequestValidator
 
+logger = get_custom_logger(__name__)
 
 class TestContactRequest(StepsCommon):
     def test_contact_request_baseline(self):
-        timeout_secs = 10
+        timeout_secs = 3
         num_contact_requests = NUM_CONTACT_REQUESTS
         project_root = get_project_root()
         nodes = []
@@ -86,10 +88,38 @@ class TestContactRequest(StepsCommon):
         timestamp, message_id, response = self.send_with_timestamp(
             second_node.send_contact_request, first_node_pubkey, contact_request_message
         )
+
+        validator = ContactRequestValidator(response)
+        validator.run_all_validations(first_node_pubkey, display_name, contact_request_message)
+
         try:
-            first_node.wait_for_signal("history.request.started", None, timeout)
-            first_node.wait_for_signal("history.request.completed", None, timeout)
-        except TimeoutError as e:
+            first_node.wait_for_signal("history.request.started", timeout)
+            messages_new_events = first_node.wait_for_complete_signal("messages.new", timeout)
+
+            messages_new_event = None
+
+            for event in messages_new_events:
+                if "chats" in event.get("event", {}):
+                    messages_new_event = event
+                    try:
+                        validator.validate_event_against_response(
+                            messages_new_event,
+                            fields_to_validate={
+                                "text": "text",
+                                "displayName": "displayName",
+                                "id": "id"
+                            }
+                        )
+                        break
+                    except AssertionError as validation_error:
+                        logging.error(f"Validation failed for event: {messages_new_event}, Error: {validation_error}")
+                        continue
+
+            if messages_new_event is None:
+                raise ValueError("No 'messages.new' event with 'chats' data found within the timeout period.")
+            first_node.wait_for_signal("history.request.completed", timeout)
+
+        except (TimeoutError, ValueError) as e:
             logging.error(f"Signal validation failed: {str(e)}")
             return timestamp, message_id, contact_request_message, None
 
@@ -115,4 +145,4 @@ class TestContactRequest(StepsCommon):
             message = str(uuid4())
             self.first_node.send_contact_request(self.second_node_pubkey, message)
             delay(10)
-        assert self.second_node.wait_for_signal("history.request.completed")
+        assert self.second_node.wait_for_complete_signal("history.request.completed")
