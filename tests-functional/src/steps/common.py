@@ -2,7 +2,6 @@ from contextlib import contextmanager
 import inspect
 import subprocess
 import pytest
-from tenacity import retry
 
 from src.libs.common import delay
 from src.libs.custom_logger import get_custom_logger

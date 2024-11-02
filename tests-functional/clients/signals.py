@@ -5,7 +5,10 @@ from src.libs.common import write_signal_to_file
 
 import websocket
 
-logger = logging.getLogger(__name__)
+from src.libs.custom_logger import get_custom_logger
+
+logger = get_custom_logger(__name__)
+
 
 class SignalClient:
 
@@ -23,25 +26,31 @@ class SignalClient:
         if signal_type in self.await_signals:
             self.received_signals[signal_type].append(signal_data)
 
-    def wait_for_signal(self, signal_type, expected_event=None, timeout=20):
+    def wait_for_signal(self, signal_type, timeout=20):
         start_time = time.time()
+        while not self.received_signals.get(signal_type):
+            if time.time() - start_time >= timeout:
+                raise TimeoutError(
+                    f"Signal {signal_type} is not received in {timeout} seconds")
+            time.sleep(0.2)
+        logging.debug(f"Signal {signal_type} is received in {round(time.time() - start_time)} seconds")
+        return self.received_signals[signal_type][0]
+
+    def wait_for_complete_signal(self, signal_type, timeout=5):
+        start_time = time.time()
+        events = []
+
         while time.time() - start_time < timeout:
             if self.received_signals.get(signal_type):
-                received_signal = self.received_signals[signal_type][0]
-                if expected_event:
-                    event = received_signal.get("event", {})
-                    if all(event.get(k) == v for k, v in expected_event.items()):
-                        logger.info(f"Signal {signal_type} with event {expected_event} received and matched.")
-                        return received_signal
-                    else:
-                        logger.debug(
-                            f"Signal {signal_type} received but event did not match expected event: {expected_event}. Received event: {event}")
-                else:
-                    logger.info(f"Signal {signal_type} received without specific event validation.")
-                    return received_signal
+                events.extend(self.received_signals[signal_type])
+                self.received_signals[signal_type] = []
             time.sleep(0.2)
 
-        raise TimeoutError(f"Signal {signal_type} with event {expected_event} not received in {timeout} seconds")
+        if events:
+            logging.debug(
+                f"Collected {len(events)} events of type {signal_type} within {timeout} seconds")
+            return events
+        raise TimeoutError(f"No signals of type {signal_type} received in {timeout} seconds")
 
     def _on_error(self, ws, error):
         logger.error(f"WebSocket error: {error}")
