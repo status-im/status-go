@@ -1,5 +1,4 @@
 import json
-import logging
 import time
 from src.libs.common import write_signal_to_file
 
@@ -33,7 +32,7 @@ class SignalClient:
                 raise TimeoutError(
                     f"Signal {signal_type} is not received in {timeout} seconds")
             time.sleep(0.2)
-        logging.debug(f"Signal {signal_type} is received in {round(time.time() - start_time)} seconds")
+        logger.debug(f"Signal {signal_type} is received in {round(time.time() - start_time)} seconds")
         return self.received_signals[signal_type][0]
 
     def wait_for_complete_signal(self, signal_type, timeout=5):
@@ -47,7 +46,7 @@ class SignalClient:
             time.sleep(0.2)
 
         if events:
-            logging.debug(
+            logger.debug(
                 f"Collected {len(events)} events of type {signal_type} within {timeout} seconds")
             return events
         raise TimeoutError(f"No signals of type {signal_type} received in {timeout} seconds")
