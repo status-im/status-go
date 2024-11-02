@@ -1,5 +1,3 @@
-import logging
-
 from src.libs.custom_logger import get_custom_logger
 
 logger = get_custom_logger(__name__)
