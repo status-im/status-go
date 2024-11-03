@@ -81,7 +81,7 @@ class StatusNode:
 
     def start_signal_client(self):
         ws_url = f"ws://localhost:{self.port}"
-        await_signals = ["history.request.started", "messages.new", "history.request.completed"]
+        await_signals = ["history.request.started", "messages.new", "message.delivered", "history.request.completed"]
         self.signal_client = SignalClient(ws_url, await_signals)
 
         websocket_thread = threading.Thread(target=self.signal_client._connect)

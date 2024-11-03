@@ -1,46 +1,54 @@
-import json
-import logging
+from src.libs.custom_logger import get_custom_logger
 
-logger = logging.getLogger(__name__)
+logger = get_custom_logger(__name__)
 
 
 class MessageValidator:
     def __init__(self, response):
         self.response = response
 
-    def validate_response(self, expected_chat_id, expected_message, expected_sender):
-        try:
-            result = self.response.get("result")
-            if not result:
-                raise ValueError("No result found in the response.")
+    def validate_response_structure(self):
+        assert self.response.get("jsonrpc") == "2.0", "Invalid JSON-RPC version"
+        assert "result" in self.response, "Missing 'result' in response"
 
-            chat_info = result.get("chats", [])[0]
-            actual_chat_id = chat_info.get("id")
-            if actual_chat_id != expected_chat_id:
-                raise AssertionError(f"Chat ID mismatch. Expected: {expected_chat_id}, Found: {actual_chat_id}")
+    def validate_chat_data(self, expected_chat_id, expected_display_name, expected_text):
+        chats = self.response["result"].get("chats", [])
+        assert len(chats) > 0, "No chats found in the response"
 
-            last_message = chat_info.get("lastMessage")
-            if not last_message:
-                raise AssertionError("No lastMessage field in chat information.")
+        chat = chats[0]
+        actual_chat_id = chat.get("id")
+        assert actual_chat_id == expected_chat_id, (
+            f"Chat ID mismatch: Expected '{expected_chat_id}', found '{actual_chat_id}'"
+        )
 
-            actual_message_text = last_message.get("text")
-            if actual_message_text != expected_message:
-                raise AssertionError(
-                    f"Message text mismatch. Expected: '{expected_message}', Found: '{actual_message_text}'")
+        actual_chat_name = chat.get("name")
+        assert actual_chat_name.startswith("0x"), (
+            f"Invalid chat name format: Expected name to start with '0x', found '{actual_chat_name}'"
+        )
 
-            actual_sender = last_message.get("displayName")
-            if actual_sender != expected_sender:
-                raise AssertionError(f"Sender mismatch. Expected: '{expected_sender}', Found: '{actual_sender}'")
+        last_message = chat.get("lastMessage", {})
+        actual_text = last_message.get("text")
+        assert actual_text == expected_text, (
+            f"Message text mismatch: Expected '{expected_text}', found '{actual_text}'"
+        )
 
-            sent_timestamp = last_message.get("timestamp")
-            if not sent_timestamp:
-                raise AssertionError("Timestamp is missing in lastMessage data.")
-            logger.info(
-                f"Message '{expected_message}' sent by '{expected_sender}' at timestamp {sent_timestamp} validated successfully.")
+        assert "compressedKey" in last_message, "Missing 'compressedKey' in last message"
 
-        except AssertionError as e:
-            logger.error(f"Validation failed: {str(e)}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error during validation: {str(e)}")
-            raise
+    def validate_event_against_response(self, event, fields_to_validate):
+        chats_in_event = event.get("event", {}).get("chats", [])
+        assert len(chats_in_event) > 0, "No chats found in the event"
+
+        response_chat = self.response["result"]["chats"][0]
+        event_chat = chats_in_event[0]
+
+        for response_field, event_field in fields_to_validate.items():
+            response_value = response_chat.get("lastMessage", {}).get(response_field)
+            event_value = event_chat.get("lastMessage", {}).get(event_field)
+            assert response_value == event_value, (
+                f"Mismatch for '{response_field}': Expected '{response_value}', found '{event_value}'"
+            )
+
+    def run_all_validations(self, expected_chat_id, expected_display_name, expected_text):
+        self.validate_response_structure()
+        self.validate_chat_data(expected_chat_id, expected_display_name, expected_text)
+        logger.info("All validations passed for the one-to-one message response.")

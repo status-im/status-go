@@ -2,7 +2,6 @@ from src.libs.custom_logger import get_custom_logger
 
 logger = get_custom_logger(__name__)
 
-
 class ContactRequestValidator:
     def __init__(self, response):
         self.response = response
@@ -16,12 +15,27 @@ class ContactRequestValidator:
         assert len(chats) > 0, "No chats found in the response"
 
         chat = chats[0]
-        assert chat.get("id") == expected_chat_id, f"Chat ID mismatch: Expected {expected_chat_id}"
-        assert chat.get("name").startswith("0x"), "Invalid chat name format"
+        actual_chat_id = chat.get("id")
+        assert actual_chat_id == expected_chat_id, (
+            f"Chat ID mismatch: Expected '{expected_chat_id}', found '{actual_chat_id}'"
+        )
+
+        actual_chat_name = chat.get("name")
+        assert actual_chat_name.startswith("0x"), (
+            f"Invalid chat name format: Expected name to start with '0x', found '{actual_chat_name}'"
+        )
 
         last_message = chat.get("lastMessage", {})
-        assert last_message.get("text") == expected_text, "Message text mismatch"
-        assert last_message.get("contactRequestState") == 1, "Unexpected contact request state"
+        actual_text = last_message.get("text")
+        assert actual_text == expected_text, (
+            f"Message text mismatch: Expected '{expected_text}', found '{actual_text}'"
+        )
+
+        actual_contact_request_state = last_message.get("contactRequestState")
+        assert actual_contact_request_state == 1, (
+            f"Unexpected contact request state: Expected '1', found '{actual_contact_request_state}'"
+        )
+
         assert "compressedKey" in last_message, "Missing 'compressedKey' in last message"
 
     def validate_event_against_response(self, event, fields_to_validate):
@@ -35,7 +49,7 @@ class ContactRequestValidator:
             response_value = response_chat.get("lastMessage", {}).get(response_field)
             event_value = event_chat.get("lastMessage", {}).get(event_field)
             assert response_value == event_value, (
-                f"Mismatch for '{response_field}': expected '{response_value}', got '{event_value}'"
+                f"Mismatch for '{response_field}': Expected '{response_value}', found '{event_value}'"
             )
 
     def run_all_validations(self, expected_chat_id, expected_display_name, expected_text):
