@@ -21,6 +21,6 @@ func (hr *HistoryProcessorWrapper) OnEnvelope(env *protocol.Envelope, processEnv
 	return hr.waku.OnNewEnvelopes(env, common.StoreMessageType, processEnvelopes)
 }
 
-func (hr *HistoryProcessorWrapper) OnRequestFailed(requestID []byte, peerID peer.ID, err error) {
-	hr.waku.onHistoricMessagesRequestFailed(requestID, peerID, err)
+func (hr *HistoryProcessorWrapper) OnRequestFailed(requestID []byte, peerInfo peer.AddrInfo, err error) {
+	hr.waku.onHistoricMessagesRequestFailed(requestID, peerInfo, err)
 }
