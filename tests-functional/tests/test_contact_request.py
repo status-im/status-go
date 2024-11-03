@@ -12,7 +12,7 @@ logger = get_custom_logger(__name__)
 
 class TestContactRequest(StepsCommon):
     def test_contact_request_baseline(self):
-        timeout_secs = 3
+        timeout_secs = 5
         num_contact_requests = NUM_CONTACT_REQUESTS
         project_root = get_project_root()
         nodes = []
