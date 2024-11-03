@@ -1,10 +1,12 @@
-import logging
 from uuid import uuid4
 import pytest
 from constants import *
 from src.libs.common import delay
+from src.libs.custom_logger import get_custom_logger
 from src.steps.common import StepsCommon
 from validators.message_validator import MessageValidator
+
+logger = get_custom_logger(__name__)
 
 
 @pytest.mark.usefixtures("start_2_nodes")
@@ -79,14 +81,14 @@ class TestOneToOneMessages(StepsCommon):
                         )
                         break
                     except AssertionError as validation_error:
-                        logging.error(f"Validation failed for event: {messages_new_event}, Error: {validation_error}")
+                        logger.error(f"Validation failed for event: {messages_new_event}, Error: {validation_error}")
                         continue
 
             if messages_new_event is None:
                 raise ValueError("No 'messages.new' event with 'chats' data found within the timeout period.")
 
         except (TimeoutError, ValueError) as e:
-            logging.error(f"Signal validation failed: {str(e)}")
+            logger.error(f"Signal validation failed: {str(e)}")
             return timestamp, message_text, message_id, None
 
         return timestamp, message_text, message_id, response
