@@ -2,7 +2,8 @@ from src.libs.custom_logger import get_custom_logger
 
 logger = get_custom_logger(__name__)
 
-class ContactRequestValidator:
+
+class MessageValidator:
     def __init__(self, response):
         self.response = response
 
@@ -31,11 +32,6 @@ class ContactRequestValidator:
             f"Message text mismatch: Expected '{expected_text}', found '{actual_text}'"
         )
 
-        actual_contact_request_state = last_message.get("contactRequestState")
-        assert actual_contact_request_state == 1, (
-            f"Unexpected contact request state: Expected '1', found '{actual_contact_request_state}'"
-        )
-
         assert "compressedKey" in last_message, "Missing 'compressedKey' in last message"
 
     def validate_event_against_response(self, event, fields_to_validate):
@@ -55,4 +51,4 @@ class ContactRequestValidator:
     def run_all_validations(self, expected_chat_id, expected_display_name, expected_text):
         self.validate_response_structure()
         self.validate_chat_data(expected_chat_id, expected_display_name, expected_text)
-        logger.info("All validations passed for the contact request response.")
+        logger.info("All validations passed for the one-to-one message response.")
