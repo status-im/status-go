@@ -45,19 +45,6 @@ make install-gomobile
 make statusgo-cross # statusgo-android or statusgo-ios to build for specific platform
 ```
 
-### 6. Build a bootnode
-
-A bootnode is a regular Ethereum node which runs only discovery (DevP2P is disabled). It is used as a first connection point for Ethereum nodes to discover other peers in the network.
-
-One reason you might want to run a bootnode build instead of a node with other subprotocols like Whisper enabled, is that it will be more forgiving in terms of version mismatches, as discovery happens on a different layer.
-
-```shell
-make bootnode
-```
-
-The output program will be available in `build/bin/bootnode`.
-
-
 ## Debugging
 
 ### IDE Debugging

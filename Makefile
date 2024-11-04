@@ -1,4 +1,4 @@
-.PHONY: statusgo statusd-prune all test clean help
+.PHONY: statusgo all test clean help
 .PHONY: statusgo-android statusgo-ios
 
 # Clear any GOROOT set outside of the Nix shell
@@ -66,11 +66,7 @@ BUILD_FLAGS_MOBILE ?=
 networkid ?= StatusChain
 
 DOCKER_IMAGE_NAME ?= statusteam/status-go
-BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
-STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
-
 DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
-
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.13
 
@@ -145,18 +141,9 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	echo "Compilation done." ;\
 	echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
-bootnode: ##@build Build discovery v5 bootnode using status-go deps
-bootnode: build/bin/bootnode
-
 statusgo: ##@build Build status-go as statusd server
 statusgo: build/bin/statusd
 statusd: statusgo
-
-statusd-prune: ##@statusd-prune Build statusd-prune
-statusd-prune: build/bin/statusd-prune
-
-spiff-workflow: ##@build Build node for SpiffWorkflow BPMN software
-spiff-workflow: build/bin/spiff-workflow
 
 status-cli: ##@build Build status-cli to send messages
 status-cli: build/bin/status-cli
@@ -168,15 +155,6 @@ run-status-backend: PORT ?= 0
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	go run ./cmd/status-backend --address localhost:${PORT}
-
-statusd-prune-docker-image: SHELL := /bin/sh
-statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
-	@echo "Building docker image for ststusd-prune..."
-	docker build --file _assets/build/Dockerfile-prune . \
-		--label "commit=$(GIT_COMMIT)" \
-		--label "author=$(GIT_AUTHOR)" \
-		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
-		-t $(STATUSD_PRUNE_IMAGE_NAME):latest
 
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
@@ -264,47 +242,9 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(DOCKER_IMAGE_NAME):latest
 
-bootnode-image: SHELL := /bin/sh
-bootnode-image:
-	@echo "Building docker image for bootnode..."
-	docker build --file _assets/build/Dockerfile-bootnode . \
-		--build-arg 'build_tags=$(BUILD_TAGS)' \
-		--build-arg 'build_flags=$(BUILD_FLAGS)' \
-		--label 'commit=$(GIT_COMMIT)' \
-		--label 'author=$(GIT_AUTHOR)' \
-		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
-		-t $(BOOTNODE_IMAGE_NAME):latest
-
-push-docker-images: SHELL := /bin/sh
-push-docker-images: docker-image bootnode-image
-	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
-	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
-
 clean-docker-images: SHELL := /bin/sh
 clean-docker-images:
 	docker rmi -f $$(docker image ls --filter="reference=$(DOCKER_IMAGE_NAME)" --quiet)
-
-# See https://www.gnu.org/software/make/manual/html_node/Target_002dspecific.html to understand this magic.
-push-docker-images-latest: SHELL := /bin/sh
-push-docker-images-latest: GIT_BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
-push-docker-images-latest: GIT_LOCAL  = $(shell git rev-parse @)
-push-docker-images-latest: GIT_REMOTE = $(shell git fetch -q && git rev-parse remotes/origin/develop || echo 'NO_DEVELOP')
-push-docker-images-latest:
-	echo $(GIT_BRANCH)
-	echo $(GIT_LOCAL)
-	echo $(GIT_REMOTE)
-	@echo "Pushing latest docker images..."
-	@echo "Checking git branch..."
-ifneq ("$(GIT_BRANCH)", "develop")
-	$(error You should only use develop branch to push the latest tag!)
-	exit 1
-endif
-ifneq ("$(GIT_LOCAL)", "$(GIT_REMOTE)")
-	$(error The local git commit does not match the remote origin!)
-	exit 1
-endif
-	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
-	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 
 setup: ##@setup Install all tools
 setup: setup-dev
@@ -431,30 +371,6 @@ update-fleet-config: ##@other Update fleets configuration from fleets.status.im
 	@echo "Updating static assets..."
 	@go generate ./static
 	@echo "Done"
-
-run-bootnode-systemd: ##@Easy way to run a bootnode locally with Docker Compose
-	@cd _assets/systemd/bootnode && $(MAKE)
-
-run-bootnode-docker: ##@Easy way to run a bootnode locally with Docker Compose
-	@cd _assets/compose/bootnode && $(MAKE)
-
-run-mailserver-systemd: ##@Easy Run a mailserver locally with systemd
-	@cd _assets/systemd/mailserver && $(MAKE)
-
-run-mailserver-docker: ##@Easy Run a mailserver locally with Docker Compose
-	@cd _assets/compose/mailserver && $(MAKE)
-
-clean-bootnode-systemd: ##@Easy Clean your systemd service for running a bootnode
-	@cd _assets/systemd/bootnode && $(MAKE) clean
-
-clean-bootnode-docker: ##@Easy Clean your Docker container running a bootnode
-	@cd _assets/compose/bootnode && $(MAKE) clean
-
-clean-mailserver-systemd: ##@Easy Clean your systemd service for running a mailserver
-	@cd _assets/systemd/mailserver && $(MAKE) clean
-
-clean-mailserver-docker: ##@Easy Clean your Docker container running a mailserver
-	@cd _assets/compose/mailserver && $(MAKE) clean
 
 migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
 migration:
