@@ -53,6 +53,14 @@ func (core *Core) Enabled(lvl zapcore.Level) bool {
 	return core.level.Enabled(lvl)
 }
 
+func (core *Core) Level() zapcore.Level {
+	return core.level.Level()
+}
+
+func (core *Core) SetLevel(lvl zapcore.Level) {
+	core.level.SetLevel(lvl)
+}
+
 func (core *Core) With(fields []zapcore.Field) zapcore.Core {
 	clonedEncoder := encoderWrapper{Encoder: core.getEncoder().Clone()}
 	for i := range fields {

@@ -67,8 +67,11 @@ func Init() {
 	flag.Parse()
 
 	// set up logger
-	loggerEnabled := *logLevel != ""
-	if err := logutils.OverrideRootLog(loggerEnabled, *logLevel, logutils.FileOptions{}, true); err != nil {
+	err = logutils.OverrideRootLoggerWithConfig(logutils.LogSettings{
+		Enabled: *logLevel != "",
+		Level:   *logLevel,
+	})
+	if err != nil {
 		panic(err)
 	}
 

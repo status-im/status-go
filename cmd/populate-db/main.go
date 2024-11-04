@@ -82,8 +82,11 @@ func init() {
 
 // nolint:gocyclo
 func main() {
-	colors := terminal.IsTerminal(int(os.Stdin.Fd()))
-	if err := logutils.OverrideRootLog(true, "ERROR", logutils.FileOptions{}, colors); err != nil {
+	if err := logutils.OverrideRootLoggerWithConfig(logutils.LogSettings{
+		Enabled:   true,
+		Level:     "ERROR",
+		Colorized: terminal.IsTerminal(int(os.Stdin.Fd())),
+	}); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)
 	}
 
@@ -285,9 +288,9 @@ func setupLogging(config *params.NodeConfig) {
 		MaxSize:         config.LogMaxSize,
 		MaxBackups:      config.LogMaxBackups,
 		CompressRotated: config.LogCompressRotated,
+		Colorized:       !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd())),
 	}
-	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
-	if err := logutils.OverrideRootLogWithConfig(logSettings, colors); err != nil {
+	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)
 	}
 }

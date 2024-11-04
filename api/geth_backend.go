@@ -498,7 +498,7 @@ func (b *GethStatusBackend) setupLogSettings() error {
 		MaxBackups:      b.config.LogMaxBackups,
 		CompressRotated: b.config.LogCompressRotated,
 	}
-	if err := logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
+	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
 		return err
 	}
 	return nil

@@ -32,7 +32,7 @@ func setupLogger(file string) *zap.Logger {
 		MaxBackups:      3,
 		CompressRotated: true,
 	}
-	if err := logutils.OverrideRootLogWithConfig(logSettings, false); err != nil {
+	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
 		zap.S().Fatalf("Error initializing logger: %v", err)
 	}
 	return logutils.ZapLogger()

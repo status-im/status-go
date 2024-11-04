@@ -1,12 +1,12 @@
 package logutils
 
 import (
+	"io"
 	"os"
-	"strings"
 
 	logging "github.com/ipfs/go-log/v2"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap/zapcore"
 )
 
 type LogSettings struct {
@@ -17,84 +17,58 @@ type LogSettings struct {
 	MaxSize         int    `json:"MaxSize"`
 	MaxBackups      int    `json:"MaxBackups"`
 	CompressRotated bool   `json:"CompressRotated"`
+	Colorized       bool   `json:"Colorized"` // FIXME: doesn't take effect
 }
 
-// OverrideWithStdLogger overwrites ethereum's root logger with a logger from golang std lib.
-func OverrideWithStdLogger(logLevel string) error {
-	return enableRootLog(logLevel, NewStdHandler(log.TerminalFormat(false)))
+func OverrideRootLoggerWithConfig(settings LogSettings) error {
+	return overrideCoreWithConfig(ZapLogger().Core().(*Core), settings)
 }
 
-// OverrideRootLogWithConfig derives all configuration from params.NodeConfig and configures logger using it.
-func OverrideRootLogWithConfig(settings LogSettings, colors bool) error {
+func overrideCoreWithConfig(core *Core, settings LogSettings) error {
 	if !settings.Enabled {
+		core.UpdateSyncer(zapcore.AddSync(io.Discard))
 		return nil
 	}
+
+	if settings.Level == "" {
+		settings.Level = "info"
+	}
+	level, err := lvlFromString(settings.Level)
+	if err != nil {
+		return err
+	}
+	core.SetLevel(level)
+
 	if settings.MobileSystem {
-		return OverrideWithStdLogger(settings.Level)
-	}
-	return OverrideRootLog(settings.Enabled, settings.Level, FileOptions{
-		Filename:   settings.File,
-		MaxSize:    settings.MaxSize,
-		MaxBackups: settings.MaxBackups,
-		Compress:   settings.CompressRotated,
-	}, colors)
-
-}
-
-// OverrideRootLog overrides root logger with file handler, if defined,
-// and log level (defaults to INFO).
-func OverrideRootLog(enabled bool, levelStr string, fileOpts FileOptions, terminal bool) error {
-	if !enabled {
-		disableRootLog()
+		core.UpdateSyncer(zapcore.Lock(os.Stdout))
 		return nil
 	}
-	if os.Getenv("CI") == "true" {
-		terminal = false
-	}
-	var (
-		handler log.Handler
-	)
-	if fileOpts.Filename != "" {
-		if fileOpts.MaxBackups == 0 {
+
+	if settings.File != "" {
+		if settings.MaxBackups == 0 {
 			// Setting MaxBackups to 0 causes all log files to be kept. Even setting MaxAge to > 0 doesn't fix it
 			// Docs: https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2@v2.0.0#readme-cleaning-up-old-log-files
-			fileOpts.MaxBackups = 1
+			settings.MaxBackups = 1
 		}
-		handler = FileHandlerWithRotation(fileOpts, log.TerminalFormat(terminal))
+		core.UpdateSyncer(ZapSyncerWithRotation(FileOptions{
+			Filename:   settings.File,
+			MaxSize:    settings.MaxSize,
+			MaxBackups: settings.MaxBackups,
+			Compress:   settings.CompressRotated,
+		}))
 	} else {
-		handler = log.StreamHandler(os.Stderr, log.TerminalFormat(terminal))
+		core.UpdateSyncer(zapcore.Lock(os.Stderr))
 	}
 
-	return enableRootLog(levelStr, handler)
-}
-
-func disableRootLog() {
-	log.Root().SetHandler(log.DiscardHandler())
-}
-
-func enableRootLog(levelStr string, handler log.Handler) error {
-	if levelStr == "" {
-		levelStr = "INFO"
-	}
-
-	levelStr = strings.ToLower(levelStr)
-
-	level, err := log.LvlFromString(levelStr)
-	if err != nil {
-		return err
-	}
-
-	filteredHandler := log.LvlFilterHandler(level, handler)
-	log.Root().SetHandler(filteredHandler)
-	log.PrintOrigins(true)
-
+	// FIXME: remove go-libp2p logging altogether
 	// go-libp2p logger
-	lvl, err := logging.LevelFromString(levelStr)
-	if err != nil {
-		return err
+	{
+		lvl, err := logging.LevelFromString(settings.Level)
+		if err != nil {
+			return err
+		}
+		logging.SetAllLoggers(lvl)
 	}
-
-	logging.SetAllLoggers(lvl)
 
 	return nil
 }

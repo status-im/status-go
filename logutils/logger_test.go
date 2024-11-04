@@ -5,14 +5,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap/zapcore"
 )
 
 func TestPrintOrigins(t *testing.T) {
-	buf := bytes.NewBuffer(nil)
-	handler := log.StreamHandler(buf, log.TerminalFormat(false))
-	require.NoError(t, enableRootLog("debug", handler))
-	log.Debug("hello")
-	require.Contains(t, buf.String(), "logutils/logger_test.go:16")
+	buffer := bytes.NewBuffer(nil)
+
+	logger := defaultLogger()
+	logger.Core().(*Core).UpdateSyncer(zapcore.AddSync(buffer))
+
+	logger.Info("hello")
+
+	require.Contains(t, buffer.String(), "logutils/logger_test.go:17")
 }

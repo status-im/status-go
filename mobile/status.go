@@ -53,11 +53,11 @@ import (
 )
 
 func call(fn any, params ...any) any {
-	return callog.Call(requestlog.GetRequestLogger(), fn, params...)
+	return callog.Call(logutils.ZapLogger(), requestlog.GetRequestLogger(), fn, params...)
 }
 
 func callWithResponse(fn any, params ...any) string {
-	return callog.CallWithResponse(requestlog.GetRequestLogger(), fn, params...)
+	return callog.CallWithResponse(logutils.ZapLogger(), requestlog.GetRequestLogger(), fn, params...)
 }
 
 type InitializeApplicationResponse struct {
@@ -2159,7 +2159,7 @@ func InitLogging(logSettingsJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	if err = logutils.OverrideRootLogWithConfig(logSettings.LogSettings, false); err == nil {
+	if err = logutils.OverrideRootLoggerWithConfig(logSettings.LogSettings); err == nil {
 		logutils.ZapLogger().Info("logging initialised", zap.String("logSettings", logSettingsJSON))
 	}
 

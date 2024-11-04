@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-
-	"github.com/status-im/status-go/logutils"
 )
 
 var sensitiveKeys = []string{
@@ -62,17 +60,17 @@ func getShortFunctionName(fn any) string {
 // 3. Uses reflection to Call the given function
 // 4. If request logging is enabled, logs method name, parameters, response, and execution duration
 // 5. Removes sensitive information before logging
-func Call(logger *zap.Logger, fn any, params ...any) any {
+func Call(logger, requestLogger *zap.Logger, fn any, params ...any) any {
 	defer func() {
 		if r := recover(); r != nil {
-			logutils.ZapLogger().Error("panic found in call", zap.Any("error", r), zap.Stack("stacktrace"))
+			logger.Error("panic found in call", zap.Any("error", r), zap.Stack("stacktrace"))
 			panic(r)
 		}
 	}()
 
 	var startTime time.Time
 
-	requestLoggingEnabled := logger != nil
+	requestLoggingEnabled := requestLogger != nil
 	if requestLoggingEnabled {
 		startTime = time.Now()
 	}
@@ -102,7 +100,7 @@ func Call(logger *zap.Logger, fn any, params ...any) any {
 		paramsString := removeSensitiveInfo(fmt.Sprintf("%+v", params))
 		respString := removeSensitiveInfo(fmt.Sprintf("%+v", resp))
 
-		logger.Debug("call",
+		requestLogger.Debug("call",
 			zap.String("method", methodName),
 			zap.String("params", paramsString),
 			zap.String("resp", respString),
@@ -113,8 +111,8 @@ func Call(logger *zap.Logger, fn any, params ...any) any {
 	return resp
 }
 
-func CallWithResponse(logger *zap.Logger, fn any, params ...any) string {
-	resp := Call(logger, fn, params...)
+func CallWithResponse(logger, requestLogger *zap.Logger, fn any, params ...any) string {
+	resp := Call(logger, requestLogger, fn, params...)
 	if resp == nil {
 		return ""
 	}

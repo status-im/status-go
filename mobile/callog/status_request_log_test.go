@@ -1,12 +1,13 @@
 package callog
 
 import (
-	"fmt"
+	"bytes"
 	"os"
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/stretchr/testify/require"
 
@@ -57,14 +58,22 @@ func TestRemoveSensitiveInfo(t *testing.T) {
 }
 
 func TestCall(t *testing.T) {
-	// Create a temporary file for logging
+	// Create default logger
+	buffer := bytes.NewBuffer(nil)
+	logger := zap.New(zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.AddSync(buffer),
+		zap.DebugLevel,
+	))
+
+	// Create a temporary file for request logging
 	tempLogFile, err := os.CreateTemp(t.TempDir(), "TestCall*.log")
 	require.NoError(t, err)
 
 	// Enable request logging
-	logger, err := requestlog.CreateRequestLogger(tempLogFile.Name())
+	requestLogger, err := requestlog.CreateRequestLogger(tempLogFile.Name())
 	require.NoError(t, err)
-	require.NotNil(t, logger)
+	require.NotNil(t, requestLogger)
 
 	// Test case 1: Normal execution
 	testFunc := func(param string) string {
@@ -73,7 +82,7 @@ func TestCall(t *testing.T) {
 	testParam := "test input"
 	expectedResult := "test result: test input"
 
-	result := CallWithResponse(logger, testFunc, testParam)
+	result := CallWithResponse(logger, requestLogger, testFunc, testParam)
 
 	// Check the result
 	if result != expectedResult {
@@ -83,29 +92,18 @@ func TestCall(t *testing.T) {
 	// Read the log file
 	logData, err := os.ReadFile(tempLogFile.Name())
 	require.NoError(t, err)
-	logOutput := string(logData)
+	requestLogOutput := string(logData)
 
 	// Check if the log contains expected information
 	expectedLogParts := []string{getShortFunctionName(testFunc), "params", testParam, "resp", expectedResult}
 	for _, part := range expectedLogParts {
-		if !strings.Contains(logOutput, part) {
+		if !strings.Contains(requestLogOutput, part) {
 			t.Errorf("Log output doesn't contain expected part: %s", part)
 		}
 	}
 
-	// Create a mock logger to capture log output
-	mockLogger := log.New()
-	mockLogger.SetHandler(log.FuncHandler(func(r *log.Record) error {
-		logOutput += r.Msg + fmt.Sprintf("%s", r.Ctx...)
-		return nil
-	}))
-
 	// Test case 2: Panic -> recovery -> re-panic
-	oldRootHandler := log.Root().GetHandler()
-	defer log.Root().SetHandler(oldRootHandler)
-	log.Root().SetHandler(mockLogger.GetHandler())
-	// Clear log output for next test
-	logOutput = ""
+	require.Empty(t, buffer.String())
 
 	e := "test panic"
 	panicFunc := func() {
@@ -113,17 +111,17 @@ func TestCall(t *testing.T) {
 	}
 
 	require.PanicsWithValue(t, e, func() {
-		Call(logger, panicFunc)
+		Call(logger, requestLogger, panicFunc)
 	})
 
 	// Check if the panic was logged
-	if !strings.Contains(logOutput, "panic found in call") {
+	if !strings.Contains(buffer.String(), "panic found in call") {
 		t.Errorf("Log output doesn't contain panic information")
 	}
-	if !strings.Contains(logOutput, e) {
+	if !strings.Contains(buffer.String(), e) {
 		t.Errorf("Log output doesn't contain panic message")
 	}
-	if !strings.Contains(logOutput, "stacktrace") {
+	if !strings.Contains(buffer.String(), "stacktrace") {
 		t.Errorf("Log output doesn't contain stacktrace")
 	}
 }
