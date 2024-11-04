@@ -18,7 +18,7 @@ import (
 // StatusBackend defines the contract for the Status.im service
 type StatusBackend interface {
 	// IsNodeRunning() bool                       // NOTE: Only used in tests
-	StartNode(config *params.NodeConfig) error // NOTE: Only used in canary
+	StartNode(config *params.NodeConfig) error
 	StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, conf *params.NodeConfig) error
 	StartNodeWithAccount(acc multiaccounts.Account, password string, conf *params.NodeConfig, chatKey *ecdsa.PrivateKey) error
 	StartNodeWithAccountAndInitialConfig(account multiaccounts.Account, password string, settings settings.Settings, conf *params.NodeConfig, subaccs []*accounts.Account, chatKey *ecdsa.PrivateKey) error

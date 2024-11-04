@@ -148,10 +148,6 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 bootnode: ##@build Build discovery v5 bootnode using status-go deps
 bootnode: build/bin/bootnode
 
-node-canary: ##@build Build P2P node canary using status-go deps
-node-canary: generate
-node-canary: build/bin/node-canary
-
 statusgo: ##@build Build status-go as statusd server
 statusgo: build/bin/statusd
 statusd: statusgo
@@ -402,19 +398,15 @@ test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
 	@./_assets/scripts/run_functional_tests.sh
 
-canary-test: node-canary
-	# TODO: uncomment that!
-	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
-
 lint-panics: generate
 	go run ./cmd/lint-panics -root="$(call sh, pwd)" -skip=./cmd -test=false ./...
 
 lint: generate lint-panics
 	golangci-lint run ./...
 
-ci: generate lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
+ci: generate lint test-unit test-e2e ##@tests Run all linters and tests at once
 
-ci-race: generate lint canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
+ci-race: generate lint test-unit test-e2e-race ##@tests Run all linters and tests at once + race
 
 clean: ##@other Cleanup
 	rm -fr build/bin/* mailserver-config.json

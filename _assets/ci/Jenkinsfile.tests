@@ -138,12 +138,6 @@ pipeline {
       } }
     }
 
-    stage('Canary') {
-      steps { script {
-        nix.shell('make canary-test', pure: true)
-      } }
-    }
-
     stage('Unit Tests') {
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"
