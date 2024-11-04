@@ -27,6 +27,14 @@ func Test_PutRouteData(t *testing.T) {
 			readRouteData, err := routeDB.GetRouteData(routeData.RouteInputParams.Uuid)
 			require.NoError(t, err)
 			require.EqualExportedValues(t, routeData, readRouteData)
+
+			for _, pathData := range routeData.PathsData {
+				for _, txData := range pathData.TransactionsData {
+					readRouteData, err = routeDB.GetRouteDataByHash(txData.ChainID, txData.TxHash)
+					require.NoError(t, err)
+					require.EqualExportedValues(t, routeData, readRouteData)
+				}
+			}
 		})
 	}
 }
