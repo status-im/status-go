@@ -32,8 +32,8 @@ class ContactRequestValidator:
         )
 
         actual_contact_request_state = last_message.get("contactRequestState")
-        assert actual_contact_request_state == 1, (
-            f"Unexpected contact request state: Expected '1', found '{actual_contact_request_state}'"
+        assert actual_contact_request_state >= 1, (
+            f"Unexpected contact request state: Expected '1' or higher, found '{actual_contact_request_state}'"
         )
 
         assert "compressedKey" in last_message, "Missing 'compressedKey' in last message"

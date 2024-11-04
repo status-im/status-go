@@ -150,6 +150,10 @@ class StatusNode:
         params = [{"id": pubkey, "message": message}]
         return self.api.send_rpc_request("wakuext_sendContactRequest", params)
 
+    def accept_contact_request(self, chatId):
+        params = [{"id": chatId}]
+        return self.api.send_rpc_request("wakuext_acceptContactRequest", params)
+
     def send_message(self, pubkey, message):
         params = [{"id": pubkey, "message": message}]
         return self.api.send_rpc_request("wakuext_sendOneToOneMessage", params)
@@ -163,3 +167,9 @@ class StatusNode:
         if self.pid:
             logger.info(f"Resuming node with pid: {self.pid}")
             os.kill(self.pid, signal.SIGCONT)
+
+    def create_group_chat_with_members(self, pubkey_list, group_chat_name):
+        if not isinstance(pubkey_list, list):
+            raise TypeError("pubkey_list needs to be list")
+        params = [None, group_chat_name, pubkey_list]
+        return self.api.send_rpc_request("wakuext_createGroupChatWithMembers", params)
