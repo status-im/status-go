@@ -110,6 +110,7 @@ type Manager struct {
 	keyDistributor           KeyDistributor
 	communityLock            *CommunityLock
 	mediaServer              server.MediaServerInterface
+	communityImageVersions   map[string]uint32
 }
 
 type CommunityLock struct {
@@ -418,17 +419,18 @@ func NewManager(
 	}
 
 	manager := &Manager{
-		logger:         logger,
-		encryptor:      encryptor,
-		identity:       identity,
-		installationID: installationID,
-		ownerVerifier:  ownerVerifier,
-		quit:           make(chan struct{}),
-		transport:      transport,
-		timesource:     timesource,
-		keyDistributor: keyDistributor,
-		communityLock:  NewCommunityLock(logger),
-		mediaServer:    mediaServer,
+		logger:                 logger,
+		encryptor:              encryptor,
+		identity:               identity,
+		installationID:         installationID,
+		ownerVerifier:          ownerVerifier,
+		quit:                   make(chan struct{}),
+		transport:              transport,
+		timesource:             timesource,
+		keyDistributor:         keyDistributor,
+		communityLock:          NewCommunityLock(logger),
+		mediaServer:            mediaServer,
+		communityImageVersions: make(map[string]uint32),
 	}
 
 	manager.persistence = &Persistence{
@@ -486,6 +488,9 @@ func NewManager(
 }
 
 func (m *Manager) SetMediaServerProperties() {
+	m.mediaServer.SetCommunityImageVersionReader(func(communityID string) uint32 {
+		return m.communityImageVersions[communityID]
+	})
 	m.mediaServer.SetCommunityImageReader(func(communityID string) (map[string]*protobuf.IdentityImage, error) {
 		community, err := m.GetByIDString(communityID)
 		if err != nil {
@@ -1621,6 +1626,15 @@ func (m *Manager) UpdatePubsubTopicPrivateKey(topic string, privKey *ecdsa.Priva
 	return m.transport.RemovePubsubTopicKey(topic)
 }
 
+// Managing the version of community images is necessary because image URLs are "constant"
+// For eg: https://Localhost:46739/communityDescriptionImages?communityID=[ID]&name=thumbnail
+// So the clients have no way of knowing that they need to reload the image
+// Having a version number makes it so that the URL changes on image updates
+// eg: https://Localhost:46739/communityDescriptionImages?communityID=[ID]&name=thumbnail&version=1
+func (m *Manager) incrementCommunityImageVersion(communityID string) {
+	m.communityImageVersions[communityID] = m.communityImageVersions[communityID] + 1
+}
+
 // EditCommunity takes a description, updates the community with the description,
 // saves it and returns it
 func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, error) {
@@ -1665,10 +1679,16 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, ErrNotAuthorized
 	}
 
+	imageModified := CommunityImagesChanged(newDescription.Identity.Images, community.Images())
+
 	// Edit the community values
 	community.Edit(newDescription)
 	if err != nil {
 		return nil, err
+	}
+
+	if imageModified {
+		m.incrementCommunityImageVersion(community.IDString())
 	}
 
 	if community.IsControlNode() {
@@ -2293,6 +2313,10 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	changes, err := community.UpdateCommunityDescription(description, payload, newControlNode)
 	if err != nil {
 		return nil, err
+	}
+
+	if changes.ImageModified {
+		m.incrementCommunityImageVersion(community.IDString())
 	}
 
 	if err = m.handleCommunityTokensMetadata(community); err != nil {

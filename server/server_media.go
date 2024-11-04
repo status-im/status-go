@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/url"
 	"strconv"
 
@@ -27,12 +28,13 @@ func WithMediaServerDisableTLS(disableTLS bool) MediaServerOption {
 type MediaServer struct {
 	Server
 
-	db                    *sql.DB
-	downloader            *ipfs.Downloader
-	multiaccountsDB       *multiaccounts.Database
-	walletDB              *sql.DB
-	communityImagesReader func(communityID string) (map[string]*protobuf.IdentityImage, error)
-	communityTokenReader  func(communityID string) ([]*protobuf.CommunityTokenMetadata, error)
+	db                          *sql.DB
+	downloader                  *ipfs.Downloader
+	multiaccountsDB             *multiaccounts.Database
+	walletDB                    *sql.DB
+	communityImagesReader       func(communityID string) (map[string]*protobuf.IdentityImage, error)
+	communityTokenReader        func(communityID string) ([]*protobuf.CommunityTokenMetadata, error)
+	communityImageVersionReader func(communityID string) uint32
 
 	// disableTLS controls whether the media server uses HTTP instead of HTTPS.
 	// Set to true to avoid TLS certificate issues with react-native-fast-image
@@ -108,6 +110,17 @@ func (s *MediaServer) MakeBaseURL() *url.URL {
 		Scheme: map[bool]string{true: "http", false: "https"}[s.disableTLS],
 		Host:   s.mustGetHost(),
 	}
+}
+
+func (s *MediaServer) SetCommunityImageVersionReader(getFunc func(communityID string) uint32) {
+	s.communityImageVersionReader = getFunc
+}
+
+func (s *MediaServer) getCommunityImageVersion(communityID string) uint32 {
+	if s.communityImageVersionReader == nil {
+		return 0
+	}
+	return s.communityImageVersionReader(communityID)
 }
 
 func (s *MediaServer) SetCommunityImageReader(getFunc func(communityID string) (map[string]*protobuf.IdentityImage, error)) {
@@ -243,6 +256,7 @@ func (s *MediaServer) MakeCommunityImageURL(communityID, name string) string {
 	u.RawQuery = url.Values{
 		"communityID": {communityID},
 		"name":        {name},
+		"version":     {fmt.Sprintf("%d", (s.getCommunityImageVersion(communityID)))},
 	}.Encode()
 
 	return u.String()

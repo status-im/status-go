@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -657,6 +658,19 @@ func (s *CommunitySuite) TestHandleCommunityDescription() {
 	}
 }
 
+func (s *CommunitySuite) TestHandleCommunityDescriptionWithImageChange() {
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	signer := &key.PublicKey
+
+	org := s.buildCommunity(signer)
+	org.Join()
+	changes, err := org.UpdateCommunityDescription(s.changedImageCommunityDescription(org), []byte{0x01}, nil)
+	s.Require().NoError(err)
+	s.Require().True(changes.ImageModified)
+}
+
 func (s *CommunitySuite) TestValidateCommunityDescription() {
 
 	testCases := []struct {
@@ -889,6 +903,17 @@ func (s *CommunitySuite) buildCommunityDescription() *protobuf.CommunityDescript
 	config := s.configOnRequestOrgOnRequestChat()
 	desc := config.CommunityDescription
 	desc.Clock = 1
+	desc.Identity = &protobuf.ChatIdentity{}
+	desc.Identity.Images = make(map[string]*protobuf.IdentityImage)
+	imgs, err := images.GenerateIdentityImages("../../_assets/tests/status.png", 0, 0, 0, 0)
+	s.Require().NoError(err)
+	for _, image := range imgs {
+		desc.Identity.Images[image.Name] = &protobuf.IdentityImage{
+			Payload:     []byte(""),
+			SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+			ImageFormat: images.GetProtobufImageFormat(image.Payload),
+		}
+	}
 	desc.Members = make(map[string]*protobuf.CommunityMember)
 	desc.Members[s.member1Key] = &protobuf.CommunityMember{}
 	desc.Members[s.member2Key] = &protobuf.CommunityMember{}
@@ -989,6 +1014,22 @@ func (s *CommunitySuite) removedChatCommunityDescription(org *Community) *protob
 	description := proto.Clone(org.config.CommunityDescription).(*protobuf.CommunityDescription)
 	description.Clock++
 	delete(description.Chats, testChatID1)
+
+	return description
+}
+
+func (s *CommunitySuite) changedImageCommunityDescription(org *Community) *protobuf.CommunityDescription {
+	description := proto.Clone(org.config.CommunityDescription).(*protobuf.CommunityDescription)
+	description.Clock++
+	imgs, err := images.GenerateIdentityImages("../../_assets/tests/elephant.jpg", 0, 0, 5, 5)
+	s.Require().NoError(err)
+	for _, image := range imgs {
+		description.Identity.Images[image.Name] = &protobuf.IdentityImage{
+			Payload:     image.Payload,
+			SourceType:  protobuf.IdentityImage_RAW_PAYLOAD,
+			ImageFormat: images.GetProtobufImageFormat(image.Payload),
+		}
+	}
 
 	return description
 }

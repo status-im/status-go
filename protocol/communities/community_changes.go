@@ -1,6 +1,7 @@
 package communities
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 
 	slices "golang.org/x/exp/slices"
@@ -53,6 +54,9 @@ type CommunityChanges struct {
 	// No kick AC notification will be generated and member will join automatically
 	// as soon as he provides missing data
 	MemberSoftKicked bool `json:"memberSoftRemoved"`
+
+	// CommunityImageModified indicates whether the community image was modified by an admin or owner
+	ImageModified bool `json:"communityImageModified"`
 }
 
 func EmptyCommunityChanges() *CommunityChanges {
@@ -159,6 +163,18 @@ func (c *CommunityChanges) IsMemberUnbanned(identity string) bool {
 	return ok
 }
 
+func CommunityImagesChanged(originCommunityImages, modifiedCommunityImages map[string]*protobuf.IdentityImage) bool {
+	for imageType, newImage := range modifiedCommunityImages {
+		oldImage, ok := originCommunityImages[imageType]
+		if ok {
+			if !bytes.Equal(oldImage.Payload, newImage.Payload) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func EvaluateCommunityChanges(origin, modified *Community) *CommunityChanges {
 	changes := evaluateCommunityChangesByDescription(origin.Description(), modified.Description())
 
@@ -186,6 +202,8 @@ func EvaluateCommunityChanges(origin, modified *Community) *CommunityChanges {
 			changes.TokenPermissionsAdded[id] = permission
 		}
 	}
+
+	changes.ImageModified = CommunityImagesChanged(modified.config.CommunityDescription.Identity.Images, origin.config.CommunityDescription.Identity.Images)
 
 	changes.Community = modified
 	return changes

@@ -410,6 +410,7 @@ func (s *ManagerSuite) TestEditCommunity() {
 		Name:        "status",
 		Description: "status community description",
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Image:       "../../_assets/tests/elephant.jpg",
 	}
 
 	community, err := s.manager.CreateCommunity(createRequest, true)
@@ -421,12 +422,19 @@ func (s *ManagerSuite) TestEditCommunity() {
 		CreateCommunity: requests.CreateCommunity{
 			Name:        "statusEdited",
 			Description: "status community description edited",
+			Image:       "../../_assets/tests/status.png",
+			ImageBx:     5,
+			ImageBy:     5,
 		},
 	}
 
 	updatedCommunity, err := s.manager.EditCommunity(update)
 	s.Require().NoError(err)
 	s.Require().NotNil(updatedCommunity)
+	// Make sure the version of the image got updated with the new image
+	communityImageVersion, ok := s.manager.communityImageVersions[community.IDString()]
+	s.Require().True(ok)
+	s.Require().Equal(uint32(1), communityImageVersion)
 
 	//ensure updated community successfully stored
 	communities, err := s.manager.All()
@@ -438,10 +446,10 @@ func (s *ManagerSuite) TestEditCommunity() {
 		storedCommunity = communities[0]
 	}
 
-	s.Require().Equal(storedCommunity.ID(), updatedCommunity.ID())
-	s.Require().Equal(storedCommunity.PrivateKey(), updatedCommunity.PrivateKey())
-	s.Require().Equal(storedCommunity.config.CommunityDescription.Identity.DisplayName, update.CreateCommunity.Name)
-	s.Require().Equal(storedCommunity.config.CommunityDescription.Identity.Description, update.CreateCommunity.Description)
+	s.Require().Equal(updatedCommunity.ID(), storedCommunity.ID())
+	s.Require().Equal(updatedCommunity.PrivateKey(), storedCommunity.PrivateKey())
+	s.Require().Equal(update.CreateCommunity.Name, storedCommunity.config.CommunityDescription.Identity.DisplayName)
+	s.Require().Equal(update.CreateCommunity.Description, storedCommunity.config.CommunityDescription.Identity.Description)
 }
 
 func (s *ManagerSuite) TestGetControlledCommunitiesChatIDs() {
