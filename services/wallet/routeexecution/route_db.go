@@ -2,8 +2,6 @@ package routeexecution
 
 import (
 	"database/sql"
-	"encoding/json"
-	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
 
@@ -22,22 +20,6 @@ func NewDB(db *sql.DB) *DB {
 }
 
 func (db *DB) PutRouteData(routeData *RouteData) (err error) {
-	routeInputParamsJson, err := json.Marshal(routeData.RouteInputParams)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(routeInputParamsJson))
-	buildInputParamsJson, err := json.Marshal(routeData.BuildInputParams)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(buildInputParamsJson))
-	pathsDataJson, err := json.Marshal(routeData.PathsData)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(pathsDataJson))
-
 	var tx *sql.Tx
 	tx, err = db.db.Begin()
 	if err != nil {
@@ -130,6 +112,10 @@ func putPathData(creator sqlite.StatementCreator, uuid string, pathIdx int, d *P
 		if err != nil {
 			return
 		}
+		err = putSentTransaction(creator, txData)
+		if err != nil {
+			return
+		}
 	}
 
 	return
@@ -175,7 +161,33 @@ func putPathTransaction(
 			"chain_id":     txData.ChainID,
 			"tx_hash":      txData.TxHash[:],
 			"tx_args_json": &sqlite.JSONBlob{Data: txData.TxArgs},
-			"tx_json":      &sqlite.JSONBlob{Data: txData.Tx},
+		})
+
+	query, args, err := q.ToSql()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := creator.Prepare(query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(args...)
+
+	return err
+}
+
+func putSentTransaction(
+	creator sqlite.StatementCreator,
+	txData *TransactionData,
+) error {
+	q := sq.Replace("sent_transactions").
+		SetMap(sq.Eq{
+			"chain_id": txData.ChainID,
+			"tx_hash":  txData.TxHash[:],
+			"tx_json":  &sqlite.JSONBlob{Data: txData.Tx},
 		})
 
 	query, args, err := q.ToSql()
@@ -319,8 +331,11 @@ func getPaths(creator sqlite.StatementCreator, uuid string) ([]*routes.Path, err
 
 func getPathTransactions(creator sqlite.StatementCreator, uuid string, pathIdx int) ([]*TransactionData, error) {
 	txs := make([]*TransactionData, 0)
-	q := sq.Select("is_approval", "chain_id", "tx_hash", "tx_args_json", "tx_json").
-		From("route_path_transactions").
+	q := sq.Select("rpt.is_approval", "rpt.chain_id", "rpt.tx_hash", "rpt.tx_args_json", "st.tx_json").
+		From("route_path_transactions rpt").
+		LeftJoin(`sent_transactions st ON 
+			rpt.chain_id = st.chain_id AND 
+			rpt.tx_hash = st.tx_hash`).
 		Where(sq.Eq{"uuid": uuid, "path_idx": pathIdx}).
 		OrderBy("tx_idx ASC")
 

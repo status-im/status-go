@@ -1,9 +1,6 @@
 package routeexecution
 
 import (
-	"encoding/json"
-	"fmt"
-
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/wallet/requests"
@@ -33,26 +30,9 @@ type TransactionData struct {
 	Tx         *ethTypes.Transaction
 }
 
-type PathTransaction struct {
-	TxArgs     *transactions.SendTxArgs
-	Tx         *ethTypes.Transaction
-	TxSentHash types.Hash
-}
-
-func printJSON(data any) {
-	dataJSON, err := json.Marshal(data)
-	if err != nil {
-		panic("printJSON cannot marshal data")
-	}
-	fmt.Println(string(dataJSON))
-}
-
 func NewRouteData(routeInputParams *requests.RouteInputParams,
 	buildInputParams *requests.RouterBuildTransactionsParams,
 	transactionDetails []*transfer.RouterTransactionDetails) *RouteData {
-	printJSON(routeInputParams)
-	printJSON(buildInputParams)
-	printJSON(transactionDetails)
 
 	pathDataPerProcessorName := make(map[string]*PathData)
 	pathsData := make([]*PathData, 0, len(transactionDetails))

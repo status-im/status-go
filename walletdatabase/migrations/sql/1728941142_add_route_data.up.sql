@@ -34,9 +34,17 @@ CREATE TABLE IF NOT EXISTS route_path_transactions (
     chain_id UNSIGNED BIGINT NOT NULL,
     tx_hash BLOB NOT NULL,
     tx_args_json JSON NOT NULL,
-    tx_json JSON NOT NULL,
     FOREIGN KEY(uuid, path_idx) REFERENCES route_paths(uuid, path_idx) ON DELETE CASCADE
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_route_path_transaction_per_uuid_path_idx_tx_idx ON route_path_transactions (uuid, path_idx, tx_idx);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_route_path_transaction_per_chain_id_tx_hash ON route_path_transactions (chain_id, tx_hash);
+
+-- store sent transactions
+CREATE TABLE IF NOT EXISTS sent_transactions (
+    chain_id UNSIGNED BIGINT NOT NULL,
+    tx_hash BLOB NOT NULL,
+    tx_json JSON NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sent_transactions_per_chain_id_tx_hash ON sent_transactions (chain_id, tx_hash);
