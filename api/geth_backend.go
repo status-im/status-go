@@ -2707,9 +2707,7 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager
 		b.statusNode.EnsService().Init(messenger.SyncEnsNamesWithDispatchMessage)
 		b.statusNode.CommunityTokensService().Init(messenger)
 
-		if walletService := b.statusNode.WalletService(); walletService != nil {
-			walletService.InjectMessenger(messenger)
-		}
+		b.statusNode.ActivityCenterService().Init(messenger)
 	}
 
 	return nil

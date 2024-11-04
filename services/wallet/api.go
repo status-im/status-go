@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	abi_spec "github.com/status-im/status-go/abi-spec"
@@ -39,17 +40,20 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
+	"github.com/status-im/status-go/services/wallet/walletconnect/walletconnectevent"
 	"github.com/status-im/status-go/transactions"
 )
 
 func NewAPI(s *Service) *API {
-	return &API{s, s.reader}
+	return &API{s, s.reader, s.feed, s.walletConnectFeed}
 }
 
 // API is class with methods available over RPC.
 type API struct {
-	s      *Service
-	reader *Reader
+	s                 *Service
+	reader            *Reader
+	feed              *event.Feed
+	walletConnectFeed *event.Feed
 }
 
 func (api *API) StartWallet(ctx context.Context) error {
@@ -926,9 +930,19 @@ func (api *API) getVerifiedWalletAccount(address, password string) (*account.Sel
 }
 
 // AddWalletConnectSession adds or updates a session wallet connect session
-func (api *API) AddWalletConnectSession(ctx context.Context, session_json string) error {
+func (api *API) AddWalletConnectSession(ctx context.Context, session_json string) (walletconnect.Session, error) {
 	logutils.ZapLogger().Debug("wallet.api.AddWalletConnectSession", zap.Int("rpcURL", len(session_json)))
-	return walletconnect.AddSession(api.s.db, api.s.config.Networks, session_json)
+	session, err := walletconnect.AddSession(api.s.db, api.s.config.Networks, session_json)
+	if err != nil {
+		logutils.ZapLogger().Error("wallet.api.AddWalletConnectSession", zap.Error(err))
+	}
+
+	api.walletConnectFeed.Send(walletconnectevent.Event{
+		Type:    walletconnectevent.EventTypeAdded,
+		Session: session,
+	})
+
+	return session, err
 }
 
 // DisconnectWalletConnectSession removes a wallet connect session

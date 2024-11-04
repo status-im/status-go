@@ -62,6 +62,7 @@ func NewService(
 	ens *ens.Service,
 	pendingTxManager *transactions.PendingTxTracker,
 	feed *event.Feed,
+	walletConnectFeed *event.Feed,
 	mediaServer *server.MediaServer,
 	statusProxyStageName string,
 ) *Service {
@@ -216,6 +217,7 @@ func NewService(
 		transactor:            transactor,
 		ens:                   ens,
 		feed:                  feed,
+		walletConnectFeed:     walletConnectFeed,
 		signals:               signals,
 		reader:                reader,
 		history:               history,
@@ -296,6 +298,7 @@ type Service struct {
 	transactor            *transactions.Transactor
 	ens                   *ens.Service
 	feed                  *event.Feed
+	walletConnectFeed     *event.Feed
 	signals               *walletevent.SignalsTransmitter
 	reader                *Reader
 	history               *history.Service

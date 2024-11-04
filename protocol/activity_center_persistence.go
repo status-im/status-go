@@ -284,6 +284,10 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 	var name sql.NullString
 	var author sql.NullString
 	var installationID sql.NullString
+	var walletProviderSessionTopic sql.NullString
+	var dAppURL sql.NullString
+	var dAppName sql.NullString
+	var dAppIconURL sql.NullString
 	notification := &ActivityCenterNotification{}
 	err := row.Scan(
 		&notification.ID,
@@ -303,12 +307,12 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 		&name,
 		&author,
 		&tokenDataBytes,
-		&notification.WalletProviderSessionTopic,
-		&notification.DAppURL,
-		&notification.DAppName,
-		&notification.DAppIconURL,
+		&walletProviderSessionTopic,
+		&dAppURL,
+		&dAppName,
+		&dAppIconURL,
 		&notification.UpdatedAt,
-	    &installationID)
+		&installationID)
 
 	if err != nil {
 		return nil, err
@@ -332,6 +336,22 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 
 	if installationID.Valid {
 		notification.InstallationID = installationID.String
+	}
+
+	if walletProviderSessionTopic.Valid {
+		notification.WalletProviderSessionTopic = walletProviderSessionTopic.String
+	}
+
+	if dAppURL.Valid {
+		notification.DAppURL = dAppURL.String
+	}
+
+	if dAppName.Valid {
+		notification.DAppName = dAppName.String
+	}
+
+	if dAppIconURL.Valid {
+		notification.DAppIconURL = dAppIconURL.String
 	}
 
 	if len(tokenDataBytes) > 0 {
@@ -384,6 +404,10 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 		var name sql.NullString
 		var author sql.NullString
 		var installationID sql.NullString
+		var walletProviderSessionTopic sql.NullString
+		var dAppURL sql.NullString
+		var dAppName sql.NullString
+		var dAppIconURL sql.NullString
 		notification := &ActivityCenterNotification{}
 		err := rows.Scan(
 			&notification.ID,
@@ -402,10 +426,10 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&name,
 			&author,
 			&tokenDataBytes,
-			&notification.WalletProviderSessionTopic,
-			&notification.DAppURL,
-			&notification.DAppName,
-			&notification.DAppIconURL,
+			&walletProviderSessionTopic,
+			&dAppURL,
+			&dAppName,
+			&dAppIconURL,
 			&latestCursor,
 			&notification.UpdatedAt,
 			&installationID,
@@ -432,6 +456,22 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 
 		if installationID.Valid {
 			notification.InstallationID = installationID.String
+		}
+
+		if walletProviderSessionTopic.Valid {
+			notification.WalletProviderSessionTopic = walletProviderSessionTopic.String
+		}
+
+		if dAppURL.Valid {
+			notification.DAppURL = dAppURL.String
+		}
+
+		if dAppName.Valid {
+			notification.DAppName = dAppName.String
+		}
+
+		if dAppIconURL.Valid {
+			notification.DAppIconURL = dAppIconURL.String
 		}
 
 		if len(tokenDataBytes) > 0 {

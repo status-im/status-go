@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/status-im/status-go/services/activitycenter"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common/shard"
@@ -107,11 +109,12 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = appendIf(config.ConnectorConfig.Enabled, services, b.connectorService())
 	services = append(services, b.gifService(accDB))
 	services = append(services, b.ChatService(accDB))
+	services = append(services, b.activityCenterService(&b.walletConnectFeed))
 
 	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
 	// Keep this initialization before the other two
 	if config.WalletConfig.Enabled {
-		walletService := b.walletService(accDB, b.appDB, &b.accountsFeed, settingsFeed, &b.walletFeed, config.WalletConfig.StatusProxyStageName)
+		walletService := b.walletService(accDB, b.appDB, &b.accountsFeed, settingsFeed, &b.walletFeed, &b.walletConnectFeed, config.WalletConfig.StatusProxyStageName)
 		services = append(services, walletService)
 	}
 
@@ -589,13 +592,14 @@ func (b *StatusNode) SetWalletCommunityInfoProvider(provider thirdparty.Communit
 	}
 }
 
-func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB, accountsFeed *event.Feed, settingsFeed *event.Feed, walletFeed *event.Feed, statusProxyStageName string) *wallet.Service {
+func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB, accountsFeed *event.Feed, settingsFeed *event.Feed, walletFeed *event.Feed, walletConnectFeed *event.Feed, statusProxyStageName string) *wallet.Service {
 	if b.walletSrvc == nil {
 		b.walletSrvc = wallet.NewService(
 			b.walletDB, accountsDB, appDB, b.rpcClient, accountsFeed, settingsFeed, b.gethAccountManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()),
 			b.pendingTracker,
 			walletFeed,
+			walletConnectFeed,
 			b.httpServer,
 			statusProxyStageName,
 		)
@@ -788,4 +792,16 @@ func (b *StatusNode) CallRPC(inputJSON string) (string, error) {
 	}
 
 	return b.rpcClient.CallRaw(inputJSON), nil
+}
+
+func (b *StatusNode) activityCenterService(walletConnectFeed *event.Feed) *activitycenter.Service {
+	b.logger.Debug("Initializing activityCenterService activity center service")
+	if b.activityCenterSrvc == nil {
+		b.activityCenterSrvc = activitycenter.NewService(walletConnectFeed)
+	}
+	return b.activityCenterSrvc
+}
+
+func (b *StatusNode) ActivityCenterService() *activitycenter.Service {
+	return b.activityCenterSrvc
 }

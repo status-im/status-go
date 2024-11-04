@@ -11,6 +11,8 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/status-im/status-go/services/activitycenter"
+
 	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap"
 
@@ -135,9 +137,11 @@ type StatusNode struct {
 	connectorSrvc          *connector.Service
 	appGeneralSrvc         *appgeneral.Service
 	ethSrvc                *eth.Service
+	activityCenterSrvc     *activitycenter.Service
 
-	accountsFeed event.Feed
-	walletFeed   event.Feed
+	accountsFeed      event.Feed
+	walletFeed        event.Feed
+	walletConnectFeed event.Feed
 }
 
 // New makes new instance of StatusNode.
@@ -509,6 +513,7 @@ func (n *StatusNode) stop() error {
 	n.publicMethods = make(map[string]bool)
 	n.pendingTracker = nil
 	n.appGeneralSrvc = nil
+	n.activityCenterSrvc = nil
 	n.logger.Debug("status node stopped")
 	return nil
 }

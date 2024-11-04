@@ -4932,6 +4932,19 @@ func (m *Messenger) AddActivityCenterNotificationToResponse(communityID string, 
 	}
 }
 
+func (m *Messenger) AddNotificationToActivityCenter(notification *ActivityCenterNotification) error {
+	response := &MessengerResponse{}
+	err := m.addActivityCenterNotification(response, notification, nil)
+	if err != nil {
+		return err
+	}
+
+	if m.config.messengerSignalsHandler != nil {
+		m.config.messengerSignalsHandler.MessengerResponse(response)
+	}
+	return nil
+}
+
 func (m *Messenger) leaveCommunityDueToKickOrBan(changes *communities.CommunityChanges, acType ActivityCenterType, stateResponse *MessengerResponse) {
 	response, err := m.kickedOutOfCommunity(changes.Community.ID(), false)
 	if err != nil {
