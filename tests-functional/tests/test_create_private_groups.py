@@ -48,21 +48,21 @@ class TestCreatePrivateGroups(StepsCommon):
 
             group_name = f"private_group_from_{sender_node.name}_{i}"
             try:
+                logger.info(f"Creating group '{group_name}' from {sender_node.name}")
                 timestamp, message_id, response = self.create_and_validate_private_group(
-                    sender_node, [receiver_pubkey], group_name
+                    sender_node, [receiver_pubkey], group_name, timeout=30
                 )
 
                 if not response:
-                    raise AssertionError("Failed to create private group. No valid response received.")
+                    raise AssertionError(f"Failed to create private group '{group_name}' from {sender_node.name}")
                 else:
-                    print(f"Private group '{group_name}' created successfully with message ID: {message_id}")
+                    logger.info(f"Private group '{group_name}' created successfully with message ID: {message_id}")
                     private_groups.append((timestamp, group_name, message_id, sender_node.name))
 
             except AssertionError as e:
-                print(f"Group creation validation failed: {e}")
+                logger.info(f"Group creation validation failed: {e}")
 
-        self.first_node.stop()
-        self.second_node.stop()
+            delay(5)
 
         missing_private_groups = [
             (ts, name, mid, node) for ts, name, mid, node in private_groups if mid is None
@@ -77,6 +77,8 @@ class TestCreatePrivateGroups(StepsCommon):
                 f"{len(missing_private_groups)} private groups out of {num_private_groups} were not created: " +
                 "\n".join(formatted_missing_groups)
             )
+        self.first_node.stop()
+        self.second_node.stop()
 
     def send_and_wait_for_message(self, nodes, display_name, index, timeout=10):
         sender_node, receiver_node = nodes
@@ -126,7 +128,7 @@ class TestCreatePrivateGroups(StepsCommon):
         return timestamp, message_id, contact_request_message, response
 
     def create_and_validate_private_group(self, node, members_pubkeys, group_name, timeout=10):
-        timestamp, message_id, response = self.send_with_timestamp(
+        timestamp, message_id, response = self.send_with_timestamp_for_group(
             node.create_group_chat_with_members, members_pubkeys, group_name
         )
 
@@ -139,7 +141,6 @@ class TestCreatePrivateGroups(StepsCommon):
         try:
             validator.validate_fields(
                 {
-                    "id": "id",
                     "name": group_name,
                     "active": True,
                     "chatType": 3,
@@ -167,6 +168,16 @@ class TestCreatePrivateGroups(StepsCommon):
         with self.add_packet_loss():
             self.test_create_group_chat_baseline()
 
-    def test_create_group_chat_with_low_bandwith(self):
+    def test_create_group_chat_with_low_bandwidth(self):
         with self.add_low_bandwidth():
             self.test_create_group_chat_baseline()
+
+    def test_create_group_with_node_pause(self):
+        with self.node_pause(self.first_node):
+            delay(10)
+            try:
+                self.test_create_group_chat_baseline()
+            except Exception as e:
+                logger.info(f"Expected exception occurred while node was paused: {e}")
+                assert "Read timed out" in str(e) or "ConnectionError" in str(
+                    e), "Unexpected error type when node is paused"

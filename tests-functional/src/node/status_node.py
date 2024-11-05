@@ -173,3 +173,7 @@ class StatusNode:
             raise TypeError("pubkey_list needs to be list")
         params = [None, group_chat_name, pubkey_list]
         return self.api.send_rpc_request("wakuext_createGroupChatWithMembers", params)
+
+    def send_group_chat_message(self, group_id, message):
+        params = [{"id": group_id, "message": message}]
+        return self.api.send_rpc_request("wakuext_sendGroupChatMessage", params)

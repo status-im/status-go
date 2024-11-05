@@ -103,6 +103,17 @@ class StepsCommon:
 
         return timestamp, message_id, response
 
+    def send_with_timestamp_for_group(self, send_method, id, message):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        response = send_method(id, message)
+        message_id = None
+        response_chats = response.get("result", {}).get("chats", [])
+
+        if response_chats:
+            message_id = response_chats[0].get("id")
+
+        return timestamp, message_id, response
+
     def accept_contact_request(self, sending_node=None, receiving_node_pk=None):
         if not sending_node:
             sending_node = self.second_node
@@ -120,3 +131,13 @@ class StepsCommon:
                 message_id = m["id"]
                 break
         return timestamp, message_id
+
+    def join_private_group(self, sender_node=None, members_list=None):
+        if not sender_node:
+            sender_node = self.second_node
+        if not members_list:
+            members_list = [self.first_node_pubkey]
+        response = sender_node.create_group_chat_with_members(members_list, "new_group")
+        self.private_group_id = response["result"]["chats"][0]["id"]
+        return self.private_group_id, response
+
