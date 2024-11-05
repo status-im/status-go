@@ -1,9 +1,9 @@
-package routeexecution_test
+package storage_test
 
 import (
 	"testing"
 
-	"github.com/status-im/status-go/services/wallet/routeexecution"
+	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 	"github.com/stretchr/testify/require"
@@ -16,11 +16,11 @@ func Test_PutRouteData(t *testing.T) {
 	require.NoError(t, err)
 	defer closeFn()
 
-	routeDB := routeexecution.NewDB(walletDB)
+	routeDB := storage.NewDB(walletDB)
 
 	for _, tt := range testData {
 		t.Run(tt.name, func(t *testing.T) {
-			routeData := routeexecution.NewRouteData(&tt.routeInputParams, tt.buildInputParams, tt.transactionDetails)
+			routeData := storage.NewRouteData(&tt.routeInputParams, tt.buildInputParams, tt.transactionDetails)
 			err := routeDB.PutRouteData(routeData)
 			require.NoError(t, err)
 

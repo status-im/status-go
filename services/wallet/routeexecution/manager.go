@@ -17,6 +17,7 @@ import (
 	statusErrors "github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
+	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
@@ -28,7 +29,7 @@ type Manager struct {
 	router             *router.Router
 	transactionManager *transfer.TransactionManager
 	transferController *transfer.Controller
-	db                 *DB
+	db                 *storage.DB
 
 	// Local data used for storage purposes
 	buildInputParams *requests.RouterBuildTransactionsParams
@@ -39,7 +40,7 @@ func NewManager(walletDB *sql.DB, router *router.Router, transactionManager *tra
 		router:             router,
 		transactionManager: transactionManager,
 		transferController: transferController,
-		db:                 NewDB(walletDB),
+		db:                 storage.NewDB(walletDB),
 	}
 }
 
@@ -189,7 +190,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 		// don't overwrite err since we want to process it in the deferred function
 		var tmpErr error
 		routerTransactions := m.transactionManager.GetRouterTransactions()
-		routeData := NewRouteData(&routeInputParams, m.buildInputParams, routerTransactions)
+		routeData := storage.NewRouteData(&routeInputParams, m.buildInputParams, routerTransactions)
 		tmpErr = m.db.PutRouteData(routeData)
 		if tmpErr != nil {
 			log.Error("Error storing route data", "error", tmpErr)

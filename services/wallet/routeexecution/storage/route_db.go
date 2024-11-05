@@ -1,4 +1,4 @@
-package routeexecution
+package storage
 
 import (
 	"database/sql"
@@ -333,8 +333,8 @@ func getPathTransactions(creator sqlite.StatementCreator, uuid string, pathIdx i
 	txs := make([]*TransactionData, 0)
 	q := sq.Select("rpt.is_approval", "rpt.chain_id", "rpt.tx_hash", "rpt.tx_args_json", "st.tx_json").
 		From("route_path_transactions rpt").
-		LeftJoin(`sent_transactions st ON 
-			rpt.chain_id = st.chain_id AND 
+		LeftJoin(`sent_transactions st ON
+			rpt.chain_id = st.chain_id AND
 			rpt.tx_hash = st.tx_hash`).
 		Where(sq.Eq{"uuid": uuid, "path_idx": pathIdx}).
 		OrderBy("tx_idx ASC")
