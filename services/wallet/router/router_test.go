@@ -101,7 +101,7 @@ func setupRouter(t *testing.T) (*Router, func()) {
 	}
 	client, _ := rpc.NewClient(config)
 
-	router := NewRouter(client, nil, nil, nil, nil, nil, nil)
+	router := NewRouter(client, nil, nil, nil, nil, nil)
 
 	transfer := pathprocessor.NewTransferProcessor(nil, nil)
 	router.AddPathProcessor(transfer)

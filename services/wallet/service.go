@@ -19,7 +19,7 @@ import (
 	protocolCommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/ens/ensresolver"
 	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
@@ -59,7 +59,7 @@ func NewService(
 	gethManager *account.GethManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
-	ens *ens.Service,
+	ensResolver *ensresolver.EnsResolver,
 	pendingTxManager *transactions.PendingTxTracker,
 	feed *event.Feed,
 	mediaServer *server.MediaServer,
@@ -190,8 +190,8 @@ func NewService(
 	}
 
 	router := router.NewRouter(rpcClient, transactor, tokenManager, marketManager, collectibles,
-		collectiblesManager, ens)
-	pathProcessors := buildPathProcessors(rpcClient, transactor, tokenManager, ens, featureFlags)
+		collectiblesManager)
+	pathProcessors := buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags)
 	for _, processor := range pathProcessors {
 		router.AddPathProcessor(processor)
 	}
@@ -214,7 +214,6 @@ func NewService(
 		gethManager:           gethManager,
 		marketManager:         marketManager,
 		transactor:            transactor,
-		ens:                   ens,
 		feed:                  feed,
 		signals:               signals,
 		reader:                reader,
@@ -235,7 +234,7 @@ func buildPathProcessors(
 	rpcClient *rpc.Client,
 	transactor *transactions.Transactor,
 	tokenManager *token.Manager,
-	ens *ens.Service,
+	ensResolver *ensresolver.EnsResolver,
 	featureFlags *protocolCommon.FeatureFlags,
 ) []pathprocessor.PathProcessor {
 	ret := make([]pathprocessor.PathProcessor, 0)
@@ -261,13 +260,13 @@ func buildPathProcessors(
 	paraswap := pathprocessor.NewSwapParaswapProcessor(rpcClient, transactor, tokenManager)
 	ret = append(ret, paraswap)
 
-	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ens)
+	ensRegister := pathprocessor.NewENSRegisterProcessor(rpcClient, transactor, ensResolver)
 	ret = append(ret, ensRegister)
 
-	ensRelease := pathprocessor.NewENSReleaseProcessor(rpcClient, transactor, ens)
+	ensRelease := pathprocessor.NewENSReleaseProcessor(rpcClient, transactor, ensResolver)
 	ret = append(ret, ensRelease)
 
-	ensPublicKey := pathprocessor.NewENSPublicKeyProcessor(rpcClient, transactor, ens)
+	ensPublicKey := pathprocessor.NewENSPublicKeyProcessor(rpcClient, transactor, ensResolver)
 	ret = append(ret, ensPublicKey)
 
 	buyStickers := pathprocessor.NewStickersBuyProcessor(rpcClient, transactor)
@@ -294,7 +293,6 @@ type Service struct {
 	collectibles          *collectibles.Service
 	gethManager           *account.GethManager
 	transactor            *transactions.Transactor
-	ens                   *ens.Service
 	feed                  *event.Feed
 	signals               *walletevent.SignalsTransmitter
 	reader                *Reader
@@ -398,8 +396,4 @@ func (s *Service) GetCollectiblesService() *collectibles.Service {
 
 func (s *Service) GetCollectiblesManager() *collectibles.Manager {
 	return s.collectiblesManager
-}
-
-func (s *Service) GetEnsService() *ens.Service {
-	return s.ens
 }

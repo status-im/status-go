@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/ens/ensresolver"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
@@ -22,16 +22,16 @@ import (
 type ENSReleaseProcessor struct {
 	contractMaker *contracts.ContractMaker
 	transactor    transactions.TransactorIface
-	ensService    *ens.Service
+	ensResolver   *ensresolver.EnsResolver
 }
 
-func NewENSReleaseProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, ensService *ens.Service) *ENSReleaseProcessor {
+func NewENSReleaseProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, ensResolver *ensresolver.EnsResolver) *ENSReleaseProcessor {
 	return &ENSReleaseProcessor{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
 		},
-		transactor: transactor,
-		ensService: ensService,
+		transactor:  transactor,
+		ensResolver: ensResolver,
 	}
 }
 
@@ -58,7 +58,7 @@ func (s *ENSReleaseProcessor) PackTxInputData(params ProcessorInputParams) ([]by
 	}
 
 	name := getNameFromEnsUsername(params.Username)
-	return registrarABI.Pack("release", ens.UsernameToLabel(name))
+	return registrarABI.Pack("release", walletCommon.UsernameToLabel(name))
 }
 
 func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
@@ -120,7 +120,7 @@ func (s *ENSReleaseProcessor) CalculateAmountOut(params ProcessorInputParams) (*
 }
 
 func (s *ENSReleaseProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {
-	addr, err := s.ensService.API().GetRegistrarAddress(context.Background(), params.FromChain.ChainID)
+	addr, err := s.ensResolver.GetRegistrarAddress(context.Background(), params.FromChain.ChainID)
 	if err != nil {
 		return common.Address{}, err
 	}
