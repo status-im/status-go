@@ -20,6 +20,7 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 const (
@@ -28,7 +29,7 @@ const (
 )
 
 type ERC721TxArgs struct {
-	transactions.SendTxArgs
+	wallettypes.SendTxArgs
 	TokenID   *hexutil.Big   `json:"tokenId"`
 	Recipient common.Address `json:"recipient"`
 }
@@ -222,7 +223,7 @@ func (s *ERC721Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, l
 	return tx, tx.Nonce(), err
 }
 
-func (s *ERC721Processor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+func (s *ERC721Processor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
 }
 

@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/transactions"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -501,7 +502,7 @@ func (s *Service) ProcessCommunityTokenAction(message *protobuf.CommunityTokenAc
 	return nil
 }
 
-func (s *Service) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error) {
+func (s *Service) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs wallettypes.SendTxArgs, password string, newSignerPubKey string) (string, error) {
 
 	if len(newSignerPubKey) <= 0 {
 		return "", fmt.Errorf("signerPubKey is empty")

@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 type ENSRegisterProcessor struct {
@@ -147,7 +148,7 @@ func (s *ENSRegisterProcessor) BuildTransaction(sendArgs *MultipathProcessorTxAr
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, *sendArgs.TransferTx, lastUsedNonce)
 }
 
-func (s *ENSRegisterProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+func (s *ENSRegisterProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
 }
 

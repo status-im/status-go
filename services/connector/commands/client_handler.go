@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/services/wallet/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -115,7 +115,7 @@ func (c *ClientSideHandler) RequestAccountsRejected(args RejectedArgs) error {
 	return nil
 }
 
-func (c *ClientSideHandler) RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error) {
+func (c *ClientSideHandler) RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *wallettypes.SendTxArgs) (types.Hash, error) {
 	if !c.setRequestRunning() {
 		return types.Hash{}, ErrAnotherConnectorOperationIsAwaitingFor
 	}

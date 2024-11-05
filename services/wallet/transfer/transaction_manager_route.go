@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/routes"
-	"github.com/status-im/status-go/services/wallet/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 type BuildRouteExtraParams struct {
@@ -73,8 +73,8 @@ func (tm *TransactionManager) buildApprovalTxForPath(path *routes.Path, addressF
 	}
 
 	addrTo := types.Address(path.FromToken.Address)
-	approavalSendArgs := &transactions.SendTxArgs{
-		Version: transactions.SendTxArgsVersion1,
+	approavalSendArgs := &wallettypes.SendTxArgs{
+		Version: wallettypes.SendTxArgsVersion1,
 
 		// tx fields
 		From:                 types.Address(addressFrom),
@@ -138,8 +138,8 @@ func (tm *TransactionManager) buildTxForPath(path *routes.Path, pathProcessors m
 	}
 
 	addrTo := types.Address(params.AddressTo)
-	sendArgs := &transactions.SendTxArgs{
-		Version: transactions.SendTxArgsVersion1,
+	sendArgs := &wallettypes.SendTxArgs{
+		Version: wallettypes.SendTxArgsVersion1,
 
 		// tx fields
 		From:                 types.Address(params.AddressFrom),

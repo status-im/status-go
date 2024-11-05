@@ -45,7 +45,7 @@ import (
 	"github.com/status-im/status-go/server/pairing/preflight"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
-	"github.com/status-im/status-go/services/wallet/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 
 	"github.com/status-im/status-go/mobile/callog"
@@ -827,7 +827,7 @@ func SendTransactionWithChainID(chainID int, txArgsJSON, password string) string
 
 // sendTransactionWithChainID converts RPC args and calls backend.SendTransactionWithChainID.
 func sendTransactionWithChainID(chainID int, txArgsJSON, password string) string {
-	var params transactions.SendTxArgs
+	var params wallettypes.SendTxArgs
 	err := json.Unmarshal([]byte(txArgsJSON), &params)
 	if err != nil {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
@@ -846,7 +846,7 @@ func SendTransaction(txArgsJSON, password string) string {
 
 // sendTransaction converts RPC args and calls backend.SendTransaction.
 func sendTransaction(txArgsJSON, password string) string {
-	var params transactions.SendTxArgs
+	var params wallettypes.SendTxArgs
 	err := json.Unmarshal([]byte(txArgsJSON), &params)
 	if err != nil {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
@@ -865,7 +865,7 @@ func SendTransactionWithSignature(txArgsJSON, sigString string) string {
 
 // sendTransactionWithSignature converts RPC args and calls backend.SendTransactionWithSignature
 func sendTransactionWithSignature(txArgsJSON, sigString string) string {
-	var params transactions.SendTxArgs
+	var params wallettypes.SendTxArgs
 	err := json.Unmarshal([]byte(txArgsJSON), &params)
 	if err != nil {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
@@ -890,7 +890,7 @@ func HashTransaction(txArgsJSON string) string {
 
 // hashTransaction validate the transaction and returns new txArgs and the transaction hash.
 func hashTransaction(txArgsJSON string) string {
-	var params transactions.SendTxArgs
+	var params wallettypes.SendTxArgs
 	err := json.Unmarshal([]byte(txArgsJSON), &params)
 	if err != nil {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
@@ -903,8 +903,8 @@ func hashTransaction(txArgsJSON string) string {
 	}
 
 	result := struct {
-		Transaction transactions.SendTxArgs `json:"transaction"`
-		Hash        types.Hash              `json:"hash"`
+		Transaction wallettypes.SendTxArgs `json:"transaction"`
+		Hash        types.Hash             `json:"hash"`
 	}{
 		Transaction: newTxArgs,
 		Hash:        hash,

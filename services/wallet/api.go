@@ -40,6 +40,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/transactions"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 func NewAPI(s *Service) *API {
@@ -656,7 +657,7 @@ func (api *API) SignMessage(ctx context.Context, message types.HexBytes, address
 
 func (api *API) BuildTransaction(ctx context.Context, chainID uint64, sendTxArgsJSON string) (response *transfer.TxResponse, err error) {
 	logutils.ZapLogger().Debug("[WalletAPI::BuildTransaction]", zap.Uint64("chainID", chainID), zap.String("sendTxArgsJSON", sendTxArgsJSON))
-	var params transactions.SendTxArgs
+	var params wallettypes.SendTxArgs
 	err = json.Unmarshal([]byte(sendTxArgsJSON), &params)
 	if err != nil {
 		return nil, err
@@ -672,7 +673,7 @@ func (api *API) BuildRawTransaction(ctx context.Context, chainID uint64, sendTxA
 		return nil, err
 	}
 
-	var params transactions.SendTxArgs
+	var params wallettypes.SendTxArgs
 	err = json.Unmarshal([]byte(sendTxArgsJSON), &params)
 	if err != nil {
 		return nil, err
@@ -694,7 +695,7 @@ func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64
 		return hash, err
 	}
 
-	var params transactions.SendTxArgs
+	var params wallettypes.SendTxArgs
 	err = json.Unmarshal([]byte(sendTxArgsJSON), &params)
 	if err != nil {
 		return hash, err
@@ -908,8 +909,8 @@ func (api *API) getVerifiedWalletAccount(address, password string) (*account.Sel
 	}
 
 	if !exists {
-		logutils.ZapLogger().Error("failed to get a selected account", zap.Error(transactions.ErrInvalidTxSender))
-		return nil, transactions.ErrAccountDoesntExist
+		logutils.ZapLogger().Error("failed to get a selected account", zap.Error(wallettypes.ErrInvalidTxSender))
+		return nil, wallettypes.ErrAccountDoesntExist
 	}
 
 	keyStoreDir := api.s.Config().KeyStoreDir

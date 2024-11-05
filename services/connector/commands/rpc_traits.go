@@ -8,7 +8,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -70,7 +70,7 @@ type ClientSideHandlerInterface interface {
 	RequestAccountsAccepted(args RequestAccountsAcceptedArgs) error
 	RequestAccountsRejected(args RejectedArgs) error
 
-	RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error)
+	RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *wallettypes.SendTxArgs) (types.Hash, error)
 	SendTransactionAccepted(args SendTransactionAcceptedArgs) error
 	SendTransactionRejected(args RejectedArgs) error
 
