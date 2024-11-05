@@ -27,7 +27,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor/cbridge"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/transactions"
 )
 
 const (

@@ -5,7 +5,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/transactions"
 )
 
 type MultipathProcessorTxArgs struct {

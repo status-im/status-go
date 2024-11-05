@@ -17,8 +17,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/transactions"
-	mock_transactor "github.com/status-im/status-go/transactions/mock"
+	"github.com/status-im/status-go/services/wallet/transactions"
+	mock_transactor "github.com/status-im/status-go/services/wallet/transactions/mock"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"

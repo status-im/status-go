@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/transactions"
 )
 
 // StatusBackend defines the contract for the Status.im service

@@ -13,9 +13,9 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/appdatabase"
 	statusRPC "github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/wallet/transactions/fake"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/transactions/fake"
 )
 
 func createDB(t *testing.T) (*sql.DB, func()) {

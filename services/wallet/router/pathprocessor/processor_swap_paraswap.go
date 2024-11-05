@@ -15,7 +15,7 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/transactions"
 )
 
 type SwapParaswapTxArgs struct {

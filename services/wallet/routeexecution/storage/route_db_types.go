@@ -5,8 +5,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/routes"
+	"github.com/status-im/status-go/services/wallet/transactions"
 	"github.com/status-im/status-go/services/wallet/transfer"
-	"github.com/status-im/status-go/transactions"
 )
 
 // These structs oontain all route execution data

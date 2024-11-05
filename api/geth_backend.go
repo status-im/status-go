@@ -54,9 +54,9 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/transactions"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
-	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 )
 

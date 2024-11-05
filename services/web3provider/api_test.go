@@ -16,9 +16,9 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/permissions"
+	"github.com/status-im/status-go/services/wallet/transactions/fake"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/transactions/fake"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	statusRPC "github.com/status-im/status-go/rpc"

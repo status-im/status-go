@@ -9,8 +9,8 @@ import (
 
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/transactions"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/require"

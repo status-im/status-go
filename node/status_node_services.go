@@ -14,8 +14,8 @@ import (
 
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/services/wallet/transactions"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/transactions"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"

@@ -5,7 +5,7 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/keystore"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/transactions"
 )
 
 const (

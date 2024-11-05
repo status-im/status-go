@@ -13,8 +13,8 @@ import (
 	"github.com/status-im/status-go/rpc"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/services/wallet/router/fees"
+	"github.com/status-im/status-go/services/wallet/transactions"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/transactions"
 )
 
 var (

@@ -21,8 +21,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/transactions"
 	"github.com/status-im/status-go/services/wallet/transfer"
-	"github.com/status-im/status-go/transactions"
 
 	"golang.org/x/exp/constraints"
 )

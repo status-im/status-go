@@ -19,9 +19,9 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
+	"github.com/status-im/status-go/services/wallet/transactions/fake"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/transactions/fake"
 	"github.com/status-im/status-go/walletdatabase"
 )
 

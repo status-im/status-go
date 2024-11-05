@@ -25,9 +25,9 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/community"
 
+	"github.com/status-im/status-go/services/wallet/transactions/fake"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/transactions/fake"
 	"github.com/status-im/status-go/walletdatabase"
 )
 

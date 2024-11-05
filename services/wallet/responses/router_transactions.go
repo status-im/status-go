@@ -3,7 +3,7 @@ package responses
 import (
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/transactions"
 )
 
 type SendDetails struct {

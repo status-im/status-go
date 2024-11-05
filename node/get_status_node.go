@@ -56,9 +56,9 @@ import (
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/transactions"
 	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
-	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/waku"
 	"github.com/status-im/status-go/wakuv2"
 )
