@@ -55,6 +55,7 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
@@ -2267,7 +2268,7 @@ func (b *GethStatusBackend) CallPrivateRPC(inputJSON string) (string, error) {
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (b *GethStatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, password string) (hash types.Hash, err error) {
+func (b *GethStatusBackend) SendTransaction(sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
 	verifiedAccount, err := b.getVerifiedWalletAccount(sendArgs.From.String(), password)
 	if err != nil {
 		return hash, err
@@ -2277,7 +2278,7 @@ func (b *GethStatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, pa
 	return hash, err
 }
 
-func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs transactions.SendTxArgs, password string) (hash types.Hash, err error) {
+func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, password string) (hash types.Hash, err error) {
 	verifiedAccount, err := b.getVerifiedWalletAccount(sendArgs.From.String(), password)
 	if err != nil {
 		return hash, err
@@ -2287,7 +2288,7 @@ func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs 
 	return hash, err
 }
 
-func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs transactions.SendTxArgs, sig []byte) (hash types.Hash, err error) {
+func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs wallettypes.SendTxArgs, sig []byte) (hash types.Hash, err error) {
 	txWithSignature, err := b.transactor.BuildTransactionWithSignature(b.transactor.NetworkID(), sendArgs, sig)
 	if err != nil {
 		return hash, err
@@ -2297,7 +2298,7 @@ func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs transactions.S
 }
 
 // HashTransaction validate the transaction and returns new sendArgs and the transaction hash.
-func (b *GethStatusBackend) HashTransaction(sendArgs transactions.SendTxArgs) (transactions.SendTxArgs, types.Hash, error) {
+func (b *GethStatusBackend) HashTransaction(sendArgs wallettypes.SendTxArgs) (wallettypes.SendTxArgs, types.Hash, error) {
 	return b.transactor.HashTransaction(sendArgs)
 }
 
@@ -2379,8 +2380,8 @@ func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (
 	}
 
 	if !exists {
-		b.logger.Error("failed to get a selected account", zap.Error(transactions.ErrInvalidTxSender))
-		return nil, transactions.ErrAccountDoesntExist
+		b.logger.Error("failed to get a selected account", zap.Error(wallettypes.ErrInvalidTxSender))
+		return nil, wallettypes.ErrAccountDoesntExist
 	}
 
 	key, err := b.accountManager.VerifyAccountPassword(config.KeyStoreDir, address, password)

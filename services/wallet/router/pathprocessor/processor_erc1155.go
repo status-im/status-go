@@ -16,11 +16,12 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
 
 type ERC1155TxArgs struct {
-	transactions.SendTxArgs
+	wallettypes.SendTxArgs
 	TokenID   *hexutil.Big   `json:"tokenId"`
 	Recipient common.Address `json:"recipient"`
 	Amount    *hexutil.Big   `json:"amount"`
@@ -164,7 +165,7 @@ func (s *ERC1155Processor) BuildTransaction(sendArgs *MultipathProcessorTxArgs, 
 	return tx, tx.Nonce(), err
 }
 
-func (s *ERC1155Processor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+func (s *ERC1155Processor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.FromChainID, *sendArgs, lastUsedNonce)
 }
 

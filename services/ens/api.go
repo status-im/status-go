@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	"github.com/status-im/status-go/services/utils"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -147,7 +148,7 @@ func (api *API) Price(ctx context.Context, chainID uint64) (string, error) {
 // Deprecated: `Release` was used before introducing a new, uniform, sending flow that uses router.
 // Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
 // TODO: remove once mobile switches to a new sending flow.
-func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string) (string, error) {
+func (api *API) Release(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, password string, username string) (string, error) {
 	registryAddr, err := api.ensResolver.GetRegistrarAddress(ctx, chainID)
 	if err != nil {
 		return "", err
@@ -185,7 +186,7 @@ func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions
 // Deprecated: `ReleasePrepareTxCallMsg` was used before introducing a new, uniform, sending flow that uses router.
 // Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
 // TODO: remove once mobile switches to a new sending flow.
-func (api *API) ReleasePrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string) (ethereum.CallMsg, error) {
+func (api *API) ReleasePrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, username string) (ethereum.CallMsg, error) {
 	registrarABI, err := abi.JSON(strings.NewReader(registrar.UsernameRegistrarABI))
 	if err != nil {
 		return ethereum.CallMsg{}, err
@@ -208,10 +209,7 @@ func (api *API) ReleasePrepareTxCallMsg(ctx context.Context, chainID uint64, txA
 	}, nil
 }
 
-// Deprecated: `ReleasePrepareTx` was used before introducing a new, uniform, sending flow that uses router.
-// Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
-// TODO: remove once mobile switches to a new sending flow.
-func (api *API) ReleasePrepareTx(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string) (interface{}, error) {
+func (api *API) ReleasePrepareTx(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, username string) (interface{}, error) {
 	callMsg, err := api.ReleasePrepareTxCallMsg(ctx, chainID, txArgs, username)
 	if err != nil {
 		return nil, err
@@ -223,7 +221,7 @@ func (api *API) ReleasePrepareTx(ctx context.Context, chainID uint64, txArgs tra
 // Deprecated: `ReleaseEstimate` was used before introducing a new, uniform, sending flow that uses router.
 // Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
 // TODO: remove once mobile switches to a new sending flow.
-func (api *API) ReleaseEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string) (uint64, error) {
+func (api *API) ReleaseEstimate(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, username string) (uint64, error) {
 	callMsg, err := api.ReleasePrepareTxCallMsg(ctx, chainID, txArgs, username)
 	if err != nil {
 		return 0, err
@@ -235,7 +233,7 @@ func (api *API) ReleaseEstimate(ctx context.Context, chainID uint64, txArgs tran
 // Deprecated: `Register` was used before introducing a new, uniform, sending flow that uses router.
 // Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
 // TODO: remove once mobile switches to a new sending flow.
-func (api *API) Register(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string, pubkey string) (string, error) {
+func (api *API) Register(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, password string, username string, pubkey string) (string, error) {
 	registryAddr, err := api.ensResolver.GetRegistrarAddress(ctx, chainID)
 	if err != nil {
 		return "", err
@@ -273,7 +271,7 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 // Deprecated: `RegisterPrepareTxCallMsg` was used before introducing a new, uniform, sending flow that uses router.
 // Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
 // TODO: remove once mobile switches to a new sending flow.
-func (api *API) RegisterPrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (ethereum.CallMsg, error) {
+func (api *API) RegisterPrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, username string, pubkey string) (ethereum.CallMsg, error) {
 	priceHex, err := api.Price(ctx, chainID)
 	if err != nil {
 		return ethereum.CallMsg{}, err
@@ -322,7 +320,7 @@ func (api *API) RegisterPrepareTxCallMsg(ctx context.Context, chainID uint64, tx
 // Deprecated: `RegisterPrepareTx` was used before introducing a new, uniform, sending flow that uses router.
 // Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
 // TODO: remove once mobile switches to a new sending flow.
-func (api *API) RegisterPrepareTx(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (interface{}, error) {
+func (api *API) RegisterPrepareTx(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, username string, pubkey string) (interface{}, error) {
 	callMsg, err := api.RegisterPrepareTxCallMsg(ctx, chainID, txArgs, username, pubkey)
 	if err != nil {
 		return nil, err
@@ -334,7 +332,7 @@ func (api *API) RegisterPrepareTx(ctx context.Context, chainID uint64, txArgs tr
 // Deprecated: `RegisterEstimate` was used before introducing a new, uniform, sending flow that uses router.
 // Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
 // TODO: remove once mobile switches to a new sending flow.
-func (api *API) RegisterEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (uint64, error) {
+func (api *API) RegisterEstimate(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, username string, pubkey string) (uint64, error) {
 	callMsg, err := api.RegisterPrepareTxCallMsg(ctx, chainID, txArgs, username, pubkey)
 	if err != nil {
 		return 0, err
@@ -346,7 +344,7 @@ func (api *API) RegisterEstimate(ctx context.Context, chainID uint64, txArgs tra
 // Deprecated: `SetPubKey` was used before introducing a new, uniform, sending flow that uses router.
 // Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
 // TODO: remove once mobile switches to a new sending flow.
-func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string, pubkey string) (string, error) {
+func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, password string, username string, pubkey string) (string, error) {
 	resolverAddress, err := api.Resolver(ctx, chainID, username)
 	if err != nil {
 		return "", err
@@ -384,7 +382,7 @@ func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactio
 // Deprecated: `SetPubKeyPrepareTxCallMsg` was used before introducing a new, uniform, sending flow that uses router.
 // Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
 // TODO: remove once mobile switches to a new sending flow.
-func (api *API) SetPubKeyPrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (ethereum.CallMsg, error) {
+func (api *API) SetPubKeyPrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, username string, pubkey string) (ethereum.CallMsg, error) {
 	err := wcommon.ValidateENSUsername(username)
 	if err != nil {
 		return ethereum.CallMsg{}, err
@@ -417,7 +415,7 @@ func (api *API) SetPubKeyPrepareTxCallMsg(ctx context.Context, chainID uint64, t
 // Deprecated: `SetPubKeyPrepareTx` was used before introducing a new, uniform, sending flow that uses router.
 // Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
 // TODO: remove once mobile switches to a new sending flow.
-func (api *API) SetPubKeyPrepareTx(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (interface{}, error) {
+func (api *API) SetPubKeyPrepareTx(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, username string, pubkey string) (interface{}, error) {
 	callMsg, err := api.SetPubKeyPrepareTxCallMsg(ctx, chainID, txArgs, username, pubkey)
 	if err != nil {
 		return nil, err
@@ -429,7 +427,7 @@ func (api *API) SetPubKeyPrepareTx(ctx context.Context, chainID uint64, txArgs t
 // Deprecated: `SetPubKeyEstimate` was used before introducing a new, uniform, sending flow that uses router.
 // Releasing ens username should start from calling `wallet_getSuggestedRoutesAsync`
 // TODO: remove once mobile switches to a new sending flow.
-func (api *API) SetPubKeyEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (uint64, error) {
+func (api *API) SetPubKeyEstimate(ctx context.Context, chainID uint64, txArgs wallettypes.SendTxArgs, username string, pubkey string) (uint64, error) {
 	callMsg, err := api.SetPubKeyPrepareTxCallMsg(ctx, chainID, txArgs, username, pubkey)
 	if err != nil {
 		return 0, err

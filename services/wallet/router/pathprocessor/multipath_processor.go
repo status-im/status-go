@@ -5,13 +5,13 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 type MultipathProcessorTxArgs struct {
 	Name              string `json:"bridgeName"`
 	ChainID           uint64
-	TransferTx        *transactions.SendTxArgs
+	TransferTx        *wallettypes.SendTxArgs
 	HopTx             *HopBridgeTxArgs
 	CbridgeTx         *CelerBridgeTxArgs
 	ERC721TransferTx  *ERC721TxArgs

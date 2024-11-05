@@ -13,8 +13,8 @@ import (
 	"github.com/status-im/status-go/rpc"
 	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/services/wallet/router/fees"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/transactions"
 )
 
 var (
@@ -29,7 +29,7 @@ type SendTransactionCommand struct {
 	ClientHandler ClientSideHandlerInterface
 }
 
-func (r *RPCRequest) getSendTransactionParams() (*transactions.SendTxArgs, error) {
+func (r *RPCRequest) getSendTransactionParams() (*wallettypes.SendTxArgs, error) {
 	if r.Params == nil || len(r.Params) == 0 {
 		return nil, ErrEmptyRPCParams
 	}
@@ -44,7 +44,7 @@ func (r *RPCRequest) getSendTransactionParams() (*transactions.SendTxArgs, error
 		return nil, fmt.Errorf("error marshalling first transaction param: %v", err)
 	}
 
-	var sendTxArgs transactions.SendTxArgs
+	var sendTxArgs wallettypes.SendTxArgs
 	err = json.Unmarshal(paramBytes, &sendTxArgs)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshalling first transaction param to SendTxArgs: %v", err)

@@ -15,11 +15,12 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
 
 type SwapParaswapTxArgs struct {
-	transactions.SendTxArgs
+	wallettypes.SendTxArgs
 	ChainID            uint64  `json:"chainId"`
 	ChainIDTo          uint64  `json:"chainIdTo"`
 	TokenIDFrom        string  `json:"tokenIdFrom"`
@@ -255,7 +256,7 @@ func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorT
 	return nil
 }
 
-func (s *SwapParaswapProcessor) prepareTransactionV2(sendArgs *transactions.SendTxArgs) error {
+func (s *SwapParaswapProcessor) prepareTransactionV2(sendArgs *wallettypes.SendTxArgs) error {
 	slippageBP := uint(sendArgs.SlippagePercentage * 100) // convert to basis points
 
 	key := makeKey(sendArgs.FromChainID, sendArgs.ToChainID, sendArgs.FromTokenID, sendArgs.ToTokenID, sendArgs.ValueIn.ToInt())
@@ -308,7 +309,7 @@ func (s *SwapParaswapProcessor) BuildTransaction(sendArgs *MultipathProcessorTxA
 	return s.transactor.ValidateAndBuildTransaction(sendArgs.ChainID, sendArgs.SwapTx.SendTxArgs, lastUsedNonce)
 }
 
-func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	err := s.prepareTransactionV2(sendArgs)
 	if err != nil {
 		return nil, 0, createSwapParaswapErrorResponse(err)

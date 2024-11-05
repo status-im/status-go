@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/typeddata"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 const Web3SendAsyncReadOnly = "web3-send-async-read-only"
@@ -247,8 +247,8 @@ func (api *API) getVerifiedWalletAccount(address, password string) (*account.Sel
 	}
 
 	if !exists {
-		logutils.ZapLogger().Error("failed to get a selected account", zap.Error(transactions.ErrInvalidTxSender))
-		return nil, transactions.ErrAccountDoesntExist
+		logutils.ZapLogger().Error("failed to get a selected account", zap.Error(wallettypes.ErrInvalidTxSender))
+		return nil, wallettypes.ErrAccountDoesntExist
 	}
 
 	key, err := api.s.accountsManager.VerifyAccountPassword(api.s.config.KeyStoreDir, address, password)
@@ -326,7 +326,7 @@ func (api *API) ProcessWeb3ReadOnlyRequest(request Web3SendAsyncReadOnlyRequest)
 			return nil, err
 		}
 
-		var trxArgs transactions.SendTxArgs
+		var trxArgs wallettypes.SendTxArgs
 		if err := json.Unmarshal(jsonString, &trxArgs); err != nil {
 			return nil, err
 		}

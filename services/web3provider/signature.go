@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/typeddata"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 // signMessage checks the pwd vs the selected account and signs a message
@@ -73,7 +73,7 @@ func (api *API) signTypedDataV4(typed signercore.TypedData, address string, pass
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (api *API) sendTransaction(chainID uint64, sendArgs transactions.SendTxArgs, password string, requestType string) (hash types.Hash, err error) {
+func (api *API) sendTransaction(chainID uint64, sendArgs wallettypes.SendTxArgs, password string, requestType string) (hash types.Hash, err error) {
 	verifiedAccount, err := api.getVerifiedWalletAccount(sendArgs.From.String(), password)
 	if err != nil {
 		return hash, err

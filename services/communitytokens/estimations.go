@@ -21,7 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/router/fees"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 type CommunityTokenFees struct {
@@ -375,8 +375,8 @@ func (s *Service) prepareCommunityTokenFees(ctx context.Context, from common.Add
 	}, nil
 }
 
-func (s *Service) suggestedFeesToSendTxArgs(from common.Address, to *common.Address, gas uint64, suggestedFees *fees.SuggestedFeesGwei) transactions.SendTxArgs {
-	sendArgs := transactions.SendTxArgs{}
+func (s *Service) suggestedFeesToSendTxArgs(from common.Address, to *common.Address, gas uint64, suggestedFees *fees.SuggestedFeesGwei) wallettypes.SendTxArgs {
+	sendArgs := wallettypes.SendTxArgs{}
 	sendArgs.From = types.Address(from)
 	sendArgs.To = (*types.Address)(to)
 	sendArgs.Gas = (*hexutil.Uint64)(&gas)
@@ -389,7 +389,7 @@ func (s *Service) suggestedFeesToSendTxArgs(from common.Address, to *common.Addr
 	return sendArgs
 }
 
-func (s *Service) estimateL1Fee(ctx context.Context, chainID uint64, sendArgs transactions.SendTxArgs) (uint64, error) {
+func (s *Service) estimateL1Fee(ctx context.Context, chainID uint64, sendArgs wallettypes.SendTxArgs) (uint64, error) {
 	transaction, _, err := s.transactor.ValidateAndBuildTransaction(chainID, sendArgs, -1)
 	if err != nil {
 		return 0, err

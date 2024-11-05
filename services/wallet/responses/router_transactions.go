@@ -3,7 +3,7 @@ package responses
 import (
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 type SendDetails struct {
@@ -54,7 +54,7 @@ type RouterSentTransactions struct {
 	SentTransactions []*RouterSentTransaction `json:"sentTransactions"`
 }
 
-func NewRouterSentTransaction(sendArgs *transactions.SendTxArgs, hash types.Hash, approvalTx bool) *RouterSentTransaction {
+func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types.Hash, approvalTx bool) *RouterSentTransaction {
 	addr := types.Address{}
 	if sendArgs.To != nil {
 		addr = *sendArgs.To

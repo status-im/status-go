@@ -5,7 +5,7 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/keystore"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 const (
@@ -20,9 +20,9 @@ const (
 )
 
 var errToCodeMap = map[error]int{
-	account.ErrNoAccountSelected:    codeErrNoAccountSelected,
-	transactions.ErrInvalidTxSender: codeErrInvalidTxSender,
-	keystore.ErrDecrypt:             codeErrDecrypt,
+	account.ErrNoAccountSelected:   codeErrNoAccountSelected,
+	wallettypes.ErrInvalidTxSender: codeErrInvalidTxSender,
+	keystore.ErrDecrypt:            codeErrDecrypt,
 }
 
 type jsonrpcSuccessfulResponse struct {

@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -101,7 +102,7 @@ func (d *DeploymentParameters) Validate(isAsset bool) error {
 	return nil
 }
 
-func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
+func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs wallettypes.SendTxArgs, password string) (DeploymentDetails, error) {
 	err := deploymentParameters.Validate(false)
 	if err != nil {
 		return DeploymentDetails{}, err
@@ -180,7 +181,7 @@ func prepareDeploymentSignatureStruct(signature string, communityID string, addr
 
 func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 	ownerTokenParameters DeploymentParameters, masterTokenParameters DeploymentParameters,
-	signerPubKey string, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
+	signerPubKey string, txArgs wallettypes.SendTxArgs, password string) (DeploymentDetails, error) {
 	err := ownerTokenParameters.Validate(false)
 	if err != nil {
 		return DeploymentDetails{}, err
@@ -272,7 +273,7 @@ func (api *API) ReTrackOwnerTokenDeploymentTransaction(ctx context.Context, chai
 	return api.s.ReTrackOwnerTokenDeploymentTransaction(ctx, chainID, contractAddress)
 }
 
-func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
+func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs wallettypes.SendTxArgs, password string) (DeploymentDetails, error) {
 
 	err := deploymentParameters.Validate(true)
 	if err != nil {
@@ -376,7 +377,7 @@ func (api *API) NewAssetsInstance(chainID uint64, contractAddress string) (*asse
 }
 
 // Universal minting function for every type of token.
-func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, walletAddresses []string, amount *bigint.BigInt) (string, error) {
+func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress string, txArgs wallettypes.SendTxArgs, password string, walletAddresses []string, amount *bigint.BigInt) (string, error) {
 
 	err := api.s.ValidateWalletsAndAmounts(walletAddresses, amount)
 	if err != nil {
@@ -439,7 +440,7 @@ func (api *API) RemoteDestructedAmount(ctx context.Context, chainID uint64, cont
 }
 
 // This is only ERC721 function
-func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, tokenIds []*bigint.BigInt, additionalData string) (string, error) {
+func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress string, txArgs wallettypes.SendTxArgs, password string, tokenIds []*bigint.BigInt, additionalData string) (string, error) {
 	err := api.s.validateTokens(tokenIds)
 	if err != nil {
 		return "", err
@@ -491,7 +492,7 @@ func (api *API) RemainingSupply(ctx context.Context, chainID uint64, contractAdd
 	return api.s.remainingSupply(ctx, chainID, contractAddress)
 }
 
-func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, burnAmount *bigint.BigInt) (string, error) {
+func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string, txArgs wallettypes.SendTxArgs, password string, burnAmount *bigint.BigInt) (string, error) {
 	err := api.s.validateBurnAmount(ctx, burnAmount, chainID, contractAddress)
 	if err != nil {
 		return "", err
@@ -546,7 +547,7 @@ func (api *API) SafeGetOwnerTokenAddress(ctx context.Context, chainID uint64, co
 	return api.s.SafeGetOwnerTokenAddress(ctx, chainID, communityID)
 }
 
-func (api *API) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error) {
+func (api *API) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs wallettypes.SendTxArgs, password string, newSignerPubKey string) (string, error) {
 	return api.s.SetSignerPubKey(ctx, chainID, contractAddress, txArgs, password, newSignerPubKey)
 }
 

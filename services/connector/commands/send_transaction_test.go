@@ -13,12 +13,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/eth-node/types"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/transactions"
 )
 
 func prepareSendTransactionRequest(dApp signal.ConnectorDApp, from types.Address) (RPCRequest, error) {
-	sendArgs := transactions.SendTxArgs{
+	sendArgs := wallettypes.SendTxArgs{
 		From:  from,
 		To:    &types.Address{0x02},
 		Value: &hexutil.Big{},

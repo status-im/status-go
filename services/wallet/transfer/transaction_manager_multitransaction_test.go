@@ -22,14 +22,15 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	mock_pathprocessor "github.com/status-im/status-go/services/wallet/router/pathprocessor/mock"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions"
 	mock_transactor "github.com/status-im/status-go/transactions/mock"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
-func deepCopy(tx *transactions.SendTxArgs) *transactions.SendTxArgs {
-	return &transactions.SendTxArgs{
+func deepCopy(tx *wallettypes.SendTxArgs) *wallettypes.SendTxArgs {
+	return &wallettypes.SendTxArgs{
 		From:  tx.From,
 		To:    tx.To,
 		Value: tx.Value,
@@ -87,7 +88,7 @@ func setupTransactionData(_ *testing.T, transactor transactions.TransactorIface)
 		{
 			ChainID: 1,
 			Name:    transferBridge.Name(),
-			TransferTx: &transactions.SendTxArgs{
+			TransferTx: &wallettypes.SendTxArgs{
 				From:  types.Address(ethTransfer.From),
 				To:    (*types.Address)(&ethTransfer.To),
 				Value: (*hexutil.Big)(big.NewInt(ethTransfer.Value / 3)),
@@ -99,7 +100,7 @@ func setupTransactionData(_ *testing.T, transactor transactions.TransactorIface)
 		{
 			ChainID: 420,
 			Name:    transferBridge.Name(),
-			TransferTx: &transactions.SendTxArgs{
+			TransferTx: &wallettypes.SendTxArgs{
 				From:  types.Address(ethTransfer.From),
 				To:    (*types.Address)(&ethTransfer.To),
 				Value: (*hexutil.Big)(big.NewInt(ethTransfer.Value * 2 / 3)),
@@ -137,7 +138,7 @@ func setupApproveTransactionData(_ *testing.T, transactor transactions.Transacto
 		{
 			//ChainID: 1, // This will be set by transaction manager
 			Name: transferBridge.Name(),
-			TransferTx: &transactions.SendTxArgs{
+			TransferTx: &wallettypes.SendTxArgs{
 				From:  types.Address(tokenTransfer.From),
 				To:    (*types.Address)(&tokenTransfer.To),
 				Value: (*hexutil.Big)(big.NewInt(tokenTransfer.Value)),
@@ -203,9 +204,9 @@ func TestSendTransactionsETHFailOnBridge(t *testing.T) {
 	transferBridge.EXPECT().Name().Return(data[0].Name).AnyTimes()
 	bridges[transferBridge.Name()] = transferBridge
 
-	expectedErr := transactions.ErrInvalidTxSender // Any error to verify
+	expectedErr := wallettypes.ErrInvalidTxSender // Any error to verify
 	// In case of bridge error, verify that the error is returned
-	transferBridge.EXPECT().Send(gomock.Any(), int64(-1), gomock.Any()).Return(types.Hash{}, uint64(0), transactions.ErrInvalidTxSender)
+	transferBridge.EXPECT().Send(gomock.Any(), int64(-1), gomock.Any()).Return(types.Hash{}, uint64(0), wallettypes.ErrInvalidTxSender)
 
 	// Call the SendTransactions method
 	_, err := tm.SendTransactions(context.Background(), multiTransaction, data, bridges, account)
@@ -219,7 +220,7 @@ func TestSendTransactionsETHFailOnTransactor(t *testing.T) {
 
 	// Verify that the SendTransactionWithChainID method is called for each transaction with proper arguments
 	// Return values are not checked, because they must be checked in Transactor tests. Only error propagation matters here
-	expectedErr := transactions.ErrInvalidTxSender // Any error to verify
+	expectedErr := wallettypes.ErrInvalidTxSender // Any error to verify
 	transactor.EXPECT().SendTransactionWithChainID(expectedData[0].ChainID, *(expectedData[0].TransferTx), int64(-1), account).Return(types.Hash{}, uint64(0), nil)
 	transactor.EXPECT().SendTransactionWithChainID(expectedData[1].ChainID, *(expectedData[1].TransferTx), int64(-1), account).Return(types.Hash{}, uint64(0), expectedErr)
 

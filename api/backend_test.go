@@ -37,11 +37,11 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet"
 	walletservice "github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -603,7 +603,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, err)
 		address := gethcrypto.PubkeyToAddress(pkey.PublicKey)
 		key, err := backend.getVerifiedWalletAccount(address.String(), password)
-		require.EqualError(t, err, transactions.ErrAccountDoesntExist.Error())
+		require.EqualError(t, err, wallettypes.ErrAccountDoesntExist.Error())
 		require.Nil(t, key)
 	})
 

@@ -30,7 +30,7 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 type AccountManagerMock struct {
@@ -201,7 +201,7 @@ func (c *CollectiblesServiceMock) SetSignerPubkeyForCommunity(communityID []byte
 	c.Signers[types.EncodeHex(communityID)] = signerPubKey
 }
 
-func (c *CollectiblesServiceMock) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error) {
+func (c *CollectiblesServiceMock) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs wallettypes.SendTxArgs, password string, newSignerPubKey string) (string, error) {
 	return "", nil
 }
 

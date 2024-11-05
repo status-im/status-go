@@ -35,11 +35,12 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
 
 type HopBridgeTxArgs struct {
-	transactions.SendTxArgs
+	wallettypes.SendTxArgs
 	ChainID   uint64         `json:"chainId"`
 	ChainIDTo uint64         `json:"chainIdTo"`
 	Symbol    string         `json:"symbol"`
@@ -350,7 +351,7 @@ func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, sig
 	return tx, nil
 }
 
-func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *transactions.SendTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
+func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (tx *ethTypes.Transaction, err error) {
 	fromChain := h.networkManager.Find(sendArgs.FromChainID)
 	if fromChain == nil {
 		return tx, fmt.Errorf("ChainID not supported %d", sendArgs.FromChainID)
@@ -433,7 +434,7 @@ func (h *HopBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxArgs
 	return tx, tx.Nonce(), createBridgeHopErrorResponse(err)
 }
 
-func (h *HopBridgeProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+func (h *HopBridgeProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	tx, err := h.sendOrBuildV2(sendArgs, nil, lastUsedNonce)
 	if err != nil {
 		return nil, 0, createBridgeHopErrorResponse(err)

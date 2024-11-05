@@ -18,6 +18,7 @@ import (
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/routes"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -30,7 +31,7 @@ type TransactionDescription struct {
 }
 
 type TransactionData struct {
-	TxArgs     *transactions.SendTxArgs
+	TxArgs     *wallettypes.SendTxArgs
 	Tx         *ethTypes.Transaction
 	HashToSign types.Hash
 	Signature  []byte
@@ -153,15 +154,15 @@ type TransactionIdentity struct {
 }
 
 type TxResponse struct {
-	KeyUID        string                  `json:"keyUid,omitempty"`
-	Address       types.Address           `json:"address,omitempty"`
-	AddressPath   string                  `json:"addressPath,omitempty"`
-	SignOnKeycard bool                    `json:"signOnKeycard,omitempty"`
-	ChainID       uint64                  `json:"chainId,omitempty"`
-	MessageToSign interface{}             `json:"messageToSign,omitempty"`
-	TxArgs        transactions.SendTxArgs `json:"txArgs,omitempty"`
-	RawTx         string                  `json:"rawTx,omitempty"`
-	TxHash        common.Hash             `json:"txHash,omitempty"`
+	KeyUID        string                 `json:"keyUid,omitempty"`
+	Address       types.Address          `json:"address,omitempty"`
+	AddressPath   string                 `json:"addressPath,omitempty"`
+	SignOnKeycard bool                   `json:"signOnKeycard,omitempty"`
+	ChainID       uint64                 `json:"chainId,omitempty"`
+	MessageToSign interface{}            `json:"messageToSign,omitempty"`
+	TxArgs        wallettypes.SendTxArgs `json:"txArgs,omitempty"`
+	RawTx         string                 `json:"rawTx,omitempty"`
+	TxHash        common.Hash            `json:"txHash,omitempty"`
 }
 
 func NewMultiTransaction(timestamp uint64, fromNetworkID, toNetworkID uint64, fromTxHash, toTxHash common.Hash, fromAddress, toAddress common.Address, fromAsset, toAsset string, fromAmount, toAmount *hexutil.Big, txType MultiTransactionType, crossTxID string) *MultiTransaction {
@@ -197,7 +198,7 @@ func (tm *TransactionManager) SignMessage(message types.HexBytes, account *types
 	return types.EncodeHex(signature), err
 }
 
-func (tm *TransactionManager) BuildTransaction(chainID uint64, sendArgs transactions.SendTxArgs) (response *TxResponse, err error) {
+func (tm *TransactionManager) BuildTransaction(chainID uint64, sendArgs wallettypes.SendTxArgs) (response *TxResponse, err error) {
 	account, err := tm.accountsDB.GetAccountByAddress(sendArgs.From)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve account: %w", err)
@@ -255,7 +256,7 @@ func (tm *TransactionManager) BuildTransaction(chainID uint64, sendArgs transact
 	}, nil
 }
 
-func (tm *TransactionManager) BuildRawTransaction(chainID uint64, sendArgs transactions.SendTxArgs, signature []byte) (response *TxResponse, err error) {
+func (tm *TransactionManager) BuildRawTransaction(chainID uint64, sendArgs wallettypes.SendTxArgs, signature []byte) (response *TxResponse, err error) {
 	tx, err := tm.transactor.BuildTransactionWithSignature(chainID, sendArgs, signature)
 	if err != nil {
 		return nil, err
@@ -274,7 +275,7 @@ func (tm *TransactionManager) BuildRawTransaction(chainID uint64, sendArgs trans
 	}, nil
 }
 
-func (tm *TransactionManager) SendTransactionWithSignature(chainID uint64, sendArgs transactions.SendTxArgs, signature []byte) (hash types.Hash, err error) {
+func (tm *TransactionManager) SendTransactionWithSignature(chainID uint64, sendArgs wallettypes.SendTxArgs, signature []byte) (hash types.Hash, err error) {
 	txWithSignature, err := tm.transactor.BuildTransactionWithSignature(chainID, sendArgs, signature)
 	if err != nil {
 		return hash, err

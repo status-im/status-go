@@ -22,7 +22,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 func NewEnsResolver(rpcClient *rpc.Client) *EnsResolver {
@@ -270,7 +270,7 @@ func (e *EnsResolver) Price(ctx context.Context, chainID uint64) (string, error)
 	return fmt.Sprintf("%x", price), nil
 }
 
-func (e *EnsResolver) Release(ctx context.Context, chainID uint64, registryAddress common.Address, txArgs transactions.SendTxArgs, username string, signFn bind.SignerFn) (*types.Transaction, error) {
+func (e *EnsResolver) Release(ctx context.Context, chainID uint64, registryAddress common.Address, txArgs wallettypes.SendTxArgs, username string, signFn bind.SignerFn) (*types.Transaction, error) {
 	registrar, err := e.contractMaker.NewUsernameRegistrar(chainID, registryAddress)
 	if err != nil {
 		return nil, err
@@ -293,7 +293,7 @@ func (e *EnsResolver) ReleaseEstimate(ctx context.Context, chainID uint64, callM
 	return estimate + 1000, nil
 }
 
-func (e *EnsResolver) Register(ctx context.Context, chainID uint64, registryAddress common.Address, txArgs transactions.SendTxArgs, username string, pubkey string, signFn bind.SignerFn) (*types.Transaction, error) {
+func (e *EnsResolver) Register(ctx context.Context, chainID uint64, registryAddress common.Address, txArgs wallettypes.SendTxArgs, username string, pubkey string, signFn bind.SignerFn) (*types.Transaction, error) {
 	snt, err := e.contractMaker.NewSNT(chainID)
 	if err != nil {
 		return nil, err
@@ -339,7 +339,7 @@ func (e *EnsResolver) RegisterEstimate(ctx context.Context, chainID uint64, call
 	return estimate + 1000, nil
 }
 
-func (e *EnsResolver) SetPubKey(ctx context.Context, chainID uint64, resolverAddress *common.Address, txArgs transactions.SendTxArgs, username string, pubkey string, signFn bind.SignerFn) (*types.Transaction, error) {
+func (e *EnsResolver) SetPubKey(ctx context.Context, chainID uint64, resolverAddress *common.Address, txArgs wallettypes.SendTxArgs, username string, pubkey string, signFn bind.SignerFn) (*types.Transaction, error) {
 	err := walletCommon.ValidateENSUsername(username)
 	if err != nil {
 		return nil, err

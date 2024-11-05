@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor/cbridge"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -38,7 +39,7 @@ const (
 )
 
 type CelerBridgeTxArgs struct {
-	transactions.SendTxArgs
+	wallettypes.SendTxArgs
 	ChainID   uint64         `json:"chainId"`
 	Symbol    string         `json:"symbol"`
 	Recipient common.Address `json:"recipient"`
@@ -365,7 +366,7 @@ func (s *CelerBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, s
 	return tx, nil
 }
 
-func (s *CelerBridgeProcessor) sendOrBuildV2(sendArgs *transactions.SendTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (*ethTypes.Transaction, error) {
+func (s *CelerBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, signerFn bind.SignerFn, lastUsedNonce int64) (*ethTypes.Transaction, error) {
 	fromChain := s.rpcClient.NetworkManager.Find(sendArgs.FromChainID)
 	if fromChain == nil {
 		return nil, ErrNetworkNotFound
@@ -441,7 +442,7 @@ func (s *CelerBridgeProcessor) BuildTransaction(sendArgs *MultipathProcessorTxAr
 	return tx, tx.Nonce(), err
 }
 
-func (s *CelerBridgeProcessor) BuildTransactionV2(sendArgs *transactions.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
+func (s *CelerBridgeProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
 	tx, err := s.sendOrBuildV2(sendArgs, nil, lastUsedNonce)
 	if err != nil {
 		return nil, 0, createBridgeCellerErrorResponse(err)

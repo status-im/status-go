@@ -43,8 +43,8 @@ import (
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/transactions"
 )
 
 type Publisher interface {
@@ -266,7 +266,7 @@ type AssetContractData struct {
 
 type CommunityTokensServiceInterface interface {
 	GetCollectibleContractData(chainID uint64, contractAddress string) (*CollectibleContractData, error)
-	SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error)
+	SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs wallettypes.SendTxArgs, password string, newSignerPubKey string) (string, error)
 	GetAssetContractData(chainID uint64, contractAddress string) (*AssetContractData, error)
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 	DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error)

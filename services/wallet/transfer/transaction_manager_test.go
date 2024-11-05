@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 	mock_transactor "github.com/status-im/status-go/transactions/mock"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -268,7 +268,7 @@ func TestBuildTransaction(t *testing.T) {
 	chainID := uint64(1)
 	nonce := uint64(1)
 	gas := uint64(21000)
-	sendArgs := transactions.SendTxArgs{
+	sendArgs := wallettypes.SendTxArgs{
 		From:                 types.Address{1},
 		To:                   &types.Address{2},
 		Value:                (*hexutil.Big)(big.NewInt(123)),
@@ -309,7 +309,7 @@ func TestBuildTransaction_AccountNotFound(t *testing.T) {
 	chainID := uint64(1)
 	nonce := uint64(1)
 	gas := uint64(21000)
-	sendArgs := transactions.SendTxArgs{
+	sendArgs := wallettypes.SendTxArgs{
 		From:                 types.Address{2},
 		To:                   &types.Address{2},
 		Value:                (*hexutil.Big)(big.NewInt(123)),
@@ -328,7 +328,7 @@ func TestBuildTransaction_InvalidSendTxArgs(t *testing.T) {
 	manager, transactor := setupTestSuite(t)
 
 	chainID := uint64(1)
-	sendArgs := transactions.SendTxArgs{
+	sendArgs := wallettypes.SendTxArgs{
 		From: types.Address{1},
 		To:   &types.Address{2},
 	}
@@ -346,7 +346,7 @@ func TestBuildRawTransaction(t *testing.T) {
 	chainID := uint64(1)
 	nonce := uint64(1)
 	gas := uint64(21000)
-	sendArgs := transactions.SendTxArgs{
+	sendArgs := wallettypes.SendTxArgs{
 		From:                 types.Address{1},
 		To:                   &types.Address{2},
 		Value:                (*hexutil.Big)(big.NewInt(123)),
