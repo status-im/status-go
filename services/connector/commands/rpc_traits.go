@@ -65,10 +65,15 @@ type RejectedArgs struct {
 	RequestID string `json:"requestId"`
 }
 
+type RecallDAppPermissionsArgs struct {
+	URL string `json:"url"`
+}
+
 type ClientSideHandlerInterface interface {
 	RequestShareAccountForDApp(dApp signal.ConnectorDApp) (types.Address, uint64, error)
 	RequestAccountsAccepted(args RequestAccountsAcceptedArgs) error
 	RequestAccountsRejected(args RejectedArgs) error
+	RecallDAppPermissions(args RecallDAppPermissionsArgs) error
 
 	RequestSendTransaction(dApp signal.ConnectorDApp, chainID uint64, txArgs *transactions.SendTxArgs) (types.Hash, error)
 	SendTransactionAccepted(args SendTransactionAcceptedArgs) error

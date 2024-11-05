@@ -22,7 +22,7 @@ type API struct {
 
 func NewAPI(s *Service) *API {
 	r := NewCommandRegistry()
-	c := commands.NewClientSideHandler()
+	c := commands.NewClientSideHandler(s.db)
 
 	// Transactions and signing
 	r.Register("eth_sendTransaction", &commands.SendTransactionCommand{
@@ -121,7 +121,7 @@ func (api *API) CallRPC(ctx context.Context, inputJSON string) (interface{}, err
 
 func (api *API) RecallDAppPermission(origin string) error {
 	// TODO: close the websocket connection
-	return persistence.DeleteDApp(api.s.db, origin)
+	return api.c.RecallDAppPermissions(commands.RecallDAppPermissionsArgs{URL: origin})
 }
 
 func (api *API) GetPermittedDAppsList() ([]persistence.DApp, error) {

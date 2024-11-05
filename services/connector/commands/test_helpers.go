@@ -81,7 +81,7 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 	})
 	require.NoError(t, err)
 
-	state.handler = NewClientSideHandler()
+	state.handler = NewClientSideHandler(state.db)
 
 	state.mockCtrl = gomock.NewController(t)
 	state.rpcClient = mock_rpcclient.NewMockClientInterface(state.mockCtrl)

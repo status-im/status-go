@@ -2,6 +2,7 @@ package commands
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
+	persistence "github.com/status-im/status-go/services/connector/database"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -23,6 +25,8 @@ var (
 	ErrPersonalSignRejectedByUser             = fmt.Errorf("personal sign was rejected by user")
 	ErrEmptyRequestID                         = fmt.Errorf("empty requestID")
 	ErrAnotherConnectorOperationIsAwaitingFor = fmt.Errorf("another connector operation is awaiting for user input")
+	ErrEmptyUrl                               = fmt.Errorf("empty URL")
+	ErrDAppDoesNotHavePermissions             = fmt.Errorf("dApp does not have permissions")
 )
 
 type MessageType int
@@ -40,12 +44,14 @@ type Message struct {
 }
 
 type ClientSideHandler struct {
+	Db               *sql.DB
 	responseChannel  chan Message
 	isRequestRunning int32
 }
 
-func NewClientSideHandler() *ClientSideHandler {
+func NewClientSideHandler(db *sql.DB) *ClientSideHandler {
 	return &ClientSideHandler{
+		Db:               db,
 		responseChannel:  make(chan Message, 1), // Buffer of 1 to avoid blocking
 		isRequestRunning: 0,
 	}
@@ -112,6 +118,33 @@ func (c *ClientSideHandler) RequestAccountsRejected(args RejectedArgs) error {
 	}
 
 	c.responseChannel <- Message{Type: Rejected, Data: args}
+	return nil
+}
+
+func (c *ClientSideHandler) RecallDAppPermissions(args RecallDAppPermissionsArgs) error {
+	if args.URL == "" {
+		return ErrEmptyUrl
+	}
+
+	dApp, err := persistence.SelectDAppByUrl(c.Db, args.URL)
+	if err != nil {
+		return err
+	}
+
+	if dApp == nil {
+		return ErrDAppDoesNotHavePermissions
+	}
+
+	err = persistence.DeleteDApp(c.Db, dApp.URL)
+	if err != nil {
+		return err
+	}
+
+	signal.SendConnectorDAppPermissionRevoked(signal.ConnectorDApp{
+		URL:     dApp.URL,
+		Name:    dApp.Name,
+		IconURL: dApp.IconURL,
+	})
 	return nil
 }
 
