@@ -43,11 +43,11 @@ func NewERC721Processor(rpcClient *rpc.Client, transactor transactions.Transacto
 }
 
 func createERC721ErrorResponse(err error) error {
-	return createErrorResponse(ProcessorERC721Name, err)
+	return createErrorResponse(walletCommon.ProcessorERC721Name, err)
 }
 
 func (s *ERC721Processor) Name() string {
-	return ProcessorERC721Name
+	return walletCommon.ProcessorERC721Name
 }
 
 func (s *ERC721Processor) AvailableFor(params ProcessorInputParams) (bool, error) {

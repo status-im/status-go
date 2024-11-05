@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/status-im/status-go/errors"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 // Abbreviartion `WPP` for the error code stands for `Wallet Path Processor`
@@ -69,25 +70,25 @@ func createErrorResponse(processorName string, err error) error {
 
 	var customErrResp *errors.ErrorResponse
 	switch processorName {
-	case ProcessorTransferName:
+	case walletCommon.ProcessorTransferName:
 		customErrResp = ErrTransferCustomError
-	case ProcessorERC721Name:
+	case walletCommon.ProcessorERC721Name:
 		customErrResp = ErrERC721TransferCustomError
-	case ProcessorERC1155Name:
+	case walletCommon.ProcessorERC1155Name:
 		customErrResp = ErrERC1155TransferCustomError
-	case ProcessorBridgeHopName:
+	case walletCommon.ProcessorBridgeHopName:
 		customErrResp = ErrBridgeHopCustomError
-	case ProcessorBridgeCelerName:
+	case walletCommon.ProcessorBridgeCelerName:
 		customErrResp = ErrBridgeCellerCustomError
-	case ProcessorSwapParaswapName:
+	case walletCommon.ProcessorSwapParaswapName:
 		customErrResp = ErrSwapParaswapCustomError
-	case ProcessorENSRegisterName:
+	case walletCommon.ProcessorENSRegisterName:
 		customErrResp = ErrENSRegisterCustomError
-	case ProcessorENSReleaseName:
+	case walletCommon.ProcessorENSReleaseName:
 		customErrResp = ErrENSReleaseCustomError
-	case ProcessorENSPublicKeyName:
+	case walletCommon.ProcessorENSPublicKeyName:
 		customErrResp = ErrENSPublicKeyCustomError
-	case ProcessorStickersBuyName:
+	case walletCommon.ProcessorStickersBuyName:
 		customErrResp = ErrStickersBuyCustomError
 	default:
 		return genericErrResp

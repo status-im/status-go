@@ -38,11 +38,11 @@ func NewENSRegisterProcessor(rpcClient *rpc.Client, transactor transactions.Tran
 }
 
 func createENSRegisterProcessorErrorResponse(err error) error {
-	return createErrorResponse(ProcessorENSRegisterName, err)
+	return createErrorResponse(walletCommon.ProcessorENSRegisterName, err)
 }
 
 func (s *ENSRegisterProcessor) Name() string {
-	return ProcessorENSRegisterName
+	return walletCommon.ProcessorENSRegisterName
 }
 
 func (s *ENSRegisterProcessor) GetPriceForRegisteringEnsName(chainID uint64) (*big.Int, error) {

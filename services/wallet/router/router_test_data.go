@@ -14,7 +14,6 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -51,19 +50,19 @@ const (
 )
 
 var (
-	testEstimationMap = map[string]pathprocessor.Estimation{
-		pathprocessor.ProcessorTransferName:  {Value: uint64(1000), Err: nil},
-		pathprocessor.ProcessorBridgeHopName: {Value: uint64(5000), Err: nil},
+	testEstimationMap = map[string]requests.Estimation{
+		walletCommon.ProcessorTransferName:  {Value: uint64(1000), Err: nil},
+		walletCommon.ProcessorBridgeHopName: {Value: uint64(5000), Err: nil},
 	}
 
 	testBBonderFeeMap = map[string]*big.Int{
-		pathprocessor.EthSymbol:  big.NewInt(testBonderFeeETH),
-		pathprocessor.UsdcSymbol: big.NewInt(testBonderFeeUSDC),
+		walletCommon.EthSymbol:  big.NewInt(testBonderFeeETH),
+		walletCommon.UsdcSymbol: big.NewInt(testBonderFeeUSDC),
 	}
 
 	testTokenPrices = map[string]float64{
-		pathprocessor.EthSymbol:  2000,
-		pathprocessor.UsdcSymbol: 1,
+		walletCommon.EthSymbol:  2000,
+		walletCommon.UsdcSymbol: 1,
 	}
 
 	testSuggestedFees = &fees.SuggestedFees{
@@ -79,12 +78,12 @@ var (
 	}
 
 	testBalanceMapPerChain = map[string]*big.Int{
-		makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
-		makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
-		makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
-		makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
-		makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount2ETHInWei),
-		makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
+		makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.EthSymbol):  big.NewInt(testAmount2ETHInWei),
+		makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.UsdcSymbol): big.NewInt(testAmount100USDC),
+		makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol):  big.NewInt(testAmount2ETHInWei),
+		makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.UsdcSymbol): big.NewInt(testAmount100USDC),
+		makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol):  big.NewInt(testAmount2ETHInWei),
+		makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.UsdcSymbol): big.NewInt(testAmount100USDC),
 	}
 )
 
@@ -174,7 +173,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
@@ -182,14 +181,14 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:   testTokenPrices,
 					SuggestedFees: testSuggestedFees,
 					BalanceMap:    testBalanceMapPerChain,
-					EstimationMap: map[string]pathprocessor.Estimation{
-						pathprocessor.ProcessorTransferName: {
+					EstimationMap: map[string]requests.Estimation{
+						walletCommon.ProcessorTransferName: {
 							Value: uint64(0),
 							Err:   fmt.Errorf("failed with 50000000 gas: insufficient funds for gas * price + value: address %s have 68251537427723 want 100000000000000", common.HexToAddress("0x1")),
 						},
@@ -214,13 +213,13 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(0)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -234,19 +233,19 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
@@ -262,13 +261,13 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -282,55 +281,55 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
@@ -346,14 +345,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:            pathprocessor.EthSymbol,
+				TokenID:            walletCommon.EthSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -368,19 +367,19 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
@@ -396,14 +395,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:            pathprocessor.EthSymbol,
+				TokenID:            walletCommon.EthSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -418,37 +417,37 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
@@ -464,14 +463,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:   testTokenPrices,
@@ -487,19 +486,19 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
@@ -515,14 +514,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -537,37 +536,37 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
@@ -583,7 +582,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
@@ -591,7 +590,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -606,7 +605,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
@@ -622,7 +621,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
@@ -630,7 +629,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -645,7 +644,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
@@ -661,7 +660,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
@@ -669,7 +668,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -684,7 +683,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
@@ -700,7 +699,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet},
 
@@ -708,7 +707,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -723,25 +722,25 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
@@ -757,7 +756,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
@@ -765,7 +764,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -780,7 +779,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
@@ -796,7 +795,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
@@ -804,7 +803,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:   testTokenPrices,
@@ -830,7 +829,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
 				},
@@ -839,7 +838,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -854,63 +853,63 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
@@ -927,7 +926,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:            pathprocessor.EthSymbol,
+				TokenID:            walletCommon.EthSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
@@ -938,7 +937,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -953,21 +952,21 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testAmount0Point2ETHInWei - testAmount0Point3ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)), //(*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)), //(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)), //(*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
@@ -984,7 +983,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
@@ -994,7 +993,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1009,63 +1008,63 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei - testBonderFeeETH)),
@@ -1082,7 +1081,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
@@ -1093,7 +1092,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1108,63 +1107,63 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei - testBonderFeeETH)),
@@ -1181,7 +1180,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
@@ -1192,7 +1191,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1217,7 +1216,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei)),
@@ -1227,7 +1226,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1252,13 +1251,13 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:     pathprocessor.UsdcSymbol,
+				TokenID:     walletCommon.UsdcSymbol,
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1273,55 +1272,55 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -1337,14 +1336,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:            pathprocessor.UsdcSymbol,
+				TokenID:            walletCommon.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1359,19 +1358,19 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -1387,14 +1386,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:            pathprocessor.UsdcSymbol,
+				TokenID:            walletCommon.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1409,37 +1408,37 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -1455,14 +1454,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1477,19 +1476,19 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -1505,14 +1504,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1527,37 +1526,37 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -1573,7 +1572,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
@@ -1581,7 +1580,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1596,7 +1595,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
@@ -1612,7 +1611,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
@@ -1620,7 +1619,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1635,7 +1634,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -1651,7 +1650,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
@@ -1659,7 +1658,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1674,7 +1673,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
@@ -1690,7 +1689,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet},
 
@@ -1698,7 +1697,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1713,25 +1712,25 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -1747,7 +1746,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
@@ -1755,7 +1754,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1770,7 +1769,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -1786,7 +1785,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
@@ -1794,7 +1793,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1819,13 +1818,13 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
-				TokenID:     pathprocessor.UsdcSymbol,
+				TokenID:     walletCommon.UsdcSymbol,
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -1840,168 +1839,168 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5 * testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5 * testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorTransferName,
+					ProcessorName:    walletCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
@@ -2018,13 +2017,13 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:    common.HexToAddress("0x1"),
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:     pathprocessor.UsdcSymbol,
+				TokenID:     walletCommon.UsdcSymbol,
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2039,37 +2038,37 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2085,14 +2084,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:            pathprocessor.UsdcSymbol,
+				TokenID:            walletCommon.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2107,13 +2106,13 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -2129,14 +2128,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:            pathprocessor.UsdcSymbol,
+				TokenID:            walletCommon.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2151,25 +2150,25 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2185,14 +2184,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2207,13 +2206,13 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2229,14 +2228,14 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2251,25 +2250,25 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2285,7 +2284,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
@@ -2293,7 +2292,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2318,7 +2317,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
@@ -2326,7 +2325,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2341,7 +2340,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -2357,7 +2356,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 
@@ -2365,7 +2364,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2390,7 +2389,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet},
 
@@ -2398,7 +2397,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2413,13 +2412,13 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -2435,7 +2434,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
@@ -2443,7 +2442,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2458,7 +2457,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -2474,7 +2473,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
@@ -2482,7 +2481,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2507,7 +2506,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
@@ -2515,7 +2514,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2529,11 +2528,11 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedError: &errors.ErrorResponse{
 				Code:    ErrNotEnoughNativeBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.EthereumMainnet),
+				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, walletCommon.EthSymbol, walletCommon.EthereumMainnet),
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
@@ -2549,7 +2548,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(5 * testAmount100USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
@@ -2557,7 +2556,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2571,11 +2570,11 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedError: &errors.ErrorResponse{
 				Code:    ErrNotEnoughTokenBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, pathprocessor.UsdcSymbol, walletCommon.EthereumMainnet),
+				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, walletCommon.UsdcSymbol, walletCommon.EthereumMainnet),
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2591,7 +2590,7 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(0.01 * testAmount1USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet},
 
@@ -2599,7 +2598,7 @@ func getNormalTestParamsList() []normalTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:           testTokenPrices,
@@ -2615,7 +2614,7 @@ func getNormalTestParamsList() []normalTestParams {
 			expectedError: ErrLowAmountInForHopBridge,
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -2644,7 +2643,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount100USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
@@ -2652,13 +2651,13 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:   testTokenPrices,
 					SuggestedFees: testSuggestedFees,
 					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
+						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.UsdcSymbol): big.NewInt(0),
 					},
 					EstimationMap:         testEstimationMap,
 					BonderFeeMap:          testBBonderFeeMap,
@@ -2677,7 +2676,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				AddrFrom:             common.HexToAddress("0x1"),
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount100USDC)),
-				TokenID:              pathprocessor.UsdcSymbol,
+				TokenID:              walletCommon.UsdcSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
@@ -2685,14 +2684,14 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:   testTokenPrices,
 					SuggestedFees: testSuggestedFees,
 					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC),
-						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
+						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.UsdcSymbol): big.NewInt(testAmount100USDC),
+						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol):  big.NewInt(0),
 					},
 					EstimationMap:         testEstimationMap,
 					BonderFeeMap:          testBBonderFeeMap,
@@ -2702,11 +2701,11 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 			},
 			expectedError: &errors.ErrorResponse{
 				Code:    ErrNotEnoughNativeBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.OptimismMainnet),
+				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, walletCommon.EthSymbol, walletCommon.OptimismMainnet),
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:         pathprocessor.ProcessorTransferName,
+					ProcessorName:         walletCommon.ProcessorTransferName,
 					FromChain:             &optimism,
 					ToChain:               &optimism,
 					ApprovalRequired:      false,
@@ -2724,25 +2723,25 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount100USDC)),
-				TokenID:            pathprocessor.UsdcSymbol,
+				TokenID:            walletCommon.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:   testTokenPrices,
 					SuggestedFees: testSuggestedFees,
 					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
-						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
-						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
-						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(0),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
+						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.UsdcSymbol): big.NewInt(0),
+						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.EthSymbol):  big.NewInt(0),
+						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.UsdcSymbol): big.NewInt(0),
+						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol):  big.NewInt(0),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.UsdcSymbol): big.NewInt(0),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol):  big.NewInt(0),
 					},
 					EstimationMap:         testEstimationMap,
 					BonderFeeMap:          testBBonderFeeMap,
@@ -2761,25 +2760,25 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount100USDC)),
-				TokenID:            pathprocessor.UsdcSymbol,
+				TokenID:            walletCommon.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:   testTokenPrices,
 					SuggestedFees: testSuggestedFees,
 					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
-						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
-						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
-						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
-						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol):  big.NewInt(0),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol):  big.NewInt(0),
+						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.EthSymbol):  big.NewInt(0),
+						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol):  big.NewInt(0),
 					},
 					EstimationMap:         testEstimationMap,
 					BonderFeeMap:          testBBonderFeeMap,
@@ -2789,17 +2788,17 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 			},
 			expectedError: &errors.ErrorResponse{
 				Code:    ErrNotEnoughNativeBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, pathprocessor.EthSymbol, walletCommon.ArbitrumMainnet),
+				Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, walletCommon.EthSymbol, walletCommon.ArbitrumMainnet),
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:         pathprocessor.ProcessorTransferName,
+					ProcessorName:         walletCommon.ProcessorTransferName,
 					FromChain:             &optimism,
 					ToChain:               &optimism,
 					ApprovalRequired:      false,
@@ -2807,7 +2806,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					RequiredNativeBalance: big.NewInt((testBaseFee + testPriorityFeeLow) * testApprovalGasEstimation),
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2823,21 +2822,21 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				AddrFrom:           common.HexToAddress("0x1"),
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount100USDC)),
-				TokenID:            pathprocessor.UsdcSymbol,
+				TokenID:            walletCommon.UsdcSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.UsdcSymbol,
+						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
 					},
 					TokenPrices:   testTokenPrices,
 					SuggestedFees: testSuggestedFees,
 					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol):  big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.UsdcSymbol): big.NewInt(testAmount100USDC + testAmount100USDC),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol):  big.NewInt(testAmount1ETHInWei),
 					},
 					EstimationMap:         testEstimationMap,
 					BonderFeeMap:          testBBonderFeeMap,
@@ -2847,13 +2846,13 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:         pathprocessor.ProcessorTransferName,
+					ProcessorName:         walletCommon.ProcessorTransferName,
 					FromChain:             &optimism,
 					ToChain:               &optimism,
 					ApprovalRequired:      false,
@@ -2861,7 +2860,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					RequiredNativeBalance: big.NewInt((testBaseFee + testPriorityFeeLow) * testApprovalGasEstimation),
 				},
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2869,7 +2868,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 			},
 			expectedBest: routes.Route{
 				{
-					ProcessorName:    pathprocessor.ProcessorBridgeHopName,
+					ProcessorName:    walletCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2894,14 +2893,14 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				Uuid:                 uuid.NewString(),
 				SendType:             sendtype.Transfer,
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					BalanceMap: map[string]*big.Int{},
@@ -2923,7 +2922,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				Uuid:                 uuid.NewString(),
 				SendType:             sendtype.Transfer,
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -2933,7 +2932,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					BalanceMap: map[string]*big.Int{},
@@ -2955,7 +2954,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				Uuid:                 uuid.NewString(),
 				SendType:             sendtype.Transfer,
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -2965,7 +2964,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					BalanceMap: map[string]*big.Int{},
@@ -2993,7 +2992,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				Uuid:                 uuid.NewString(),
 				SendType:             sendtype.Transfer,
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
-				TokenID:              pathprocessor.EthSymbol,
+				TokenID:              walletCommon.EthSymbol,
 				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -3004,7 +3003,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					BalanceMap: map[string]*big.Int{},
@@ -3032,7 +3031,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				Uuid:        uuid.NewString(),
 				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -3042,7 +3041,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					BalanceMap: map[string]*big.Int{},
@@ -3070,7 +3069,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				Uuid:        uuid.NewString(),
 				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount5ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -3080,7 +3079,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					BalanceMap: map[string]*big.Int{},
@@ -3114,19 +3113,19 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				Uuid:        uuid.NewString(),
 				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
 					},
 				},
 			},
@@ -3170,7 +3169,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				Uuid:        uuid.NewString(),
 				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
 				},
@@ -3179,13 +3178,13 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount2ETHInWei),
-						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount3ETHInWei),
+						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount2ETHInWei),
+						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount3ETHInWei),
 					},
 				},
 			},
@@ -3225,7 +3224,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				Uuid:        uuid.NewString(),
 				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 				FromLockedAmount: map[uint64]*hexutil.Big{
 					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
 					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
@@ -3235,13 +3234,13 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount2ETHInWei),
-						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount3ETHInWei),
+						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount2ETHInWei),
+						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount3ETHInWei),
 					},
 				},
 			},
@@ -3273,19 +3272,19 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 				Uuid:        uuid.NewString(),
 				SendType:    sendtype.Transfer,
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount5ETHInWei)),
-				TokenID:     pathprocessor.EthSymbol,
+				TokenID:     walletCommon.EthSymbol,
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &token.Token{
 						ChainID:  1,
-						Symbol:   pathprocessor.EthSymbol,
+						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
 					},
 					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.EthereumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.OptimismMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, pathprocessor.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
+						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
 					},
 				},
 			},

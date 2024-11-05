@@ -126,11 +126,11 @@ func NewHopBridgeProcessor(rpcClient rpc.ClientInterface, transactor transaction
 }
 
 func createBridgeHopErrorResponse(err error) error {
-	return createErrorResponse(ProcessorBridgeHopName, err)
+	return createErrorResponse(walletCommon.ProcessorBridgeHopName, err)
 }
 
 func (h *HopBridgeProcessor) Name() string {
-	return ProcessorBridgeHopName
+	return walletCommon.ProcessorBridgeHopName
 }
 
 func (h *HopBridgeProcessor) Clear() {
@@ -164,7 +164,7 @@ func (c *HopBridgeProcessor) getAppropriateABI(contractType string, chainID uint
 		if token.IsNative() {
 			return abi.JSON(strings.NewReader(hopL1EthBridge.HopL1EthBridgeABI))
 		}
-		if token.Symbol == HopSymbol {
+		if token.Symbol == walletCommon.HopSymbol {
 			return abi.JSON(strings.NewReader(hopL1HopBridge.HopL1HopBridgeABI))
 		}
 		return abi.JSON(strings.NewReader(hopL1Erc20Bridge.HopL1Erc20BridgeABI))
@@ -575,7 +575,7 @@ func (h *HopBridgeProcessor) sendL1BridgeTx(contractAddress common.Address, ethC
 			walletCommon.ZeroBigIntValue())
 	}
 
-	if token.Symbol == HopSymbol {
+	if token.Symbol == walletCommon.HopSymbol {
 		contractInstance, err := hopL1HopBridge.NewHopL1HopBridge(
 			contractAddress,
 			ethClient,

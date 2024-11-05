@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 )
 
@@ -72,7 +73,7 @@ func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {
 	return multiTransactions, nil
 }
 
-func addSignaturesToTransactions(transactions map[common.Hash]*TransactionDescription, signatures map[string]SignatureDetails) error {
+func addSignaturesToTransactions(transactions map[common.Hash]*TransactionDescription, signatures map[string]requests.SignatureDetails) error {
 	if len(transactions) == 0 {
 		return errors.New("no transactions to proceed with")
 	}

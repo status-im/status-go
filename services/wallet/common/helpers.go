@@ -12,6 +12,14 @@ import (
 	"github.com/status-im/status-go/contracts/ierc20"
 )
 
+func IsProcessorBridge(name string) bool {
+	return name == ProcessorBridgeHopName || name == ProcessorBridgeCelerName
+}
+
+func IsProcessorSwap(name string) bool {
+	return name == ProcessorSwapParaswapName
+}
+
 func PackApprovalInputData(amountIn *big.Int, approvalContractAddress *common.Address) ([]byte, error) {
 	if approvalContractAddress == nil || *approvalContractAddress == ZeroAddress() {
 		return []byte{}, nil

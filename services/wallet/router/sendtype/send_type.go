@@ -2,16 +2,9 @@ package sendtype
 
 import (
 	"math/big"
-	"slices"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/market"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
-	"github.com/status-im/status-go/services/wallet/token"
 )
 
 type SendType int
@@ -40,79 +33,28 @@ func (s SendType) IsStickersTransfer() bool {
 	return s == StickersBuy
 }
 
-func (s SendType) FetchPrices(marketManager *market.Manager, tokenIDs []string) (map[string]float64, error) {
-	nonUniqueSymbols := append(tokenIDs, "ETH")
-	// remove duplicate enteries
-	slices.Sort(nonUniqueSymbols)
-	symbols := slices.Compact(nonUniqueSymbols)
-	if s.IsCollectiblesTransfer() {
-		symbols = []string{"ETH"}
-	}
-
-	pricesMap, err := marketManager.GetOrFetchPrices(symbols, []string{"USD"}, market.MaxAgeInSecondsForFresh)
-
-	if err != nil {
-		return nil, err
-	}
-	prices := make(map[string]float64, 0)
-	for symbol, pricePerCurrency := range pricesMap {
-		prices[symbol] = pricePerCurrency["USD"].Price
-	}
-	if s.IsCollectiblesTransfer() {
-		for _, tokenID := range tokenIDs {
-			prices[tokenID] = 0
-		}
-	}
-	return prices, nil
-}
-
-func (s SendType) FindToken(tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *token.Token {
-	if !s.IsCollectiblesTransfer() {
-		return tokenManager.FindToken(network, tokenID)
-	}
-
-	parts := strings.Split(tokenID, ":")
-	contractAddress := common.HexToAddress(parts[0])
-	collectibleTokenID, success := new(big.Int).SetString(parts[1], 10)
-	if !success {
-		return nil
-	}
-	uniqueID, err := collectibles.GetOwnedCollectible(walletCommon.ChainID(network.ChainID), account, contractAddress, collectibleTokenID)
-	if err != nil || uniqueID == nil {
-		return nil
-	}
-
-	return &token.Token{
-		Address:  contractAddress,
-		Symbol:   collectibleTokenID.String(),
-		Decimals: 0,
-		ChainID:  network.ChainID,
-	}
-}
-
 // canUseProcessor is used to check if certain SendType can be used with a given path processor
-func (s SendType) CanUseProcessor(p pathprocessor.PathProcessor) bool {
-	pathProcessorName := p.Name()
+func (s SendType) CanUseProcessor(pathProcessorName string) bool {
 	switch s {
 	case Transfer:
-		return pathProcessorName == pathprocessor.ProcessorTransferName ||
-			pathprocessor.IsProcessorBridge(pathProcessorName)
+		return pathProcessorName == walletCommon.ProcessorTransferName ||
+			walletCommon.IsProcessorBridge(pathProcessorName)
 	case Bridge:
-		return pathprocessor.IsProcessorBridge(pathProcessorName)
+		return walletCommon.IsProcessorBridge(pathProcessorName)
 	case Swap:
-		return pathprocessor.IsProcessorSwap(pathProcessorName)
+		return walletCommon.IsProcessorSwap(pathProcessorName)
 	case ERC721Transfer:
-		return pathProcessorName == pathprocessor.ProcessorERC721Name
+		return pathProcessorName == walletCommon.ProcessorERC721Name
 	case ERC1155Transfer:
-		return pathProcessorName == pathprocessor.ProcessorERC1155Name
+		return pathProcessorName == walletCommon.ProcessorERC1155Name
 	case ENSRegister:
-		return pathProcessorName == pathprocessor.ProcessorENSRegisterName
+		return pathProcessorName == walletCommon.ProcessorENSRegisterName
 	case ENSRelease:
-		return pathProcessorName == pathprocessor.ProcessorENSReleaseName
+		return pathProcessorName == walletCommon.ProcessorENSReleaseName
 	case ENSSetPubKey:
-		return pathProcessorName == pathprocessor.ProcessorENSPublicKeyName
+		return pathProcessorName == walletCommon.ProcessorENSPublicKeyName
 	case StickersBuy:
-		return pathProcessorName == pathprocessor.ProcessorStickersBuyName
+		return pathProcessorName == walletCommon.ProcessorStickersBuyName
 	default:
 		return true
 	}
@@ -121,7 +63,7 @@ func (s SendType) CanUseProcessor(p pathprocessor.PathProcessor) bool {
 func (s SendType) ProcessZeroAmountInProcessor(amountIn *big.Int, amountOut *big.Int, processorName string) bool {
 	if amountIn.Cmp(walletCommon.ZeroBigIntValue()) == 0 {
 		if s == Transfer {
-			if processorName != pathprocessor.ProcessorTransferName {
+			if processorName != walletCommon.ProcessorTransferName {
 				return false
 			}
 		} else if s == Swap {

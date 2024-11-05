@@ -6,6 +6,7 @@ import (
 
 	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/token"
 
 	"github.com/stretchr/testify/assert"
@@ -43,10 +44,10 @@ var optimism = params.Network{
 	RelatedChainID:         walletCommon.OptimismMainnet,
 }
 
-var testEstimationMap = map[string]Estimation{
-	ProcessorTransferName:     {uint64(1000), nil},
-	ProcessorBridgeHopName:    {uint64(5000), nil},
-	ProcessorSwapParaswapName: {uint64(2000), nil},
+var testEstimationMap = map[string]requests.Estimation{
+	walletCommon.ProcessorTransferName:     {Value: uint64(1000)},
+	walletCommon.ProcessorBridgeHopName:    {Value: uint64(5000)},
+	walletCommon.ProcessorSwapParaswapName: {Value: uint64(2000)},
 }
 
 type expectedResult struct {
@@ -67,15 +68,15 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 			},
 			expected: map[string]expectedResult{
-				ProcessorTransferName: {
+				walletCommon.ProcessorTransferName: {
 					expected:      false,
 					expectedError: ErrNoChainSet,
 				},
-				ProcessorBridgeHopName: {
+				walletCommon.ProcessorBridgeHopName: {
 					expected:      false,
 					expectedError: ErrNoChainSet,
 				},
-				ProcessorSwapParaswapName: {
+				walletCommon.ProcessorSwapParaswapName: {
 					expected:      false,
 					expectedError: ErrNoChainSet,
 				},
@@ -90,15 +91,15 @@ func TestPathProcessors(t *testing.T) {
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
-				ProcessorTransferName: {
+				walletCommon.ProcessorTransferName: {
 					expected:      false,
 					expectedError: ErrNoTokenSet,
 				},
-				ProcessorBridgeHopName: {
+				walletCommon.ProcessorBridgeHopName: {
 					expected:      false,
 					expectedError: ErrNoTokenSet,
 				},
-				ProcessorSwapParaswapName: {
+				walletCommon.ProcessorSwapParaswapName: {
 					expected:      false,
 					expectedError: ErrToAndFromTokensMustBeSet,
 				},
@@ -111,20 +112,20 @@ func TestPathProcessors(t *testing.T) {
 				FromChain: &mainnet,
 				ToChain:   &mainnet,
 				FromToken: &token.Token{
-					Symbol: EthSymbol,
+					Symbol: walletCommon.EthSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
-				ProcessorTransferName: {
+				walletCommon.ProcessorTransferName: {
 					expected:      true,
 					expectedError: nil,
 				},
-				ProcessorBridgeHopName: {
+				walletCommon.ProcessorBridgeHopName: {
 					expected:      false,
 					expectedError: ErrFromAndToChainsMustBeDifferent,
 				},
-				ProcessorSwapParaswapName: {
+				walletCommon.ProcessorSwapParaswapName: {
 					expected:      false,
 					expectedError: ErrToAndFromTokensMustBeSet,
 				},
@@ -137,23 +138,23 @@ func TestPathProcessors(t *testing.T) {
 				FromChain: &mainnet,
 				ToChain:   &mainnet,
 				FromToken: &token.Token{
-					Symbol: EthSymbol,
+					Symbol: walletCommon.EthSymbol,
 				},
 				ToToken: &token.Token{
-					Symbol: EthSymbol,
+					Symbol: walletCommon.EthSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
-				ProcessorTransferName: {
+				walletCommon.ProcessorTransferName: {
 					expected:      false,
 					expectedError: ErrToTokenShouldNotBeSet,
 				},
-				ProcessorBridgeHopName: {
+				walletCommon.ProcessorBridgeHopName: {
 					expected:      false,
 					expectedError: ErrToTokenShouldNotBeSet,
 				},
-				ProcessorSwapParaswapName: {
+				walletCommon.ProcessorSwapParaswapName: {
 					expected:      false,
 					expectedError: ErrFromAndToTokensMustBeDifferent,
 				},
@@ -166,23 +167,23 @@ func TestPathProcessors(t *testing.T) {
 				FromChain: &mainnet,
 				ToChain:   &mainnet,
 				FromToken: &token.Token{
-					Symbol: EthSymbol,
+					Symbol: walletCommon.EthSymbol,
 				},
 				ToToken: &token.Token{
-					Symbol: UsdcSymbol,
+					Symbol: walletCommon.UsdcSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
-				ProcessorTransferName: {
+				walletCommon.ProcessorTransferName: {
 					expected:      false,
 					expectedError: ErrToTokenShouldNotBeSet,
 				},
-				ProcessorBridgeHopName: {
+				walletCommon.ProcessorBridgeHopName: {
 					expected:      false,
 					expectedError: ErrToTokenShouldNotBeSet,
 				},
-				ProcessorSwapParaswapName: {
+				walletCommon.ProcessorSwapParaswapName: {
 					expected:      true,
 					expectedError: nil,
 				},
@@ -197,15 +198,15 @@ func TestPathProcessors(t *testing.T) {
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
-				ProcessorTransferName: {
+				walletCommon.ProcessorTransferName: {
 					expected:      false,
 					expectedError: ErrNoTokenSet,
 				},
-				ProcessorBridgeHopName: {
+				walletCommon.ProcessorBridgeHopName: {
 					expected:      false,
 					expectedError: ErrNoTokenSet,
 				},
-				ProcessorSwapParaswapName: {
+				walletCommon.ProcessorSwapParaswapName: {
 					expected:      false,
 					expectedError: ErrFromAndToChainsMustBeSame,
 				},
@@ -218,20 +219,20 @@ func TestPathProcessors(t *testing.T) {
 				FromChain: &mainnet,
 				ToChain:   &optimism,
 				FromToken: &token.Token{
-					Symbol: EthSymbol,
+					Symbol: walletCommon.EthSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
-				ProcessorTransferName: {
+				walletCommon.ProcessorTransferName: {
 					expected:      false,
 					expectedError: nil,
 				},
-				ProcessorBridgeHopName: {
+				walletCommon.ProcessorBridgeHopName: {
 					expected:      true,
 					expectedError: nil,
 				},
-				ProcessorSwapParaswapName: {
+				walletCommon.ProcessorSwapParaswapName: {
 					expected:      false,
 					expectedError: ErrFromAndToChainsMustBeSame,
 				},
@@ -244,23 +245,23 @@ func TestPathProcessors(t *testing.T) {
 				FromChain: &mainnet,
 				ToChain:   &optimism,
 				FromToken: &token.Token{
-					Symbol: EthSymbol,
+					Symbol: walletCommon.EthSymbol,
 				},
 				ToToken: &token.Token{
-					Symbol: EthSymbol,
+					Symbol: walletCommon.EthSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
-				ProcessorTransferName: {
+				walletCommon.ProcessorTransferName: {
 					expected:      false,
 					expectedError: ErrToTokenShouldNotBeSet,
 				},
-				ProcessorBridgeHopName: {
+				walletCommon.ProcessorBridgeHopName: {
 					expected:      false,
 					expectedError: ErrToTokenShouldNotBeSet,
 				},
-				ProcessorSwapParaswapName: {
+				walletCommon.ProcessorSwapParaswapName: {
 					expected:      false,
 					expectedError: ErrFromAndToChainsMustBeSame,
 				},
@@ -273,23 +274,23 @@ func TestPathProcessors(t *testing.T) {
 				FromChain: &mainnet,
 				ToChain:   &optimism,
 				FromToken: &token.Token{
-					Symbol: EthSymbol,
+					Symbol: walletCommon.EthSymbol,
 				},
 				ToToken: &token.Token{
-					Symbol: UsdcSymbol,
+					Symbol: walletCommon.UsdcSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
 			},
 			expected: map[string]expectedResult{
-				ProcessorTransferName: {
+				walletCommon.ProcessorTransferName: {
 					expected:      false,
 					expectedError: ErrToTokenShouldNotBeSet,
 				},
-				ProcessorBridgeHopName: {
+				walletCommon.ProcessorBridgeHopName: {
 					expected:      false,
 					expectedError: ErrToTokenShouldNotBeSet,
 				},
-				ProcessorSwapParaswapName: {
+				walletCommon.ProcessorSwapParaswapName: {
 					expected:      false,
 					expectedError: ErrFromAndToChainsMustBeSame,
 				},
@@ -302,11 +303,11 @@ func TestPathProcessors(t *testing.T) {
 			t.Run(fmt.Sprintf("%s[%s]", processorName, tt.name), func(t *testing.T) {
 
 				var processor PathProcessor
-				if processorName == ProcessorTransferName {
+				if processorName == walletCommon.ProcessorTransferName {
 					processor = NewTransferProcessor(nil, nil)
-				} else if processorName == ProcessorBridgeHopName {
+				} else if processorName == walletCommon.ProcessorBridgeHopName {
 					processor = NewHopBridgeProcessor(nil, nil, nil, nil)
-				} else if processorName == ProcessorSwapParaswapName {
+				} else if processorName == walletCommon.ProcessorSwapParaswapName {
 					processor = NewSwapParaswapProcessor(nil, nil, nil)
 				}
 
@@ -325,8 +326,8 @@ func TestPathProcessors(t *testing.T) {
 					assert.Greater(t, estimatedGas, uint64(0))
 
 					input := tt.input
-					input.TestEstimationMap = map[string]Estimation{
-						"randomName": {10000, nil},
+					input.TestEstimationMap = map[string]requests.Estimation{
+						"randomName": {Value: 10000},
 					}
 					estimatedGas, err = processor.EstimateGas(input)
 					assert.Error(t, err)

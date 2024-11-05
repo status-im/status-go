@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 func getSigner(chainID uint64, from types.Address, verifiedAccount *account.SelectedExtKey) bind.SignerFn {
@@ -32,8 +33,9 @@ func makeKey(fromChain, toChain uint64, fromTokenSymbol, toTokenSymbol string, a
 }
 
 func getNameFromEnsUsername(ensUsername string) string {
-	if strings.HasSuffix(ensUsername, StatusDomain) {
-		return ensUsername[:len(ensUsername)-len(StatusDomain)]
+	suffix := "." + walletCommon.StatusDomain
+	if strings.HasSuffix(ensUsername, suffix) {
+		return ensUsername[:len(ensUsername)-len(suffix)]
 	}
 	return ensUsername
 }

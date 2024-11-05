@@ -759,7 +759,7 @@ func (api *API) BuildTransactionsFromRoute(ctx context.Context, buildInputParams
 // - call `SendRouterTransactionsWithSignatures` with the signatures of signed hashes from the previous step
 //
 // TODO: remove this struct once mobile switches to the new approach
-func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signatures map[string]transfer.SignatureDetails) (*transfer.MultiTransactionCommandResult, error) {
+func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signatures map[string]requests.SignatureDetails) (*transfer.MultiTransactionCommandResult, error) {
 	logutils.ZapLogger().Debug("[WalletAPI:: ProceedWithTransactionsSignatures] sign with signatures and send multi transaction")
 	return api.s.transactionManager.ProceedWithTransactionsSignatures(ctx, signatures)
 }

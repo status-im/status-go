@@ -35,11 +35,11 @@ func NewStickersBuyProcessor(rpcClient *rpc.Client, transactor transactions.Tran
 }
 
 func createStickersBuyErrorResponse(err error) error {
-	return createErrorResponse(ProcessorStickersBuyName, err)
+	return createErrorResponse(walletCommon.ProcessorStickersBuyName, err)
 }
 
 func (s *StickersBuyProcessor) Name() string {
-	return ProcessorStickersBuyName
+	return walletCommon.ProcessorStickersBuyName
 }
 
 func (s *StickersBuyProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {

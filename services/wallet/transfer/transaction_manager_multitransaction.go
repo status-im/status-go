@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
@@ -102,7 +103,7 @@ func (tm *TransactionManager) SendTransactions(ctx context.Context, multiTransac
 	}, nil
 }
 
-func (tm *TransactionManager) ProceedWithTransactionsSignatures(ctx context.Context, signatures map[string]SignatureDetails) (*MultiTransactionCommandResult, error) {
+func (tm *TransactionManager) ProceedWithTransactionsSignatures(ctx context.Context, signatures map[string]requests.SignatureDetails) (*MultiTransactionCommandResult, error) {
 	if err := addSignaturesToTransactions(tm.transactionsForKeycardSigning, signatures); err != nil {
 		return nil, err
 	}

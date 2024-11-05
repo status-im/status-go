@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"slices"
+	"strings"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -13,7 +15,9 @@ import (
 	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	routs "github.com/status-im/status-go/services/wallet/router/routes"
@@ -235,4 +239,54 @@ func (r *Router) cacluateFees(ctx context.Context, path *routs.Path, fetchedFees
 	path.RequiredNativeBalance = requiredNativeBalance
 
 	return nil
+}
+
+func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *token.Token {
+	if !sendType.IsCollectiblesTransfer() {
+		return tokenManager.FindToken(network, tokenID)
+	}
+
+	parts := strings.Split(tokenID, ":")
+	contractAddress := common.HexToAddress(parts[0])
+	collectibleTokenID, success := new(big.Int).SetString(parts[1], 10)
+	if !success {
+		return nil
+	}
+	uniqueID, err := collectibles.GetOwnedCollectible(walletCommon.ChainID(network.ChainID), account, contractAddress, collectibleTokenID)
+	if err != nil || uniqueID == nil {
+		return nil
+	}
+
+	return &token.Token{
+		Address:  contractAddress,
+		Symbol:   collectibleTokenID.String(),
+		Decimals: 0,
+		ChainID:  network.ChainID,
+	}
+}
+
+func fetchPrices(sendType sendtype.SendType, marketManager *market.Manager, tokenIDs []string) (map[string]float64, error) {
+	nonUniqueSymbols := append(tokenIDs, "ETH")
+	// remove duplicate enteries
+	slices.Sort(nonUniqueSymbols)
+	symbols := slices.Compact(nonUniqueSymbols)
+	if sendType.IsCollectiblesTransfer() {
+		symbols = []string{"ETH"}
+	}
+
+	pricesMap, err := marketManager.GetOrFetchPrices(symbols, []string{"USD"}, market.MaxAgeInSecondsForFresh)
+
+	if err != nil {
+		return nil, err
+	}
+	prices := make(map[string]float64, 0)
+	for symbol, pricePerCurrency := range pricesMap {
+		prices[symbol] = pricePerCurrency["USD"].Price
+	}
+	if sendType.IsCollectiblesTransfer() {
+		for _, tokenID := range tokenIDs {
+			prices[tokenID] = 0
+		}
+	}
+	return prices, nil
 }

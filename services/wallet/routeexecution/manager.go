@@ -15,10 +15,10 @@ import (
 
 	status_common "github.com/status-im/status-go/common"
 	statusErrors "github.com/status-im/status-go/errors"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/signal"
@@ -117,9 +117,9 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			clearLocalData := true
 			if routeInputParams.SendType == sendtype.Swap {
 				// in case of swap don't clear local data if an approval is placed, but swap tx is not sent yet
-				if m.transactionManager.ApprovalRequiredForPath(pathprocessor.ProcessorSwapParaswapName) &&
-					m.transactionManager.ApprovalPlacedForPath(pathprocessor.ProcessorSwapParaswapName) &&
-					!m.transactionManager.TxPlacedForPath(pathprocessor.ProcessorSwapParaswapName) {
+				if m.transactionManager.ApprovalRequiredForPath(walletCommon.ProcessorSwapParaswapName) &&
+					m.transactionManager.ApprovalPlacedForPath(walletCommon.ProcessorSwapParaswapName) &&
+					!m.transactionManager.TxPlacedForPath(walletCommon.ProcessorSwapParaswapName) {
 					clearLocalData = false
 				}
 			}

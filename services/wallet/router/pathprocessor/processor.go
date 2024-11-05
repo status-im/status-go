@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
@@ -61,13 +62,8 @@ type ProcessorInputParams struct {
 
 	// for testing purposes
 	TestsMode                 bool
-	TestEstimationMap         map[string]Estimation // [bridge-name, estimation]
-	TestBonderFeeMap          map[string]*big.Int   // [token-symbol, bonder-fee]
+	TestEstimationMap         map[string]requests.Estimation // [bridge-name, estimation]
+	TestBonderFeeMap          map[string]*big.Int            // [token-symbol, bonder-fee]
 	TestApprovalGasEstimation uint64
 	TestApprovalL1Fee         uint64
-}
-
-type Estimation struct {
-	Value uint64
-	Err   error
 }

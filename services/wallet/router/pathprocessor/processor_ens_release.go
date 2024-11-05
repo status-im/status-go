@@ -36,11 +36,11 @@ func NewENSReleaseProcessor(rpcClient *rpc.Client, transactor transactions.Trans
 }
 
 func createENSReleaseErrorResponse(err error) error {
-	return createErrorResponse(ProcessorENSReleaseName, err)
+	return createErrorResponse(walletCommon.ProcessorENSReleaseName, err)
 }
 
 func (s *ENSReleaseProcessor) Name() string {
-	return ProcessorENSReleaseName
+	return walletCommon.ProcessorENSReleaseName
 }
 
 func (s *ENSReleaseProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {

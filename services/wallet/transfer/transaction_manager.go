@@ -21,20 +21,6 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-type SignatureDetails struct {
-	R string `json:"r"`
-	S string `json:"s"`
-	V string `json:"v"`
-}
-
-func (sd *SignatureDetails) Validate() error {
-	if len(sd.R) != 64 || len(sd.S) != 64 || len(sd.V) != 2 {
-		return ErrInvalidSignatureDetails
-	}
-
-	return nil
-}
-
 // TODO: remove this struct once mobile switches to the new approach
 type TransactionDescription struct {
 	chainID   uint64

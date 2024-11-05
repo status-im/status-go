@@ -8,7 +8,6 @@ import (
 	"github.com/status-im/status-go/errors"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/fees"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
 )
@@ -65,13 +64,18 @@ type RouteInputParams struct {
 type RouterTestParams struct {
 	TokenFrom             *token.Token
 	TokenPrices           map[string]float64
-	EstimationMap         map[string]pathprocessor.Estimation // [processor-name, estimation]
-	BonderFeeMap          map[string]*big.Int                 // [token-symbol, bonder-fee]
+	EstimationMap         map[string]Estimation // [processor-name, estimation]
+	BonderFeeMap          map[string]*big.Int   // [token-symbol, bonder-fee]
 	SuggestedFees         *fees.SuggestedFees
 	BaseFee               *big.Int
 	BalanceMap            map[string]*big.Int // [token-symbol, balance]
 	ApprovalGasEstimation uint64
 	ApprovalL1Fee         uint64
+}
+
+type Estimation struct {
+	Value uint64
+	Err   error
 }
 
 func (i *RouteInputParams) Validate() error {
@@ -80,11 +84,11 @@ func (i *RouteInputParams) Validate() error {
 			return ErrENSRegisterRequiresUsernameAndPubKey
 		}
 		if i.TestnetMode {
-			if i.TokenID != pathprocessor.SttSymbol {
+			if i.TokenID != walletCommon.SttSymbol {
 				return ErrENSRegisterTestnetSTTOnly
 			}
 		} else {
-			if i.TokenID != pathprocessor.SntSymbol {
+			if i.TokenID != walletCommon.SntSymbol {
 				return ErrENSRegisterMainnetSNTOnly
 			}
 		}

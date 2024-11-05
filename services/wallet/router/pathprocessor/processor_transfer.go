@@ -27,11 +27,11 @@ func NewTransferProcessor(rpcClient *rpc.Client, transactor transactions.Transac
 }
 
 func createTransferErrorResponse(err error) error {
-	return createErrorResponse(ProcessorTransferName, err)
+	return createErrorResponse(walletCommon.ProcessorTransferName, err)
 }
 
 func (s *TransferProcessor) Name() string {
-	return ProcessorTransferName
+	return walletCommon.ProcessorTransferName
 }
 
 func (s *TransferProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {

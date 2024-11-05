@@ -36,10 +36,10 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 	processor := NewSwapParaswapProcessor(nil, nil, nil)
 
 	fromToken := token.Token{
-		Symbol: EthSymbol,
+		Symbol: walletCommon.EthSymbol,
 	}
 	toToken := token.Token{
-		Symbol: UsdcSymbol,
+		Symbol: walletCommon.UsdcSymbol,
 	}
 	chainIDs := []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.UnknownChainID}
 
@@ -107,10 +107,10 @@ func TestParaswapErrors(t *testing.T) {
 	processor.paraswapClient = client
 
 	fromToken := token.Token{
-		Symbol: EthSymbol,
+		Symbol: walletCommon.EthSymbol,
 	}
 	toToken := token.Token{
-		Symbol: UsdcSymbol,
+		Symbol: walletCommon.UsdcSymbol,
 	}
 	chainID := walletCommon.EthereumMainnet
 

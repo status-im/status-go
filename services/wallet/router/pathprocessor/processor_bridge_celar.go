@@ -64,11 +64,11 @@ func NewCelerBridgeProcessor(rpcClient *rpc.Client, transactor transactions.Tran
 }
 
 func createBridgeCellerErrorResponse(err error) error {
-	return createErrorResponse(ProcessorBridgeCelerName, err)
+	return createErrorResponse(walletCommon.ProcessorBridgeCelerName, err)
 }
 
 func (s *CelerBridgeProcessor) Name() string {
-	return ProcessorBridgeCelerName
+	return walletCommon.ProcessorBridgeCelerName
 }
 
 func (s *CelerBridgeProcessor) estimateAmt(from, to *params.Network, amountIn *big.Int, symbol string) (*cbridge.EstimateAmtResponse, error) {
@@ -147,11 +147,11 @@ func (s *CelerBridgeProcessor) AvailableFor(params ProcessorInputParams) (bool, 
 	var fromAvailable *cbridge.Chain
 	var toAvailable *cbridge.Chain
 	for _, chain := range transferConfig.Chains {
-		if uint64(chain.GetId()) == params.FromChain.ChainID && chain.GasTokenSymbol == EthSymbol {
+		if uint64(chain.GetId()) == params.FromChain.ChainID && chain.GasTokenSymbol == walletCommon.EthSymbol {
 			fromAvailable = chain
 		}
 
-		if uint64(chain.GetId()) == params.ToChain.ChainID && chain.GasTokenSymbol == EthSymbol {
+		if uint64(chain.GetId()) == params.ToChain.ChainID && chain.GasTokenSymbol == walletCommon.EthSymbol {
 			toAvailable = chain
 		}
 	}

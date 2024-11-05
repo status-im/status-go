@@ -36,11 +36,11 @@ func NewERC1155Processor(rpcClient *rpc.Client, transactor transactions.Transact
 }
 
 func createERC1155ErrorResponse(err error) error {
-	return createErrorResponse(ProcessorERC1155Name, err)
+	return createErrorResponse(walletCommon.ProcessorERC1155Name, err)
 }
 
 func (s *ERC1155Processor) Name() string {
-	return ProcessorERC1155Name
+	return walletCommon.ProcessorERC1155Name
 }
 
 func (s *ERC1155Processor) AvailableFor(params ProcessorInputParams) (bool, error) {

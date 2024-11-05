@@ -76,11 +76,11 @@ func createSwapParaswapErrorResponse(err error) error {
 	case "ESTIMATED_LOSS_GREATER_THAN_MAX_IMPACT":
 		return ErrPriceImpactTooHigh
 	}
-	return createErrorResponse(ProcessorSwapParaswapName, err)
+	return createErrorResponse(walletCommon.ProcessorSwapParaswapName, err)
 }
 
 func (s *SwapParaswapProcessor) Name() string {
-	return ProcessorSwapParaswapName
+	return walletCommon.ProcessorSwapParaswapName
 }
 
 func (s *SwapParaswapProcessor) Clear() {

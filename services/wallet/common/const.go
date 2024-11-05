@@ -13,7 +13,26 @@ type MultiTransactionIDType int64
 const (
 	NoMultiTransactionID = MultiTransactionIDType(0)
 	HexAddressLength     = 42
-	StatusDomain         = "stateofus.eth"
+
+	StatusDomain = "stateofus.eth"
+	EthDomain    = "eth"
+
+	EthSymbol  = "ETH"
+	SntSymbol  = "SNT"
+	SttSymbol  = "STT"
+	UsdcSymbol = "USDC"
+	HopSymbol  = "HOP"
+
+	ProcessorTransferName     = "Transfer"
+	ProcessorBridgeHopName    = "Hop"
+	ProcessorBridgeCelerName  = "CBridge"
+	ProcessorSwapParaswapName = "Paraswap"
+	ProcessorERC721Name       = "ERC721Transfer"
+	ProcessorERC1155Name      = "ERC1155Transfer"
+	ProcessorENSRegisterName  = "ENSRegister"
+	ProcessorENSReleaseName   = "ENSRelease"
+	ProcessorENSPublicKeyName = "ENSPublicKey"
+	ProcessorStickersBuyName  = "StickersBuy"
 )
 
 type ChainID uint64

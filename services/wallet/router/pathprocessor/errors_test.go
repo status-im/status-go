@@ -7,6 +7,8 @@ import (
 
 	s_errors "github.com/status-im/status-go/errors"
 
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,17 +17,17 @@ func TestPlainError(t *testing.T) {
 	err := errors.New(errString)
 
 	processorNames := []string{
-		ProcessorTransferName,
-		ProcessorTransferName,
-		ProcessorBridgeHopName,
-		ProcessorBridgeCelerName,
-		ProcessorSwapParaswapName,
-		ProcessorERC721Name,
-		ProcessorERC1155Name,
-		ProcessorENSRegisterName,
-		ProcessorENSReleaseName,
-		ProcessorENSPublicKeyName,
-		ProcessorStickersBuyName,
+		walletCommon.ProcessorTransferName,
+		walletCommon.ProcessorTransferName,
+		walletCommon.ProcessorBridgeHopName,
+		walletCommon.ProcessorBridgeCelerName,
+		walletCommon.ProcessorSwapParaswapName,
+		walletCommon.ProcessorERC721Name,
+		walletCommon.ProcessorERC1155Name,
+		walletCommon.ProcessorENSRegisterName,
+		walletCommon.ProcessorENSReleaseName,
+		walletCommon.ProcessorENSPublicKeyName,
+		walletCommon.ProcessorStickersBuyName,
 	}
 
 	for _, processorName := range processorNames {
@@ -62,7 +64,7 @@ func TestNonGenericErrorResponse(t *testing.T) {
 		Details: "Not Generic Error Response",
 	}
 	err := s_errors.CreateErrorResponseFromError(errResp)
-	ppErrResp := createErrorResponse(ProcessorTransferName, err)
+	ppErrResp := createErrorResponse(walletCommon.ProcessorTransferName, err)
 
 	castPPErrResp := ppErrResp.(*s_errors.ErrorResponse)
 	require.Equal(t, errResp.Code, castPPErrResp.Code)

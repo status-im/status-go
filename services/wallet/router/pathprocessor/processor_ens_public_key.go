@@ -36,11 +36,11 @@ func NewENSPublicKeyProcessor(rpcClient *rpc.Client, transactor transactions.Tra
 }
 
 func createENSPublicKeyErrorResponse(err error) error {
-	return createErrorResponse(ProcessorENSPublicKeyName, err)
+	return createErrorResponse(walletCommon.ProcessorENSPublicKeyName, err)
 }
 
 func (s *ENSPublicKeyProcessor) Name() string {
-	return ProcessorENSPublicKeyName
+	return walletCommon.ProcessorENSPublicKeyName
 }
 
 func (s *ENSPublicKeyProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
