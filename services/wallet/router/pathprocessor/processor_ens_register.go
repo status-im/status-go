@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/services/ens/ensresolver"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
@@ -24,16 +24,16 @@ import (
 type ENSRegisterProcessor struct {
 	contractMaker *contracts.ContractMaker
 	transactor    transactions.TransactorIface
-	ensService    *ens.Service
+	ensResolver   *ensresolver.EnsResolver
 }
 
-func NewENSRegisterProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, ensService *ens.Service) *ENSRegisterProcessor {
+func NewENSRegisterProcessor(rpcClient *rpc.Client, transactor transactions.TransactorIface, ensResolver *ensresolver.EnsResolver) *ENSRegisterProcessor {
 	return &ENSRegisterProcessor{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
 		},
-		transactor: transactor,
-		ensService: ensService,
+		transactor:  transactor,
+		ensResolver: ensResolver,
 	}
 }
 
@@ -46,7 +46,7 @@ func (s *ENSRegisterProcessor) Name() string {
 }
 
 func (s *ENSRegisterProcessor) GetPriceForRegisteringEnsName(chainID uint64) (*big.Int, error) {
-	registryAddr, err := s.ensService.API().GetRegistrarAddress(context.Background(), chainID)
+	registryAddr, err := s.ensResolver.GetRegistrarAddress(context.Background(), chainID)
 	if err != nil {
 		return nil, createENSRegisterProcessorErrorResponse(err)
 	}
@@ -78,8 +78,8 @@ func (s *ENSRegisterProcessor) PackTxInputData(params ProcessorInputParams) ([]b
 		return []byte{}, createENSRegisterProcessorErrorResponse(err)
 	}
 
-	x, y := ens.ExtractCoordinates(params.PublicKey)
-	extraData, err := registrarABI.Pack("register", ens.UsernameToLabel(params.Username), params.FromAddr, x, y)
+	x, y := walletCommon.ExtractCoordinates(params.PublicKey)
+	extraData, err := registrarABI.Pack("register", walletCommon.UsernameToLabel(params.Username), params.FromAddr, x, y)
 	if err != nil {
 		return []byte{}, createENSRegisterProcessorErrorResponse(err)
 	}
@@ -89,7 +89,7 @@ func (s *ENSRegisterProcessor) PackTxInputData(params ProcessorInputParams) ([]b
 		return []byte{}, createENSRegisterProcessorErrorResponse(err)
 	}
 
-	registryAddr, err := s.ensService.API().GetRegistrarAddress(context.Background(), params.FromChain.ChainID)
+	registryAddr, err := s.ensResolver.GetRegistrarAddress(context.Background(), params.FromChain.ChainID)
 	if err != nil {
 		return []byte{}, createENSRegisterProcessorErrorResponse(err)
 	}

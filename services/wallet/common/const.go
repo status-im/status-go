@@ -13,6 +13,7 @@ type MultiTransactionIDType int64
 const (
 	NoMultiTransactionID = MultiTransactionIDType(0)
 	HexAddressLength     = 42
+	StatusDomain         = "stateofus.eth"
 )
 
 type ChainID uint64

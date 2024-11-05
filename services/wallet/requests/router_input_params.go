@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/errors"
-	"github.com/status-im/status-go/services/ens"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
@@ -103,7 +102,7 @@ func (i *RouteInputParams) Validate() error {
 			return ErrENSSetPubKeyRequiresUsernameAndPubKey
 		}
 
-		if ens.ValidateENSUsername(i.Username) != nil {
+		if walletCommon.ValidateENSUsername(i.Username) != nil {
 			return ErrENSSetPubKeyInvalidUsername
 		}
 	}

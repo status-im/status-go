@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -68,7 +67,6 @@ type Router struct {
 	marketManager       *market.Manager
 	collectiblesService *collectibles.Service
 	collectiblesManager *collectibles.Manager
-	ensService          *ens.Service
 	feesManager         *fees.FeeManager
 	pathProcessors      map[string]pathprocessor.PathProcessor
 	scheduler           *async.Scheduler
@@ -88,7 +86,7 @@ type Router struct {
 }
 
 func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, tokenManager *token.Manager, marketManager *market.Manager,
-	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager, ensService *ens.Service) *Router {
+	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager) *Router {
 	processors := make(map[string]pathprocessor.PathProcessor)
 
 	return &Router{
@@ -97,7 +95,6 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 		marketManager:       marketManager,
 		collectiblesService: collectibles,
 		collectiblesManager: collectiblesManager,
-		ensService:          ensService,
 		feesManager: &fees.FeeManager{
 			RPCClient: rpcClient,
 		},
