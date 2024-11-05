@@ -12,7 +12,7 @@ logger = get_custom_logger(__name__)
 @pytest.mark.usefixtures("start_2_nodes")
 class TestPrivateGroupMessages(StepsCommon):
     def test_group_chat_messages_baseline(self):
-        num_private_groups = NUM_MESSAGES
+        num_private_groups = PRIVATE_GROUPS
         private_groups = []
         contact_request_sent = False
 
