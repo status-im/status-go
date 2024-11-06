@@ -1,8 +1,12 @@
 package responses
 
 import (
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
@@ -59,6 +63,15 @@ func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types.Hash,
 	if sendArgs.To != nil {
 		addr = *sendArgs.To
 	}
+	if sendArgs.Value == nil {
+		sendArgs.Value = (*hexutil.Big)(big.NewInt(0))
+	}
+	if sendArgs.ValueIn == nil {
+		sendArgs.ValueIn = (*hexutil.Big)(big.NewInt(0))
+	}
+	if sendArgs.ValueOut == nil {
+		sendArgs.ValueOut = (*hexutil.Big)(big.NewInt(0))
+	}
 	return &RouterSentTransaction{
 		FromAddress: sendArgs.From,
 		ToAddress:   addr,
@@ -70,5 +83,25 @@ func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types.Hash,
 		AmountOut:   sendArgs.ValueOut.String(),
 		Hash:        hash,
 		ApprovalTx:  approvalTx,
+	}
+}
+
+func (sd *SendDetails) UpdateFields(inputParams requests.RouteInputParams) {
+	sd.SendType = int(inputParams.SendType)
+	sd.FromAddress = types.Address(inputParams.AddrFrom)
+	sd.ToAddress = types.Address(inputParams.AddrTo)
+	sd.FromToken = inputParams.TokenID
+	sd.ToToken = inputParams.ToTokenID
+	if inputParams.AmountIn != nil {
+		sd.FromAmount = inputParams.AmountIn.String()
+	}
+	if inputParams.AmountOut != nil {
+		sd.ToAmount = inputParams.AmountOut.String()
+	}
+	sd.OwnerTokenBeingSent = inputParams.TokenIDIsOwnerToken
+	sd.Username = inputParams.Username
+	sd.PublicKey = inputParams.PublicKey
+	if inputParams.PackID != nil {
+		sd.PackID = inputParams.PackID.String()
 	}
 }

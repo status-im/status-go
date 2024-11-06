@@ -173,7 +173,7 @@ func TestPendingTxTracker_InterruptWatching(t *testing.T) {
 	sub := eventFeed.Subscribe(eventChan)
 
 	for i := range txs {
-		err := m.addPending(&txs[i])
+		err := m.addPendingAndNotify(&txs[i])
 		require.NoError(t, err)
 	}
 
@@ -563,7 +563,7 @@ func TestPendingTransactions(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	err = manager.addPending(&tx)
+	err = manager.addPendingAndNotify(&tx)
 	require.NoError(t, err)
 
 	rst, err = manager.GetPendingByAddress([]uint64{777}, tx.From)

@@ -55,6 +55,14 @@ func (db *DB) GetRouteData(uuid string) (*wallettypes.RouteData, error) {
 	return getRouteData(db.db, uuid)
 }
 
+func (db *DB) GetRouteDataByHash(chainID uint64, txHash types.Hash) (*wallettypes.RouteData, error) {
+	uuid, err := getUuidForTxOnChain(db.db, chainID, txHash)
+	if err != nil {
+		return nil, err
+	}
+	return db.GetRouteData(uuid)
+}
+
 func putRouteInputParams(creator sqlite.StatementCreator, p *requests.RouteInputParams) error {
 	q := sq.Replace("route_input_parameters").
 		SetMap(sq.Eq{"route_input_params_json": &sqlite.JSONBlob{Data: p}})
@@ -393,4 +401,25 @@ func getPathTransaction(creator sqlite.StatementCreator, uuid string, pathIdx in
 	}
 
 	return tx, nil
+}
+
+func getUuidForTxOnChain(creator sqlite.StatementCreator, chainID uint64, txHash types.Hash) (string, error) {
+	var uuid string
+	q := sq.Select("uuid").
+		From("route_path_transactions").
+		Where(sq.Eq{"chain_id": chainID, "tx_hash": txHash[:]})
+
+	query, args, err := q.ToSql()
+	if err != nil {
+		return uuid, err
+	}
+
+	stmt, err := creator.Prepare(query)
+	if err != nil {
+		return uuid, err
+	}
+	defer stmt.Close()
+
+	err = stmt.QueryRow(args...).Scan(&uuid)
+	return uuid, err
 }

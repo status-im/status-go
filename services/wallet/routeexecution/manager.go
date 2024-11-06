@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 
 	status_common "github.com/status-im/status-go/common"
@@ -81,7 +80,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 
 		m.buildInputParams = buildInputParams
 
-		updateFields(response.SendDetails, routeInputParams)
+		response.SendDetails.UpdateFields(routeInputParams)
 
 		// notify client that sending transactions started (has 3 steps, building txs, signing txs, sending txs)
 		signal.SendWalletEvent(signal.RouterSendingTransactionsStarted, response.SendDetails)
@@ -143,7 +142,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			return
 		}
 
-		updateFields(response.SendDetails, routeInputParams)
+		response.SendDetails.UpdateFields(routeInputParams)
 
 		err = m.transactionManager.ValidateAndAddSignaturesToRouterTransactions(sendInputParams.Signatures)
 		if err != nil {
@@ -218,24 +217,4 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			logutils.ZapLogger().Error("Error checking recent history", zap.Error(tmpErr))
 		}
 	}()
-}
-
-func updateFields(sd *responses.SendDetails, inputParams requests.RouteInputParams) {
-	sd.SendType = int(inputParams.SendType)
-	sd.FromAddress = types.Address(inputParams.AddrFrom)
-	sd.ToAddress = types.Address(inputParams.AddrTo)
-	sd.FromToken = inputParams.TokenID
-	sd.ToToken = inputParams.ToTokenID
-	if inputParams.AmountIn != nil {
-		sd.FromAmount = inputParams.AmountIn.String()
-	}
-	if inputParams.AmountOut != nil {
-		sd.ToAmount = inputParams.AmountOut.String()
-	}
-	sd.OwnerTokenBeingSent = inputParams.TokenIDIsOwnerToken
-	sd.Username = inputParams.Username
-	sd.PublicKey = inputParams.PublicKey
-	if inputParams.PackID != nil {
-		sd.PackID = inputParams.PackID.String()
-	}
 }

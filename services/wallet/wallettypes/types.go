@@ -66,16 +66,16 @@ type SendTxArgs struct {
 
 	// additional data - version SendTxArgsVersion0
 	MultiTransactionID wallet_common.MultiTransactionIDType `json:"multiTransactionID"`
-	Symbol             string                               `json:"-"`
+	Symbol             string                               `json:"symbol"`
 	// additional data - version SendTxArgsVersion1
-	ValueIn            *hexutil.Big  `json:"-"`
-	ValueOut           *hexutil.Big  `json:"-"`
-	FromChainID        uint64        `json:"-"`
-	ToChainID          uint64        `json:"-"`
-	FromTokenID        string        `json:"-"`
-	ToTokenID          string        `json:"-"`
-	ToContractAddress  types.Address `json:"-"` // represents address of the contract that needs to be used in order to send assets, like ERC721 or ERC1155 tx
-	SlippagePercentage float32       `json:"-"`
+	ValueIn            *hexutil.Big  `json:"valueIn"`
+	ValueOut           *hexutil.Big  `json:"valueOut"`
+	FromChainID        uint64        `json:"fromChainID"`
+	ToChainID          uint64        `json:"toChainID"`
+	FromTokenID        string        `json:"fromTokenID"`
+	ToTokenID          string        `json:"toTokenID"`
+	ToContractAddress  types.Address `json:"toContractAddress"` // represents address of the contract that needs to be used in order to send assets, like ERC721 or ERC1155 tx
+	SlippagePercentage float32       `json:"slippagePercentage"`
 }
 
 // Valid checks whether this structure is filled in correctly.
