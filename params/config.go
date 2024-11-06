@@ -20,6 +20,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/static"
 	wakucommon "github.com/status-im/status-go/waku/common"
@@ -919,7 +920,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		DataDir:                dataDir,
 		KeyStoreDir:            keyStoreDir,
 		KeycardPairingDataFile: keycardPairingDataFile,
-		Version:                Version(),
+		Version:                version.Version(),
 		HTTPHost:               "localhost",
 		HTTPPort:               8545,
 		HTTPVirtualHosts:       []string{"localhost"},

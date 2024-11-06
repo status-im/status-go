@@ -80,6 +80,9 @@ const (
 
 	// LESDiscoveryIdentifier is a prefix for topic used for LES peers discovery.
 	LESDiscoveryIdentifier = "LES2@"
+
+	// IpfsGatewayURL is the Gateway URL to use for IPFS
+	IpfsGatewayURL = "https://ipfs.status.im/"
 )
 
 var (

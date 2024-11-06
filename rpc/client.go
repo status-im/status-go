@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	appCommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"
+	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/chain"
@@ -59,17 +60,17 @@ var (
 
 var (
 	// rpcUserAgentName the user agent
-	rpcUserAgentName         = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS", params.Version())
-	rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, "no-GOOS", params.Version())
+	rpcUserAgentName         = fmt.Sprintf(rpcUserAgentFormat, "no-GOOS", version.Version())
+	rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, "no-GOOS", version.Version())
 )
 
 func init() {
 	if appCommon.IsMobilePlatform() {
-		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, mobile, params.Version())
-		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, mobile, params.Version())
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, mobile, version.Version())
+		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, mobile, version.Version())
 	} else {
-		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, desktop, params.Version())
-		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, desktop, params.Version())
+		rpcUserAgentName = fmt.Sprintf(rpcUserAgentFormat, desktop, version.Version())
+		rpcUserAgentUpstreamName = fmt.Sprintf(rpcUserAgentUpstreamFormat, desktop, version.Version())
 	}
 }
 

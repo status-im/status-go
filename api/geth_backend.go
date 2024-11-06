@@ -35,6 +35,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -112,8 +113,8 @@ func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
 	backend.initialize()
 
 	logger.Info("Status backend initialized",
-		zap.String("backend geth version", params.Version()),
-		zap.String("commit", params.GitCommit()),
+		zap.String("backend geth version", version.Version()),
+		zap.String("commit", version.GitCommit()),
 		zap.String("IpfsGatewayURL", params.IpfsGatewayURL))
 
 	return backend
@@ -2062,10 +2063,10 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 
 	// Start WakuV1 if WakuV2 is not enabled
 	conf.WakuConfig.Enabled = !conf.WakuV2Config.Enabled
-	// NodeConfig.Version should be taken from params.Version
+	// NodeConfig.Version should be taken from version.Version
 	// which is set at the compile time.
 	// What's cached is usually outdated so we overwrite it here.
-	conf.Version = params.Version()
+	conf.Version = version.Version()
 	conf.RootDataDir = b.rootDataDir
 	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
 	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
@@ -2112,8 +2113,8 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}()
 
 	b.logger.Info("status-go version details",
-		zap.String("version", params.Version()),
-		zap.String("commit", params.GitCommit()))
+		zap.String("version", version.Version()),
+		zap.String("commit", version.GitCommit()))
 	b.logger.Debug("starting node with config", zap.Stringer("config", config))
 	// Update config with some defaults.
 	if err := config.UpdateWithDefaults(); err != nil {

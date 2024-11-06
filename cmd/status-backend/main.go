@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/cmd/status-backend/server"
+	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/params"
 )
 
 var (
@@ -45,8 +45,8 @@ func main() {
 
 	log.Info("status-backend started",
 		"address", srv.Address(),
-		"version", params.Version(),
-		"gitCommit", params.GitCommit(),
+		"version", version.Version(),
+		"gitCommit", version.GitCommit(),
 	)
 	srv.RegisterMobileAPI()
 	srv.Serve()
