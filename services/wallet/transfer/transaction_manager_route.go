@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/transactions"
 )
 
 type BuildRouteExtraParams struct {
@@ -61,14 +62,14 @@ func (tm *TransactionManager) TxPlacedForPath(pathProcessorName string) bool {
 	return false
 }
 
-func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *RouterTransactionDetails {
+func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *wallettypes.RouterTransactionDetails {
 	for _, desc := range tm.routerTransactions {
 		if desc.RouterPath.ID() == path.ID() {
 			return desc
 		}
 	}
 
-	newDetails := &RouterTransactionDetails{
+	newDetails := &wallettypes.RouterTransactionDetails{
 		RouterPath: path,
 	}
 	tm.routerTransactions = append(tm.routerTransactions, newDetails)
@@ -77,7 +78,7 @@ func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *Router
 }
 
 func buildApprovalTxForPath(transactor transactions.TransactorIface, path *routes.Path, addressFrom common.Address,
-	usedNonces map[uint64]int64, signer ethTypes.Signer) (*TransactionData, error) {
+	usedNonces map[uint64]int64, signer ethTypes.Signer) (*wallettypes.TransactionData, error) {
 	lastUsedNonce := int64(-1)
 	if nonce, ok := usedNonces[path.FromChain.ChainID]; ok {
 		lastUsedNonce = nonce
@@ -116,7 +117,7 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 	approvalTxHash := signer.Hash(builtApprovalTx)
 	usedNonces[path.FromChain.ChainID] = int64(usedNonce)
 
-	return &TransactionData{
+	return &wallettypes.TransactionData{
 		TxArgs:     approavalSendArgs,
 		Tx:         builtApprovalTx,
 		HashToSign: types.Hash(approvalTxHash),
@@ -124,7 +125,7 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 }
 
 func buildTxForPath(transactor transactions.TransactorIface, path *routes.Path, pathProcessors map[string]pathprocessor.PathProcessor,
-	usedNonces map[uint64]int64, signer ethTypes.Signer, params BuildRouteExtraParams) (*TransactionData, error) {
+	usedNonces map[uint64]int64, signer ethTypes.Signer, params BuildRouteExtraParams) (*wallettypes.TransactionData, error) {
 	lastUsedNonce := int64(-1)
 	if nonce, ok := usedNonces[path.FromChain.ChainID]; ok {
 		lastUsedNonce = nonce
@@ -204,7 +205,7 @@ func buildTxForPath(transactor transactions.TransactorIface, path *routes.Path, 
 	txHash := signer.Hash(builtTx)
 	usedNonces[path.FromChain.ChainID] = int64(usedNonce)
 
-	return &TransactionData{
+	return &wallettypes.TransactionData{
 		TxArgs:     sendArgs,
 		Tx:         builtTx,
 		HashToSign: types.Hash(txHash),
@@ -295,7 +296,7 @@ func getSignatureForTxHash(txHash string, signatures map[string]requests.Signatu
 	return signature, nil
 }
 
-func validateAndAddSignature(txData *TransactionData, signatures map[string]SignatureDetails) error {
+func validateAndAddSignature(txData *wallettypes.TransactionData, signatures map[string]requests.SignatureDetails) error {
 	if txData != nil && !txData.IsTxPlaced() {
 		var err error
 		txData.Signature, err = getSignatureForTxHash(txData.HashToSign.String(), signatures)
@@ -331,7 +332,7 @@ func (tm *TransactionManager) ValidateAndAddSignaturesToRouterTransactions(signa
 
 func addSignatureAndSendTransaction(
 	transactor transactions.TransactorIface,
-	txData *TransactionData,
+	txData *wallettypes.TransactionData,
 	multiTransactionID walletCommon.MultiTransactionIDType,
 	isApproval bool) (*responses.RouterSentTransaction, error) {
 	var txWithSignature *ethTypes.Transaction
@@ -385,6 +386,6 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiT
 	return
 }
 
-func (tm *TransactionManager) GetRouterTransactions() []*RouterTransactionDetails {
+func (tm *TransactionManager) GetRouterTransactions() []*wallettypes.RouterTransactionDetails {
 	return tm.routerTransactions
 }

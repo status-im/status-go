@@ -1,16 +1,16 @@
-package routeexecution_test
+package storage_test
 
 import (
 	"encoding/json"
 
 	"github.com/status-im/status-go/services/wallet/requests"
-	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
 type dbParams struct {
 	routeInputParams   requests.RouteInputParams
 	buildInputParams   *requests.RouterBuildTransactionsParams
-	transactionDetails []*transfer.RouterTransactionDetails
+	transactionDetails []*wallettypes.RouterTransactionDetails
 }
 
 type dbTestData struct {
@@ -33,7 +33,7 @@ func createDBParams(routeInputParamsJSON string, buildInputParamsJSON string, tr
 		panic(err)
 	}
 
-	transactionDetails := make([]*transfer.RouterTransactionDetails, 0)
+	transactionDetails := make([]*wallettypes.RouterTransactionDetails, 0)
 	err = json.Unmarshal([]byte(transactionDetailsJSON), &transactionDetails)
 	if err != nil {
 		panic(err)

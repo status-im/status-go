@@ -17,7 +17,6 @@ import (
 	"github.com/status-im/status-go/params"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
-	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -28,32 +27,6 @@ type TransactionDescription struct {
 	from      common.Address
 	builtTx   *ethTypes.Transaction
 	signature []byte
-}
-
-type TransactionData struct {
-	TxArgs     *wallettypes.SendTxArgs
-	Tx         *ethTypes.Transaction
-	HashToSign types.Hash
-	Signature  []byte
-	SentHash   types.Hash
-}
-
-func (txd *TransactionData) IsTxPlaced() bool {
-	return txd.SentHash != types.Hash(wallet_common.ZeroHash())
-}
-
-type RouterTransactionDetails struct {
-	RouterPath     *routes.Path
-	TxData         *TransactionData
-	ApprovalTxData *TransactionData
-}
-
-func (rtd *RouterTransactionDetails) IsTxPlaced() bool {
-	return rtd.TxData != nil && rtd.TxData.IsTxPlaced()
-}
-
-func (rtd *RouterTransactionDetails) IsApprovalPlaced() bool {
-	return rtd.ApprovalTxData != nil && rtd.ApprovalTxData.IsTxPlaced()
 }
 
 type TransactionManager struct {
@@ -71,7 +44,7 @@ type TransactionManager struct {
 	transactionsForKeycardSigning     map[common.Hash]*TransactionDescription
 
 	// used in a new approach
-	routerTransactions []*RouterTransactionDetails
+	routerTransactions []*wallettypes.RouterTransactionDetails
 }
 
 type MultiTransactionStorage interface {
