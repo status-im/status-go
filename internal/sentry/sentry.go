@@ -1,8 +1,6 @@
 package sentry
 
 import (
-	"encoding/json"
-	"fmt"
 	"slices"
 	"time"
 
@@ -58,12 +56,6 @@ func beforeSend(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 		trimStacktrace(exception.Stacktrace)
 	}
 
-	// FIXME: Remove this temporary printing
-	eventJSON, _ := json.Marshal(event)
-	hintJSON, _ := json.Marshal(hint)
-	fmt.Println("publish sentry event")
-	fmt.Println(string(eventJSON))
-	fmt.Println(string(hintJSON))
 	return event
 }
 
