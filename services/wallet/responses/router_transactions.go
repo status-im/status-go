@@ -48,6 +48,7 @@ type RouterSentTransaction struct {
 	FromToken   string        `json:"fromToken"`
 	ToToken     string        `json:"toToken"`
 	Amount      string        `json:"amount"`    // amount sent
+	AmountIn    string        `json:"amountIn"`  // amount that is "data" of tx (important for erc20 tokens)
 	AmountOut   string        `json:"amountOut"` // amount that will be received
 	Hash        types.Hash    `json:"hash"`
 	ApprovalTx  bool          `json:"approvalTx"`
@@ -80,6 +81,7 @@ func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types.Hash,
 		FromToken:   sendArgs.FromTokenID,
 		ToToken:     sendArgs.ToTokenID,
 		Amount:      sendArgs.Value.String(),
+		AmountIn:    sendArgs.ValueIn.String(),
 		AmountOut:   sendArgs.ValueOut.String(),
 		Hash:        hash,
 		ApprovalTx:  approvalTx,
