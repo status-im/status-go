@@ -386,7 +386,7 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *transactions.SendTxArgs, si
 		return tx, createBridgeHopErrorResponse(err)
 	}
 
-	bonderKey := makeKey(sendArgs.FromChainID, sendArgs.ToChainID, "", "", (*big.Int)(sendArgs.Value))
+	bonderKey := makeKey(sendArgs.FromChainID, sendArgs.ToChainID, "", "", (*big.Int)(sendArgs.ValueIn))
 	bonderFeeIns, ok := h.bonderFee.Load(bonderKey)
 	if !ok {
 		return nil, ErrNoBonderFeeFound

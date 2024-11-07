@@ -68,6 +68,7 @@ type SendTxArgs struct {
 	MultiTransactionID wallet_common.MultiTransactionIDType `json:"multiTransactionID"`
 	Symbol             string                               `json:"-"`
 	// additional data - version SendTxArgsVersion1
+	ValueIn            *hexutil.Big  `json:"-"`
 	ValueOut           *hexutil.Big  `json:"-"`
 	FromChainID        uint64        `json:"-"`
 	ToChainID          uint64        `json:"-"`

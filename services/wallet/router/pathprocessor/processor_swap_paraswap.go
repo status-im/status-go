@@ -212,7 +212,7 @@ func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) 
 func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorTxArgs) error {
 	slippageBP := uint(sendArgs.SwapTx.SlippagePercentage * 100) // convert to basis points
 
-	key := makeKey(sendArgs.SwapTx.ChainID, sendArgs.SwapTx.ChainIDTo, sendArgs.SwapTx.TokenIDFrom, sendArgs.SwapTx.TokenIDTo, sendArgs.SwapTx.Value.ToInt())
+	key := makeKey(sendArgs.SwapTx.ChainID, sendArgs.SwapTx.ChainIDTo, sendArgs.SwapTx.TokenIDFrom, sendArgs.SwapTx.TokenIDTo, sendArgs.SwapTx.ValueIn.ToInt())
 	priceRouteIns, ok := s.priceRoute.Load(key)
 	if !ok {
 		return ErrPriceRouteNotFound
@@ -258,7 +258,7 @@ func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorT
 func (s *SwapParaswapProcessor) prepareTransactionV2(sendArgs *transactions.SendTxArgs) error {
 	slippageBP := uint(sendArgs.SlippagePercentage * 100) // convert to basis points
 
-	key := makeKey(sendArgs.FromChainID, sendArgs.ToChainID, sendArgs.FromTokenID, sendArgs.ToTokenID, sendArgs.Value.ToInt())
+	key := makeKey(sendArgs.FromChainID, sendArgs.ToChainID, sendArgs.FromTokenID, sendArgs.ToTokenID, sendArgs.ValueIn.ToInt())
 	priceRouteIns, ok := s.priceRoute.Load(key)
 	if !ok {
 		return ErrPriceRouteNotFound

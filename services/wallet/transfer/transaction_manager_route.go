@@ -153,6 +153,7 @@ func (tm *TransactionManager) buildTxForPath(path *routes.Path, pathProcessors m
 		MaxPriorityFeePerGas: path.TxPriorityFee,
 
 		// additional fields version 1
+		ValueIn:            path.AmountIn,
 		ValueOut:           path.AmountOut,
 		FromChainID:        path.FromChain.ChainID,
 		ToChainID:          path.ToChain.ChainID,
