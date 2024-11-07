@@ -43,26 +43,30 @@ type TransactionDescription struct {
 	signature []byte
 }
 
+type TransactionData struct {
+	TxArgs     *transactions.SendTxArgs
+	Tx         *ethTypes.Transaction
+	HashToSign types.Hash
+	Signature  []byte
+	SentHash   types.Hash
+}
+
+func (txd *TransactionData) IsTxPlaced() bool {
+	return txd.SentHash != types.Hash(wallet_common.ZeroHash())
+}
+
 type RouterTransactionDetails struct {
-	RouterPath         *routes.Path
-	TxArgs             *transactions.SendTxArgs
-	Tx                 *ethTypes.Transaction
-	TxHashToSign       types.Hash
-	TxSignature        []byte
-	TxSentHash         types.Hash
-	ApprovalTxArgs     *transactions.SendTxArgs
-	ApprovalTx         *ethTypes.Transaction
-	ApprovalHashToSign types.Hash
-	ApprovalSignature  []byte
-	ApprovalTxSentHash types.Hash
+	RouterPath     *routes.Path
+	TxData         *TransactionData
+	ApprovalTxData *TransactionData
 }
 
 func (rtd *RouterTransactionDetails) IsTxPlaced() bool {
-	return rtd.TxSentHash != types.Hash(wallet_common.ZeroHash())
+	return rtd.TxData != nil && rtd.TxData.IsTxPlaced()
 }
 
 func (rtd *RouterTransactionDetails) IsApprovalPlaced() bool {
-	return rtd.ApprovalTxSentHash != types.Hash(wallet_common.ZeroHash())
+	return rtd.ApprovalTxData != nil && rtd.ApprovalTxData.IsTxPlaced()
 }
 
 type TransactionManager struct {

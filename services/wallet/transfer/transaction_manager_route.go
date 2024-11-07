@@ -60,8 +60,23 @@ func (tm *TransactionManager) TxPlacedForPath(pathProcessorName string) bool {
 	return false
 }
 
-func (tm *TransactionManager) buildApprovalTxForPath(path *routes.Path, addressFrom common.Address,
-	usedNonces map[uint64]int64, signer ethTypes.Signer) (types.Hash, error) {
+func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *RouterTransactionDetails {
+	for _, desc := range tm.routerTransactions {
+		if desc.RouterPath.ID() == path.ID() {
+			return desc
+		}
+	}
+
+	newDetails := &RouterTransactionDetails{
+		RouterPath: path,
+	}
+	tm.routerTransactions = append(tm.routerTransactions, newDetails)
+
+	return newDetails
+}
+
+func buildApprovalTxForPath(transactor transactions.TransactorIface, path *routes.Path, addressFrom common.Address,
+	usedNonces map[uint64]int64, signer ethTypes.Signer) (*TransactionData, error) {
 	lastUsedNonce := int64(-1)
 	if nonce, ok := usedNonces[path.FromChain.ChainID]; ok {
 		lastUsedNonce = nonce
@@ -69,7 +84,7 @@ func (tm *TransactionManager) buildApprovalTxForPath(path *routes.Path, addressF
 
 	data, err := walletCommon.PackApprovalInputData(path.AmountIn.ToInt(), path.ApprovalContractAddress)
 	if err != nil {
-		return types.Hash{}, err
+		return nil, err
 	}
 
 	addrTo := types.Address(path.FromToken.Address)
@@ -93,25 +108,22 @@ func (tm *TransactionManager) buildApprovalTxForPath(path *routes.Path, addressF
 		approavalSendArgs.FromTokenID = path.FromToken.Symbol
 	}
 
-	builtApprovalTx, usedNonce, err := tm.transactor.ValidateAndBuildTransaction(approavalSendArgs.FromChainID, *approavalSendArgs, lastUsedNonce)
+	builtApprovalTx, usedNonce, err := transactor.ValidateAndBuildTransaction(approavalSendArgs.FromChainID, *approavalSendArgs, lastUsedNonce)
 	if err != nil {
-		return types.Hash{}, err
+		return nil, err
 	}
 	approvalTxHash := signer.Hash(builtApprovalTx)
 	usedNonces[path.FromChain.ChainID] = int64(usedNonce)
 
-	tm.routerTransactions = append(tm.routerTransactions, &RouterTransactionDetails{
-		RouterPath:         path,
-		ApprovalTxArgs:     approavalSendArgs,
-		ApprovalTx:         builtApprovalTx,
-		ApprovalHashToSign: types.Hash(approvalTxHash),
-	})
-
-	return types.Hash(approvalTxHash), nil
+	return &TransactionData{
+		TxArgs:     approavalSendArgs,
+		Tx:         builtApprovalTx,
+		HashToSign: types.Hash(approvalTxHash),
+	}, nil
 }
 
-func (tm *TransactionManager) buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.PathProcessor,
-	usedNonces map[uint64]int64, signer ethTypes.Signer, params BuildRouteExtraParams) (types.Hash, error) {
+func buildTxForPath(transactor transactions.TransactorIface, path *routes.Path, pathProcessors map[string]pathprocessor.PathProcessor,
+	usedNonces map[uint64]int64, signer ethTypes.Signer, params BuildRouteExtraParams) (*TransactionData, error) {
 	lastUsedNonce := int64(-1)
 	if nonce, ok := usedNonces[path.FromChain.ChainID]; ok {
 		lastUsedNonce = nonce
@@ -134,7 +146,7 @@ func (tm *TransactionManager) buildTxForPath(path *routes.Path, pathProcessors m
 
 	data, err := pathProcessors[path.ProcessorName].PackTxInputData(processorInputParams)
 	if err != nil {
-		return types.Hash{}, err
+		return nil, err
 	}
 
 	addrTo := types.Address(params.AddressTo)
@@ -185,19 +197,16 @@ func (tm *TransactionManager) buildTxForPath(path *routes.Path, pathProcessors m
 
 	builtTx, usedNonce, err := pathProcessors[path.ProcessorName].BuildTransactionV2(sendArgs, lastUsedNonce)
 	if err != nil {
-		return types.Hash{}, err
+		return nil, err
 	}
 	txHash := signer.Hash(builtTx)
 	usedNonces[path.FromChain.ChainID] = int64(usedNonce)
 
-	tm.routerTransactions = append(tm.routerTransactions, &RouterTransactionDetails{
-		RouterPath:   path,
-		TxArgs:       sendArgs,
-		Tx:           builtTx,
-		TxHashToSign: types.Hash(txHash),
-	})
-
-	return types.Hash(txHash), nil
+	return &TransactionData{
+		TxArgs:     sendArgs,
+		Tx:         builtTx,
+		HashToSign: types.Hash(txHash),
+	}, nil
 }
 
 func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pathProcessors map[string]pathprocessor.PathProcessor,
@@ -227,13 +236,15 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 	for _, path := range route {
 		signer := ethTypes.NewLondonSigner(big.NewInt(int64(path.FromChain.ChainID)))
 
+		txDetails := tm.getOrInitDetailsForPath(path)
+
 		// always check for approval tx first for the path and build it if needed
 		if path.ApprovalRequired && !tm.ApprovalPlacedForPath(path.ProcessorName) {
-			approvalTxHash, err := tm.buildApprovalTxForPath(path, params.AddressFrom, usedNonces, signer)
+			txDetails.ApprovalTxData, err = buildApprovalTxForPath(tm.transactor, path, params.AddressFrom, usedNonces, signer)
 			if err != nil {
 				return nil, err
 			}
-			response.Hashes = append(response.Hashes, approvalTxHash)
+			response.Hashes = append(response.Hashes, txDetails.ApprovalTxData.HashToSign)
 
 			// if approval is needed for swap, we cannot build the swap tx before the approval tx is mined
 			if path.ProcessorName == pathprocessor.ProcessorSwapParaswapName {
@@ -242,11 +253,11 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 		}
 
 		// build tx for the path
-		txHash, err := tm.buildTxForPath(path, pathProcessors, usedNonces, signer, params)
+		txDetails.TxData, err = buildTxForPath(tm.transactor, path, pathProcessors, usedNonces, signer, params)
 		if err != nil {
 			return nil, err
 		}
-		response.Hashes = append(response.Hashes, txHash)
+		response.Hashes = append(response.Hashes, txDetails.TxData.HashToSign)
 	}
 
 	return response, nil
@@ -282,31 +293,60 @@ func getSignatureForTxHash(txHash string, signatures map[string]SignatureDetails
 	return signature, nil
 }
 
+func validateAndAddSignature(txData *TransactionData, signatures map[string]SignatureDetails) error {
+	if txData != nil && !txData.IsTxPlaced() {
+		var err error
+		txData.Signature, err = getSignatureForTxHash(txData.HashToSign.String(), signatures)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (tm *TransactionManager) ValidateAndAddSignaturesToRouterTransactions(signatures map[string]SignatureDetails) error {
 	if len(tm.routerTransactions) == 0 {
 		return ErrNoTrsansactionsBeingBuilt
 	}
 
 	// check if all transactions have been signed
+	var err error
 	for _, desc := range tm.routerTransactions {
-		if desc.ApprovalTx != nil && desc.ApprovalTxSentHash == (types.Hash{}) {
-			sig, err := getSignatureForTxHash(desc.ApprovalHashToSign.String(), signatures)
-			if err != nil {
-				return err
-			}
-			desc.ApprovalSignature = sig
+		err = validateAndAddSignature(desc.ApprovalTxData, signatures)
+		if err != nil {
+			return err
 		}
 
-		if desc.Tx != nil && desc.TxSentHash == (types.Hash{}) {
-			sig, err := getSignatureForTxHash(desc.TxHashToSign.String(), signatures)
-			if err != nil {
-				return err
-			}
-			desc.TxSignature = sig
+		err = validateAndAddSignature(desc.TxData, signatures)
+		if err != nil {
+			return err
 		}
 	}
 
 	return nil
+}
+
+func addSignatureAndSendTransaction(
+	transactor transactions.TransactorIface,
+	txData *TransactionData,
+	multiTransactionID walletCommon.MultiTransactionIDType,
+	isApproval bool) (*responses.RouterSentTransaction, error) {
+	var txWithSignature *ethTypes.Transaction
+	var err error
+
+	txWithSignature, err = transactor.AddSignatureToTransaction(txData.TxArgs.FromChainID, txData.Tx, txData.Signature)
+	if err != nil {
+		return nil, err
+	}
+	txData.Tx = txWithSignature
+
+	txData.SentHash, err = transactor.SendTransactionWithSignature(common.Address(txData.TxArgs.From), txData.TxArgs.FromTokenID, multiTransactionID, txWithSignature)
+	if err != nil {
+		return nil, err
+	}
+
+	return responses.NewRouterSentTransaction(txData.TxArgs, txData.SentHash, isApproval), nil
 }
 
 func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiTx *MultiTransaction) (transactions []*responses.RouterSentTransaction, err error) {
@@ -314,19 +354,14 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiT
 
 	// send transactions
 	for _, desc := range tm.routerTransactions {
-		if desc.ApprovalTx != nil && !desc.IsApprovalPlaced() {
-			var approvalTxWithSignature *ethTypes.Transaction
-			approvalTxWithSignature, err = tm.transactor.AddSignatureToTransaction(desc.ApprovalTxArgs.FromChainID, desc.ApprovalTx, desc.ApprovalSignature)
+		if desc.ApprovalTxData != nil && !desc.IsApprovalPlaced() {
+			var response *responses.RouterSentTransaction
+			response, err = addSignatureAndSendTransaction(tm.transactor, desc.ApprovalTxData, multiTx.ID, true)
 			if err != nil {
 				return
 			}
 
-			desc.ApprovalTxSentHash, err = tm.transactor.SendTransactionWithSignature(common.Address(desc.ApprovalTxArgs.From), desc.ApprovalTxArgs.FromTokenID, multiTx.ID, approvalTxWithSignature)
-			if err != nil {
-				return
-			}
-
-			transactions = append(transactions, responses.NewRouterSentTransaction(desc.ApprovalTxArgs, desc.ApprovalTxSentHash, true))
+			transactions = append(transactions, response)
 
 			// if approval is needed for swap, then we need to wait for the approval tx to be mined before sending the swap tx
 			if desc.RouterPath.ProcessorName == pathprocessor.ProcessorSwapParaswapName {
@@ -334,19 +369,14 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiT
 			}
 		}
 
-		if desc.Tx != nil && !desc.IsTxPlaced() {
-			var txWithSignature *ethTypes.Transaction
-			txWithSignature, err = tm.transactor.AddSignatureToTransaction(desc.TxArgs.FromChainID, desc.Tx, desc.TxSignature)
+		if desc.TxData != nil && !desc.IsTxPlaced() {
+			var response *responses.RouterSentTransaction
+			response, err = addSignatureAndSendTransaction(tm.transactor, desc.TxData, multiTx.ID, false)
 			if err != nil {
 				return
 			}
 
-			desc.TxSentHash, err = tm.transactor.SendTransactionWithSignature(common.Address(desc.TxArgs.From), desc.TxArgs.FromTokenID, multiTx.ID, txWithSignature)
-			if err != nil {
-				return
-			}
-
-			transactions = append(transactions, responses.NewRouterSentTransaction(desc.TxArgs, desc.TxSentHash, false))
+			transactions = append(transactions, response)
 		}
 	}
 

@@ -2,6 +2,7 @@ package routes
 
 import (
 	"math/big"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -168,4 +169,10 @@ func (p *Path) Copy() *Path {
 	}
 
 	return newPath
+}
+
+// ID that uniquely identifies a path in a given route
+func (p *Path) ID() string {
+	// A route will contain at most a single path from a given processor for a given origin chain
+	return p.ProcessorName + "-" + strconv.Itoa(int(p.FromChain.ChainID))
 }
