@@ -8,7 +8,10 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/routes"
+	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/sqlite"
+
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 )
 
 type DB struct {
@@ -92,7 +95,7 @@ func putBuildTxParams(creator sqlite.StatementCreator, p *requests.RouterBuildTr
 	return err
 }
 
-func putPathsData(creator sqlite.StatementCreator, uuid string, d []*PathData) error {
+func putPathsData(creator sqlite.StatementCreator, uuid string, d []*transfer.RouterTransactionDetails) error {
 	for i, pathData := range d {
 		if err := putPathData(creator, uuid, i, pathData); err != nil {
 			return err
@@ -101,18 +104,31 @@ func putPathsData(creator sqlite.StatementCreator, uuid string, d []*PathData) e
 	return nil
 }
 
-func putPathData(creator sqlite.StatementCreator, uuid string, pathIdx int, d *PathData) (err error) {
-	err = putPath(creator, uuid, pathIdx, d.Path)
+func putPathData(creator sqlite.StatementCreator, uuid string, pathIdx int, d *transfer.RouterTransactionDetails) (err error) {
+	err = putPath(creator, uuid, pathIdx, d.RouterPath)
 	if err != nil {
 		return
 	}
 
-	for txIdx, txData := range d.TransactionsData {
-		err = putPathTransaction(creator, uuid, pathIdx, txIdx, txData)
+	if d.ApprovalTxData != nil {
+		err = putPathTransaction(creator, uuid, pathIdx, true, d.RouterPath.FromChain.ChainID, d.ApprovalTxData)
 		if err != nil {
 			return
 		}
-		err = putSentTransaction(creator, txData)
+
+		err = putSentTransaction(creator, d.RouterPath.FromChain.ChainID, d.ApprovalTxData.SentHash, d.ApprovalTxData.Tx)
+		if err != nil {
+			return
+		}
+	}
+
+	if d.TxData != nil {
+		err = putPathTransaction(creator, uuid, pathIdx, false, d.RouterPath.FromChain.ChainID, d.TxData)
+		if err != nil {
+			return
+		}
+
+		err = putSentTransaction(creator, d.RouterPath.FromChain.ChainID, d.TxData.SentHash, d.TxData.Tx)
 		if err != nil {
 			return
 		}
@@ -149,18 +165,20 @@ func putPathTransaction(
 	creator sqlite.StatementCreator,
 	uuid string,
 	pathIdx int,
-	txIdx int,
-	txData *TransactionData,
+	isApproval bool,
+	chainID uint64,
+	txData *transfer.TransactionData,
 ) error {
 	q := sq.Replace("route_path_transactions").
 		SetMap(sq.Eq{
 			"uuid":         uuid,
 			"path_idx":     pathIdx,
-			"tx_idx":       txIdx,
-			"is_approval":  txData.IsApproval,
-			"chain_id":     txData.ChainID,
-			"tx_hash":      txData.TxHash[:],
+			"is_approval":  isApproval,
+			"chain_id":     chainID,
+			"tx_hash":      txData.SentHash[:],
 			"tx_args_json": &sqlite.JSONBlob{Data: txData.TxArgs},
+			"hash_to_sign": txData.HashToSign[:],
+			"sig":          txData.Signature,
 		})
 
 	query, args, err := q.ToSql()
@@ -181,13 +199,15 @@ func putPathTransaction(
 
 func putSentTransaction(
 	creator sqlite.StatementCreator,
-	txData *TransactionData,
+	chainID uint64,
+	txHash types.Hash,
+	tx *ethTypes.Transaction,
 ) error {
 	q := sq.Replace("sent_transactions").
 		SetMap(sq.Eq{
-			"chain_id": txData.ChainID,
-			"tx_hash":  txData.TxHash[:],
-			"tx_json":  &sqlite.JSONBlob{Data: txData.Tx},
+			"chain_id": chainID,
+			"tx_hash":  txHash[:],
+			"tx_json":  &sqlite.JSONBlob{Data: tx},
 		})
 
 	query, args, err := q.ToSql()
@@ -271,8 +291,8 @@ func getBuildTxParams(creator sqlite.StatementCreator, uuid string) (*requests.R
 	return &p, err
 }
 
-func getPathsData(creator sqlite.StatementCreator, uuid string) ([]*PathData, error) {
-	var pathsData []*PathData
+func getPathsData(creator sqlite.StatementCreator, uuid string) ([]*transfer.RouterTransactionDetails, error) {
+	var pathsData []*transfer.RouterTransactionDetails
 
 	paths, err := getPaths(creator, uuid)
 	if err != nil {
@@ -280,12 +300,15 @@ func getPathsData(creator sqlite.StatementCreator, uuid string) ([]*PathData, er
 	}
 
 	for pathIdx, path := range paths {
-		pathData := &PathData{Path: path}
-		txs, err := getPathTransactions(creator, uuid, pathIdx)
-		if err != nil {
+		pathData := &transfer.RouterTransactionDetails{RouterPath: path}
+		pathData.ApprovalTxData, err = getPathTransaction(creator, uuid, pathIdx, true)
+		if err != nil && err != sql.ErrNoRows {
 			return nil, err
 		}
-		pathData.TransactionsData = txs
+		pathData.TxData, err = getPathTransaction(creator, uuid, pathIdx, false)
+		if err != nil && err != sql.ErrNoRows {
+			return nil, err
+		}
 
 		pathsData = append(pathsData, pathData)
 	}
@@ -329,15 +352,13 @@ func getPaths(creator sqlite.StatementCreator, uuid string) ([]*routes.Path, err
 	return paths, nil
 }
 
-func getPathTransactions(creator sqlite.StatementCreator, uuid string, pathIdx int) ([]*TransactionData, error) {
-	txs := make([]*TransactionData, 0, 2)
-	q := sq.Select("rpt.is_approval", "rpt.chain_id", "rpt.tx_hash", "rpt.tx_args_json", "st.tx_json").
+func getPathTransaction(creator sqlite.StatementCreator, uuid string, pathIdx int, isApproval bool) (*transfer.TransactionData, error) {
+	q := sq.Select("rpt.tx_args_json", "st.tx_json", "rpt.hash_to_sign", "rpt.sig", "rpt.tx_hash").
 		From("route_path_transactions rpt").
 		LeftJoin(`sent_transactions st ON 
 			rpt.chain_id = st.chain_id AND 
 			rpt.tx_hash = st.tx_hash`).
-		Where(sq.Eq{"rpt.uuid": uuid, "rpt.path_idx": pathIdx}).
-		OrderBy("rpt.tx_idx ASC")
+		Where(sq.Eq{"rpt.uuid": uuid, "rpt.path_idx": pathIdx, "rpt.is_approval": isApproval})
 
 	query, args, err := q.ToSql()
 	if err != nil {
@@ -350,24 +371,26 @@ func getPathTransactions(creator sqlite.StatementCreator, uuid string, pathIdx i
 	}
 	defer stmt.Close()
 
-	rows, err := stmt.Query(args...)
+	tx := new(transfer.TransactionData)
+	var hashToSign []byte
+	var sentHash []byte
+	err = stmt.QueryRow(args...).Scan(
+		&sqlite.JSONBlob{Data: &tx.TxArgs},
+		&sqlite.JSONBlob{Data: &tx.Tx},
+		&hashToSign,
+		&tx.Signature,
+		&sentHash,
+	)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var tx TransactionData
-		var txHash sql.RawBytes
-		err = rows.Scan(&tx.IsApproval, &tx.ChainID, &txHash, &sqlite.JSONBlob{Data: &tx.TxArgs}, &sqlite.JSONBlob{Data: &tx.Tx})
-		if err != nil {
-			return nil, err
-		}
-		if len(txHash) > 0 {
-			tx.TxHash = types.BytesToHash(txHash)
-		}
-		txs = append(txs, &tx)
+	if len(hashToSign) > 0 {
+		tx.HashToSign = types.BytesToHash(hashToSign)
+	}
+	if len(sentHash) > 0 {
+		tx.SentHash = types.BytesToHash(sentHash)
 	}
 
-	return txs, nil
+	return tx, nil
 }
