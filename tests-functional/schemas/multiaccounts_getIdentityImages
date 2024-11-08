@@ -1,0 +1,21 @@
+{
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "type": "null"
+        }
+    }
+}

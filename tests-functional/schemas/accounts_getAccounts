@@ -1,0 +1,104 @@
+{
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "address",
+                    "chat",
+                    "clock",
+                    "colorId",
+                    "createdAt",
+                    "emoji",
+                    "hidden",
+                    "key-uid",
+                    "mixedcase-address",
+                    "name",
+                    "operable",
+                    "path",
+                    "position",
+                    "prodPreferredChainIds",
+                    "public-key",
+                    "removed",
+                    "testPreferredChainIds",
+                    "type",
+                    "wallet"
+                ],
+                "properties": {
+                    "address": {
+                        "type": "string"
+                    },
+                    "chat": {
+                        "type": "boolean"
+                    },
+                    "clock": {
+                        "type": "integer"
+                    },
+                    "colorId": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "integer"
+                    },
+                    "emoji": {
+                        "type": "string"
+                    },
+                    "hidden": {
+                        "type": "boolean"
+                    },
+                    "key-uid": {
+                        "type": "string"
+                    },
+                    "mixedcase-address": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "operable": {
+                        "type": "string"
+                    },
+                    "path": {
+                        "type": "string"
+                    },
+                    "position": {
+                        "type": "integer"
+                    },
+                    "prodPreferredChainIds": {
+                        "type": "string"
+                    },
+                    "public-key": {
+                        "type": "string"
+                    },
+                    "removed": {
+                        "type": "boolean"
+                    },
+                    "testPreferredChainIds": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "wallet": {
+                        "type": "boolean"
+                    }
+                }
+            }
+        }
+    }
+}

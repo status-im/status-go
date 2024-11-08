@@ -1,0 +1,216 @@
+{
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "type": "object",
+            "required": [
+                "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+            ],
+            "properties": {
+                "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "address",
+                            "assetWebsiteUrl",
+                            "balancesPerChain",
+                            "builtOn",
+                            "chainId",
+                            "decimals",
+                            "description",
+                            "marketValuesPerCurrency",
+                            "name",
+                            "pegSymbol",
+                            "symbol",
+                            "tokenListId",
+                            "verified"
+                        ],
+                        "properties": {
+                            "address": {
+                                "type": "string"
+                            },
+                            "assetWebsiteUrl": {
+                                "type": "string"
+                            },
+                            "balancesPerChain": {
+                                "type": "object",
+                                "required": [
+                                    "31337"
+                                ],
+                                "properties": {
+                                    "31337": {
+                                        "type": "object",
+                                        "required": [
+                                            "address",
+                                            "balance",
+                                            "balance1DayAgo",
+                                            "chainId",
+                                            "hasError",
+                                            "rawBalance"
+                                        ],
+                                        "properties": {
+                                            "address": {
+                                                "type": "string"
+                                            },
+                                            "balance": {
+                                                "type": "string"
+                                            },
+                                            "balance1DayAgo": {
+                                                "type": "string"
+                                            },
+                                            "chainId": {
+                                                "type": "integer"
+                                            },
+                                            "hasError": {
+                                                "type": "boolean"
+                                            },
+                                            "rawBalance": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "builtOn": {
+                                "type": "string"
+                            },
+                            "chainId": {
+                                "type": "integer"
+                            },
+                            "decimals": {
+                                "type": "integer"
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "marketValuesPerCurrency": {
+                                "type": "object",
+                                "required": [
+                                    "USD",
+                                    "usd"
+                                ],
+                                "properties": {
+                                    "USD": {
+                                        "type": "object",
+                                        "required": [
+                                            "change24hour",
+                                            "changePct24hour",
+                                            "changePctDay",
+                                            "changePctHour",
+                                            "hasError",
+                                            "highDay",
+                                            "lowDay",
+                                            "marketCap",
+                                            "price"
+                                        ],
+                                        "properties": {
+                                            "change24hour": {
+                                                "type": "number"
+                                            },
+                                            "changePct24hour": {
+                                                "type": "number"
+                                            },
+                                            "changePctDay": {
+                                                "type": "number"
+                                            },
+                                            "changePctHour": {
+                                                "type": "number"
+                                            },
+                                            "hasError": {
+                                                "type": "boolean"
+                                            },
+                                            "highDay": {
+                                                "type": "number"
+                                            },
+                                            "lowDay": {
+                                                "type": "number"
+                                            },
+                                            "marketCap": {
+                                                "type": "number"
+                                            },
+                                            "price": {
+                                                "type": "number"
+                                            }
+                                        }
+                                    },
+                                    "usd": {
+                                        "type": "object",
+                                        "required": [
+                                            "change24hour",
+                                            "changePct24hour",
+                                            "changePctDay",
+                                            "changePctHour",
+                                            "hasError",
+                                            "highDay",
+                                            "lowDay",
+                                            "marketCap",
+                                            "price"
+                                        ],
+                                        "properties": {
+                                            "change24hour": {
+                                                "type": "number"
+                                            },
+                                            "changePct24hour": {
+                                                "type": "number"
+                                            },
+                                            "changePctDay": {
+                                                "type": "number"
+                                            },
+                                            "changePctHour": {
+                                                "type": "number"
+                                            },
+                                            "hasError": {
+                                                "type": "boolean"
+                                            },
+                                            "highDay": {
+                                                "type": "number"
+                                            },
+                                            "lowDay": {
+                                                "type": "number"
+                                            },
+                                            "marketCap": {
+                                                "type": "number"
+                                            },
+                                            "price": {
+                                                "type": "number"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "pegSymbol": {
+                                "type": "string"
+                            },
+                            "symbol": {
+                                "type": "string"
+                            },
+                            "tokenListId": {
+                                "type": "string"
+                            },
+                            "verified": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -15,6 +15,7 @@ class TestRpc(StatusBackendTestCase):
         "method, params",
         [
             ("wakuext_peers", []),
+            ("wakuext_activityCenterNotifications", [{"cursor": "", "limit": 20, "activityTypes": [5], "readType": 2}])
         ],
     )
     def test_(self, method, params):

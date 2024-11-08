@@ -2,22 +2,17 @@ import random
 
 import pytest
 
-from constants import user_1
 from test_cases import StatusBackendTestCase
 
 
 @pytest.mark.accounts
 @pytest.mark.rpc
-class TestAccounts(StatusBackendTestCase):
+class TestAppGeneral(StatusBackendTestCase):
 
     @pytest.mark.parametrize(
         "method, params",
         [
-            ("accounts_getAccounts", []),
-            ("accounts_getKeypairs", []),
-            ("accounts_hasPairedDevices", []),
-            ("accounts_remainingAccountCapacity", []),
-            ("multiaccounts_getIdentityImages", [user_1.private_key]),
+            ("appgeneral_getCurrencies", []),
 
         ],
     )

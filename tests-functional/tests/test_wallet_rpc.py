@@ -5,7 +5,8 @@ import jsonschema
 import pytest
 
 from conftest import option
-from test_cases import StatusBackendTestCase, TransactionTestCase
+from constants import user_1
+from test_cases import StatusBackendTestCase, TransactionTestCase, StatusDTestCase
 
 
 @pytest.mark.wallet
@@ -85,7 +86,36 @@ class TestRpc(StatusBackendTestCase):
             ("wallet_getEthereumChains", []),
             ("wallet_getTokenList", []),
             ("wallet_getCryptoOnRamps", []),
-            ("wallet_getCachedCurrencyFormats", [])
+            ("wallet_getCachedCurrencyFormats", []),
+            ("wallet_fetchPrices",
+             [["WETH9", "USDC", "ZEENUS", "EUROC", "WEENUS", "XEENUS", "WETH", "ETH", "STT", "UNI", "YEENUS", "DAI"],
+              ["usd"]]),
+
+            ("wallet_fetchMarketValues",
+             [["WETH9", "USDC", "ZEENUS", "EUROC", "WEENUS", "XEENUS", "WETH", "ETH", "STT", "UNI", "YEENUS", "DAI"],
+              "usd"]),
+            ("wallet_fetchTokenDetails",
+             [["WETH9", "USDC", "ZEENUS", "EUROC", "WEENUS", "XEENUS", "WETH", "ETH", "STT", "UNI", "YEENUS", "DAI"]]),
+            ("wallet_checkRecentHistoryForChainIDs", [[31337], [user_1.address]]),
+            ("wallet_getWalletConnectActiveSessions", [1728995277]),
+            ("wallet_stopSuggestedRoutesAsyncCalculation", []),
+        ]
+    )
+    def test_(self, method, params):
+        _id = str(random.randint(1, 8888))
+
+        response = self.rpc_client.rpc_valid_request(method, params, _id)
+        self.rpc_client.verify_json_schema(response.json(), method)
+
+
+@pytest.mark.wallet
+@pytest.mark.rpc
+class TestRpcStatusD(StatusDTestCase):  # temp for methods not implemented in Status Backend
+
+    @pytest.mark.parametrize(
+        "method, params",
+        [
+            ("wallet_getWalletToken", [[user_1.address, ]]),
         ],
     )
     def test_(self, method, params):

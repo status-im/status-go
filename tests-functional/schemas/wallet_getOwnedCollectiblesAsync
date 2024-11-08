@@ -1,0 +1,53 @@
+{
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "required": [
+        "type",
+        "event"
+    ],
+    "properties": {
+        "type": {
+            "type": "string"
+        },
+        "event": {
+            "type": "object",
+            "required": [
+                "type",
+                "blockNumber",
+                "accounts",
+                "message",
+                "at",
+                "chainId",
+                "requestId",
+                "EventParams"
+            ],
+            "properties": {
+                "type": {
+                    "type": "string"
+                },
+                "blockNumber": {
+                    "type": "null"
+                },
+                "accounts": {
+                    "type": "null"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "at": {
+                    "type": "integer"
+                },
+                "chainId": {
+                    "type": "integer"
+                },
+                "requestId": {
+                    "type": "integer"
+                },
+                "EventParams": {
+                    "type": "null"
+                }
+            }
+        }
+    }
+}

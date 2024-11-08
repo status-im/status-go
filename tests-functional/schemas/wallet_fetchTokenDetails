@@ -1,0 +1,313 @@
+{
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "required": [
+        "jsonrpc",
+        "id",
+        "result"
+    ],
+    "properties": {
+        "jsonrpc": {
+            "type": "string"
+        },
+        "id": {
+            "type": "string"
+        },
+        "result": {
+            "type": "object",
+            "required": [
+                "DAI",
+                "ETH",
+                "STT",
+                "UNI",
+                "USDC",
+                "WETH"
+            ],
+            "properties": {
+                "DAI": {
+                    "type": "object",
+                    "required": [
+                        "Id",
+                        "Name",
+                        "Symbol",
+                        "Description",
+                        "TotalCoinsMined",
+                        "AssetLaunchDate",
+                        "AssetWhitepaperUrl",
+                        "AssetWebsiteUrl",
+                        "BuiltOn",
+                        "SmartContractAddress"
+                    ],
+                    "properties": {
+                        "Id": {
+                            "type": "string"
+                        },
+                        "Name": {
+                            "type": "string"
+                        },
+                        "Symbol": {
+                            "type": "string"
+                        },
+                        "Description": {
+                            "type": "string"
+                        },
+                        "TotalCoinsMined": {
+                            "type": "number"
+                        },
+                        "AssetLaunchDate": {
+                            "type": "string"
+                        },
+                        "AssetWhitepaperUrl": {
+                            "type": "string"
+                        },
+                        "AssetWebsiteUrl": {
+                            "type": "string"
+                        },
+                        "BuiltOn": {
+                            "type": "string"
+                        },
+                        "SmartContractAddress": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "ETH": {
+                    "type": "object",
+                    "required": [
+                        "Id",
+                        "Name",
+                        "Symbol",
+                        "Description",
+                        "TotalCoinsMined",
+                        "AssetLaunchDate",
+                        "AssetWhitepaperUrl",
+                        "AssetWebsiteUrl",
+                        "BuiltOn",
+                        "SmartContractAddress"
+                    ],
+                    "properties": {
+                        "Id": {
+                            "type": "string"
+                        },
+                        "Name": {
+                            "type": "string"
+                        },
+                        "Symbol": {
+                            "type": "string"
+                        },
+                        "Description": {
+                            "type": "string"
+                        },
+                        "TotalCoinsMined": {
+                            "type": "number"
+                        },
+                        "AssetLaunchDate": {
+                            "type": "string"
+                        },
+                        "AssetWhitepaperUrl": {
+                            "type": "string"
+                        },
+                        "AssetWebsiteUrl": {
+                            "type": "string"
+                        },
+                        "BuiltOn": {
+                            "type": "string"
+                        },
+                        "SmartContractAddress": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "STT": {
+                    "type": "object",
+                    "required": [
+                        "Id",
+                        "Name",
+                        "Symbol",
+                        "Description",
+                        "TotalCoinsMined",
+                        "AssetLaunchDate",
+                        "AssetWhitepaperUrl",
+                        "AssetWebsiteUrl",
+                        "BuiltOn",
+                        "SmartContractAddress"
+                    ],
+                    "properties": {
+                        "Id": {
+                            "type": "string"
+                        },
+                        "Name": {
+                            "type": "string"
+                        },
+                        "Symbol": {
+                            "type": "string"
+                        },
+                        "Description": {
+                            "type": "string"
+                        },
+                        "TotalCoinsMined": {
+                            "type": "number"
+                        },
+                        "AssetLaunchDate": {
+                            "type": "string"
+                        },
+                        "AssetWhitepaperUrl": {
+                            "type": "string"
+                        },
+                        "AssetWebsiteUrl": {
+                            "type": "string"
+                        },
+                        "BuiltOn": {
+                            "type": "string"
+                        },
+                        "SmartContractAddress": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "UNI": {
+                    "type": "object",
+                    "required": [
+                        "Id",
+                        "Name",
+                        "Symbol",
+                        "Description",
+                        "TotalCoinsMined",
+                        "AssetLaunchDate",
+                        "AssetWhitepaperUrl",
+                        "AssetWebsiteUrl",
+                        "BuiltOn",
+                        "SmartContractAddress"
+                    ],
+                    "properties": {
+                        "Id": {
+                            "type": "string"
+                        },
+                        "Name": {
+                            "type": "string"
+                        },
+                        "Symbol": {
+                            "type": "string"
+                        },
+                        "Description": {
+                            "type": "string"
+                        },
+                        "TotalCoinsMined": {
+                            "type": "number"
+                        },
+                        "AssetLaunchDate": {
+                            "type": "string"
+                        },
+                        "AssetWhitepaperUrl": {
+                            "type": "string"
+                        },
+                        "AssetWebsiteUrl": {
+                            "type": "string"
+                        },
+                        "BuiltOn": {
+                            "type": "string"
+                        },
+                        "SmartContractAddress": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "USDC": {
+                    "type": "object",
+                    "required": [
+                        "Id",
+                        "Name",
+                        "Symbol",
+                        "Description",
+                        "TotalCoinsMined",
+                        "AssetLaunchDate",
+                        "AssetWhitepaperUrl",
+                        "AssetWebsiteUrl",
+                        "BuiltOn",
+                        "SmartContractAddress"
+                    ],
+                    "properties": {
+                        "Id": {
+                            "type": "string"
+                        },
+                        "Name": {
+                            "type": "string"
+                        },
+                        "Symbol": {
+                            "type": "string"
+                        },
+                        "Description": {
+                            "type": "string"
+                        },
+                        "TotalCoinsMined": {
+                            "type": "number"
+                        },
+                        "AssetLaunchDate": {
+                            "type": "string"
+                        },
+                        "AssetWhitepaperUrl": {
+                            "type": "string"
+                        },
+                        "AssetWebsiteUrl": {
+                            "type": "string"
+                        },
+                        "BuiltOn": {
+                            "type": "string"
+                        },
+                        "SmartContractAddress": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "WETH": {
+                    "type": "object",
+                    "required": [
+                        "Id",
+                        "Name",
+                        "Symbol",
+                        "Description",
+                        "TotalCoinsMined",
+                        "AssetLaunchDate",
+                        "AssetWhitepaperUrl",
+                        "AssetWebsiteUrl",
+                        "BuiltOn",
+                        "SmartContractAddress"
+                    ],
+                    "properties": {
+                        "Id": {
+                            "type": "string"
+                        },
+                        "Name": {
+                            "type": "string"
+                        },
+                        "Symbol": {
+                            "type": "string"
+                        },
+                        "Description": {
+                            "type": "string"
+                        },
+                        "TotalCoinsMined": {
+                            "type": "number"
+                        },
+                        "AssetLaunchDate": {
+                            "type": "string"
+                        },
+                        "AssetWhitepaperUrl": {
+                            "type": "string"
+                        },
+                        "AssetWebsiteUrl": {
+                            "type": "string"
+                        },
+                        "BuiltOn": {
+                            "type": "string"
+                        },
+                        "SmartContractAddress": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

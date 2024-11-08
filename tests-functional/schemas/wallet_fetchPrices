@@ -1,0 +1,169 @@
+{
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "$id": "http://example.com/example.json",
+    "type": "object",
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "type": "object",
+            "required": [
+                "DAI",
+                "ETH",
+                "EUROC",
+                "STT",
+                "UNI",
+                "USDC",
+                "WEENUS",
+                "WETH",
+                "WETH9",
+                "XEENUS",
+                "YEENUS",
+                "ZEENUS"
+            ],
+            "properties": {
+                "DAI": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "number"
+                        }
+                    }
+                },
+                "ETH": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "number"
+                        }
+                    }
+                },
+                "EUROC": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "STT": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "number"
+                        }
+                    }
+                },
+                "UNI": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "number"
+                        }
+                    }
+                },
+                "USDC": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "number"
+                        }
+                    }
+                },
+                "WEENUS": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "WETH": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "number"
+                        }
+                    }
+                },
+                "WETH9": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "XEENUS": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "YEENUS": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "ZEENUS": {
+                    "type": "object",
+                    "required": [
+                        "usd"
+                    ],
+                    "properties": {
+                        "usd": {
+                            "type": "integer"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
