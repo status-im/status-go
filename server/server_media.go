@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"net/url"
 	"strconv"
@@ -11,6 +12,14 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/signal"
+)
+
+var (
+	// UseHTTP controls whether the media server uses HTTP instead of HTTPS.
+	// Set to true to avoid TLS certificate issues with react-native-fast-image
+	// on Android, which has limitations with dynamic certificate updates.
+	// Pls check doc/use-status-backend-server.md in status-mobile for more details
+	UseHTTP = false
 )
 
 type MediaServer struct {
@@ -24,14 +33,18 @@ type MediaServer struct {
 
 // NewMediaServer returns a *MediaServer
 func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiaccounts.Database, walletDB *sql.DB) (*MediaServer, error) {
-	err := generateMediaTLSCert()
-	if err != nil {
-		return nil, err
+	var cert *tls.Certificate
+	if !UseHTTP {
+		err := generateMediaTLSCert()
+		if err != nil {
+			return nil, err
+		}
+		cert = globalMediaCertificate
 	}
 
 	s := &MediaServer{
 		Server: NewServer(
-			globalMediaCertificate,
+			cert,
 			Localhost,
 			signal.SendMediaServerStarted,
 			logutils.ZapLogger().Named("MediaServer"),
@@ -63,6 +76,13 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 	})
 
 	return s, nil
+}
+
+func (s *MediaServer) MakeBaseURL() *url.URL {
+	return &url.URL{
+		Scheme: map[bool]string{true: "http", false: "https"}[UseHTTP],
+		Host:   s.mustGetHost(),
+	}
 }
 
 func (s *MediaServer) MakeImageServerURL() string {

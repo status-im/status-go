@@ -57,10 +57,23 @@ func (s *Server) mustGetHost() string {
 
 func (s *Server) listenAndServe() {
 	defer common.LogOnPanic()
-	cfg := &tls.Config{Certificates: []tls.Certificate{*s.cert}, ServerName: s.hostname, MinVersion: tls.VersionTLS12}
 
-	// in case of restart, we should use the same port as the first start in order not to break existing links
-	listener, err := tls.Listen("tcp", s.getHost(), cfg)
+	var listener net.Listener
+	var err error
+
+	if s.cert != nil {
+		// HTTPS mode
+		cfg := &tls.Config{
+			Certificates: []tls.Certificate{*s.cert},
+			ServerName:   s.hostname,
+			MinVersion:   tls.VersionTLS12,
+		}
+		listener, err = tls.Listen("tcp", s.getHost(), cfg)
+	} else {
+		// HTTP mode
+		listener, err = net.Listen("tcp", s.getHost())
+	}
+
 	if err != nil {
 		s.logger.Error("failed to start server, retrying", zap.Error(err))
 		s.ResetPort()
