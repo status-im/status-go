@@ -10,7 +10,7 @@ from pathlib import Path
 
 logger = get_custom_logger(__name__)
 GO_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-SOURCE_DIR = GO_PROJECT_ROOT / "cmd/status-backend"
+SOURCE_DIR = GO_PROJECT_ROOT / "build/bin"
 DEST_DIR = GO_PROJECT_ROOT / "tests-functional"
 BINARY_PATH = SOURCE_DIR / "status-backend"
 REPORTS_DIR = DEST_DIR / "reports"
@@ -36,7 +36,7 @@ def get_project_root() -> str:
 
 
 def write_signal_to_file(signal_data):
-    with open(LOG_FILE_PATH, "a") as file:
+    with open(LOG_FILE_PATH, "a+") as file:
         json.dump(signal_data, file)
         file.write("\n")
 

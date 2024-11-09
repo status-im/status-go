@@ -110,6 +110,8 @@ __pycache__/
 report/results.xml
 tests-functional/coverage
 tests-functional/reports
+tests-functional/local
+tests-functional/status-backend
 tests-functional/*.log
 
 # generated files
