@@ -9,24 +9,20 @@
     "HTTPPort": 3333,
     "HTTPVirtualHosts": ["*", "status-go"],
     "APIModules": "eth,admin,wallet,accounts,waku,wakuext,ethclient",
-    "WalletConfig": {
-      "Enabled": true
-    },
-    "WakuConfig": {
-        "Enabled": false
-    },
+    "WalletConfig": {"Enabled": true},
+    "WakuConfig": {"Enabled": false},
     "Networks": [
         {
-			"ChainID":                31337,
-			"ChainName":              "Anvil",
-			"RPCURL":                 "http://anvil:8545",
-			"ShortName":              "eth",
-			"NativeCurrencyName":     "Ether",
-			"NativeCurrencySymbol":   "ETH",
-			"NativeCurrencyDecimals": 18,
-			"IsTest":                 false,
-			"Layer":                  1,
-			"Enabled":                true
-		}
-    ]
+            "ChainID": 31337,
+            "ChainName": "Anvil",
+            "RPCURL": "http://anvil:8545",
+            "ShortName": "eth",
+            "NativeCurrencyName": "Ether",
+            "NativeCurrencySymbol": "ETH",
+            "NativeCurrencyDecimals": 18,
+            "IsTest": false,
+            "Layer": 1,
+            "Enabled": true,
+        }
+    ],
 }

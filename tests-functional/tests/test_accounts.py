@@ -1,21 +1,18 @@
 import random
-
 import pytest
+from src.steps.common import StatusBackendTestCase
 
-from test_cases import StatusBackendTestCase
 
-
+@pytest.mark.usefixtures("init_status_backend")
 @pytest.mark.accounts
 @pytest.mark.rpc
 class TestAccounts(StatusBackendTestCase):
-
     @pytest.mark.parametrize(
         "method, params",
         [
             ("accounts_getKeypairs", []),
             ("accounts_hasPairedDevices", []),
-            ("accounts_remainingAccountCapacity", [])
-
+            ("accounts_remainingAccountCapacity", []),
         ],
     )
     def test_(self, method, params):

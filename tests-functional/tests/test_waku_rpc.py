@@ -6,11 +6,11 @@ from typing import Optional
 import pytest
 
 from conftest import option
-from test_cases import StatusBackendTestCase
+from src.steps.common import StatusBackendTestCase
 
 
+@pytest.mark.usefixtures("init_status_backend")
 class TestRpc(StatusBackendTestCase):
-
     @pytest.mark.parametrize(
         "method, params",
         [
@@ -40,17 +40,11 @@ class TestRpcMessaging(StatusBackendTestCase):
 
         # get chat public key
         for user in self.user_1, self.user_2:
-            response = self.rpc_client.rpc_request(
-                "accounts_getAccounts", [], _id, url=user.rpc_url
-            )
+            response = self.rpc_client.rpc_request("accounts_getAccounts", [], _id, url=user.rpc_url)
             self.rpc_client.verify_is_valid_json_rpc_response(response)
 
             user.chat_public_key = next(
-                (
-                    item["public-key"]
-                    for item in response.json()["result"]
-                    if item["chat"]
-                ),
+                (item["public-key"] for item in response.json()["result"] if item["chat"]),
                 None,
             )
 

@@ -1,0 +1,11 @@
+{
+    "include": ["tests-functional"],
+    "reportMissingImports": true,
+    "reportOptionalMemberAccess": false,
+    "reportGeneralTypeIssues": false,
+    "reportInvalidStringEscapeSequence": false,
+    "reportWildcardImportFromLibrary": false,
+    "venvPath": ".",
+    "venv": ".venv",
+    "typeCheckingMode": "off"
+}

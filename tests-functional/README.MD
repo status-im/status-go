@@ -7,15 +7,22 @@ Functional tests for status-go
 - [Overview](#overview)
 - [How to Install](#how-to-install)
 - [How to Run](#how-to-run)
-  - [Running Tests](#running-tests)
+- [Running Tests](#running-tests)
 - [Implementation details](#implementation-details)
 
 ## How to Install
 
-* Install [Docker](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/)
-* Install [Python 3.10.14](https://www.python.org/downloads/)
-* In `./tests-functional`, run `pip install -r requirements.txt`
-* **Optional (for test development)**: Use Python virtual environment for better dependency management. You can follow the guide [here](https://akrabat.com/creating-virtual-environments-with-pyenv/):
+1. Install [Docker](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/)
+2. Install [Python 3.10.14](https://www.python.org/downloads/)
+3. **Set up a virtual environment (recommended):**
+   - In `./tests-functional`, run:
+     ```bash
+     python3 -m venv .venv
+     source .venv/bin/activate
+     pip install -r requirements.txt
+     ```
+   - **Optional (for test development)**: Use Python virtual environment for better dependency management. You can follow the guide [here](https://akrabat.com/creating-virtual-environments-with-pyenv/)
+
 
 ## How to Run
 

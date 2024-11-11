@@ -1,8 +1,11 @@
+import inspect
 import os
 import threading
 from dataclasses import dataclass
-
 import pytest as pytest
+from src.libs.custom_logger import get_custom_logger
+
+logger = get_custom_logger(__name__)
 
 
 def pytest_addoption(parser):
@@ -58,30 +61,27 @@ def pytest_configure(config):
     option.base_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session", autouse=False)
 def init_status_backend():
-    await_signals = [
+    logger.info(f"Running fixture setup: {inspect.currentframe().f_code.co_name}")
 
+    await_signals = [
         "mediaserver.started",
         "node.started",
         "node.ready",
         "node.login",
-
         "wallet",  # TODO: a test per event of a different type
     ]
 
-    from clients.status_backend import StatusBackend
-    backend_client = StatusBackend(
-        await_signals=await_signals
-    )
+    from src.node.clients.status_backend import StatusBackend
 
-    websocket_thread = threading.Thread(
-        target=backend_client._connect
-    )
+    backend_client = StatusBackend(await_signals=await_signals)
+
+    websocket_thread = threading.Thread(target=backend_client._connect)
     websocket_thread.daemon = True
     websocket_thread.start()
 
-    backend_client.init_status_backend()
+    backend_client.init_status_backend(data_dir="/")
     backend_client.restore_account_and_wait_for_rpc_client_to_start()
 
     yield backend_client

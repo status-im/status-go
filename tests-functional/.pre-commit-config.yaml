@@ -1,0 +1,11 @@
+repos:
+-   repo: https://github.com/psf/black
+    rev: 23.7.0
+    hooks:
+    - id: black
+      args: [--line-length=150]
+
+-   repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.326
+    hooks:
+    - id: pyright

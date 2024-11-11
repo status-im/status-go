@@ -2,18 +2,25 @@ import random
 
 import pytest
 
-from test_cases import StatusBackendTestCase
+from src.steps.common import StatusBackendTestCase
 
 
+@pytest.mark.usefixtures("init_status_backend")
 class TestProfile(StatusBackendTestCase):
-
     @pytest.mark.parametrize(
         "method, params",
         [
             ("wakuext_setDisplayName", ["new valid username"]),
             ("wakuext_setBio", ["some valid bio"]),
-            ("wakuext_setCustomizationColor", [{'customizationColor': 'magenta',
-                                                'keyUid': '0xea42dd9a4e668b0b76c7a5210ca81576d51cd19cdd0f6a0c22196219dc423f29'}]),
+            (
+                "wakuext_setCustomizationColor",
+                [
+                    {
+                        "customizationColor": "magenta",
+                        "keyUid": "0xea42dd9a4e668b0b76c7a5210ca81576d51cd19cdd0f6a0c22196219dc423f29",
+                    }
+                ],
+            ),
             ("wakuext_setUserStatus", [3, ""]),
             ("wakuext_setSyncingOnMobileNetwork", [{"enabled": False}]),
             ("wakuext_togglePeerSyncing", [{"enabled": True}]),
