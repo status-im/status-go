@@ -66,13 +66,13 @@ func NewMissingMessageVerifier(storenodeRequester common.StorenodeRequestor, mes
 	}
 }
 
-func (m *MissingMessageVerifier) SetCriteriaInterest(peerID peer.ID, contentFilter protocol.ContentFilter) {
+func (m *MissingMessageVerifier) SetCriteriaInterest(peerInfo peer.AddrInfo, contentFilter protocol.ContentFilter) {
 	m.criteriaInterestMu.Lock()
 	defer m.criteriaInterestMu.Unlock()
 
 	ctx, cancel := context.WithCancel(m.ctx)
 	criteriaInterest := criteriaInterest{
-		peerID:        peerID,
+		peerInfo:      peerInfo,
 		contentFilter: contentFilter,
 		lastChecked:   m.timesource.Now().Add(-m.params.delay),
 		ctx:           ctx,
@@ -164,7 +164,7 @@ func (m *MissingMessageVerifier) fetchHistory(c chan<- *protocol.Envelope, inter
 			}
 
 			m.logger.Error("could not fetch history",
-				zap.Stringer("peerID", interest.peerID),
+				zap.Stringer("peerID", interest.peerInfo.ID),
 				zap.String("pubsubTopic", interest.contentFilter.PubsubTopic),
 				zap.Strings("contentTopics", contentTopics))
 			continue
@@ -207,7 +207,7 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 	contentTopics := interest.contentFilter.ContentTopics.ToList()
 
 	logger := m.logger.With(
-		zap.Stringer("peerID", interest.peerID),
+		zap.Stringer("peerID", interest.peerInfo.ID),
 		zap.Strings("contentTopics", contentTopics[batchFrom:batchTo]),
 		zap.String("pubsubTopic", interest.contentFilter.PubsubTopic),
 		logging.Epoch("from", interest.lastChecked),
@@ -226,7 +226,7 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 
 		return m.storenodeRequestor.Query(
 			ctx,
-			interest.peerID,
+			interest.peerInfo,
 			storeQueryRequest,
 		)
 	}, logger, "retrieving history to check for missing messages")
@@ -309,7 +309,7 @@ func (m *MissingMessageVerifier) fetchMessagesBatch(c chan<- *protocol.Envelope,
 					PaginationLimit: proto.Uint64(maxMsgHashesPerRequest),
 				}
 
-				return m.storenodeRequestor.Query(queryCtx, interest.peerID, storeQueryRequest)
+				return m.storenodeRequestor.Query(queryCtx, interest.peerInfo, storeQueryRequest)
 			}, logger, "retrieving missing messages")
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {

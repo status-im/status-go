@@ -318,7 +318,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"runtime"
 	"strconv"
 	"strings"
@@ -327,7 +326,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -347,7 +345,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/metrics"
 
-	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
+	libp2pproto "github.com/libp2p/go-libp2p/core/protocol"
 
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
 	"github.com/waku-org/go-waku/waku/v2/api/history"
@@ -360,6 +358,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/utils"
@@ -434,7 +433,7 @@ type WakuConfig struct {
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
-	wakuCtx unsafe.Pointer
+	node *WakuNode
 
 	appDB *sql.DB
 
@@ -504,7 +503,7 @@ type Waku struct {
 	// discV5BootstrapNodes is the ENR to be used to fetch bootstrap nodes for discovery
 	discV5BootstrapNodes []string
 
-	onHistoricMessagesRequestFailed func([]byte, peer.ID, error)
+	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
 	onPeerStats                     func(types.ConnStatus)
 
 	statusTelemetryClient ITelemetryClient
@@ -523,12 +522,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuConfig, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.ID, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
-	// Lock the main goroutine to its current OS thread
-	runtime.LockOSThread()
-
-	WakuSetup() // This should only be called once in the whole app's life
-
+func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuConfig, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	node, err := wakuNew(nodeKey,
 		fleet,
 		cfg,
@@ -538,20 +532,6 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuCon
 	if err != nil {
 		return nil, err
 	}
-
-	defaultPubsubTopic, err := node.WakuDefaultPubsubTopic()
-	if err != nil {
-		return nil, err
-	}
-
-	if nwakuCfg.EnableRelay {
-		err = node.WakuRelaySubscribe(defaultPubsubTopic)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	node.WakuSetEventCallback()
 
 	return node, nil
 
@@ -850,7 +830,6 @@ func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, su
 		}
 	}
 }
-
 */
 
 func (w *Waku) discoverAndConnectPeers() {
@@ -859,14 +838,14 @@ func (w *Waku) discoverAndConnectPeers() {
 	if nameserver == "" {
 		nameserver = "8.8.8.8"
 	}
-	timeout := int(requestTimeout / time.Millisecond)
 
 	for _, addrString := range w.cfg.WakuNodes {
 		addrString := addrString
 		if strings.HasPrefix(addrString, "enrtree://") {
 
 			// Use DNS Discovery
-			res, err := w.WakuDnsDiscovery(addrString, nameserver, timeout)
+			ctx, _ := context.WithTimeout(w.ctx, requestTimeout)
+			res, err := w.node.DnsDiscovery(ctx, addrString, nameserver)
 			if err != nil {
 				w.logger.Error("could not obtain dns discovery peers for ClusterConfig.WakuNodes", zap.Error(err), zap.String("dnsDiscURL", addrString))
 				continue
@@ -885,20 +864,31 @@ func (w *Waku) discoverAndConnectPeers() {
 			addrsToConnect = append(addrsToConnect, addr)
 		}
 	}
-
 	// Now connect to all the Multiaddresses
 	for _, ma := range addrsToConnect {
-		w.WakuConnect(ma.String(), timeout)
+		ctx, _ := context.WithTimeout(w.ctx, requestTimeout)
+		w.node.Connect(ctx, ma)
 	}
-
 }
 
 func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origin) {
 	defer gocommon.LogOnPanic()
 	// Connection will be prunned eventually by the connection manager if needed
 	// The peer connector in go-waku uses Connect, so it will execute identify as part of its
+
+	// TODO-nwaku
+	// TODO: is enr and origin required?
+	// TODO: this function is meant to add a node to a peer store so it can be picked up by the peer manager
+	//       so probably we shouldn't connect directly but expose an AddPeer function in libwaku
+
+	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
+	defer cancel()
+
 	addr := peerInfo.Addrs[0]
-	w.WakuConnect(addr.String(), 1000)
+	err := w.node.Connect(ctx, addr)
+	if err != nil {
+		w.logger.Error("couldn't connect to peer", zap.Error(err), zap.Stringer("peerID", peerInfo.ID))
+	}
 }
 
 /* TODO-nwaku
@@ -993,17 +983,9 @@ func (w *Waku) GetPubsubTopic(topic string) string {
 	return topic
 }
 
-/* TODO-nwaku
 func (w *Waku) unsubscribeFromPubsubTopicWithWakuRelay(topic string) error {
 	topic = w.GetPubsubTopic(topic)
-
-	if !w.node.Relay().IsSubscribed(topic) {
-		return nil
-	}
-
-	contentFilter := protocol.NewContentFilter(topic)
-
-	return w.node.Relay().Unsubscribe(w.ctx, contentFilter)
+	return w.node.RelayUnsubscribe(topic)
 }
 
 func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.PublicKey) error {
@@ -1013,6 +995,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 
 	topic = w.GetPubsubTopic(topic)
 
+	/* TODO nwaku
 	if w.node.Relay().IsSubscribed(topic) {
 		return nil
 	}
@@ -1023,10 +1006,9 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 			return err
 		}
 	}
+	*/
 
-	contentFilter := protocol.NewContentFilter(topic)
-
-	sub, err := w.node.Relay().Subscribe(w.ctx, contentFilter)
+	err := w.node.RelaySubscribe(topic)
 	if err != nil {
 		return err
 	}
@@ -1038,23 +1020,23 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 		for {
 			select {
 			case <-w.ctx.Done():
-				err := w.node.Relay().Unsubscribe(w.ctx, contentFilter)
+				err := w.node.RelayUnsubscribe(topic)
 				if err != nil && !errors.Is(err, context.Canceled) {
 					w.logger.Error("could not unsubscribe", zap.Error(err))
 				}
 				return
-			case env := <-sub[0].Ch:
+				// TODO-nwaku
+				/*case env := <-sub[0].Ch:
 				err := w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 				if err != nil {
 					w.logger.Error("OnNewEnvelopes error", zap.Error(err))
-				}
+				}*/
 			}
 		}
 	}()
 
 	return nil
 }
-*/
 
 // MaxMessageSize returns the maximum accepted message size.
 func (w *Waku) MaxMessageSize() uint32 {
@@ -1393,7 +1375,7 @@ func (w *Waku) OnNewEnvelope(env *protocol.Envelope) error {
 // Start implements node.Service, starting the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Start() error {
-	err := w.WakuStart()
+	err := w.node.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start nwaku node: %v", err)
 	}
@@ -1414,12 +1396,11 @@ func (w *Waku) Start() error {
 		return fmt.Errorf("failed to start go-waku node: %v", err)
 	}
 	*/
-	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, newPinger(w.wakuCtx))
-
-	w.HistoryRetriever = history.NewHistoryRetriever(newStorenodeRequestor(w.wakuCtx, w.logger), NewHistoryProcessorWrapper(w), w.logger)
+	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, newPinger(w.node))
+	w.HistoryRetriever = history.NewHistoryRetriever(newStorenodeRequestor(w.node, w.logger), NewHistoryProcessorWrapper(w), w.logger)
 	w.StorenodeCycle.Start(w.ctx)
 
-	peerID, err := w.PeerID()
+	peerID, err := w.node.PeerID()
 	if err != nil {
 		return err
 	}
@@ -1490,7 +1471,7 @@ func (w *Waku) Start() error {
 
 	if w.cfg.EnableMissingMessageVerification {
 		w.missingMsgVerifier = missing.NewMissingMessageVerifier(
-			newStorenodeRequestor(w.wakuCtx, w.logger),
+			newStorenodeRequestor(w.node, w.logger),
 			w,
 			w.timesource,
 			w.logger)
@@ -1644,7 +1625,7 @@ func (w *Waku) startMessageSender() error {
 		publishMethod = publish.LightPush
 	}*/
 
-	sender, err := publish.NewMessageSender(publishMethod, newPublisher(w.wakuCtx), w.logger)
+	sender, err := publish.NewMessageSender(publishMethod, newPublisher(w.node), w.logger)
 	if err != nil {
 		w.logger.Error("failed to create message sender", zap.Error(err))
 		return err
@@ -1653,7 +1634,7 @@ func (w *Waku) startMessageSender() error {
 	if w.cfg.EnableStoreConfirmationForMessagesSent {
 		msgStoredChan := make(chan gethcommon.Hash, 1000)
 		msgExpiredChan := make(chan gethcommon.Hash, 1000)
-		messageSentCheck := publish.NewMessageSentCheck(w.ctx, newStorenodeMessageVerifier(w.wakuCtx), w.StorenodeCycle, w.timesource, msgStoredChan, msgExpiredChan, w.logger)
+		messageSentCheck := publish.NewMessageSentCheck(w.ctx, newStorenodeMessageVerifier(w.node), w.StorenodeCycle, w.timesource, msgStoredChan, msgExpiredChan, w.logger)
 		sender.WithMessageSentCheck(messageSentCheck)
 
 		w.wg.Add(1)
@@ -1706,13 +1687,12 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
 }
 
-/* TODO-nwaku
-func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic string, contentTopics []string) {
+func (w *Waku) SetTopicsToVerifyForMissingMessages(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []string) {
 	if !w.cfg.EnableMissingMessageVerification {
 		return
 	}
 
-	w.missingMsgVerifier.SetCriteriaInterest(peerID, protocol.NewContentFilter(pubsubTopic, contentTopics...))
+	w.missingMsgVerifier.SetCriteriaInterest(peerInfo, protocol.NewContentFilter(pubsubTopic, contentTopics...))
 }
 
 func (w *Waku) setupRelaySubscriptions() error {
@@ -1741,7 +1721,7 @@ func (w *Waku) setupRelaySubscriptions() error {
 	}
 
 	return nil
-} */
+}
 
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Waku protocol.
@@ -1750,7 +1730,7 @@ func (w *Waku) Stop() error {
 
 	w.envelopeCache.Stop()
 
-	err := w.WakuStop()
+	err := w.node.Stop()
 	if err != nil {
 		return err
 	}
@@ -1942,12 +1922,7 @@ func (w *Waku) ClearEnvelopesCache() {
 }
 
 func (w *Waku) PeerCount() (int, error) {
-	peerCount, err := w.GetNumConnectedPeers()
-	if err != nil {
-		return 0, err
-	}
-
-	return peerCount, nil
+	return w.node.GetNumConnectedPeers()
 }
 
 // TODO-nwaku
@@ -2204,23 +2179,19 @@ func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 
 func (w *Waku) DialPeer(address multiaddr.Multiaddr) error {
 	// Using WakuConnect so it matches the go-waku's behavior and terminology
-	return w.WakuConnect(address.String(), int(requestTimeout/time.Millisecond))
+	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
+	defer cancel()
+	return w.node.Connect(ctx, address)
 }
 
-func (self *Waku) DropPeer(peerId peer.ID) error {
-	var resp = C.allocResp()
-	var cPeerId = C.CString(peerId.String())
-	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cPeerId))
+func (w *Waku) DialPeerByID(peerID peer.ID) error {
+	ctx, cancel := context.WithTimeout(w.ctx, requestTimeout)
+	defer cancel()
+	return w.node.DialPeerByID(ctx, peerID, relay.WakuRelayID_v200)
+}
 
-	C.cGoWakuDisconnectPeerById(self.wakuCtx, cPeerId, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error DisconnectPeerById: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
+func (w *Waku) DropPeer(peerID peer.ID) error {
+	return w.node.DisconnectPeerByID(peerID)
 }
 
 func (w *Waku) ProcessingP2PMessages() bool {
@@ -2246,22 +2217,7 @@ func (w *Waku) Clean() error {
 }
 
 func (w *Waku) PeerID() (peer.ID, error) {
-	var resp = C.allocResp()
-	defer C.freeResp(resp)
-	C.cGoWakuGetMyPeerId(w.wakuCtx, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-
-		peerIdStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		id, err := peer.Decode(peerIdStr)
-		if err != nil {
-			errMsg := "WakuGetMyPeerId - decoding peerId: %w"
-			return "", fmt.Errorf(errMsg, err)
-		}
-		return id, nil
-	}
-	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return "", fmt.Errorf("WakuGetMyPeerId: %s", errMsg)
+	return w.node.PeerID()
 }
 
 // validatePrivateKey checks the format of the given private key.
@@ -2334,10 +2290,6 @@ func (w *Waku) LegacyStoreNode() legacy_store.Store {
 	return nil
 }
 
-func WakuSetup() {
-	C.waku_setup()
-}
-
 func printStackTrace() {
 	// Create a buffer to hold the stack trace
 	buf := make([]byte, 102400)
@@ -2354,7 +2306,7 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 	logger *zap.Logger,
 	appDB *sql.DB,
 	ts *timesource.NTPTimeSource,
-	onHistoricMessagesRequestFailed func([]byte, peer.ID, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 
 	var err error
 	if logger == nil {
@@ -2377,479 +2329,234 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 	}
 	logger.Info("starting wakuv2 with config", zap.Any("nwakuCfg", nwakuCfg), zap.Any("wakuCfg", cfg))
 
-	jsonConfig, err := json.Marshal(nwakuCfg)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	wakunode, err := newWakuNode(ctx, nwakuCfg)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
-	var cJsonConfig = C.CString(string(jsonConfig))
-	var resp = C.allocResp()
-
-	defer C.free(unsafe.Pointer(cJsonConfig))
-	defer C.freeResp(resp)
-
-	wakuCtx := C.cGoWakuNew(cJsonConfig, resp)
 	// Notice that the events for self node are handled by the 'MyEventCallback' method
 
-	if C.getRet(resp) == C.RET_OK {
-		ctx, cancel := context.WithCancel(context.Background())
-		return &Waku{
-			wakuCtx:                         wakuCtx,
-			wakuCfg:                         nwakuCfg,
-			cfg:                             cfg,
-			privateKeys:                     make(map[string]*ecdsa.PrivateKey),
-			symKeys:                         make(map[string][]byte),
-			envelopeCache:                   newTTLCache(),
-			msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
-			topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
-			connectionNotifChan:             make(chan node.PeerConnection, 20),
-			connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
-			ctx:                             ctx,
-			cancel:                          cancel,
-			wg:                              sync.WaitGroup{},
-			dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
-			dnsAddressCacheLock:             &sync.RWMutex{},
-			dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
-			storeMsgIDs:                     make(map[gethcommon.Hash]bool),
-			timesource:                      ts,
-			storeMsgIDsMu:                   sync.RWMutex{},
-			logger:                          logger,
-			discV5BootstrapNodes:            nwakuCfg.Discv5BootstrapNodes,
-			onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
-			onPeerStats:                     onPeerStats,
-			onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
-			sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
-		}, nil
-	}
+	return &Waku{
+		node:                            wakunode,
+		wakuCfg:                         nwakuCfg,
+		cfg:                             cfg,
+		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
+		symKeys:                         make(map[string][]byte),
+		envelopeCache:                   newTTLCache(),
+		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
+		topicHealthStatusChan:           make(chan peermanager.TopicHealthStatus, 100),
+		connectionNotifChan:             make(chan node.PeerConnection, 20),
+		connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
+		ctx:                             ctx,
+		cancel:                          cancel,
+		wg:                              sync.WaitGroup{},
+		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
+		dnsAddressCacheLock:             &sync.RWMutex{},
+		dnsDiscAsyncRetrievedSignal:     make(chan struct{}),
+		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
+		timesource:                      ts,
+		storeMsgIDsMu:                   sync.RWMutex{},
+		logger:                          logger,
+		discV5BootstrapNodes:            nwakuCfg.Discv5BootstrapNodes,
+		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
+		onPeerStats:                     onPeerStats,
+		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
+		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
+	}, nil
 
-	errMsg := "error wakuNew: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return nil, errors.New(errMsg)
-}
-
-func (self *Waku) WakuStart() error {
-
-	var resp = C.allocResp()
-	defer C.freeResp(resp)
-	C.cGoWakuStart(self.wakuCtx, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error WakuStart: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
-}
-
-func (self *Waku) WakuStop() error {
-	var resp = C.allocResp()
-	defer C.freeResp(resp)
-	C.cGoWakuStop(self.wakuCtx, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error WakuStop: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
-}
-func (self *Waku) WakuDestroy() error {
-	var resp = C.allocResp()
-	defer C.freeResp(resp)
-	C.cGoWakuDestroy(self.wakuCtx, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error WakuDestroy: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
-}
-
-func (self *Waku) StartDiscV5() error {
-	var resp = C.allocResp()
-	defer C.freeResp(resp)
-	C.cGoWakuStartDiscV5(self.wakuCtx, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error WakuStartDiscV5: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
-}
-
-func (self *Waku) StopDiscV5() error {
-	var resp = C.allocResp()
-	defer C.freeResp(resp)
-	C.cGoWakuStopDiscV5(self.wakuCtx, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error WakuStopDiscV5: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
-}
-
-func (self *Waku) WakuVersion() (string, error) {
-	var resp = C.allocResp()
-	defer C.freeResp(resp)
-
-	C.cGoWakuVersion(self.wakuCtx, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		var version = C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		return version, nil
-	}
-
-	errMsg := "error WakuVersion: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return "", errors.New(errMsg)
 }
 
 //export globalEventCallback
 func globalEventCallback(callerRet C.int, msg *C.char, len C.size_t, userData unsafe.Pointer) {
 	// This is shared among all Golang instances
-	self := Waku{wakuCtx: userData}
-	self.MyEventCallback(callerRet, msg, len)
+	// TODO-nwaku
+	// self := Waku{wakuCtx: userData}
+	// self.MyEventCallback(callerRet, msg, len)
 }
 
 func (self *Waku) MyEventCallback(callerRet C.int, msg *C.char, len C.size_t) {
 	fmt.Println("Event received:", C.GoStringN(msg, C.int(len)))
 }
 
-func (self *Waku) WakuSetEventCallback() {
-	// Notice that the events for self node are handled by the 'MyEventCallback' method
-	C.cGoWakuSetEventCallback(self.wakuCtx)
+type response struct {
+	err   error
+	value any
 }
 
-func (self *Waku) FormatContentTopic(
-	appName string,
-	appVersion int,
-	contentTopicName string,
-	encoding string) (WakuContentTopic, error) {
-
-	var cAppName = C.CString(appName)
-	var cContentTopicName = C.CString(contentTopicName)
-	var cEncoding = C.CString(encoding)
-	var resp = C.allocResp()
-
-	defer C.free(unsafe.Pointer(cAppName))
-	defer C.free(unsafe.Pointer(cContentTopicName))
-	defer C.free(unsafe.Pointer(cEncoding))
-	defer C.freeResp(resp)
-
-	C.cGoWakuContentTopic(self.wakuCtx,
-		cAppName,
-		C.int(appVersion),
-		cContentTopicName,
-		cEncoding,
-		resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		var contentTopic = C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		return contentTopic, nil
-	}
-
-	errMsg := "error FormatContentTopic: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-
-	return "", errors.New(errMsg)
+// WakuNode represents an instance of an nwaku node
+type WakuNode struct {
+	wakuCtx   unsafe.Pointer
+	cancel    context.CancelFunc
+	requestCh chan *request
 }
 
-func (self *Waku) FormatPubsubTopic(topicName string) (WakuPubsubTopic, error) {
-	var cTopicName = C.CString(topicName)
-	var resp = C.allocResp()
+type requestType int
 
-	defer C.free(unsafe.Pointer(cTopicName))
-	defer C.freeResp(resp)
+const (
+	requestTypeNew requestType = iota + 1
+	requestTypePing
+	requestTypeStart
+	requestTypeRelayPublish
+	requestTypeStoreQuery
+	requestTypePeerID
+	requestTypeStop
+	requestTypeDestroy
+	requestTypeStartDiscV5
+	requestTypeStopDiscV5
+	requestTypeVersion
+	requestTypeRelaySubscribe
+	requestTypeRelayUnsubscribe
+	requestTypePeerExchangeRequest
+	requestTypeConnect
+	requestTypeDialPeerByID
+	requestTypeListenAddresses
+	requestTypeENR
+	requestTypeListPeersInMesh
+	requestTypeGetConnectedPeers
+	requestTypeGetPeerIDsFromPeerStore
+	requestTypeGetPeerIDsByProtocol
+	requestTypeDisconnectPeerByID
+	requestTypeDnsDiscovery
+	requestTypeDialPeer
+	requestTypeGetNumConnectedRelayPeers
+)
 
-	C.cGoWakuPubsubTopic(self.wakuCtx, cTopicName, resp)
-	if C.getRet(resp) == C.RET_OK {
-		var pubsubTopic = C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		return pubsubTopic, nil
-	}
-
-	errMsg := "error FormatPubsubTopic: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-
-	return "", errors.New(errMsg)
+type request struct {
+	id         string
+	reqType    requestType
+	input      any
+	responseCh chan response
 }
 
-func (self *Waku) WakuDefaultPubsubTopic() (WakuPubsubTopic, error) {
-	var resp = C.allocResp()
-	defer C.freeResp(resp)
-	C.cGoWakuDefaultPubsubTopic(self.wakuCtx, resp)
-	if C.getRet(resp) == C.RET_OK {
-		var defaultPubsubTopic = C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		return defaultPubsubTopic, nil
+func newWakuNode(ctx context.Context, config *WakuConfig) (*WakuNode, error) {
+	ctx, cancel := context.WithCancel(ctx)
+
+	n := &WakuNode{
+		requestCh: make(chan *request),
+		cancel:    cancel,
 	}
 
-	errMsg := "error WakuDefaultPubsubTopic: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	// Notice this runs insto a separate goroutine. This is because we can't be sure
+	// from which OS thread will go call nwaku operations (They need to be done from
+	// the same thread that started nwaku). Communication with the goroutine to send
+	// operations to nwaku will be done via channels
+	go func() {
+		defer gocommon.LogOnPanic()
 
-	return "", errors.New(errMsg)
-}
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
 
-func (self *Waku) WakuRelaySubscribe(pubsubTopic string) error {
-	var resp = C.allocResp()
-	var cPubsubTopic = C.CString(pubsubTopic)
+		C.waku_setup()
 
-	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cPubsubTopic))
+		n.processLoop(ctx)
+	}()
 
-	if self.wakuCtx == nil {
-		return errors.New("wakuCtx is nil")
-	}
-	// if self.cPubsubTopic == nil {
-	// 	fmt.Println("cPubsubTopic is nil")
-	// }
-	// if self.resp == nil {
-	// 	fmt.Println("resp is nil")
-	// }
-
-	C.cGoWakuRelaySubscribe(self.wakuCtx, cPubsubTopic, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error WakuRelaySubscribe: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
-}
-
-func (self *Waku) WakuRelayUnsubscribe(pubsubTopic string) error {
-	var resp = C.allocResp()
-	var cPubsubTopic = C.CString(pubsubTopic)
-	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cPubsubTopic))
-	C.cGoWakuRelayUnsubscribe(self.wakuCtx, cPubsubTopic, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error WakuRelayUnsubscribe: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
-}
-
-func (self *Waku) WakuLightpushPublish(message *pb.WakuMessage, pubsubTopic string) (string, error) {
-	jsonMsg, err := json.Marshal(message)
+	_, err := n.postTask(requestTypeNew, config)
 	if err != nil {
-		return "", err
+		cancel()
+		return nil, err
 	}
-
-	var cPubsubTopic = C.CString(pubsubTopic)
-	var msg = C.CString(string(jsonMsg))
-	var resp = C.allocResp()
-
-	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cPubsubTopic))
-	defer C.free(unsafe.Pointer(msg))
-
-	C.cGoWakuLightpushPublish(self.wakuCtx, cPubsubTopic, msg, resp)
-	if C.getRet(resp) == C.RET_OK {
-		msg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		return msg, nil
-	}
-	errMsg := "error WakuLightpushPublish: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return "", errors.New(errMsg)
+	return n, nil
 }
 
-func wakuStoreQuery(
-	wakuCtx unsafe.Pointer,
-	jsonQuery string,
-	peerAddr string,
-	timeoutMs int) (string, error) {
-
-	var cJsonQuery = C.CString(jsonQuery)
-	var cPeerAddr = C.CString(peerAddr)
-	var resp = C.allocResp()
-
-	defer C.free(unsafe.Pointer(cJsonQuery))
-	defer C.free(unsafe.Pointer(cPeerAddr))
-	defer C.freeResp(resp)
-
-	C.cGoWakuStoreQuery(wakuCtx, cJsonQuery, cPeerAddr, C.int(timeoutMs), resp)
-	if C.getRet(resp) == C.RET_OK {
-		msg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		return msg, nil
+func (n *WakuNode) postTask(reqType requestType, input any) (any, error) {
+	responseCh := make(chan response)
+	n.requestCh <- &request{
+		reqType:    reqType,
+		input:      input,
+		responseCh: responseCh,
 	}
-	errMsg := "error WakuStoreQuery: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return "", errors.New(errMsg)
+	response := <-responseCh
+	if response.err != nil {
+		return nil, response.err
+	}
+	return response.value, nil
 }
 
-func (self *Waku) WakuPeerExchangeRequest(numPeers uint64) (uint64, error) {
-	var resp = C.allocResp()
-	defer C.freeResp(resp)
-
-	C.cGoWakuPeerExchangeQuery(self.wakuCtx, C.uint64_t(numPeers), resp)
-	if C.getRet(resp) == C.RET_OK {
-		numRecvPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		numRecvPeers, err := strconv.ParseUint(numRecvPeersStr, 10, 64)
-		if err != nil {
-			return 0, err
+func (n *WakuNode) processLoop(ctx context.Context) {
+	for req := range n.requestCh {
+		switch req.reqType {
+		case requestTypeNew:
+			req.responseCh <- response{err: n.newNode(req.input.(*WakuConfig))}
+		case requestTypePing:
+			duration, err := n.pingPeer(req.input.(pingRequest))
+			req.responseCh <- response{value: duration, err: err}
+		case requestTypeStart:
+			req.responseCh <- response{err: n.start()}
+		case requestTypeRelayPublish:
+			hash, err := n.relayPublish(req.input.(relayPublishRequest))
+			req.responseCh <- response{value: hash, err: err}
+		case requestTypeStoreQuery:
+			results, err := n.storeQuery(req.input.(storeQueryRequest))
+			req.responseCh <- response{value: results, err: err}
+		case requestTypeDestroy:
+			req.responseCh <- response{err: n.destroy()}
+		case requestTypePeerID:
+			peerID, err := n.peerID()
+			req.responseCh <- response{value: peerID, err: err}
+		case requestTypeStop:
+			req.responseCh <- response{err: n.stop()}
+		case requestTypeStartDiscV5:
+			req.responseCh <- response{err: n.startDiscV5()}
+		case requestTypeStopDiscV5:
+			req.responseCh <- response{err: n.stopDiscV5()}
+		case requestTypeVersion:
+			version, err := n.version()
+			req.responseCh <- response{value: version, err: err}
+		case requestTypePeerExchangeRequest:
+			numPeers, err := n.peerExchangeRequest(req.input.(uint64))
+			req.responseCh <- response{value: numPeers, err: err}
+		case requestTypeRelaySubscribe:
+			req.responseCh <- response{err: n.relaySubscribe(req.input.(string))}
+		case requestTypeRelayUnsubscribe:
+			req.responseCh <- response{err: n.relayUnsubscribe(req.input.(string))}
+		case requestTypeConnect:
+			req.responseCh <- response{err: n.connect(req.input.(connectRequest))}
+		case requestTypeDialPeerByID:
+			req.responseCh <- response{err: n.dialPeerById(req.input.(dialPeerByIDRequest))}
+		case requestTypeListenAddresses:
+			addrs, err := n.listenAddresses()
+			req.responseCh <- response{value: addrs, err: err}
+		case requestTypeENR:
+			enr, err := n.enr()
+			req.responseCh <- response{value: enr, err: err}
+		case requestTypeListPeersInMesh:
+			numPeers, err := n.listPeersInMesh(req.input.(string))
+			req.responseCh <- response{value: numPeers, err: err}
+		case requestTypeGetConnectedPeers:
+			peers, err := n.getConnectedPeers()
+			req.responseCh <- response{value: peers, err: err}
+		case requestTypeGetPeerIDsFromPeerStore:
+			peers, err := n.getPeerIDsFromPeerStore()
+			req.responseCh <- response{value: peers, err: err}
+		case requestTypeGetPeerIDsByProtocol:
+			peers, err := n.getPeerIDsByProtocol(req.input.(libp2pproto.ID))
+			req.responseCh <- response{value: peers, err: err}
+		case requestTypeDisconnectPeerByID:
+			req.responseCh <- response{err: n.disconnectPeerByID(req.input.(peer.ID))}
+		case requestTypeDnsDiscovery:
+			addrs, err := n.dnsDiscovery(req.input.(dnsDiscoveryRequest))
+			req.responseCh <- response{value: addrs, err: err}
+		case requestTypeDialPeer:
+			req.responseCh <- response{err: n.dialPeer(req.input.(dialPeerRequest))}
+		case requestTypeGetNumConnectedRelayPeers:
+			numPeers, err := n.getNumConnectedRelayPeers(req.input.([]string)...)
+			req.responseCh <- response{value: numPeers, err: err}
+		default:
+			req.responseCh <- response{err: errors.New("invalid operation")}
 		}
-		return numRecvPeers, nil
 	}
-	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return 0, fmt.Errorf("WakuPeerExchangeRequest: %s", errMsg)
 }
 
-func (self *Waku) WakuConnect(peerMultiAddr string, timeoutMs int) error {
-	var resp = C.allocResp()
-	var cPeerMultiAddr = C.CString(peerMultiAddr)
-	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cPeerMultiAddr))
-
-	C.cGoWakuConnect(self.wakuCtx, cPeerMultiAddr, C.int(timeoutMs), resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error WakuConnect: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
-}
-
-func (self *Waku) WakuDialPeer(peerMultiAddr multiaddr.Multiaddr, protocol string, timeoutMs int) error {
-	var resp = C.allocResp()
-	var cPeerMultiAddr = C.CString(peerMultiAddr.String())
-	var cProtocol = C.CString(protocol)
-	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cPeerMultiAddr))
-	defer C.free(unsafe.Pointer(cProtocol))
-
-	C.cGoWakuDialPeer(self.wakuCtx, cPeerMultiAddr, cProtocol, C.int(timeoutMs), resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error DialPeer: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
-}
-
-func (self *Waku) WakuDialPeerById(peerId peer.ID, protocol string, timeoutMs int) error {
-	var resp = C.allocResp()
-	var cPeerId = C.CString(peerId.String())
-	var cProtocol = C.CString(protocol)
-	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cPeerId))
-	defer C.free(unsafe.Pointer(cProtocol))
-
-	C.cGoWakuDialPeerById(self.wakuCtx, cPeerId, cProtocol, C.int(timeoutMs), resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		return nil
-	}
-	errMsg := "error DialPeerById: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
-}
-
-func (self *Waku) WakuDnsDiscovery(entTreeUrl string, nameDnsServer string, timeoutMs int) ([]multiaddr.Multiaddr, error) {
-	var resp = C.allocResp()
-	var cEnrTree = C.CString(entTreeUrl)
-	var cDnsServer = C.CString(nameDnsServer)
-	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cEnrTree))
-	defer C.free(unsafe.Pointer(cDnsServer))
-
-	C.cGoWakuDnsDiscovery(self.wakuCtx, cEnrTree, cDnsServer, C.int(timeoutMs), resp)
-
-	if C.getRet(resp) == C.RET_OK {
-
-		var addrsRet []multiaddr.Multiaddr
-		nodeAddresses := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		addrss := strings.Split(nodeAddresses, ",")
-		for _, addr := range addrss {
-			addr, err := multiaddr.NewMultiaddr(addr)
-			if err != nil {
-				return nil, err
-			}
-
-			addrsRet = append(addrsRet, addr)
-		}
-
-		return addrsRet, nil
-	}
-	errMsg := "error WakuDnsDiscovery: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-
-	return nil, errors.New(errMsg)
-}
-
-func (self *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	var resp = C.allocResp()
-	defer C.freeResp(resp)
-	C.cGoWakuListenAddresses(self.wakuCtx, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-
-		var addrsRet []multiaddr.Multiaddr
-		listenAddresses := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		addrss := strings.Split(listenAddresses, ",")
-		for _, addr := range addrss {
-			addr, err := multiaddr.NewMultiaddr(addr)
-			if err != nil {
-				return nil, err
-			}
-
-			addrsRet = append(addrsRet, addr)
-		}
-
-		return addrsRet, nil
-	}
-	errMsg := "error WakuListenAddresses: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-
-	return nil, errors.New(errMsg)
-}
-
-func (self *Waku) ENR() (*enode.Node, error) {
-	var resp = C.allocResp()
-	defer C.freeResp(resp)
-	C.cGoWakuGetMyENR(self.wakuCtx, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		enrStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		n, err := enode.Parse(enode.ValidSchemes, enrStr)
-		if err != nil {
-			return nil, err
-		}
-		return n, nil
-	}
-	errMsg := "error WakuGetMyENR: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return nil, errors.New(errMsg)
-}
-
-func (self *Waku) ListPeersInMesh(pubsubTopic string) (int, error) {
-	var resp = C.allocResp()
-	var cPubsubTopic = C.CString(pubsubTopic)
-	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cPubsubTopic))
-
-	C.cGoWakuListPeersInMesh(self.wakuCtx, cPubsubTopic, resp)
-
-	if C.getRet(resp) == C.RET_OK {
-		numPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		numPeers, err := strconv.Atoi(numPeersStr)
-		if err != nil {
-			errMsg := "ListPeersInMesh - error converting string to int: " + err.Error()
-			return 0, errors.New(errMsg)
-		}
-		return numPeers, nil
-	}
-	errMsg := "error ListPeersInMesh: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return 0, errors.New(errMsg)
-}
-
-func (self *Waku) GetNumConnectedRelayPeers(paramPubsubTopic ...string) (int, error) {
+func (n *WakuNode) getNumConnectedRelayPeers(optPubsubTopic ...string) (int, error) {
 	var pubsubTopic string
-	if len(paramPubsubTopic) == 0 {
+	if len(optPubsubTopic) == 0 {
 		pubsubTopic = ""
 	} else {
-		pubsubTopic = paramPubsubTopic[0]
+		pubsubTopic = optPubsubTopic[0]
 	}
 
 	var resp = C.allocResp()
@@ -2857,7 +2564,7 @@ func (self *Waku) GetNumConnectedRelayPeers(paramPubsubTopic ...string) (int, er
 	defer C.freeResp(resp)
 	defer C.free(unsafe.Pointer(cPubsubTopic))
 
-	C.cGoWakuGetNumConnectedRelayPeers(self.wakuCtx, cPubsubTopic, resp)
+	C.cGoWakuGetNumConnectedRelayPeers(n.wakuCtx, cPubsubTopic, resp)
 
 	if C.getRet(resp) == C.RET_OK {
 		numPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
@@ -2873,19 +2580,32 @@ func (self *Waku) GetNumConnectedRelayPeers(paramPubsubTopic ...string) (int, er
 	return 0, errors.New(errMsg)
 }
 
-func (self *Waku) GetConnectedPeers() (peer.IDSlice, error) {
+func (n *WakuNode) disconnectPeerByID(peerID peer.ID) error {
+	var resp = C.allocResp()
+	var cPeerId = C.CString(peerID.String())
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPeerId))
+
+	C.cGoWakuDisconnectPeerById(n.wakuCtx, cPeerId, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error DisconnectPeerById: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) getConnectedPeers() (peer.IDSlice, error) {
 	var resp = C.allocResp()
 	defer C.freeResp(resp)
-	C.cGoWakuGetConnectedPeers(self.wakuCtx, resp)
-
+	C.cGoWakuGetConnectedPeers(n.wakuCtx, resp)
 	if C.getRet(resp) == C.RET_OK {
 		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		if peersStr == "" {
-			return peer.IDSlice{}, nil
+			return nil, nil
 		}
 		// peersStr contains a comma-separated list of peer ids
 		itemsPeerIds := strings.Split(peersStr, ",")
-
 		var peers peer.IDSlice
 		for _, peerId := range itemsPeerIds {
 			id, err := peer.Decode(peerId)
@@ -2894,204 +2614,168 @@ func (self *Waku) GetConnectedPeers() (peer.IDSlice, error) {
 			}
 			peers = append(peers, id)
 		}
-
 		return peers, nil
 	}
 	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return nil, fmt.Errorf("GetConnectedPeers: %s", errMsg)
+
 }
 
-func (self *Waku) GetNumConnectedPeers() (int, error) {
-	connecterPeers, err := self.GetConnectedPeers()
-	if err != nil {
-		return 0, err
+func (n *WakuNode) relaySubscribe(pubsubTopic string) error {
+	if pubsubTopic == "" {
+		return errors.New("pubsub topic is empty")
 	}
-	return len(connecterPeers), nil
-}
 
-func (self *Waku) GetPeerIdsFromPeerStore() (peer.IDSlice, error) {
 	var resp = C.allocResp()
+	var cPubsubTopic = C.CString(pubsubTopic)
+
 	defer C.freeResp(resp)
-	C.cGoWakuGetPeerIdsFromPeerStore(self.wakuCtx, resp)
+	defer C.free(unsafe.Pointer(cPubsubTopic))
+
+	if n.wakuCtx == nil {
+		return errors.New("wakuCtx is nil")
+	}
+
+	C.cGoWakuRelaySubscribe(n.wakuCtx, cPubsubTopic, resp)
 
 	if C.getRet(resp) == C.RET_OK {
-		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		if peersStr == "" {
-			return peer.IDSlice{}, nil
-		}
-		// peersStr contains a comma-separated list of peer ids
-		itemsPeerIds := strings.Split(peersStr, ",")
-
-		var peers peer.IDSlice
-		for _, peerId := range itemsPeerIds {
-			id, err := peer.Decode(peerId)
-			if err != nil {
-				return nil, fmt.Errorf("GetPeerIdsFromPeerStore - decoding peerId: %w", err)
-			}
-			peers = append(peers, id)
-		}
-
-		return peers, nil
+		return nil
 	}
+
+	errMsg := "error WakuRelaySubscribe: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) relayUnsubscribe(pubsubTopic string) error {
+	if pubsubTopic == "" {
+		return errors.New("pubsub topic is empty")
+	}
+
+	var resp = C.allocResp()
+	var cPubsubTopic = C.CString(pubsubTopic)
+
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPubsubTopic))
+
+	if n.wakuCtx == nil {
+		return errors.New("wakuCtx is nil")
+	}
+
+	C.cGoWakuRelayUnsubscribe(n.wakuCtx, cPubsubTopic, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+
+	errMsg := "error WakuRelayUnsubscribe: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) peerExchangeRequest(numPeers uint64) (uint64, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+
+	C.cGoWakuPeerExchangeQuery(n.wakuCtx, C.uint64_t(numPeers), resp)
+	if C.getRet(resp) == C.RET_OK {
+		numRecvPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		numRecvPeers, err := strconv.ParseUint(numRecvPeersStr, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return numRecvPeers, nil
+	}
+
 	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return nil, fmt.Errorf("GetPeerIdsFromPeerStore: %s", errMsg)
+	return 0, errors.New(errMsg)
 }
 
-func (self *Waku) GetPeerIdsByProtocol(protocol string) (peer.IDSlice, error) {
+func (n *WakuNode) startDiscV5() error {
 	var resp = C.allocResp()
-	var cProtocol = C.CString(protocol)
 	defer C.freeResp(resp)
-	defer C.free(unsafe.Pointer(cProtocol))
-
-	C.cGoWakuGetPeerIdsByProtocol(self.wakuCtx, cProtocol, resp)
+	C.cGoWakuStartDiscV5(n.wakuCtx, resp)
 
 	if C.getRet(resp) == C.RET_OK {
-		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		if peersStr == "" {
-			return peer.IDSlice{}, nil
-		}
-		// peersStr contains a comma-separated list of peer ids
-		itemsPeerIds := strings.Split(peersStr, ",")
-
-		var peers peer.IDSlice
-		for _, p := range itemsPeerIds {
-			id, err := peer.Decode(p)
-			if err != nil {
-				return nil, fmt.Errorf("GetPeerIdsByProtocol - decoding peerId: %w", err)
-			}
-			peers = append(peers, id)
-		}
-
-		return peers, nil
+		return nil
 	}
-	errMsg := "error GetPeerIdsByProtocol: " +
+	errMsg := "error WakuStartDiscV5: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) stopDiscV5() error {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+	C.cGoWakuStopDiscV5(n.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error WakuStopDiscV5: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) version() (string, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+
+	C.cGoWakuVersion(n.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		var version = C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		return version, nil
+	}
+
+	errMsg := "error WakuVersion: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return "", errors.New(errMsg)
+}
+
+func (n *WakuNode) storeQuery(storeQueryRequest storeQueryRequest) (any, error) {
+	// TODO: extract timeout from context
+	timeoutMs := time.Minute.Milliseconds()
+
+	b, err := json.Marshal(storeQueryRequest.storeRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	addrs := make([]string, len(storeQueryRequest.peerInfo.Addrs))
+	for i, addr := range utils.EncapsulatePeerID(storeQueryRequest.peerInfo.ID, storeQueryRequest.peerInfo.Addrs...) {
+		addrs[i] = addr.String()
+	}
+
+	var cJsonQuery = C.CString(string(b))
+	var cPeerAddr = C.CString(strings.Join(addrs, ","))
+	var resp = C.allocResp()
+
+	defer C.free(unsafe.Pointer(cJsonQuery))
+	defer C.free(unsafe.Pointer(cPeerAddr))
+	defer C.freeResp(resp)
+
+	C.cGoWakuStoreQuery(n.wakuCtx, cJsonQuery, cPeerAddr, C.int(timeoutMs), resp)
+	if C.getRet(resp) == C.RET_OK {
+		jsonResponseStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		storeQueryResponse := &storepb.StoreQueryResponse{}
+		err = json.Unmarshal([]byte(jsonResponseStr), storeQueryResponse)
+		if err != nil {
+			return nil, err
+		}
+		return storeQueryResponse, nil
+	}
+	errMsg := "error WakuStoreQuery: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return nil, errors.New(errMsg)
 }
 
-// func main() {
+func (n *WakuNode) relayPublish(relayPublishRequest relayPublishRequest) (pb.MessageHash, error) {
+	// TODO: extract timeout from context
+	timeoutMs := time.Minute.Milliseconds()
 
-// 	config := WakuConfig{
-// 		Host:        "0.0.0.0",
-// 		Port:        30304,
-// 		NodeKey:     "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
-// 		EnableRelay: true,
-// 		LogLevel:    "DEBUG",
-// 	}
-
-// 	node, err := wakuNew(config)
-// 	if err != nil {
-// 		fmt.Println("Error happened:", err.Error())
-// 		return
-// 	}
-
-// 	node.WakuSetEventCallback()
-
-// 	defaultPubsubTopic, err := node.WakuDefaultPubsubTopic()
-// 	if err != nil {
-// 		fmt.Println("Error happened:", err.Error())
-// 		return
-// 	}
-
-// 	err = node.WakuRelaySubscribe(defaultPubsubTopic)
-// 	if err != nil {
-// 		fmt.Println("Error happened:", err.Error())
-// 		return
-// 	}
-
-// 	err = node.WakuConnect(
-// 		// tries to connect to a localhost node with key: 0d714a1fada214dead6dc9c7274585eca0ff292451866e7d6d677dc818e8ccd2
-// 		"/ip4/0.0.0.0/tcp/60000/p2p/16Uiu2HAmVFXtAfSj4EiR7mL2KvL4EE2wztuQgUSBoj2Jx2KeXFLN",
-// 		10000)
-// 	if err != nil {
-// 		fmt.Println("Error happened:", err.Error())
-// 		return
-// 	}
-
-// 	err = node.WakuStart()
-// 	if err != nil {
-// 		fmt.Println("Error happened:", err.Error())
-// 		return
-// 	}
-
-// 	version, err := node.WakuVersion()
-// 	if err != nil {
-// 		fmt.Println("Error happened:", err.Error())
-// 		return
-// 	}
-
-// 	formattedContentTopic, err := node.FormatContentTopic("appName", 1, "cTopicName", "enc")
-// 	if err != nil {
-// 		fmt.Println("Error happened:", err.Error())
-// 		return
-// 	}
-
-// 	formattedPubsubTopic, err := node.FormatPubsubTopic("my-ctopic")
-// 	if err != nil {
-// 		fmt.Println("Error happened:", err.Error())
-// 		return
-// 	}
-
-// 	listenAddresses, err := node.WakuListenAddresses()
-// 	if err != nil {
-// 		fmt.Println("Error happened:", err.Error())
-// 		return
-// 	}
-
-// 	fmt.Println("Version:", version)
-// 	fmt.Println("Custom content topic:", formattedContentTopic)
-// 	fmt.Println("Custom pubsub topic:", formattedPubsubTopic)
-// 	fmt.Println("Default pubsub topic:", defaultPubsubTopic)
-// 	fmt.Println("Listen addresses:", listenAddresses)
-
-// 	// Wait for a SIGINT or SIGTERM signal
-// 	ch := make(chan os.Signal, 1)
-// 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-// 	<-ch
-
-// 	err = node.WakuStop()
-// 	if err != nil {
-// 		fmt.Println("Error happened:", err.Error())
-// 		return
-// 	}
-
-// 	err = node.WakuDestroy()
-// 	if err != nil {
-// 		fmt.Println("Error happened:", err.Error())
-// 		return
-// 	}
-// }
-
-// MaxMessageSize returns the maximum accepted message size.
-/* TODO-nwaku
-func (w *Waku) MaxMessageSize() uint32 {
-	return w.cfg.MaxMessageSize
-} */
-
-func newPublisher(wakuCtx unsafe.Pointer) publish.Publisher {
-	return &nwakuPublisher{
-		wakuCtx: wakuCtx,
-	}
-}
-
-type nwakuPublisher struct {
-	wakuCtx unsafe.Pointer
-}
-
-func (p *nwakuPublisher) RelayListPeers(pubsubTopic string) ([]peer.ID, error) {
-	// TODO-nwaku
-	return nil, nil
-}
-
-func (p *nwakuPublisher) RelayPublish(ctx context.Context, message *pb.WakuMessage, pubsubTopic string) (pb.MessageHash, error) {
-	timeoutMs := 1000
-
-	jsonMsg, err := json.Marshal(message)
+	jsonMsg, err := json.Marshal(relayPublishRequest.message)
 	if err != nil {
 		return pb.MessageHash{}, err
 	}
 
-	var cPubsubTopic = C.CString(pubsubTopic)
+	var cPubsubTopic = C.CString(relayPublishRequest.pubsubTopic)
 	var msg = C.CString(string(jsonMsg))
 	var resp = C.allocResp()
 
@@ -3099,7 +2783,7 @@ func (p *nwakuPublisher) RelayPublish(ctx context.Context, message *pb.WakuMessa
 	defer C.free(unsafe.Pointer(cPubsubTopic))
 	defer C.free(unsafe.Pointer(msg))
 
-	C.cGoWakuRelayPublish(p.wakuCtx, cPubsubTopic, msg, C.int(timeoutMs), resp)
+	C.cGoWakuRelayPublish(n.wakuCtx, cPubsubTopic, msg, C.int(timeoutMs), resp)
 	if C.getRet(resp) == C.RET_OK {
 		msgHash := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		msgHashBytes, err := hexutil.Decode(msgHash)
@@ -3108,82 +2792,39 @@ func (p *nwakuPublisher) RelayPublish(ctx context.Context, message *pb.WakuMessa
 		}
 		return pb.ToMessageHash(msgHashBytes), nil
 	}
-	errMsg := "error WakuRelayPublish: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	errMsg := "WakuRelayPublish: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return pb.MessageHash{}, errors.New(errMsg)
 }
 
-// LightpushPublish publishes a message via WakuLightPush
-func (p *nwakuPublisher) LightpushPublish(ctx context.Context, message *pb.WakuMessage, pubsubTopic string, maxPeers int) (pb.MessageHash, error) {
-	// TODO-nwaku
-	return pb.MessageHash{}, errors.New("not implemented yet")
+func (n *WakuNode) dnsDiscovery(dnsDiscRequest dnsDiscoveryRequest) ([]multiaddr.Multiaddr, error) {
+	var resp = C.allocResp()
+	var cEnrTree = C.CString(dnsDiscRequest.enrTreeUrl)
+	var cDnsServer = C.CString(dnsDiscRequest.nameDnsServer)
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cEnrTree))
+	defer C.free(unsafe.Pointer(cDnsServer))
+	// TODO: extract timeout from context
+	C.cGoWakuDnsDiscovery(n.wakuCtx, cEnrTree, cDnsServer, C.int(time.Minute.Milliseconds()), resp)
+	if C.getRet(resp) == C.RET_OK {
+		var addrsRet []multiaddr.Multiaddr
+		nodeAddresses := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		addrss := strings.Split(nodeAddresses, ",")
+		for _, addr := range addrss {
+			addr, err := multiaddr.NewMultiaddr(addr)
+			if err != nil {
+				return nil, err
+			}
+			addrsRet = append(addrsRet, addr)
+		}
+		return addrsRet, nil
+	}
+	errMsg := "error WakuDnsDiscovery: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, errors.New(errMsg)
 }
 
-func newStorenodeMessageVerifier(wakuCtx unsafe.Pointer) publish.StorenodeMessageVerifier {
-	return &storenodeMessageVerifier{
-		wakuCtx: wakuCtx,
-	}
-}
+func (n *WakuNode) pingPeer(request pingRequest) (time.Duration, error) {
+	peerInfo := request.peerInfo
 
-type storenodeMessageVerifier struct {
-	wakuCtx unsafe.Pointer
-}
-
-func (d *storenodeMessageVerifier) MessageHashesExist(ctx context.Context, requestID []byte, peerID peer.ID, pageSize uint64, messageHashes []pb.MessageHash) ([]pb.MessageHash, error) {
-	requestIDStr := hex.EncodeToString(requestID)
-	storeRequest := &storepb.StoreQueryRequest{
-		RequestId:         requestIDStr,
-		MessageHashes:     make([][]byte, len(messageHashes)),
-		IncludeData:       false,
-		PaginationCursor:  nil,
-		PaginationForward: false,
-		PaginationLimit:   proto.Uint64(pageSize),
-	}
-
-	for i, mhash := range messageHashes {
-		storeRequest.MessageHashes[i] = mhash.Bytes()
-	}
-
-	jsonQuery, err := json.Marshal(storeRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: timeouts need to be managed differently. For now we're using a 1m timeout
-	jsonResponse, err := wakuStoreQuery(d.wakuCtx, string(jsonQuery), peerID.String(), int(time.Minute.Milliseconds()))
-	if err != nil {
-		return nil, err
-	}
-
-	response := &storepb.StoreQueryResponse{}
-	err = json.Unmarshal([]byte(jsonResponse), response)
-	if err != nil {
-		return nil, err
-	}
-
-	if response.GetStatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("could not query storenode: %s %d %s", requestIDStr, response.GetStatusCode(), response.GetStatusDesc())
-	}
-
-	result := make([]pb.MessageHash, len(response.Messages))
-	for i, msg := range response.Messages {
-		result[i] = pb.ToMessageHash(msg.GetMessageHash())
-	}
-
-	return result, nil
-}
-
-type pinger struct {
-	wakuCtx unsafe.Pointer
-}
-
-func newPinger(wakuCtx unsafe.Pointer) commonapi.Pinger {
-	return &pinger{
-		wakuCtx: wakuCtx,
-	}
-}
-
-func (p *pinger) PingPeer(ctx context.Context, peerInfo peer.AddrInfo) (time.Duration, error) {
 	addrs := make([]string, len(peerInfo.Addrs))
 	for i, addr := range utils.EncapsulatePeerID(peerInfo.ID, peerInfo.Addrs...) {
 		addrs[i] = addr.String()
@@ -3194,7 +2835,8 @@ func (p *pinger) PingPeer(ctx context.Context, peerInfo peer.AddrInfo) (time.Dur
 	defer C.freeResp(resp)
 	defer C.free(unsafe.Pointer(cPeerId))
 
-	C.cGoWakuPingPeer(p.wakuCtx, cPeerId, C.int(time.Minute.Milliseconds()), resp)
+	// TODO: extract timeout from ctx
+	C.cGoWakuPingPeer(n.wakuCtx, cPeerId, C.int(time.Minute.Milliseconds()), resp)
 	if C.getRet(resp) == C.RET_OK {
 		rttStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		rttInt, err := strconv.ParseInt(rttStr, 10, 64)
@@ -3208,156 +2850,502 @@ func (p *pinger) PingPeer(ctx context.Context, peerInfo peer.AddrInfo) (time.Dur
 	return 0, fmt.Errorf("PingPeer: %s", errMsg)
 }
 
-type storenodeRequestor struct {
-	wakuCtx unsafe.Pointer
-	logger  *zap.Logger
-}
+func (n *WakuNode) start() error {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
 
-func newStorenodeRequestor(wakuCtx unsafe.Pointer, logger *zap.Logger) commonapi.StorenodeRequestor {
-	return &storenodeRequestor{
-		wakuCtx: wakuCtx,
-		logger:  logger.Named("storenodeRequestor"),
-	}
-}
+	C.cGoWakuStart(n.wakuCtx, resp)
 
-func (s *storenodeRequestor) GetMessagesByHash(ctx context.Context, peerID peer.ID, pageSize uint64, messageHashes []pb.MessageHash) (commonapi.StoreRequestResult, error) {
-	requestIDStr := hex.EncodeToString(protocol.GenerateRequestID())
-
-	logger := s.logger.With(zap.Stringer("peerID", peerID), zap.String("requestID", requestIDStr))
-
-	logger.Debug("sending store request")
-
-	storeRequest := &storepb.StoreQueryRequest{
-		RequestId:         requestIDStr,
-		MessageHashes:     make([][]byte, len(messageHashes)),
-		IncludeData:       true,
-		PaginationCursor:  nil,
-		PaginationForward: false,
-		PaginationLimit:   proto.Uint64(pageSize),
-	}
-
-	for i, mhash := range messageHashes {
-		storeRequest.MessageHashes[i] = mhash.Bytes()
-	}
-
-	jsonQuery, err := json.Marshal(storeRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: timeouts need to be managed differently. For now we're using a 1m timeout
-	jsonResponse, err := wakuStoreQuery(s.wakuCtx, string(jsonQuery), peerID.String(), int(time.Minute.Milliseconds()))
-	if err != nil {
-		return nil, err
-	}
-
-	storeResponse := &storepb.StoreQueryResponse{}
-	err = json.Unmarshal([]byte(jsonResponse), storeResponse)
-	if err != nil {
-		return nil, err
-	}
-
-	if storeResponse.GetStatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("could not query storenode: %s %d %s", requestIDStr, storeResponse.GetStatusCode(), storeResponse.GetStatusDesc())
-	}
-
-	return newStoreResultImpl(s.wakuCtx, peerID, storeRequest, storeResponse), nil
-}
-
-func (s *storenodeRequestor) Query(ctx context.Context, peerID peer.ID, storeRequest *storepb.StoreQueryRequest) (commonapi.StoreRequestResult, error) {
-	jsonQuery, err := json.Marshal(storeRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: timeouts need to be managed differently. For now we're using a 1m timeout
-	jsonResponse, err := wakuStoreQuery(s.wakuCtx, string(jsonQuery), peerID.String(), int(time.Minute.Milliseconds()))
-	if err != nil {
-		return nil, err
-	}
-
-	storeResponse := &storepb.StoreQueryResponse{}
-	err = json.Unmarshal([]byte(jsonResponse), storeResponse)
-	if err != nil {
-		return nil, err
-	}
-
-	if storeResponse.GetStatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("could not query storenode: %s %d %s", storeRequest.RequestId, storeResponse.GetStatusCode(), storeResponse.GetStatusDesc())
-	}
-
-	return newStoreResultImpl(s.wakuCtx, peerID, storeRequest, storeResponse), nil
-}
-
-type storeResultImpl struct {
-	done bool
-
-	wakuCtx       unsafe.Pointer
-	storeRequest  *storepb.StoreQueryRequest
-	storeResponse *storepb.StoreQueryResponse
-	peerID        peer.ID
-}
-
-func newStoreResultImpl(wakuCtx unsafe.Pointer, peerID peer.ID, storeRequest *storepb.StoreQueryRequest, storeResponse *storepb.StoreQueryResponse) *storeResultImpl {
-	return &storeResultImpl{
-		wakuCtx:       wakuCtx,
-		storeRequest:  storeRequest,
-		storeResponse: storeResponse,
-		peerID:        peerID,
-	}
-}
-
-func (r *storeResultImpl) Cursor() []byte {
-	return r.storeResponse.GetPaginationCursor()
-}
-
-func (r *storeResultImpl) IsComplete() bool {
-	return r.done
-}
-
-func (r *storeResultImpl) PeerID() peer.ID {
-	return r.peerID
-}
-
-func (r *storeResultImpl) Query() *storepb.StoreQueryRequest {
-	return r.storeRequest
-}
-
-func (r *storeResultImpl) Response() *storepb.StoreQueryResponse {
-	return r.storeResponse
-}
-
-func (r *storeResultImpl) Next(ctx context.Context, opts ...store.RequestOption) error {
-	// TODO: opts is being ignored. Will require some changes in go-waku. For now using this
-	// is not necessary
-
-	if r.storeResponse.GetPaginationCursor() == nil {
-		r.done = true
+	if C.getRet(resp) == C.RET_OK {
 		return nil
 	}
 
-	r.storeRequest.RequestId = hex.EncodeToString(protocol.GenerateRequestID())
-	r.storeRequest.PaginationCursor = r.storeResponse.PaginationCursor
+	errMsg := "error WakuStart: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
 
-	jsonQuery, err := json.Marshal(r.storeRequest)
+func (n *WakuNode) stop() error {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+
+	C.cGoWakuStop(n.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+
+	errMsg := "error WakuStop: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) destroy() error {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+
+	C.cGoWakuDestroy(n.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+
+	errMsg := "error WakuDestroy: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) peerID() (peer.ID, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+
+	C.cGoWakuGetMyPeerId(n.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		peerIdStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		id, err := peer.Decode(peerIdStr)
+		if err != nil {
+			errMsg := "WakuGetMyPeerId - decoding peerId: %w"
+			return "", fmt.Errorf(errMsg, err)
+		}
+		return id, nil
+	}
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return "", errors.New(errMsg)
+}
+
+func (n *WakuNode) connect(connReq connectRequest) error {
+	var resp = C.allocResp()
+	var cPeerMultiAddr = C.CString(connReq.addr.String())
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPeerMultiAddr))
+
+	// TODO: extract timeout from ctx
+	C.cGoWakuConnect(n.wakuCtx, cPeerMultiAddr, C.int(time.Minute.Milliseconds()), resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error WakuConnect: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) dialPeerById(dialPeerByIDReq dialPeerByIDRequest) error {
+	var resp = C.allocResp()
+	var cPeerId = C.CString(dialPeerByIDReq.peerID.String())
+	var cProtocol = C.CString(string(dialPeerByIDReq.protocol))
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPeerId))
+	defer C.free(unsafe.Pointer(cProtocol))
+
+	// TODO: extract timeout from ctx
+	C.cGoWakuDialPeerById(n.wakuCtx, cPeerId, cProtocol, C.int(time.Minute.Milliseconds()), resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error DialPeerById: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) listenAddresses() ([]multiaddr.Multiaddr, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+	C.cGoWakuListenAddresses(n.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		var addrsRet []multiaddr.Multiaddr
+		listenAddresses := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		addrss := strings.Split(listenAddresses, ",")
+		for _, addr := range addrss {
+			addr, err := multiaddr.NewMultiaddr(addr)
+			if err != nil {
+				return nil, err
+			}
+			addrsRet = append(addrsRet, addr)
+		}
+		return addrsRet, nil
+	}
+	errMsg := "error WakuListenAddresses: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, errors.New(errMsg)
+}
+
+func (n *WakuNode) enr() (*enode.Node, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+	C.cGoWakuGetMyENR(n.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		enrStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		n, err := enode.Parse(enode.ValidSchemes, enrStr)
+		if err != nil {
+			return nil, err
+		}
+		return n, nil
+	}
+	errMsg := "error WakuGetMyENR: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, errors.New(errMsg)
+}
+
+func (n *WakuNode) listPeersInMesh(pubsubTopic string) (int, error) {
+	var resp = C.allocResp()
+	var cPubsubTopic = C.CString(pubsubTopic)
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPubsubTopic))
+
+	C.cGoWakuListPeersInMesh(n.wakuCtx, cPubsubTopic, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		numPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		numPeers, err := strconv.Atoi(numPeersStr)
+		if err != nil {
+			errMsg := "ListPeersInMesh - error converting string to int: " + err.Error()
+			return 0, errors.New(errMsg)
+		}
+		return numPeers, nil
+	}
+	errMsg := "error ListPeersInMesh: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return 0, errors.New(errMsg)
+}
+
+func (n *WakuNode) getPeerIDsFromPeerStore() (peer.IDSlice, error) {
+	var resp = C.allocResp()
+	defer C.freeResp(resp)
+	C.cGoWakuGetPeerIdsFromPeerStore(n.wakuCtx, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		if peersStr == "" {
+			return nil, nil
+		}
+		// peersStr contains a comma-separated list of peer ids
+		itemsPeerIds := strings.Split(peersStr, ",")
+
+		var peers peer.IDSlice
+		for _, peerId := range itemsPeerIds {
+			id, err := peer.Decode(peerId)
+			if err != nil {
+				return nil, fmt.Errorf("GetPeerIdsFromPeerStore - decoding peerId: %w", err)
+			}
+			peers = append(peers, id)
+		}
+		return peers, nil
+	}
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, fmt.Errorf("GetPeerIdsFromPeerStore: %s", errMsg)
+}
+
+func (n *WakuNode) getPeerIDsByProtocol(protocolID libp2pproto.ID) (peer.IDSlice, error) {
+	var resp = C.allocResp()
+	var cProtocol = C.CString(string(protocolID))
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cProtocol))
+
+	C.cGoWakuGetPeerIdsByProtocol(n.wakuCtx, cProtocol, resp)
+
+	if C.getRet(resp) == C.RET_OK {
+		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		if peersStr == "" {
+			return nil, nil
+		}
+		// peersStr contains a comma-separated list of peer ids
+		itemsPeerIds := strings.Split(peersStr, ",")
+
+		var peers peer.IDSlice
+		for _, p := range itemsPeerIds {
+			id, err := peer.Decode(p)
+			if err != nil {
+				return nil, fmt.Errorf("GetPeerIdsByProtocol - decoding peerId: %w", err)
+			}
+			peers = append(peers, id)
+		}
+		return peers, nil
+	}
+	errMsg := "error GetPeerIdsByProtocol: " +
+		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return nil, fmt.Errorf("GetPeerIdsByProtocol: %s", errMsg)
+}
+
+func (n *WakuNode) newNode(config *WakuConfig) error {
+	jsonConfig, err := json.Marshal(config)
 	if err != nil {
 		return err
 	}
 
-	// TODO: timeouts need to be managed differently. For now we're using a 1m timeout
-	jsonResponse, err := wakuStoreQuery(r.wakuCtx, string(jsonQuery), r.peerID.String(), int(time.Minute.Milliseconds()))
-	if err != nil {
-		return err
+	var cJsonConfig = C.CString(string(jsonConfig))
+	var resp = C.allocResp()
+
+	defer C.free(unsafe.Pointer(cJsonConfig))
+	defer C.freeResp(resp)
+
+	if C.getRet(resp) != C.RET_OK {
+		errMsg := "error wakuNew: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		return errors.New(errMsg)
 	}
 
-	err = json.Unmarshal([]byte(jsonResponse), r.storeResponse)
-	if err != nil {
-		return err
-	}
+	wakuCtx := C.cGoWakuNew(cJsonConfig, resp)
+	n.wakuCtx = unsafe.Pointer(wakuCtx)
+
+	// Notice that the events for self node are handled by the 'MyEventCallback' method
+	C.cGoWakuSetEventCallback(n.wakuCtx)
 
 	return nil
 }
 
-func (r *storeResultImpl) Messages() []*storepb.WakuMessageKeyValue {
-	return r.storeResponse.GetMessages()
+func (n *WakuNode) dialPeer(dialPeerReq dialPeerRequest) error {
+	var resp = C.allocResp()
+	var cPeerMultiAddr = C.CString(dialPeerReq.peerAddr.String())
+	var cProtocol = C.CString(string(dialPeerReq.protocol))
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPeerMultiAddr))
+	defer C.free(unsafe.Pointer(cProtocol))
+	// TODO: extract timeout from context
+	C.cGoWakuDialPeer(n.wakuCtx, cPeerMultiAddr, cProtocol, C.int(requestTimeout.Milliseconds()), resp)
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+	errMsg := "error DialPeer: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+type pingRequest struct {
+	ctx      context.Context
+	peerInfo peer.AddrInfo
+}
+
+func (n *WakuNode) PingPeer(ctx context.Context, info peer.AddrInfo) (time.Duration, error) {
+	response, err := n.postTask(requestTypePing, pingRequest{
+		ctx:      ctx,
+		peerInfo: info,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return response.(time.Duration), nil
+}
+
+func (n *WakuNode) Start() error {
+	_, err := n.postTask(requestTypeStart, nil)
+	return err
+}
+
+type relayPublishRequest struct {
+	ctx         context.Context
+	pubsubTopic string
+	message     *pb.WakuMessage
+}
+
+func (n *WakuNode) RelayPublish(ctx context.Context, message *pb.WakuMessage, pubsubTopic string) (pb.MessageHash, error) {
+	response, err := n.postTask(requestTypeRelayPublish, relayPublishRequest{
+		ctx:         ctx,
+		pubsubTopic: pubsubTopic,
+		message:     message,
+	})
+	if err != nil {
+		return pb.MessageHash{}, err
+	}
+	return response.(pb.MessageHash), nil
+}
+
+type storeQueryRequest struct {
+	ctx          context.Context
+	storeRequest *storepb.StoreQueryRequest
+	peerInfo     peer.AddrInfo
+}
+
+func (n *WakuNode) StoreQuery(ctx context.Context, storeRequest *storepb.StoreQueryRequest, peerInfo peer.AddrInfo) (*storepb.StoreQueryResponse, error) {
+	response, err := n.postTask(requestTypeStoreQuery, storeQueryRequest{
+		ctx:          ctx,
+		peerInfo:     peerInfo,
+		storeRequest: storeRequest,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response.(*storepb.StoreQueryResponse), nil
+}
+
+func (n *WakuNode) PeerID() (peer.ID, error) {
+	response, err := n.postTask(requestTypePeerID, nil)
+	if err != nil {
+		return "", err
+	}
+	return response.(peer.ID), nil
+}
+
+func (n *WakuNode) Stop() error {
+	_, err := n.postTask(requestTypeStop, nil)
+	return err
+}
+
+func (n *WakuNode) Destroy() error {
+	_, err := n.postTask(requestTypeDestroy, nil)
+	return err
+}
+
+func (n *WakuNode) StartDiscV5() error {
+	_, err := n.postTask(requestTypeStartDiscV5, nil)
+	return err
+}
+
+func (n *WakuNode) StopDiscV5() error {
+	_, err := n.postTask(requestTypeStopDiscV5, nil)
+	return err
+}
+
+func (n *WakuNode) Version() (string, error) {
+	response, err := n.postTask(requestTypeVersion, nil)
+	if err != nil {
+		return "", err
+	}
+	return response.(string), nil
+}
+
+func (n *WakuNode) RelaySubscribe(pubsubTopic string) error {
+	_, err := n.postTask(requestTypeRelaySubscribe, pubsubTopic)
+	return err
+}
+
+func (n *WakuNode) RelayUnsubscribe(pubsubTopic string) error {
+	_, err := n.postTask(requestTypeRelayUnsubscribe, pubsubTopic)
+	return err
+}
+
+func (n *WakuNode) PeerExchangeRequest(numPeers uint64) (uint64, error) {
+	response, err := n.postTask(requestTypePeerExchangeRequest, numPeers)
+	if err != nil {
+		return 0, err
+	}
+	return response.(uint64), nil
+}
+
+type connectRequest struct {
+	ctx  context.Context
+	addr multiaddr.Multiaddr
+}
+
+func (n *WakuNode) Connect(ctx context.Context, addr multiaddr.Multiaddr) error {
+	_, err := n.postTask(requestTypeConnect, connectRequest{
+		ctx:  ctx,
+		addr: addr,
+	})
+	return err
+}
+
+type dialPeerByIDRequest struct {
+	ctx      context.Context
+	peerID   peer.ID
+	protocol libp2pproto.ID
+}
+
+func (n *WakuNode) DialPeerByID(ctx context.Context, peerID peer.ID, protocol libp2pproto.ID) error {
+	_, err := n.postTask(requestTypeDialPeerByID, dialPeerByIDRequest{
+		ctx:      ctx,
+		peerID:   peerID,
+		protocol: protocol,
+	})
+	return err
+}
+
+func (n *WakuNode) ListenAddresses() ([]multiaddr.Multiaddr, error) {
+	response, err := n.postTask(requestTypeListenAddresses, nil)
+	if err != nil {
+		return nil, err
+	}
+	return response.([]multiaddr.Multiaddr), nil
+}
+
+func (n *WakuNode) ENR() (*enode.Node, error) {
+	response, err := n.postTask(requestTypeENR, nil)
+	if err != nil {
+		return nil, err
+	}
+	return response.(*enode.Node), nil
+}
+
+func (n *WakuNode) ListPeersInMesh(pubsubTopic string) (int, error) {
+	response, err := n.postTask(requestTypeListPeersInMesh, pubsubTopic)
+	if err != nil {
+		return 0, err
+	}
+	return response.(int), nil
+}
+
+func (n *WakuNode) GetConnectedPeers() (peer.IDSlice, error) {
+	response, err := n.postTask(requestTypeGetConnectedPeers, nil)
+	if err != nil {
+		return nil, err
+	}
+	return response.(peer.IDSlice), nil
+}
+
+func (n *WakuNode) GetNumConnectedPeers() (int, error) {
+	peers, err := n.GetConnectedPeers()
+	if err != nil {
+		return 0, err
+	}
+	return len(peers), nil
+}
+
+func (n *WakuNode) GetPeerIDsFromPeerStore() (peer.IDSlice, error) {
+	response, err := n.postTask(requestTypeGetPeerIDsFromPeerStore, nil)
+	if err != nil {
+		return nil, err
+	}
+	return response.(peer.IDSlice), nil
+}
+
+func (n *WakuNode) GetPeerIDsByProtocol(protocol libp2pproto.ID) (peer.IDSlice, error) {
+	response, err := n.postTask(requestTypeGetPeerIDsByProtocol, protocol)
+	if err != nil {
+		return nil, err
+	}
+	return response.(peer.IDSlice), nil
+}
+
+func (n *WakuNode) DisconnectPeerByID(peerID peer.ID) error {
+	_, err := n.postTask(requestTypeDisconnectPeerByID, peerID)
+	return err
+}
+
+type dnsDiscoveryRequest struct {
+	ctx           context.Context
+	enrTreeUrl    string
+	nameDnsServer string
+}
+
+func (n *WakuNode) DnsDiscovery(ctx context.Context, enrTreeUrl string, nameDnsServer string) ([]multiaddr.Multiaddr, error) {
+	response, err := n.postTask(requestTypeDnsDiscovery, dnsDiscoveryRequest{
+		ctx:           ctx,
+		enrTreeUrl:    enrTreeUrl,
+		nameDnsServer: nameDnsServer,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response.([]multiaddr.Multiaddr), nil
+}
+
+type dialPeerRequest struct {
+	ctx      context.Context
+	peerAddr multiaddr.Multiaddr
+	protocol libp2pproto.ID
+}
+
+func (n *WakuNode) DialPeer(ctx context.Context, peerAddr multiaddr.Multiaddr, protocol libp2pproto.ID) error {
+	_, err := n.postTask(requestTypeDialPeer, dialPeerRequest{
+		ctx:      ctx,
+		peerAddr: peerAddr,
+		protocol: protocol,
+	})
+	return err
+}
+
+func (n *WakuNode) GetNumConnectedRelayPeers(paramPubsubTopic ...string) (int, error) {
+	response, err := n.postTask(requestTypeGetNumConnectedRelayPeers, paramPubsubTopic)
+	if err != nil {
+		return 0, err
+	}
+	return response.(int), nil
 }

@@ -12,9 +12,13 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
+	"github.com/waku-org/go-waku/waku/v2/api/history"
+	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -24,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/wakuv2/common"
 )
 
 var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
@@ -150,6 +155,28 @@ func parseNodes(rec []string) []*enode.Node {
 	return ns
 }
 
+type testStorenodeConfigProvider struct {
+	storenode peer.AddrInfo
+}
+
+func (t *testStorenodeConfigProvider) UseStorenodes() (bool, error) {
+	return true, nil
+}
+
+func (t *testStorenodeConfigProvider) GetPinnedStorenode() (peer.AddrInfo, error) {
+	return peer.AddrInfo{}, nil
+}
+
+func (t *testStorenodeConfigProvider) Storenodes() ([]peer.AddrInfo, error) {
+	return []peer.AddrInfo{t.storenode}, nil
+}
+
+func newTestStorenodeConfigProvider(storenode peer.AddrInfo) history.StorenodeConfigProvider {
+	return &testStorenodeConfigProvider{
+		storenode: storenode,
+	}
+}
+
 // In order to run these tests, you must run an nwaku node
 //
 // Using Docker:
@@ -187,7 +214,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
-	enr, err := w.ENR()
+	enr, err := w.node.ENR()
 	require.NoError(t, err)
 	require.NotNil(t, enr)
 
@@ -197,7 +224,7 @@ func TestBasicWakuV2(t *testing.T) {
 
 	// Sanity check, not great, but it's probably helpful
 	err = tt.RetryWithBackOff(func() error {
-		numConnected, err := w.GetNumConnectedRelayPeers()
+		numConnected, err := w.node.GetNumConnectedPeers()
 		if err != nil {
 			return err
 		}
@@ -212,96 +239,102 @@ func TestBasicWakuV2(t *testing.T) {
 	// Get local store node address
 	storeNode, err := peer.AddrInfoFromString(storeNodeInfo.ListenAddresses[0])
 	require.NoError(t, err)
-	require.NoError(t, err)
+
+	for i := 0; i <= 100; i++ {
+		time.Sleep(2 * time.Second)
+	}
+
+	w.StorenodeCycle.SetStorenodeConfigProvider(newTestStorenodeConfigProvider(*storeNode))
 
 	// Check that we are indeed connected to the store node
-	connectedStoreNodes, err := w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
+	connectedStoreNodes, err := w.node.GetPeerIDsByProtocol(store.StoreQueryID_v300)
 	require.NoError(t, err)
 	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
 
 	// Disconnect from the store node
-	err = w.DropPeer(storeNode.ID)
+	err = w.node.DisconnectPeerByID(storeNode.ID)
 	require.NoError(t, err)
 
 	// Check that we are indeed disconnected
-	connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
+	connectedStoreNodes, err = w.node.GetPeerIDsByProtocol(store.StoreQueryID_v300)
 	require.NoError(t, err)
 	isDisconnected := !slices.Contains(connectedStoreNodes, storeNode.ID)
 	require.True(t, isDisconnected, "nwaku should be disconnected from the store node")
 
-	storeNodeMultiadd, err := multiaddr.NewMultiaddr(storeNodeInfo.ListenAddresses[0])
-	require.NoError(t, err)
-
 	// Re-connect
-	err = w.DialPeer(storeNodeMultiadd)
+	err = w.DialPeerByID(storeNode.ID)
 	require.NoError(t, err)
-
-	time.Sleep(1 * time.Second)
 
 	// Check that we are connected again
-	connectedStoreNodes, err = w.GetPeerIdsByProtocol(string(store.StoreQueryID_v300))
+	connectedStoreNodes, err = w.node.GetPeerIDsByProtocol(store.StoreQueryID_v300)
 	require.NoError(t, err)
 	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
 
-	/*
-		filter := &common.Filter{
-			PubsubTopic:   config.DefaultShardPubsubTopic,
-			Messages:      common.NewMemoryMessageStore(),
-			ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
-		}
+	filter := &common.Filter{
+		PubsubTopic:   w.cfg.DefaultShardPubsubTopic,
+		Messages:      common.NewMemoryMessageStore(),
+		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
+	}
 
-		_, err = w.Subscribe(filter)
-		require.NoError(t, err)
+	_, err = w.Subscribe(filter)
+	require.NoError(t, err)
 
-		msgTimestamp := w.timestamp()
-		contentTopic := maps.Keys(filter.ContentTopics)[0]
+	msgTimestamp := w.timestamp()
+	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
-		time.Sleep(2 * time.Second)
+	time.Sleep(2 * time.Second)
 
-		_, err = w.Send(config.DefaultShardPubsubTopic, &pb.WakuMessage{
-			Payload:      []byte{1, 2, 3, 4, 5},
-			ContentTopic: contentTopic.ContentTopic(),
-			Version:      proto.Uint32(0),
-			Timestamp:    &msgTimestamp,
-		}, nil)
+	msgID, err := w.Send(w.cfg.DefaultShardPubsubTopic, &pb.WakuMessage{
+		Payload:      []byte{1, 2, 3, 4, 5},
+		ContentTopic: contentTopic.ContentTopic(),
+		Version:      proto.Uint32(0),
+		Timestamp:    &msgTimestamp,
+	}, nil)
 
-		require.NoError(t, err)
+	require.NoError(t, err)
+	require.NotEqual(t, msgID, "1")
 
-		time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second)
 
-		messages := filter.Retrieve()
-		require.Len(t, messages, 1)
+	messages := filter.Retrieve()
+	require.Len(t, messages, 1)
 
-		timestampInSeconds := msgTimestamp / int64(time.Second)
-		marginInSeconds := 20
+	timestampInSeconds := msgTimestamp / int64(time.Second)
+	marginInSeconds := 20
 
-		options = func(b *backoff.ExponentialBackOff) {
-			b.MaxElapsedTime = 60 * time.Second
-			b.InitialInterval = 500 * time.Millisecond
-		}
-		err = tt.RetryWithBackOff(func() error {
-			_, envelopeCount, err := w.Query(
-				context.Background(),
-				storeNode.PeerID,
-				store.FilterCriteria{
-					ContentFilter: protocol.NewContentFilter(config.DefaultShardPubsubTopic, contentTopic.ContentTopic()),
-					TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
-					TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
-				},
-				nil,
-				nil,
-				false,
-			)
-			if err != nil || envelopeCount == 0 {
-				// in case of failure extend timestamp margin up to 40secs
-				if marginInSeconds < 40 {
-					marginInSeconds += 5
-				}
-				return errors.New("no messages received from store node")
+	options = func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 60 * time.Second
+		b.InitialInterval = 500 * time.Millisecond
+	}
+	err = tt.RetryWithBackOff(func() error {
+		err := w.HistoryRetriever.Query(
+			context.Background(),
+			store.FilterCriteria{
+				ContentFilter: protocol.NewContentFilter(w.cfg.DefaultShardPubsubTopic, contentTopic.ContentTopic()),
+				TimeStart:     proto.Int64((timestampInSeconds - int64(marginInSeconds)) * int64(time.Second)),
+				TimeEnd:       proto.Int64((timestampInSeconds + int64(marginInSeconds)) * int64(time.Second)),
+			},
+			*storeNode,
+			10,
+			nil, false,
+		)
+
+		return err
+
+		// TODO-nwaku
+		/*if err != nil || envelopeCount == 0 {
+			// in case of failure extend timestamp margin up to 40secs
+			if marginInSeconds < 40 {
+				marginInSeconds += 5
 			}
-			return nil
-		}, options)
-		require.NoError(t, err) */
+			return errors.New("no messages received from store node")
+		}
+		return nil*/
+
+	}, options)
+	require.NoError(t, err)
+
+	time.Sleep(10 * time.Second)
 
 	require.NoError(t, w.Stop())
 }
@@ -356,10 +389,10 @@ func TestPeerExchange(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	discV5NodePeerId, err := discV5Node.PeerID()
+	discV5NodePeerId, err := discV5Node.node.PeerID()
 	require.NoError(t, err)
 
-	discv5NodeEnr, err := discV5Node.ENR()
+	discv5NodeEnr, err := discV5Node.node.ENR()
 	require.NoError(t, err)
 
 	pxServerConfig := Config{
@@ -387,7 +420,7 @@ func TestPeerExchange(t *testing.T) {
 	// Adding an extra second to make sure PX cache is not empty
 	time.Sleep(2 * time.Second)
 
-	serverNodeMa, err := pxServerNode.ListenAddresses()
+	serverNodeMa, err := pxServerNode.node.ListenAddresses()
 	require.NoError(t, err)
 	require.NotNil(t, serverNodeMa)
 
@@ -398,7 +431,7 @@ func TestPeerExchange(t *testing.T) {
 
 	// Check that pxServerNode has discV5Node in its Peer Store
 	err = tt.RetryWithBackOff(func() error {
-		peers, err := pxServerNode.GetPeerIdsFromPeerStore()
+		peers, err := pxServerNode.node.GetPeerIDsFromPeerStore()
 
 		if err != nil {
 			return err
@@ -436,12 +469,12 @@ func TestPeerExchange(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	pxServerPeerId, err := pxServerNode.PeerID()
+	pxServerPeerId, err := pxServerNode.node.PeerID()
 	require.NoError(t, err)
 
 	// Check that the light node discovered the discV5Node and has both nodes in its peer store
 	err = tt.RetryWithBackOff(func() error {
-		peers, err := lightNode.GetPeerIdsFromPeerStore()
+		peers, err := lightNode.node.GetPeerIDsFromPeerStore()
 		if err != nil {
 			return err
 		}
@@ -455,7 +488,7 @@ func TestPeerExchange(t *testing.T) {
 
 	// Now perform the PX request manually to see if it also works
 	err = tt.RetryWithBackOff(func() error {
-		numPeersReceived, err := lightNode.WakuPeerExchangeRequest(1)
+		numPeersReceived, err := lightNode.node.PeerExchangeRequest(1)
 		if err != nil {
 			return err
 		}
@@ -551,88 +584,6 @@ func TestPeerExchange(t *testing.T) {
 	require.NoError(t, discV5Node.Stop()) */
 }
 
-func TestDial(t *testing.T) {
-	logger, err := zap.NewDevelopment()
-	require.NoError(t, err)
-
-	dialerNodeConfig := Config{
-		UseThrottledPublish: true,
-		ClusterID:           16,
-	}
-
-	// start node that will initiate the dial
-	dialerNodeWakuConfig := WakuConfig{
-		EnableRelay:     true,
-		LogLevel:        "DEBUG",
-		Discv5Discovery: false,
-		ClusterID:       16,
-		Shards:          []uint16{64},
-		Discv5UdpPort:   9020,
-		TcpPort:         60020,
-	}
-
-	dialerNode, err := New(nil, "", &dialerNodeConfig, &dialerNodeWakuConfig, logger.Named("dialerNode"), nil, nil, nil, nil)
-	require.NoError(t, err)
-	require.NoError(t, dialerNode.Start())
-
-	time.Sleep(1 * time.Second)
-
-	receiverNodeConfig := Config{
-		UseThrottledPublish: true,
-		ClusterID:           16,
-	}
-
-	// start node that will receive the dial
-	receiverNodeWakuConfig := WakuConfig{
-		EnableRelay:     true,
-		LogLevel:        "DEBUG",
-		Discv5Discovery: false,
-		ClusterID:       16,
-		Shards:          []uint16{64},
-		Discv5UdpPort:   9021,
-		TcpPort:         60021,
-	}
-
-	receiverNode, err := New(nil, "", &receiverNodeConfig, &receiverNodeWakuConfig, logger.Named("receiverNode"), nil, nil, nil, nil)
-	require.NoError(t, err)
-	require.NoError(t, receiverNode.Start())
-
-	time.Sleep(1 * time.Second)
-
-	receiverMultiaddr, err := receiverNode.ListenAddresses()
-	require.NoError(t, err)
-	require.NotNil(t, receiverMultiaddr)
-
-	// Check that both nodes start with no connected peers
-	dialerPeerCount, err := dialerNode.PeerCount()
-	require.NoError(t, err)
-	require.True(t, dialerPeerCount == 0, "Dialer node should have no connected peers")
-
-	receiverPeerCount, err := receiverNode.PeerCount()
-	require.NoError(t, err)
-	require.True(t, receiverPeerCount == 0, "Receiver node should have no connected peers")
-
-	// Dial
-	err = dialerNode.DialPeer(receiverMultiaddr[0])
-	require.NoError(t, err)
-
-	time.Sleep(1 * time.Second)
-
-	// Check that both nodes now have one connected peer
-	dialerPeerCount, err = dialerNode.PeerCount()
-	require.NoError(t, err)
-	require.True(t, dialerPeerCount == 1, "Dialer node should have 1 peer")
-
-	receiverPeerCount, err = receiverNode.PeerCount()
-	require.NoError(t, err)
-	require.True(t, receiverPeerCount == 1, "Receiver node should have 1 peer")
-
-	// Stop nodes
-	require.NoError(t, dialerNode.Stop())
-	require.NoError(t, receiverNode.Stop())
-
-}
-
 func TestDnsDiscover(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
@@ -655,13 +606,78 @@ func TestDnsDiscover(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	sampleEnrTree := "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im"
 
-	res, err := node.WakuDnsDiscovery(sampleEnrTree, nodeConfig.Nameserver, int(requestTimeout/time.Millisecond))
+	ctx, cancel := context.WithTimeout(context.TODO(), requestTimeout)
+	defer cancel()
+	res, err := node.node.DnsDiscovery(ctx, sampleEnrTree, nodeConfig.Nameserver)
 	require.NoError(t, err)
-
 	require.True(t, len(res) > 1, "multiple nodes should be returned from the DNS Discovery query")
-
 	// Stop nodes
 	require.NoError(t, node.Stop())
+}
+
+func TestDial(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+	dialerNodeConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+	// start node that will initiate the dial
+	dialerNodeWakuConfig := WakuConfig{
+		EnableRelay:     true,
+		LogLevel:        "DEBUG",
+		Discv5Discovery: false,
+		ClusterID:       16,
+		Shards:          []uint16{64},
+		Discv5UdpPort:   9020,
+		TcpPort:         60020,
+	}
+	dialerNode, err := New(nil, "", &dialerNodeConfig, &dialerNodeWakuConfig, logger.Named("dialerNode"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, dialerNode.Start())
+	time.Sleep(1 * time.Second)
+	receiverNodeConfig := Config{
+		UseThrottledPublish: true,
+		ClusterID:           16,
+	}
+	// start node that will receive the dial
+	receiverNodeWakuConfig := WakuConfig{
+		EnableRelay:     true,
+		LogLevel:        "DEBUG",
+		Discv5Discovery: false,
+		ClusterID:       16,
+		Shards:          []uint16{64},
+		Discv5UdpPort:   9021,
+		TcpPort:         60021,
+	}
+	receiverNode, err := New(nil, "", &receiverNodeConfig, &receiverNodeWakuConfig, logger.Named("receiverNode"), nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, receiverNode.Start())
+	time.Sleep(1 * time.Second)
+	receiverMultiaddr, err := receiverNode.node.ListenAddresses()
+	require.NoError(t, err)
+	require.NotNil(t, receiverMultiaddr)
+	// Check that both nodes start with no connected peers
+	dialerPeerCount, err := dialerNode.PeerCount()
+	require.NoError(t, err)
+	require.True(t, dialerPeerCount == 0, "Dialer node should have no connected peers")
+	receiverPeerCount, err := receiverNode.PeerCount()
+	require.NoError(t, err)
+	require.True(t, receiverPeerCount == 0, "Receiver node should have no connected peers")
+	// Dial
+	err = dialerNode.DialPeer(receiverMultiaddr[0])
+	require.NoError(t, err)
+	time.Sleep(1 * time.Second)
+	// Check that both nodes now have one connected peer
+	dialerPeerCount, err = dialerNode.PeerCount()
+	require.NoError(t, err)
+	require.True(t, dialerPeerCount == 1, "Dialer node should have 1 peer")
+	receiverPeerCount, err = receiverNode.PeerCount()
+	require.NoError(t, err)
+	require.True(t, receiverPeerCount == 1, "Receiver node should have 1 peer")
+	// Stop nodes
+	require.NoError(t, dialerNode.Stop())
+	require.NoError(t, receiverNode.Stop())
 }
 
 /*
