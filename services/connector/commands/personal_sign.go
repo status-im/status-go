@@ -29,18 +29,17 @@ func (r *RPCRequest) getPersonalSignParams() (*PersonalSignParams, error) {
 		return nil, ErrEmptyRPCParams
 	}
 
-	paramMap, ok := r.Params[0].(map[string]interface{})
-	if !ok {
+	if len(r.Params) < 2 {
 		return nil, ErrInvalidParamsStructure
 	}
 
-	// Extract the Challenge and Address fields from paramMap
-	challenge, ok := paramMap["challenge"].(string)
+	// Extract the Challenge and Address fields from paramsArray
+	challenge, ok := r.Params[0].(string)
 	if !ok {
 		return nil, fmt.Errorf("missing or invalid 'challenge' field")
 	}
 
-	address, ok := paramMap["address"].(string)
+	address, ok := r.Params[1].(string)
 	if !ok {
 		return nil, fmt.Errorf("missing or invalid 'address' field")
 	}

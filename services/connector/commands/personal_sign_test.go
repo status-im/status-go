@@ -12,12 +12,7 @@ import (
 )
 
 func preparePersonalSignRequest(dApp signal.ConnectorDApp, challenge, address string) (RPCRequest, error) {
-	params := map[string]interface{}{
-		"challenge": challenge,
-		"address":   address,
-	}
-
-	return ConstructRPCRequest("personal_sign", []interface{}{params}, &dApp)
+	return ConstructRPCRequest("personal_sign", []interface{}{challenge, address}, &dApp)
 }
 
 func TestFailToPersonalSignWithMissingDAppFields(t *testing.T) {
