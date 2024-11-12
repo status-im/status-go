@@ -2,6 +2,7 @@ package activity
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"time"
@@ -14,12 +15,30 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/responses"
+	"github.com/status-im/status-go/services/wallet/routeexecution"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
 
 const nilStr = "nil"
+
+type Version string
+
+const (
+	V1 Version = "v1"
+	V2 Version = "v2"
+)
+
+type TransactionID struct {
+	ChainID common.ChainID
+	Hash    eth.Hash
+}
+
+func (t TransactionID) key() string {
+	return strconv.FormatUint(uint64(t.ChainID), 10) + t.Hash.Hex()
+}
 
 type EntryIdentity struct {
 	payloadType PayloadType
@@ -54,7 +73,8 @@ type SessionID int32
 // 4. ResetFilterSession in case client receives SessionUpdate with HasNewOnTop = true to get the latest state
 // 5. StopFilterSession to stop the session when no used (user changed from activity screens or changed addresses and chains)
 type Session struct {
-	id SessionID
+	id      SessionID
+	version Version
 
 	// Filter info
 	//
@@ -84,16 +104,23 @@ type SessionUpdate struct {
 
 type fullFilterParams struct {
 	sessionID SessionID
+	version   Version
 	addresses []eth.Address
 	chainIDs  []common.ChainID
 	filter    Filter
 }
 
+func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, offset int, count int) ([]Entry, error) {
+	allAddresses := s.areAllAddresses(f.addresses)
+	if f.version == V1 {
+		return getActivityEntries(ctx, s.getDeps(), f.addresses, allAddresses, f.chainIDs, f.filter, offset, count)
+	}
+	return getActivityEntriesV2(ctx, s.getDeps(), f.addresses, allAddresses, f.chainIDs, f.filter, offset, count)
+}
+
 func (s *Service) internalFilter(f fullFilterParams, offset int, count int, processResults func(entries []Entry) (offsetOverride int)) {
 	s.scheduler.Enqueue(int32(f.sessionID), filterTask, func(ctx context.Context) (interface{}, error) {
-		allAddresses := s.areAllAddresses(f.addresses)
-		activities, err := getActivityEntries(ctx, s.getDeps(), f.addresses, allAddresses, f.chainIDs, f.filter, offset, count)
-		return activities, err
+		return s.getActivityEntries(ctx, f, offset, count)
 	}, func(result interface{}, taskType async.TaskType, err error) {
 		res := FilterResponse{
 			ErrorCode: ErrorCodeFailed,
@@ -134,6 +161,7 @@ func (s *Service) internalFilterForSession(session *Session, firstPageCount int)
 	s.internalFilter(
 		fullFilterParams{
 			sessionID: session.id,
+			version:   session.version,
 			addresses: session.addresses,
 			chainIDs:  session.chainIDs,
 			filter:    session.filter,
@@ -151,11 +179,12 @@ func (s *Service) internalFilterForSession(session *Session, firstPageCount int)
 	)
 }
 
-func (s *Service) StartFilterSession(addresses []eth.Address, chainIDs []common.ChainID, filter Filter, firstPageCount int) SessionID {
+func (s *Service) StartFilterSession(addresses []eth.Address, chainIDs []common.ChainID, filter Filter, firstPageCount int, version Version) SessionID {
 	sessionID := s.nextSessionID()
 
 	session := &Session{
-		id: sessionID,
+		id:      sessionID,
+		version: version,
 
 		addresses: addresses,
 		chainIDs:  chainIDs,
@@ -215,6 +244,7 @@ func (s *Service) UpdateFilterForSession(id SessionID, filter Filter, firstPageC
 		s.internalFilter(
 			fullFilterParams{
 				sessionID: session.id,
+				version:   session.version,
 				addresses: session.addresses,
 				chainIDs:  session.chainIDs,
 				filter:    session.filter,
@@ -257,6 +287,7 @@ func (s *Service) ResetFilterSession(id SessionID, firstPageCount int) error {
 	s.internalFilter(
 		fullFilterParams{
 			sessionID: id,
+			version:   session.version,
 			addresses: session.addresses,
 			chainIDs:  session.chainIDs,
 			filter:    session.filter,
@@ -301,6 +332,7 @@ func (s *Service) GetMoreForFilterSession(id SessionID, pageCount int) error {
 	s.internalFilter(
 		fullFilterParams{
 			sessionID: id,
+			version:   session.version,
 			addresses: session.addresses,
 			chainIDs:  session.chainIDs,
 			filter:    session.filter,
@@ -331,40 +363,112 @@ func (s *Service) GetMoreForFilterSession(id SessionID, pageCount int) error {
 func (s *Service) subscribeToEvents() {
 	s.ch = make(chan walletevent.Event, 100)
 	s.subscriptions = s.eventFeed.Subscribe(s.ch)
-	go s.processEvents()
+	ctx, cancel := context.WithCancel(context.Background())
+	s.subscriptionsCancelFn = cancel
+	go s.processEvents(ctx)
 }
 
 // processEvents runs only if more than one session is active
-func (s *Service) processEvents() {
+func (s *Service) processEvents(ctx context.Context) {
 	defer gocommon.LogOnPanic()
 	eventCount := 0
-	lastUpdate := time.Now().UnixMilli()
-	for event := range s.ch {
-		if event.Type == transactions.EventPendingTransactionUpdate ||
-			event.Type == transactions.EventPendingTransactionStatusChanged ||
-			event.Type == transfer.EventNewTransfers {
-			eventCount++
+	changedTxs := make([]TransactionID, 0)
+	newTxs := false
+
+	var debounceTimer *time.Timer
+	debouncerCh := make(chan struct{})
+	debounceProcessChangesFn := func() {
+		if debounceTimer == nil {
+			debounceTimer = time.AfterFunc(s.debounceDuration, func() {
+				debouncerCh <- struct{}{}
+			})
 		}
-		// debounce events updates
-		if eventCount > 0 &&
-			(time.Duration(time.Now().UnixMilli()-lastUpdate)*time.Millisecond) >= s.debounceDuration {
-			s.detectNew(eventCount)
-			eventCount = 0
-			lastUpdate = time.Now().UnixMilli()
+	}
+
+	for {
+		select {
+		case event := <-s.ch:
+			switch event.Type {
+			case transactions.EventPendingTransactionUpdate:
+				eventCount++
+				var payload transactions.PendingTxUpdatePayload
+				if err := json.Unmarshal([]byte(event.Message), &payload); err != nil {
+					logutils.ZapLogger().Error("Error unmarshalling PendingTxUpdatePayload", zap.Error(err))
+					continue
+				}
+				changedTxs = append(changedTxs, TransactionID{
+					ChainID: payload.ChainID,
+					Hash:    payload.Hash,
+				})
+				debounceProcessChangesFn()
+			case transactions.EventPendingTransactionStatusChanged:
+				eventCount++
+				var payload transactions.StatusChangedPayload
+				if err := json.Unmarshal([]byte(event.Message), &payload); err != nil {
+					logutils.ZapLogger().Error("Error unmarshalling StatusChangedPayload", zap.Error(err))
+					continue
+				}
+				changedTxs = append(changedTxs, TransactionID{
+					ChainID: payload.ChainID,
+					Hash:    payload.Hash,
+				})
+				debounceProcessChangesFn()
+			case transfer.EventNewTransfers:
+				eventCount++
+				// No updates here, these are detected with their final state, just trigger
+				// the detection of new entries
+				newTxs = true
+				debounceProcessChangesFn()
+			case routeexecution.EventRouteExecutionTransactionSent:
+				sentTxs, ok := event.EventParams.(*responses.RouterSentTransactions)
+				if ok && sentTxs != nil {
+					for _, tx := range sentTxs.SentTransactions {
+						changedTxs = append(changedTxs, TransactionID{
+							ChainID: common.ChainID(tx.FromChain),
+							Hash:    eth.Hash(tx.Hash),
+						})
+					}
+				}
+				debounceProcessChangesFn()
+			}
+		case <-debouncerCh:
+			if eventCount > 0 || newTxs || len(changedTxs) > 0 {
+				s.processChanges(eventCount, changedTxs)
+				eventCount = 0
+				newTxs = false
+				changedTxs = nil
+				debounceTimer = nil
+			}
+		case <-ctx.Done():
+			return
 		}
 	}
 }
 
-func (s *Service) detectNew(changeCount int) {
+func (s *Service) processChanges(eventCount int, changedTxs []TransactionID) {
 	for sessionID := range s.sessions {
 		session := s.sessions[sessionID]
 
-		fetchLen := len(session.model) + changeCount
-		allAddresses := s.areAllAddresses(session.addresses)
-		activities, err := getActivityEntries(context.Background(), s.getDeps(), session.addresses, allAddresses, session.chainIDs, session.filter, 0, fetchLen)
+		f := fullFilterParams{
+			sessionID: session.id,
+			version:   session.version,
+			addresses: session.addresses,
+			chainIDs:  session.chainIDs,
+			filter:    session.filter,
+		}
+
+		limit := NoLimit
+		if session.version == V1 {
+			limit = len(session.model) + eventCount
+		}
+		activities, err := s.getActivityEntries(context.Background(), f, 0, limit)
 		if err != nil {
 			logutils.ZapLogger().Error("Error getting activity entries", zap.Error(err))
 			continue
+		}
+
+		if session.version != V1 {
+			s.processEntryDataUpdates(sessionID, activities, changedTxs)
 		}
 
 		s.sessionsRWMutex.RLock()
@@ -414,6 +518,55 @@ func (s *Service) detectNew(changeCount int) {
 	}
 }
 
+func (s *Service) processEntryDataUpdates(sessionID SessionID, entries []Entry, changedTxs []TransactionID) {
+	updateData := make([]*EntryData, 0, len(changedTxs))
+
+	entriesMap := make(map[string]Entry, len(entries))
+	for _, e := range entries {
+		if e.payloadType == MultiTransactionPT {
+			if e.id != common.NoMultiTransactionID {
+				for _, tx := range e.transactions {
+					id := TransactionID{
+						ChainID: tx.ChainID,
+						Hash:    tx.Hash,
+					}
+					entriesMap[id.key()] = e
+				}
+			}
+		} else if e.transaction != nil {
+			id := TransactionID{
+				ChainID: e.transaction.ChainID,
+				Hash:    e.transaction.Hash,
+			}
+			entriesMap[id.key()] = e
+		}
+	}
+
+	for _, tx := range changedTxs {
+		e, found := entriesMap[tx.key()]
+		if !found {
+			continue
+		}
+
+		data := &EntryData{
+			ActivityStatus: &e.activityStatus,
+		}
+		if e.payloadType == MultiTransactionPT {
+			data.ID = common.NewAndSet(e.id)
+		} else {
+			data.Transaction = e.transaction
+		}
+		data.PayloadType = e.payloadType
+
+		updateData = append(updateData, data)
+	}
+
+	if len(updateData) > 0 {
+		requestID := int32(sessionID)
+		sendResponseEvent(s.eventFeed, &requestID, EventActivityFilteringUpdate, updateData, nil)
+	}
+}
+
 func notify(eventFeed *event.Feed, id SessionID, hasNewOnTop bool, mixed []*EntryUpdate) {
 	defer gocommon.LogOnPanic()
 	payload := SessionUpdate{
@@ -429,6 +582,8 @@ func notify(eventFeed *event.Feed, id SessionID, hasNewOnTop bool, mixed []*Entr
 
 // unsubscribeFromEvents should be called with sessionsRWMutex locked for writing
 func (s *Service) unsubscribeFromEvents() {
+	s.subscriptionsCancelFn()
+	s.subscriptionsCancelFn = nil
 	s.subscriptions.Unsubscribe()
 	close(s.ch)
 	s.ch = nil

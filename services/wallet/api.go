@@ -814,7 +814,17 @@ func (api *API) StartActivityFilterSession(addresses []common.Address, chainIDs 
 		zap.Int("firstPageCount", firstPageCount),
 	)
 
-	return api.s.activity.StartFilterSession(addresses, chainIDs, filter, firstPageCount), nil
+	return api.s.activity.StartFilterSession(addresses, chainIDs, filter, firstPageCount, activity.V1), nil
+}
+
+func (api *API) StartActivityFilterSessionV2(addresses []common.Address, chainIDs []wcommon.ChainID, filter activity.Filter, firstPageCount int) (activity.SessionID, error) {
+	logutils.ZapLogger().Debug("wallet.api.StartActivityFilterSessionV2",
+		zap.Int("addr.count", len(addresses)),
+		zap.Int("chainIDs.count", len(chainIDs)),
+		zap.Int("firstPageCount", firstPageCount),
+	)
+
+	return api.s.activity.StartFilterSession(addresses, chainIDs, filter, firstPageCount, activity.V2), nil
 }
 
 func (api *API) UpdateActivityFilterForSession(sessionID activity.SessionID, filter activity.Filter, firstPageCount int) error {

@@ -40,7 +40,7 @@ var (
 	ZeroAddress = eth.Address{}
 )
 
-type TransferType = int
+type TransferType = int64
 
 const (
 	TransferTypeEth TransferType = iota + 1
@@ -49,51 +49,66 @@ const (
 	TransferTypeErc1155
 )
 
+const (
+	L1FinalizationDuration = 960    // A block on layer 1 is every 12s, finalization require 64 blocks. A buffer of 16 blocks is added to not create false positives.
+	L2FinalizationDuration = 648000 // 7.5 days in seconds for layer 2 finalization. 0.5 day is buffer to not create false positive.
+)
+
+const (
+	NoLimit = 0
+)
+
 type Entry struct {
-	payloadType     PayloadType
-	transaction     *transfer.TransactionIdentity
-	id              common.MultiTransactionIDType
-	timestamp       int64
-	activityType    Type
-	activityStatus  Status
-	amountOut       *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
-	amountIn        *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT, ApproveAT
-	tokenOut        *Token       // Used for activityType SendAT, SwapAT, BridgeAT
-	tokenIn         *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT, ApproveAT
-	symbolOut       *string
-	symbolIn        *string
-	sender          *eth.Address
-	recipient       *eth.Address
-	chainIDOut      *common.ChainID
-	chainIDIn       *common.ChainID
-	transferType    *TransferType
-	contractAddress *eth.Address
-	communityID     *string
+	payloadType               PayloadType
+	transaction               *transfer.TransactionIdentity   // ID for SimpleTransactionPT and PendingTransactionPT.	Origin transaction for MultiTransactionPT
+	id                        common.MultiTransactionIDType   // ID for MultiTransactionPT
+	transactions              []*transfer.TransactionIdentity // List of transactions for MultiTransactionPT
+	timestamp                 int64
+	activityType              Type
+	activityStatus            Status
+	amountOut                 *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
+	amountIn                  *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT, ApproveAT
+	tokenOut                  *Token       // Used for activityType SendAT, SwapAT, BridgeAT
+	tokenIn                   *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT, ApproveAT
+	symbolOut                 *string
+	symbolIn                  *string
+	sender                    *eth.Address
+	recipient                 *eth.Address
+	chainIDOut                *common.ChainID
+	chainIDIn                 *common.ChainID
+	transferType              *TransferType
+	contractAddress           *eth.Address // Used for contract deployment
+	communityID               *string
+	interactedContractAddress *eth.Address
+	approvalSpender           *eth.Address
 
 	isNew bool // isNew is used to indicate if the entry is newer than session start (changed state also)
 }
 
 // Only used for JSON marshalling
 type EntryData struct {
-	PayloadType     PayloadType                    `json:"payloadType"`
-	Transaction     *transfer.TransactionIdentity  `json:"transaction,omitempty"`
-	ID              *common.MultiTransactionIDType `json:"id,omitempty"`
-	Timestamp       *int64                         `json:"timestamp,omitempty"`
-	ActivityType    *Type                          `json:"activityType,omitempty"`
-	ActivityStatus  *Status                        `json:"activityStatus,omitempty"`
-	AmountOut       *hexutil.Big                   `json:"amountOut,omitempty"`
-	AmountIn        *hexutil.Big                   `json:"amountIn,omitempty"`
-	TokenOut        *Token                         `json:"tokenOut,omitempty"`
-	TokenIn         *Token                         `json:"tokenIn,omitempty"`
-	SymbolOut       *string                        `json:"symbolOut,omitempty"`
-	SymbolIn        *string                        `json:"symbolIn,omitempty"`
-	Sender          *eth.Address                   `json:"sender,omitempty"`
-	Recipient       *eth.Address                   `json:"recipient,omitempty"`
-	ChainIDOut      *common.ChainID                `json:"chainIdOut,omitempty"`
-	ChainIDIn       *common.ChainID                `json:"chainIdIn,omitempty"`
-	TransferType    *TransferType                  `json:"transferType,omitempty"`
-	ContractAddress *eth.Address                   `json:"contractAddress,omitempty"`
-	CommunityID     *string                        `json:"communityId,omitempty"`
+	PayloadType               PayloadType                     `json:"payloadType"`
+	Transaction               *transfer.TransactionIdentity   `json:"transaction,omitempty"`
+	ID                        *common.MultiTransactionIDType  `json:"id,omitempty"`
+	Transactions              []*transfer.TransactionIdentity `json:"transactions,omitempty"`
+	Timestamp                 *int64                          `json:"timestamp,omitempty"`
+	ActivityType              *Type                           `json:"activityType,omitempty"`
+	ActivityStatus            *Status                         `json:"activityStatus,omitempty"`
+	AmountOut                 *hexutil.Big                    `json:"amountOut,omitempty"`
+	AmountIn                  *hexutil.Big                    `json:"amountIn,omitempty"`
+	TokenOut                  *Token                          `json:"tokenOut,omitempty"`
+	TokenIn                   *Token                          `json:"tokenIn,omitempty"`
+	SymbolOut                 *string                         `json:"symbolOut,omitempty"`
+	SymbolIn                  *string                         `json:"symbolIn,omitempty"`
+	Sender                    *eth.Address                    `json:"sender,omitempty"`
+	Recipient                 *eth.Address                    `json:"recipient,omitempty"`
+	ChainIDOut                *common.ChainID                 `json:"chainIdOut,omitempty"`
+	ChainIDIn                 *common.ChainID                 `json:"chainIdIn,omitempty"`
+	TransferType              *TransferType                   `json:"transferType,omitempty"`
+	ContractAddress           *eth.Address                    `json:"contractAddress,omitempty"`
+	CommunityID               *string                         `json:"communityId,omitempty"`
+	InteractedContractAddress *eth.Address                    `json:"interactedContractAddress,omitempty"`
+	ApprovalSpender           *eth.Address                    `json:"approvalSpender,omitempty"`
 
 	IsNew *bool `json:"isNew,omitempty"`
 
@@ -103,26 +118,29 @@ type EntryData struct {
 
 func (e *Entry) MarshalJSON() ([]byte, error) {
 	data := EntryData{
-		Timestamp:       &e.timestamp,
-		ActivityType:    &e.activityType,
-		ActivityStatus:  &e.activityStatus,
-		AmountOut:       e.amountOut,
-		AmountIn:        e.amountIn,
-		TokenOut:        e.tokenOut,
-		TokenIn:         e.tokenIn,
-		SymbolOut:       e.symbolOut,
-		SymbolIn:        e.symbolIn,
-		Sender:          e.sender,
-		Recipient:       e.recipient,
-		ChainIDOut:      e.chainIDOut,
-		ChainIDIn:       e.chainIDIn,
-		TransferType:    e.transferType,
-		ContractAddress: e.contractAddress,
-		CommunityID:     e.communityID,
+		Timestamp:                 &e.timestamp,
+		ActivityType:              &e.activityType,
+		ActivityStatus:            &e.activityStatus,
+		AmountOut:                 e.amountOut,
+		AmountIn:                  e.amountIn,
+		TokenOut:                  e.tokenOut,
+		TokenIn:                   e.tokenIn,
+		SymbolOut:                 e.symbolOut,
+		SymbolIn:                  e.symbolIn,
+		Sender:                    e.sender,
+		Recipient:                 e.recipient,
+		ChainIDOut:                e.chainIDOut,
+		ChainIDIn:                 e.chainIDIn,
+		TransferType:              e.transferType,
+		ContractAddress:           e.contractAddress,
+		CommunityID:               e.communityID,
+		InteractedContractAddress: e.interactedContractAddress,
+		ApprovalSpender:           e.approvalSpender,
 	}
 
 	if e.payloadType == MultiTransactionPT {
 		data.ID = common.NewAndSet(e.id)
+		data.Transactions = e.transactions
 	} else {
 		data.Transaction = e.transaction
 	}
@@ -145,6 +163,7 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	if aux.ID != nil {
 		e.id = *aux.ID
 	}
+	e.transactions = aux.Transactions
 	if aux.Timestamp != nil {
 		e.timestamp = *aux.Timestamp
 	}
@@ -166,6 +185,8 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	e.chainIDIn = aux.ChainIDIn
 	e.transferType = aux.TransferType
 	e.communityID = aux.CommunityID
+	e.interactedContractAddress = aux.InteractedContractAddress
+	e.approvalSpender = aux.ApprovalSpender
 
 	e.isNew = aux.IsNew != nil && *aux.IsNew
 
@@ -496,8 +517,8 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		includeAllNetworks,
 		transactions.Pending,
 		deps.currentTimestamp(),
-		648000, // 7.5 days in seconds for layer 2 finalization. 0.5 day is buffer to not create false positive.
-		960,    // A block on layer 1 is every 12s, finalization require 64 blocks. A buffer of 16 blocks is added to not create false positives.
+		L2FinalizationDuration,
+		L1FinalizationDuration,
 		limit, offset)
 	if err != nil {
 		return nil, err

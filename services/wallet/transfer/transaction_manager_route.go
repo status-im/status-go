@@ -350,6 +350,8 @@ func addSignatureAndSendTransaction(
 		return nil, err
 	}
 
+	txData.TxArgs.MultiTransactionID = multiTransactionID
+
 	return responses.NewRouterSentTransaction(txData.TxArgs, txData.SentHash, isApproval), nil
 }
 

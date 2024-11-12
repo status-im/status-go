@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 
 	// used for embedding the sql query in the binary
 	_ "embed"
@@ -31,7 +32,7 @@ type Period struct {
 	EndTimestamp   int64 `json:"endTimestamp"`
 }
 
-type Type int
+type Type uint64
 
 const (
 	SendAT Type = iota
@@ -42,6 +43,7 @@ const (
 	ContractDeploymentAT
 	MintAT
 	ApproveAT
+	UnknownAT = math.MaxUint64
 )
 
 func allActivityTypesFilter() []Type {

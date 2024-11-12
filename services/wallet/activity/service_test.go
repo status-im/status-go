@@ -422,7 +422,7 @@ func TestService_IncrementalUpdateOnTop(t *testing.T) {
 	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 5)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 5, V1)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -448,7 +448,7 @@ func TestService_IncrementalUpdateOnTop(t *testing.T) {
 		newTx := payload.Activities[0]
 		require.Equal(t, PendingTransactionPT, newTx.payloadType)
 		// We don't keep type in the DB
-		require.Equal(t, (*int)(nil), newTx.transferType)
+		require.Equal(t, (*int64)(nil), newTx.transferType)
 		require.Equal(t, SendAT, newTx.activityType)
 		require.Equal(t, PendingAS, newTx.activityStatus)
 		require.Equal(t, exp.ChainID, newTx.transaction.ChainID)
@@ -497,7 +497,7 @@ func TestService_IncrementalUpdateMixed(t *testing.T) {
 	)
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 5)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 5, V1)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -544,7 +544,7 @@ func TestService_IncrementalUpdateFetchWindow(t *testing.T) {
 	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2, V1)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -593,7 +593,7 @@ func TestService_IncrementalUpdateFetchWindowNoReset(t *testing.T) {
 	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2, V1)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -640,7 +640,7 @@ func TestService_FilteredIncrementalUpdateResetAndClear(t *testing.T) {
 	allAddresses = append(append(allAddresses, newFromTrs...), newToTrs...)
 
 	// 1. User visualizes transactions for the first time
-	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 4)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 4, V1)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
