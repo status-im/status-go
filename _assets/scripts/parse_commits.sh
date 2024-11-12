@@ -15,7 +15,7 @@ parse_commits() {
 
     start_commit=${1:-origin/${BASE_BRANCH}}
     end_commit=${2:-HEAD}
-    is_breaking_change=false
+    is_breaking_change=true
     exit_code=0
 
     echo -e "${GRN}Checking commits between:${RST} $start_commit $end_commit"
