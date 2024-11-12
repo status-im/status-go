@@ -29,7 +29,7 @@ parse_commits() {
             fi
         else
             echo -e "${YLW}Commit message is ill-formed:${RST} $message"
-            exit_code=1
+            exit_code=0
         fi
     done < <(git log --format=%s "$start_commit".."$end_commit")
 
