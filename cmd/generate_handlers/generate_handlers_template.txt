@@ -5,15 +5,15 @@
 package protocol
 
 import (
-        "errors"
+  "errors"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/v2/common"
-	"github.com/status-im/status-go/protocol/v2/protobuf"
-	"github.com/status-im/status-go/protocol/v2/transport"
-	v1protocol "github.com/status-im/status-go/v3/protocol/v1"
+	"github.com/status-im/status-go/v2/protocol/common"
+	"github.com/status-im/status-go/v2/protocol/protobuf"
+	"github.com/status-im/status-go/v2/protocol/transport"
+	v1protocol "github.com/status-im/status-go/v2/protocol/v1"
 )
 
 func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter, fromArchive bool) error {
