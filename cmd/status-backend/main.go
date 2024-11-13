@@ -9,14 +9,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/status-im/status-go/cmd/status-backend/server"
+	backendServer "github.com/status-im/status-go/cmd/status-backend/server"
 	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
+	mediaServer "github.com/status-im/status-go/server"
 )
 
 var (
-	address = flag.String("address", "", "host:port to listen")
-	logger  = log.New("package", "status-go/cmd/status-backend")
+	address       = flag.String("address", "", "host:port to listen")
+	useMediaHTTPS = flag.Bool("media-https", true, "use HTTPS for media server (default: true)")
+	logger        = log.New("package", "status-go/cmd/status-backend")
 )
 
 func init() {
@@ -34,7 +36,9 @@ func init() {
 func main() {
 	flag.Parse()
 
-	srv := server.NewServer()
+	mediaServer.UseHTTP = !*useMediaHTTPS
+
+	srv := backendServer.NewServer()
 	srv.Setup()
 
 	err := srv.Listen(*address)
