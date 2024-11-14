@@ -29,6 +29,7 @@ import (
 	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
+	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
@@ -443,6 +444,16 @@ func (api *API) DeleteEthereumChain(ctx context.Context, chainID uint64) error {
 func (api *API) GetEthereumChains(ctx context.Context) ([]*network.CombinedNetwork, error) {
 	log.Debug("call to GetEthereumChains")
 	return api.s.rpcClient.NetworkManager.GetCombinedNetworks()
+}
+
+func (api *API) GetOrFetchPrices(ctx context.Context, symbols []string, currencies []string) (market.DataPerTokenAndCurrency, error) {
+	log.Debug("call to GetOrFetchPrices")
+	return api.s.marketManager.GetOrFetchPrices(symbols, currencies, market.MaxAgeInSecondsForBalances)
+}
+
+func (api *API) GetOrFetchTokenMarketValues(ctx context.Context, symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
+	log.Debug("call to GetOrFetchTokenMarketValues")
+	return api.s.marketManager.GetOrFetchTokenMarketValues(symbols, currency, market.MaxAgeInSecondsForBalances)
 }
 
 // @deprecated
