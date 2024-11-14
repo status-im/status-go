@@ -1713,24 +1713,33 @@ func (b *GethStatusBackend) prepareForKeycard(request *requests.CreateAccount, i
 		return response, nil
 	}
 
-	kp := wallet.NewKeycardPairings()
-	kp.SetKeycardPairingsFile(response.nodeConfig.KeycardPairingDataFile)
-	pairings, err := kp.GetPairings()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get keycard pairings")
-	}
+	if request.KeycardPairingKey != "" {
+		// KeycardPairingKey is used only on mobile
+		response.settings.KeycardPairing = request.KeycardPairingKey
+		response.account.KeycardPairing = request.KeycardPairingKey
+	} else {
+		// KeycardPairingDataFile is used only on desktop
+		kp := wallet.NewKeycardPairings()
+		kp.SetKeycardPairingsFile(response.nodeConfig.KeycardPairingDataFile)
+		pairings, err := kp.GetPairings()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get keycard pairings")
+		}
 
-	keycard, ok := pairings[request.KeycardInstanceUID]
-	if !ok {
-		return nil, errors.New("keycard not found in pairings file")
+		keycard, ok := pairings[request.KeycardInstanceUID]
+		if !ok {
+			return nil, errors.New("keycard not found in pairings file")
+		}
+
+		response.settings.KeycardPairing = keycard.Key
+		response.account.KeycardPairing = keycard.Key
 	}
 
 	response.settings.KeycardInstanceUID = request.KeycardInstanceUID
 	response.settings.KeycardPairedOn = time.Now().Unix()
-	response.settings.KeycardPairing = keycard.Key
-	response.account.KeycardPairing = keycard.Key
 
 	privateKeyHex := strings.TrimPrefix(input.derivedAddresses[pathDefaultChat].PrivateKey, "0x")
+	var err error
 	response.chatPrivateKey, err = crypto.HexToECDSA(privateKeyHex)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse chat private key hex")

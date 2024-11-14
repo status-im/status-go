@@ -79,7 +79,11 @@ type CreateAccount struct {
 
 	APIConfig *APIConfig `json:"apiConfig"`
 
-	KeycardInstanceUID     string  `json:"keycardInstanceUID"`
+	KeycardInstanceUID string `json:"keycardInstanceUID"`
+
+	// on mobile there is no KeycardPairingDataFile, so for now KeycardPairingKey will be used
+	// for recovering account
+	KeycardPairingKey      string  `json:"keycardPairingKey"`
 	KeycardPairingDataFile *string `json:"keycardPairingDataFile"`
 	StatusProxyEnabled     bool    `json:"statusProxyEnabled"`
 }
