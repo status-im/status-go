@@ -29,4 +29,7 @@ type FeatureFlags struct {
 
 	// EnableCelerBridge indicates whether we should enable the Celer bridge in the Router
 	EnableCelerBridge bool
+
+	// EnableMercuryoProvider indicates whether we should enable the Mercuryo provider in the Wallet
+	EnableMercuryoProvider bool
 }
