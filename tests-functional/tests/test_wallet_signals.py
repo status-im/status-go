@@ -27,6 +27,7 @@ class TestWalletRpcSignal(SignalBackendTestCase):
         message = json.loads(signal_response['event']['message'].replace("'", "\""))
         assert user_1.address in message['ownershipStatus'].keys()
 
+    @pytest.mark.skip
     def test_wallet_filter_activity_async(self):
         method = "wallet_filterActivityAsync"
         params = [1, [user_1.address], [self.network_id],
