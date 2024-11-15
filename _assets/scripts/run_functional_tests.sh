@@ -42,14 +42,8 @@ echo -e "${GRN}Saving logs${RST}"
 docker compose -p ${project_name} ${all_compose_files} logs status-go > "${root_path}/statusd.log"
 docker compose -p ${project_name} ${all_compose_files} logs status-backend > "${root_path}/status-backend.log"
 
-if [ "$(uname)" = "Darwin" ]; then
-    separator="-"
-else
-    separator="_"
-fi
-
 # Retrieve exit code
-exit_code=$(docker inspect ${project_name}${separator}tests-rpc${separator}1 -f '{{.State.ExitCode}}');
+exit_code=$(docker inspect ${project_name}-tests-rpc-1 -f '{{.State.ExitCode}}');
 
 # Cleanup containers
 echo -e "${GRN}Removing docker containers${RST}"
