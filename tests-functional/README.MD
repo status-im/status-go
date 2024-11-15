@@ -25,7 +25,7 @@ Functional tests for status-go
     * Status-im contracts will be deployed to the network
 
 ### Run tests
-- In `./tests-functional` run `docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f docker-compose.status-go.local.yml up --build --remove-orphans`, as result:
+- In `./tests-functional` run `docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f docker-compose.status-go.local.yml up --build --scale status-backend=10 --remove-orphans`, as result:
     * a container with [status-go as daemon](https://github.com/status-im/status-go/issues/5175) will be created with APIModules exposed on `0.0.0.0:3333`
     * status-go will use [anvil](https://book.getfoundry.sh/reference/anvil/) as RPCURL with ChainID 31337 
     * all Status-im contracts will be deployed to the network

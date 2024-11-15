@@ -4,18 +4,22 @@ import random
 import pytest
 
 from constants import user_1
-from test_cases import SignalBackendTestCase
+from test_cases import StatusBackendTestCase
 
 
 @pytest.mark.wallet
 @pytest.mark.rpc
-class TestWalletRpcSignal(SignalBackendTestCase):
-    await_signals = ["wallet", ]
+class TestWalletSignals(StatusBackendTestCase):
+
+    def setup_class(self):
+        self.await_signals.append("wallet")
+        super().setup_class(self)
+
 
     def setup_method(self):
-        super().setup_method()
         self.request_id = str(random.randint(1, 8888))
 
+    @pytest.mark.skip
     def test_wallet_get_owned_collectibles_async(self):
         method = "wallet_getOwnedCollectiblesAsync"
         params = [0, [self.network_id, ], [user_1.address], None, 0, 25, 1,

@@ -68,9 +68,8 @@ services:
       "-m", "rpc",
       "--anvil_url=http://anvil:8545",
       "--rpc_url_statusd=http://status-go:3333",
-      "--rpc_url_status_backend=http://status-backend:3333",
+      "--status_backend_urls=${STATUS_BACKEND_URLS}",
       "--ws_url_statusd=ws://status-go:8354",
-      "--ws_url_status_backend=ws://status-backend:3333",
       "--junitxml=/tests-rpc/reports/report.xml"
     ]
     volumes:

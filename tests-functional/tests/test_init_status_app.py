@@ -1,3 +1,4 @@
+from test_cases import StatusBackend
 import pytest
 
 
@@ -6,10 +7,20 @@ import pytest
 class TestInitialiseApp:
 
     @pytest.mark.init
-    def test_init_app(self, init_status_backend):
-        # this test is going to fail on every call except first since status-backend will be already initialized
+    def test_init_app(self):
 
-        backend_client = init_status_backend
+        await_signals = [
+
+            "mediaserver.started",
+            "node.started",
+            "node.ready",
+            "node.login",
+        ]
+
+        backend_client = StatusBackend(await_signals)
+        backend_client.init_status_backend()
+        backend_client.restore_account_and_login()
+
         assert backend_client is not None
         
         backend_client.verify_json_schema(

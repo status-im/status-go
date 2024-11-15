@@ -22,10 +22,18 @@ class StatusDTestCase:
 
 
 class StatusBackendTestCase:
-    await_signals = []
+
+    await_signals = [
+        "node.ready"
+    ]
 
     def setup_class(self):
         self.rpc_client = StatusBackend(await_signals=self.await_signals)
+
+        self.rpc_client.init_status_backend()
+        self.rpc_client.restore_account_and_login()
+        self.rpc_client.wait_for_signal("node.ready")
+
         self.network_id = 31337
 
 
@@ -140,13 +148,5 @@ class SignalTestCase(StatusDTestCase):
         self.signal_client = SignalClient(option.ws_url_statusd, self.await_signals)
 
         websocket_thread = threading.Thread(target=self.signal_client._connect)
-        websocket_thread.daemon = True
-        websocket_thread.start()
-
-
-class SignalBackendTestCase(StatusBackendTestCase):
-
-    def setup_method(self):
-        websocket_thread = threading.Thread(target=self.rpc_client._connect)
         websocket_thread.daemon = True
         websocket_thread.start()

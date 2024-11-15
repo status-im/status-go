@@ -8,4 +8,4 @@ services:
       - 8354:8354
   status-backend:
     ports:
-      - 3334:3333
+      - 3314-3324:3333

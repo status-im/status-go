@@ -26,9 +26,12 @@ mkdir -p "${test_results_path}"
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.test.status-go.yml"
 project_name="status-go-func-tests-$(date +%s)"
 
+export STATUS_BACKEND_COUNT=10
+export STATUS_BACKEND_URLS=$(eval echo http://${project_name}-status-backend-{1..${STATUS_BACKEND_COUNT}}:3333 | tr ' ' ,)
+
 # Run functional tests
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
-docker compose -p ${project_name} ${all_compose_files} up -d --build --remove-orphans
+docker compose -p ${project_name} ${all_compose_files} up -d --build --scale status-backend=${STATUS_BACKEND_COUNT} --remove-orphans
 
 echo -e "${GRN}Running tests-rpc${RST}" # Follow the logs, wait for them to finish
 docker compose -p ${project_name} ${all_compose_files} logs -f tests-rpc > "${root_path}/tests-rpc.log"
