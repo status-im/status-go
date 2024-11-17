@@ -46,10 +46,19 @@ func (m *Messenger) Chats() []*Chat {
 	return chats
 }
 
-func (m *Messenger) ChatsPreview() []*ChatPreview {
+// ChatsPreview returns a list of chat previews.
+// When onlyCommunityChats is nil, returns all chats
+// When onlyCommunityChats is true, only returns community chats
+// When onlyCommunityChats is false, returns all non-community chats
+func (m *Messenger) ChatsPreview(onlyCommunityChats *bool) []*ChatPreview {
 	var chats []*ChatPreview
 
 	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
+		// Skip if chat doesn't match the filter
+		isCommunityChat := chat.ChatType == ChatTypeCommunityChat
+		if onlyCommunityChats != nil && isCommunityChat != *onlyCommunityChats {
+			return true
+		}
 		if chat.Active || chat.Muted {
 			chatPreview := &ChatPreview{
 				ID:                    chat.ID,

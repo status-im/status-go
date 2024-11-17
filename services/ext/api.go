@@ -291,8 +291,8 @@ func (api *PublicAPI) Chats(parent context.Context) []*protocol.Chat {
 	return api.service.messenger.Chats()
 }
 
-func (api *PublicAPI) ChatsPreview(parent context.Context) []*protocol.ChatPreview {
-	return api.service.messenger.ChatsPreview()
+func (api *PublicAPI) ChatsPreview(parent context.Context, onlyCommunityChats *bool) []*protocol.ChatPreview {
+	return api.service.messenger.ChatsPreview(onlyCommunityChats)
 }
 
 func (api *PublicAPI) Chat(parent context.Context, chatID string) *protocol.Chat {
