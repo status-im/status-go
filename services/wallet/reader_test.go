@@ -1078,11 +1078,11 @@ func TestGetLastTokenUpdateTimestamps(t *testing.T) {
 	reader.lastWalletTokenUpdateTimestamp.Store(address1, timestamp1)
 	reader.lastWalletTokenUpdateTimestamp.Store(address2, timestamp2)
 
+	// Call the method to retrieve timestamps.
 	timestamps := reader.GetLastTokenUpdateTimestamps()
 	require.Len(t, timestamps, 2, "Expected two timestamps in the result map")
 
 	// Verify that the retrieved timestamps match the stored values.
-	assert.Equal(t, time.Unix(timestamp1, 0), timestamps[address1], "Timestamp for address1 does not match")
-	assert.Equal(t, time.Unix(timestamp2, 0), timestamps[address2], "Timestamp for address2 does not match")
-
+	assert.Equal(t, timestamp1, timestamps[address1], "Timestamp for address1 does not match")
+	assert.Equal(t, timestamp2, timestamps[address2], "Timestamp for address2 does not match")
 }

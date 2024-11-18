@@ -558,14 +558,14 @@ func (r *Reader) GetWalletToken(ctx context.Context, clients map[uint64]chain.Cl
 }
 
 // GetLastTokenUpdateTimestamps returns last timestamps of successful token updates
-func (r *Reader) GetLastTokenUpdateTimestamps() map[common.Address]time.Time {
-	result := make(map[common.Address]time.Time)
+func (r *Reader) GetLastTokenUpdateTimestamps() map[common.Address]int64 {
+	result := make(map[common.Address]int64)
 
 	r.lastWalletTokenUpdateTimestamp.Range(func(key, value interface{}) bool {
 		addr, ok1 := key.(common.Address)
 		timestamp, ok2 := value.(int64)
 		if ok1 && ok2 {
-			result[addr] = time.Unix(timestamp, 0)
+			result[addr] = timestamp
 		}
 		return true
 	})

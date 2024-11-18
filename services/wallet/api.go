@@ -89,7 +89,7 @@ func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) 
 	return api.reader.GetWalletToken(ctx, clients, addresses, currency)
 }
 
-func (api *API) GetLastWalletTokenUpdate() map[common.Address]time.Time {
+func (api *API) GetLastWalletTokenUpdate() map[common.Address]int64 {
 	return api.reader.GetLastTokenUpdateTimestamps()
 }
 
