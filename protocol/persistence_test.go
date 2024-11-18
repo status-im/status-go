@@ -2128,3 +2128,45 @@ func TestGetCommunityMemberMessages(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, messages, 2)
 }
+
+func TestPaymentRequestMessages(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+	chatID := testPublicChatID
+	var messages []*common.Message
+
+	message := common.Message{
+		ID:          strconv.Itoa(1),
+		LocalChatID: chatID,
+		ChatMessage: &protobuf.ChatMessage{
+			Clock: uint64(1),
+		},
+		From: testPK,
+	}
+	message.PaymentRequests = []*protobuf.PaymentRequest{
+		{
+			Amount:   "1.123",
+			Symbol:   "ETH",
+			Receiver: "0x123",
+			ChainId:  1,
+		},
+		{
+			Amount:   "1.124",
+			Symbol:   "DAI",
+			Receiver: "0x124",
+			ChainId:  11,
+		},
+	}
+
+	messages = append(messages, &message)
+
+	err = p.SaveMessages(messages)
+	require.NoError(t, err)
+
+	m, _, err := p.MessageByChatID(testPublicChatID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, m, 1)
+
+	require.Equal(t, m[0].PaymentRequests, message.PaymentRequests)
+}

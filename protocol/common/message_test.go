@@ -640,23 +640,30 @@ func assertMarshalAndUnmarshalJSON[T any](t *testing.T, obj *T, msgAndArgs ...an
 }
 
 func TestMarshalMessageJSON(t *testing.T) {
-	msg := &Message{
-		ID:   "1",
-		From: "0x04c51631b3354242d5a56f044c3b7703bcc001e8c725c4706928b3fac3c2a12ec9019e1e224d487f5c893389405bcec998bc687307f290a569d6a97d24b711bca8",
-		LinkPreviews: []LinkPreview{
-			{
-				Type:        protobuf.UnfurledLink_LINK,
-				Description: "GitHub is where people build software.",
-				Hostname:    "github.com",
-				Title:       "Build software better, together",
-				URL:         "https://github.com",
-				Thumbnail: LinkPreviewThumbnail{
-					Width:   100,
-					Height:  200,
-					URL:     "http://localhost:9999",
-					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
-				},
+	msg := NewMessage()
+	msg.ID = "1"
+	msg.From = "0x04c51631b3354242d5a56f044c3b7703bcc001e8c725c4706928b3fac3c2a12ec9019e1e224d487f5c893389405bcec998bc687307f290a569d6a97d24b711bca8"
+	msg.LinkPreviews = []LinkPreview{
+		{
+			Type:        protobuf.UnfurledLink_LINK,
+			Description: "GitHub is where people build software.",
+			Hostname:    "github.com",
+			Title:       "Build software better, together",
+			URL:         "https://github.com",
+			Thumbnail: LinkPreviewThumbnail{
+				Width:   100,
+				Height:  200,
+				URL:     "http://localhost:9999",
+				DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
 			},
+		},
+	}
+	msg.PaymentRequests = []*protobuf.PaymentRequest{
+		{
+			Amount:   "1000000000000000000",
+			Receiver: "0x7F47C2e98a4BBf5487E6fb082eC2D9Ab0E6d8882",
+			Symbol:   "ETH",
+			ChainId:  1,
 		},
 	}
 

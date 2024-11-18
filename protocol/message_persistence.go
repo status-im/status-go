@@ -115,7 +115,8 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		contact_verification_status,
 		mentioned,
 		replied,
-    discord_message_id`
+    	discord_message_id,
+		payment_requests`
 }
 
 // keep the same order as in tableUserMessagesScanAllFields
@@ -148,6 +149,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.links,
 		m1.unfurled_links,
 		m1.unfurled_status_links,
+		m1.payment_requests,
 		m1.command_id,
 		m1.command_value,
 		m1.command_from,
@@ -243,6 +245,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var serializedLinks []byte
 	var serializedUnfurledLinks []byte
 	var serializedUnfurledStatusLinks []byte
+	var serializedPaymentRequests []byte
 	var alias sql.NullString
 	var identicon sql.NullString
 	var communityID sql.NullString
@@ -303,6 +306,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&serializedLinks,
 		&serializedUnfurledLinks,
 		&serializedUnfurledStatusLinks,
+		&serializedPaymentRequests,
 		&command.ID,
 		&command.Value,
 		&command.From,
@@ -474,6 +478,13 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		message.UnfurledStatusLinks = &links
 	}
 
+	if serializedPaymentRequests != nil {
+		err := json.Unmarshal(serializedPaymentRequests, &message.PaymentRequests)
+		if err != nil {
+			return err
+		}
+	}
+
 	if attachment.Id != "" {
 		discordMessage.Attachments = append(discordMessage.Attachments, attachment)
 	}
@@ -581,6 +592,14 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		}
 	}
 
+	var serializedPaymentRequests []byte
+	if len(message.PaymentRequests) != 0 {
+		serializedPaymentRequests, err = json.Marshal(message.PaymentRequests)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return []interface{}{
 		message.ID,
 		message.WhisperTimestamp,
@@ -638,6 +657,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.Mentioned,
 		message.Replied,
 		discordMessage.Id,
+		serializedPaymentRequests,
 	}, nil
 }
 

@@ -119,6 +119,13 @@ message BridgeMessage {
   string parentMessageID = 7;
 }
 
+message PaymentRequest {
+    string receiver = 1;
+    string symbol = 2;
+    string amount = 3;
+    uint32 chainId = 4;
+}
+
 message UnfurledLinkThumbnail {
   bytes payload = 1;
   uint32 width = 2;
@@ -233,6 +240,8 @@ message ChatMessage {
   UnfurledStatusLinks unfurled_status_links = 18;
 
   uint32 customization_color = 19;
+
+  repeated PaymentRequest payment_requests = 20;
 
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;

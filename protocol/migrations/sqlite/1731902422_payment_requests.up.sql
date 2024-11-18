@@ -1,0 +1,1 @@
+ALTER TABLE user_messages ADD COLUMN payment_requests BLOB;
