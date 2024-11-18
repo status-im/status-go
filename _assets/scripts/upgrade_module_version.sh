@@ -19,4 +19,4 @@ mod upgrade -tag ${version}
 find . -name "*.go" -exec sed -i '' "s/\/v${version}\/v${version}/\/v${version}/g" {} +
 
 # Fallback "/v3/extkeys" to "/extkeys"
-find . -name "*.go" -exec sed -i '' "s|github.com/status-im/status-go/v${version}extkeys|github.com/status-im/status-go/extkeys|g" {} \;
+find . -name "*.go" -exec sed -i '' "s|github.com/status-im/status-go/v${version}/extkeys|github.com/status-im/status-go/extkeys|g" {} \;
