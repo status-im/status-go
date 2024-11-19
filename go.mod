@@ -82,6 +82,7 @@ require (
 	github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5
 	github.com/andybalholm/brotli v1.1.0
 	github.com/bits-and-blooms/bloom/v3 v3.7.0
+	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/gorilla/sessions v1.2.1
