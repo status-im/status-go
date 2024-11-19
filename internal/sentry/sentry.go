@@ -20,6 +20,17 @@ func MustInit(options ...Option) {
 	}
 }
 
+func Close() error {
+	// Set DSN to empty string to disable sending events
+	return sentry.Init(sentry.ClientOptions{
+		Dsn: "",
+	})
+}
+
+func Flush() {
+	sentry.Flush(time.Second * 2)
+}
+
 func Recover() {
 	err := recover()
 	if err == nil {
@@ -37,7 +48,7 @@ func RecoverError(err interface{}) {
 func defaultConfig() *sentry.ClientOptions {
 	return &sentry.ClientOptions{
 		EnableTracing:  false,
-		Debug:          true, // FIXME: Set to false
+		Debug:          false,
 		SendDefaultPII: false,
 		Release:        version.Version(),
 		Environment:    Environment(),

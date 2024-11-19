@@ -101,6 +101,7 @@ type GethStatusBackend struct {
 	allowAllRPC              bool // used only for tests, disables api method restrictions
 	LocalPairingStateManager *statecontrol.ProcessStateManager
 	centralizedMetrics       *centralizedmetrics.MetricService
+	sentryDSN                string
 
 	logger *zap.Logger
 }
@@ -2845,4 +2846,27 @@ func (b *GethStatusBackend) getWalletDBPath(keyUID string) (string, error) {
 	}
 
 	return filepath.Join(b.rootDataDir, fmt.Sprintf("%s-wallet.db", keyUID)), nil
+}
+
+func (b *GethStatusBackend) SetSentryDSN(dsn string) {
+	b.sentryDSN = dsn
+}
+
+func (b *GethStatusBackend) EnableSentry() error {
+	return sentry.Init(
+		sentry.WithDSN(b.sentryDSN),
+		sentry.WithDefaultContext(),
+	)
+}
+
+func (b *GethStatusBackend) DisableSentry() error {
+	sentry.Flush()
+	return sentry.Close()
+}
+
+func (b *GethStatusBackend) ToggleSentry(enabled bool) error {
+	if enabled {
+		return b.EnableSentry()
+	}
+	return b.DisableSentry()
 }

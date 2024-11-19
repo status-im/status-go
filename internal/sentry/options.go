@@ -21,9 +21,9 @@ func WithEnvironmentDSN(name string) Option {
 	return WithDSN(os.Getenv(name))
 }
 
-//func WithEnvironmentDSN() Option {
-//	return WithDSN(os.Getenv("SENTRY_DSN"))
-//}
+func WithDefaultEnvironmentDSN() Option {
+	return WithEnvironmentDSN(DefaultEnvVarDSN)
+}
 
 func WithContext(name string, version string) Option {
 	return func(o *sentry.ClientOptions) {

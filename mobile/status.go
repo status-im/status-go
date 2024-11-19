@@ -49,7 +49,6 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 
-	"github.com/status-im/status-go/internal/sentry"
 	"github.com/status-im/status-go/mobile/callog"
 )
 
@@ -102,11 +101,9 @@ func initializeApplication(requestJSON string) string {
 	}
 
 	// initialize sentry
+	statusBackend.SetSentryDSN(request.SentryDSN)
 	if centralizedMetricsInfo.Enabled {
-		err = sentry.Init(
-			sentry.WithDSN(request.SentryDSN),
-			sentry.WithDefaultContext(),
-		)
+		err = statusBackend.EnableSentry()
 		if err != nil {
 			return makeJSONResponse(err)
 		}
@@ -2211,6 +2208,11 @@ func toggleCentralizedMetrics(requestJSON string) string {
 	}
 
 	err = statusBackend.ToggleCentralizedMetrics(request.Enabled)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.ToggleSentry(request.Enabled)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
