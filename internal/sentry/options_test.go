@@ -4,9 +4,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/getsentry/sentry-go"
 	"github.com/stretchr/testify/require"
-	"github.com/brianvoe/gofakeit/v6"
 )
 
 func TestWithDSN(t *testing.T) {

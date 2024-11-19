@@ -2,6 +2,7 @@ package sentry
 
 import (
 	"testing"
+
 	"github.com/getsentry/sentry-go"
 	"github.com/stretchr/testify/require"
 )
