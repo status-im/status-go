@@ -1189,58 +1189,6 @@ func (db sqlitePersistence) StatusUpdates() (statusUpdates []UserStatus, err err
 	return
 }
 
-func (db sqlitePersistence) DeleteSwitcherCard(cardID string) error {
-	_, err := db.db.Exec("DELETE from switcher_cards WHERE card_id = ?", cardID)
-	return err
-}
-
-func (db sqlitePersistence) UpsertSwitcherCard(switcherCard SwitcherCard) error {
-	_, err := db.db.Exec(`INSERT INTO switcher_cards(
-		card_id,
-		type,
-		clock,
-		screen_id)
-		VALUES (?, ?, ?, ?)`,
-		switcherCard.CardID,
-		switcherCard.Type,
-		switcherCard.Clock,
-		switcherCard.ScreenID,
-	)
-
-	return err
-}
-
-func (db sqlitePersistence) SwitcherCards() (switcherCards []SwitcherCard, err error) {
-	rows, err := db.db.Query(`
-		SELECT
-			card_id,
-			type,
-			clock,
-			screen_id
-		FROM switcher_cards
-	`)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var switcherCard SwitcherCard
-		err = rows.Scan(
-			&switcherCard.CardID,
-			&switcherCard.Type,
-			&switcherCard.Clock,
-			&switcherCard.ScreenID,
-		)
-		if err != nil {
-			return
-		}
-		switcherCards = append(switcherCards, switcherCard)
-	}
-
-	return
-}
-
 func (db sqlitePersistence) NextHigherClockValueOfAutomaticStatusUpdates(clock uint64) (uint64, error) {
 	var nextClock uint64
 

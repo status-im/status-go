@@ -730,10 +730,6 @@ type ApplicationStatusUpdatesResponse struct {
 	StatusUpdates []protocol.UserStatus `json:"statusUpdates"`
 }
 
-type ApplicationSwitcherCardsResponse struct {
-	SwitcherCards []protocol.SwitcherCard `json:"switcherCards"`
-}
-
 func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*ApplicationMessagesResponse, error) {
 	messages, cursor, err := api.service.messenger.MessageByChatID(chatID, cursor, limit)
 	if err != nil {
@@ -796,25 +792,6 @@ func (api *PublicAPI) StatusUpdates() (*ApplicationStatusUpdatesResponse, error)
 
 	return &ApplicationStatusUpdatesResponse{
 		StatusUpdates: statusUpdates,
-	}, nil
-}
-
-func (api *PublicAPI) UpsertSwitcherCard(request *requests.UpsertSwitcherCard) error {
-	return api.service.messenger.UpsertSwitcherCard(request)
-}
-
-func (api *PublicAPI) DeleteSwitcherCard(id string) error {
-	return api.service.messenger.DeleteSwitcherCard(id)
-}
-
-func (api *PublicAPI) SwitcherCards() (*ApplicationSwitcherCardsResponse, error) {
-	switcherCards, err := api.service.messenger.SwitcherCards()
-	if err != nil {
-		return nil, err
-	}
-
-	return &ApplicationSwitcherCardsResponse{
-		SwitcherCards: switcherCards,
 	}, nil
 }
 
