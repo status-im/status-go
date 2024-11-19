@@ -102,7 +102,12 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 			NetworkManager: networkManager,
 		}
 	case Method_PersonalSign:
-		state.cmd = &PersonalSignCommand{
+		state.cmd = &SignCommand{
+			Db:            state.walletDb,
+			ClientHandler: state.handler,
+		}
+	case Method_SignTypedDataV4:
+		state.cmd = &SignCommand{
 			Db:            state.walletDb,
 			ClientHandler: state.handler,
 		}

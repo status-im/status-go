@@ -22,7 +22,7 @@ var (
 	ErrEmptyAccountsShared                    = fmt.Errorf("empty accounts were shared by wallet")
 	ErrRequestAccountsRejectedByUser          = fmt.Errorf("request accounts was rejected by user")
 	ErrSendTransactionRejectedByUser          = fmt.Errorf("send transaction was rejected by user")
-	ErrPersonalSignRejectedByUser             = fmt.Errorf("personal sign was rejected by user")
+	ErrSignRejectedByUser                     = fmt.Errorf("sign was rejected by user")
 	ErrEmptyRequestID                         = fmt.Errorf("empty requestID")
 	ErrAnotherConnectorOperationIsAwaitingFor = fmt.Errorf("another connector operation is awaiting for user input")
 	ErrEmptyUrl                               = fmt.Errorf("empty URL")
@@ -34,7 +34,7 @@ type MessageType int
 const (
 	RequestAccountsAccepted MessageType = iota
 	SendTransactionAccepted
-	PersonalSignAccepted
+	SignAccepted
 	Rejected
 )
 
@@ -203,14 +203,14 @@ func (c *ClientSideHandler) SendTransactionRejected(args RejectedArgs) error {
 	return nil
 }
 
-func (c *ClientSideHandler) RequestPersonalSign(dApp signal.ConnectorDApp, challenge, address string) (string, error) {
+func (c *ClientSideHandler) RequestSign(dApp signal.ConnectorDApp, challenge, address string, method string) (string, error) {
 	if !c.setRequestRunning() {
 		return "", ErrAnotherConnectorOperationIsAwaitingFor
 	}
 	defer c.clearRequestRunning()
 
 	requestID := c.generateRequestID(dApp)
-	signal.SendConnectorPersonalSign(dApp, requestID, challenge, address)
+	signal.SendConnectorSign(dApp, requestID, challenge, address, method)
 
 	timeout := time.After(WalletResponseMaxInterval)
 
@@ -218,15 +218,15 @@ func (c *ClientSideHandler) RequestPersonalSign(dApp signal.ConnectorDApp, chall
 		select {
 		case msg := <-c.responseChannel:
 			switch msg.Type {
-			case PersonalSignAccepted:
-				response := msg.Data.(PersonalSignAcceptedArgs)
+			case SignAccepted:
+				response := msg.Data.(SignAcceptedArgs)
 				if response.RequestID == requestID {
 					return response.Signature, nil
 				}
 			case Rejected:
 				response := msg.Data.(RejectedArgs)
 				if response.RequestID == requestID {
-					return "", ErrPersonalSignRejectedByUser
+					return "", ErrSignRejectedByUser
 				}
 			}
 		case <-timeout:
@@ -235,16 +235,16 @@ func (c *ClientSideHandler) RequestPersonalSign(dApp signal.ConnectorDApp, chall
 	}
 }
 
-func (c *ClientSideHandler) PersonalSignAccepted(args PersonalSignAcceptedArgs) error {
+func (c *ClientSideHandler) SignAccepted(args SignAcceptedArgs) error {
 	if args.RequestID == "" {
 		return ErrEmptyRequestID
 	}
 
-	c.responseChannel <- Message{Type: PersonalSignAccepted, Data: args}
+	c.responseChannel <- Message{Type: SignAccepted, Data: args}
 	return nil
 }
 
-func (c *ClientSideHandler) PersonalSignRejected(args RejectedArgs) error {
+func (c *ClientSideHandler) SignRejected(args RejectedArgs) error {
 	if args.RequestID == "" {
 		return ErrEmptyRequestID
 	}

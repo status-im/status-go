@@ -60,12 +60,12 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 				Hash:      expectedHash,
 			})
 			assert.NoError(t, err)
-		case signal.EventConnectorPersonalSign:
-			var ev signal.ConnectorPersonalSignSignal
+		case signal.EventConnectorSign:
+			var ev signal.ConnectorSignSignal
 			err := json.Unmarshal(evt.Event, &ev)
 			assert.NoError(t, err)
 
-			err = state.api.PersonalSignAccepted(commands.PersonalSignAcceptedArgs{
+			err = state.api.SignAccepted(commands.SignAcceptedArgs{
 				RequestID: ev.RequestID,
 				Signature: expectedSignature,
 			})

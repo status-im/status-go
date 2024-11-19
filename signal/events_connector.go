@@ -7,7 +7,7 @@ import (
 const (
 	EventConnectorSendRequestAccounts   = "connector.sendRequestAccounts"
 	EventConnectorSendTransaction       = "connector.sendTransaction"
-	EventConnectorPersonalSign          = "connector.personalSign"
+	EventConnectorSign                  = "connector.sign"
 	EventConnectorDAppPermissionGranted = "connector.dAppPermissionGranted"
 	EventConnectorDAppPermissionRevoked = "connector.dAppPermissionRevoked"
 	EventConnectorDAppChainIdSwitched   = "connector.dAppChainIdSwitched"
@@ -39,11 +39,12 @@ type ConnectorSendDappPermissionGrantedSignal struct {
 	SharedAccount types.Address `json:"sharedAccount"`
 }
 
-type ConnectorPersonalSignSignal struct {
+type ConnectorSignSignal struct {
 	ConnectorDApp
 	RequestID string `json:"requestId"`
 	Challenge string `json:"challenge"`
 	Address   string `json:"address"`
+	Method    string `json:"method"`
 }
 
 type ConnectorDAppChainIdSwitchedSignal struct {
@@ -67,12 +68,13 @@ func SendConnectorSendTransaction(dApp ConnectorDApp, chainID uint64, txArgs str
 	})
 }
 
-func SendConnectorPersonalSign(dApp ConnectorDApp, requestID, challenge, address string) {
-	send(EventConnectorPersonalSign, ConnectorPersonalSignSignal{
+func SendConnectorSign(dApp ConnectorDApp, requestID, challenge, address string, method string) {
+	send(EventConnectorSign, ConnectorSignSignal{
 		ConnectorDApp: dApp,
 		RequestID:     requestID,
 		Challenge:     challenge,
 		Address:       address,
+		Method:        method,
 	})
 }
 

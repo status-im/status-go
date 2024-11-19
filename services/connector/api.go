@@ -30,7 +30,11 @@ func NewAPI(s *Service) *API {
 		Db:            s.db,
 		ClientHandler: c,
 	})
-	r.Register("personal_sign", &commands.PersonalSignCommand{
+	r.Register("personal_sign", &commands.SignCommand{
+		Db:            s.db,
+		ClientHandler: c,
+	})
+	r.Register("eth_signTypedData_v4", &commands.SignCommand{
 		Db:            s.db,
 		ClientHandler: c,
 	})
@@ -144,10 +148,10 @@ func (api *API) SendTransactionRejected(args commands.RejectedArgs) error {
 	return api.c.SendTransactionRejected(args)
 }
 
-func (api *API) PersonalSignAccepted(args commands.PersonalSignAcceptedArgs) error {
-	return api.c.PersonalSignAccepted(args)
+func (api *API) SignAccepted(args commands.SignAcceptedArgs) error {
+	return api.c.SignAccepted(args)
 }
 
-func (api *API) PersonalSignRejected(args commands.RejectedArgs) error {
-	return api.c.PersonalSignRejected(args)
+func (api *API) SignRejected(args commands.RejectedArgs) error {
+	return api.c.SignRejected(args)
 }

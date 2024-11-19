@@ -17,6 +17,7 @@ const (
 	Method_EthRequestAccounts  = "eth_requestAccounts"
 	Method_EthChainId          = "eth_chainId"
 	Method_PersonalSign        = "personal_sign"
+	Method_SignTypedDataV4     = "eth_signTypedData_v4"
 	Method_EthSendTransaction  = "eth_sendTransaction"
 	Method_RequestPermissions  = "wallet_requestPermissions"
 	Method_RevokePermissions   = "wallet_revokePermissions"
@@ -56,7 +57,7 @@ type SendTransactionAcceptedArgs struct {
 	Hash      types.Hash `json:"hash"`
 }
 
-type PersonalSignAcceptedArgs struct {
+type SignAcceptedArgs struct {
 	RequestID string `json:"requestId"`
 	Signature string `json:"signature"`
 }
@@ -79,9 +80,9 @@ type ClientSideHandlerInterface interface {
 	SendTransactionAccepted(args SendTransactionAcceptedArgs) error
 	SendTransactionRejected(args RejectedArgs) error
 
-	RequestPersonalSign(dApp signal.ConnectorDApp, challenge, address string) (string, error)
-	PersonalSignAccepted(args PersonalSignAcceptedArgs) error
-	PersonalSignRejected(args RejectedArgs) error
+	RequestSign(dApp signal.ConnectorDApp, challenge, address string, method string) (string, error)
+	SignAccepted(args SignAcceptedArgs) error
+	SignRejected(args RejectedArgs) error
 }
 
 type NetworkManagerInterface interface {
