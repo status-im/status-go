@@ -34,7 +34,7 @@ func init() {
 
 func main() {
 	sentry.MustInit(
-		sentry.WithEnvironmentDSN(),
+		sentry.WithEnvironmentDSN(sentry.DefaultEnvVarDSN),
 		sentry.WithContext("status-backend", version.Version()),
 	)
 	defer sentry.Recover()

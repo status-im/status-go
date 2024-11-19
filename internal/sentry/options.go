@@ -6,6 +6,9 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
+const DefaultEnvVarDSN = "SENTRY_DSN_STATUS_GO"
+const DefaultEnvVarEnvironment = "SENTRY_ENVIRONMENT"
+
 type Option func(*sentry.ClientOptions)
 
 func WithDSN(dsn string) Option {
@@ -14,12 +17,19 @@ func WithDSN(dsn string) Option {
 	}
 }
 
-func WithEnvironmentDSN() Option {
-	return WithDSN(os.Getenv("SENTRY_DSN"))
+func WithEnvironmentDSN(name string) Option {
+	return WithDSN(os.Getenv(name))
 }
+
+//func WithEnvironmentDSN() Option {
+//	return WithDSN(os.Getenv("SENTRY_DSN"))
+//}
 
 func WithContext(name string, version string) Option {
 	return func(o *sentry.ClientOptions) {
+		if o.Tags == nil {
+			o.Tags = make(map[string]string)
+		}
 		o.Tags["context.name"] = name
 		o.Tags["context.version"] = version
 	}

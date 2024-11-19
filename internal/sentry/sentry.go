@@ -1,7 +1,6 @@
 package sentry
 
 import (
-	"slices"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -57,46 +56,4 @@ func beforeSend(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 	}
 
 	return event
-}
-
-var stacktraceFilters = []struct {
-	Module    string
-	Functions []string
-}{
-	{
-		Module:    "github.com/status-im/status-go/internal/sentry",
-		Functions: []string{"Recover", "RecoverError"},
-	},
-	{
-		Module:    "github.com/status-im/status-go/common",
-		Functions: []string{"LogOnPanic"},
-	},
-	{
-		Module:    "github.com/status-im/status-go/mobile/callog",
-		Functions: []string{"Call.func1"},
-	},
-}
-
-func trimStacktrace(stacktrace *sentry.Stacktrace) {
-	if stacktrace == nil {
-		return
-	}
-
-	if len(stacktrace.Frames) <= 1 {
-		return
-	}
-
-	// Trim max 2 frames from the end
-	for i := len(stacktrace.Frames) - 1; i >= len(stacktrace.Frames)-3; i-- {
-		frame := stacktrace.Frames[i]
-		for _, filter := range stacktraceFilters {
-			if frame.Module != filter.Module {
-				continue
-			}
-			if !slices.Contains(filter.Functions, frame.Function) {
-				continue
-			}
-			stacktrace.Frames = stacktrace.Frames[:i]
-		}
-	}
 }

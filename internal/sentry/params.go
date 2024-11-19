@@ -35,10 +35,14 @@ func Production() bool {
 }
 
 func Environment() string {
-	if Production() {
+	return environment(Production(), DefaultEnvVarEnvironment)
+}
+
+func environment(production bool, envvar string) string {
+	if production {
 		return productionEnvironment
 	}
-	env := os.Getenv("SENTRY_ENVIRONMENT")
+	env := os.Getenv(envvar)
 	if env == productionEnvironment {
 		// Production environment can only be set during build
 		return ""
