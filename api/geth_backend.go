@@ -2860,7 +2860,6 @@ func (b *GethStatusBackend) EnableSentry() error {
 }
 
 func (b *GethStatusBackend) DisableSentry() error {
-	sentry.Flush()
 	return sentry.Close()
 }
 

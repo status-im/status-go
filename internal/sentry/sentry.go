@@ -21,14 +21,11 @@ func MustInit(options ...Option) {
 }
 
 func Close() error {
+	sentry.Flush(time.Second * 2)
 	// Set DSN to empty string to disable sending events
 	return sentry.Init(sentry.ClientOptions{
 		Dsn: "",
 	})
-}
-
-func Flush() {
-	sentry.Flush(time.Second * 2)
 }
 
 func Recover() {
@@ -42,7 +39,7 @@ func Recover() {
 
 func RecoverError(err interface{}) {
 	sentry.CurrentHub().Recover(err)
-	sentry.Flush(time.Second * 5)
+	sentry.Flush(time.Second * 2)
 }
 
 func defaultConfig() *sentry.ClientOptions {
