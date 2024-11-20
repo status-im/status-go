@@ -14,6 +14,7 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -51,8 +52,8 @@ const (
 
 var (
 	testEstimationMap = map[string]requests.Estimation{
-		walletCommon.ProcessorTransferName:  {Value: uint64(1000), Err: nil},
-		walletCommon.ProcessorBridgeHopName: {Value: uint64(5000), Err: nil},
+		pathProcessorCommon.ProcessorTransferName:  {Value: uint64(1000), Err: nil},
+		pathProcessorCommon.ProcessorBridgeHopName: {Value: uint64(5000), Err: nil},
 	}
 
 	testBBonderFeeMap = map[string]*big.Int{
@@ -188,7 +189,7 @@ func getNormalTestParamsList() []normalTestParams {
 					SuggestedFees: testSuggestedFees,
 					BalanceMap:    testBalanceMapPerChain,
 					EstimationMap: map[string]requests.Estimation{
-						walletCommon.ProcessorTransferName: {
+						pathProcessorCommon.ProcessorTransferName: {
 							Value: uint64(0),
 							Err:   fmt.Errorf("failed with 50000000 gas: insufficient funds for gas * price + value: address %s have 68251537427723 want 100000000000000", common.HexToAddress("0x1")),
 						},
@@ -233,19 +234,19 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
@@ -281,55 +282,55 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
@@ -367,19 +368,19 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
@@ -417,37 +418,37 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
@@ -486,19 +487,19 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
@@ -536,37 +537,37 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
@@ -605,7 +606,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
@@ -644,7 +645,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
@@ -683,7 +684,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
@@ -722,25 +723,25 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
@@ -779,7 +780,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
@@ -853,63 +854,63 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
@@ -952,21 +953,21 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testAmount0Point2ETHInWei - testAmount0Point3ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)), //(*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)), //(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)), //(*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
@@ -1008,63 +1009,63 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei - testBonderFeeETH)),
@@ -1107,63 +1108,63 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei - testBonderFeeETH)),
@@ -1272,55 +1273,55 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -1358,19 +1359,19 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -1408,37 +1409,37 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -1476,19 +1477,19 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -1526,37 +1527,37 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -1595,7 +1596,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
@@ -1634,7 +1635,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -1673,7 +1674,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
@@ -1712,25 +1713,25 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -1769,7 +1770,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -1839,168 +1840,168 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5 * testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5 * testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorTransferName,
+					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5 * testAmount100USDC)),
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(2.5*testAmount100USDC - testBonderFeeUSDC)),
@@ -2038,37 +2039,37 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2106,13 +2107,13 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -2150,25 +2151,25 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2206,13 +2207,13 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2250,25 +2251,25 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2340,7 +2341,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -2412,13 +2413,13 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -2457,7 +2458,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -2532,7 +2533,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: false,
@@ -2574,7 +2575,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2614,7 +2615,7 @@ func getNormalTestParamsList() []normalTestParams {
 			expectedError: ErrLowAmountInForHopBridge,
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
 					ApprovalRequired: true,
@@ -2705,7 +2706,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:         walletCommon.ProcessorTransferName,
+					ProcessorName:         pathProcessorCommon.ProcessorTransferName,
 					FromChain:             &optimism,
 					ToChain:               &optimism,
 					ApprovalRequired:      false,
@@ -2792,13 +2793,13 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:         walletCommon.ProcessorTransferName,
+					ProcessorName:         pathProcessorCommon.ProcessorTransferName,
 					FromChain:             &optimism,
 					ToChain:               &optimism,
 					ApprovalRequired:      false,
@@ -2806,7 +2807,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					RequiredNativeBalance: big.NewInt((testBaseFee + testPriorityFeeLow) * testApprovalGasEstimation),
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2846,13 +2847,13 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 			},
 			expectedCandidates: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
 				},
 				{
-					ProcessorName:         walletCommon.ProcessorTransferName,
+					ProcessorName:         pathProcessorCommon.ProcessorTransferName,
 					FromChain:             &optimism,
 					ToChain:               &optimism,
 					ApprovalRequired:      false,
@@ -2860,7 +2861,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					RequiredNativeBalance: big.NewInt((testBaseFee + testPriorityFeeLow) * testApprovalGasEstimation),
 				},
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
@@ -2868,7 +2869,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 			},
 			expectedBest: routes.Route{
 				{
-					ProcessorName:    walletCommon.ProcessorBridgeHopName,
+					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,

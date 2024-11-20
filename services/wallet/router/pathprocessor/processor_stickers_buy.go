@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -36,11 +37,11 @@ func NewStickersBuyProcessor(rpcClient *rpc.Client, transactor transactions.Tran
 }
 
 func createStickersBuyErrorResponse(err error) error {
-	return createErrorResponse(walletCommon.ProcessorStickersBuyName, err)
+	return createErrorResponse(pathProcessorCommon.ProcessorStickersBuyName, err)
 }
 
 func (s *StickersBuyProcessor) Name() string {
-	return walletCommon.ProcessorStickersBuyName
+	return pathProcessorCommon.ProcessorStickersBuyName
 }
 
 func (s *StickersBuyProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
@@ -124,7 +125,7 @@ func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 		return 0, createStickersBuyErrorResponse(err)
 	}
 
-	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
 
 	return uint64(increasedEstimation), nil
 }

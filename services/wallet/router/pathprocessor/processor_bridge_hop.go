@@ -31,8 +31,10 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -127,11 +129,11 @@ func NewHopBridgeProcessor(rpcClient rpc.ClientInterface, transactor transaction
 }
 
 func createBridgeHopErrorResponse(err error) error {
-	return createErrorResponse(walletCommon.ProcessorBridgeHopName, err)
+	return createErrorResponse(pathProcessorCommon.ProcessorBridgeHopName, err)
 }
 
 func (h *HopBridgeProcessor) Name() string {
-	return walletCommon.ProcessorBridgeHopName
+	return pathProcessorCommon.ProcessorBridgeHopName
 }
 
 func (h *HopBridgeProcessor) Clear() {
@@ -202,7 +204,7 @@ func (h *HopBridgeProcessor) packTxInputDataInternally(params ProcessorInputPara
 		return []byte{}, createBridgeHopErrorResponse(err)
 	}
 
-	bonderKey := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "", params.AmountIn)
+	bonderKey := pathProcessorCommon.MakeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "", params.AmountIn)
 	bonderFeeIns, ok := h.bonderFee.Load(bonderKey)
 	if !ok {
 		return nil, ErrNoBonderFeeFound
@@ -274,7 +276,7 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, e
 		}
 	}
 
-	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil
 }
 
@@ -320,7 +322,7 @@ func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, sig
 		return tx, createBridgeHopErrorResponse(err)
 	}
 
-	bonderKey := makeKey(sendArgs.HopTx.ChainID, sendArgs.HopTx.ChainIDTo, "", "", (*big.Int)(sendArgs.HopTx.Amount))
+	bonderKey := pathProcessorCommon.MakeKey(sendArgs.HopTx.ChainID, sendArgs.HopTx.ChainIDTo, "", "", (*big.Int)(sendArgs.HopTx.Amount))
 	bonderFeeIns, ok := h.bonderFee.Load(bonderKey)
 	if !ok {
 		return nil, ErrNoBonderFeeFound
@@ -387,7 +389,7 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, sig
 		return tx, createBridgeHopErrorResponse(err)
 	}
 
-	bonderKey := makeKey(sendArgs.FromChainID, sendArgs.ToChainID, "", "", (*big.Int)(sendArgs.ValueIn))
+	bonderKey := pathProcessorCommon.MakeKey(sendArgs.FromChainID, sendArgs.ToChainID, "", "", (*big.Int)(sendArgs.ValueIn))
 	bonderFeeIns, ok := h.bonderFee.Load(bonderKey)
 	if !ok {
 		return nil, ErrNoBonderFeeFound
@@ -419,7 +421,7 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, sig
 }
 
 func (h *HopBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, nonce uint64, err error) {
-	tx, err := h.sendOrBuild(sendArgs, getSigner(sendArgs.HopTx.ChainID, sendArgs.HopTx.From, verifiedAccount), lastUsedNonce)
+	tx, err := h.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.HopTx.ChainID, sendArgs.HopTx.From, verifiedAccount.AccountKey.PrivateKey), lastUsedNonce)
 	if err != nil {
 		return types.Hash{}, 0, createBridgeHopErrorResponse(err)
 	}
@@ -443,7 +445,7 @@ func (h *HopBridgeProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs
 }
 
 func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error) {
-	bonderKey := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "", params.AmountIn)
+	bonderKey := pathProcessorCommon.MakeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "", params.AmountIn)
 	if params.TestsMode {
 		if val, ok := params.TestBonderFeeMap[params.FromToken.Symbol]; ok {
 			res := new(big.Int).Sub(params.AmountIn, val)
@@ -454,7 +456,7 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 				DestinationAmountOutMin: &bigint.BigInt{Int: res},
 				BonderFee:               &bigint.BigInt{Int: val},
 				EstimatedRecieved:       &bigint.BigInt{Int: res},
-				Deadline:                time.Now().Add(SevenDaysInSeconds).Unix(),
+				Deadline:                time.Now().Add(pathProcessorCommon.SevenDaysInSeconds).Unix(),
 			}
 			h.bonderFee.Store(bonderKey, bonderFee)
 			return val, walletCommon.ZeroBigIntValue(), nil
@@ -508,7 +510,7 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 }
 
 func (h *HopBridgeProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
-	bonderKey := makeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "", params.AmountIn)
+	bonderKey := pathProcessorCommon.MakeKey(params.FromChain.ChainID, params.ToChain.ChainID, "", "", params.AmountIn)
 	bonderFeeIns, ok := h.bonderFee.Load(bonderKey)
 	if !ok {
 		return nil, ErrNoBonderFeeFound

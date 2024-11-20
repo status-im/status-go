@@ -1,4 +1,4 @@
-package pathprocessor
+package common
 
 import (
 	"testing"
@@ -8,14 +8,14 @@ import (
 
 func TestGettingNameFromEnsUsername(t *testing.T) {
 	ensName := "test"
-	name := getNameFromEnsUsername(ensName)
+	name := GetNameFromEnsUsername(ensName)
 	require.Equal(t, ensName, name)
 
 	ensStatusName := "test.stateofus.eth"
-	name = getNameFromEnsUsername(ensStatusName)
+	name = GetNameFromEnsUsername(ensStatusName)
 	require.Equal(t, ensName, name)
 
 	ensNotStatusName := "test.eth"
-	name = getNameFromEnsUsername(ensNotStatusName)
+	name = GetNameFromEnsUsername(ensNotStatusName)
 	require.Equal(t, ensNotStatusName, name)
 }

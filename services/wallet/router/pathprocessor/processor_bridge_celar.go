@@ -23,8 +23,10 @@ import (
 	"github.com/status-im/status-go/rpc"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/utils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor/cbridge"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -65,11 +67,11 @@ func NewCelerBridgeProcessor(rpcClient *rpc.Client, transactor transactions.Tran
 }
 
 func createBridgeCellerErrorResponse(err error) error {
-	return createErrorResponse(walletCommon.ProcessorBridgeCelerName, err)
+	return createErrorResponse(pathProcessorCommon.ProcessorBridgeCelerName, err)
 }
 
 func (s *CelerBridgeProcessor) Name() string {
-	return walletCommon.ProcessorBridgeCelerName
+	return pathProcessorCommon.ProcessorBridgeCelerName
 }
 
 func (s *CelerBridgeProcessor) estimateAmt(from, to *params.Network, amountIn *big.Int, symbol string) (*cbridge.EstimateAmtResponse, error) {
@@ -281,7 +283,7 @@ func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 			return 0, createBridgeCellerErrorResponse(err)
 		}
 	}
-	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil
 }
 
@@ -429,7 +431,7 @@ func (s *CelerBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, s
 }
 
 func (s *CelerBridgeProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (types.Hash, uint64, error) {
-	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.CbridgeTx.From, verifiedAccount), lastUsedNonce)
+	tx, err := s.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.ChainID, sendArgs.CbridgeTx.From, verifiedAccount.AccountKey.PrivateKey), lastUsedNonce)
 	if err != nil {
 		return types.HexToHash(""), 0, createBridgeCellerErrorResponse(err)
 	}

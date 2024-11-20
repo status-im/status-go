@@ -15,7 +15,9 @@ import (
 	"github.com/status-im/status-go/contracts/ierc1155"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/utils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -37,11 +39,11 @@ func NewERC1155Processor(rpcClient *rpc.Client, transactor transactions.Transact
 }
 
 func createERC1155ErrorResponse(err error) error {
-	return createErrorResponse(walletCommon.ProcessorERC1155Name, err)
+	return createErrorResponse(pathProcessorCommon.ProcessorERC1155Name, err)
 }
 
 func (s *ERC1155Processor) Name() string {
-	return walletCommon.ProcessorERC1155Name
+	return pathProcessorCommon.ProcessorERC1155Name
 }
 
 func (s *ERC1155Processor) AvailableFor(params ProcessorInputParams) (bool, error) {
@@ -105,7 +107,7 @@ func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams) (uint64, err
 	if err != nil {
 		return 0, createERC1155ErrorResponse(err)
 	}
-	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil
 }
 
@@ -153,7 +155,7 @@ func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signe
 }
 
 func (s *ERC1155Processor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
-	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC1155TransferTx.From, verifiedAccount), lastUsedNonce)
+	tx, err := s.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.ChainID, sendArgs.ERC1155TransferTx.From, verifiedAccount.AccountKey.PrivateKey), lastUsedNonce)
 	if err != nil {
 		return hash, 0, createERC1155ErrorResponse(err)
 	}

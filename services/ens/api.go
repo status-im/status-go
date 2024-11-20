@@ -154,7 +154,7 @@ func (api *API) Release(ctx context.Context, chainID uint64, txArgs wallettypes.
 		return "", err
 	}
 
-	signFn := utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password)
+	signFn := utils.VerifyPasswordAndGetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password)
 	tx, err := api.ensResolver.Release(ctx, chainID, registryAddr, txArgs, username, signFn)
 	if err != nil {
 		return "", err
@@ -239,7 +239,7 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs wallettypes
 		return "", err
 	}
 
-	signFn := utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password)
+	signFn := utils.VerifyPasswordAndGetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password)
 
 	tx, err := api.ensResolver.Register(ctx, chainID, registryAddr, txArgs, username, pubkey, signFn)
 	if err != nil {
@@ -350,7 +350,7 @@ func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs wallettype
 		return "", err
 	}
 
-	signFn := utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password)
+	signFn := utils.VerifyPasswordAndGetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password)
 	tx, err := api.ensResolver.SetPubKey(ctx, chainID, resolverAddress, txArgs, username, pubkey, signFn)
 	if err != nil {
 		return "", err

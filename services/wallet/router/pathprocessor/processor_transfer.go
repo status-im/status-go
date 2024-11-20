@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -28,11 +29,11 @@ func NewTransferProcessor(rpcClient *rpc.Client, transactor transactions.Transac
 }
 
 func createTransferErrorResponse(err error) error {
-	return createErrorResponse(walletCommon.ProcessorTransferName, err)
+	return createErrorResponse(pathProcessorCommon.ProcessorTransferName, err)
 }
 
 func (s *TransferProcessor) Name() string {
-	return walletCommon.ProcessorTransferName
+	return pathProcessorCommon.ProcessorTransferName
 }
 
 func (s *TransferProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
@@ -111,7 +112,7 @@ func (s *TransferProcessor) EstimateGas(params ProcessorInputParams) (uint64, er
 
 	}
 
-	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil
 }
 

@@ -107,7 +107,7 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 	if err != nil {
 		return DeploymentDetails{}, err
 	}
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.VerifyPasswordAndGetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
@@ -196,7 +196,7 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 		return DeploymentDetails{}, err
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.VerifyPasswordAndGetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	deployerContractInst, err := api.NewCommunityTokenDeployerInstance(chainID)
 	if err != nil {
@@ -280,7 +280,7 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		return DeploymentDetails{}, err
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.VerifyPasswordAndGetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
@@ -384,7 +384,7 @@ func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress 
 		return "", err
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.VerifyPasswordAndGetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	contractInst, err := NewTokenInstance(api.s, chainID, contractAddress)
 	if err != nil {
@@ -446,7 +446,7 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 		return "", err
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.VerifyPasswordAndGetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	var tempTokenIds []*big.Int
 	for _, v := range tokenIds {
@@ -498,7 +498,7 @@ func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string
 		return "", err
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.VerifyPasswordAndGetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	newMaxSupply, err := api.s.prepareNewMaxSupply(ctx, chainID, contractAddress, burnAmount)
 	if err != nil {

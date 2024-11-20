@@ -4,7 +4,8 @@ import (
 	"context"
 
 	"github.com/status-im/status-go/errors"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
+
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 )
 
 // Abbreviartion `WPP` for the error code stands for `Wallet Path Processor`
@@ -70,25 +71,25 @@ func createErrorResponse(processorName string, err error) error {
 
 	var customErrResp *errors.ErrorResponse
 	switch processorName {
-	case walletCommon.ProcessorTransferName:
+	case pathProcessorCommon.ProcessorTransferName:
 		customErrResp = ErrTransferCustomError
-	case walletCommon.ProcessorERC721Name:
+	case pathProcessorCommon.ProcessorERC721Name:
 		customErrResp = ErrERC721TransferCustomError
-	case walletCommon.ProcessorERC1155Name:
+	case pathProcessorCommon.ProcessorERC1155Name:
 		customErrResp = ErrERC1155TransferCustomError
-	case walletCommon.ProcessorBridgeHopName:
+	case pathProcessorCommon.ProcessorBridgeHopName:
 		customErrResp = ErrBridgeHopCustomError
-	case walletCommon.ProcessorBridgeCelerName:
+	case pathProcessorCommon.ProcessorBridgeCelerName:
 		customErrResp = ErrBridgeCellerCustomError
-	case walletCommon.ProcessorSwapParaswapName:
+	case pathProcessorCommon.ProcessorSwapParaswapName:
 		customErrResp = ErrSwapParaswapCustomError
-	case walletCommon.ProcessorENSRegisterName:
+	case pathProcessorCommon.ProcessorENSRegisterName:
 		customErrResp = ErrENSRegisterCustomError
-	case walletCommon.ProcessorENSReleaseName:
+	case pathProcessorCommon.ProcessorENSReleaseName:
 		customErrResp = ErrENSReleaseCustomError
-	case walletCommon.ProcessorENSPublicKeyName:
+	case pathProcessorCommon.ProcessorENSPublicKeyName:
 		customErrResp = ErrENSPublicKeyCustomError
-	case walletCommon.ProcessorStickersBuyName:
+	case pathProcessorCommon.ProcessorStickersBuyName:
 		customErrResp = ErrStickersBuyCustomError
 	default:
 		return genericErrResp

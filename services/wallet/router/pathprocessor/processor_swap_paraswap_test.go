@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	mock_paraswap "github.com/status-im/status-go/services/wallet/thirdparty/paraswap/mock"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -44,7 +45,7 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 	chainIDs := []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.UnknownChainID}
 
 	for _, chainID := range chainIDs {
-		key := makeKey(chainID, chainID, fromToken.Symbol, toToken.Symbol, testPriceRoute.SrcAmount.Int)
+		key := pathProcessorCommon.MakeKey(chainID, chainID, fromToken.Symbol, toToken.Symbol, testPriceRoute.SrcAmount.Int)
 		processor.priceRoute.Store(key, testPriceRoute)
 
 		testInputParams := ProcessorInputParams{

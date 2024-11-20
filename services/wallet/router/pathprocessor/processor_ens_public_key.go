@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -37,11 +38,11 @@ func NewENSPublicKeyProcessor(rpcClient *rpc.Client, transactor transactions.Tra
 }
 
 func createENSPublicKeyErrorResponse(err error) error {
-	return createErrorResponse(walletCommon.ProcessorENSPublicKeyName, err)
+	return createErrorResponse(pathProcessorCommon.ProcessorENSPublicKeyName, err)
 }
 
 func (s *ENSPublicKeyProcessor) Name() string {
-	return walletCommon.ProcessorENSPublicKeyName
+	return pathProcessorCommon.ProcessorENSPublicKeyName
 }
 
 func (s *ENSPublicKeyProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
@@ -99,7 +100,7 @@ func (s *ENSPublicKeyProcessor) EstimateGas(params ProcessorInputParams) (uint64
 		return 0, createENSPublicKeyErrorResponse(err)
 	}
 
-	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
 
 	return uint64(increasedEstimation), nil
 }

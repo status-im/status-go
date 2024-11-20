@@ -5,6 +5,7 @@ import (
 
 	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 )
 
 type SendType int
@@ -37,24 +38,24 @@ func (s SendType) IsStickersTransfer() bool {
 func (s SendType) CanUseProcessor(pathProcessorName string) bool {
 	switch s {
 	case Transfer:
-		return pathProcessorName == walletCommon.ProcessorTransferName ||
+		return pathProcessorName == pathProcessorCommon.ProcessorTransferName ||
 			walletCommon.IsProcessorBridge(pathProcessorName)
 	case Bridge:
 		return walletCommon.IsProcessorBridge(pathProcessorName)
 	case Swap:
 		return walletCommon.IsProcessorSwap(pathProcessorName)
 	case ERC721Transfer:
-		return pathProcessorName == walletCommon.ProcessorERC721Name
+		return pathProcessorName == pathProcessorCommon.ProcessorERC721Name
 	case ERC1155Transfer:
-		return pathProcessorName == walletCommon.ProcessorERC1155Name
+		return pathProcessorName == pathProcessorCommon.ProcessorERC1155Name
 	case ENSRegister:
-		return pathProcessorName == walletCommon.ProcessorENSRegisterName
+		return pathProcessorName == pathProcessorCommon.ProcessorENSRegisterName
 	case ENSRelease:
-		return pathProcessorName == walletCommon.ProcessorENSReleaseName
+		return pathProcessorName == pathProcessorCommon.ProcessorENSReleaseName
 	case ENSSetPubKey:
-		return pathProcessorName == walletCommon.ProcessorENSPublicKeyName
+		return pathProcessorName == pathProcessorCommon.ProcessorENSPublicKeyName
 	case StickersBuy:
-		return pathProcessorName == walletCommon.ProcessorStickersBuyName
+		return pathProcessorName == pathProcessorCommon.ProcessorStickersBuyName
 	default:
 		return true
 	}
@@ -63,7 +64,7 @@ func (s SendType) CanUseProcessor(pathProcessorName string) bool {
 func (s SendType) ProcessZeroAmountInProcessor(amountIn *big.Int, amountOut *big.Int, processorName string) bool {
 	if amountIn.Cmp(walletCommon.ZeroBigIntValue()) == 0 {
 		if s == Transfer {
-			if processorName != walletCommon.ProcessorTransferName {
+			if processorName != pathProcessorCommon.ProcessorTransferName {
 				return false
 			}
 		} else if s == Swap {

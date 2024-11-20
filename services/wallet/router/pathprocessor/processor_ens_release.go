@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens/ensresolver"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -37,11 +38,11 @@ func NewENSReleaseProcessor(rpcClient *rpc.Client, transactor transactions.Trans
 }
 
 func createENSReleaseErrorResponse(err error) error {
-	return createErrorResponse(walletCommon.ProcessorENSReleaseName, err)
+	return createErrorResponse(pathProcessorCommon.ProcessorENSReleaseName, err)
 }
 
 func (s *ENSReleaseProcessor) Name() string {
-	return walletCommon.ProcessorENSReleaseName
+	return pathProcessorCommon.ProcessorENSReleaseName
 }
 
 func (s *ENSReleaseProcessor) AvailableFor(params ProcessorInputParams) (bool, error) {
@@ -58,7 +59,7 @@ func (s *ENSReleaseProcessor) PackTxInputData(params ProcessorInputParams) ([]by
 		return []byte{}, createENSReleaseErrorResponse(err)
 	}
 
-	name := getNameFromEnsUsername(params.Username)
+	name := pathProcessorCommon.GetNameFromEnsUsername(params.Username)
 	return registrarABI.Pack("release", walletCommon.UsernameToLabel(name))
 }
 
@@ -99,7 +100,7 @@ func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams) (uint64, 
 		return 0, createENSReleaseErrorResponse(err)
 	}
 
-	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
 
 	return uint64(increasedEstimation), nil
 }

@@ -10,14 +10,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/contracts/ierc20"
+
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 )
 
 func IsProcessorBridge(name string) bool {
-	return name == ProcessorBridgeHopName || name == ProcessorBridgeCelerName
+	return name == pathProcessorCommon.ProcessorBridgeHopName || name == pathProcessorCommon.ProcessorBridgeCelerName
 }
 
 func IsProcessorSwap(name string) bool {
-	return name == ProcessorSwapParaswapName
+	return name == pathProcessorCommon.ProcessorSwapParaswapName
 }
 
 func PackApprovalInputData(amountIn *big.Int, approvalContractAddress *common.Address) ([]byte, error) {

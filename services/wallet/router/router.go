@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -840,7 +841,7 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute rou
 			}
 		}
 
-		if path.ProcessorName == walletCommon.ProcessorBridgeHopName {
+		if path.ProcessorName == pathProcessorCommon.ProcessorBridgeHopName {
 			if path.TxBonderFees.ToInt().Cmp(path.AmountOut.ToInt()) > 0 {
 				return hasPositiveBalance, ErrLowAmountInForHopBridge
 			}

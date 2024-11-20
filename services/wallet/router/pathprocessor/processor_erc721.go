@@ -17,7 +17,9 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/utils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
@@ -44,11 +46,11 @@ func NewERC721Processor(rpcClient *rpc.Client, transactor transactions.Transacto
 }
 
 func createERC721ErrorResponse(err error) error {
-	return createErrorResponse(walletCommon.ProcessorERC721Name, err)
+	return createErrorResponse(pathProcessorCommon.ProcessorERC721Name, err)
 }
 
 func (s *ERC721Processor) Name() string {
-	return walletCommon.ProcessorERC721Name
+	return pathProcessorCommon.ProcessorERC721Name
 }
 
 func (s *ERC721Processor) AvailableFor(params ProcessorInputParams) (bool, error) {
@@ -143,7 +145,7 @@ func (s *ERC721Processor) EstimateGas(params ProcessorInputParams) (uint64, erro
 		return 0, createERC721ErrorResponse(err)
 	}
 
-	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
 	return uint64(increasedEstimation), nil
 }
 
@@ -211,7 +213,7 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 }
 
 func (s *ERC721Processor) Send(sendArgs *MultipathProcessorTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, usedNonce uint64, err error) {
-	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount), lastUsedNonce)
+	tx, err := s.sendOrBuild(sendArgs, utils.GetSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount.AccountKey.PrivateKey), lastUsedNonce)
 	if err != nil {
 		return hash, 0, createERC721ErrorResponse(err)
 	}

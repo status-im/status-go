@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
@@ -180,13 +181,13 @@ func buildTxForPath(transactor transactions.TransactorIface, path *routes.Path, 
 		if !path.FromToken.IsNative() {
 			sendArgs.Value = (*hexutil.Big)(big.NewInt(0))
 
-			if path.ProcessorName == walletCommon.ProcessorTransferName ||
-				path.ProcessorName == walletCommon.ProcessorStickersBuyName ||
-				path.ProcessorName == walletCommon.ProcessorENSRegisterName ||
-				path.ProcessorName == walletCommon.ProcessorENSReleaseName ||
-				path.ProcessorName == walletCommon.ProcessorENSPublicKeyName ||
-				path.ProcessorName == walletCommon.ProcessorERC721Name ||
-				path.ProcessorName == walletCommon.ProcessorERC1155Name {
+			if path.ProcessorName == pathProcessorCommon.ProcessorTransferName ||
+				path.ProcessorName == pathProcessorCommon.ProcessorStickersBuyName ||
+				path.ProcessorName == pathProcessorCommon.ProcessorENSRegisterName ||
+				path.ProcessorName == pathProcessorCommon.ProcessorENSReleaseName ||
+				path.ProcessorName == pathProcessorCommon.ProcessorENSPublicKeyName ||
+				path.ProcessorName == pathProcessorCommon.ProcessorERC721Name ||
+				path.ProcessorName == pathProcessorCommon.ProcessorERC1155Name {
 				// TODO: update functions from `TransactorIface` to use `ToContractAddress` (as an address of the contract a transaction should be sent to)
 				// and `To` (as the destination address, recipient) of `SendTxArgs` struct appropriately
 				toContractAddr := types.Address(path.FromToken.Address)
@@ -250,7 +251,7 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 			response.Hashes = append(response.Hashes, txDetails.ApprovalTxData.HashToSign)
 
 			// if approval is needed for swap, we cannot build the swap tx before the approval tx is mined
-			if path.ProcessorName == walletCommon.ProcessorSwapParaswapName {
+			if path.ProcessorName == pathProcessorCommon.ProcessorSwapParaswapName {
 				continue
 			}
 		}
@@ -367,7 +368,7 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiT
 			transactions = append(transactions, response)
 
 			// if approval is needed for swap, then we need to wait for the approval tx to be mined before sending the swap tx
-			if desc.RouterPath.ProcessorName == walletCommon.ProcessorSwapParaswapName {
+			if desc.RouterPath.ProcessorName == pathProcessorCommon.ProcessorSwapParaswapName {
 				continue
 			}
 		}

@@ -508,7 +508,7 @@ func (s *Service) SetSignerPubKey(ctx context.Context, chainID uint64, contractA
 		return "", fmt.Errorf("signerPubKey is empty")
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, s.accountsManager, s.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.VerifyPasswordAndGetSigner(chainID, s.accountsManager, s.config.KeyStoreDir, txArgs.From, password))
 
 	contractInst, err := s.NewOwnerTokenInstance(chainID, contractAddress)
 	if err != nil {
