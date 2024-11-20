@@ -1,5 +1,0 @@
-GET {{address}}/statusgo/Panic
-
-{
-    "lol": "kek",
-}
