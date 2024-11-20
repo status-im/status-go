@@ -84,9 +84,9 @@ func initializeApplication(requestJSON string) string {
 	providers.MixpanelAppID = request.MixpanelAppID
 	providers.MixpanelToken = request.MixpanelToken
 
-	datadir := request.DataDir
+	statusBackend.StatusNode().SetMediaServerEnableTLS(request.MediaServerEnableTLS)
 
-	statusBackend.UpdateRootDataDir(datadir)
+	statusBackend.UpdateRootDataDir(request.DataDir)
 	err = statusBackend.OpenAccounts()
 	if err != nil {
 		return makeJSONResponse(err)

@@ -14,13 +14,13 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
-var (
-	// UseHTTP controls whether the media server uses HTTP instead of HTTPS.
-	// Set to true to avoid TLS certificate issues with react-native-fast-image
-	// on Android, which has limitations with dynamic certificate updates.
-	// Pls check doc/use-status-backend-server.md in status-mobile for more details
-	UseHTTP = false
-)
+type MediaServerOption func(*MediaServer)
+
+func WithMediaServerDisableTLS(disableTLS bool) MediaServerOption {
+	return func(s *MediaServer) {
+		s.disableTLS = disableTLS
+	}
+}
 
 type MediaServer struct {
 	Server
@@ -29,31 +29,52 @@ type MediaServer struct {
 	downloader      *ipfs.Downloader
 	multiaccountsDB *multiaccounts.Database
 	walletDB        *sql.DB
+
+	// disableTLS controls whether the media server uses HTTP instead of HTTPS.
+	// Set to true to avoid TLS certificate issues with react-native-fast-image
+	// on Android, which has limitations with dynamic certificate updates.
+	// Pls check doc/use-status-backend-server.md in status-mobile for more details
+	disableTLS bool
+}
+
+func initMediaCertificate(disableTLS bool) (*tls.Certificate, error) {
+	if disableTLS {
+		return nil, nil
+	}
+
+	cert, _, err := generateMediaTLSCert()
+	if err != nil {
+		return nil, err
+	}
+	return cert, nil
 }
 
 // NewMediaServer returns a *MediaServer
-func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiaccounts.Database, walletDB *sql.DB) (*MediaServer, error) {
-	var cert *tls.Certificate
-	if !UseHTTP {
-		err := generateMediaTLSCert()
-		if err != nil {
-			return nil, err
-		}
-		cert = globalMediaCertificate
-	}
+func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiaccounts.Database, walletDB *sql.DB, opts ...MediaServerOption) (*MediaServer, error) {
 
 	s := &MediaServer{
-		Server: NewServer(
-			cert,
-			Localhost,
-			signal.SendMediaServerStarted,
-			logutils.ZapLogger().Named("MediaServer"),
-		),
+		disableTLS:      false,
 		db:              db,
 		downloader:      downloader,
 		multiaccountsDB: multiaccountsDB,
 		walletDB:        walletDB,
 	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	cert, err := initMediaCertificate(s.disableTLS)
+	if err != nil {
+		return nil, err
+	}
+	s.Server = NewServer(
+		cert,
+		Localhost,
+		signal.SendMediaServerStarted,
+		logutils.ZapLogger().Named("MediaServer"),
+	)
+
 	s.SetHandlers(HandlerPatternMap{
 		accountImagesPath:                   handleAccountImages(s.multiaccountsDB, s.logger),
 		accountInitialsPath:                 handleAccountInitials(s.multiaccountsDB, s.logger),
@@ -80,7 +101,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 
 func (s *MediaServer) MakeBaseURL() *url.URL {
 	return &url.URL{
-		Scheme: map[bool]string{true: "http", false: "https"}[UseHTTP],
+		Scheme: map[bool]string{true: "http", false: "https"}[s.disableTLS],
 		Host:   s.mustGetHost(),
 	}
 }

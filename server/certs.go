@@ -75,9 +75,9 @@ func GenerateTLSCert(notBefore, notAfter time.Time, IPAddresses []net.IP, DNSNam
 	return &finalCert, certPem, err
 }
 
-func generateMediaTLSCert() error {
+func generateMediaTLSCert() (*tls.Certificate, string, error) {
 	if globalMediaCertificate != nil {
-		return nil
+		return globalMediaCertificate, globalMediaPem, nil
 	}
 
 	now := time.Now()
@@ -90,21 +90,21 @@ func generateMediaTLSCert() error {
 	)
 	finalCert, certPem, err := GenerateTLSCert(notBefore, notAfter, []net.IP{}, []string{Localhost})
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
 	globalMediaCertificate = finalCert
 	globalMediaPem = string(certPem)
-	return nil
+	return finalCert, globalMediaPem, nil
 }
 
 func PublicMediaTLSCert() (string, error) {
-	err := generateMediaTLSCert()
+	_, pem, err := generateMediaTLSCert()
 	if err != nil {
 		return "", err
 	}
 
-	return globalMediaPem, nil
+	return pem, nil
 }
 
 // ToECDSA takes a []byte of D and uses it to create an ecdsa.PublicKey on the elliptic.P256 curve

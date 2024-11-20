@@ -152,10 +152,9 @@ status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend
 
 run-status-backend: PORT ?= 0
-MEDIA_HTTPS ?= true
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
-	go run ./cmd/status-backend --address localhost:${PORT} --media-https=${MEDIA_HTTPS}
+	go run ./cmd/status-backend --address localhost:${PORT}
 
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."

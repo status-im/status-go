@@ -88,7 +88,9 @@ type StatusNode struct {
 	rpcClient *rpc.Client        // reference to an RPC client
 
 	downloader *ipfs.Downloader
-	httpServer *server.MediaServer
+
+	mediaServerEnableTLS *bool
+	httpServer           *server.MediaServer
 
 	discovery discovery.Discovery
 	register  *peers.Register
@@ -215,7 +217,11 @@ func (n *StatusNode) StartMediaServerWithoutDB() error {
 		}
 	}
 
-	httpServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB, nil)
+	var opts []server.MediaServerOption
+	if n.mediaServerEnableTLS != nil {
+		opts = append(opts, server.WithMediaServerDisableTLS(!*n.mediaServerEnableTLS))
+	}
+	httpServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB, nil, opts...)
 	if err != nil {
 		return err
 	}
@@ -269,6 +275,10 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 	return nil
 }
 
+func (n *StatusNode) SetMediaServerEnableTLS(enableTLS *bool) {
+	n.mediaServerEnableTLS = enableTLS
+}
+
 func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) error {
 	if err := n.createNode(config, accs, db); err != nil {
 		return err
@@ -287,7 +297,12 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 		}
 	}
 
-	httpServer, err := server.NewMediaServer(n.appDB, n.downloader, n.multiaccountsDB, n.walletDB)
+	var opts []server.MediaServerOption
+	if n.mediaServerEnableTLS != nil {
+		opts = append(opts, server.WithMediaServerDisableTLS(!*n.mediaServerEnableTLS))
+	}
+
+	httpServer, err := server.NewMediaServer(n.appDB, n.downloader, n.multiaccountsDB, n.walletDB, opts...)
 	if err != nil {
 		return err
 	}

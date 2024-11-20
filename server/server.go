@@ -55,25 +55,26 @@ func (s *Server) mustGetHost() string {
 	return fmt.Sprintf("%s:%d", s.hostname, s.MustGetPort())
 }
 
+func (s *Server) createListener() (net.Listener, error) {
+	host := s.getHost()
+	if s.cert == nil {
+		// HTTP mode
+		return net.Listen("tcp", host)
+	}
+
+	// HTTPS mode
+	cfg := &tls.Config{
+		Certificates: []tls.Certificate{*s.cert},
+		ServerName:   s.hostname,
+		MinVersion:   tls.VersionTLS12,
+	}
+	return tls.Listen("tcp", host, cfg)
+}
+
 func (s *Server) listenAndServe() {
 	defer common.LogOnPanic()
 
-	var listener net.Listener
-	var err error
-
-	if s.cert != nil {
-		// HTTPS mode
-		cfg := &tls.Config{
-			Certificates: []tls.Certificate{*s.cert},
-			ServerName:   s.hostname,
-			MinVersion:   tls.VersionTLS12,
-		}
-		listener, err = tls.Listen("tcp", s.getHost(), cfg)
-	} else {
-		// HTTP mode
-		listener, err = net.Listen("tcp", s.getHost())
-	}
-
+	listener, err := s.createListener()
 	if err != nil {
 		s.logger.Error("failed to start server, retrying", zap.Error(err))
 		s.ResetPort()
