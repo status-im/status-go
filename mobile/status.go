@@ -103,7 +103,7 @@ func initializeApplication(requestJSON string) string {
 	// initialize sentry
 	statusBackend.SetSentryDSN(request.SentryDSN)
 	if centralizedMetricsInfo.Enabled {
-		err = statusBackend.EnableSentry()
+		err = statusBackend.EnablePanicReporting()
 		if err != nil {
 			return makeJSONResponse(err)
 		}
@@ -2212,7 +2212,7 @@ func toggleCentralizedMetrics(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.ToggleSentry(request.Enabled)
+	err = statusBackend.TogglePanicReporting(request.Enabled)
 	if err != nil {
 		return makeJSONResponse(err)
 	}

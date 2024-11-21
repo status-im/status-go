@@ -2852,20 +2852,20 @@ func (b *GethStatusBackend) SetSentryDSN(dsn string) {
 	b.sentryDSN = dsn
 }
 
-func (b *GethStatusBackend) EnableSentry() error {
+func (b *GethStatusBackend) EnablePanicReporting() error {
 	return sentry.Init(
 		sentry.WithDSN(b.sentryDSN),
 		sentry.WithDefaultContext(),
 	)
 }
 
-func (b *GethStatusBackend) DisableSentry() error {
+func (b *GethStatusBackend) DisablePanicReporting() error {
 	return sentry.Close()
 }
 
-func (b *GethStatusBackend) ToggleSentry(enabled bool) error {
+func (b *GethStatusBackend) TogglePanicReporting(enabled bool) error {
 	if enabled {
-		return b.EnableSentry()
+		return b.EnablePanicReporting()
 	}
-	return b.DisableSentry()
+	return b.DisablePanicReporting()
 }
