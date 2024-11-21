@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -58,4 +59,49 @@ func TestCore(t *testing.T) {
 	require.Len(t, buffer2Lines, 5+1)
 	require.Regexp(t, `"logger"\s*:\s*"child"`, buffer2Lines[1])
 	require.Regexp(t, `"logger"\s*:\s*"child\.grandChild"`, buffer2Lines[4])
+}
+
+func benchmarkCore(b *testing.B, core zapcore.Core) {
+	logger := zap.New(core)
+
+	messageQueue := make(chan int, b.N)
+	for i := 0; i < b.N; i++ {
+		messageQueue <- i
+	}
+	close(messageQueue)
+
+	b.ResetTimer()
+
+	wg := sync.WaitGroup{}
+	for g := 0; g < 4; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range messageQueue {
+				logger.Debug("Benchmark message", zap.Int("i", i))
+			}
+		}()
+	}
+
+	wg.Wait()
+	err := logger.Sync()
+	if err != nil {
+		b.Fatal(err)
+	}
+}
+
+func BenchmarkCustomCore(b *testing.B) {
+	benchmarkCore(b, NewCore(
+		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.Lock(zapcore.AddSync(bytes.NewBuffer(nil))),
+		zap.NewAtomicLevelAt(zap.DebugLevel)),
+	)
+}
+
+func BenchmarkZapCore(b *testing.B) {
+	benchmarkCore(b, zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.Lock(zapcore.AddSync(bytes.NewBuffer(nil))),
+		zap.NewAtomicLevelAt(zap.DebugLevel)),
+	)
 }
