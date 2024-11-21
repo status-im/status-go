@@ -12,6 +12,14 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 )
 
+type ChatPreviewFilterType int
+
+const (
+	ChatPreviewFilterTypeAll ChatPreviewFilterType = iota
+	ChatPreviewFilterTypeCommunity
+	ChatPreviewFilterTypeNonCommunity
+)
+
 func (m *Messenger) getOneToOneAndNextClock(contact *Contact) (*Chat, uint64, error) {
 	chat, ok := m.allChats.Load(contact.ID)
 	if !ok {
@@ -50,13 +58,19 @@ func (m *Messenger) Chats() []*Chat {
 // When onlyCommunityChats is nil, returns all chats
 // When onlyCommunityChats is true, only returns community chats
 // When onlyCommunityChats is false, returns all non-community chats
-func (m *Messenger) ChatsPreview(onlyCommunityChats *bool) []*ChatPreview {
+func (m *Messenger) ChatsPreview(filterPointer *ChatPreviewFilterType) []*ChatPreview {
 	var chats []*ChatPreview
-
+	filter := ChatPreviewFilterTypeAll
+	if filterPointer != nil {
+		filter = *filterPointer
+	}
 	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
 		// Skip if chat doesn't match the filter
 		isCommunityChat := chat.ChatType == ChatTypeCommunityChat
-		if onlyCommunityChats != nil && isCommunityChat != *onlyCommunityChats {
+		if filter == ChatPreviewFilterTypeCommunity && !isCommunityChat {
+			return true
+		}
+		if filter == ChatPreviewFilterTypeNonCommunity && isCommunityChat {
 			return true
 		}
 		if chat.Active || chat.Muted {
