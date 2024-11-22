@@ -2,11 +2,13 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	stderrors "errors"
 	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/protocol/common/shard"
@@ -51,14 +53,9 @@ func (m *Messenger) collectFiltersAndKeys() ([]transport.FiltersToInitialize, []
 	wg.Wait()
 	close(filtersCh)
 	close(publicKeysCh)
+	close(errCh)
 
-	select {
-	case err := <-errCh:
-		return nil, nil, err
-	default:
-	}
-
-	return m.collectResults(filtersCh, publicKeysCh)
+	return m.collectResults(filtersCh, publicKeysCh, errCh)
 }
 
 func (m *Messenger) processJoinedCommunities(wg *sync.WaitGroup, filtersCh chan<- []transport.FiltersToInitialize, errCh chan<- error) {
@@ -77,51 +74,18 @@ func (m *Messenger) processJoinedCommunities(wg *sync.WaitGroup, filtersCh chan<
 
 func (m *Messenger) processCommunitiesSettings(communities []*communities.Community) []transport.FiltersToInitialize {
 	logger := m.logger.With(zap.String("site", "processCommunitiesSettings"))
-	var filtersToInit []transport.FiltersToInitialize
+	filtersToInit := make([]transport.FiltersToInitialize, 0, len(communities))
 
 	for _, org := range communities {
 		// the org advertise on the public topic derived by the pk
 		filtersToInit = append(filtersToInit, m.DefaultFilters(org)...)
 
-		if err := m.ensureCommunitySettings(org); err != nil {
+		if err := m.communitiesManager.EnsureCommunitySettings(org); err != nil {
 			logger.Warn("failed to process community settings", zap.Error(err))
 		}
 	}
 
 	return filtersToInit
-}
-
-func (m *Messenger) ensureCommunitySettings(org *communities.Community) error {
-	// This is for status-go versions that didn't have `CommunitySettings`
-	// We need to ensure communities that existed before community settings
-	// were introduced will have community settings as well
-	exists, err := m.communitiesManager.CommunitySettingsExist(org.ID())
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		communitySettings := communities.CommunitySettings{
-			CommunityID:                  org.IDString(),
-			HistoryArchiveSupportEnabled: true,
-		}
-		return m.communitiesManager.SaveCommunitySettings(communitySettings)
-	}
-
-	// In case we do have settings, but the history archive support is disabled
-	// for this community, we enable it, as this should be the default for all
-	// non-admin communities
-	communitySettings, err := m.communitiesManager.GetCommunitySettingsByID(org.ID())
-	if err != nil {
-		return err
-	}
-
-	if !org.IsControlNode() && !communitySettings.HistoryArchiveSupportEnabled {
-		communitySettings.HistoryArchiveSupportEnabled = true
-		return m.communitiesManager.UpdateCommunitySettings(*communitySettings)
-	}
-
-	return nil
 }
 
 func (m *Messenger) processSpectatedCommunities(wg *sync.WaitGroup, filtersCh chan<- []transport.FiltersToInitialize, errCh chan<- error) {
@@ -134,7 +98,7 @@ func (m *Messenger) processSpectatedCommunities(wg *sync.WaitGroup, filtersCh ch
 		return
 	}
 
-	var filtersToInit []transport.FiltersToInitialize
+	filtersToInit := make([]transport.FiltersToInitialize, 0, len(spectatedCommunities))
 	for _, org := range spectatedCommunities {
 		filtersToInit = append(filtersToInit, m.DefaultFilters(org)...)
 	}
@@ -153,8 +117,11 @@ func (m *Messenger) processChats(wg *sync.WaitGroup, filtersCh chan<- []transpor
 		return
 	}
 
-	validChats, communityInfo := m.validateAndProcessChats(chats)
-	filters, publicKeys, err := m.processValidChats(validChats, communityInfo)
+	validChats := m.validateChats(chats)
+	communitiesCache := make(map[string]*communities.Community)
+	m.initChatsFirstMessageTimestamp(communitiesCache, validChats)
+
+	filters, publicKeys, err := m.processValidChats(validChats, communitiesCache)
 	if err != nil {
 		errCh <- err
 		return
@@ -168,9 +135,8 @@ func (m *Messenger) processChats(wg *sync.WaitGroup, filtersCh chan<- []transpor
 	}
 }
 
-func (m *Messenger) validateAndProcessChats(chats []*Chat) ([]*Chat, map[string]*communities.Community) {
-	logger := m.logger.With(zap.String("site", "validateAndProcessChats"))
-	communityInfo := make(map[string]*communities.Community)
+func (m *Messenger) validateChats(chats []*Chat) []*Chat {
+	logger := m.logger.With(zap.String("site", "validateChats"))
 	var validChats []*Chat
 
 	for _, chat := range chats {
@@ -181,8 +147,7 @@ func (m *Messenger) validateAndProcessChats(chats []*Chat) ([]*Chat, map[string]
 		validChats = append(validChats, chat)
 	}
 
-	m.initChatsFirstMessageTimestamp(communityInfo, validChats)
-	return validChats, communityInfo
+	return validChats
 }
 
 func (m *Messenger) processValidChats(validChats []*Chat, communityInfo map[string]*communities.Community) ([]transport.FiltersToInitialize, []*ecdsa.PublicKey, error) {
@@ -361,7 +326,17 @@ func (m *Messenger) processControlledCommunities(wg *sync.WaitGroup, errCh chan<
 	}
 }
 
-func (m *Messenger) collectResults(filtersCh <-chan []transport.FiltersToInitialize, publicKeysCh <-chan []*ecdsa.PublicKey) ([]transport.FiltersToInitialize, []*ecdsa.PublicKey, error) {
+func (m *Messenger) collectResults(filtersCh <-chan []transport.FiltersToInitialize, publicKeysCh <-chan []*ecdsa.PublicKey, errCh <-chan error) ([]transport.FiltersToInitialize, []*ecdsa.PublicKey, error) {
+	var errs []error
+	for err := range errCh {
+		m.logger.Error("error collecting filters and public keys", zap.Error(err))
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return nil, nil, stderrors.Join(errs...)
+	}
+
 	var allFilters []transport.FiltersToInitialize
 	var allPublicKeys []*ecdsa.PublicKey
 

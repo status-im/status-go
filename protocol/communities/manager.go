@@ -4169,6 +4169,39 @@ func (m *Manager) CommunitySettingsExist(id types.HexBytes) (bool, error) {
 	return m.persistence.CommunitySettingsExist(id)
 }
 
+func (m *Manager) EnsureCommunitySettings(org *Community) error {
+	// This is for status-go versions that didn't have `CommunitySettings`
+	// We need to ensure communities that existed before community settings
+	// were introduced will have community settings as well
+	exists, err := m.CommunitySettingsExist(org.ID())
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		communitySettings := CommunitySettings{
+			CommunityID:                  org.IDString(),
+			HistoryArchiveSupportEnabled: true,
+		}
+		return m.SaveCommunitySettings(communitySettings)
+	}
+
+	// In case we do have settings, but the history archive support is disabled
+	// for this community, we enable it, as this should be the default for all
+	// non-admin communities
+	communitySettings, err := m.GetCommunitySettingsByID(org.ID())
+	if err != nil {
+		return err
+	}
+
+	if !org.IsControlNode() && !communitySettings.HistoryArchiveSupportEnabled {
+		communitySettings.HistoryArchiveSupportEnabled = true
+		return m.UpdateCommunitySettings(*communitySettings)
+	}
+
+	return nil
+}
+
 func (m *Manager) DeleteCommunitySettings(id types.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
