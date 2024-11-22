@@ -350,7 +350,7 @@ func (w *gethWakuV2Wrapper) ProcessMailserverBatch(
 
 	criteria := store.FilterCriteria{
 		TimeStart:     proto.Int64(batch.From.UnixNano()),
-		TimeEnd:       proto.Int64(batch.From.UnixNano()),
+		TimeEnd:       proto.Int64(batch.To.UnixNano()),
 		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
 	}
 
