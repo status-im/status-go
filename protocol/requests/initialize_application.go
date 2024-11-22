@@ -13,8 +13,8 @@ type InitializeApplication struct {
 	MixpanelAppID string `json:"mixpanelAppId"`
 	MixpanelToken string `json:"mixpanelToken"`
 	// MediaServerEnableTLS is optional, if not provided, media server will use TLS by default
-	MediaServerEnableTLS *bool `json:"mediaServerEnableTLS"`
-	SentryDSN     string `json:"sentryDSN"`
+	MediaServerEnableTLS *bool  `json:"mediaServerEnableTLS"`
+	SentryDSN            string `json:"sentryDSN"`
 }
 
 func (i *InitializeApplication) Validate() error {

@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/sentry"
-	"github.com/status-im/status-go/logutils"
 )
 
 var sensitiveKeys = []string{
