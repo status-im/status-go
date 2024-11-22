@@ -83,7 +83,7 @@ To cover these requirements, I added these environment variables:
 | `SENTRY_DSN`                                      | - At build time with direct call to `sentry.Init`<br>- At runtime with `InitializeApplication` endpoint | [Sentry DSN](https://docs.sentry.io/concepts/key-terms/dsn-explainer/) to be used                                                                       |
 | `SENTRY_CONTEXT_NAME`<br>`SENTRY_CONTEXT_VERSION` | Build time                                                                                              | Execution context of status-go                                                                                                                          |
 | `SENTRY_PRODUCTION`                               | Build time                                                                                              | When `true` or `1`:<br>-Defines if this is a production build<br>-Sets environment to `production`<br>-Has precedence over runtime `SENTRY_ENVIRONMENT` |
-| `SENTRY_ENVIRONMENT`                              | Run time                                                                                                | Sets the environment. Has no effect when `SENTRY_ENVIRONMENT` is set                                                                                    |
+| `SENTRY_ENVIRONMENT`                              | Run time                                                                                                | Sets the environment. Has no effect when `SENTRY_PRODUCTION` is set                                                                                    |
 
 # Client integration
 
