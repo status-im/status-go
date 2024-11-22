@@ -49,6 +49,9 @@ import (
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 
+	"path"
+	"time"
+
 	"github.com/status-im/status-go/mobile/callog"
 )
 
@@ -66,7 +69,21 @@ type InitializeApplicationResponse struct {
 }
 
 func InitializeApplication(requestJSON string) string {
-	return callWithResponse(initializeApplication, requestJSON)
+	// NOTE: InitializeApplication is logs the call on its own rather than using `callWithResponse`,
+	//       because the API logging is enabled during this exact call.
+	defer callog.Recover(logutils.ZapLogger())
+
+	startTime := time.Now()
+	response := initializeApplication(requestJSON)
+	callog.Log(
+		requestlog.GetRequestLogger(),
+		"InitializeApplication",
+		requestJSON,
+		response,
+		startTime,
+	)
+
+	return response
 }
 
 func initializeApplication(requestJSON string) string {
@@ -80,22 +97,53 @@ func initializeApplication(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
+	// Initialize logs
+	if request.LogDir == "" {
+		request.LogDir = request.DataDir
+	}
+	logSettings := logutils.LogSettings{
+		Enabled:      request.LogEnabled,
+		MobileSystem: false,
+		Level:        request.LogLevel,
+		File:         path.Join(request.LogDir, api.DefaultLogFile),
+	}
+	if err = logutils.OverrideRootLoggerWithConfig(logSettings); err == nil {
+		logutils.ZapLogger().Info("logging initialised",
+			zap.Any("logSettings", logSettings),
+			zap.Bool("APILoggingEnabled", request.APILoggingEnabled),
+		)
+	} else {
+		return makeJSONResponse(err)
+	}
+
+	if request.APILoggingEnabled {
+		logRequestsFile := path.Join(request.LogDir, api.DefaultAPILogFile)
+		err = requestlog.ConfigureAndEnableRequestLogging(logRequestsFile)
+		if err != nil {
+			return makeJSONResponse(err)
+		}
+	}
+
 	// initialize metrics
 	providers.MixpanelAppID = request.MixpanelAppID
 	providers.MixpanelToken = request.MixpanelToken
 
 	statusBackend.StatusNode().SetMediaServerEnableTLS(request.MediaServerEnableTLS)
-
 	statusBackend.UpdateRootDataDir(request.DataDir)
+
+	// Read available accounts
 	err = statusBackend.OpenAccounts()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+
 	accs, err := statusBackend.GetAccounts()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	centralizedMetricsInfo, err := statusBackend.CentralizedMetricsInfo()
+
+	// Read centralized metrics info
+	metricsInfo, err := statusBackend.CentralizedMetricsInfo()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -109,9 +157,11 @@ func initializeApplication(requestJSON string) string {
 		}
 	}
 
+
+	// Prepare response
 	response := &InitializeApplicationResponse{
 		Accounts:               accs,
-		CentralizedMetricsInfo: centralizedMetricsInfo,
+		CentralizedMetricsInfo: metricsInfo,
 	}
 	data, err := json.Marshal(response)
 	if err != nil {
@@ -2162,6 +2212,7 @@ type InitLoggingRequest struct {
 // InitLogging The InitLogging function should be called when the application starts.
 // This ensures that we can capture logs before the user login. Subsequent calls will update the logger settings.
 // Before this, we can only capture logs after user login since we will only configure the logging after the login process.
+// Deprecated: Use InitializeApplication instead
 func InitLogging(logSettingsJSON string) string {
 	var logSettings InitLoggingRequest
 	var err error

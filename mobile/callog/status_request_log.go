@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-
 	"github.com/status-im/status-go/internal/sentry"
 )
 
@@ -63,21 +62,9 @@ func getShortFunctionName(fn any) string {
 // 4. If request logging is enabled, logs method name, parameters, response, and execution duration
 // 5. Removes sensitive information before logging
 func Call(logger, requestLogger *zap.Logger, fn any, params ...any) any {
-	defer func() {
-		if r := recover(); r != nil {
-			logger.Error("panic found in call", zap.Any("error", r), zap.Stack("stacktrace"))
-			sentry.RecoverError(r)
-			panic(r)
-		}
-	}()
+	defer Recover(logger)
 
-	var startTime time.Time
-
-	requestLoggingEnabled := requestLogger != nil
-	if requestLoggingEnabled {
-		startTime = time.Now()
-	}
-
+	startTime := time.Now()
 	fnValue := reflect.ValueOf(fn)
 	fnType := fnValue.Type()
 	if fnType.Kind() != reflect.Func {
@@ -97,18 +84,9 @@ func Call(logger, requestLogger *zap.Logger, fn any, params ...any) any {
 		resp = results[0].Interface()
 	}
 
-	if requestLoggingEnabled {
-		duration := time.Since(startTime)
+	if requestLogger != nil {
 		methodName := getShortFunctionName(fn)
-		paramsString := removeSensitiveInfo(fmt.Sprintf("%+v", params))
-		respString := removeSensitiveInfo(fmt.Sprintf("%+v", resp))
-
-		requestLogger.Debug("call",
-			zap.String("method", methodName),
-			zap.String("params", paramsString),
-			zap.String("resp", respString),
-			zap.Duration("duration", duration),
-		)
+		Log(requestLogger, methodName, params, resp, startTime)
 	}
 
 	return resp
@@ -128,4 +106,32 @@ func removeSensitiveInfo(jsonStr string) string {
 		parts := sensitiveRegex.FindStringSubmatch(match)
 		return fmt.Sprintf(`%s:"***"`, parts[1])
 	})
+}
+
+func Recover(logger *zap.Logger) {
+	err := recover()
+	if err == nil {
+		return
+	}
+
+	logger.Error("panic found in call",
+		zap.Any("error", err),
+		zap.Stack("stacktrace"))
+
+	sentry.RecoverError(err)
+
+	panic(err)
+}
+
+func Log(logger *zap.Logger, method string, params any, resp any, startTime time.Time) {
+	if logger == nil {
+		return
+	}
+	duration := time.Since(startTime)
+	logger.Debug("call",
+		zap.String("method", method),
+		zap.String("params", removeSensitiveInfo(fmt.Sprintf("%+v", params))),
+		zap.String("resp", removeSensitiveInfo(fmt.Sprintf("%+v", resp))),
+		zap.Duration("duration", duration),
+	)
 }

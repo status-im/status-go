@@ -10,7 +10,8 @@ import (
 )
 
 type LogSettings struct {
-	Enabled         bool   `json:"Enabled"`
+	Enabled bool `json:"Enabled"`
+	// Deprecated: MobileSystem should not be used and will be removed in the future.
 	MobileSystem    bool   `json:"MobileSystem"`
 	Level           string `json:"Level"`
 	File            string `json:"File"`
