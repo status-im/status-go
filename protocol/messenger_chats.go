@@ -15,8 +15,7 @@ import (
 type ChatPreviewFilterType int
 
 const (
-	ChatPreviewFilterTypeAll ChatPreviewFilterType = iota
-	ChatPreviewFilterTypeCommunity
+	ChatPreviewFilterTypeCommunity ChatPreviewFilterType = iota
 	ChatPreviewFilterTypeNonCommunity
 )
 
