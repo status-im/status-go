@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/transport"
-	"go.uber.org/zap"
 )
 
 // InitFilters analyzes chats and contacts in order to setup filters
