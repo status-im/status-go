@@ -2,7 +2,7 @@ from time import sleep
 from uuid import uuid4
 import pytest
 from test_cases import OneToOneMessageTestCase
-
+from constants import DEFAULT_DISPLAY_NAME
 
 @pytest.mark.rpc
 class TestOneToOneMessages(OneToOneMessageTestCase):
@@ -13,15 +13,12 @@ class TestOneToOneMessages(OneToOneMessageTestCase):
             "messages.new",
             "message.delivered",
         ]
-        request.cls.sender = self.sender = self.initialize_backend(display_name="Sender", await_signals=await_signals
-        )
-        request.cls.receiver = self.receiver = self.initialize_backend(display_name="Receiver", await_signals=await_signals
-        )
-
+        request.cls.sender = self.sender = self.initialize_backend(await_signals=await_signals)
+        request.cls.receiver = self.receiver = self.initialize_backend(await_signals=await_signals)
 
     @pytest.mark.dependency(name="test_one_to_one_message_baseline")
     def test_one_to_one_message_baseline(self, message_count=1):
-        pk_receiver = self.receiver.get_pubkey("Receiver")
+        pk_receiver = self.receiver.get_pubkey(DEFAULT_DISPLAY_NAME)
 
         self.sender.send_contact_request([{"id": pk_receiver, "message": "contact_request"}])
 

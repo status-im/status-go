@@ -10,7 +10,7 @@ import pytest
 from clients.signals import SignalClient
 from clients.status_backend import RpcClient, StatusBackend
 from conftest import option
-from constants import user_1, user_2
+from constants import user_1, user_2, DEFAULT_DISPLAY_NAME
 
 
 class StatusDTestCase:
@@ -177,7 +177,7 @@ class NetworkConditionTestCase:
 
 class OneToOneMessageTestCase(NetworkConditionTestCase):
 
-    def initialize_backend(self, display_name, await_signals, url=None):
+    def initialize_backend(self, await_signals, display_name=DEFAULT_DISPLAY_NAME, url=None):
         backend = StatusBackend(await_signals=await_signals, url=url)
         backend.init_status_backend()
         backend.create_account_and_login(display_name=display_name)
@@ -205,7 +205,7 @@ class OneToOneMessageTestCase(NetworkConditionTestCase):
             if match:
                 return
 
-            mismatch_details.append(f"Message ID: {message["id"]}, Mismatches: {message_mismatch}")
+            mismatch_details.append(f"Message ID: {message['id']}, Mismatches: {message_mismatch}")
 
         raise AssertionError(
             "Some Sender RPC responses are not matching the signals received by the receiver.\n"

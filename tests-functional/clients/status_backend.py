@@ -10,7 +10,7 @@ from clients.signals import SignalClient
 from clients.rpc import RpcClient
 from datetime import datetime
 from conftest import option
-from constants import user_1
+from constants import user_1, DEFAULT_DISPLAY_NAME
 
 
 
@@ -67,7 +67,7 @@ class StatusBackend(RpcClient, SignalClient):
         }
         return self.api_valid_request(method, data)
 
-    def create_account_and_login(self, display_name="Mr_Meeseeks", password=user_1.password):
+    def create_account_and_login(self, display_name=DEFAULT_DISPLAY_NAME, password=user_1.password):
         data_dir = f"dataDir_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         method = "CreateAccountAndLogin"
         data = {
@@ -79,7 +79,7 @@ class StatusBackend(RpcClient, SignalClient):
         }
         return self.api_valid_request(method, data)
 
-    def restore_account_and_login(self, display_name="Mr_Meeseeks", user=user_1):
+    def restore_account_and_login(self, display_name=DEFAULT_DISPLAY_NAME, user=user_1):
         method = "RestoreAccountAndLogin"
         data = {
             "rootDataDir": "/",
