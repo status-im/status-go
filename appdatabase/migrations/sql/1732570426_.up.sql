@@ -1,0 +1,1 @@
+ALTER TABLE log_config DROP COLUMN mobile_system;

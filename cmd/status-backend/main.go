@@ -22,10 +22,9 @@ var (
 
 func init() {
 	logSettings := logutils.LogSettings{
-		Enabled:      true,
-		MobileSystem: false,
-		Level:        "INFO",
-		Colorized:    terminal.IsTerminal(int(os.Stdin.Fd())),
+		Enabled:   true,
+		Level:     "INFO",
+		Colorized: terminal.IsTerminal(int(os.Stdin.Fd())),
 	}
 	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
 		stdlog.Fatalf("failed to initialize log: %v", err)

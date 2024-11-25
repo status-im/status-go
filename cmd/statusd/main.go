@@ -396,7 +396,6 @@ func setupLogging(config *params.NodeConfig) {
 
 	logSettings := logutils.LogSettings{
 		Enabled:         config.LogEnabled,
-		MobileSystem:    config.LogMobileSystem,
 		Level:           config.LogLevel,
 		File:            config.LogFile,
 		MaxSize:         config.LogMaxSize,

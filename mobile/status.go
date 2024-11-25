@@ -102,10 +102,9 @@ func initializeApplication(requestJSON string) string {
 		request.LogDir = request.DataDir
 	}
 	logSettings := logutils.LogSettings{
-		Enabled:      request.LogEnabled,
-		MobileSystem: false,
-		Level:        request.LogLevel,
-		File:         path.Join(request.LogDir, api.DefaultLogFile),
+		Enabled: request.LogEnabled,
+		Level:   request.LogLevel,
+		File:    path.Join(request.LogDir, api.DefaultLogFile),
 	}
 	if err = logutils.OverrideRootLoggerWithConfig(logSettings); err == nil {
 		logutils.ZapLogger().Info("logging initialised",

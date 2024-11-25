@@ -494,7 +494,6 @@ func (b *GethStatusBackend) ensureWalletDBOpened(account multiaccounts.Account, 
 func (b *GethStatusBackend) setupLogSettings() error {
 	logSettings := logutils.LogSettings{
 		Enabled:         b.config.LogEnabled,
-		MobileSystem:    b.config.LogMobileSystem,
 		Level:           b.config.LogLevel,
 		File:            b.config.LogFile,
 		MaxSize:         b.config.LogMaxSize,

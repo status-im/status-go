@@ -10,9 +10,7 @@ import (
 )
 
 type LogSettings struct {
-	Enabled bool `json:"Enabled"`
-	// Deprecated: MobileSystem should not be used and will be removed in the future.
-	MobileSystem    bool   `json:"MobileSystem"`
+	Enabled         bool   `json:"Enabled"`
 	Level           string `json:"Level"`
 	File            string `json:"File"`
 	MaxSize         int    `json:"MaxSize"`
@@ -39,12 +37,7 @@ func overrideCoreWithConfig(core *Core, settings LogSettings) error {
 		return err
 	}
 	core.SetLevel(level)
-
-	if settings.MobileSystem {
-		core.UpdateSyncer(zapcore.Lock(os.Stdout))
-		return nil
-	}
-
+	
 	if settings.File != "" {
 		if settings.MaxBackups == 0 {
 			// Setting MaxBackups to 0 causes all log files to be kept. Even setting MaxAge to > 0 doesn't fix it

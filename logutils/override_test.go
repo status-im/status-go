@@ -41,8 +41,7 @@ func TestOverrideCoreWithConfig(t *testing.T) {
 		{
 			name: "mobile system logging",
 			settings: LogSettings{
-				Enabled:      true,
-				MobileSystem: true,
+				Enabled: true,
 			},
 			expectError: false,
 		},
