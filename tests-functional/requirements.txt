@@ -4,3 +4,5 @@ pytest==6.2.4
 requests==2.31.0
 genson~=1.2.2
 websocket-client~=1.4.2
+tenacity~=9.0.0
+pytest-dependency~=0.6.0

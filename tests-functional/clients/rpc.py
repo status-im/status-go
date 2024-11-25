@@ -2,7 +2,7 @@ import json
 import logging
 import jsonschema
 import requests
-
+from tenacity import retry, stop_after_delay, wait_fixed
 from conftest import option
 from json import JSONDecodeError
 
@@ -42,6 +42,7 @@ class RpcClient:
         assert response.content
         self._check_decode_and_key_errors_in_response(response, "error")
 
+    @retry(stop=stop_after_delay(10), wait=wait_fixed(0.5), reraise=True)
     def rpc_request(self, method, params=[], request_id=13, url=None):
         url = url if url else self.rpc_url
         data = {"jsonrpc": "2.0", "method": method, "id": request_id}
@@ -50,7 +51,10 @@ class RpcClient:
         logging.info(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True, indent=4)}")
         response = self.client.post(url, json=data)
         try:
-            logging.info(f"Got response: {json.dumps(response.json(), sort_keys=True, indent=4)}")
+            resp_json = response.json()
+            logging.info(f"Got response: {json.dumps(resp_json, sort_keys=True, indent=4)}")
+            if resp_json.get("error"):
+                assert "JSON-RPC client is unavailable" != resp_json["error"]
         except JSONDecodeError:
             logging.info(f"Got response: {response.content}")
         return response

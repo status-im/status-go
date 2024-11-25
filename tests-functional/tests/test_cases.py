@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import json
 import logging
 import threading
@@ -150,3 +151,65 @@ class SignalTestCase(StatusDTestCase):
         websocket_thread = threading.Thread(target=self.signal_client._connect)
         websocket_thread.daemon = True
         websocket_thread.start()
+
+
+class NetworkConditionTestCase:
+
+    @contextmanager
+    def add_latency(self):
+        pass
+        #TODO: To be implemented when we have docker exec capability
+
+    @contextmanager
+    def add_packet_loss(self):
+        pass
+        #TODO: To be implemented when we have docker exec capability
+
+    @contextmanager
+    def add_low_bandwith(self):
+        pass
+        #TODO: To be implemented when we have docker exec capability
+
+    @contextmanager
+    def node_pause(self, node):
+        pass
+        #TODO: To be implemented when we have docker exec capability
+
+class OneToOneMessageTestCase(NetworkConditionTestCase):
+
+    def initialize_backend(self, display_name, await_signals, url=None):
+        backend = StatusBackend(await_signals=await_signals, url=url)
+        backend.init_status_backend()
+        backend.create_account_and_login(display_name=display_name)
+        backend.start_messenger()
+        return backend
+
+
+    def validate_event_against_response(self, event, fields_to_validate, response):
+        messages_in_event = event["event"]["messages"]
+        assert len(messages_in_event) > 0, "No messages found in the event"
+        response_chat = response["result"]["chats"][0]
+
+        mismatch_details = []
+        for message in messages_in_event:
+            match = True
+            message_mismatch = []
+            for response_field, event_field in fields_to_validate.items():
+                response_value = response_chat["lastMessage"][response_field]
+                event_value = message[event_field]
+                if response_value != event_value:
+                    match = False
+                    message_mismatch.append(
+                        f"Field '{response_field}': Expected '{response_value}', Found '{event_value}'"
+                    )
+            if match:
+                return
+
+            mismatch_details.append(f"Message ID: {message["id"]}, Mismatches: {message_mismatch}")
+
+        raise AssertionError(
+            "Some Sender RPC responses are not matching the signals received by the receiver.\n"
+            "Details of mismatches:\n" +
+            "\n".join(mismatch_details)
+        )
+

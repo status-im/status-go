@@ -107,7 +107,11 @@ __pycache__/
 report/results.xml
 tests-functional/coverage
 tests-functional/reports
+tests-functional/signals
 tests-functional/*.log
+pyrightconfig.json
+.venv
+
 
 # generated files
 mock

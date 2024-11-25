@@ -3,10 +3,13 @@ import logging
 import time
 
 import websocket
+import os
+from pathlib import Path
+from constants import SIGNALS_DIR
+from datetime import datetime
 
 
 class SignalClient:
-
     def __init__(self, ws_url, await_signals):
         self.url = f"{ws_url}/signals"
 
@@ -14,21 +17,30 @@ class SignalClient:
         self.received_signals = {
             signal: [] for signal in self.await_signals
         }
+        self.signal_file_path = os.path.join(SIGNALS_DIR, f"sig_log_{ws_url.split(":")[-1]}_{datetime.now().strftime("%H%M%S")}.json")
+        Path(SIGNALS_DIR).mkdir(parents=True, exist_ok=True)
 
     def on_message(self, ws, signal):
-        signal = json.loads(signal)
-        if signal.get("type") in self.await_signals:
-            self.received_signals[signal["type"]].append(signal)
+        signal_data = json.loads(signal)
+        self.write_signal_to_file(signal_data)
 
-    def wait_for_signal(self, signal_type, timeout=20):
+        signal_type = signal_data.get("type")
+        if signal_type in self.await_signals:
+            self.received_signals[signal_type].append(signal_data)
+
+    def wait_for_signal(self, signal_type, timeout=20, event_contains=None):
         start_time = time.time()
-        while not self.received_signals.get(signal_type):
+        while True:
+            if self.received_signals.get(signal_type):
+                for event in self.received_signals[signal_type]:
+                    if event_contains is None or event_contains in str(event):
+                        logging.info(
+                            f"Signal {signal_type} containing {event_contains} is received in {round(time.time() - start_time)} seconds")
+                        return event
             if time.time() - start_time >= timeout:
                 raise TimeoutError(
-                    f"Signal {signal_type} is not received in {timeout} seconds")
+                    f"Signal {signal_type} containing {event_contains} is not received in {timeout} seconds")
             time.sleep(0.2)
-        logging.debug(f"Signal {signal_type} is received in {round(time.time() - start_time)} seconds")
-        return self.received_signals[signal_type][0]
 
     def _on_error(self, ws, error):
         logging.error(f"Error: {error}")
@@ -46,3 +58,8 @@ class SignalClient:
                                     on_close=self._on_close)
         ws.on_open = self._on_open
         ws.run_forever()
+
+    def write_signal_to_file(self, signal_data):
+        with open(self.signal_file_path, "a+") as file:
+            json.dump(signal_data, file)
+            file.write("\n")
