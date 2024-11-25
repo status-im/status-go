@@ -64,7 +64,7 @@ func getShortFunctionName(fn any) string {
 func Call(logger, requestLogger *zap.Logger, fn any, params ...any) any {
 	defer Recover(logger)
 
-	startTime := time.Now()
+	startTime := requestStartTime(requestLogger != nil)
 	fnValue := reflect.ValueOf(fn)
 	fnType := fnValue.Type()
 	if fnType.Kind() != reflect.Func {
@@ -106,6 +106,13 @@ func removeSensitiveInfo(jsonStr string) string {
 		parts := sensitiveRegex.FindStringSubmatch(match)
 		return fmt.Sprintf(`%s:"***"`, parts[1])
 	})
+}
+
+func requestStartTime(enabled bool) time.Time {
+	if !enabled {
+		return time.Time{}
+	}
+	return time.Now()
 }
 
 func Recover(logger *zap.Logger) {
