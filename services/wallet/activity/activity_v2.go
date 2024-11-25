@@ -3,7 +3,6 @@ package activity
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -30,10 +29,10 @@ import (
 // it returns metadata for all entries ordered by timestamp column
 func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresses []eth.Address, allAddresses bool, chainIDs []wCommon.ChainID, filter Filter, offset int, limit int) ([]Entry, error) {
 	if len(addresses) == 0 {
-		return nil, errors.New("no addresses provided")
+		return nil, ErrNoAddressesProvided
 	}
 	if len(chainIDs) == 0 {
-		return nil, errors.New("no chainIDs provided")
+		return nil, ErrNoChainIDsProvided
 	}
 
 	q := sq.Select(`
@@ -85,7 +84,7 @@ func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresse
 	}
 	defer stmt.Close()
 
-	rows, err := stmt.Query(args...)
+	rows, err := stmt.QueryContext(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
