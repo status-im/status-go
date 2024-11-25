@@ -5,7 +5,7 @@ import time
 import websocket
 import os
 from pathlib import Path
-from constants import SIGNALS_DIR
+from constants import SIGNALS_DIR, LOG_SIGNALS_TO_FILE
 from datetime import datetime
 
 
@@ -17,11 +17,14 @@ class SignalClient:
         self.received_signals = {
             signal: [] for signal in self.await_signals
         }
-        self.signal_file_path = os.path.join(SIGNALS_DIR, f"signal_{ws_url.split(':')[-1]}_{datetime.now().strftime('%H%M%S')}.log")
+        if LOG_SIGNALS_TO_FILE:
+            self.signal_file_path = os.path.join(SIGNALS_DIR, f"signal_{ws_url.split(':')[-1]}_{datetime.now().strftime('%H%M%S')}.log")
+            Path(SIGNALS_DIR).mkdir(parents=True, exist_ok=True)
 
     def on_message(self, ws, signal):
         signal_data = json.loads(signal)
-        self.write_signal_to_file(signal_data)
+        if LOG_SIGNALS_TO_FILE:
+            self.write_signal_to_file(signal_data)
 
         signal_type = signal_data.get("type")
         if signal_type in self.await_signals:

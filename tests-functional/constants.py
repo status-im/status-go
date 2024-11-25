@@ -26,3 +26,4 @@ DEFAULT_DISPLAY_NAME = "Mr_Meeseeks"
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 TESTS_DIR = os.path.join(PROJECT_ROOT, "tests-functional")
 SIGNALS_DIR = os.path.join(TESTS_DIR, "signals")
+LOG_SIGNALS_TO_FILE = False # used for debugging purposes
