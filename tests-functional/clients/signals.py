@@ -17,8 +17,7 @@ class SignalClient:
         self.received_signals = {
             signal: [] for signal in self.await_signals
         }
-        self.signal_file_path = os.path.join(SIGNALS_DIR, f"sig_log_{ws_url.split(':')[-1]}_{datetime.now().strftime('%H%M%S')}.json")
-        Path(SIGNALS_DIR).mkdir(parents=True, exist_ok=True)
+        self.signal_file_path = os.path.join(SIGNALS_DIR, f"signal_{ws_url.split(':')[-1]}_{datetime.now().strftime('%H%M%S')}.log")
 
     def on_message(self, ws, signal):
         signal_data = json.loads(signal)
