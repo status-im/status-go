@@ -37,7 +37,7 @@ func overrideCoreWithConfig(core *Core, settings LogSettings) error {
 		return err
 	}
 	core.SetLevel(level)
-	
+
 	if settings.File != "" {
 		if settings.MaxBackups == 0 {
 			// Setting MaxBackups to 0 causes all log files to be kept. Even setting MaxAge to > 0 doesn't fix it

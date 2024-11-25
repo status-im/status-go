@@ -149,13 +149,12 @@ func initializeApplication(requestJSON string) string {
 
 	// initialize sentry
 	statusBackend.SetSentryDSN(request.SentryDSN)
-	if centralizedMetricsInfo.Enabled {
+	if metricsInfo.Enabled {
 		err = statusBackend.EnablePanicReporting()
 		if err != nil {
 			return makeJSONResponse(err)
 		}
 	}
-
 
 	// Prepare response
 	response := &InitializeApplicationResponse{
