@@ -94,10 +94,6 @@ run_test_for_packages() {
   return ${go_test_exit}
 }
 
-if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
-	cc-test-reporter before-build
-fi
-
 rm -rf ./**/*.coverage.out
 
 echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
@@ -141,7 +137,7 @@ fi
 
 # Gather test coverage results
 merged_coverage_report="coverage_merged.out"
-final_coverage_report="c.out" # Name expected by cc-test-reporter
+final_coverage_report="c.out"
 coverage_reports=$(find . -iname "*.coverage.out")
 rm -f ${final_coverage_report} ${merged_coverage_report}
 
@@ -154,15 +150,6 @@ grep -v '^github.com/status-im/status-go/cmd/' ${merged_coverage_report} > ${fin
 
 # Generate HTML coverage report
 convert_coverage_to_html ${final_coverage_report} "test-coverage.html"
-
-# Upload coverage report to CodeClimate
-if [[ $UNIT_TEST_REPORT_CODECLIMATE == 'true' ]]; then
-  echo -e "${GRN}Uploading coverage report to CodeClimate${RST}"
-  # https://docs.codeclimate.com/docs/jenkins#jenkins-ci-builds
-  GIT_COMMIT=$(git log | grep -m1 -oE '[^ ]+$')
-  cc-test-reporter format-coverage --prefix=github.com/status-im/status-go # To generate 'coverage/codeclimate.json'
-  cc-test-reporter after-build --prefix=github.com/status-im/status-go
-fi
 
 if [[ $UNIT_TEST_REPORT_CODECOV == 'true' ]]; then
   report_to_codecov "report_*.xml" ${final_coverage_report} "unit"

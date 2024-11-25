@@ -31,11 +31,6 @@ pipeline {
       description: 'Should the job use detailed logging for tests, potentially generating large logs?'
     )
     booleanParam(
-      name: 'UNIT_TEST_REPORT_CODECLIMATE',
-      defaultValue: !isNightlyJob(),
-      description: 'Should the job report test coverage to CodeClimate?'
-    )
-    booleanParam(
       name: 'UNIT_TEST_REPORT_CODECOV',
       defaultValue: !isNightlyJob(),
       description: 'Should the job report test coverage to Codecov?'
@@ -81,7 +76,6 @@ pipeline {
     UNIT_TEST_FAILFAST =               "${params.UNIT_TEST_FAILFAST}"
     UNIT_TEST_RERUN_FAILS =            "${params.UNIT_TEST_RERUN_FAILS}"
     UNIT_TEST_USE_DEVELOPMENT_LOGGER = "${params.UNIT_TEST_USE_DEVELOPMENT_LOGGER}"
-    UNIT_TEST_REPORT_CODECLIMATE =     "${params.UNIT_TEST_REPORT_CODECLIMATE}"
     UNIT_TEST_REPORT_CODECOV =         "${params.UNIT_TEST_REPORT_CODECOV}"
     UNIT_TEST_DRY_RUN =                "${params.UNIT_TEST_DRY_RUN}"
 
@@ -171,10 +165,6 @@ pipeline {
           ].join(' ')) { c2 ->
             withCredentials([
               string(
-                credentialsId: 'codeclimate-test-reporter-id',
-                variable: 'CC_TEST_REPORTER_ID'
-              ),
-              string(
                 credentialsId: 'codecov-repository-upload-token',
                 variable: 'CODECOV_TOKEN'
               ),
@@ -182,7 +172,7 @@ pipeline {
               nix.shell('make test-unit V=1', pure: false)
             }
             sh "mv c.out test-coverage.out"
-            archiveArtifacts('report_*.xml, test_*.log, test-coverage.out, coverage/codeclimate.json, test-coverage.html, coverage_merged.out')
+            archiveArtifacts('report_*.xml, test_*.log, test-coverage.out, test-coverage.html, coverage_merged.out')
           }
         }
       } }
@@ -199,7 +189,7 @@ pipeline {
         env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
         if (!isPRJob()) {
-          archiveArtifacts('report_*.xml, test_*.log, test-coverage.html, test-coverage.out, coverage/codeclimate.json')
+          archiveArtifacts('report_*.xml, test_*.log, test-coverage.html, test-coverage.out')
         }
         if (params.UNIT_TEST_RERUN_FAILS) {
           def rerunReports = findFiles(glob: 'report_rerun_fails_*.txt')
