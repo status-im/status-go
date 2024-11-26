@@ -40,7 +40,7 @@ const (
 )
 
 const FreshEventPeriod = 10 // seconds
-const MaxSendCount = 15     // stop resend the message after 15 times (~10 days)
+const MaxSendCount = 14     // stop resend the message after 14 times (~10 days)
 
 type PeerStatusChangeEvent struct {
 	PeerID    state.PeerID

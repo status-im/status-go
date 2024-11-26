@@ -2047,8 +2047,8 @@ github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4 h1:KBeXtOoisXji
 github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4/go.mod h1:5rjPyv3KffPNVbFjnsVy0NGj9+JeW40WvXLdxH1VKuE=
 github.com/status-im/migrate/v4 v4.6.2-status.3 h1:Khwjb59NzniloUr5i9s9AtkEyqBbQFt1lkoAu66sAu0=
 github.com/status-im/migrate/v4 v4.6.2-status.3/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
-github.com/status-im/mvds v0.0.27-0.20240729032523-f6fba962c2b1 h1:4idVpLp9lqLpXF32iwB2/6v4RhWJswCH+OnQCNuvHd8=
-github.com/status-im/mvds v0.0.27-0.20240729032523-f6fba962c2b1/go.mod h1:2fiAx0q9XYIPKYRq2B1oiO9zZESy/n4D32gWw6lMDsE=
+github.com/status-im/mvds v0.0.27-0.20241031073756-b192c603a75d h1:+eBm+aBGFgXsJi6wDdEo6ASLd78kPN3vcKtnXQXn240=
+github.com/status-im/mvds v0.0.27-0.20241031073756-b192c603a75d/go.mod h1:2fiAx0q9XYIPKYRq2B1oiO9zZESy/n4D32gWw6lMDsE=
 github.com/status-im/notify v1.0.2-status h1:x8wev0Sh8H8KAf4bVcv+L0dVHldBESOKUlqRqRY7uL8=
 github.com/status-im/notify v1.0.2-status/go.mod h1:gF3zSOrafR9DQEWSE8TjfI9NkooDxbyT4UgRGKZA0lc=
 github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088 h1:ClCAP2FPCvl8hGMhbUx/tq/sOu2wibztAa5jAvQEe4Q=
