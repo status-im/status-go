@@ -91,7 +91,7 @@ func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	INSERT OR REPLACE INTO log_config (
 		enabled, log_dir, log_level, max_backups, max_size,
 		file, compress_rotated, log_to_stderr, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'id'	)`,
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'id'	)`,
 		c.LogEnabled, c.LogDir, c.LogLevel, c.LogMaxBackups, c.LogMaxSize,
 		c.LogFile, c.LogCompressRotated, c.LogToStderr,
 	)
