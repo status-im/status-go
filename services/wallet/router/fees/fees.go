@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/params"
 	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
+	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/common"
@@ -23,6 +24,11 @@ const (
 	GasFeeLow GasFeeMode = iota
 	GasFeeMedium
 	GasFeeHigh
+	GasFeeCustom
+)
+
+var (
+	ErrCustomFeeModeNotAvailableInSuggestedFees = &errors.ErrorResponse{Code: errors.ErrorCode("WRF-001"), Details: "custom fee mode is not available in suggested fees"}
 )
 
 type MaxFeesLevels struct {
@@ -50,23 +56,28 @@ type SuggestedFeesGwei struct {
 	MaxFeePerGasLow      *big.Float `json:"maxFeePerGasLow"`
 	MaxFeePerGasMedium   *big.Float `json:"maxFeePerGasMedium"`
 	MaxFeePerGasHigh     *big.Float `json:"maxFeePerGasHigh"`
+	MaxFeePerGasCustom   *big.Float `json:"maxFeePerGasCustom"`
 	L1GasFee             *big.Float `json:"l1GasFee,omitempty"`
 	EIP1559Enabled       bool       `json:"eip1559Enabled"`
 }
 
-func (m *MaxFeesLevels) FeeFor(mode GasFeeMode) *big.Int {
+func (m *MaxFeesLevels) FeeFor(mode GasFeeMode) (*big.Int, error) {
+	if mode == GasFeeCustom {
+		return nil, ErrCustomFeeModeNotAvailableInSuggestedFees
+	}
+
 	if mode == GasFeeLow {
-		return m.Low.ToInt()
+		return m.Low.ToInt(), nil
 	}
 
 	if mode == GasFeeHigh {
-		return m.High.ToInt()
+		return m.High.ToInt(), nil
 	}
 
-	return m.Medium.ToInt()
+	return m.Medium.ToInt(), nil
 }
 
-func (s *SuggestedFees) FeeFor(mode GasFeeMode) *big.Int {
+func (s *SuggestedFees) FeeFor(mode GasFeeMode) (*big.Int, error) {
 	return s.MaxFeesLevels.FeeFor(mode)
 }
 

@@ -296,7 +296,7 @@ func (h *HopBridgeProcessor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, sig
 
 	var nonce uint64
 	if lastUsedNonce < 0 {
-		nonce, err = h.transactor.NextNonce(h.contractMaker.RPCClient, fromChain.ChainID, sendArgs.HopTx.From)
+		nonce, err = h.transactor.NextNonce(context.Background(), h.contractMaker.RPCClient, fromChain.ChainID, sendArgs.HopTx.From)
 		if err != nil {
 			return tx, createBridgeHopErrorResponse(err)
 		}
@@ -363,7 +363,7 @@ func (h *HopBridgeProcessor) sendOrBuildV2(sendArgs *wallettypes.SendTxArgs, sig
 
 	var nonce uint64
 	if lastUsedNonce < 0 {
-		nonce, err = h.transactor.NextNonce(h.contractMaker.RPCClient, fromChain.ChainID, sendArgs.From)
+		nonce, err = h.transactor.NextNonce(context.Background(), h.contractMaker.RPCClient, fromChain.ChainID, sendArgs.From)
 		if err != nil {
 			return tx, createBridgeHopErrorResponse(err)
 		}

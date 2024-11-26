@@ -486,6 +486,21 @@ func (api *API) StopSuggestedRoutesCalculation(ctx context.Context) {
 	api.s.router.StopSuggestedRoutesCalculation()
 }
 
+// SetFeeMode sets the fee mode for the provided path it should be used for setting predefined fee modes `GasFeeLow`, `GasFeeMedium` and `GasFeeHigh`
+// in case of setting custom fee use `SetCustomTxDetails` function
+func (api *API) SetFeeMode(ctx context.Context, pathTxIdentity *requests.PathTxIdentity, feeMode fees.GasFeeMode) error {
+	logutils.ZapLogger().Debug("call to SetFeeMode")
+
+	return api.s.router.SetFeeMode(ctx, pathTxIdentity, feeMode)
+}
+
+// SetCustomTxDetails sets custom tx details for the provided path, in case of setting predefined fee modes use `SetFeeMode` function
+func (api *API) SetCustomTxDetails(ctx context.Context, pathTxIdentity *requests.PathTxIdentity, pathTxCustomParams *requests.PathTxCustomParams) error {
+	logutils.ZapLogger().Debug("call to SetCustomTxDetails")
+
+	return api.s.router.SetCustomTxDetails(ctx, pathTxIdentity, pathTxCustomParams)
+}
+
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
 func (api *API) GetDerivedAddresses(ctx context.Context, password string, derivedFrom string, paths []string) ([]*DerivedAddress, error) {
 	info, err := api.s.gethManager.AccountsGenerator().LoadAccount(derivedFrom, password)

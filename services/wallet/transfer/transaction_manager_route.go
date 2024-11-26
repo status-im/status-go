@@ -65,7 +65,7 @@ func (tm *TransactionManager) TxPlacedForPath(pathProcessorName string) bool {
 
 func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *wallettypes.RouterTransactionDetails {
 	for _, desc := range tm.routerTransactions {
-		if desc.RouterPath.ID() == path.ID() {
+		if desc.RouterPath.PathIdentity() == path.PathIdentity() {
 			return desc
 		}
 	}
@@ -99,8 +99,9 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 		To:                   &addrTo,
 		Value:                (*hexutil.Big)(big.NewInt(0)),
 		Data:                 data,
+		Nonce:                path.ApprovalTxNonce,
 		Gas:                  (*hexutil.Uint64)(&path.ApprovalGasAmount),
-		MaxFeePerGas:         path.MaxFeesPerGas,
+		MaxFeePerGas:         path.ApprovalMaxFeesPerGas,
 		MaxPriorityFeePerGas: path.ApprovalPriorityFee,
 		ValueOut:             (*hexutil.Big)(big.NewInt(0)),
 
@@ -125,7 +126,7 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 	}, nil
 }
 
-func buildTxForPath(transactor transactions.TransactorIface, path *routes.Path, pathProcessors map[string]pathprocessor.PathProcessor,
+func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.PathProcessor,
 	usedNonces map[uint64]int64, signer ethTypes.Signer, params BuildRouteExtraParams) (*wallettypes.TransactionData, error) {
 	lastUsedNonce := int64(-1)
 	if nonce, ok := usedNonces[path.FromChain.ChainID]; ok {
@@ -161,8 +162,9 @@ func buildTxForPath(transactor transactions.TransactorIface, path *routes.Path, 
 		To:                   &addrTo,
 		Value:                path.AmountIn,
 		Data:                 data,
+		Nonce:                path.TxNonce,
 		Gas:                  (*hexutil.Uint64)(&path.TxGasAmount),
-		MaxFeePerGas:         path.MaxFeesPerGas,
+		MaxFeePerGas:         path.TxMaxFeesPerGas,
 		MaxPriorityFeePerGas: path.TxPriorityFee,
 
 		// additional fields version 1
@@ -257,7 +259,7 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 		}
 
 		// build tx for the path
-		txDetails.TxData, err = buildTxForPath(tm.transactor, path, pathProcessors, usedNonces, signer, params)
+		txDetails.TxData, err = buildTxForPath(path, pathProcessors, usedNonces, signer, params)
 		if err != nil {
 			return nil, path.FromChain.ChainID, path.ToChain.ChainID, err
 		}

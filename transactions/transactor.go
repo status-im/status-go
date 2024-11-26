@@ -51,7 +51,7 @@ func (e *ErrBadNonce) Error() string {
 
 // Transactor is an interface that defines the methods for validating and sending transactions.
 type TransactorIface interface {
-	NextNonce(rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error)
+	NextNonce(ctx context.Context, rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error)
 	EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error)
 	SendTransaction(sendArgs wallettypes.SendTxArgs, verifiedAccount *account.SelectedExtKey, lastUsedNonce int64) (hash types.Hash, nonce uint64, err error)
 	SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64, verifiedAccount *account.SelectedExtKey) (hash types.Hash, nonce uint64, err error)
@@ -102,9 +102,8 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 	t.rpcCallTimeout = timeout
 }
 
-func (t *Transactor) NextNonce(rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error) {
+func (t *Transactor) NextNonce(ctx context.Context, rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error) {
 	wrapper := newRPCWrapper(rpcClient, chainID)
-	ctx := context.Background()
 	nonce, err := wrapper.PendingNonceAt(ctx, common.Address(from))
 	if err != nil {
 		return 0, err
@@ -256,8 +255,11 @@ func (t *Transactor) BuildTransactionWithSignature(chainID uint64, args walletty
 		return nil, ErrInvalidSignatureSize
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+
 	tx := t.buildTransaction(args)
-	expectedNonce, err := t.NextNonce(t.rpcWrapper.RPCClient, chainID, args.From)
+	expectedNonce, err := t.NextNonce(ctx, t.rpcWrapper.RPCClient, chainID, args.From)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +283,10 @@ func (t *Transactor) HashTransaction(args wallettypes.SendTxArgs) (validatedArgs
 
 	validatedArgs = args
 
-	nonce, err := t.NextNonce(t.rpcWrapper.RPCClient, t.rpcWrapper.chainID, args.From)
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+
+	nonce, err := t.NextNonce(ctx, t.rpcWrapper.RPCClient, t.rpcWrapper.chainID, args.From)
 	if err != nil {
 		return validatedArgs, hash, err
 	}
@@ -290,8 +295,6 @@ func (t *Transactor) HashTransaction(args wallettypes.SendTxArgs) (validatedArgs
 	gasFeeCap := (*big.Int)(args.MaxFeePerGas)
 	gasTipCap := (*big.Int)(args.MaxPriorityFeePerGas)
 	if args.GasPrice == nil && !args.IsDynamicFeeTx() {
-		ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
-		defer cancel()
 		gasPrice, err = t.rpcWrapper.SuggestGasPrice(ctx)
 		if err != nil {
 			return validatedArgs, hash, err
@@ -303,9 +306,6 @@ func (t *Transactor) HashTransaction(args wallettypes.SendTxArgs) (validatedArgs
 
 	var gas uint64
 	if args.Gas == nil {
-		ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
-		defer cancel()
-
 		var (
 			gethTo    common.Address
 			gethToPtr *common.Address
@@ -374,13 +374,16 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args wa
 		return tx, wallettypes.ErrInvalidSendTxArgs
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+
 	var nonce uint64
 	if args.Nonce != nil {
 		nonce = uint64(*args.Nonce)
 	} else {
 		// some chains, like arbitrum doesn't count pending txs in the nonce, so we need to calculate it manually
 		if lastUsedNonce < 0 {
-			nonce, err = t.NextNonce(rpcWrapper.RPCClient, rpcWrapper.chainID, args.From)
+			nonce, err = t.NextNonce(ctx, rpcWrapper.RPCClient, rpcWrapper.chainID, args.From)
 			if err != nil {
 				return tx, err
 			}
@@ -388,9 +391,6 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args wa
 			nonce = uint64(lastUsedNonce) + 1
 		}
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
-	defer cancel()
 
 	gasPrice := (*big.Int)(args.GasPrice)
 	// GasPrice should be estimated only for LegacyTx

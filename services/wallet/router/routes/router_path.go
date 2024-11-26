@@ -1,8 +1,8 @@
 package routes
 
 import (
+	"fmt"
 	"math/big"
-	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -12,23 +12,26 @@ import (
 )
 
 type Path struct {
-	ProcessorName  string
-	FromChain      *params.Network    // Source chain
-	ToChain        *params.Network    // Destination chain
-	FromToken      *walletToken.Token // Source token
-	ToToken        *walletToken.Token // Destination token, set if applicable
-	AmountIn       *hexutil.Big       // Amount that will be sent from the source chain
-	AmountInLocked bool               // Is the amount locked
-	AmountOut      *hexutil.Big       // Amount that will be received on the destination chain
+	RouterInputParamsUuid string
+	ProcessorName         string
+	FromChain             *params.Network    // Source chain
+	ToChain               *params.Network    // Destination chain
+	FromToken             *walletToken.Token // Source token
+	ToToken               *walletToken.Token // Destination token, set if applicable
+	AmountIn              *hexutil.Big       // Amount that will be sent from the source chain
+	AmountInLocked        bool               // Is the amount locked
+	AmountOut             *hexutil.Big       // Amount that will be received on the destination chain
 
 	SuggestedLevelsForMaxFeesPerGas *fees.MaxFeesLevels // Suggested max fees for the transaction (in ETH WEI)
-	MaxFeesPerGas                   *hexutil.Big        // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
 
-	TxBaseFee     *hexutil.Big // Base fee for the transaction (in ETH WEI)
-	TxPriorityFee *hexutil.Big // Priority fee for the transaction (in ETH WEI)
-	TxGasAmount   uint64       // Gas used for the transaction
-	TxBonderFees  *hexutil.Big // Bonder fees for the transaction - used for Hop bridge (in selected token)
-	TxTokenFees   *hexutil.Big // Token fees for the transaction - used for bridges (represent the difference between the amount in and the amount out, in selected token)
+	TxNonce         *hexutil.Uint64 // Nonce for the transaction
+	TxMaxFeesPerGas *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
+	TxBaseFee       *hexutil.Big    // Base fee for the transaction (in ETH WEI)
+	TxPriorityFee   *hexutil.Big    // Priority fee for the transaction (in ETH WEI)
+	TxGasAmount     uint64          // Gas used for the transaction
+	TxBonderFees    *hexutil.Big    // Bonder fees for the transaction - used for Hop bridge (in selected token)
+	TxTokenFees     *hexutil.Big    // Token fees for the transaction - used for bridges (represent the difference between the amount in and the amount out, in selected token)
+	TxEstimatedTime fees.TransactionEstimation
 
 	TxFee   *hexutil.Big // fee for the transaction (includes tx fee only, doesn't include approval fees, l1 fees, l1 approval fees, token fees or bonders fees, in ETH WEI)
 	TxL1Fee *hexutil.Big // L1 fee for the transaction - used for for transactions placed on L2 chains (in ETH WEI)
@@ -36,20 +39,29 @@ type Path struct {
 	ApprovalRequired        bool            // Is approval required for the transaction
 	ApprovalAmountRequired  *hexutil.Big    // Amount required for the approval transaction
 	ApprovalContractAddress *common.Address // Address of the contract that needs to be approved
+	ApprovalTxNonce         *hexutil.Uint64 // Nonce for the transaction
+	ApprovalMaxFeesPerGas   *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
 	ApprovalBaseFee         *hexutil.Big    // Base fee for the approval transaction (in ETH WEI)
 	ApprovalPriorityFee     *hexutil.Big    // Priority fee for the approval transaction (in ETH WEI)
 	ApprovalGasAmount       uint64          // Gas used for the approval transaction
+	ApprovalEstimatedTime   fees.TransactionEstimation
 
 	ApprovalFee   *hexutil.Big // Total fee for the approval transaction (includes approval tx fees only, doesn't include approval l1 fees, in ETH WEI)
 	ApprovalL1Fee *hexutil.Big // L1 fee for the approval transaction - used for for transactions placed on L2 chains (in ETH WEI)
 
 	TxTotalFee *hexutil.Big // Total fee for the transaction (includes tx fees, approval fees, l1 fees, l1 approval fees, in ETH WEI)
 
-	EstimatedTime fees.TransactionEstimation
-
 	RequiredTokenBalance  *big.Int // (in selected token)
 	RequiredNativeBalance *big.Int // (in ETH WEI)
 	SubtractFees          bool
+}
+
+func (p *Path) PathIdentity() string {
+	return fmt.Sprintf("%s-%s-%d", p.RouterInputParamsUuid, p.ProcessorName, p.FromChain.ChainID)
+}
+
+func (p *Path) TxIdentityKey(approval bool) string {
+	return fmt.Sprintf("%s-%v", p.PathIdentity(), approval)
 }
 
 func (p *Path) Equal(o *Path) bool {
@@ -58,13 +70,15 @@ func (p *Path) Equal(o *Path) bool {
 
 func (p *Path) Copy() *Path {
 	newPath := &Path{
-		ProcessorName:     p.ProcessorName,
-		AmountInLocked:    p.AmountInLocked,
-		TxGasAmount:       p.TxGasAmount,
-		ApprovalRequired:  p.ApprovalRequired,
-		ApprovalGasAmount: p.ApprovalGasAmount,
-		EstimatedTime:     p.EstimatedTime,
-		SubtractFees:      p.SubtractFees,
+		RouterInputParamsUuid: p.RouterInputParamsUuid,
+		ProcessorName:         p.ProcessorName,
+		AmountInLocked:        p.AmountInLocked,
+		TxGasAmount:           p.TxGasAmount,
+		TxEstimatedTime:       p.TxEstimatedTime,
+		ApprovalRequired:      p.ApprovalRequired,
+		ApprovalGasAmount:     p.ApprovalGasAmount,
+		ApprovalEstimatedTime: p.ApprovalEstimatedTime,
+		SubtractFees:          p.SubtractFees,
 	}
 
 	if p.FromChain != nil {
@@ -103,8 +117,13 @@ func (p *Path) Copy() *Path {
 		}
 	}
 
-	if p.MaxFeesPerGas != nil {
-		newPath.MaxFeesPerGas = (*hexutil.Big)(big.NewInt(0).Set(p.MaxFeesPerGas.ToInt()))
+	if p.TxNonce != nil {
+		txNonce := *p.TxNonce
+		newPath.TxNonce = &txNonce
+	}
+
+	if p.TxMaxFeesPerGas != nil {
+		newPath.TxMaxFeesPerGas = (*hexutil.Big)(big.NewInt(0).Set(p.TxMaxFeesPerGas.ToInt()))
 	}
 
 	if p.TxBaseFee != nil {
@@ -140,6 +159,15 @@ func (p *Path) Copy() *Path {
 		newPath.ApprovalContractAddress = &addr
 	}
 
+	if p.ApprovalTxNonce != nil {
+		approvalTxNonce := *p.ApprovalTxNonce
+		newPath.ApprovalTxNonce = &approvalTxNonce
+	}
+
+	if p.ApprovalMaxFeesPerGas != nil {
+		newPath.ApprovalMaxFeesPerGas = (*hexutil.Big)(big.NewInt(0).Set(p.ApprovalMaxFeesPerGas.ToInt()))
+	}
+
 	if p.ApprovalBaseFee != nil {
 		newPath.ApprovalBaseFee = (*hexutil.Big)(big.NewInt(0).Set(p.ApprovalBaseFee.ToInt()))
 	}
@@ -169,10 +197,4 @@ func (p *Path) Copy() *Path {
 	}
 
 	return newPath
-}
-
-// ID that uniquely identifies a path in a given route
-func (p *Path) ID() string {
-	// A route will contain at most a single path from a given processor for a given origin chain
-	return p.ProcessorName + "-" + strconv.Itoa(int(p.FromChain.ChainID))
 }

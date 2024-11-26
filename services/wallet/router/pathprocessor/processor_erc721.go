@@ -182,7 +182,7 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 
 	var nonce uint64
 	if lastUsedNonce < 0 {
-		nonce, err = s.transactor.NextNonce(s.rpcClient, sendArgs.ChainID, sendArgs.ERC721TransferTx.From)
+		nonce, err = s.transactor.NextNonce(context.Background(), s.rpcClient, sendArgs.ChainID, sendArgs.ERC721TransferTx.From)
 		if err != nil {
 			return tx, createERC721ErrorResponse(err)
 		}

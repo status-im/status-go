@@ -64,6 +64,7 @@ type SuggestedRoutes struct {
 
 type Router struct {
 	rpcClient           *rpc.Client
+	transactor          *transactions.Transactor
 	tokenManager        *token.Manager
 	marketManager       *market.Manager
 	collectiblesService *collectibles.Service
@@ -92,6 +93,7 @@ func NewRouter(rpcClient *rpc.Client, transactor *transactions.Transactor, token
 
 	return &Router{
 		rpcClient:           rpcClient,
+		transactor:          transactor,
 		tokenManager:        tokenManager,
 		marketManager:       marketManager,
 		collectiblesService: collectibles,
@@ -138,6 +140,57 @@ func (r *Router) SetTestBalanceMap(balanceMap map[string]*big.Int) {
 	for k, v := range balanceMap {
 		r.activeBalanceMap.Store(k, v)
 	}
+}
+
+func (r *Router) setCustomTxDetails(pathTxIdentity *requests.PathTxIdentity, pathTxCustomParams *requests.PathTxCustomParams) error {
+	if pathTxIdentity == nil {
+		return ErrTxIdentityNotProvided
+	}
+	if pathTxCustomParams == nil {
+		return ErrTxCustomParamsNotProvided
+	}
+	err := pathTxCustomParams.Validate()
+	if err != nil {
+		return err
+	}
+
+	r.activeRoutesMutex.Lock()
+	defer r.activeRoutesMutex.Unlock()
+	if r.activeRoutes == nil || len(r.activeRoutes.Best) == 0 {
+		return ErrCannotCustomizeIfNoRoute
+	}
+
+	for _, path := range r.activeRoutes.Best {
+		if path.PathIdentity() != pathTxIdentity.PathIdentity() {
+			continue
+		}
+
+		r.lastInputParamsMutex.Lock()
+		if r.lastInputParams.PathTxCustomParams == nil {
+			r.lastInputParams.PathTxCustomParams = make(map[string]*requests.PathTxCustomParams)
+		}
+		r.lastInputParams.PathTxCustomParams[pathTxIdentity.TxIdentityKey()] = pathTxCustomParams
+		r.lastInputParamsMutex.Unlock()
+
+		return nil
+	}
+
+	return ErrCannotFindPathForProvidedIdentity
+}
+
+func (r *Router) SetFeeMode(ctx context.Context, pathTxIdentity *requests.PathTxIdentity, feeMode fees.GasFeeMode) error {
+	if feeMode == fees.GasFeeCustom {
+		return ErrCustomFeeModeCannotBeSetThisWay
+	}
+
+	return r.setCustomTxDetails(pathTxIdentity, &requests.PathTxCustomParams{GasFeeMode: feeMode})
+}
+
+func (r *Router) SetCustomTxDetails(ctx context.Context, pathTxIdentity *requests.PathTxIdentity, pathTxCustomParams *requests.PathTxCustomParams) error {
+	if pathTxCustomParams != nil && pathTxCustomParams.GasFeeMode != fees.GasFeeCustom {
+		return ErrOnlyCustomFeeModeCanBeSetThisWay
+	}
+	return r.setCustomTxDetails(pathTxIdentity, pathTxCustomParams)
 }
 
 func newSuggestedRoutes(
@@ -585,7 +638,11 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 	var (
 		testsMode = input.TestsMode && input.TestParams != nil
 		group     = async.NewAtomicGroup(ctx)
-		mu        sync.Mutex
+
+		candidatesMu sync.Mutex
+
+		usedNonces   = make(map[uint64]uint64)
+		usedNoncesMu sync.Mutex
 	)
 
 	crossChainAmountOptions, err := r.findOptionsForSendingAmount(input, selectedFromChains)
@@ -601,8 +658,8 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 			zap.Uint64("toChainId", toChainID),
 			zap.Stringer("amount", amount),
 			zap.Error(err))
-		mu.Lock()
-		defer mu.Unlock()
+		candidatesMu.Lock()
+		defer candidatesMu.Unlock()
 		processorErrors = append(processorErrors, &ProcessorError{
 			ProcessorName: processorName,
 			Error:         err,
@@ -610,8 +667,8 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 	}
 
 	appendPathFn := func(path *routes.Path) {
-		mu.Lock()
-		defer mu.Unlock()
+		candidatesMu.Lock()
+		defer candidatesMu.Unlock()
 		candidates = append(candidates, path)
 	}
 
@@ -765,22 +822,16 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 							continue
 						}
 
-						maxFeesPerGas := fetchedFees.FeeFor(input.GasFeeMode)
-
-						estimatedTime := r.feesManager.TransactionEstimatedTime(ctx, network.ChainID, maxFeesPerGas)
-						if approvalRequired && estimatedTime < fees.MoreThanFiveMinutes {
-							estimatedTime += 1
-						}
-
 						path := &routes.Path{
-							ProcessorName:  pProcessor.Name(),
-							FromChain:      network,
-							ToChain:        dest,
-							FromToken:      token,
-							ToToken:        toToken,
-							AmountIn:       (*hexutil.Big)(amountOption.amount),
-							AmountInLocked: amountOption.locked,
-							AmountOut:      (*hexutil.Big)(amountOut),
+							RouterInputParamsUuid: input.Uuid,
+							ProcessorName:         pProcessor.Name(),
+							FromChain:             network,
+							ToChain:               dest,
+							FromToken:             token,
+							ToToken:               toToken,
+							AmountIn:              (*hexutil.Big)(amountOption.amount),
+							AmountInLocked:        amountOption.locked,
+							AmountOut:             (*hexutil.Big)(amountOut),
 
 							// set params that we don't want to be recalculated with every new block creation
 							TxGasAmount:  gasLimit,
@@ -792,12 +843,12 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 							ApprovalContractAddress: &approvalContractAddress,
 							ApprovalGasAmount:       approvalGasLimit,
 
-							EstimatedTime: estimatedTime,
-
 							SubtractFees: amountOption.subtractFees,
 						}
 
-						err = r.cacluateFees(ctx, path, fetchedFees, processorInputParams.TestsMode, processorInputParams.TestApprovalL1Fee)
+						usedNoncesMu.Lock()
+						err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, processorInputParams.TestsMode, processorInputParams.TestApprovalL1Fee)
+						usedNoncesMu.Unlock()
 						if err != nil {
 							appendProcessorErrorFn(pProcessor.Name(), input.SendType, processorInputParams.FromChain.ChainID, processorInputParams.ToChain.ChainID, processorInputParams.AmountIn, err)
 							continue

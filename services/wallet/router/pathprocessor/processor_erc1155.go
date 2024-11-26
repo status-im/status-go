@@ -125,7 +125,7 @@ func (s *ERC1155Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signe
 
 	var nonce uint64
 	if lastUsedNonce < 0 {
-		nonce, err = s.transactor.NextNonce(s.rpcClient, sendArgs.ChainID, sendArgs.ERC1155TransferTx.From)
+		nonce, err = s.transactor.NextNonce(context.Background(), s.rpcClient, sendArgs.ChainID, sendArgs.ERC1155TransferTx.From)
 		if err != nil {
 			return tx, createERC1155ErrorResponse(err)
 		}

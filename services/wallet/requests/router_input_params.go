@@ -55,6 +55,9 @@ type RouteInputParams struct {
 	PublicKey string       `json:"publicKey"`
 	PackID    *hexutil.Big `json:"packID"`
 
+	// Used internally
+	PathTxCustomParams map[string]*PathTxCustomParams `json:"-"`
+
 	// TODO: Remove two fields below once we implement a better solution for tests
 	// Currently used for tests only
 	TestsMode  bool
