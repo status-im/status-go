@@ -1,6 +1,7 @@
 package callog
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -138,8 +139,17 @@ func Log(logger *zap.Logger, method string, params any, resp any, startTime time
 	duration := time.Since(startTime)
 	logger.Debug("call",
 		zap.String("method", method),
-		zap.String("params", removeSensitiveInfo(fmt.Sprintf("%+v", params))),
-		zap.String("resp", removeSensitiveInfo(fmt.Sprintf("%+v", resp))),
 		zap.Duration("duration", duration),
+		dataField("request", params),
+		dataField("response", resp),
 	)
+}
+
+func dataField(name string, data any) zap.Field {
+	dataString := removeSensitiveInfo(fmt.Sprintf("%+v", data))
+	var paramsParsed any
+	if json.Unmarshal([]byte(dataString), &paramsParsed) == nil {
+		return zap.Any(name, paramsParsed)
+	}
+	return zap.String(name, dataString)
 }
