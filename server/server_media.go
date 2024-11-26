@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/tls"
 	"database/sql"
+	"errors"
 	"net/url"
 	"strconv"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/signal"
 )
@@ -25,10 +27,12 @@ func WithMediaServerDisableTLS(disableTLS bool) MediaServerOption {
 type MediaServer struct {
 	Server
 
-	db              *sql.DB
-	downloader      *ipfs.Downloader
-	multiaccountsDB *multiaccounts.Database
-	walletDB        *sql.DB
+	db                    *sql.DB
+	downloader            *ipfs.Downloader
+	multiaccountsDB       *multiaccounts.Database
+	walletDB              *sql.DB
+	communityImagesReader func(communityID string) (map[string]*protobuf.IdentityImage, error)
+	communityTokenReader  func(communityID string) ([]*protobuf.CommunityTokenMetadata, error)
 
 	// disableTLS controls whether the media server uses HTTP instead of HTTPS.
 	// Set to true to avoid TLS certificate issues with react-native-fast-image
@@ -89,8 +93,8 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		LinkPreviewFaviconPath:              handleLinkPreviewFavicon(s.db, s.logger),
 		StatusLinkPreviewThumbnailPath:      handleStatusLinkPreviewThumbnail(s.db, s.logger),
 		communityTokenImagesPath:            handleCommunityTokenImages(s.db, s.logger),
-		communityDescriptionImagesPath:      handleCommunityDescriptionImagesPath(s.db, s.logger),
-		communityDescriptionTokenImagesPath: handleCommunityDescriptionTokenImagesPath(s.db, s.logger),
+		communityDescriptionImagesPath:      handleCommunityDescriptionImagesPath(s.db, s.getCommunityImage, s.logger),
+		communityDescriptionTokenImagesPath: handleCommunityDescriptionTokenImagesPath(s.db, s.getCommunityTokens, s.logger),
 		walletCommunityImagesPath:           handleWalletCommunityImages(s.walletDB, s.logger),
 		walletCollectionImagesPath:          handleWalletCollectionImages(s.walletDB, s.logger),
 		walletCollectibleImagesPath:         handleWalletCollectibleImages(s.walletDB, s.logger),
@@ -104,6 +108,28 @@ func (s *MediaServer) MakeBaseURL() *url.URL {
 		Scheme: map[bool]string{true: "http", false: "https"}[s.disableTLS],
 		Host:   s.mustGetHost(),
 	}
+}
+
+func (s *MediaServer) SetCommunityImageReader(getFunc func(communityID string) (map[string]*protobuf.IdentityImage, error)) {
+	s.communityImagesReader = getFunc
+}
+
+func (s *MediaServer) getCommunityImage(communityID string) (map[string]*protobuf.IdentityImage, error) {
+	if s.communityImagesReader == nil {
+		return nil, errors.New("community image reader not set")
+	}
+	return s.communityImagesReader(communityID)
+}
+
+func (s *MediaServer) SetCommunityTokensReader(getFunc func(communityID string) ([]*protobuf.CommunityTokenMetadata, error)) {
+	s.communityTokenReader = getFunc
+}
+
+func (s *MediaServer) getCommunityTokens(communityID string) ([]*protobuf.CommunityTokenMetadata, error) {
+	if s.communityTokenReader == nil {
+		return nil, errors.New("community token reader not set")
+	}
+	return s.communityTokenReader(communityID)
 }
 
 func (s *MediaServer) MakeImageServerURL() string {

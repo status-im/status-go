@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -477,7 +478,28 @@ func NewManager(
 		manager.forceMembersReevaluation = make(map[string]chan struct{}, 10)
 	}
 
+	if mediaServer != nil && !reflect.ValueOf(mediaServer).IsNil() {
+		manager.SetMediaServerProperties()
+	}
+
 	return manager, nil
+}
+
+func (m *Manager) SetMediaServerProperties() {
+	m.mediaServer.SetCommunityImageReader(func(communityID string) (map[string]*protobuf.IdentityImage, error) {
+		community, err := m.GetByIDString(communityID)
+		if err != nil {
+			return nil, err
+		}
+		return community.Images(), nil
+	})
+	m.mediaServer.SetCommunityTokensReader(func(communityID string) ([]*protobuf.CommunityTokenMetadata, error) {
+		community, err := m.GetByIDString(communityID)
+		if err != nil {
+			return nil, err
+		}
+		return community.CommunityTokensMetadata(), nil
+	})
 }
 
 type Subscription struct {
@@ -507,6 +529,7 @@ type CommunityResponse struct {
 
 func (m *Manager) SetMediaServer(mediaServer server.MediaServerInterface) {
 	m.mediaServer = mediaServer
+	m.SetMediaServerProperties()
 }
 
 func (m *Manager) Subscribe() chan *Subscription {
@@ -2238,6 +2261,9 @@ func (m *Manager) NewHashRatchetKeys(keys []*encryption.HashRatchetInfo) error {
 	return m.persistence.InvalidateDecryptedCommunityCacheForKeys(keys)
 }
 
+// NOTE: encrypted_community_description_cache is not a cache for the community description
+// The purpose of this cache is tightly coupled with the hash ratchet,
+// meaning the cache is invalidated whenever we receive a key that was previously missing for that community
 func (m *Manager) preprocessDescription(id types.HexBytes, description *protobuf.CommunityDescription) ([]*CommunityPrivateDataFailedToDecrypt, *protobuf.CommunityDescription, error) {
 	decryptedCommunity, err := m.persistence.GetDecryptedCommunityDescription(id, description.Clock)
 	if err != nil {

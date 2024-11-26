@@ -14,9 +14,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang/protobuf/proto"
-
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 
 	"go.uber.org/zap"
@@ -1000,7 +997,7 @@ func handleCommunityTokenImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc
 	}
 }
 
-func handleCommunityDescriptionImagesPath(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+func handleCommunityDescriptionImagesPath(db *sql.DB, getCommunityImages func(communityID string) (map[string]*protobuf.IdentityImage, error), logger *zap.Logger) http.HandlerFunc {
 	if db == nil {
 		return handleRequestDBMissing(logger)
 	}
@@ -1019,17 +1016,13 @@ func handleCommunityDescriptionImagesPath(db *sql.DB, logger *zap.Logger) http.H
 			name = params["name"][0]
 		}
 
-		err, communityDescription := getCommunityDescription(db, communityID, logger)
+		communityImages, err := getCommunityImages(communityID)
 		if err != nil {
-			return
-		}
-		if communityDescription.Identity == nil {
-			logger.Error("no identity in community description", zap.String("community id", communityID))
 			return
 		}
 
 		var imagePayload []byte
-		for t, i := range communityDescription.Identity.Images {
+		for t, i := range communityImages {
 			if t == name {
 				imagePayload = i.Payload
 			}
@@ -1053,7 +1046,7 @@ func handleCommunityDescriptionImagesPath(db *sql.DB, logger *zap.Logger) http.H
 	}
 }
 
-func handleCommunityDescriptionTokenImagesPath(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+func handleCommunityDescriptionTokenImagesPath(db *sql.DB, getCommunityTokens func(communityID string) ([]*protobuf.CommunityTokenMetadata, error), logger *zap.Logger) http.HandlerFunc {
 	if db == nil {
 		return handleRequestDBMissing(logger)
 	}
@@ -1073,13 +1066,13 @@ func handleCommunityDescriptionTokenImagesPath(db *sql.DB, logger *zap.Logger) h
 		}
 		symbol := params["symbol"][0]
 
-		err, communityDescription := getCommunityDescription(db, communityID, logger)
+		communityTokens, err := getCommunityTokens(communityID)
 		if err != nil {
 			return
 		}
 
 		var foundToken *protobuf.CommunityTokenMetadata
-		for _, m := range communityDescription.CommunityTokensMetadata {
+		for _, m := range communityTokens {
 			if m.GetSymbol() == symbol {
 				foundToken = m
 			}
@@ -1106,23 +1099,6 @@ func handleCommunityDescriptionTokenImagesPath(db *sql.DB, logger *zap.Logger) h
 			logger.Error("failed to write community description token image", zap.String("community id", communityID), zap.String("symbol", symbol), zap.Error(err))
 		}
 	}
-}
-
-// getCommunityDescription returns the latest community description from the cache.
-// NOTE: you should ensure preprocessDescription is called before this function.
-func getCommunityDescription(db *sql.DB, communityID string, logger *zap.Logger) (error, *protobuf.CommunityDescription) {
-	var descriptionBytes []byte
-	err := db.QueryRow(`SELECT description FROM encrypted_community_description_cache WHERE community_id = ? ORDER BY clock DESC LIMIT 1`, types.Hex2Bytes(communityID)).Scan(&descriptionBytes)
-	if err != nil {
-		logger.Error("failed to find community description", zap.String("community id", communityID), zap.Error(err))
-		return err, nil
-	}
-	communityDescription := new(protobuf.CommunityDescription)
-	err = proto.Unmarshal(descriptionBytes, communityDescription)
-	if err != nil {
-		logger.Error("failed to unmarshal community description", zap.String("community id", communityID), zap.Error(err))
-	}
-	return err, communityDescription
 }
 
 func handleWalletCommunityImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
