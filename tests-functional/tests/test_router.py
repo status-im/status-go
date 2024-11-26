@@ -5,18 +5,18 @@ import pytest
 from conftest import option
 from constants import user_1, user_2
 from test_cases import SignalTestCase
-
+from clients.signals import SignalType
 
 @pytest.mark.rpc
 @pytest.mark.transaction
 @pytest.mark.wallet
 class TestTransactionFromRoute(SignalTestCase):
     await_signals = [
-        "wallet.suggested.routes",
-        "wallet.router.sign-transactions",
-        "wallet.router.sending-transactions-started",
-        "wallet.transaction.status-changed",
-        "wallet.router.transactions-sent"
+        SignalType.WALLET_SUGGESTED_ROUTES.value,
+        SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value,
+        SignalType.WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED.value,
+        SignalType.WALLET_TRANSACTION_STATUS_CHANGED.value,
+        SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
     ]
 
     def test_tx_from_route(self):
@@ -44,7 +44,7 @@ class TestTransactionFromRoute(SignalTestCase):
         ]
         response = self.rpc_client.rpc_valid_request(method, params)
 
-        routes = self.signal_client.wait_for_signal("wallet.suggested.routes")
+        routes = self.signal_client.wait_for_signal(SignalType.WALLET_SUGGESTED_ROUTES.value)
         assert routes['event']['Uuid'] == _uuid
 
         method = "wallet_buildTransactionsFromRoute"
@@ -57,7 +57,7 @@ class TestTransactionFromRoute(SignalTestCase):
         response = self.rpc_client.rpc_valid_request(method, params)
 
         wallet_router_sign_transactions = self.signal_client.wait_for_signal(
-            "wallet.router.sign-transactions")
+            SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value)
 
         assert wallet_router_sign_transactions['event']['signingDetails']['signOnKeycard'] == False
         transaction_hashes = wallet_router_sign_transactions['event']['signingDetails']['hashes']
@@ -98,7 +98,7 @@ class TestTransactionFromRoute(SignalTestCase):
         response = self.rpc_client.rpc_valid_request(method, params)
 
         tx_status = self.signal_client.wait_for_signal(
-            "wallet.transaction.status-changed")
+            SignalType.WALLET_TRANSACTION_STATUS_CHANGED.value)
 
         assert tx_status["event"]["chainId"] == 31337
         assert tx_status["event"]["status"] == "Success"

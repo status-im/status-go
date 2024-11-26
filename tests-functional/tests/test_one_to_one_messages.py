@@ -3,6 +3,7 @@ from uuid import uuid4
 import pytest
 from test_cases import OneToOneMessageTestCase
 from constants import DEFAULT_DISPLAY_NAME
+from clients.signals import SignalType
 
 @pytest.mark.rpc
 class TestOneToOneMessages(OneToOneMessageTestCase):
@@ -10,8 +11,8 @@ class TestOneToOneMessages(OneToOneMessageTestCase):
     @pytest.fixture(scope="class", autouse=True)
     def setup_nodes(self, request):
         await_signals = [
-            "messages.new",
-            "message.delivered",
+            SignalType.MESSAGES_NEW.value,
+            SignalType.MESSAGE_DELIVERED.value,
         ]
         request.cls.sender = self.sender = self.initialize_backend(await_signals=await_signals)
         request.cls.receiver = self.receiver = self.initialize_backend(await_signals=await_signals)
@@ -27,10 +28,10 @@ class TestOneToOneMessages(OneToOneMessageTestCase):
             message_text = f"test_message_{i+1}_{uuid4()}"
             response = self.sender.send_message([{"id": pk_receiver, "message": message_text}])
             sent_messages.append((message_text, response))
-            sleep(1)
+            sleep(0.01)
 
         for i, (message_text, response) in enumerate(sent_messages):
-            messages_new_event = self.receiver.wait_for_signal("messages.new", event_contains=message_text)
+            messages_new_event = self.receiver.wait_for_signal(SignalType.MESSAGES_NEW.value, event_pattern=message_text, timeout=60)
             self.validate_event_against_response(
                 messages_new_event,
                 fields_to_validate={
@@ -71,7 +72,7 @@ class TestOneToOneMessages(OneToOneMessageTestCase):
             message_text = f"test_message_{uuid4()}"
             self.sender.send_message([{"id": pk_receiver, "message": message_text}])
             sleep(30)
-        self.receiver.wait_for_signal("messages.new", event_contains=message_text)
+        self.receiver.wait_for_signal(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
         self.sender.wait_for_signal("messages.delivered")
 
     

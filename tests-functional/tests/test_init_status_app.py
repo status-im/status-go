@@ -1,6 +1,6 @@
 from test_cases import StatusBackend
 import pytest
-
+from clients.signals import SignalType
 
 @pytest.mark.create_account
 @pytest.mark.rpc
@@ -11,10 +11,10 @@ class TestInitialiseApp:
 
         await_signals = [
 
-            "mediaserver.started",
-            "node.started",
-            "node.ready",
-            "node.login",
+            SignalType.MEDIASERVER_STARTED.value,
+            SignalType.NODE_STARTED.value,
+            SignalType.NODE_READY.value,
+            SignalType.NODE_LOGIN.value,
         ]
 
         backend_client = StatusBackend(await_signals)
@@ -24,10 +24,10 @@ class TestInitialiseApp:
         assert backend_client is not None
         
         backend_client.verify_json_schema(
-            backend_client.wait_for_signal("mediaserver.started"), "signal_mediaserver_started")
+            backend_client.wait_for_signal(SignalType.MEDIASERVER_STARTED.value), "signal_mediaserver_started")
         backend_client.verify_json_schema(
-            backend_client.wait_for_signal("node.started"), "signal_node_started")
+            backend_client.wait_for_signal(SignalType.NODE_STARTED.value), "signal_node_started")
         backend_client.verify_json_schema(
-            backend_client.wait_for_signal("node.ready"), "signal_node_ready")
+            backend_client.wait_for_signal(SignalType.NODE_READY.value), "signal_node_ready")
         backend_client.verify_json_schema(
-            backend_client.wait_for_signal("node.login"), "signal_node_login")
+            backend_client.wait_for_signal(SignalType.NODE_LOGIN.value), "signal_node_login")

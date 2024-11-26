@@ -7,7 +7,20 @@ import os
 from pathlib import Path
 from constants import SIGNALS_DIR, LOG_SIGNALS_TO_FILE
 from datetime import datetime
+from enum import Enum
 
+class SignalType(Enum):
+    MESSAGES_NEW = "messages.new"
+    MESSAGE_DELIVERED = "message.delivered"
+    NODE_READY = "node.ready"
+    NODE_STARTED = "node.started"
+    NODE_LOGIN = "node.login"
+    MEDIASERVER_STARTED = "mediaserver.started"
+    WALLET_SUGGESTED_ROUTES = "wallet.suggested.routes"
+    WALLET_ROUTER_SIGN_TRANSACTIONS = "wallet.router.sign-transactions"
+    WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED = "wallet.router.sending-transactions-started"
+    WALLET_TRANSACTION_STATUS_CHANGED = "wallet.transaction.status-changed"
+    WALLET_ROUTER_TRANSACTIONS_SENT = "wallet.router.transactions-sent"
 
 class SignalClient:
     def __init__(self, ws_url, await_signals):
@@ -30,18 +43,22 @@ class SignalClient:
         if signal_type in self.await_signals:
             self.received_signals[signal_type].append(signal_data)
 
-    def wait_for_signal(self, signal_type, timeout=20, event_contains=None):
+    def wait_for_signal(self, signal_type, timeout=20, event_pattern=None):
         start_time = time.time()
         while True:
-            if self.received_signals.get(signal_type):
-                for event in self.received_signals[signal_type]:
-                    if event_contains is None or event_contains in str(event):
-                        logging.info(
-                            f"Signal {signal_type} containing {event_contains} is received in {round(time.time() - start_time)} seconds")
-                        return event
-            if time.time() - start_time >= timeout:
-                raise TimeoutError(
-                    f"Signal {signal_type} containing {event_contains} is not received in {timeout} seconds")
+            if not self.received_signals.get(signal_type):
+                if time.time() - start_time >= timeout:
+                    raise TimeoutError(
+                        f"Signal {signal_type} containing {event_pattern} is not received in {timeout} seconds"
+                    )
+                time.sleep(0.2)
+                continue
+            for event in self.received_signals[signal_type]:
+                if event_pattern is None or event_pattern in str(event):
+                    logging.info(
+                        f"Signal {signal_type} containing {event_pattern} is received in {round(time.time() - start_time)} seconds"
+                    )
+                    return event
             time.sleep(0.2)
 
     def _on_error(self, ws, error):

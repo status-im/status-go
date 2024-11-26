@@ -7,7 +7,7 @@ from collections import namedtuple
 
 import pytest
 
-from clients.signals import SignalClient
+from clients.signals import SignalClient, SignalType
 from clients.status_backend import RpcClient, StatusBackend
 from conftest import option
 from constants import user_1, user_2, DEFAULT_DISPLAY_NAME
@@ -25,7 +25,7 @@ class StatusDTestCase:
 class StatusBackendTestCase:
 
     await_signals = [
-        "node.ready"
+        SignalType.NODE_READY.value
     ]
 
     def setup_class(self):
@@ -33,7 +33,7 @@ class StatusBackendTestCase:
 
         self.rpc_client.init_status_backend()
         self.rpc_client.restore_account_and_login()
-        self.rpc_client.wait_for_signal("node.ready")
+        self.rpc_client.wait_for_signal(SignalType.NODE_READY.value)
 
         self.network_id = 31337
 
