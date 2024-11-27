@@ -69,27 +69,6 @@ func (api *API) SetPairingsJSONFileContent(content []byte) error {
 	return api.s.keycardPairings.SetPairingsJSONFileContent(content)
 }
 
-// Used by mobile
-func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
-	currency, err := api.s.accountsDB.GetCurrency()
-	if err != nil {
-		return nil, err
-	}
-
-	activeNetworks, err := api.s.rpcClient.NetworkManager.GetActiveNetworks()
-	if err != nil {
-		return nil, err
-	}
-
-	chainIDs := wcommon.NetworksToChainIDs(activeNetworks)
-	clients, err := api.s.rpcClient.EthClients(chainIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.reader.GetWalletToken(ctx, clients, addresses, currency)
-}
-
 func (api *API) GetLastWalletTokenUpdate() map[common.Address]int64 {
 	return api.reader.GetLastTokenUpdateTimestamps()
 }
