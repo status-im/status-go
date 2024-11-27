@@ -90,6 +90,88 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 	s.Require().Equal(ErrInvalidEditOrDeleteAuthor, err)
 }
 
+func (s *MessengerEditMessageSuite) TestEditImageMessage() {
+	theirMessenger := s.newMessenger()
+	defer TearDownMessenger(&s.Suite, theirMessenger)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err := theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	const messageCount = 1
+	var album []*common.Message
+
+	for i := 0; i < messageCount; i++ {
+		image, err := buildImageWithoutAlbumIDMessage(*ourChat)
+		s.NoError(err)
+		image.Text = "my message"
+		album = append(album, image)
+	}
+
+	sendResponse, err := s.m.SendChatMessages(context.Background(), album)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), messageCount)
+
+	ogMessage := sendResponse.Messages()[0]
+
+	response, err := WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool {
+			if len(r.messages) == 0 {
+				return false
+			}
+			_, ok := r.messages[ogMessage.ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+
+	messageID, err := types.DecodeHex(ogMessage.ID)
+	s.Require().NoError(err)
+
+	editedText := "edited text"
+	editedMessage := &requests.EditMessage{
+		ID:   messageID,
+		Text: editedText,
+	}
+
+	sendResponse, err = s.m.EditMessage(context.Background(), editedMessage)
+
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+	s.Require().Equal(editedText, sendResponse.Messages()[0].Text)
+	s.Require().Equal(protobuf.ChatMessage_IMAGE, sendResponse.Messages()[0].ContentType)
+
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool {
+			if len(r.messages) == 0 {
+				return false
+			}
+			_, ok := r.messages[sendResponse.Messages()[0].ID]
+			return ok
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().NotEmpty(response.Messages()[0].EditedAt)
+	s.Require().False(response.Messages()[0].New)
+	s.Require().Equal(protobuf.ChatMessage_IMAGE, response.Messages()[0].ContentType)
+
+	// Check DB to make sure the message is still an image
+	dbMessage, err := s.m.persistence.MessageByID(ogMessage.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(protobuf.ChatMessage_IMAGE, dbMessage.ContentType)
+}
+
 func (s *MessengerEditMessageSuite) TestEditBridgeMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
@@ -136,9 +218,8 @@ func (s *MessengerEditMessageSuite) TestEditBridgeMessage() {
 
 	editedText := "edited text"
 	editedMessage := &requests.EditMessage{
-		ID:          messageID,
-		Text:        editedText,
-		ContentType: protobuf.ChatMessage_BRIDGE_MESSAGE,
+		ID:   messageID,
+		Text: editedText,
 	}
 
 	sendResponse, err = theirMessenger.EditMessage(context.Background(), editedMessage)

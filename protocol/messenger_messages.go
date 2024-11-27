@@ -70,7 +70,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 			replacedText = request.Text
 		}
 		editMessage.Text = replacedText
-		editMessage.ContentType = request.ContentType
+		editMessage.ContentType = message.ContentType // The contentType cannot change
 		editMessage.ChatId = message.ChatId
 		editMessage.MessageId = message.ID
 		editMessage.Clock = clock
