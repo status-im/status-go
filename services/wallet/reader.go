@@ -32,10 +32,6 @@ const (
 	activityReloadMarginSeconds = 30 // Trigger a wallet reload if activity is detected this many seconds before the last reload
 )
 
-func getFixedCurrencies() []string {
-	return []string{"USD"}
-}
-
 func belongsToMandatoryTokens(symbol string) bool {
 	var mandatoryTokens = []string{"ETH", "DAI", "SNT", "STT"}
 	for _, t := range mandatoryTokens {
