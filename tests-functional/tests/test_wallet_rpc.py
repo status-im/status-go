@@ -106,20 +106,3 @@ class TestRpc(StatusBackendTestCase):
 
         response = self.rpc_client.rpc_valid_request(method, params, _id)
         self.rpc_client.verify_json_schema(response.json(), method)
-
-
-@pytest.mark.wallet
-@pytest.mark.rpc
-class TestRpcStatusD(StatusDTestCase):  # temp for methods not implemented in Status Backend
-
-    @pytest.mark.parametrize(
-        "method, params",
-        [
-            ("wallet_getWalletToken", [[user_1.address, ]]),
-        ],
-    )
-    def test_(self, method, params):
-        _id = str(random.randint(1, 8888))
-
-        response = self.rpc_client.rpc_valid_request(method, params, _id)
-        self.rpc_client.verify_json_schema(response.json(), method)
