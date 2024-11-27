@@ -52,7 +52,7 @@ func NewManager(walletDB *sql.DB, eventFeed *event.Feed, router *router.Router, 
 	}
 }
 
-func (m *Manager) clearLocalRouteData() {
+func (m *Manager) ClearLocalRouteData() {
 	m.buildInputParams = nil
 	m.transactionManager.ClearLocalRouterTransactionsData()
 }
@@ -72,7 +72,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 
 		defer func() {
 			if err != nil {
-				m.clearLocalRouteData()
+				m.ClearLocalRouteData()
 				err = statusErrors.CreateErrorResponseFromError(err)
 				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
 			}
@@ -134,7 +134,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			}
 
 			if clearLocalData {
-				m.clearLocalRouteData()
+				m.ClearLocalRouteData()
 			}
 
 			if err != nil {

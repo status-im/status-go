@@ -482,11 +482,15 @@ func gweiToWei(val *big.Float) *big.Int {
 func (api *API) GetSuggestedRoutes(ctx context.Context, input *requests.RouteInputParams) (*router.SuggestedRoutes, error) {
 	logutils.ZapLogger().Debug("call to GetSuggestedRoutes")
 
+	api.s.routeExecutionManager.ClearLocalRouteData()
+
 	return api.s.router.SuggestedRoutes(ctx, input)
 }
 
 func (api *API) GetSuggestedRoutesAsync(ctx context.Context, input *requests.RouteInputParams) {
 	logutils.ZapLogger().Debug("call to GetSuggestedRoutesAsync")
+
+	api.s.routeExecutionManager.ClearLocalRouteData()
 
 	api.s.router.SuggestedRoutesAsync(input)
 }
