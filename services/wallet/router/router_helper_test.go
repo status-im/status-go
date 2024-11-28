@@ -6,15 +6,15 @@ import (
 	"math/big"
 	"testing"
 
-	common2 "github.com/status-im/status-go/services/wallet/common"
-
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router"
 )
 
@@ -28,7 +28,7 @@ type CalculateFeesTestSuite struct {
 func (s *CalculateFeesTestSuite) SetupTest() {
 	s.mockCtrl = gomock.NewController(s.T())
 	s.ethClient = mock_client.NewMockClientInterface(s.mockCtrl)
-	s.chainID = common2.OptimismMainnet
+	s.chainID = walletCommon.OptimismMainnet
 }
 
 func (s *CalculateFeesTestSuite) TearDownTest() {
