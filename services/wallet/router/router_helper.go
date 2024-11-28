@@ -108,10 +108,13 @@ func (r *Router) calculateApprovalL1Fee(amountIn *big.Int, chainID uint64, appro
 
 		callOpt := &bind.CallOpts{}
 
-		l1FeeResult, _ := oracleContract.GetL1Fee(callOpt, data)
-		l1Fee = l1FeeResult.Uint64()
+		l1FeeResult, err := oracleContract.GetL1Fee(callOpt, data)
+		if err == nil {
+			l1Fee = l1FeeResult.Uint64()
+		}
 	}
 
+	// return 0 if we failed to get the fee
 	return l1Fee, nil
 }
 
