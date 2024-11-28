@@ -49,13 +49,13 @@ type Mailserver struct {
 	FailedRequests uint   `json:"-"`
 }
 
-func (m Mailserver) PeerInfo() (*peer.AddrInfo, error) {
+func (m Mailserver) PeerInfo() (peer.AddrInfo, error) {
 	var maddrs []multiaddr.Multiaddr
 
 	if m.ENR != nil {
 		addrInfo, err := enr.EnodeToPeerInfo(m.ENR)
 		if err != nil {
-			return nil, err
+			return peer.AddrInfo{}, err
 		}
 		addrInfo.Addrs = utils.EncapsulatePeerID(addrInfo.ID, addrInfo.Addrs...)
 		maddrs = append(maddrs, addrInfo.Addrs...)
@@ -67,14 +67,14 @@ func (m Mailserver) PeerInfo() (*peer.AddrInfo, error) {
 
 	p, err := peer.AddrInfosFromP2pAddrs(maddrs...)
 	if err != nil {
-		return nil, err
+		return peer.AddrInfo{}, err
 	}
 
 	if len(p) != 1 {
-		return nil, errors.New("invalid mailserver setup")
+		return peer.AddrInfo{}, errors.New("invalid mailserver setup")
 	}
 
-	return &p[0], nil
+	return p[0], nil
 }
 
 func (m Mailserver) PeerID() (peer.ID, error) {

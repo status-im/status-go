@@ -93,63 +93,64 @@ func (m *Messenger) asyncRequestAllHistoricMessages() {
 	}()
 }
 
-func (m *Messenger) GetPinnedStorenode() (peer.ID, error) {
+func (m *Messenger) GetPinnedStorenode() (peer.AddrInfo, error) {
 	fleet, err := m.getFleet()
 	if err != nil {
-		return "", err
+		return peer.AddrInfo{}, err
 	}
 
 	pinnedMailservers, err := m.settings.GetPinnedMailservers()
 	if err != nil {
-		return "", err
+		return peer.AddrInfo{}, err
 	}
 
 	pinnedMailserver, ok := pinnedMailservers[fleet]
 	if !ok {
-		return "", nil
+		return peer.AddrInfo{}, nil
 	}
 
 	fleetMailservers := mailservers.DefaultMailservers()
 
 	for _, c := range fleetMailservers {
 		if c.Fleet == fleet && c.ID == pinnedMailserver {
-			return c.PeerID()
+			return c.PeerInfo()
 		}
 	}
 
 	if m.mailserversDatabase != nil {
 		customMailservers, err := m.mailserversDatabase.Mailservers()
 		if err != nil {
-			return "", err
+			return peer.AddrInfo{}, err
 		}
 
 		for _, c := range customMailservers {
 			if c.Fleet == fleet && c.ID == pinnedMailserver {
-				return c.PeerID()
+				return c.PeerInfo()
 			}
 		}
 	}
 
-	return "", nil
+	return peer.AddrInfo{}, nil
 }
 
 func (m *Messenger) UseStorenodes() (bool, error) {
 	return m.settings.CanUseMailservers()
 }
 
-func (m *Messenger) Storenodes() ([]peer.ID, error) {
+func (m *Messenger) Storenodes() ([]peer.AddrInfo, error) {
 	mailservers, err := m.AllMailservers()
 	if err != nil {
 		return nil, err
 	}
 
-	var result []peer.ID
+	var result []peer.AddrInfo
 	for _, m := range mailservers {
-		peerID, err := m.PeerID()
+
+		peerInfo, err := m.PeerInfo()
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, peerID)
+		result = append(result, peerInfo)
 	}
 
 	return result, nil

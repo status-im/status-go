@@ -72,6 +72,8 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
+	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
@@ -1064,10 +1066,10 @@ func (w *Waku) Start() error {
 		return fmt.Errorf("failed to start go-waku node: %v", err)
 	}
 
-	w.StorenodeCycle = history.NewStorenodeCycle(w.logger)
-	w.HistoryRetriever = history.NewHistoryRetriever(w.node.Store(), NewHistoryProcessorWrapper(w), w.logger)
+	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, commonapi.NewDefaultPinger(w.node.Host()))
+	w.HistoryRetriever = history.NewHistoryRetriever(missing.NewDefaultStorenodeRequestor(w.node.Store()), NewHistoryProcessorWrapper(w), w.logger)
 
-	w.StorenodeCycle.Start(w.ctx, w.node.Host())
+	w.StorenodeCycle.Start(w.ctx)
 
 	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.node.Host().ID()))
 

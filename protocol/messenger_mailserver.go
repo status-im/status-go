@@ -8,6 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 
@@ -542,55 +543,15 @@ func (m *Messenger) syncFiltersFrom(peerID peer.ID, filters []*transport.Filter,
 		m.config.messengerSignalsHandler.HistoryRequestStarted(len(batches))
 	}
 
-	var batches24h []types.MailserverBatch
 	for pubsubTopic := range batches {
-		batchKeys := make([]int, 0, len(batches[pubsubTopic]))
-		for k := range batches[pubsubTopic] {
-			batchKeys = append(batchKeys, k)
-		}
+		batchKeys := maps.Keys(batches[pubsubTopic])
 		sort.Ints(batchKeys)
-
-		keysToIterate := append([]int{}, batchKeys...)
-		for {
-			// For all batches
-			var tmpKeysToIterate []int
-			for _, k := range keysToIterate {
-				batch := batches[pubsubTopic][k]
-
-				dayBatch := types.MailserverBatch{
-					To:          batch.To,
-					Cursor:      batch.Cursor,
-					PubsubTopic: batch.PubsubTopic,
-					Topics:      batch.Topics,
-					ChatIDs:     batch.ChatIDs,
-				}
-
-				from := batch.To.Add(-oneDayDuration)
-				if from.After(batch.From) {
-					dayBatch.From = from
-					batches24h = append(batches24h, dayBatch)
-
-					// Replace og batch with new dates
-					batch.To = from
-					batches[pubsubTopic][k] = batch
-					tmpKeysToIterate = append(tmpKeysToIterate, k)
-				} else {
-					batches24h = append(batches24h, batch)
-				}
+		for _, k := range batchKeys {
+			err := m.processMailserverBatch(peerID, batches[pubsubTopic][k])
+			if err != nil {
+				m.logger.Error("error syncing topics", zap.Error(err))
+				return nil, err
 			}
-
-			if len(tmpKeysToIterate) == 0 {
-				break
-			}
-			keysToIterate = tmpKeysToIterate
-		}
-	}
-
-	for _, batch := range batches24h {
-		err := m.processMailserverBatch(peerID, batch)
-		if err != nil {
-			m.logger.Error("error syncing topics", zap.Error(err))
-			return nil, err
 		}
 	}
 

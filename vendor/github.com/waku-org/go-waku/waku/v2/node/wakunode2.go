@@ -464,13 +464,17 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		//TODO: setting this up temporarily to improve connectivity success for lightNode in status.
-		//This will have to be removed or changed with community sharding will be implemented.
-		if w.opts.shards != nil {
-			err = w.SetRelayShards(*w.opts.shards)
-			if err != nil {
-				return err
-			}
+	}
+
+	//TODO: setting this up temporarily to improve connectivity success for lightNode
+	//      in status. Also, when executing go-waku service-node as a lightclient
+	//      (using --pubsub-topic and --relay=false)
+	//      This will have to be removed or changed with community sharding will be
+	//      implemented.
+	if w.opts.shards != nil {
+		err = w.SetRelayShards(*w.opts.shards)
+		if err != nil {
+			return err
 		}
 	}
 
