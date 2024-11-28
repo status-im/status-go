@@ -1191,3 +1191,14 @@ func LesTopic(netid int) string {
 		return ""
 	}
 }
+
+func (c *NodeConfig) LogSettings() logutils.LogSettings {
+	return logutils.LogSettings{
+		Enabled:         c.LogEnabled,
+		Level:           c.LogLevel,
+		File:            c.LogFile,
+		MaxSize:         c.LogMaxSize,
+		MaxBackups:      c.LogMaxBackups,
+		CompressRotated: c.LogCompressRotated,
+	}
+}

@@ -492,18 +492,8 @@ func (b *GethStatusBackend) ensureWalletDBOpened(account multiaccounts.Account, 
 }
 
 func (b *GethStatusBackend) setupLogSettings() error {
-	logSettings := logutils.LogSettings{
-		Enabled:         b.config.LogEnabled,
-		Level:           b.config.LogLevel,
-		File:            b.config.LogFile,
-		MaxSize:         b.config.LogMaxSize,
-		MaxBackups:      b.config.LogMaxBackups,
-		CompressRotated: b.config.LogCompressRotated,
-	}
-	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
-		return err
-	}
-	return nil
+	logSettings := b.config.LogSettings()
+	return logutils.OverrideRootLoggerWithConfig(logSettings)
 }
 
 // Deprecated: Use StartNodeWithAccount instead.

@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 
+	"github.com/status-im/status-go/cmd/utils"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
@@ -116,7 +117,7 @@ func main() {
 	}
 
 	// set up logging options
-	setupLogging(config)
+	utils.SetupLogging(logLevel, logWithoutColors, config)
 
 	// We want statusd to be distinct from StatusIM client.
 	config.Name = serverClientName
@@ -229,25 +230,6 @@ func getDefaultDataDir() string {
 		return filepath.Join(home, ".statusd")
 	}
 	return "./statusd-data"
-}
-
-func setupLogging(config *params.NodeConfig) {
-	if *logLevel != "" {
-		config.LogLevel = *logLevel
-	}
-
-	logSettings := logutils.LogSettings{
-		Enabled:         config.LogEnabled,
-		Level:           config.LogLevel,
-		File:            config.LogFile,
-		MaxSize:         config.LogMaxSize,
-		MaxBackups:      config.LogMaxBackups,
-		CompressRotated: config.LogCompressRotated,
-		Colorized:       !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd())),
-	}
-	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
-		stdlog.Fatalf("Error initializing logger: %v", err)
-	}
 }
 
 // printVersion prints verbose output about version and config.
