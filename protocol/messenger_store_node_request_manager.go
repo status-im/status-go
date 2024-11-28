@@ -8,10 +8,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/waku-org/go-waku/waku/v2/api/history"
+
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common/shard"
-	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"go.uber.org/zap"
 

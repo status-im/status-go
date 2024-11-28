@@ -3,9 +3,10 @@ package wakuv2
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+
+	"github.com/status-im/status-go/wakuv2/common"
 )
 
 type HistoryProcessorWrapper struct {
