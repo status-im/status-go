@@ -14,6 +14,29 @@ import (
 const allFieldsForTableActivityCenterNotification = `id, timestamp, notification_type, chat_id, read, dismissed, accepted, message, author,
     reply_message, community_id, membership_status, contact_verification_status, token_data, deleted, updated_at`
 
+const selectActivityCenterNotificationsQuery = `SELECT
+			a.id,
+			a.timestamp,
+			a.notification_type,
+			a.chat_id,
+			a.community_id,
+			a.membership_status,
+			a.read,
+			a.accepted,
+			a.dismissed,
+			a.deleted,
+			a.message,
+			c.last_message,
+			a.reply_message,
+			a.contact_verification_status,
+			c.name,
+			a.author,
+			a.token_data,
+			a.updated_at,
+			a.installation_id
+		FROM activity_center_notifications a
+		LEFT JOIN chats c ON c.id = a.chat_id `
+
 var emptyNotifications = make([]*ActivityCenterNotification, 0)
 
 func (db sqlitePersistence) DeleteActivityCenterNotificationByID(id []byte, updatedAt uint64) error {
@@ -697,34 +720,33 @@ func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBy
 	return notifications, nil
 }
 
+func (db sqlitePersistence) GetActivityCenterNotificationByTypeAuthorAndChatID(acType ActivityCenterType, author string, chatID string) (*ActivityCenterNotification, error) {
+	if len(author) == 0 {
+		return nil, nil
+	}
+	if len(chatID) == 0 {
+		return nil, nil
+	}
+	// nolint: gosec
+	query := selectActivityCenterNotificationsQuery + `
+		WHERE a.notification_type = ?
+			AND a.author = ?
+			AND a.chat_id = ?
+		ORDER BY a.timestamp DESC
+		LIMIT 1`
+
+	row := db.db.QueryRow(query, acType, author, chatID)
+	notification, err := db.unmarshalActivityCenterNotificationRow(row)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return notification, err
+}
+
 // GetActivityCenterNotificationByID returns a notification by its ID even it's deleted logically
 func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes) (*ActivityCenterNotification, error) {
-	row := db.db.QueryRow(`
-		SELECT
-		a.id,
-		a.timestamp,
-		a.notification_type,
-		a.chat_id,
-		a.community_id,
-		a.membership_status,
-		a.read,
-		a.accepted,
-		a.dismissed,
-		a.deleted,
-		a.message,
-		c.last_message,
-		a.reply_message,
-		a.contact_verification_status,
-		c.name,
-		a.author,
-		a.token_data,
-		a.updated_at,
-		a.installation_id
-		FROM activity_center_notifications a
-		LEFT JOIN chats c
-		ON
-		c.id = a.chat_id
-		WHERE a.id = ?`, id)
+	query := selectActivityCenterNotificationsQuery + `WHERE a.id = ?`
+	row := db.db.QueryRow(query, id)
 
 	notification, err := db.unmarshalActivityCenterNotificationRow(row)
 	if err == sql.ErrNoRows {
@@ -1334,29 +1356,7 @@ func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (
 	// contact request per contact, but to avoid relying on the unpredictable
 	// behavior of the DB engine for sorting, we sort by notification.Timestamp
 	// DESC.
-	query := `
-		SELECT
-			a.id,
-			a.timestamp,
-			a.notification_type,
-			a.chat_id,
-			a.community_id,
-			a.membership_status,
-			a.read,
-			a.accepted,
-			a.dismissed,
-			a.deleted,
-			a.message,
-			c.last_message,
-			a.reply_message,
-			a.contact_verification_status,
-			c.name,
-			a.author,
-			a.token_data,
-			a.updated_at,
-			a.installation_id
-		FROM activity_center_notifications a
-		LEFT JOIN chats c ON c.id = a.chat_id
+	query := selectActivityCenterNotificationsQuery + `
 		WHERE a.author = ?
 		    AND NOT a.deleted
 			AND NOT a.dismissed

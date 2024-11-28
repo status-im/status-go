@@ -31,7 +31,7 @@ func (s *MessengerContactRequestSuite) findFirstByContentType(messages []*common
 	return FindFirstByContentType(messages, contentType)
 }
 
-func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.SendContactRequest, messenger *Messenger) {
+func (s *MessengerContactRequestSuite) sendContactRequestWithState(request *requests.SendContactRequest, messenger *Messenger, requestState common.ContactRequestState, mutualState bool) *MessengerResponse {
 	s.logger.Info("sendContactRequest", zap.String("sender", messenger.IdentityPublicKeyString()), zap.String("receiver", request.ID))
 
 	// Send contact request
@@ -53,7 +53,7 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 	contactRequest := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
 	s.Require().NotNil(contactRequest)
 
-	s.Require().Equal(common.ContactRequestStatePending, contactRequest.ContactRequestState)
+	s.Require().Equal(requestState, contactRequest.ContactRequestState)
 	s.Require().Equal(request.Message, contactRequest.Text)
 
 	// Check pending notification
@@ -66,12 +66,14 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 	// Check contacts
 	s.Require().Len(resp.Contacts, 1)
 	contact := resp.Contacts[0]
-	s.Require().False(contact.mutual())
+	s.Require().Equal(mutualState, contact.mutual())
 
 	// Make sure it's not returned as coming from us
 	contactRequests, _, err := messenger.PendingContactRequests("", 10)
 	s.Require().NoError(err)
-	s.Require().Len(contactRequests, 0)
+	if len(contactRequests) > 0 {
+		s.Require().Equal(request.ID, contactRequests[0].LocalChatID)
+	}
 
 	// Make sure contact is added on the sender side
 	contacts := messenger.AddedContacts()
@@ -81,6 +83,12 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 
 	// Check contact's primary name matches notification's name
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, contacts[0].PrimaryName())
+
+	return resp
+}
+
+func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.SendContactRequest, messenger *Messenger) *MessengerResponse {
+	return s.sendContactRequestWithState(request, messenger, common.ContactRequestStatePending, false)
 }
 
 func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string, theirMessenger *Messenger) *common.Message {
@@ -1197,11 +1205,7 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 		ID:      aliceID,
 		Message: messageTextBob,
 	}
-
-	// Send contact request
-	resp, err := bob.SendContactRequest(context.Background(), requestFromBob)
-	s.Require().NoError(err)
-	s.Require().NotNil(resp)
+	resp := s.sendContactRequestWithState(requestFromBob, bob, common.ContactRequestStateAccepted, true)
 
 	// Check CR message, it should be accepted
 	s.Require().Len(resp.Messages(), 2)
@@ -1223,6 +1227,31 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 	s.Require().Len(resp.Contacts, 1)
 	contact := resp.Contacts[0]
 	s.Require().True(contact.mutual())
+
+	resp, err := WaitOnMessengerResponse(
+		alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) == 1 && len(r.Messages()) >= 2 && len(r.ActivityCenterNotifications()) == 1
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+
+	contactRequest = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequest)
+
+	// Alice's contact request is marked as accepted
+	s.Require().Equal(common.ContactRequestStateAccepted, contactRequest.ContactRequestState)
+	s.Require().Equal(messageTextBob, contactRequest.Text)
+
+	// Check activity center notification is of the right type and is is the Accepted satte as well
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().Equal(contactRequest.ContactRequestState, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+	s.Require().Equal(true, resp.ActivityCenterNotifications()[0].Read)
+	s.Require().Equal(false, resp.ActivityCenterNotifications()[0].Accepted)
+	s.Require().Equal(false, resp.ActivityCenterNotifications()[0].Dismissed)
 }
 
 func (s *MessengerContactRequestSuite) TestBuildContact() {

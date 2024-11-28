@@ -2374,6 +2374,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		m.logger.Warn("failed to add peersyncing message", zap.Error(err))
 	}
 
+	receivedAContactRequest := false
 	// If we receive some propagated state from someone who's not
 	// our paired device, we handle it
 	if receivedMessage.ContactRequestPropagatedState != nil && !isSyncMessage {
@@ -2385,6 +2386,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			}
 		}
 		if result.newContactRequestReceived {
+			receivedAContactRequest = true
 
 			if contact.hasAddedUs() && !contact.mutual() {
 				receivedMessage.ContactRequestState = common.ContactRequestStatePending
@@ -2407,9 +2409,26 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			}
 			state.Response.AddMessage(updateMessage)
 
-			err = m.createIncomingContactRequestNotification(contact, state, receivedMessage, true)
-			if err != nil {
-				return err
+			if !contact.mutual() {
+				// Only create the notification if we are not mutual yet
+				err = m.createIncomingContactRequestNotification(contact, state, receivedMessage, true)
+				if err != nil {
+					return err
+				}
+			} else {
+				// We already sent a contact request, so we can mark the old notification as Accepted
+				notification, err := m.persistence.GetActivityCenterNotificationByTypeAuthorAndChatID(ActivityCenterNotificationTypeContactRequest, m.myHexIdentity(), contact.ID)
+				if err != nil {
+					return err
+				}
+				if notification != nil && notification.Message.ContactRequestState != common.ContactRequestStateAccepted {
+					notification.Message.ContactRequestState = common.ContactRequestStateAccepted
+					notification.UpdatedAt = m.GetCurrentTimeInMillis()
+					err = m.addActivityCenterNotification(state.Response, notification, nil)
+					if err != nil {
+						return err
+					}
+				}
 			}
 		}
 		state.ModifiedContacts.Store(contact.ID, true)
@@ -2429,7 +2448,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			chatContact.CustomizationColor = multiaccountscommon.IDToColorFallbackToBlue(receivedMessage.CustomizationColor)
 		}
 
-		if chatContact.mutual() || chatContact.dismissed() {
+		if (!receivedAContactRequest && chatContact.mutual()) || chatContact.dismissed() {
 			m.logger.Info("ignoring contact request message for a mutual or dismissed contact")
 			return nil
 		}
