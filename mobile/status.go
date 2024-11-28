@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/pprof"
+	"runtime"
 	"unsafe"
 
 	"go.uber.org/zap"
@@ -1069,6 +1072,32 @@ func WriteHeapProfile(dataDir string) string {
 func writeHeapProfile(dataDir string) string { //nolint: deadcode
 	err := profiling.WriteHeapFile(dataDir)
 	return makeJSONResponse(err)
+}
+
+// StartMutexProfiling starts mutex profiling and HTTP server for pprof
+func StartMutexProfiling(address string) string {
+	return callWithResponse(startMutexProfiling, address)
+}
+
+func startMutexProfiling(address string) string {
+	runtime.SetMutexProfileFraction(5)
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/mutex", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	go func() {
+		if err := http.ListenAndServe(address, mux); err != nil {
+			logutils.ZapLogger().Error("failed to start pprof server", zap.Error(err))
+		}
+	}()
+
+	return makeJSONResponse(nil)
 }
 
 func makeJSONResponse(err error) string {
