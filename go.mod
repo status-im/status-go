@@ -54,7 +54,7 @@ require (
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4
 	github.com/status-im/migrate/v4 v4.6.2-status.3
-	github.com/status-im/mvds v0.0.27-0.20240729032523-f6fba962c2b1
+	github.com/status-im/mvds v0.0.27-0.20241031073756-b192c603a75d
 	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v1.1.1-status
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
@@ -97,7 +97,7 @@ require (
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 	github.com/urfave/cli/v2 v2.27.2
-	github.com/waku-org/go-waku v0.8.1-0.20241004054019-0ed94ce0b1cb
+	github.com/waku-org/go-waku v0.8.1-0.20241021202955-3c4e40c729a0
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1

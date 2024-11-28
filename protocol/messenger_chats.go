@@ -12,6 +12,13 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 )
 
+type ChatPreviewFilterType int
+
+const (
+	ChatPreviewFilterTypeCommunity ChatPreviewFilterType = iota
+	ChatPreviewFilterTypeNonCommunity
+)
+
 func (m *Messenger) getOneToOneAndNextClock(contact *Contact) (*Chat, uint64, error) {
 	chat, ok := m.allChats.Load(contact.ID)
 	if !ok {
@@ -46,10 +53,17 @@ func (m *Messenger) Chats() []*Chat {
 	return chats
 }
 
-func (m *Messenger) ChatsPreview() []*ChatPreview {
+func (m *Messenger) ChatsPreview(filter ChatPreviewFilterType) []*ChatPreview {
 	var chats []*ChatPreview
-
 	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
+		// Skip if chat doesn't match the filter
+		isCommunityChat := chat.ChatType == ChatTypeCommunityChat
+		if filter == ChatPreviewFilterTypeCommunity && !isCommunityChat {
+			return true
+		}
+		if filter == ChatPreviewFilterTypeNonCommunity && isCommunityChat {
+			return true
+		}
 		if chat.Active || chat.Muted {
 			chatPreview := &ChatPreview{
 				ID:                    chat.ID,

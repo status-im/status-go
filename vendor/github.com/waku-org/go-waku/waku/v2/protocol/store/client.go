@@ -50,8 +50,8 @@ type StoreError struct {
 }
 
 // NewStoreError creates a new instance of StoreError
-func NewStoreError(code int, message string) StoreError {
-	return StoreError{
+func NewStoreError(code int, message string) *StoreError {
+	return &StoreError{
 		Code:    code,
 		Message: message,
 	}
@@ -99,7 +99,7 @@ func (s *WakuStore) SetHost(h host.Host) {
 // Request is used to send a store query. This function requires understanding how to prepare a store query
 // and most of the time you can use `Query`, `QueryByHash` and `Exists` instead, as they provide
 // a simpler API
-func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...RequestOption) (*Result, error) {
+func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...RequestOption) (Result, error) {
 	params := new(Parameters)
 
 	optList := DefaultOptions()
@@ -182,7 +182,7 @@ func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...Requ
 		return nil, err
 	}
 
-	result := &Result{
+	result := &resultImpl{
 		store:         s,
 		messages:      response.Messages,
 		storeRequest:  storeRequest,
@@ -195,12 +195,12 @@ func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...Requ
 }
 
 // Query retrieves all the messages that match a criteria. Use the options to indicate whether to return the message themselves or not.
-func (s *WakuStore) Query(ctx context.Context, criteria FilterCriteria, opts ...RequestOption) (*Result, error) {
+func (s *WakuStore) Query(ctx context.Context, criteria FilterCriteria, opts ...RequestOption) (Result, error) {
 	return s.Request(ctx, criteria, opts...)
 }
 
 // Query retrieves all the messages with specific message hashes
-func (s *WakuStore) QueryByHash(ctx context.Context, messageHashes []wpb.MessageHash, opts ...RequestOption) (*Result, error) {
+func (s *WakuStore) QueryByHash(ctx context.Context, messageHashes []wpb.MessageHash, opts ...RequestOption) (Result, error) {
 	return s.Request(ctx, MessageHashCriteria{messageHashes}, opts...)
 }
 
@@ -214,17 +214,17 @@ func (s *WakuStore) Exists(ctx context.Context, messageHash wpb.MessageHash, opt
 		return false, err
 	}
 
-	return len(result.messages) != 0, nil
+	return len(result.Messages()) != 0, nil
 }
 
-func (s *WakuStore) next(ctx context.Context, r *Result, opts ...RequestOption) (*Result, error) {
+func (s *WakuStore) next(ctx context.Context, r Result, opts ...RequestOption) (*resultImpl, error) {
 	if r.IsComplete() {
-		return &Result{
+		return &resultImpl{
 			store:         s,
 			messages:      nil,
 			cursor:        nil,
-			storeRequest:  r.storeRequest,
-			storeResponse: r.storeResponse,
+			storeRequest:  r.Query(),
+			storeResponse: r.Response(),
 			peerID:        r.PeerID(),
 		}, nil
 	}
@@ -240,7 +240,7 @@ func (s *WakuStore) next(ctx context.Context, r *Result, opts ...RequestOption) 
 		}
 	}
 
-	storeRequest := proto.Clone(r.storeRequest).(*pb.StoreQueryRequest)
+	storeRequest := proto.Clone(r.Query()).(*pb.StoreQueryRequest)
 	storeRequest.RequestId = hex.EncodeToString(protocol.GenerateRequestID())
 	storeRequest.PaginationCursor = r.Cursor()
 
@@ -249,7 +249,7 @@ func (s *WakuStore) next(ctx context.Context, r *Result, opts ...RequestOption) 
 		return nil, err
 	}
 
-	result := &Result{
+	result := &resultImpl{
 		store:         s,
 		messages:      response.Messages,
 		storeRequest:  storeRequest,
@@ -263,7 +263,7 @@ func (s *WakuStore) next(ctx context.Context, r *Result, opts ...RequestOption) 
 }
 
 func (s *WakuStore) queryFrom(ctx context.Context, storeRequest *pb.StoreQueryRequest, params *Parameters) (*pb.StoreQueryResponse, error) {
-	logger := s.log.With(logging.HostID("peer", params.selectedPeer), zap.String("requestId", hex.EncodeToString([]byte(storeRequest.RequestId))))
+	logger := s.log.With(logging.HostID("peer", params.selectedPeer), zap.String("requestId", storeRequest.RequestId))
 
 	logger.Debug("sending store request")
 
@@ -317,7 +317,7 @@ func (s *WakuStore) queryFrom(ctx context.Context, storeRequest *pb.StoreQueryRe
 
 	if storeResponse.GetStatusCode() != ok {
 		err := NewStoreError(int(storeResponse.GetStatusCode()), storeResponse.GetStatusDesc())
-		return nil, &err
+		return nil, err
 	}
 	return storeResponse, nil
 }

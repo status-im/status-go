@@ -1321,7 +1321,7 @@ func (m *Messenger) FetchContact(contactID string, waitForResponse bool) (*Conta
 	options := []StoreNodeRequestOption{
 		WithWaitForResponseOption(waitForResponse),
 	}
-	contact, _, err := m.storeNodeRequestsManager.FetchContact(contactID, options)
+	contact, _, err := m.storeNodeRequestsManager.FetchContact(m.ctx, contactID, options)
 	return contact, err
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 	"testing"
 
 	eth "github.com/ethereum/go-ethereum/common"
@@ -35,6 +36,7 @@ type MockChainClient struct {
 	mock_client.MockClientInterface
 
 	Clients map[common.ChainID]*MockETHClient
+	mu      sync.RWMutex
 }
 
 var _ chain.ClientInterface = (*MockChainClient)(nil)
@@ -46,6 +48,8 @@ func NewMockChainClient() *MockChainClient {
 }
 
 func (m *MockChainClient) SetAvailableClients(chainIDs []common.ChainID) *MockChainClient {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, chainID := range chainIDs {
 		if _, ok := m.Clients[chainID]; !ok {
 			m.Clients[chainID] = new(MockETHClient)
@@ -55,6 +59,8 @@ func (m *MockChainClient) SetAvailableClients(chainIDs []common.ChainID) *MockCh
 }
 
 func (m *MockChainClient) AbstractEthClient(chainID common.ChainID) (ethclient.BatchCallClient, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if _, ok := m.Clients[chainID]; !ok {
 		panic(fmt.Sprintf("no mock client for chainID %d", chainID))
 	}

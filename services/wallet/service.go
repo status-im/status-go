@@ -106,10 +106,23 @@ func NewService(
 	tokenManager.Start()
 
 	cryptoOnRampProviders := []onramp.Provider{
-		onramp.NewMercuryoProvider(tokenManager),
 		onramp.NewRampProvider(),
 		onramp.NewMoonPayProvider(),
 	}
+
+	featureFlags := &protocolCommon.FeatureFlags{}
+	if config.WalletConfig.EnableCelerBridge {
+		featureFlags.EnableCelerBridge = true
+	}
+
+	if config.WalletConfig.EnableMercuryoProvider {
+		featureFlags.EnableMercuryoProvider = true
+	}
+
+	if featureFlags.EnableMercuryoProvider {
+		cryptoOnRampProviders = append(cryptoOnRampProviders, onramp.NewMercuryoProvider(tokenManager))
+	}
+
 	cryptoOnRampManager := onramp.NewManager(cryptoOnRampProviders)
 
 	savedAddressesManager := &SavedAddressesManager{db: db}
@@ -184,11 +197,6 @@ func NewService(
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed, pendingTxManager)
 
-	featureFlags := &protocolCommon.FeatureFlags{}
-	if config.WalletConfig.EnableCelerBridge {
-		featureFlags.EnableCelerBridge = true
-	}
-
 	router := router.NewRouter(rpcClient, transactor, tokenManager, marketManager, collectibles,
 		collectiblesManager)
 	pathProcessors := buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags)
@@ -196,7 +204,7 @@ func NewService(
 		router.AddPathProcessor(processor)
 	}
 
-	routeExecutionManager := routeexecution.NewManager(db, router, transactionManager, transferController)
+	routeExecutionManager := routeexecution.NewManager(db, feed, router, transactionManager, transferController)
 
 	return &Service{
 		db:                    db,

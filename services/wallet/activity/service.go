@@ -67,10 +67,11 @@ type Service struct {
 
 	scheduler *async.MultiClientScheduler
 
-	sessions      map[SessionID]*Session
-	lastSessionID atomic.Int32
-	subscriptions event.Subscription
-	ch            chan walletevent.Event
+	sessions              map[SessionID]*Session
+	lastSessionID         atomic.Int32
+	subscriptions         event.Subscription
+	subscriptionsCancelFn context.CancelFunc
+	ch                    chan walletevent.Event
 	// sessionsRWMutex is used to protect all sessions related members
 	sessionsRWMutex  sync.RWMutex
 	debounceDuration time.Duration

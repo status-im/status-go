@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/logutils"
@@ -21,8 +22,13 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
+)
+
+const (
+	EventRouteExecutionTransactionSent walletevent.EventType = walletevent.InternalEventTypePrefix + "wallet-route-execution-transaction-sent"
 )
 
 type Manager struct {
@@ -30,17 +36,19 @@ type Manager struct {
 	transactionManager *transfer.TransactionManager
 	transferController *transfer.Controller
 	db                 *storage.DB
+	eventFeed          *event.Feed
 
 	// Local data used for storage purposes
 	buildInputParams *requests.RouterBuildTransactionsParams
 }
 
-func NewManager(walletDB *sql.DB, router *router.Router, transactionManager *transfer.TransactionManager, transferController *transfer.Controller) *Manager {
+func NewManager(walletDB *sql.DB, eventFeed *event.Feed, router *router.Router, transactionManager *transfer.TransactionManager, transferController *transfer.Controller) *Manager {
 	return &Manager{
 		router:             router,
 		transactionManager: transactionManager,
 		transferController: transferController,
 		db:                 storage.NewDB(walletDB),
+		eventFeed:          eventFeed,
 	}
 }
 
@@ -134,6 +142,12 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
 			}
 			signal.SendWalletEvent(signal.RouterTransactionsSent, response)
+
+			event := walletevent.Event{
+				Type:        EventRouteExecutionTransactionSent,
+				EventParams: response,
+			}
+			m.eventFeed.Send(event)
 		}()
 
 		_, routeInputParams = m.router.GetBestRouteAndAssociatedInputParams()

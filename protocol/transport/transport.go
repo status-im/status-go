@@ -4,16 +4,16 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"encoding/hex"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
+
+	"github.com/waku-org/go-waku/waku/v2/api/history"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -462,89 +462,6 @@ func (t *Transport) Peers() types.PeerStats {
 	return t.waku.Peers()
 }
 
-func (t *Transport) createMessagesRequest(
-	ctx context.Context,
-	peerID peer.ID,
-	from, to uint32,
-	previousStoreCursor types.StoreRequestCursor,
-	pubsubTopic string,
-	contentTopics []types.TopicType,
-	limit uint32,
-	waitForResponse bool,
-	processEnvelopes bool,
-) (storeCursor types.StoreRequestCursor, envelopesCount int, err error) {
-	r := createMessagesRequest(from, to, nil, previousStoreCursor, pubsubTopic, contentTopics, limit)
-
-	if waitForResponse {
-		resultCh := make(chan struct {
-			storeCursor    types.StoreRequestCursor
-			envelopesCount int
-			err            error
-		})
-
-		go func() {
-			defer gocommon.LogOnPanic()
-			storeCursor, envelopesCount, err = t.waku.RequestStoreMessages(ctx, peerID, r, processEnvelopes)
-			resultCh <- struct {
-				storeCursor    types.StoreRequestCursor
-				envelopesCount int
-				err            error
-			}{storeCursor, envelopesCount, err}
-		}()
-
-		select {
-		case result := <-resultCh:
-			return result.storeCursor, result.envelopesCount, result.err
-		case <-ctx.Done():
-			return nil, 0, ctx.Err()
-		}
-	} else {
-		go func() {
-			defer gocommon.LogOnPanic()
-			_, _, err = t.waku.RequestStoreMessages(ctx, peerID, r, false)
-			if err != nil {
-				t.logger.Error("failed to request store messages", zap.Error(err))
-			}
-		}()
-	}
-
-	return
-}
-
-func (t *Transport) SendMessagesRequestForTopics(
-	ctx context.Context,
-	peerID peer.ID,
-	from, to uint32,
-	prevCursor types.StoreRequestCursor,
-	pubsubTopic string,
-	contentTopics []types.TopicType,
-	limit uint32,
-	waitForResponse bool,
-	processEnvelopes bool,
-) (cursor types.StoreRequestCursor, envelopesCount int, err error) {
-	return t.createMessagesRequest(ctx, peerID, from, to, prevCursor, pubsubTopic, contentTopics, limit, waitForResponse, processEnvelopes)
-}
-
-func createMessagesRequest(from, to uint32, cursor []byte, storeCursor types.StoreRequestCursor, pubsubTopic string, topics []types.TopicType, limit uint32) types.MessagesRequest {
-	aUUID := uuid.New()
-	// uuid is 16 bytes, converted to hex it's 32 bytes as expected by types.MessagesRequest
-	id := []byte(hex.EncodeToString(aUUID[:]))
-	var topicBytes [][]byte
-	for idx := range topics {
-		topicBytes = append(topicBytes, topics[idx][:])
-	}
-	return types.MessagesRequest{
-		ID:            id,
-		From:          from,
-		To:            to,
-		Limit:         limit,
-		Cursor:        cursor,
-		PubsubTopic:   pubsubTopic,
-		ContentTopics: topicBytes,
-		StoreCursor:   storeCursor,
-	}
-}
-
 // ConfirmMessagesProcessed marks the messages as processed in the cache so
 // they won't be passed to the next layer anymore
 func (t *Transport) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
@@ -635,10 +552,6 @@ func (t *Transport) ConnectionChanged(state connection.State) {
 	t.waku.ConnectionChanged(state)
 }
 
-func (t *Transport) PingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error) {
-	return t.waku.PingPeer(ctx, peerID)
-}
-
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
 func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
 	if t.waku.Version() == 2 {
@@ -685,10 +598,6 @@ func (t *Transport) ConfirmMessageDelivered(messageID string) {
 	t.waku.ConfirmMessageDelivered(commHashes)
 }
 
-func (t *Transport) SetStorePeerID(peerID peer.ID) {
-	t.waku.SetStorePeerID(peerID)
-}
-
 func (t *Transport) SetCriteriaForMissingMessageVerification(peerID peer.ID, filters []*Filter) {
 	if t.waku.Version() != 2 {
 		return
@@ -719,5 +628,54 @@ func (t *Transport) SetCriteriaForMissingMessageVerification(peerID peer.ID, fil
 				zap.Stringers("contentTopics", ctList))
 			return
 		}
+	}
+}
+
+func (t *Transport) GetActiveStorenode() peer.ID {
+	return t.waku.GetActiveStorenode()
+}
+
+func (t *Transport) DisconnectActiveStorenode(ctx context.Context, backoffReason time.Duration, shouldCycle bool) {
+	t.waku.DisconnectActiveStorenode(ctx, backoffReason, shouldCycle)
+}
+
+func (t *Transport) OnStorenodeChanged() <-chan peer.ID {
+	return t.waku.OnStorenodeChanged()
+}
+
+func (t *Transport) OnStorenodeNotWorking() <-chan struct{} {
+	return t.waku.OnStorenodeNotWorking()
+}
+
+func (t *Transport) OnStorenodeAvailable() <-chan peer.ID {
+	return t.waku.OnStorenodeAvailable()
+}
+
+func (t *Transport) WaitForAvailableStoreNode(ctx context.Context) bool {
+	return t.waku.WaitForAvailableStoreNode(ctx)
+}
+
+func (t *Transport) IsStorenodeAvailable(peerID peer.ID) bool {
+	return t.waku.IsStorenodeAvailable(peerID)
+}
+
+func (t *Transport) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
+	return t.waku.PerformStorenodeTask(fn, opts...)
+}
+
+func (t *Transport) ProcessMailserverBatch(
+	ctx context.Context,
+	batch types.MailserverBatch,
+	storenodeID peer.ID,
+	pageLimit uint64,
+	shouldProcessNextPage func(int) (bool, uint64),
+	processEnvelopes bool,
+) error {
+	return t.waku.ProcessMailserverBatch(ctx, batch, storenodeID, pageLimit, shouldProcessNextPage, processEnvelopes)
+}
+
+func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
+	if t.WakuVersion() == 2 {
+		t.waku.SetStorenodeConfigProvider(c)
 	}
 }

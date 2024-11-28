@@ -291,8 +291,8 @@ func (api *PublicAPI) Chats(parent context.Context) []*protocol.Chat {
 	return api.service.messenger.Chats()
 }
 
-func (api *PublicAPI) ChatsPreview(parent context.Context) []*protocol.ChatPreview {
-	return api.service.messenger.ChatsPreview()
+func (api *PublicAPI) ChatsPreview(parent context.Context, filterType protocol.ChatPreviewFilterType) []*protocol.ChatPreview {
+	return api.service.messenger.ChatsPreview(filterType)
 }
 
 func (api *PublicAPI) Chat(parent context.Context, chatID string) *protocol.Chat {
@@ -1384,10 +1384,6 @@ func (api *PublicAPI) RequestAllHistoricMessages(forceFetchingBackup bool) (*pro
 
 func (api *PublicAPI) RequestAllHistoricMessagesWithRetries(forceFetchingBackup bool) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RequestAllHistoricMessages(forceFetchingBackup, true)
-}
-
-func (api *PublicAPI) DisconnectActiveMailserver() {
-	api.service.messenger.DisconnectActiveMailserver()
 }
 
 // Echo is a method for testing purposes.
