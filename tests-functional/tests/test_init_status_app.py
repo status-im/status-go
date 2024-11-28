@@ -34,6 +34,7 @@ class TestInitialiseApp:
 
 
 @pytest.mark.rpc
+@pytest.mark.skip("waiting for status-backend to be executed on the same host/container")
 class TestInitializeLogging:
 
     @pytest.mark.init
