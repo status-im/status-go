@@ -2262,7 +2262,7 @@ func addCentralizedMetric(requestJSON string) string {
 	return metric.ID
 }
 
-func Panic(message string) string {
+func IntendedPanic(message string) string {
 	type intendedPanic struct {
 		error
 	}
