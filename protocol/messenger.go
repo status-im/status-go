@@ -2102,6 +2102,10 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 	if m.dispatchMessageTestCallback != nil {
 		m.dispatchMessageTestCallback(rawMessage)
 	}
+
+	// if m.telemetryClient != nil {
+	// 	go m.telemetryClient.PushSentMessageType(ctx, int32(rawMessage.MessageType), chat.ChatType)
+	// }
 	return rawMessage, nil
 }
 

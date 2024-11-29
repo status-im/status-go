@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
@@ -53,6 +55,12 @@ type MessageSender struct {
 	messageSentCheck ISentCheck
 	rateLimiter      *PublishRateLimiter
 	logger           *zap.Logger
+	evtMessageSent   event.Emitter
+}
+
+type MessageSent struct {
+	Size      uint32 // Size of payload in bytes
+	Timestamp int64
 }
 
 type Request struct {
@@ -93,6 +101,15 @@ func (ms *MessageSender) WithMessageSentCheck(messageSentCheck ISentCheck) *Mess
 
 func (ms *MessageSender) WithRateLimiting(rateLimiter *PublishRateLimiter) *MessageSender {
 	ms.rateLimiter = rateLimiter
+	return ms
+}
+
+func (ms *MessageSender) WithMessageSentEmitter(host host.Host) *MessageSender {
+	evtMessageSent, err := host.EventBus().Emitter(new(MessageSent))
+	if err != nil {
+		ms.logger.Error("failed to create message sent emitter", zap.Error(err))
+	}
+	ms.evtMessageSent = evtMessageSent
 	return ms
 }
 
@@ -147,6 +164,16 @@ func (ms *MessageSender) Send(req *Request) error {
 			common.BytesToHash(req.envelope.Hash().Bytes()),
 			uint32(req.envelope.Message().GetTimestamp()/int64(time.Second)),
 		)
+	}
+
+	if ms.evtMessageSent != nil {
+		err := ms.evtMessageSent.Emit(MessageSent{
+			Size:      uint32(len(req.envelope.Message().Payload)),
+			Timestamp: req.envelope.Message().GetTimestamp(),
+		})
+		if err != nil {
+			logger.Error("failed to emit message sent event", zap.Error(err))
+		}
 	}
 
 	return nil

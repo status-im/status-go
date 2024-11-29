@@ -23,6 +23,8 @@ import (
 
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	v2common "github.com/status-im/status-go/wakuv2/common"
+
+	protobuf "github.com/status-im/status-go/protocol/protobuf"
 )
 
 type TelemetryType string
@@ -58,6 +60,10 @@ const (
 	MissedRelevantMessageMetric TelemetryType = "MissedRelevantMessages"
 	// MVDS ack received for a sent message
 	MessageDeliveryConfirmedMetric TelemetryType = "MessageDeliveryConfirmed"
+	// Tracks how much of each message type is sent by this node
+	SentMessageTypeMetric TelemetryType = "SentMessageType"
+	// Total number and size of Waku messages sent by this node
+	SentMessageTotalMetric TelemetryType = "SentMessageTotal"
 )
 
 const MaxRetryCache = 5000
@@ -145,6 +151,39 @@ func (c *Client) PushMessageDeliveryConfirmed(ctx context.Context, messageHash s
 	c.processAndPushTelemetry(ctx, MessageDeliveryConfirmed{MessageHash: messageHash})
 }
 
+func (c *Client) PushSentMessageType(ctx context.Context, messageType int32) {
+	// Get message type string from the ApplicationMetadataMessage_Type_name map
+	messageTypeStr := protobuf.ApplicationMetadataMessage_Type_name[messageType]
+	if messageTypeStr == "" {
+		messageTypeStr = "UNKNOWN"
+	}
+
+	// Convert chat type to string
+	var chatTypeStr string = "UNKNOWN"
+	// switch chatType {
+	// case ChatTypeOneToOne:
+	// 	chatTypeStr = "ONE_TO_ONE"
+	// case ChatTypePublic:
+	// 	chatTypeStr = "PUBLIC"
+	// case ChatTypePrivateGroupChat:
+	// 	chatTypeStr = "PRIVATE_GROUP"
+	// case ChatTypeCommunityChat:
+	// 	chatTypeStr = "COMMUNITY"
+	// default:
+	// 	chatTypeStr = "UNKNOWN"
+	// }
+
+	c.processAndPushTelemetry(ctx, SentMessageType{
+		MessageType:     messageTypeStr,
+		FunctionalScope: "default",
+		ChatType:        chatTypeStr,
+	})
+}
+
+func (c *Client) PushSentMessageTotal(ctx context.Context, messageSize uint32) {
+	c.processAndPushTelemetry(ctx, SentMessageTotal{Size: messageSize})
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
@@ -195,6 +234,31 @@ type MissedRelevantMessage struct {
 type MessageDeliveryConfirmed struct {
 	MessageHash string
 }
+
+type SentMessageType struct {
+	MessageType     string
+	FunctionalScope string
+	ChatType        string
+}
+
+type SentMessageTotal struct {
+	Size uint32
+}
+
+type FunctionalScope string
+
+const (
+	// Global scope messages
+	GlobalControl FunctionalScope = "GLOBAL_CONTROL" // Messages that control app-wide features accessible to all users (e.g., contact requests, community invites, global status updates, group chat invites)
+	GlobalContent FunctionalScope = "GLOBAL_CONTENT" // User-generated content meant for global communication (e.g., 1:1 chat messages, private group chat media sharing)
+
+	// Community scope messages
+	CommunityControl FunctionalScope = "COMMUNITY_CONTROL" // Messages that manage community-specific features and governance (e.g., membership updates, community status updates, role changes)
+	CommunityContent FunctionalScope = "COMMUNITY_CONTENT" // User-generated content shared within a specific community's context (e.g., community chat messages, community-specific media)
+
+	// Local scope messages
+	Local FunctionalScope = "LOCAL" // Self-addressed messages for single-user operations (e.g., backup sync between devices, settings sync, profile updates)
+)
 
 type Client struct {
 	serverURL            string
@@ -392,6 +456,18 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			TelemetryType: MessageDeliveryConfirmedMetric,
 			TelemetryData: c.ProcessMessageDeliveryConfirmed(v),
 		}
+	case SentMessageType:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: SentMessageTypeMetric,
+			TelemetryData: c.ProcessSentMessageType(v),
+		}
+	case SentMessageTotal:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: SentMessageTotalMetric,
+			TelemetryData: c.ProcessSentMessageTotal(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
@@ -564,6 +640,20 @@ func (c *Client) ProcessMissedRelevantMessage(missedMessage MissedRelevantMessag
 func (c *Client) ProcessMessageDeliveryConfirmed(messageDeliveryConfirmed MessageDeliveryConfirmed) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["messageHash"] = messageDeliveryConfirmed.MessageHash
+	return c.marshalPostBody(postBody)
+}
+
+func (c *Client) ProcessSentMessageType(sentMessageType SentMessageType) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageType"] = sentMessageType.MessageType
+	postBody["functionalScope"] = sentMessageType.FunctionalScope
+	postBody["chatType"] = sentMessageType.ChatType
+	return c.marshalPostBody(postBody)
+}
+
+func (c *Client) ProcessSentMessageTotal(sentMessageTotal SentMessageTotal) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["size"] = sentMessageTotal.Size
 	return c.marshalPostBody(postBody)
 }
 
