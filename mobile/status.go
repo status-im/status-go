@@ -97,57 +97,31 @@ func initializeApplication(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	// Initialize logs
-	if request.LogDir == "" {
-		request.LogDir = request.DataDir
-	}
-	logSettings := logutils.LogSettings{
-		Enabled: request.LogEnabled,
-		Level:   request.LogLevel,
-		File:    path.Join(request.LogDir, api.DefaultLogFile),
-	}
-	if err = logutils.OverrideRootLoggerWithConfig(logSettings); err == nil {
-		logutils.ZapLogger().Info("logging initialised",
-			zap.Any("logSettings", logSettings),
-			zap.Bool("APILoggingEnabled", request.APILoggingEnabled),
-		)
-	} else {
+	err = initializeLogging(&request)
+	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	if request.APILoggingEnabled {
-		logRequestsFile := path.Join(request.LogDir, api.DefaultAPILogFile)
-		err = requestlog.ConfigureAndEnableRequestLogging(logRequestsFile)
-		if err != nil {
-			return makeJSONResponse(err)
-		}
-	}
-
-	// initialize metrics
 	providers.MixpanelAppID = request.MixpanelAppID
 	providers.MixpanelToken = request.MixpanelToken
 
 	statusBackend.StatusNode().SetMediaServerEnableTLS(request.MediaServerEnableTLS)
 	statusBackend.UpdateRootDataDir(request.DataDir)
 
-	// Read available accounts
 	err = statusBackend.OpenAccounts()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-
 	accs, err := statusBackend.GetAccounts()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	// Read centralized metrics info
 	metricsInfo, err := statusBackend.CentralizedMetricsInfo()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	// initialize sentry
 	statusBackend.SetSentryDSN(request.SentryDSN)
 	if metricsInfo.Enabled {
 		err = statusBackend.EnablePanicReporting()
@@ -156,7 +130,6 @@ func initializeApplication(requestJSON string) string {
 		}
 	}
 
-	// Prepare response
 	response := &InitializeApplicationResponse{
 		Accounts:               accs,
 		CentralizedMetricsInfo: metricsInfo,
@@ -166,6 +139,38 @@ func initializeApplication(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 	return string(data)
+}
+
+func initializeLogging(request *requests.InitializeApplication) error {
+	if request.LogDir == "" {
+		request.LogDir = request.DataDir
+	}
+
+	logSettings := logutils.LogSettings{
+		Enabled: request.LogEnabled,
+		Level:   request.LogLevel,
+		File:    path.Join(request.LogDir, api.DefaultLogFile),
+	}
+
+	err := logutils.OverrideRootLoggerWithConfig(logSettings)
+	if err != nil {
+		return err
+	}
+
+	logutils.ZapLogger().Info("logging initialised",
+		zap.Any("logSettings", logSettings),
+		zap.Bool("APILoggingEnabled", request.APILoggingEnabled),
+	)
+
+	if request.APILoggingEnabled {
+		logRequestsFile := path.Join(request.LogDir, api.DefaultAPILogFile)
+		err = requestlog.ConfigureAndEnableRequestLogging(logRequestsFile)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Deprecated: Use InitializeApplication instead.
