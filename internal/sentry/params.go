@@ -3,6 +3,7 @@ package sentry
 import (
 	_ "embed"
 	"os"
+	"strings"
 )
 
 //go:generate sh -c "echo $SENTRY_CONTEXT_NAME > SENTRY_CONTEXT_NAME"
@@ -22,6 +23,10 @@ var (
 	production string
 )
 
+func init() {
+	production = strings.TrimSpace(production)
+}
+
 func DefaultContext() string {
 	return defaultContextName
 }
@@ -38,8 +43,8 @@ func Environment() string {
 	return environment(Production(), DefaultEnvVarEnvironment)
 }
 
-func environment(production bool, envvar string) string {
-	if production {
+func environment(forceProduction bool, envvar string) string {
+	if forceProduction {
 		return productionEnvironment
 	}
 	env := os.Getenv(envvar)
