@@ -95,7 +95,7 @@ func TestCall(t *testing.T) {
 	requestLogOutput := string(logData)
 
 	// Check if the log contains expected information
-	expectedLogParts := []string{getShortFunctionName(testFunc), "params", testParam, "resp", expectedResult}
+	expectedLogParts := []string{getShortFunctionName(testFunc), "request", testParam, "response", expectedResult}
 	for _, part := range expectedLogParts {
 		if !strings.Contains(requestLogOutput, part) {
 			t.Errorf("Log output doesn't contain expected part: %s", part)
