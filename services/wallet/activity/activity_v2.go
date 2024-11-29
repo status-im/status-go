@@ -59,7 +59,7 @@ func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresse
 			rpt.uuid = rbtp.uuid`).
 		LeftJoin(`route_input_parameters rip ON 
 			rpt.uuid = rip.uuid`)
-	q = q.OrderBy("tt.timestamp DESC")
+	q = q.OrderBy("tt.timestamp DESC", "rpt.is_approval ASC")
 
 	qConditions := sq.And{}
 
