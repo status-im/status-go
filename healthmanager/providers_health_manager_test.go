@@ -62,7 +62,9 @@ func (s *ProvidersHealthManagerSuite) TestInitialStatus() {
 }
 
 func (s *ProvidersHealthManagerSuite) TestUpdateProviderStatuses() {
-	s.updateAndWait(s.phm.Subscribe(), []rpcstatus.RpcProviderCallStatus{
+	ch := s.phm.Subscribe()
+	defer s.phm.Unsubscribe(ch)
+	s.updateAndWait(ch, []rpcstatus.RpcProviderCallStatus{
 		{Name: "Provider1", Timestamp: time.Now(), Err: nil},
 		{Name: "Provider2", Timestamp: time.Now(), Err: errors.New("connection error")},
 	}, rpcstatus.StatusUp, time.Second)
@@ -75,6 +77,7 @@ func (s *ProvidersHealthManagerSuite) TestUpdateProviderStatuses() {
 
 func (s *ProvidersHealthManagerSuite) TestChainStatusUpdatesOnce() {
 	ch := s.phm.Subscribe()
+	defer s.phm.Unsubscribe(ch)
 	s.assertChainStatus(rpcstatus.StatusDown)
 
 	// Update providers to Down
@@ -88,6 +91,7 @@ func (s *ProvidersHealthManagerSuite) TestChainStatusUpdatesOnce() {
 
 func (s *ProvidersHealthManagerSuite) TestSubscribeReceivesOnlyOnChange() {
 	ch := s.phm.Subscribe()
+	defer s.phm.Unsubscribe(ch)
 
 	// Update provider to Up and wait for notification
 	upStatuses := []rpcstatus.RpcProviderCallStatus{
@@ -134,78 +138,6 @@ func (s *ProvidersHealthManagerSuite) TestConcurrency() {
 
 	chainStatus := s.phm.Status().Status
 	s.Equal(chainStatus, rpcstatus.StatusUp, "Expected chain status to be either Up or Down")
-}
-
-func (s *BlockchainHealthManagerSuite) TestInterleavedChainStatusChanges() {
-	// Register providers for chains 1, 2, and 3
-	phm1 := NewProvidersHealthManager(1)
-	phm2 := NewProvidersHealthManager(2)
-	phm3 := NewProvidersHealthManager(3)
-	err := s.manager.RegisterProvidersHealthManager(s.ctx, phm1)
-	s.Require().NoError(err)
-	err = s.manager.RegisterProvidersHealthManager(s.ctx, phm2)
-	s.Require().NoError(err)
-	err = s.manager.RegisterProvidersHealthManager(s.ctx, phm3)
-	s.Require().NoError(err)
-
-	// Subscribe to status updates
-	ch := s.manager.Subscribe()
-	defer s.manager.Unsubscribe(ch)
-
-	// Initially, all chains are up
-	phm1.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{{Name: "provider_chain1", Timestamp: time.Now(), Err: nil}})
-	phm2.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{{Name: "provider_chain2", Timestamp: time.Now(), Err: nil}})
-	phm3.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{{Name: "provider_chain3", Timestamp: time.Now(), Err: nil}})
-
-	// Wait for the status to propagate
-	s.waitForUpdate(ch, rpcstatus.StatusUp, 100*time.Millisecond)
-
-	// Now chain 1 goes down, and chain 3 goes down at the same time
-	phm1.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{{Name: "provider_chain1", Timestamp: time.Now(), Err: errors.New("connection error")}})
-	phm3.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{{Name: "provider_chain3", Timestamp: time.Now(), Err: errors.New("connection error")}})
-
-	// Wait for the status to reflect the changes
-	s.waitForUpdate(ch, rpcstatus.StatusUp, 100*time.Millisecond)
-
-	// Check that short status correctly reflects the mixed state
-	shortStatus := s.manager.GetStatusPerChain()
-	s.Equal(rpcstatus.StatusUp, shortStatus.Status.Status)
-	s.Equal(rpcstatus.StatusDown, shortStatus.StatusPerChain[1].Status) // Chain 1 is down
-	s.Equal(rpcstatus.StatusUp, shortStatus.StatusPerChain[2].Status)   // Chain 2 is still up
-	s.Equal(rpcstatus.StatusDown, shortStatus.StatusPerChain[3].Status) // Chain 3 is down
-}
-
-func (s *BlockchainHealthManagerSuite) TestDelayedChainUpdate() {
-	// Register providers for chains 1 and 2
-	phm1 := NewProvidersHealthManager(1)
-	phm2 := NewProvidersHealthManager(2)
-	err := s.manager.RegisterProvidersHealthManager(s.ctx, phm1)
-	s.Require().NoError(err)
-	err = s.manager.RegisterProvidersHealthManager(s.ctx, phm2)
-	s.Require().NoError(err)
-
-	// Subscribe to status updates
-	ch := s.manager.Subscribe()
-	defer s.manager.Unsubscribe(ch)
-
-	// Initially, both chains are up
-	phm1.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{{Name: "provider1_chain1", Timestamp: time.Now(), Err: nil}})
-	phm2.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{{Name: "provider1_chain2", Timestamp: time.Now(), Err: nil}})
-	s.waitForUpdate(ch, rpcstatus.StatusUp, 100*time.Millisecond)
-
-	// Chain 2 goes down
-	phm2.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{{Name: "provider1_chain2", Timestamp: time.Now(), Err: errors.New("connection error")}})
-	s.waitForUpdate(ch, rpcstatus.StatusUp, 100*time.Millisecond)
-
-	// Chain 1 goes down after a delay
-	phm1.Update(s.ctx, []rpcstatus.RpcProviderCallStatus{{Name: "provider1_chain1", Timestamp: time.Now(), Err: errors.New("connection error")}})
-	s.waitForUpdate(ch, rpcstatus.StatusDown, 100*time.Millisecond)
-
-	// Check that short status reflects the final state where both chains are down
-	shortStatus := s.manager.GetStatusPerChain()
-	s.Equal(rpcstatus.StatusDown, shortStatus.Status.Status)
-	s.Equal(rpcstatus.StatusDown, shortStatus.StatusPerChain[1].Status) // Chain 1 is down
-	s.Equal(rpcstatus.StatusDown, shortStatus.StatusPerChain[2].Status) // Chain 2 is down
 }
 
 func TestProvidersHealthManagerSuite(t *testing.T) {

@@ -23,7 +23,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain/ethclient"
 )
 
-type BlockchainHealthManagerSuite struct {
+type BlockchainHealthSuite struct {
 	suite.Suite
 	blockchainHealthManager *healthmanager.BlockchainHealthManager
 	mockProviders           map[uint64]*healthmanager.ProvidersHealthManager
@@ -32,7 +32,7 @@ type BlockchainHealthManagerSuite struct {
 	mockCtrl                *gomock.Controller
 }
 
-func (s *BlockchainHealthManagerSuite) SetupTest() {
+func (s *BlockchainHealthSuite) SetupTest() {
 	s.blockchainHealthManager = healthmanager.NewBlockchainHealthManager()
 	s.mockProviders = make(map[uint64]*healthmanager.ProvidersHealthManager)
 	s.mockEthClients = make(map[uint64]*mockEthclient.MockRPSLimitedEthClientInterface)
@@ -40,12 +40,12 @@ func (s *BlockchainHealthManagerSuite) SetupTest() {
 	s.mockCtrl = gomock.NewController(s.T())
 }
 
-func (s *BlockchainHealthManagerSuite) TearDownTest() {
+func (s *BlockchainHealthSuite) TearDownTest() {
 	s.blockchainHealthManager.Stop()
 	s.mockCtrl.Finish()
 }
 
-func (s *BlockchainHealthManagerSuite) setupClients(chainIDs []uint64) {
+func (s *BlockchainHealthSuite) setupClients(chainIDs []uint64) {
 	ctx := context.Background()
 
 	for _, chainID := range chainIDs {
@@ -65,7 +65,7 @@ func (s *BlockchainHealthManagerSuite) setupClients(chainIDs []uint64) {
 	}
 }
 
-func (s *BlockchainHealthManagerSuite) simulateChainStatus(chainID uint64, up bool) {
+func (s *BlockchainHealthSuite) simulateChainStatus(chainID uint64, up bool) {
 	client, exists := s.clients[chainID]
 	require.True(s.T(), exists, "Client for chainID %d not found", chainID)
 
@@ -85,7 +85,7 @@ func (s *BlockchainHealthManagerSuite) simulateChainStatus(chainID uint64, up bo
 	}
 }
 
-func (s *BlockchainHealthManagerSuite) waitForStatus(statusCh chan struct{}, expectedStatus rpcstatus.StatusType) {
+func (s *BlockchainHealthSuite) waitForStatus(statusCh chan struct{}, expectedStatus rpcstatus.StatusType) {
 	timeout := time.After(2 * time.Second)
 	for {
 		select {
@@ -101,7 +101,7 @@ func (s *BlockchainHealthManagerSuite) waitForStatus(statusCh chan struct{}, exp
 	}
 }
 
-func (s *BlockchainHealthManagerSuite) TestAllChainsUp() {
+func (s *BlockchainHealthSuite) TestAllChainsUp() {
 	s.setupClients([]uint64{1, 2, 3})
 
 	statusCh := s.blockchainHealthManager.Subscribe()
@@ -114,7 +114,7 @@ func (s *BlockchainHealthManagerSuite) TestAllChainsUp() {
 	s.waitForStatus(statusCh, rpcstatus.StatusUp)
 }
 
-func (s *BlockchainHealthManagerSuite) TestSomeChainsDown() {
+func (s *BlockchainHealthSuite) TestSomeChainsDown() {
 	s.setupClients([]uint64{1, 2, 3})
 
 	statusCh := s.blockchainHealthManager.Subscribe()
@@ -127,7 +127,7 @@ func (s *BlockchainHealthManagerSuite) TestSomeChainsDown() {
 	s.waitForStatus(statusCh, rpcstatus.StatusUp)
 }
 
-func (s *BlockchainHealthManagerSuite) TestAllChainsDown() {
+func (s *BlockchainHealthSuite) TestAllChainsDown() {
 	s.setupClients([]uint64{1, 2})
 
 	statusCh := s.blockchainHealthManager.Subscribe()
@@ -139,7 +139,7 @@ func (s *BlockchainHealthManagerSuite) TestAllChainsDown() {
 	s.waitForStatus(statusCh, rpcstatus.StatusDown)
 }
 
-func (s *BlockchainHealthManagerSuite) TestChainStatusChanges() {
+func (s *BlockchainHealthSuite) TestChainStatusChanges() {
 	s.setupClients([]uint64{1, 2})
 
 	statusCh := s.blockchainHealthManager.Subscribe()
@@ -153,7 +153,7 @@ func (s *BlockchainHealthManagerSuite) TestChainStatusChanges() {
 	s.waitForStatus(statusCh, rpcstatus.StatusUp)
 }
 
-func (s *BlockchainHealthManagerSuite) TestGetFullStatus() {
+func (s *BlockchainHealthSuite) TestGetFullStatus() {
 	// Setup clients for chain IDs 1 and 2
 	s.setupClients([]uint64{1, 2})
 
@@ -233,7 +233,7 @@ func (s *BlockchainHealthManagerSuite) TestGetFullStatus() {
 	require.NotEmpty(s.T(), jsonData)
 }
 
-func (s *BlockchainHealthManagerSuite) TestGetShortStatus() {
+func (s *BlockchainHealthSuite) TestGetShortStatus() {
 	// Setup clients for chain IDs 1 and 2
 	s.setupClients([]uint64{1, 2})
 
@@ -294,6 +294,6 @@ func (s *BlockchainHealthManagerSuite) TestGetShortStatus() {
 	require.NotEmpty(s.T(), jsonData)
 }
 
-func TestBlockchainHealthManagerSuite(t *testing.T) {
-	suite.Run(t, new(BlockchainHealthManagerSuite))
+func TestBlockchainHealthSuite(t *testing.T) {
+	suite.Run(t, new(BlockchainHealthSuite))
 }

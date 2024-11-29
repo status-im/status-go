@@ -22,11 +22,10 @@ type BlockchainStatus struct {
 	StatusPerChain map[uint64]rpcstatus.ProviderStatus `json:"statusPerChain"`
 }
 
-// BlockchainHealthManager manages the state of all providers and aggregates their statuses.
 type BlockchainHealthManager struct {
-	mu          sync.RWMutex
-	aggregator  *aggregator.Aggregator
-	subscribers sync.Map // thread-safe
+	mu                  sync.RWMutex
+	aggregator          *aggregator.Aggregator
+	subscriptionManager *SubscriptionManager
 
 	providers   map[uint64]*ProvidersHealthManager
 	cancelFuncs map[uint64]context.CancelFunc // Map chainID to cancel functions
@@ -38,9 +37,10 @@ type BlockchainHealthManager struct {
 func NewBlockchainHealthManager() *BlockchainHealthManager {
 	agg := aggregator.NewAggregator("blockchain")
 	return &BlockchainHealthManager{
-		aggregator:  agg,
-		providers:   make(map[uint64]*ProvidersHealthManager),
-		cancelFuncs: make(map[uint64]context.CancelFunc),
+		aggregator:          agg,
+		providers:           make(map[uint64]*ProvidersHealthManager),
+		cancelFuncs:         make(map[uint64]context.CancelFunc),
+		subscriptionManager: &SubscriptionManager{subscribers: make(map[chan struct{}]struct{})},
 	}
 }
 
@@ -109,15 +109,12 @@ func (b *BlockchainHealthManager) Stop() {
 
 // Subscribe allows clients to receive notifications about changes.
 func (b *BlockchainHealthManager) Subscribe() chan struct{} {
-	ch := make(chan struct{}, 1)
-	b.subscribers.Store(ch, struct{}{})
-	return ch
+	return b.subscriptionManager.Subscribe()
 }
 
 // Unsubscribe removes a subscriber from receiving notifications.
 func (b *BlockchainHealthManager) Unsubscribe(ch chan struct{}) {
-	b.subscribers.Delete(ch) // Удаляем подписчика из sync.Map
-	close(ch)
+	b.subscriptionManager.Unsubscribe(ch)
 }
 
 // aggregateAndUpdateStatus collects statuses from all providers and updates the overall and short status.
@@ -185,18 +182,7 @@ func compareShortStatus(newStatus, previousStatus BlockchainStatus) bool {
 
 // emitBlockchainHealthStatus sends a notification to all subscribers about the new blockchain status.
 func (b *BlockchainHealthManager) emitBlockchainHealthStatus(ctx context.Context) {
-	b.subscribers.Range(func(key, value interface{}) bool {
-		subscriber := key.(chan struct{})
-		select {
-		case <-ctx.Done():
-			// Stop sending notifications when the context is cancelled
-			return false
-		case subscriber <- struct{}{}:
-		default:
-			// Skip notification if the subscriber's channel is full (non-blocking)
-		}
-		return true
-	})
+	b.subscriptionManager.Emit(ctx)
 }
 
 func (b *BlockchainHealthManager) GetFullStatus() BlockchainFullStatus {

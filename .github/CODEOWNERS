@@ -14,3 +14,4 @@ shell.nix             @status-im/devops
 # Feel free to add yourself for any new packages you implement.
 /cmd/status-backend   @igor-sirotin
 /internal/sentry      @igor-sirotin
+/healthmanager	      @friofry
