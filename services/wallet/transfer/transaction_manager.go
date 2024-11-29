@@ -126,6 +126,10 @@ type TransactionIdentity struct {
 	Address common.Address        `json:"address"`
 }
 
+func (tid *TransactionIdentity) Key() string {
+	return fmt.Sprintf("%d-%s-%s", tid.ChainID, tid.Hash.Hex(), tid.Address.Hex())
+}
+
 type TxResponse struct {
 	KeyUID        string                 `json:"keyUid,omitempty"`
 	Address       types.Address          `json:"address,omitempty"`

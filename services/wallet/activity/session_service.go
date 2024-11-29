@@ -456,6 +456,7 @@ func (s *Service) processEntryDataUpdates(sessionID SessionID, entries []Entry, 
 		}
 
 		data := &EntryData{
+			Key:            e.Key(),
 			ActivityStatus: &e.activityStatus,
 		}
 		if e.payloadType == MultiTransactionPT {

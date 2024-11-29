@@ -85,9 +85,21 @@ type Entry struct {
 	isNew bool // isNew is used to indicate if the entry is newer than session start (changed state also)
 }
 
+func (e *Entry) Key() string {
+	if e.payloadType == MultiTransactionPT {
+		key := fmt.Sprintf("%d", e.id)
+		for _, t := range e.transactions {
+			key += fmt.Sprintf("-%s", t.Key())
+		}
+		return key
+	}
+	return e.transaction.Key()
+}
+
 // Only used for JSON marshalling
 type EntryData struct {
 	PayloadType               PayloadType                     `json:"payloadType"`
+	Key                       string                          `json:"key"`
 	Transaction               *transfer.TransactionIdentity   `json:"transaction,omitempty"`
 	ID                        *common.MultiTransactionIDType  `json:"id,omitempty"`
 	Transactions              []*transfer.TransactionIdentity `json:"transactions,omitempty"`
@@ -118,6 +130,7 @@ type EntryData struct {
 
 func (e *Entry) MarshalJSON() ([]byte, error) {
 	data := EntryData{
+		Key:                       e.Key(),
 		Timestamp:                 &e.timestamp,
 		ActivityType:              &e.activityType,
 		ActivityStatus:            &e.activityStatus,

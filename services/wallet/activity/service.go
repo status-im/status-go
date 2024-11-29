@@ -276,6 +276,7 @@ func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*E
 			}
 			for _, e := range entryList {
 				data := &EntryData{
+					Key:     e.Key(),
 					NftName: nftName,
 					NftURL:  nftURL,
 				}
