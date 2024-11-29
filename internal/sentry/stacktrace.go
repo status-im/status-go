@@ -20,7 +20,7 @@ var stacktraceFilters = []struct {
 	},
 	{
 		Module:    "github.com/status-im/status-go/mobile/callog",
-		Functions: []string{"Call.func1"},
+		Functions: []string{"Recover"},
 	},
 }
 

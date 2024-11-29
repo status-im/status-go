@@ -34,7 +34,7 @@ func TestTrimStacktrace(t *testing.T) {
 			stacktrace: &sentry.Stacktrace{
 				Frames: []sentry.Frame{
 					{Module: "github.com/status-im/status-go/other", Function: "OtherFunc"},
-					{Module: "github.com/status-im/status-go/mobile/callog", Function: "Call.func1"},
+					{Module: "github.com/status-im/status-go/mobile/callog", Function: "Recover"},
 					{Module: "github.com/status-im/status-go/internal/sentry", Function: "RecoverError"},
 				},
 			},
@@ -92,7 +92,7 @@ func TestTrimStacktrace(t *testing.T) {
 					{Module: "github.com/status-im/status-go/other", Function: "OtherFunc2"},
 					{Module: "github.com/status-im/status-go/other", Function: "OtherFunc3"},
 					{Module: "github.com/status-im/status-go/internal/sentry", Function: "Recover"},
-					{Module: "github.com/status-im/status-go/mobile/callog", Function: "Call.func1"},
+					{Module: "github.com/status-im/status-go/mobile/callog", Function: "Recover"},
 					{Module: "github.com/status-im/status-go/common", Function: "LogOnPanic"},
 				},
 			},
@@ -107,13 +107,13 @@ func TestTrimStacktrace(t *testing.T) {
 			name: "break if non-matching frame found",
 			stacktrace: &sentry.Stacktrace{
 				Frames: []sentry.Frame{
-					{Module: "github.com/status-im/status-go/mobile/callog", Function: "Call.func1"},
+					{Module: "github.com/status-im/status-go/mobile/callog", Function: "Recover"},
 					{Module: "github.com/status-im/status-go/internal/sentry", Function: "RecoverError"},
 					{Module: "github.com/status-im/status-go/other", Function: "OtherFunc1"},
 				},
 			},
 			expected: []sentry.Frame{
-				{Module: "github.com/status-im/status-go/mobile/callog", Function: "Call.func1"},
+				{Module: "github.com/status-im/status-go/mobile/callog", Function: "Recover"},
 				{Module: "github.com/status-im/status-go/internal/sentry", Function: "RecoverError"},
 				{Module: "github.com/status-im/status-go/other", Function: "OtherFunc1"},
 			},
