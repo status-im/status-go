@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/contracts"
 	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
@@ -88,12 +89,16 @@ func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParam
 }
 
 func (r *Router) calculateApprovalL1Fee(amountIn *big.Int, chainID uint64, approvalContractAddress *common.Address) (uint64, error) {
-	data, err := walletCommon.PackApprovalInputData(amountIn, approvalContractAddress)
+	ethClient, err := r.rpcClient.EthClient(chainID)
 	if err != nil {
 		return 0, err
 	}
 
-	ethClient, err := r.rpcClient.EthClient(chainID)
+	return CalculateApprovalL1Fee(amountIn, chainID, approvalContractAddress, ethClient)
+}
+
+func CalculateApprovalL1Fee(amountIn *big.Int, chainID uint64, approvalContractAddress *common.Address, ethClient chain.ClientInterface) (uint64, error) {
+	data, err := walletCommon.PackApprovalInputData(amountIn, approvalContractAddress)
 	if err != nil {
 		return 0, err
 	}
@@ -108,10 +113,13 @@ func (r *Router) calculateApprovalL1Fee(amountIn *big.Int, chainID uint64, appro
 
 		callOpt := &bind.CallOpts{}
 
-		l1FeeResult, _ := oracleContract.GetL1Fee(callOpt, data)
-		l1Fee = l1FeeResult.Uint64()
+		l1FeeResult, err := oracleContract.GetL1Fee(callOpt, data)
+		if err == nil {
+			l1Fee = l1FeeResult.Uint64()
+		}
 	}
 
+	// return 0 if we failed to get the fee
 	return l1Fee, nil
 }
 

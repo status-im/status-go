@@ -11,7 +11,6 @@ import (
 
 type LogSettings struct {
 	Enabled         bool   `json:"Enabled"`
-	MobileSystem    bool   `json:"MobileSystem"`
 	Level           string `json:"Level"`
 	File            string `json:"File"`
 	MaxSize         int    `json:"MaxSize"`
@@ -38,11 +37,6 @@ func overrideCoreWithConfig(core *Core, settings LogSettings) error {
 		return err
 	}
 	core.SetLevel(level)
-
-	if settings.MobileSystem {
-		core.UpdateSyncer(zapcore.Lock(os.Stdout))
-		return nil
-	}
 
 	if settings.File != "" {
 		if settings.MaxBackups == 0 {

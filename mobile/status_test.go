@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/brianvoe/gofakeit/v6"
+
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/signal"
@@ -37,4 +39,11 @@ func TestSetMobileSignalHandler(t *testing.T) {
 	require.Contains(t, handler.receivedSignal, `"key-uid":"0x1"`, "Signal should contain the correct KeyUID")
 	require.Contains(t, handler.receivedSignal, `"name":"test"`, "Signal should contain the correct account name")
 	require.Contains(t, handler.receivedSignal, `"ensUsernames":{"test":"test"}`, "Signal should contain the correct ENS usernames")
+}
+
+func TestIntendedPanic(t *testing.T) {
+	message := gofakeit.LetterN(5)
+	require.PanicsWithError(t, message, func() {
+		IntendedPanic(message)
+	})
 }

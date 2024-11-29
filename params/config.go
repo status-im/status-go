@@ -414,9 +414,6 @@ type NodeConfig struct {
 	// LogEnabled enables the logger
 	LogEnabled bool `json:"LogEnabled"`
 
-	// LogMobileSystem enables log redirection to android/ios system logger.
-	LogMobileSystem bool
-
 	// LogFile is a folder which contains LogFile
 	LogDir string
 

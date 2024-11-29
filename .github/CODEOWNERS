@@ -1,0 +1,16 @@
+# No default owner
+
+# CI-related changes
+Makefile              @status-im/devops @status-im/status-go-guild
+default.nix           @status-im/devops
+shell.nix             @status-im/devops
+/nix/                 @status-im/devops
+/_assets/build/       @status-im/devops
+/_assets/ci/          @status-im/devops
+/_assets/hooks/       @status-im/devops
+/_assets/scripts/     @status-im/devops
+
+# Custom ownership for specific folders
+# Feel free to add yourself for any new packages you implement.
+/cmd/status-backend   @igor-sirotin
+/internal/sentry      @igor-sirotin

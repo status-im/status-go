@@ -302,7 +302,6 @@ test-unit-prep: export UNIT_TEST_DRY_RUN ?= false
 test-unit-prep: export UNIT_TEST_COUNT ?= 1
 test-unit-prep: export UNIT_TEST_FAILFAST ?= true
 test-unit-prep: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
-test-unit-prep: export UNIT_TEST_REPORT_CODECLIMATE ?= false
 test-unit-prep: export UNIT_TEST_REPORT_CODECOV ?= false
 
 test-unit: test-unit-prep

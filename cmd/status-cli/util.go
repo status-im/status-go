@@ -25,7 +25,6 @@ func setupLogger(file string) *zap.Logger {
 	logFile := fmt.Sprintf("%s.log", strings.ToLower(file))
 	logSettings := logutils.LogSettings{
 		Enabled:         true,
-		MobileSystem:    false,
 		Level:           "DEBUG",
 		File:            logFile,
 		MaxSize:         100,

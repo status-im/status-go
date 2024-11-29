@@ -159,7 +159,6 @@ func randomNodeConfig() *params.NodeConfig {
 		IPCEnabled:                randomBool(),
 		IPCFile:                   randomString(),
 		LogEnabled:                randomBool(),
-		LogMobileSystem:           randomBool(),
 		LogDir:                    randomString(),
 		LogFile:                   randomString(),
 		LogLevel:                  randomString(),

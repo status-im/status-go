@@ -27,11 +27,13 @@ const (
 	shardsTestClusterID      = 16
 	walletAccountDefaultName = "Account 1"
 
-	DefaultKeystoreRelativePath       = "keystore"
-	DefaultKeycardPairingDataFile     = "/ethereum/mainnet_rpc/keycard/pairings.json"
-	DefaultDataDir                    = "/ethereum/mainnet_rpc"
-	DefaultNodeName                   = "StatusIM"
-	DefaultLogFile                    = "geth.log"
+	DefaultKeystoreRelativePath   = "keystore"
+	DefaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
+	DefaultDataDir                = "/ethereum/mainnet_rpc"
+	DefaultNodeName               = "StatusIM"
+	DefaultLogFile                = "geth.log"
+	DefaultAPILogFile             = "api.log"
+
 	DefaultLogLevel                   = "ERROR"
 	DefaultMaxPeers                   = 20
 	DefaultMaxPendingPeers            = 20

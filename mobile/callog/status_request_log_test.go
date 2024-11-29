@@ -95,7 +95,7 @@ func TestCall(t *testing.T) {
 	requestLogOutput := string(logData)
 
 	// Check if the log contains expected information
-	expectedLogParts := []string{getShortFunctionName(testFunc), "params", testParam, "resp", expectedResult}
+	expectedLogParts := []string{getShortFunctionName(testFunc), "request", testParam, "response", expectedResult}
 	for _, part := range expectedLogParts {
 		if !strings.Contains(requestLogOutput, part) {
 			t.Errorf("Log output doesn't contain expected part: %s", part)
@@ -133,4 +133,49 @@ func initializeApplication(requestJSON string) string {
 func TestGetFunctionName(t *testing.T) {
 	fn := getShortFunctionName(initializeApplication)
 	require.Equal(t, "initializeApplication", fn)
+}
+
+func TestDataField(t *testing.T) {
+	entry := zapcore.Entry{}
+	enc := zapcore.NewJSONEncoder(zapcore.EncoderConfig{})
+
+	f := dataField("root", "value")
+	require.NotNil(t, f)
+	require.Equal(t, "root", f.Key)
+	require.Equal(t, zapcore.StringType, f.Type)
+	require.Equal(t, "value", f.String)
+
+	// Test JSON object
+	f = dataField("root", `{"key1": "value1"}`)
+	require.NotNil(t, f)
+	require.Equal(t, "root", f.Key)
+	require.Equal(t, zapcore.ReflectType, f.Type)
+
+	buf, err := enc.EncodeEntry(entry, []zapcore.Field{f})
+	require.NoError(t, err)
+	require.NotNil(t, buf)
+	require.Equal(t, `{"root":{"key1":"value1"}}`+"\n", buf.String())
+
+	// Test JSON array
+	f = dataField("root", `["value1", "value2"]`)
+	require.NotNil(t, f)
+	require.Equal(t, "root", f.Key)
+	require.Equal(t, zapcore.ReflectType, f.Type)
+
+	buf, err = enc.EncodeEntry(entry, []zapcore.Field{f})
+	require.NoError(t, err)
+	require.NotNil(t, buf)
+	require.Equal(t, `{"root":["value1","value2"]}`+"\n", buf.String())
+
+	// Test non-json content
+	f = dataField("root", `{non-json content}`)
+	require.NotNil(t, f)
+	require.Equal(t, "root", f.Key)
+	require.Equal(t, zapcore.StringType, f.Type)
+	require.Equal(t, `{non-json content}`, f.String)
+
+	buf, err = enc.EncodeEntry(entry, []zapcore.Field{f})
+	require.NoError(t, err)
+	require.NotNil(t, buf)
+	require.Equal(t, `{"root":"{non-json content}"}`+"\n", buf.String())
 }

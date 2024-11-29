@@ -14,9 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
+	"github.com/waku-org/go-waku/waku/v2/api/common"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"go.uber.org/zap"
 )
@@ -46,8 +45,8 @@ type peerStatus struct {
 
 type StorenodeConfigProvider interface {
 	UseStorenodes() (bool, error)
-	GetPinnedStorenode() (peer.ID, error)
-	Storenodes() ([]peer.ID, error)
+	GetPinnedStorenode() (peer.AddrInfo, error)
+	Storenodes() ([]peer.AddrInfo, error)
 }
 
 type StorenodeCycle struct {
@@ -55,9 +54,8 @@ type StorenodeCycle struct {
 
 	logger *zap.Logger
 
-	host host.Host
-
 	storenodeConfigProvider StorenodeConfigProvider
+	pinger                  common.Pinger
 
 	StorenodeAvailableOneshotEmitter *OneShotEmitter[struct{}]
 	StorenodeChangedEmitter          *Emitter[peer.ID]
@@ -71,19 +69,19 @@ type StorenodeCycle struct {
 	peers           map[peer.ID]peerStatus
 }
 
-func NewStorenodeCycle(logger *zap.Logger) *StorenodeCycle {
+func NewStorenodeCycle(logger *zap.Logger, pinger common.Pinger) *StorenodeCycle {
 	return &StorenodeCycle{
 		StorenodeAvailableOneshotEmitter: NewOneshotEmitter[struct{}](),
 		StorenodeChangedEmitter:          NewEmitter[peer.ID](),
 		StorenodeNotWorkingEmitter:       NewEmitter[struct{}](),
 		StorenodeAvailableEmitter:        NewEmitter[peer.ID](),
+		pinger:                           pinger,
 		logger:                           logger.Named("storenode-cycle"),
 	}
 }
 
-func (m *StorenodeCycle) Start(ctx context.Context, h host.Host) {
+func (m *StorenodeCycle) Start(ctx context.Context) {
 	m.logger.Debug("starting storenode cycle")
-	m.host = h
 	m.failedRequests = make(map[peer.ID]uint)
 	m.peers = make(map[peer.ID]peerStatus)
 
@@ -107,7 +105,7 @@ func (m *StorenodeCycle) connectToNewStorenodeAndWait(ctx context.Context) error
 	}
 
 	// If no pinned storenode, no need to disconnect and wait for it to be available
-	if pinnedStorenode == "" {
+	if pinnedStorenode.ID == "" {
 		m.disconnectActiveStorenode(graylistBackoff)
 	}
 
@@ -183,21 +181,26 @@ func poolSize(fleetSize int) int {
 	return int(math.Ceil(float64(fleetSize) / 4))
 }
 
-func (m *StorenodeCycle) getAvailableStorenodesSortedByRTT(ctx context.Context, allStorenodes []peer.ID) []peer.ID {
+func (m *StorenodeCycle) getAvailableStorenodesSortedByRTT(ctx context.Context, allStorenodes []peer.AddrInfo) []peer.AddrInfo {
+	peerIDToInfo := make(map[peer.ID]peer.AddrInfo)
+	for _, p := range allStorenodes {
+		peerIDToInfo[p.ID] = p
+	}
+
 	availableStorenodes := make(map[peer.ID]time.Duration)
 	availableStorenodesMutex := sync.Mutex{}
 	availableStorenodesWg := sync.WaitGroup{}
 	for _, storenode := range allStorenodes {
 		availableStorenodesWg.Add(1)
-		go func(peerID peer.ID) {
+		go func(peerInfo peer.AddrInfo) {
 			defer availableStorenodesWg.Done()
 			ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 			defer cancel()
 
-			rtt, err := m.pingPeer(ctx, peerID)
+			rtt, err := m.pinger.PingPeer(ctx, peerInfo)
 			if err == nil { // pinging storenodes might fail, but we don't care
 				availableStorenodesMutex.Lock()
-				availableStorenodes[peerID] = rtt
+				availableStorenodes[peerInfo.ID] = rtt
 				availableStorenodesMutex.Unlock()
 			}
 		}(storenode)
@@ -212,7 +215,7 @@ func (m *StorenodeCycle) getAvailableStorenodesSortedByRTT(ctx context.Context, 
 	var sortedStorenodes []SortedStorenode
 	for storenodeID, rtt := range availableStorenodes {
 		sortedStorenode := SortedStorenode{
-			Storenode: storenodeID,
+			Storenode: peerIDToInfo[storenodeID],
 			RTT:       rtt,
 		}
 		m.peersMutex.Lock()
@@ -225,25 +228,12 @@ func (m *StorenodeCycle) getAvailableStorenodesSortedByRTT(ctx context.Context, 
 	}
 	sort.Sort(byRTTMsAndCanConnectBefore(sortedStorenodes))
 
-	result := make([]peer.ID, len(sortedStorenodes))
+	result := make([]peer.AddrInfo, len(sortedStorenodes))
 	for i, s := range sortedStorenodes {
 		result[i] = s.Storenode
 	}
 
 	return result
-}
-
-func (m *StorenodeCycle) pingPeer(ctx context.Context, peerID peer.ID) (time.Duration, error) {
-	pingResultCh := ping.Ping(ctx, m.host, peerID)
-	select {
-	case <-ctx.Done():
-		return 0, ctx.Err()
-	case r := <-pingResultCh:
-		if r.Error != nil {
-			return 0, r.Error
-		}
-		return r.RTT, nil
-	}
 }
 
 func (m *StorenodeCycle) findNewStorenode(ctx context.Context) error {
@@ -268,8 +258,8 @@ func (m *StorenodeCycle) findNewStorenode(ctx context.Context) error {
 		return err
 	}
 
-	if pinnedStorenode != "" {
-		return m.setActiveStorenode(pinnedStorenode)
+	if pinnedStorenode.ID != "" {
+		return m.setActiveStorenode(pinnedStorenode.ID)
 	}
 
 	m.logger.Info("Finding a new storenode..")
@@ -303,7 +293,7 @@ func (m *StorenodeCycle) findNewStorenode(ctx context.Context) error {
 	}
 
 	ms := allStorenodes[r.Int64()]
-	return m.setActiveStorenode(ms)
+	return m.setActiveStorenode(ms.ID)
 }
 
 func (m *StorenodeCycle) storenodeStatus(peerID peer.ID) connStatus {

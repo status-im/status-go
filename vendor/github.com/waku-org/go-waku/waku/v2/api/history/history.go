@@ -2,6 +2,7 @@ package history
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"math"
 	"sync"
@@ -10,8 +11,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/api/common"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
+	"google.golang.org/protobuf/proto"
+
 	"go.uber.org/zap"
 )
 
@@ -25,7 +30,7 @@ type work struct {
 }
 
 type HistoryRetriever struct {
-	store            Store
+	store            common.StorenodeRequestor
 	logger           *zap.Logger
 	historyProcessor HistoryProcessor
 }
@@ -35,11 +40,7 @@ type HistoryProcessor interface {
 	OnRequestFailed(requestID []byte, peerID peer.ID, err error)
 }
 
-type Store interface {
-	Query(ctx context.Context, criteria store.FilterCriteria, opts ...store.RequestOption) (store.Result, error)
-}
-
-func NewHistoryRetriever(store Store, historyProcessor HistoryProcessor, logger *zap.Logger) *HistoryRetriever {
+func NewHistoryRetriever(store common.StorenodeRequestor, historyProcessor HistoryProcessor, logger *zap.Logger) *HistoryRetriever {
 	return &HistoryRetriever{
 		store:            store,
 		logger:           logger.Named("history-retriever"),
@@ -158,7 +159,26 @@ loop:
 				}()
 
 				queryCtx, queryCancel := context.WithTimeout(ctx, mailserverRequestTimeout)
-				cursor, envelopesCount, err := hr.createMessagesRequest(queryCtx, storenodeID, w.criteria, w.cursor, w.limit, true, processEnvelopes, logger)
+
+				// If time range is greater than 24 hours, limit the range: to - (to-24h)
+				// TODO: handle cases in which TimeStart/TimeEnd could be nil
+				//       (this type of query does not happen in status-go, though, and
+				//       nwaku might limit query duration to 24h anyway, so perhaps
+				//       it's not worth adding such logic)
+				timeStart := w.criteria.TimeStart
+				timeEnd := w.criteria.TimeEnd
+				exceeds24h := false
+				if timeStart != nil && timeEnd != nil && *timeEnd-*timeStart > (24*time.Hour).Nanoseconds() {
+					newTimeStart := *timeEnd - (24 * time.Hour).Nanoseconds()
+					timeStart = &newTimeStart
+					exceeds24h = true
+				}
+
+				newCriteria := w.criteria
+				newCriteria.TimeStart = timeStart
+				newCriteria.TimeEnd = timeEnd
+
+				cursor, envelopesCount, err := hr.createMessagesRequest(queryCtx, storenodeID, newCriteria, w.cursor, w.limit, true, processEnvelopes, logger)
 				queryCancel()
 
 				if err != nil {
@@ -179,18 +199,28 @@ loop:
 
 				// Check the cursor after calling `shouldProcessNextPage`.
 				// The app might use process the fetched envelopes in the callback for own needs.
-				if cursor == nil {
+				// If from/to does not exceed 24h and no cursor was returned, we have already
+				// requested the entire time range
+				if cursor == nil && !exceeds24h {
 					return
 				}
 
 				logger.Debug("processBatch producer - creating work (cursor)")
 
-				workWg.Add(1)
-				workCh <- work{
+				newWork := work{
 					criteria: w.criteria,
 					cursor:   cursor,
 					limit:    nextPageLimit,
 				}
+
+				// If from/to has exceeded the 24h, but there are no more records within the current
+				// 24h range, then we update the `to` for the new work to not include it.
+				if cursor == nil && exceeds24h {
+					newWork.criteria.TimeEnd = timeStart
+				}
+
+				workWg.Add(1)
+				workCh <- newWork
 			}(w)
 		case err := <-errCh:
 			logger.Debug("processBatch - received error", zap.Error(err))
@@ -257,12 +287,6 @@ func (hr *HistoryRetriever) requestStoreMessages(ctx context.Context, peerID pee
 	requestID := protocol.GenerateRequestID()
 	logger := hr.logger.With(zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", peerID))
 
-	opts := []store.RequestOption{
-		store.WithPaging(false, limit),
-		store.WithRequestID(requestID),
-		store.WithPeer(peerID),
-		store.WithCursor(cursor)}
-
 	logger.Debug("store.query",
 		logging.Timep("startTime", criteria.TimeStart),
 		logging.Timep("endTime", criteria.TimeEnd),
@@ -271,8 +295,19 @@ func (hr *HistoryRetriever) requestStoreMessages(ctx context.Context, peerID pee
 		zap.String("cursor", hexutil.Encode(cursor)),
 	)
 
+	storeQueryRequest := &pb.StoreQueryRequest{
+		RequestId:        hex.EncodeToString(requestID),
+		IncludeData:      true,
+		PubsubTopic:      &criteria.PubsubTopic,
+		ContentTopics:    criteria.ContentTopicsList(),
+		TimeStart:        criteria.TimeStart,
+		TimeEnd:          criteria.TimeEnd,
+		PaginationCursor: cursor,
+		PaginationLimit:  proto.Uint64(limit),
+	}
+
 	queryStart := time.Now()
-	result, err := hr.store.Query(ctx, criteria, opts...)
+	result, err := hr.store.Query(ctx, peerID, storeQueryRequest)
 	queryDuration := time.Since(queryStart)
 	if err != nil {
 		logger.Error("error querying storenode", zap.Error(err))

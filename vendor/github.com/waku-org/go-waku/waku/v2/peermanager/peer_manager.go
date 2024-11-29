@@ -101,7 +101,9 @@ const (
 const maxFailedAttempts = 5
 const prunePeerStoreInterval = 10 * time.Minute
 const peerConnectivityLoopSecs = 15
-const maxConnsToPeerRatio = 5
+const maxConnsToPeerRatio = 3
+const badPeersCleanupInterval = 1 * time.Minute
+const maxDialFailures = 2
 
 // 80% relay peers 20% service peers
 func relayAndServicePeers(maxConnections int) (int, int) {
@@ -256,16 +258,32 @@ func (pm *PeerManager) Start(ctx context.Context) {
 	}
 }
 
+func (pm *PeerManager) removeBadPeers() {
+	if !pm.RelayEnabled {
+		for _, peerID := range pm.host.Peerstore().Peers() {
+			if pm.host.Peerstore().(wps.WakuPeerstore).ConnFailures(peerID) > maxDialFailures {
+				//delete peer from peerStore
+				pm.logger.Debug("removing bad peer due to recurring dial failures", zap.Stringer("peerID", peerID))
+				pm.RemovePeer(peerID)
+			}
+		}
+	}
+}
+
 func (pm *PeerManager) peerStoreLoop(ctx context.Context) {
 	defer utils.LogOnPanic()
 	t := time.NewTicker(prunePeerStoreInterval)
+	t1 := time.NewTicker(badPeersCleanupInterval)
 	defer t.Stop()
+	defer t1.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 			pm.prunePeerStore()
+		case <-t1.C:
+			pm.removeBadPeers()
 		}
 	}
 }
@@ -743,5 +761,10 @@ func (pm *PeerManager) HandleDialError(err error, peerID peer.ID) {
 		if emitterErr != nil {
 			pm.logger.Error("failed to emit DialError", zap.Error(emitterErr))
 		}
+	}
+	if !pm.RelayEnabled && pm.host.Peerstore().(wps.WakuPeerstore).ConnFailures(peerID) >= maxDialFailures {
+		//delete peer from peerStore
+		pm.logger.Debug("removing bad peer due to recurring dial failures", zap.Stringer("peerID", peerID))
+		pm.RemovePeer(peerID)
 	}
 }

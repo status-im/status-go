@@ -89,10 +89,10 @@ func insertHTTPConfig(tx *sql.Tx, c *params.NodeConfig) error {
 func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO log_config (
-		enabled, mobile_system, log_dir, log_level, max_backups, max_size,
+		enabled, log_dir, log_level, max_backups, max_size,
 		file, compress_rotated, log_to_stderr, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'id'	)`,
-		c.LogEnabled, c.LogMobileSystem, c.LogDir, c.LogLevel, c.LogMaxBackups, c.LogMaxSize,
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'id'	)`,
+		c.LogEnabled, c.LogDir, c.LogLevel, c.LogMaxBackups, c.LogMaxSize,
 		c.LogFile, c.LogCompressRotated, c.LogToStderr,
 	)
 
@@ -488,8 +488,8 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	err = tx.QueryRow("SELECT enabled, mobile_system, log_dir, log_level, file, max_backups, max_size, compress_rotated, log_to_stderr FROM log_config WHERE synthetic_id = 'id'").Scan(
-		&nodecfg.LogEnabled, &nodecfg.LogMobileSystem, &nodecfg.LogDir, &nodecfg.LogLevel, &nodecfg.LogFile, &nodecfg.LogMaxBackups, &nodecfg.LogMaxSize, &nodecfg.LogCompressRotated, &nodecfg.LogToStderr)
+	err = tx.QueryRow("SELECT enabled, log_dir, log_level, file, max_backups, max_size, compress_rotated, log_to_stderr FROM log_config WHERE synthetic_id = 'id'").Scan(
+		&nodecfg.LogEnabled, &nodecfg.LogDir, &nodecfg.LogLevel, &nodecfg.LogFile, &nodecfg.LogMaxBackups, &nodecfg.LogMaxSize, &nodecfg.LogCompressRotated, &nodecfg.LogToStderr)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
