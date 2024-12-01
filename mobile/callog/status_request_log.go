@@ -88,7 +88,7 @@ func Call(logger, requestLogger *zap.Logger, fn any, params ...any) any {
 
 	if requestLogger != nil {
 		methodName := getShortFunctionName(fn)
-		Log(requestLogger, methodName, params, resp, startTime)
+		LogCall(requestLogger, methodName, params, resp, startTime)
 	}
 
 	return resp
@@ -132,7 +132,7 @@ func Recover(logger *zap.Logger) {
 	panic(err)
 }
 
-func Log(logger *zap.Logger, method string, params any, resp any, startTime time.Time) {
+func LogCall(logger *zap.Logger, method string, params any, resp any, startTime time.Time) {
 	if logger == nil {
 		return
 	}
@@ -142,6 +142,16 @@ func Log(logger *zap.Logger, method string, params any, resp any, startTime time
 		zap.Duration("duration", duration),
 		dataField("request", params),
 		dataField("response", resp),
+	)
+}
+
+func LogSignal(logger *zap.Logger, eventType string, event interface{}) {
+	if logger == nil {
+		return
+	}
+	logger.Debug("signal",
+		zap.String("type", eventType),
+		dataField("event", event),
 	)
 }
 

@@ -76,7 +76,7 @@ func InitializeApplication(requestJSON string) string {
 
 	startTime := time.Now()
 	response := initializeApplication(requestJSON)
-	callog.Log(
+	callog.LogCall(
 		requestlog.GetRequestLogger(),
 		"InitializeApplication",
 		requestJSON,

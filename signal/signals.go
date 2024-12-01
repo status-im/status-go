@@ -17,6 +17,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/logutils/requestlog"
+	"github.com/status-im/status-go/mobile/callog"
 )
 
 // MobileSignalHandler is a simple callback function that gets called when any signal is received
@@ -50,6 +52,8 @@ func send(typ string, event interface{}) {
 		logger.Error("Marshalling signal envelope", zap.Error(err))
 		return
 	}
+	callog.LogSignal(requestlog.GetRequestLogger(), typ, event)
+
 	// If a Go implementation of signal handler is set, let's use it.
 	if mobileSignalHandler != nil {
 		mobileSignalHandler(data)
