@@ -25,6 +25,13 @@ const (
 	GasFeeHigh
 )
 
+// If ever adjusted, fee factors for low, medium and high fee levels should be set to values from 0 to 10
+const (
+	lowFeeFactor    = 1
+	mediumFeeFactor = 1.2
+	highFeeFactor   = 2
+)
+
 type MaxFeesLevels struct {
 	Low    *hexutil.Big `json:"low"`
 	Medium *hexutil.Big `json:"medium"`
@@ -90,6 +97,30 @@ type FeeManager struct {
 	RPCClient rpc.ClientInterface
 }
 
+func isFloat(value interface{}) bool {
+	switch value.(type) {
+	case float32, float64:
+		return true
+	default:
+		return false
+	}
+}
+
+func calculateFee(baseFee *big.Int, maxPriorityFeePerGas *big.Int, factor interface{}) *big.Int {
+	if isFloat(factor) {
+		return new(big.Int).Add(new(big.Int).Div(new(big.Int).Mul(baseFee, big.NewInt(int64(factor.(float64)*10))), big.NewInt(10)), maxPriorityFeePerGas)
+	}
+	return new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(factor.(int64))), maxPriorityFeePerGas)
+}
+
+func evaluateMaxFeesLevels(baseFee *big.Int, maxPriorityFeePerGas *big.Int) *MaxFeesLevels {
+	return &MaxFeesLevels{
+		Low:    (*hexutil.Big)(calculateFee(baseFee, maxPriorityFeePerGas, lowFeeFactor)),
+		Medium: (*hexutil.Big)(calculateFee(baseFee, maxPriorityFeePerGas, mediumFeeFactor)),
+		High:   (*hexutil.Big)(calculateFee(baseFee, maxPriorityFeePerGas, highFeeFactor)),
+	}
+}
+
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
 	backend, err := f.RPCClient.EthClient(chainID)
 	if err != nil {
@@ -122,12 +153,8 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 		GasPrice:             gasPrice,
 		BaseFee:              baseFee,
 		MaxPriorityFeePerGas: maxPriorityFeePerGas,
-		MaxFeesLevels: &MaxFeesLevels{
-			Low:    (*hexutil.Big)(new(big.Int).Add(baseFee, maxPriorityFeePerGas)),
-			Medium: (*hexutil.Big)(new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(2)), maxPriorityFeePerGas)),
-			High:   (*hexutil.Big)(new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(3)), maxPriorityFeePerGas)),
-		},
-		EIP1559Enabled: true,
+		MaxFeesLevels:        evaluateMaxFeesLevels(baseFee, maxPriorityFeePerGas),
+		EIP1559Enabled:       true,
 	}, nil
 }
 
