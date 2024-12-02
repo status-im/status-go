@@ -1,0 +1,4 @@
+services:
+  anvil:
+    ports:
+      - 8545:8545

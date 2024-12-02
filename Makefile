@@ -420,7 +420,10 @@ test-verif-proxy-wrapper:
 
 run-anvil: SHELL := /bin/sh
 run-anvil:
-	docker-compose -f tests-functional/docker-compose.anvil.yml up --remove-orphans
+	@docker compose \
+		-f tests-functional/docker-compose.anvil.yml \
+		-f tests-functional/docker-compose.anvil.dev.yml \
+		up --remove-orphans
 
 codecov-validate: SHELL := /bin/sh
 codecov-validate:
