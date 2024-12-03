@@ -33,6 +33,7 @@ import (
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -571,7 +572,7 @@ func (s *Service) maxSupply(ctx context.Context, chainID uint64, contractAddress
 	}
 }
 
-func (s *Service) CreateCommunityTokenAndSave(chainID int, deploymentParameters DeploymentParameters,
+func (s *Service) CreateCommunityTokenAndSave(chainID int, deploymentParameters requests.DeploymentParameters,
 	deployerAddress string, contractAddress string, tokenType protobuf.CommunityTokenType, privilegesLevel token.PrivilegesLevel, transactionHash string) (*token.CommunityToken, error) {
 
 	contractVersion := ""

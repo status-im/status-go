@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
@@ -45,7 +46,7 @@ func gweiToWei(val *big.Float) *big.Int {
 }
 
 func (s *Service) deployOwnerTokenEstimate(ctx context.Context, chainID uint64, fromAddress string,
-	ownerTokenParameters DeploymentParameters, masterTokenParameters DeploymentParameters,
+	ownerTokenParameters requests.DeploymentParameters, masterTokenParameters requests.DeploymentParameters,
 	communityID string, signerPubKey string) (*CommunityTokenFees, error) {
 
 	gasUnits, err := s.deployOwnerTokenGasUnits(ctx, chainID, fromAddress, ownerTokenParameters, masterTokenParameters,
@@ -157,7 +158,7 @@ func (s *Service) remoteBurnGasUnits(ctx context.Context, chainID uint64, contra
 }
 
 func (s *Service) deployOwnerTokenGasUnits(ctx context.Context, chainID uint64, fromAddress string,
-	ownerTokenParameters DeploymentParameters, masterTokenParameters DeploymentParameters,
+	ownerTokenParameters requests.DeploymentParameters, masterTokenParameters requests.DeploymentParameters,
 	communityID string, signerPubKey string) (uint64, error) {
 	ethClient, err := s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
