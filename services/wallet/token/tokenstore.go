@@ -1638,7 +1638,7 @@ func newDefaultStore() *DefaultStore {
 				Address:     common.HexToAddress("0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9"),
 				Name:        "Tether USD",
 				Symbol:      "USDT",
-				Decimals:    18,
+				Decimals:    6,
 				ChainID:     42161,
 				TokenListID: "status",
 			},
