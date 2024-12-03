@@ -50,7 +50,7 @@ func NewAPI(s *Service) *API {
 // API is class with methods available over RPC.
 type API struct {
 	s      *Service
-	reader *Reader
+	reader ReaderInterface
 }
 
 func (api *API) StartWallet(ctx context.Context) error {
@@ -84,7 +84,7 @@ func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addre
 	return api.s.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokens)
 }
 
-func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address) (map[common.Address][]token.StorageToken, error) {
+func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address, forceRefresh bool) (map[common.Address][]token.StorageToken, error) {
 	activeNetworks, err := api.s.rpcClient.NetworkManager.GetActiveNetworks()
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []
 		return nil, err
 	}
 
-	return api.reader.FetchOrGetCachedWalletBalances(ctx, clients, addresses, false)
+	return api.reader.FetchOrGetCachedWalletBalances(ctx, clients, addresses, forceRefresh)
 }
 
 type DerivedAddress struct {
