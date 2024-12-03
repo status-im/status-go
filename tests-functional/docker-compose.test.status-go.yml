@@ -50,27 +50,3 @@ services:
     volumes:
       - ./coverage/binary:/coverage/binary
     stop_signal: SIGINT
-
-  tests-rpc:
-    user: ${FUNCTIONAL_TESTS_DOCKER_UID}
-    depends_on:
-      status-go:
-        condition: service_healthy
-      status-backend:
-        condition: service_healthy
-      deploy-communities-contracts:
-        condition: service_completed_successfully
-    build:
-      context: .
-      dockerfile: Dockerfile.tests-rpc
-    entrypoint: [
-      "pytest",
-      "-m", "rpc",
-      "--anvil_url=http://anvil:8545",
-      "--rpc_url_statusd=http://status-go:3333",
-      "--status_backend_urls=${STATUS_BACKEND_URLS}",
-      "--ws_url_statusd=ws://status-go:8354",
-      "--junitxml=/tests-rpc/reports/report.xml"
-    ]
-    volumes:
-      - .:/tests-rpc

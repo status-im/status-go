@@ -13,6 +13,7 @@ coverage_reports_path="${root_path}/coverage"
 binary_coverage_reports_path="${coverage_reports_path}/binary"
 merged_coverage_reports_path="${coverage_reports_path}/merged"
 test_results_path="${root_path}/reports"
+status_backend_logs="${root_path}/logs/status-backend"
 
 # Cleanup any previous coverage reports
 rm -rf "${coverage_reports_path}"
@@ -22,19 +23,40 @@ rm -rf "${test_results_path}"
 mkdir -p "${binary_coverage_reports_path}"
 mkdir -p "${merged_coverage_reports_path}"
 mkdir -p "${test_results_path}"
+mkdir -p "${status_backend_logs}"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.test.status-go.yml"
 project_name="status-go-func-tests-$(date +%s)"
 
-export STATUS_BACKEND_COUNT=10
 export STATUS_BACKEND_URLS=$(eval echo http://${project_name}-status-backend-{1..${STATUS_BACKEND_COUNT}}:3333 | tr ' ' ,)
 
-# Run functional tests
-echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
-docker compose -p ${project_name} ${all_compose_files} up -d --build --scale status-backend=${STATUS_BACKEND_COUNT} --remove-orphans
+# Remove orphans
+docker ps -a --filter "name=status-go-func-tests-*-status-backend-*" --filter "status=exited" -q | xargs -r docker rm
 
-echo -e "${GRN}Running tests-rpc${RST}" # Follow the logs, wait for them to finish
-docker compose -p ${project_name} ${all_compose_files} logs -f tests-rpc > "${root_path}/tests-rpc.log"
+# Run docker
+echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"
+docker compose -p ${project_name} ${all_compose_files} up -d --build --remove-orphans
+
+# Set up virtual environment
+venv_path="${root_path}/.venv"
+
+if [[ -d "${venv_path}" ]]; then
+    echo -e "${GRN}Using existing virtual environment${RST}"
+else
+    echo -e "${GRN}Creating new virtual environment${RST}"
+    python3 -m venv "${venv_path}"
+fi
+
+source "${venv_path}/bin/activate"
+
+# Upgrade pip and install requirements
+echo -e "${GRN}Installing dependencies${RST}"
+pip install --upgrade pip
+pip install -r "${root_path}/requirements.txt"
+
+# Run functional tests
+pytest -m rpc --docker_project_name=${project_name} --junitxml=${test_results_path}/report.xml
+exit_code=$?
 
 # Stop containers
 echo -e "${GRN}Stopping docker containers${RST}"
@@ -44,9 +66,6 @@ docker compose -p ${project_name} ${all_compose_files} stop
 echo -e "${GRN}Saving logs${RST}"
 docker compose -p ${project_name} ${all_compose_files} logs status-go > "${root_path}/statusd.log"
 docker compose -p ${project_name} ${all_compose_files} logs status-backend > "${root_path}/status-backend.log"
-
-# Retrieve exit code
-exit_code=$(docker inspect ${project_name}-tests-rpc-1 -f '{{.State.ExitCode}}');
 
 # Cleanup containers
 echo -e "${GRN}Removing docker containers${RST}"

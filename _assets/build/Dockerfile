@@ -30,6 +30,7 @@ LABEL source="https://github.com/status-im/status-go"
 LABEL description="status-go is an underlying part of Status - a browser, messenger, and gateway to a decentralized world."
 
 RUN apk add --no-cache ca-certificates bash libgcc libstdc++ curl
+RUN mkdir -p /usr/status-user && chmod -R 777 /usr/status-user
 RUN mkdir -p /static/keys
 RUN mkdir -p /static/configs
 

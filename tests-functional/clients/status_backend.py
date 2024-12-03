@@ -4,23 +4,32 @@ import time
 import random
 import threading
 import requests
-from tenacity import retry, stop_after_delay, wait_fixed
+import docker
+import os
 
+from tenacity import retry, stop_after_delay, wait_fixed
 from clients.signals import SignalClient
 from clients.rpc import RpcClient
 from datetime import datetime
 from conftest import option
-from constants import user_1, DEFAULT_DISPLAY_NAME
+from constants import user_1, DEFAULT_DISPLAY_NAME, USER_DIR
 
 
 class StatusBackend(RpcClient, SignalClient):
 
-    def __init__(self, await_signals=[], url=None):
-        try:
-            url = url if url else random.choice(option.status_backend_urls)
-        except IndexError:
-            raise Exception("Not enough status-backend containers, please add more")
-        option.status_backend_urls.remove(url)
+    def __init__(self, await_signals=[], new_container=True):
+
+        if new_container:
+
+            self.docker_client = docker.from_env()
+            host_port = random.choice(option.status_backend_port_range)
+
+            self.container = self._start_container(host_port)
+            url = f"http://0.0.0.0:{host_port}"
+            option.status_backend_port_range.remove(host_port)
+
+        else:
+            url = option.status_backend_url
 
         self.api_url = f"{url}/statusgo"
         self.ws_url = f"{url}".replace("http", "ws")
@@ -29,14 +38,71 @@ class StatusBackend(RpcClient, SignalClient):
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
 
+        self._health_check()
+
         websocket_thread = threading.Thread(target=self._connect)
         websocket_thread.daemon = True
         websocket_thread.start()
 
+    def _start_container(self, host_port):
+        docker_project_name = option.docker_project_name
+
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        image_name = f"{docker_project_name}-status-backend:latest"
+        container_name = f"{docker_project_name}-status-backend-{timestamp}"
+
+        coverage_path = os.path.abspath("./coverage/binary")
+
+        container_args = {
+            "image": image_name,
+            "detach": True,
+            "name": container_name,
+            "labels": {"com.docker.compose.project": docker_project_name},
+            "entrypoint": [
+                "status-backend",
+                "--address", "0.0.0.0:3333",
+            ],
+            "ports": {"3333/tcp": host_port},
+            "environment": {
+                "GOCOVERDIR": "/coverage/binary",
+            },
+            "volumes": {
+                coverage_path: {
+                    "bind": "/coverage/binary",
+                    "mode": "rw",
+                }
+            },
+            "stop_signal": "SIGINT"
+        }
+
+        if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
+            container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
+
+        container = self.docker_client.containers.run(**container_args)
+
+        network = self.docker_client.networks.get(
+            f"{docker_project_name}_default")
+        network.connect(container)
+
+        option.status_backend_containers.append(container.id)
+        return container
+
+    def _health_check(self):
+        start_time = time.time()
+        while True:
+            try:
+                self.api_valid_request(method="Fleets", data=[])
+                break
+            except Exception as e:
+                if time.time() - start_time > 20:
+                    raise Exception(e)
+                time.sleep(1)
+
     def api_request(self, method, data, url=None):
         url = url if url else self.api_url
         url = f"{url}/{method}"
-        logging.info(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True, indent=4)}")
+        logging.info(
+            f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True, indent=4)}")
         response = requests.post(url, json=data)
         logging.info(f"Got response: {response.content}")
         return response
@@ -46,7 +112,8 @@ class StatusBackend(RpcClient, SignalClient):
         assert response.content
         logging.info(f"Got response: {response.content}")
         try:
-            assert not response.json()["error"]
+            error = response.json()["error"]
+            assert not error, f"Error: {error}"
         except json.JSONDecodeError:
             raise AssertionError(
                 f"Invalid JSON in response: {response.content}")
@@ -58,7 +125,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.verify_is_valid_api_response(response)
         return response
 
-    def init_status_backend(self, data_dir="/"):
+    def init_status_backend(self, data_dir=USER_DIR):
         method = "InitializeApplication"
         data = {
             "dataDir": data_dir,
@@ -68,7 +135,7 @@ class StatusBackend(RpcClient, SignalClient):
         }
         return self.api_valid_request(method, data)
 
-    def create_account_and_login(self, data_dir="/", display_name=DEFAULT_DISPLAY_NAME, password=user_1.password):
+    def create_account_and_login(self, data_dir=USER_DIR, display_name=DEFAULT_DISPLAY_NAME, password=user_1.password):
         method = "CreateAccountAndLogin"
         data = {
             "rootDataDir": data_dir,
@@ -81,7 +148,7 @@ class StatusBackend(RpcClient, SignalClient):
         }
         return self.api_valid_request(method, data)
 
-    def restore_account_and_login(self, data_dir="/",display_name=DEFAULT_DISPLAY_NAME, user=user_1,
+    def restore_account_and_login(self, data_dir=USER_DIR, display_name=DEFAULT_DISPLAY_NAME, user=user_1,
                                   network_id=31337):
         method = "RestoreAccountAndLogin"
         data = {
@@ -136,7 +203,8 @@ class StatusBackend(RpcClient, SignalClient):
                 return
             except AssertionError:
                 time.sleep(3)
-        raise TimeoutError(f"RPC client was not started after {timeout} seconds")
+        raise TimeoutError(
+            f"RPC client was not started after {timeout} seconds")
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.5), reraise=True)
     def start_messenger(self, params=[]):
@@ -173,7 +241,8 @@ class StatusBackend(RpcClient, SignalClient):
         for account in accounts:
             if account.get("name") == display_name:
                 return account.get("public-key")
-        raise ValueError(f"Public key not found for display name: {display_name}")
+        raise ValueError(
+            f"Public key not found for display name: {display_name}")
 
     def send_contact_request(self, params=[]):
         method = "wakuext_sendContactRequest"

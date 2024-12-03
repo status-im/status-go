@@ -15,7 +15,7 @@ def verify_json_schema(response, method):
         jsonschema.validate(instance=response,
                             schema=json.load(schema))
         
-def get_suggested_routes(rpc_client, signal_client, **kwargs):
+def get_suggested_routes(rpc_client, **kwargs):
     _uuid = str(uuid.uuid4())
     amount_in = "0xde0b6b3a7640000"
 
@@ -43,15 +43,15 @@ def get_suggested_routes(rpc_client, signal_client, **kwargs):
                 f"Warning: The key '{key}' does not exist in the input_params parameters and will be ignored.")
     params = [input_params]
 
-    signal_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
+    rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
     _ = rpc_client.rpc_valid_request(method, params)
 
-    routes = signal_client.wait_for_signal("wallet.suggested.routes")
+    routes = rpc_client.wait_for_signal("wallet.suggested.routes")
     assert routes['event']['Uuid'] == _uuid
 
     return routes['event']
 
-def build_transactions_from_route(rpc_client, signal_client, uuid, **kwargs):
+def build_transactions_from_route(rpc_client, uuid, **kwargs):
     method = "wallet_buildTransactionsFromRoute"
     build_tx_params = {
         "uuid": uuid,
@@ -66,7 +66,7 @@ def build_transactions_from_route(rpc_client, signal_client, uuid, **kwargs):
     params = [build_tx_params]
     _ = rpc_client.rpc_valid_request(method, params)
 
-    wallet_router_sign_transactions = signal_client.wait_for_signal("wallet.router.sign-transactions")
+    wallet_router_sign_transactions = rpc_client.wait_for_signal("wallet.router.sign-transactions")
 
     assert wallet_router_sign_transactions['event']['signingDetails']['signOnKeycard'] == False
     transaction_hashes = wallet_router_sign_transactions['event']['signingDetails']['hashes']
@@ -101,7 +101,7 @@ def sign_messages(rpc_client, hashes):
         tx_signatures[hash] = signature
     return tx_signatures
 
-def send_router_transactions_with_signatures(rpc_client, signal_client, uuid, tx_signatures):
+def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
     method = "wallet_sendRouterTransactionsWithSignatures"
     params = [
         {
@@ -111,18 +111,18 @@ def send_router_transactions_with_signatures(rpc_client, signal_client, uuid, tx
     ]
     _ = rpc_client.rpc_valid_request(method, params)
 
-    tx_status = signal_client.wait_for_signal(
+    tx_status = rpc_client.wait_for_signal(
         "wallet.transaction.status-changed")
 
     assert tx_status["event"]["status"] == "Success"
 
     return tx_status["event"]
 
-def send_router_transaction(rpc_client, signal_client, **kwargs):
-    routes = get_suggested_routes(rpc_client, signal_client, **kwargs)
-    build_tx = build_transactions_from_route(rpc_client, signal_client, routes['Uuid'])
+def send_router_transaction(rpc_client, **kwargs):
+    routes = get_suggested_routes(rpc_client, **kwargs)
+    build_tx = build_transactions_from_route(rpc_client, routes['Uuid'])
     tx_signatures = sign_messages(rpc_client, build_tx['signingDetails']['hashes'])
-    tx_status = send_router_transactions_with_signatures(rpc_client, signal_client, routes['Uuid'], tx_signatures)
+    tx_status = send_router_transactions_with_signatures(rpc_client, routes['Uuid'], tx_signatures)
     return {
         "routes": routes,
         "build_tx": build_tx,

@@ -179,8 +179,8 @@ class NetworkConditionTestCase:
 
 class OneToOneMessageTestCase(NetworkConditionTestCase):
 
-    def initialize_backend(self, await_signals, display_name=DEFAULT_DISPLAY_NAME, url=None):
-        backend = StatusBackend(await_signals=await_signals, url=url)
+    def initialize_backend(self, await_signals, display_name=DEFAULT_DISPLAY_NAME):
+        backend = StatusBackend(await_signals=await_signals)
         backend.init_status_backend()
         backend.create_account_and_login(display_name=display_name)
         backend.start_messenger()
