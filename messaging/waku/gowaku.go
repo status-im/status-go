@@ -292,7 +292,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, protectedTo
 		node.WithConnectionNotification(waku.connectionNotifChan),
 		node.WithTopicHealthStatusChannel(waku.topicHealthStatusChan),
 		node.WithKeepAlive(randomPeersKeepAliveInterval, allPeersKeepAliveInterval),
-		node.WithLogger(logger),
+		node.WithLogger(logger.Named("wakunode")),
 		node.WithLogLevel(logger.Level()),
 		node.WithClusterID(cfg.ClusterID),
 		node.WithMaxMsgSize(1024 * 1024),
@@ -1003,7 +1003,7 @@ func (w *Waku) GetFilter(id string) types.Filter {
 // Unsubscribe removes an installed message handler.
 func (w *Waku) UnsubscribeMany(ids []string) error {
 	for _, id := range ids {
-		w.logger.Info("cleaning up filter", zap.String("id", id))
+		w.logger.Debug("cleaning up filter", zap.String("id", id))
 		ok := w.filters.Uninstall(id)
 		if !ok {
 			w.logger.Warn("could not remove filter with id", zap.String("id", id))
@@ -1432,7 +1432,7 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 
 	_, err := w.add(recvMessage, processImmediately)
 	if err != nil {
-		logger.Info("invalid envelope received", zap.Error(err))
+		logger.Debug("invalid envelope received", zap.Error(err))
 		trouble = true
 	}
 
