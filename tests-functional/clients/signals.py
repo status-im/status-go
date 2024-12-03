@@ -90,11 +90,11 @@ class SignalClient:
     def find_signal_containing_pattern(self, signal_type, event_pattern, timeout=20):
         start_time = time.time()
         while True:
+            if time.time() - start_time >= timeout:
+                raise TimeoutError(
+                    f"Signal {signal_type} containing {event_pattern} is not received in {timeout} seconds"
+                )
             if not self.received_signals.get(signal_type):
-                if time.time() - start_time >= timeout:
-                    raise TimeoutError(
-                        f"Signal {signal_type} containing {event_pattern} is not received in {timeout} seconds"
-                    )
                 time.sleep(0.2)
                 continue
             for event in self.received_signals[signal_type]["received"]:

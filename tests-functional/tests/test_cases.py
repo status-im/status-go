@@ -190,26 +190,24 @@ class OneToOneMessageTestCase(NetworkConditionTestCase):
         assert len(messages_in_event) > 0, "No messages found in the event"
         response_chat = response["result"]["chats"][0]
 
-        mismatch_details = []
-        for message in messages_in_event:
-            match = True
-            message_mismatch = []
-            for response_field, event_field in fields_to_validate.items():
-                response_value = response_chat["lastMessage"][response_field]
-                event_value = message[event_field]
-                if response_value != event_value:
-                    match = False
-                    message_mismatch.append(
-                        f"Field '{response_field}': Expected '{response_value}', Found '{event_value}'"
-                    )
-            if match:
-                return
+        message_id = response_chat["lastMessage"]["id"]
+        message = next((message for message in messages_in_event if message["id"] == message_id), None)
+        assert message, f"Message with ID {message_id} not found in the event"
 
-            mismatch_details.append(f"Message ID: {message['id']}, Mismatches: {message_mismatch}")
+        message_mismatch = []
+        for response_field, event_field in fields_to_validate.items():
+            response_value = response_chat["lastMessage"][response_field]
+            event_value = message[event_field]
+            if response_value != event_value:
+                message_mismatch.append(
+                    f"Field '{response_field}': Expected '{response_value}', Found '{event_value}'"
+                )
+
+        if not message_mismatch:
+            return
 
         raise AssertionError(
             "Some Sender RPC responses are not matching the signals received by the receiver.\n"
             "Details of mismatches:\n" +
-            "\n".join(mismatch_details)
+            "\n".join(message_mismatch)
         )
-

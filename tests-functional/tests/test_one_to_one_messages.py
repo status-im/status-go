@@ -34,10 +34,7 @@ class TestOneToOneMessages(OneToOneMessageTestCase):
             messages_new_event = self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text, timeout=60)
             self.validate_event_against_response(
                 messages_new_event,
-                fields_to_validate={
-                    "text": "text",
-                    "id": "id",
-                },
+                fields_to_validate={"text": "text"},
                 response=response,
             )
 
