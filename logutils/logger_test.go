@@ -12,7 +12,7 @@ func TestPrintOrigins(t *testing.T) {
 	buffer := bytes.NewBuffer(nil)
 
 	logger := defaultLogger()
-	logger.Core().(*Core).UpdateSyncer(zapcore.AddSync(buffer))
+	logger.Core().(*namespaceFilteringCore).Parent().(*Core).UpdateSyncer(zapcore.AddSync(buffer))
 
 	logger.Info("hello")
 

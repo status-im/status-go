@@ -34,7 +34,7 @@ func defaultLogger() *zap.Logger {
 		zapcore.AddSync(io.Discard),
 		zap.NewAtomicLevelAt(zap.InfoLevel),
 	)
-	return zap.New(core, zap.AddCaller())
+	return zap.New(newNamespaceFilteringCore(core), zap.AddCaller())
 }
 
 func defaultEncoder() zapcore.Encoder {

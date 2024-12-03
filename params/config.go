@@ -426,6 +426,10 @@ type NodeConfig struct {
 	// LogLevel defines minimum log level. Valid names are "ERROR", "WARN", "INFO", "DEBUG", and "TRACE".
 	LogLevel string `validate:"eq=ERROR|eq=WARN|eq=INFO|eq=DEBUG|eq=TRACE"`
 
+	// LogNamespaces defines log level per namespace. Example: "namespace1:debug,namespace2.namespace3:error"
+	// It doesn't affect LogLevel for unmentioned namespaces.
+	LogNamespaces string
+
 	// LogMaxBackups defines number of rotated log files that will be stored.
 	LogMaxBackups int
 
@@ -1196,6 +1200,7 @@ func (c *NodeConfig) LogSettings() logutils.LogSettings {
 	return logutils.LogSettings{
 		Enabled:         c.LogEnabled,
 		Level:           c.LogLevel,
+		Namespaces:      c.LogNamespaces,
 		File:            c.LogFile,
 		MaxSize:         c.LogMaxSize,
 		MaxBackups:      c.LogMaxBackups,

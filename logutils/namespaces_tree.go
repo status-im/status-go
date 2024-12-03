@@ -12,6 +12,13 @@ import (
 var namespacesRegex = regexp.MustCompile(`^([a-zA-Z0-9_\.]+:(debug|info|warn|error))(,[a-zA-Z0-9_\.]+:(debug|info|warn|error))*$`)
 var errInvalidNamespacesFormat = fmt.Errorf("invalid namespaces format")
 
+func ValidateNamespaces(namespaces string) error {
+	if namespaces != "" && !namespacesRegex.MatchString(namespaces) {
+		return errInvalidNamespacesFormat
+	}
+	return nil
+}
+
 type namespacesTree struct {
 	namespaces map[string]*namespaceNode
 	minLevel   zapcore.Level

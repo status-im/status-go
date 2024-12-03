@@ -38,6 +38,14 @@ func (m *Messenger) SetLogLevel(request *requests.SetLogLevel) error {
 	return nodecfg.SetLogLevel(m.database, request.LogLevel)
 }
 
+func (m *Messenger) SetLogNamespaces(request *requests.SetLogNamespaces) error {
+	if err := request.Validate(); err != nil {
+		return err
+	}
+
+	return nodecfg.SetLogNamespaces(m.database, request.LogNamespaces)
+}
+
 func (m *Messenger) SetMaxLogBackups(request *requests.SetMaxLogBackups) error {
 	return nodecfg.SetMaxLogBackups(m.database, request.MaxLogBackups)
 }

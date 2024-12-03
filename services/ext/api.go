@@ -1808,8 +1808,26 @@ func (api *PublicAPI) SetLogLevel(request *requests.SetLogLevel) error {
 	return api.service.messenger.SetLogLevel(request)
 }
 
+func (api *PublicAPI) SetLogNamespaces(request *requests.SetLogNamespaces) error {
+	return api.service.messenger.SetLogNamespaces(request)
+}
+
 func (api *PublicAPI) SetMaxLogBackups(request *requests.SetMaxLogBackups) error {
 	return api.service.messenger.SetMaxLogBackups(request)
+}
+
+func (api *PublicAPI) LogTest() error {
+	l1 := logutils.ZapLogger().Named("test1")
+	l2 := l1.Named("test2")
+	l3 := l2.Named("test3")
+
+	for level := zap.DebugLevel; level <= zap.ErrorLevel; level++ {
+		for _, logger := range []*zap.Logger{l1, l2, l3} {
+			logger.Check(level, "test message").Write(zap.String("level", level.String()))
+		}
+	}
+
+	return l1.Sync()
 }
 
 func (api *PublicAPI) SetCustomNodes(request *requests.SetCustomNodes) error {

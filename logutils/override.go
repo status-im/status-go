@@ -12,6 +12,7 @@ import (
 type LogSettings struct {
 	Enabled         bool   `json:"Enabled"`
 	Level           string `json:"Level"`
+	Namespaces      string `json:"Namespaces"`
 	File            string `json:"File"`
 	MaxSize         int    `json:"MaxSize"`
 	MaxBackups      int    `json:"MaxBackups"`
@@ -20,10 +21,11 @@ type LogSettings struct {
 }
 
 func OverrideRootLoggerWithConfig(settings LogSettings) error {
-	return overrideCoreWithConfig(ZapLogger().Core().(*Core), settings)
+	return overrideCoreWithConfig(ZapLogger().Core().(*namespaceFilteringCore), settings)
 }
 
-func overrideCoreWithConfig(core *Core, settings LogSettings) error {
+func overrideCoreWithConfig(filteringCore *namespaceFilteringCore, settings LogSettings) error {
+	core := filteringCore.Parent().(*Core)
 	if !settings.Enabled {
 		core.UpdateSyncer(zapcore.AddSync(io.Discard))
 		return nil
@@ -37,6 +39,11 @@ func overrideCoreWithConfig(core *Core, settings LogSettings) error {
 		return err
 	}
 	core.SetLevel(level)
+
+	err = filteringCore.Rebuild(settings.Namespaces)
+	if err != nil {
+		return err
+	}
 
 	if settings.File != "" {
 		if settings.MaxBackups == 0 {

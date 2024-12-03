@@ -63,30 +63,34 @@ class StatusBackend(RpcClient, SignalClient):
     def init_status_backend(self, data_dir="/"):
         method = "InitializeApplication"
         data = {
-            "dataDir": data_dir
+            "dataDir": data_dir,
         }
         return self.api_valid_request(method, data)
 
-    def create_account_and_login(self, display_name=DEFAULT_DISPLAY_NAME, password=user_1.password):
-        data_dir = f"dataDir_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    def create_account_and_login(self, data_dir="/", display_name=DEFAULT_DISPLAY_NAME, password=user_1.password):
         method = "CreateAccountAndLogin"
         data = {
             "rootDataDir": data_dir,
             "kdfIterations": 256000,
             "displayName": display_name,
             "password": password,
-            "customizationColor": "primary"
+            "customizationColor": "primary",
+            "logEnabled": True,
+            "logLevel": "INFO",
         }
         return self.api_valid_request(method, data)
 
-    def restore_account_and_login(self, display_name=DEFAULT_DISPLAY_NAME, user=user_1):
+    def restore_account_and_login(self, data_dir="/",display_name=DEFAULT_DISPLAY_NAME, user=user_1):
         method = "RestoreAccountAndLogin"
         data = {
-            "rootDataDir": "/",
+            "rootDataDir": data_dir,
+            "kdfIterations": 256000,
             "displayName": display_name,
             "password": user.password,
             "mnemonic": user.passphrase,
             "customizationColor": "blue",
+            "logEnabled": True,
+            "logLevel": "INFO",
             "testNetworksEnabled": True,
             "networkId": 31337,
             "networksOverride": [
@@ -106,6 +110,19 @@ class StatusBackend(RpcClient, SignalClient):
             ]
         }
         return self.api_valid_request(method, data)
+
+    def login(self, keyUid, user=user_1):
+        method = "LoginAccount"
+        data = {
+            "password": user.password,
+            "keyUid": keyUid,
+            "kdfIterations": 256000,
+        }
+        return self.api_valid_request(method, data)
+
+    def logout(self, user=user_1):
+        method = "Logout"
+        return self.api_valid_request(method, {})
 
     def restore_account_and_wait_for_rpc_client_to_start(self, timeout=60):
         self.restore_account_and_login()

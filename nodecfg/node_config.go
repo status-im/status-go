@@ -89,10 +89,10 @@ func insertHTTPConfig(tx *sql.Tx, c *params.NodeConfig) error {
 func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO log_config (
-		enabled, log_dir, log_level, max_backups, max_size,
+		enabled, log_dir, log_level, log_namespaces, max_backups, max_size,
 		file, compress_rotated, log_to_stderr, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'id'	)`,
-		c.LogEnabled, c.LogDir, c.LogLevel, c.LogMaxBackups, c.LogMaxSize,
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
+		c.LogEnabled, c.LogDir, c.LogLevel, c.LogNamespaces, c.LogMaxBackups, c.LogMaxSize,
 		c.LogFile, c.LogCompressRotated, c.LogToStderr,
 	)
 
@@ -488,8 +488,8 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	err = tx.QueryRow("SELECT enabled, log_dir, log_level, file, max_backups, max_size, compress_rotated, log_to_stderr FROM log_config WHERE synthetic_id = 'id'").Scan(
-		&nodecfg.LogEnabled, &nodecfg.LogDir, &nodecfg.LogLevel, &nodecfg.LogFile, &nodecfg.LogMaxBackups, &nodecfg.LogMaxSize, &nodecfg.LogCompressRotated, &nodecfg.LogToStderr)
+	err = tx.QueryRow("SELECT enabled, log_dir, log_level, log_namespaces, file, max_backups, max_size, compress_rotated, log_to_stderr FROM log_config WHERE synthetic_id = 'id'").Scan(
+		&nodecfg.LogEnabled, &nodecfg.LogDir, &nodecfg.LogLevel, &nodecfg.LogNamespaces, &nodecfg.LogFile, &nodecfg.LogMaxBackups, &nodecfg.LogMaxSize, &nodecfg.LogCompressRotated, &nodecfg.LogToStderr)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
@@ -788,6 +788,11 @@ func SetStoreConfirmationForMessagesSent(db *sql.DB, enabled bool) error {
 
 func SetLogLevel(db *sql.DB, logLevel string) error {
 	_, err := db.Exec(`UPDATE log_config SET log_level = ?`, logLevel)
+	return err
+}
+
+func SetLogNamespaces(db *sql.DB, logNamespaces string) error {
+	_, err := db.Exec(`UPDATE log_config SET log_namespaces = ?`, logNamespaces)
 	return err
 }
 

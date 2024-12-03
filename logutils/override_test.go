@@ -65,7 +65,7 @@ func TestOverrideCoreWithConfig(t *testing.T) {
 				zapcore.AddSync(io.Discard),
 				zap.NewAtomicLevelAt(zap.InfoLevel),
 			)
-			err := overrideCoreWithConfig(core, tt.settings)
+			err := overrideCoreWithConfig(newNamespaceFilteringCore(core), tt.settings)
 			if tt.expectError {
 				require.Error(t, err)
 			} else {
