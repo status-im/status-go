@@ -24,7 +24,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
-	"golang.org/x/time/rate"
 )
 
 // LightPushID_v20beta1 is the current Waku LightPush protocol identifier
@@ -40,7 +39,7 @@ var (
 type WakuLightPush struct {
 	h       host.Host
 	relay   *relay.WakuRelay
-	limiter *rate.Limiter
+	limiter *utils.RateLimiter
 	cancel  context.CancelFunc
 	pm      *peermanager.PeerManager
 	metrics Metrics
@@ -59,11 +58,12 @@ func NewWakuLightPush(relay *relay.WakuRelay, pm *peermanager.PeerManager, reg p
 	wakuLP.metrics = newMetrics(reg)
 
 	params := &LightpushParameters{}
+	opts = append(DefaultLightpushOptions(), opts...)
 	for _, opt := range opts {
 		opt(params)
 	}
 
-	wakuLP.limiter = params.limiter
+	wakuLP.limiter = utils.NewRateLimiter(params.limitR, params.limitB)
 
 	return wakuLP
 }
@@ -106,7 +106,7 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(network.Stream)
 			Response: &pb.PushResponse{},
 		}
 
-		if wakuLP.limiter != nil && !wakuLP.limiter.Allow() {
+		if !wakuLP.limiter.Allow(stream.Conn().RemotePeer()) {
 			wakuLP.metrics.RecordError(rateLimitFailure)
 			responseMsg := "exceeds the rate limit"
 			responsePushRPC.Response.Info = &responseMsg

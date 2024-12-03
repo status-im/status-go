@@ -55,6 +55,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
 
+	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"github.com/waku-org/go-waku/waku/v2/api/missing"
@@ -71,8 +72,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
-
-	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
@@ -119,6 +118,7 @@ type ITelemetryClient interface {
 	PushMissedMessage(ctx context.Context, envelope *protocol.Envelope)
 	PushMissedRelevantMessage(ctx context.Context, message *common.ReceivedMessage)
 	PushMessageDeliveryConfirmed(ctx context.Context, messageHash string)
+	PushSentMessageTotal(ctx context.Context, messageSize uint32)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -1114,12 +1114,18 @@ func (w *Waku) Start() error {
 			peerTelemetryTicker := time.NewTicker(peerTelemetryTickerInterval)
 			defer peerTelemetryTicker.Stop()
 
-			sub, err := w.node.Host().EventBus().Subscribe(new(utils.DialError))
+			dialErrSub, err := w.node.Host().EventBus().Subscribe(new(utils.DialError))
 			if err != nil {
 				w.logger.Error("failed to subscribe to dial errors", zap.Error(err))
 				return
 			}
-			defer sub.Close()
+			defer dialErrSub.Close()
+
+			messageSentSub, err := w.node.Host().EventBus().Subscribe(new(publish.MessageSent))
+			if err != nil {
+				w.logger.Error("failed to subscribe to message sent events", zap.Error(err))
+				return
+			}
 
 			for {
 				select {
@@ -1127,11 +1133,13 @@ func (w *Waku) Start() error {
 					return
 				case <-peerTelemetryTicker.C:
 					w.reportPeerMetrics()
-				case dialErr := <-sub.Out():
+				case dialErr := <-dialErrSub.Out():
 					errors := common.ParseDialErrors(dialErr.(utils.DialError).Err.Error())
 					for _, dialError := range errors {
 						w.statusTelemetryClient.PushDialFailure(w.ctx, common.DialError{ErrType: dialError.ErrType, ErrMsg: dialError.ErrMsg, Protocols: dialError.Protocols})
 					}
+				case messageSent := <-messageSentSub.Out():
+					w.statusTelemetryClient.PushSentMessageTotal(w.ctx, messageSent.(publish.MessageSent).Size)
 				}
 			}
 		}()
@@ -1299,6 +1307,10 @@ func (w *Waku) startMessageSender() error {
 	if err != nil {
 		w.logger.Error("failed to create message sender", zap.Error(err))
 		return err
+	}
+
+	if w.cfg.TelemetryServerURL != "" {
+		sender.WithMessageSentEmitter(w.node.Host())
 	}
 
 	if w.cfg.EnableStoreConfirmationForMessagesSent {

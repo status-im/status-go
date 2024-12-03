@@ -96,6 +96,7 @@ var (
 	peerNotFoundFailure        metricsErrCategory = "peer_not_found_failure"
 	writeResponseFailure       metricsErrCategory = "write_response_failure"
 	pushTimeoutFailure         metricsErrCategory = "push_timeout_failure"
+	rateLimitFailure           metricsErrCategory = "ratelimit_failure"
 )
 
 // RecordError increases the counter for different error types

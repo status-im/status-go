@@ -54,6 +54,7 @@ type WakuFilterLightNode struct {
 	log              *zap.Logger
 	subscriptions    *subscription.SubscriptionsMap
 	pm               *peermanager.PeerManager
+	limiter          *utils.RateLimiter
 	peerPingInterval time.Duration
 }
 
@@ -89,6 +90,7 @@ func NewWakuFilterLightNode(
 	onlineChecker onlinechecker.OnlineChecker,
 	reg prometheus.Registerer,
 	log *zap.Logger,
+	opts ...LightNodeOption,
 ) *WakuFilterLightNode {
 	wf := new(WakuFilterLightNode)
 	wf.log = log.Named("filterv2-lightnode")
@@ -99,6 +101,14 @@ func NewWakuFilterLightNode(
 	wf.CommonService = service.NewCommonService()
 	wf.metrics = newMetrics(reg)
 	wf.peerPingInterval = 1 * time.Minute
+
+	params := &LightNodeParameters{}
+	opts = append(DefaultLightNodeOptions(), opts...)
+	for _, opt := range opts {
+		opt(params)
+	}
+	wf.limiter = utils.NewRateLimiter(params.limitR, params.limitB)
+
 	return wf
 }
 
@@ -154,6 +164,14 @@ func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(network.Strea
 		peerID := stream.Conn().RemotePeer()
 
 		logger := wf.log.With(logging.HostID("peerID", peerID))
+
+		if !wf.limiter.Allow(peerID) {
+			wf.metrics.RecordError(rateLimitFailure)
+			if err := stream.Reset(); err != nil {
+				wf.log.Error("resetting connection", zap.Error(err))
+			}
+			return
+		}
 
 		if !wf.subscriptions.IsSubscribedTo(peerID) {
 			logger.Warn("received message push from unknown peer", logging.HostID("peerID", peerID))
@@ -287,7 +305,7 @@ func (wf *WakuFilterLightNode) request(ctx context.Context, requestID []byte,
 
 	}
 
-	if filterSubscribeResponse.RequestId != request.RequestId {
+	if filterSubscribeResponse.RequestId != "N/A" && filterSubscribeResponse.RequestId != request.RequestId {
 		wf.log.Error("requestID mismatch", zap.String("expected", request.RequestId), zap.String("received", filterSubscribeResponse.RequestId))
 		wf.metrics.RecordError(requestIDMismatch)
 		err := NewFilterError(300, "request_id_mismatch")

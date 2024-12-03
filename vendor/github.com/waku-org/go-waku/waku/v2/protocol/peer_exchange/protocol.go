@@ -23,7 +23,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/service"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
-	"golang.org/x/time/rate"
 )
 
 // PeerExchangeID_v20alpha1 is the current Waku Peer Exchange protocol identifier
@@ -51,7 +50,7 @@ type WakuPeerExchange struct {
 
 	peerConnector PeerConnector
 	enrCache      *enrCache
-	limiter       *rate.Limiter
+	limiter       *utils.RateLimiter
 }
 
 // NewWakuPeerExchange returns a new instance of WakuPeerExchange struct
@@ -68,11 +67,12 @@ func NewWakuPeerExchange(disc *discv5.DiscoveryV5, clusterID uint16, peerConnect
 	wakuPX.CommonService = service.NewCommonService()
 
 	params := &PeerExchangeParameters{}
+	opts = append(DefaultPeerExchangeOptions(), opts...)
 	for _, opt := range opts {
 		opt(params)
 	}
 
-	wakuPX.limiter = params.limiter
+	wakuPX.limiter = utils.NewRateLimiter(params.limiterR, params.limiterB)
 	return wakuPX, nil
 }
 
@@ -97,9 +97,10 @@ func (wakuPX *WakuPeerExchange) start() error {
 
 func (wakuPX *WakuPeerExchange) onRequest() func(network.Stream) {
 	return func(stream network.Stream) {
-		logger := wakuPX.log.With(logging.HostID("peer", stream.Conn().RemotePeer()))
+		peerID := stream.Conn().RemotePeer()
+		logger := wakuPX.log.With(logging.HostID("peer", peerID))
 
-		if wakuPX.limiter != nil && !wakuPX.limiter.Allow() {
+		if wakuPX.limiter != nil && !wakuPX.limiter.Allow(peerID) {
 			wakuPX.metrics.RecordError(rateLimitFailure)
 			wakuPX.log.Info("exceeds the rate limit")
 			// TODO: peer exchange protocol should contain an err field

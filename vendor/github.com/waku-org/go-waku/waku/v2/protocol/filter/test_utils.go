@@ -22,6 +22,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 type LightNodeData struct {
@@ -133,7 +134,7 @@ func (s *FilterTestSuite) GetWakuFilterFullNode(topic string, withRegisterAll bo
 
 	nodeData := s.GetWakuRelay(topic)
 
-	node2Filter := NewWakuFilterFullNode(timesource.NewDefaultClock(), prometheus.DefaultRegisterer, s.Log)
+	node2Filter := NewWakuFilterFullNode(timesource.NewDefaultClock(), prometheus.DefaultRegisterer, s.Log, WithFullNodeRateLimiter(rate.Inf, 0))
 	node2Filter.SetHost(nodeData.FullNodeHost)
 
 	var sub *relay.Subscription
@@ -166,7 +167,7 @@ func (s *FilterTestSuite) GetWakuFilterLightNode() LightNodeData {
 	b := relay.NewBroadcaster(10)
 	s.Require().NoError(b.Start(context.Background()))
 	pm := peermanager.NewPeerManager(5, 5, nil, nil, true, s.Log)
-	filterPush := NewWakuFilterLightNode(b, pm, timesource.NewDefaultClock(), onlinechecker.NewDefaultOnlineChecker(true), prometheus.DefaultRegisterer, s.Log)
+	filterPush := NewWakuFilterLightNode(b, pm, timesource.NewDefaultClock(), onlinechecker.NewDefaultOnlineChecker(true), prometheus.DefaultRegisterer, s.Log, WithLightNodeRateLimiter(rate.Inf, 0))
 	filterPush.SetHost(host)
 	pm.SetHost(host)
 	return LightNodeData{filterPush, host}

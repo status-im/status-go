@@ -58,6 +58,8 @@ const (
 	MissedRelevantMessageMetric TelemetryType = "MissedRelevantMessages"
 	// MVDS ack received for a sent message
 	MessageDeliveryConfirmedMetric TelemetryType = "MessageDeliveryConfirmed"
+	// Total number and size of Waku messages sent by this node
+	SentMessageTotalMetric TelemetryType = "SentMessageTotal"
 )
 
 const MaxRetryCache = 5000
@@ -145,6 +147,10 @@ func (c *Client) PushMessageDeliveryConfirmed(ctx context.Context, messageHash s
 	c.processAndPushTelemetry(ctx, MessageDeliveryConfirmed{MessageHash: messageHash})
 }
 
+func (c *Client) PushSentMessageTotal(ctx context.Context, messageSize uint32) {
+	c.processAndPushTelemetry(ctx, SentMessageTotal{Size: messageSize})
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
@@ -194,6 +200,10 @@ type MissedRelevantMessage struct {
 
 type MessageDeliveryConfirmed struct {
 	MessageHash string
+}
+
+type SentMessageTotal struct {
+	Size uint32
 }
 
 type Client struct {
@@ -392,6 +402,12 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			TelemetryType: MessageDeliveryConfirmedMetric,
 			TelemetryData: c.ProcessMessageDeliveryConfirmed(v),
 		}
+	case SentMessageTotal:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: SentMessageTotalMetric,
+			TelemetryData: c.ProcessSentMessageTotal(v),
+		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
 		return
@@ -564,6 +580,12 @@ func (c *Client) ProcessMissedRelevantMessage(missedMessage MissedRelevantMessag
 func (c *Client) ProcessMessageDeliveryConfirmed(messageDeliveryConfirmed MessageDeliveryConfirmed) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["messageHash"] = messageDeliveryConfirmed.MessageHash
+	return c.marshalPostBody(postBody)
+}
+
+func (c *Client) ProcessSentMessageTotal(sentMessageTotal SentMessageTotal) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["size"] = sentMessageTotal.Size
 	return c.marshalPostBody(postBody)
 }
 

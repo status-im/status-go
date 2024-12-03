@@ -37,9 +37,9 @@ type (
 		metrics Metrics
 		log     *zap.Logger
 		*service.CommonService
-		subscriptions *SubscribersMap
-		pm            *peermanager.PeerManager
-
+		subscriptions    *SubscribersMap
+		pm               *peermanager.PeerManager
+		limiter          *utils.RateLimiter
 		maxSubscriptions int
 	}
 )
@@ -56,6 +56,7 @@ func NewWakuFilterFullNode(timesource timesource.Timesource, reg prometheus.Regi
 		opt(params)
 	}
 
+	wf.limiter = utils.NewRateLimiter(params.limitR, params.limitB)
 	wf.CommonService = service.NewCommonService()
 	wf.metrics = newMetrics(reg)
 	wf.subscriptions = NewSubscribersMap(params.Timeout)
@@ -93,7 +94,14 @@ func (wf *WakuFilterFullNode) start(sub *relay.Subscription) error {
 
 func (wf *WakuFilterFullNode) onRequest(ctx context.Context) func(network.Stream) {
 	return func(stream network.Stream) {
-		logger := wf.log.With(logging.HostID("peer", stream.Conn().RemotePeer()))
+		peerID := stream.Conn().RemotePeer()
+		logger := wf.log.With(logging.HostID("peer", peerID))
+
+		if !wf.limiter.Allow(peerID) {
+			wf.metrics.RecordError(rateLimitFailure)
+			wf.reply(ctx, stream, &pb.FilterSubscribeRequest{RequestId: "N/A"}, http.StatusTooManyRequests, "filter request rejected due rate limit exceeded")
+			return
+		}
 
 		reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
 

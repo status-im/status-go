@@ -448,7 +448,7 @@ github.com/jackpal/go-nat-pmp
 # github.com/jbenet/go-temp-err-catcher v0.1.0
 ## explicit; go 1.13
 github.com/jbenet/go-temp-err-catcher
-# github.com/jellydator/ttlcache/v3 v3.2.0
+# github.com/jellydator/ttlcache/v3 v3.3.0
 ## explicit; go 1.18
 github.com/jellydator/ttlcache/v3
 # github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
@@ -1044,7 +1044,7 @@ github.com/waku-org/go-discover/discover/v5wire
 github.com/waku-org/go-libp2p-rendezvous
 github.com/waku-org/go-libp2p-rendezvous/db
 github.com/waku-org/go-libp2p-rendezvous/pb
-# github.com/waku-org/go-waku v0.8.1-0.20241128183857-1608cf2b0b90
+# github.com/waku-org/go-waku v0.8.1-0.20241203032230-6550ff35bc71
 ## explicit; go 1.21
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/tests

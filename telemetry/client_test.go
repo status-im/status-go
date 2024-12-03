@@ -597,3 +597,17 @@ func TestProcessDialFailure(t *testing.T) {
 	}
 	runTestCase(t, tc)
 }
+
+func TestProcessSentMessageTotal(t *testing.T) {
+	tc := testCase{
+		name: "SentMessageTotal",
+		input: SentMessageTotal{
+			Size: uint32(1234),
+		},
+		expectedType: SentMessageTotalMetric,
+		expectedFields: map[string]interface{}{
+			"size": float64(1234),
+		},
+	}
+	runTestCase(t, tc)
+}

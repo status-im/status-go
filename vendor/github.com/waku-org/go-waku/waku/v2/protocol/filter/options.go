@@ -11,6 +11,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 func (old *FilterSubscribeParameters) Copy() *FilterSubscribeParameters {
@@ -57,12 +58,34 @@ type (
 		Timeout        time.Duration
 		MaxSubscribers int
 		pm             *peermanager.PeerManager
+		limitR         rate.Limit
+		limitB         int
 	}
 
 	Option func(*FilterParameters)
 
+	LightNodeParameters struct {
+		limitR rate.Limit
+		limitB int
+	}
+
+	LightNodeOption func(*LightNodeParameters)
+
 	FilterSubscribeOption func(*FilterSubscribeParameters) error
 )
+
+func WithLightNodeRateLimiter(r rate.Limit, b int) LightNodeOption {
+	return func(params *LightNodeParameters) {
+		params.limitR = r
+		params.limitB = b
+	}
+}
+
+func DefaultLightNodeOptions() []LightNodeOption {
+	return []LightNodeOption{
+		WithLightNodeRateLimiter(1, 1),
+	}
+}
 
 func WithTimeout(timeout time.Duration) Option {
 	return func(params *FilterParameters) {
@@ -202,9 +225,17 @@ func WithPeerManager(pm *peermanager.PeerManager) Option {
 	}
 }
 
+func WithFullNodeRateLimiter(r rate.Limit, b int) Option {
+	return func(params *FilterParameters) {
+		params.limitR = r
+		params.limitB = b
+	}
+}
+
 func DefaultOptions() []Option {
 	return []Option{
 		WithTimeout(DefaultIdleSubscriptionTimeout),
 		WithMaxSubscribers(DefaultMaxSubscribers),
+		WithFullNodeRateLimiter(1, 1),
 	}
 }
