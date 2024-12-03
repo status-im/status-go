@@ -57,11 +57,5 @@ func defaultConfig() *sentry.ClientOptions {
 func beforeSend(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 	event.Modules = nil   // Clear modules as we know all dependencies by commit hash
 	event.ServerName = "" // Clear server name as it might be sensitive
-
-	// Cleanup the stacktrace from last Recover/LogOnPanic frames
-	for _, exception := range event.Exception {
-		trimStacktrace(exception.Stacktrace)
-	}
-
 	return event
 }
