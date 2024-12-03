@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/requests"
 )
 
 type Manager struct {
@@ -96,7 +97,7 @@ func (m *Manager) GetCollectibleContractData(chainID uint64, contractAddress str
 		TotalSupply:    &bigint.BigInt{Int: totalSupply},
 		Transferable:   transferable,
 		RemoteBurnable: remoteBurnable,
-		InfiniteSupply: GetInfiniteSupply().Cmp(totalSupply) == 0,
+		InfiniteSupply: requests.GetInfiniteSupply().Cmp(totalSupply) == 0,
 	}, nil
 }
 
@@ -113,7 +114,7 @@ func (m *Manager) GetAssetContractData(chainID uint64, contractAddress string) (
 
 	return &communities.AssetContractData{
 		TotalSupply:    &bigint.BigInt{Int: totalSupply},
-		InfiniteSupply: GetInfiniteSupply().Cmp(totalSupply) == 0,
+		InfiniteSupply: requests.GetInfiniteSupply().Cmp(totalSupply) == 0,
 	}, nil
 }
 
