@@ -192,6 +192,8 @@ func TestBasicWakuV2(t *testing.T) {
 	storeNodeInfo, err := GetNwakuInfo(nil, &extNodeRestPort)
 	require.NoError(t, err)
 
+	ctx := context.Background()
+
 	wakuConfig := Config{
 		UseThrottledPublish: true,
 		ClusterID:           16,
@@ -240,9 +242,7 @@ func TestBasicWakuV2(t *testing.T) {
 	storeNode, err := peer.AddrInfoFromString(storeNodeInfo.ListenAddresses[0])
 	require.NoError(t, err)
 
-	for i := 0; i <= 100; i++ {
-		time.Sleep(2 * time.Second)
-	}
+	w.node.DialPeer(ctx, storeNode.Addrs[0], "")
 
 	w.StorenodeCycle.SetStorenodeConfigProvider(newTestStorenodeConfigProvider(*storeNode))
 

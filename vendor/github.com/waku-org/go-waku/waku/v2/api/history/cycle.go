@@ -76,6 +76,7 @@ func NewStorenodeCycle(logger *zap.Logger, pinger common.Pinger) *StorenodeCycle
 		StorenodeNotWorkingEmitter:       NewEmitter[struct{}](),
 		StorenodeAvailableEmitter:        NewEmitter[peer.ID](),
 		logger:                           logger.Named("storenode-cycle"),
+		pinger:                           pinger,
 	}
 }
 
