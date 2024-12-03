@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -18,13 +17,14 @@ import (
 	communityownertokenregistry "github.com/status-im/status-go/contracts/community-tokens/registry"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/requests"
+	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -39,80 +39,17 @@ type API struct {
 	s *Service
 }
 
-type DeploymentDetails struct {
-	ContractAddress string                `json:"contractAddress"`
-	TransactionHash string                `json:"transactionHash"`
-	CommunityToken  *token.CommunityToken `json:"communityToken"`
-	OwnerToken      *token.CommunityToken `json:"ownerToken"`
-	MasterToken     *token.CommunityToken `json:"masterToken"`
-}
-
-const maxSupply = 999999999
-
-type DeploymentParameters struct {
-	Name               string               `json:"name"`
-	Symbol             string               `json:"symbol"`
-	Supply             *bigint.BigInt       `json:"supply"`
-	InfiniteSupply     bool                 `json:"infiniteSupply"`
-	Transferable       bool                 `json:"transferable"`
-	RemoteSelfDestruct bool                 `json:"remoteSelfDestruct"`
-	TokenURI           string               `json:"tokenUri"`
-	OwnerTokenAddress  string               `json:"ownerTokenAddress"`
-	MasterTokenAddress string               `json:"masterTokenAddress"`
-	CommunityID        string               `json:"communityId"`
-	Description        string               `json:"description"`
-	CroppedImage       *images.CroppedImage `json:"croppedImage,omitempty"` // for community tokens
-	Base64Image        string               `json:"base64image"`            // for owner & master tokens
-	Decimals           int                  `json:"decimals"`
-}
-
-func (d *DeploymentParameters) GetSupply() *big.Int {
-	if d.InfiniteSupply {
-		return d.GetInfiniteSupply()
-	}
-	return d.Supply.Int
-}
-
-// infinite supply for ERC721 is 2^256-1
-func (d *DeploymentParameters) GetInfiniteSupply() *big.Int {
-	return GetInfiniteSupply()
-}
-
-func GetInfiniteSupply() *big.Int {
-	max := new(big.Int).Exp(big.NewInt(2), big.NewInt(256), nil)
-	max.Sub(max, big.NewInt(1))
-	return max
-}
-
-func (d *DeploymentParameters) Validate(isAsset bool) error {
-	if len(d.Name) <= 0 {
-		return errors.New("empty collectible name")
-	}
-	if len(d.Symbol) <= 0 {
-		return errors.New("empty collectible symbol")
-	}
-	var maxForType = big.NewInt(maxSupply)
-	if isAsset {
-		assetMultiplier, _ := big.NewInt(0).SetString("1000000000000000000", 10)
-		maxForType = maxForType.Mul(maxForType, assetMultiplier)
-	}
-	if !d.InfiniteSupply && (d.Supply.Cmp(big.NewInt(0)) < 0 || d.Supply.Cmp(maxForType) > 0) {
-		return fmt.Errorf("wrong supply value: %v", d.Supply)
-	}
-	return nil
-}
-
-func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs wallettypes.SendTxArgs, password string) (DeploymentDetails, error) {
+func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deploymentParameters requests.DeploymentParameters, txArgs wallettypes.SendTxArgs, password string) (responses.DeploymentDetails, error) {
 	err := deploymentParameters.Validate(false)
 	if err != nil {
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 	transactOpts := txArgs.ToTransactOpts(utils.VerifyPasswordAndGetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
 		logutils.ZapLogger().Error(err.Error())
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 	address, tx, _, err := collectibles.DeployCollectibles(transactOpts, ethClient, deploymentParameters.Name,
 		deploymentParameters.Symbol, deploymentParameters.GetSupply(),
@@ -121,7 +58,7 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 		common.HexToAddress(deploymentParameters.MasterTokenAddress))
 	if err != nil {
 		logutils.ZapLogger().Error(err.Error())
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	err = api.s.pendingTracker.TrackPendingTransaction(
@@ -135,16 +72,16 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 	)
 	if err != nil {
 		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	savedCommunityToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), deploymentParameters, txArgs.From.Hex(), address.Hex(),
 		protobuf.CommunityTokenType_ERC721, token.CommunityLevel, tx.Hash().Hex())
 	if err != nil {
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
-	return DeploymentDetails{
+	return responses.DeploymentDetails{
 		ContractAddress: address.Hex(),
 		TransactionHash: tx.Hash().Hex(),
 		CommunityToken:  savedCommunityToken}, nil
@@ -180,27 +117,27 @@ func prepareDeploymentSignatureStruct(signature string, communityID string, addr
 }
 
 func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
-	ownerTokenParameters DeploymentParameters, masterTokenParameters DeploymentParameters,
-	signerPubKey string, txArgs wallettypes.SendTxArgs, password string) (DeploymentDetails, error) {
+	ownerTokenParameters requests.DeploymentParameters, masterTokenParameters requests.DeploymentParameters,
+	signerPubKey string, txArgs wallettypes.SendTxArgs, password string) (responses.DeploymentDetails, error) {
 	err := ownerTokenParameters.Validate(false)
 	if err != nil {
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	if len(signerPubKey) <= 0 {
-		return DeploymentDetails{}, fmt.Errorf("signerPubKey is empty")
+		return responses.DeploymentDetails{}, fmt.Errorf("signerPubKey is empty")
 	}
 
 	err = masterTokenParameters.Validate(false)
 	if err != nil {
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	transactOpts := txArgs.ToTransactOpts(utils.VerifyPasswordAndGetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	deployerContractInst, err := api.NewCommunityTokenDeployerInstance(chainID)
 	if err != nil {
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	ownerTokenConfig := communitytokendeployer.CommunityTokenDeployerTokenConfig{
@@ -217,12 +154,12 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 
 	signature, err := api.s.Messenger.CreateCommunityTokenDeploymentSignature(context.Background(), chainID, txArgs.From.Hex(), ownerTokenParameters.CommunityID)
 	if err != nil {
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	communitySignature, err := prepareDeploymentSignatureStruct(types.HexBytes(signature).String(), ownerTokenParameters.CommunityID, common.Address(txArgs.From))
 	if err != nil {
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	logutils.ZapLogger().Debug("Prepare deployment", zap.Any("signature", communitySignature))
@@ -231,7 +168,7 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 
 	if err != nil {
 		logutils.ZapLogger().Error(err.Error())
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	logutils.ZapLogger().Debug("Contract deployed", zap.Stringer("hash", tx.Hash()))
@@ -247,21 +184,21 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
 	)
 	if err != nil {
 		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	savedOwnerToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), ownerTokenParameters, txArgs.From.Hex(),
 		api.s.TemporaryOwnerContractAddress(tx.Hash().Hex()), protobuf.CommunityTokenType_ERC721, token.OwnerLevel, tx.Hash().Hex())
 	if err != nil {
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 	savedMasterToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), masterTokenParameters, txArgs.From.Hex(),
 		api.s.TemporaryMasterContractAddress(tx.Hash().Hex()), protobuf.CommunityTokenType_ERC721, token.MasterLevel, tx.Hash().Hex())
 	if err != nil {
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
-	return DeploymentDetails{
+	return responses.DeploymentDetails{
 		ContractAddress: "",
 		TransactionHash: tx.Hash().Hex(),
 		OwnerToken:      savedOwnerToken,
@@ -273,11 +210,11 @@ func (api *API) ReTrackOwnerTokenDeploymentTransaction(ctx context.Context, chai
 	return api.s.ReTrackOwnerTokenDeploymentTransaction(ctx, chainID, contractAddress)
 }
 
-func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs wallettypes.SendTxArgs, password string) (DeploymentDetails, error) {
+func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentParameters requests.DeploymentParameters, txArgs wallettypes.SendTxArgs, password string) (responses.DeploymentDetails, error) {
 
 	err := deploymentParameters.Validate(true)
 	if err != nil {
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	transactOpts := txArgs.ToTransactOpts(utils.VerifyPasswordAndGetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
@@ -285,7 +222,7 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
 		logutils.ZapLogger().Error(err.Error())
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	const decimals = 18
@@ -296,7 +233,7 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		common.HexToAddress(deploymentParameters.MasterTokenAddress))
 	if err != nil {
 		logutils.ZapLogger().Error(err.Error())
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	err = api.s.pendingTracker.TrackPendingTransaction(
@@ -310,16 +247,16 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 	)
 	if err != nil {
 		logutils.ZapLogger().Error("TrackPendingTransaction error", zap.Error(err))
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
 	savedCommunityToken, err := api.s.CreateCommunityTokenAndSave(int(chainID), deploymentParameters, txArgs.From.Hex(), address.Hex(),
 		protobuf.CommunityTokenType_ERC20, token.CommunityLevel, tx.Hash().Hex())
 	if err != nil {
-		return DeploymentDetails{}, err
+		return responses.DeploymentDetails{}, err
 	}
 
-	return DeploymentDetails{
+	return responses.DeploymentDetails{
 		ContractAddress: address.Hex(),
 		TransactionHash: tx.Hash().Hex(),
 		CommunityToken:  savedCommunityToken}, nil
@@ -334,7 +271,7 @@ func (api *API) DeployAssetsEstimate(ctx context.Context, chainID uint64, fromAd
 }
 
 func (api *API) DeployOwnerTokenEstimate(ctx context.Context, chainID uint64, fromAddress string,
-	ownerTokenParameters DeploymentParameters, masterTokenParameters DeploymentParameters,
+	ownerTokenParameters requests.DeploymentParameters, masterTokenParameters requests.DeploymentParameters,
 	communityID string, signerPubKey string) (*CommunityTokenFees, error) {
 	return api.s.deployOwnerTokenEstimate(ctx, chainID, fromAddress, ownerTokenParameters, masterTokenParameters, communityID, signerPubKey)
 }
