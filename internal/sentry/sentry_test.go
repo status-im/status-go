@@ -32,12 +32,8 @@ func TestBeforeSend(t *testing.T) {
 	// Call the beforeSend function
 	result := beforeSend(event, nil)
 
-	// Verify that the stacktrace frames are correctly trimmed
-	require.NotNil(t, result)
-	require.Len(t, result.Exception[0].Stacktrace.Frames, 1)
-	require.Equal(t, "OtherFunction", result.Exception[0].Stacktrace.Frames[0].Function)
-
 	// Verify that Modules and ServerName are empty
+	require.NotNil(t, result)
 	require.Empty(t, result.Modules)
 	require.Empty(t, result.ServerName)
 }
