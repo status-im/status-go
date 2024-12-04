@@ -242,14 +242,29 @@ class StatusBackend(RpcClient, SignalClient):
         raise ValueError(
             f"Public key not found for display name: {display_name}")
 
-    def send_contact_request(self, params=[]):
+    def send_contact_request(self, contact_id: str, message: str):
         method = "wakuext_sendContactRequest"
+        params = [{"id": contact_id, "message": message}]
         response = self.rpc_request(method, params)
         self.verify_is_valid_json_rpc_response(response)
         return response.json()
 
-    def send_message(self, params=[]):
+    def accept_contact_request(self, chat_id: str):
+        method = "wakuext_acceptContactRequest"
+        params = [{"id": chat_id}]
+        response = self.rpc_request(method, params)
+        self.verify_is_valid_json_rpc_response(response)
+        return response.json()
+
+    def get_contacts(self):
+        method = "wakuext_contacts"
+        response = self.rpc_request(method)
+        self.verify_is_valid_json_rpc_response(response)
+        return response.json()
+
+    def send_message(self, contact_id: str, message: str):
         method = "wakuext_sendOneToOneMessage"
+        params = [{"id": contact_id, "message": message}]
         response = self.rpc_request(method, params)
         self.verify_is_valid_json_rpc_response(response)
         return response.json()

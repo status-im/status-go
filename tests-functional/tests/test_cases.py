@@ -187,18 +187,17 @@ class OneToOneMessageTestCase(NetworkConditionTestCase):
         return backend
 
 
-    def validate_event_against_response(self, event, fields_to_validate, response):
-        messages_in_event = event["event"]["messages"]
-        assert len(messages_in_event) > 0, "No messages found in the event"
-        response_chat = response["result"]["chats"][0]
+    def validate_signal_event_against_response(self, signal_event, fields_to_validate, expected_message):
+        expected_message_id = expected_message.get("id")
+        signal_event_messages = signal_event.get("event", {}).get("messages")
+        assert len(signal_event_messages) > 0, "No messages found in the signal event"
 
-        message_id = response_chat["lastMessage"]["id"]
-        message = next((message for message in messages_in_event if message["id"] == message_id), None)
-        assert message, f"Message with ID {message_id} not found in the event"
+        message = next((message for message in signal_event_messages if message.get("id") == expected_message_id), None)
+        assert message, f"Message with ID {expected_message_id} not found in the signal event"
 
         message_mismatch = []
         for response_field, event_field in fields_to_validate.items():
-            response_value = response_chat["lastMessage"][response_field]
+            response_value = expected_message[response_field]
             event_value = message[event_field]
             if response_value != event_value:
                 message_mismatch.append(
@@ -213,3 +212,11 @@ class OneToOneMessageTestCase(NetworkConditionTestCase):
             "Details of mismatches:\n" +
             "\n".join(message_mismatch)
         )
+
+    def get_message_by_content_type(self, response, content_type):
+        messages = response.get("result", {}).get("messages", [])
+        for message in messages:
+            if message.get("contentType") == content_type:
+                return message
+
+        raise ValueError(f"Failed to find a message with contentType '{content_type}' in response")
