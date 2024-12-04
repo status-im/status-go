@@ -823,38 +823,6 @@ func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
 	return api.s.currency.FetchAllCurrencyFormats()
 }
 
-// @deprecated replaced by session APIs; see #12120
-func (api *API) FilterActivityAsync(requestID int32, addresses []common.Address, chainIDs []wcommon.ChainID, filter activity.Filter, offset int, limit int) error {
-	logutils.ZapLogger().Debug("wallet.api.FilterActivityAsync",
-		zap.Int32("requestID", requestID),
-		zap.Int("addr.count", len(addresses)),
-		zap.Int("chainIDs.count", len(chainIDs)),
-		zap.Int("offset", offset),
-		zap.Int("limit", limit),
-	)
-
-	api.s.activity.FilterActivityAsync(requestID, addresses, chainIDs, filter, offset, limit)
-	return nil
-}
-
-// @deprecated replaced by session APIs; see #12120
-func (api *API) CancelActivityFilterTask(requestID int32) error {
-	logutils.ZapLogger().Debug("wallet.api.CancelActivityFilterTask", zap.Int32("requestID", requestID))
-
-	api.s.activity.CancelFilterTask(requestID)
-	return nil
-}
-
-func (api *API) StartActivityFilterSession(addresses []common.Address, chainIDs []wcommon.ChainID, filter activity.Filter, firstPageCount int) (activity.SessionID, error) {
-	logutils.ZapLogger().Debug("wallet.api.StartActivityFilterSession",
-		zap.Int("addr.count", len(addresses)),
-		zap.Int("chainIDs.count", len(chainIDs)),
-		zap.Int("firstPageCount", firstPageCount),
-	)
-
-	return api.s.activity.StartFilterSession(addresses, chainIDs, filter, firstPageCount, activity.V1), nil
-}
-
 func (api *API) StartActivityFilterSessionV2(addresses []common.Address, chainIDs []wcommon.ChainID, filter activity.Filter, firstPageCount int) (activity.SessionID, error) {
 	logutils.ZapLogger().Debug("wallet.api.StartActivityFilterSessionV2",
 		zap.Int("addr.count", len(addresses)),
@@ -896,18 +864,6 @@ func (api *API) StopActivityFilterSession(id activity.SessionID) {
 	logutils.ZapLogger().Debug("wallet.api.StopActivityFilterSession", zap.Int32("id", int32(id)))
 
 	api.s.activity.StopFilterSession(id)
-}
-
-func (api *API) GetMultiTxDetails(ctx context.Context, multiTxID int) (*activity.EntryDetails, error) {
-	logutils.ZapLogger().Debug("wallet.api.GetMultiTxDetails", zap.Int("multiTxID", multiTxID))
-
-	return api.s.activity.GetMultiTxDetails(ctx, multiTxID)
-}
-
-func (api *API) GetTxDetails(ctx context.Context, id string) (*activity.EntryDetails, error) {
-	logutils.ZapLogger().Debug("wallet.api.GetTxDetails", zap.String("id", id))
-
-	return api.s.activity.GetTxDetails(ctx, id)
 }
 
 func (api *API) GetRecipientsAsync(requestID int32, chainIDs []wcommon.ChainID, addresses []common.Address, offset int, limit int) (ignored bool, err error) {

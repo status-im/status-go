@@ -117,38 +117,6 @@ type FilterResponse struct {
 	ErrorCode ErrorCode `json:"errorCode"`
 }
 
-// FilterActivityAsync allows only one filter task to run at a time
-// it cancels the current one if a new one is started
-// and should not expect other owners to have data in one of the queried tables
-//
-// All calls will trigger an EventActivityFilteringDone event with the result of the filtering
-// TODO #12120: replace with session based APIs
-func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Address, chainIDs []w_common.ChainID, filter Filter, offset int, limit int) {
-	s.scheduler.Enqueue(requestID, filterTask, func(ctx context.Context) (interface{}, error) {
-		allAddresses := s.areAllAddresses(addresses)
-		activities, err := getActivityEntries(ctx, s.getDeps(), addresses, allAddresses, chainIDs, filter, offset, limit)
-		return activities, err
-	}, func(result interface{}, taskType async.TaskType, err error) {
-		res := FilterResponse{
-			ErrorCode: ErrorCodeFailed,
-		}
-
-		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
-			res.ErrorCode = ErrorCodeTaskCanceled
-		} else if err == nil {
-			activities := result.([]Entry)
-			res.Activities = activities
-			res.Offset = offset
-			res.HasMore = len(activities) == limit
-			res.ErrorCode = ErrorCodeSuccess
-		}
-
-		sendResponseEvent(s.eventFeed, &requestID, EventActivityFilteringDone, res, err)
-
-		s.getActivityDetailsAsync(requestID, res.Activities)
-	})
-}
-
 type CollectibleHeader struct {
 	ID       thirdparty.CollectibleUniqueID `json:"id"`
 	Name     string                         `json:"name"`
@@ -205,14 +173,6 @@ func (s *Service) GetActivityCollectiblesAsync(requestID int32, chainIDs []w_com
 
 		sendResponseEvent(s.eventFeed, &requestID, EventActivityGetCollectibles, res, err)
 	})
-}
-
-func (s *Service) GetMultiTxDetails(ctx context.Context, multiTxID int) (*EntryDetails, error) {
-	return getMultiTxDetails(ctx, s.db, multiTxID)
-}
-
-func (s *Service) GetTxDetails(ctx context.Context, id string) (*EntryDetails, error) {
-	return getTxDetails(ctx, s.db, id)
 }
 
 // getActivityDetails check if any of the entries have details that are not loaded then fetch and emit result

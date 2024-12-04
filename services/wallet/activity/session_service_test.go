@@ -21,7 +21,7 @@ func TestService_IncrementalUpdateOnTop(t *testing.T) {
 	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 5, V1)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 5, V2)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -98,7 +98,7 @@ func TestService_IncrementalUpdateMixed(t *testing.T) {
 	)
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 5, V1)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 5, V2)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -145,7 +145,7 @@ func TestService_IncrementalUpdateFetchWindow(t *testing.T) {
 	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2, V1)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2, V2)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -194,7 +194,7 @@ func TestService_IncrementalUpdateFetchWindowNoReset(t *testing.T) {
 	allAddresses, pendings, ch, cleanup := setupTransactions(t, state, transactionCount, []transactions.TestTxSummary{{DontConfirm: true, Timestamp: transactionCount + 1}})
 	defer cleanup()
 
-	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2, V1)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 2, V2)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 
@@ -241,7 +241,7 @@ func TestService_FilteredIncrementalUpdateResetAndClear(t *testing.T) {
 	allAddresses = append(append(allAddresses, newFromTrs...), newToTrs...)
 
 	// 1. User visualizes transactions for the first time
-	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 4, V1)
+	sessionID := state.service.StartFilterSession(allAddresses, allNetworksFilter(), Filter{}, 4, V2)
 	require.Greater(t, sessionID, SessionID(0))
 	defer state.service.StopFilterSession(sessionID)
 

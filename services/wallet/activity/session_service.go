@@ -27,7 +27,6 @@ import (
 type Version string
 
 const (
-	V1 Version = "v1"
 	V2 Version = "v2"
 )
 
@@ -61,10 +60,10 @@ type fullFilterParams struct {
 }
 
 func (s *Service) getActivityEntries(ctx context.Context, f fullFilterParams, offset int, count int) ([]Entry, error) {
-	allAddresses := s.areAllAddresses(f.addresses)
-	if f.version == V1 {
-		return getActivityEntries(ctx, s.getDeps(), f.addresses, allAddresses, f.chainIDs, f.filter, offset, count)
+	if f.version != V2 {
+		return nil, errors.New("unsupported version")
 	}
+	allAddresses := s.areAllAddresses(f.addresses)
 	return getActivityEntriesV2(ctx, s.getDeps(), f.addresses, allAddresses, f.chainIDs, f.filter, offset, count)
 }
 
@@ -364,18 +363,13 @@ func (s *Service) processChangesForSession(session *Session, eventCount int, cha
 
 	f := session.getFullFilterParams()
 	limit := NoLimit
-	if session.version == V1 {
-		limit = len(session.model) + eventCount
-	}
 	activities, err := s.getActivityEntries(context.Background(), f, 0, limit)
 	if err != nil {
 		logutils.ZapLogger().Error("Error getting activity entries", zap.Error(err))
 		return
 	}
 
-	if session.version != V1 {
-		s.processEntryDataUpdates(session.id, activities, changedTxs)
-	}
+	s.processEntryDataUpdates(session.id, activities, changedTxs)
 
 	allData := append(session.new, session.model...)
 	new, _ /*removed*/ := findUpdates(allData, activities)

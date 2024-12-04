@@ -1396,56 +1396,6 @@ func TestGetActivityEntries_ErrorIfNoAddress(t *testing.T) {
 	require.EqualError(t, err, "no addresses provided")
 }
 
-func TestGetTxDetails(t *testing.T) {
-	deps, close := setupTestActivityDB(t)
-	defer close()
-
-	// Adds 4 extractable transactions 2 transactions (ETH/Sepolia, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
-	td, _, _ := fillTestData(t, deps.db)
-
-	_, err := getTxDetails(context.Background(), deps.db, "")
-	require.EqualError(t, err, "invalid tx id")
-
-	details, err := getTxDetails(context.Background(), deps.db, td.tr1.Hash.String())
-	require.NoError(t, err)
-
-	require.Equal(t, td.tr1.Hash.String(), details.ID)
-	require.Equal(t, 0, details.MultiTxID)
-	require.Equal(t, td.tr1.Nonce, details.Nonce)
-	require.Equal(t, len(details.ChainDetails), 1)
-	require.Equal(t, td.tr1.ChainID, common.ChainID(details.ChainDetails[0].ChainID))
-	require.Equal(t, td.tr1.BlkNumber, details.ChainDetails[0].BlockNumber)
-	require.Equal(t, td.tr1.Hash, details.ChainDetails[0].Hash)
-	require.Equal(t, td.tr1.Contract, *details.ChainDetails[0].Contract)
-}
-
-func TestGetMultiTxDetails(t *testing.T) {
-	deps, close := setupTestActivityDB(t)
-	defer close()
-
-	// Adds 4 extractable transactions 2 transactions (ETH/Sepolia, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
-	td, _, _ := fillTestData(t, deps.db)
-
-	_, err := getMultiTxDetails(context.Background(), deps.db, 0)
-	require.EqualError(t, err, "invalid tx id")
-
-	details, err := getMultiTxDetails(context.Background(), deps.db, int(td.multiTx1.ID))
-	require.NoError(t, err)
-
-	require.Equal(t, "", details.ID)
-	require.Equal(t, int(td.multiTx1.ID), details.MultiTxID)
-	require.Equal(t, td.multiTx1Tr2.Nonce, details.Nonce)
-	require.Equal(t, 2, len(details.ChainDetails))
-	require.Equal(t, td.multiTx1Tr1.ChainID, common.ChainID(details.ChainDetails[0].ChainID))
-	require.Equal(t, td.multiTx1Tr1.BlkNumber, details.ChainDetails[0].BlockNumber)
-	require.Equal(t, td.multiTx1Tr1.Hash, details.ChainDetails[0].Hash)
-	require.Equal(t, td.multiTx1Tr1.Contract, *details.ChainDetails[0].Contract)
-	require.Equal(t, td.multiTx1Tr2.ChainID, common.ChainID(details.ChainDetails[1].ChainID))
-	require.Equal(t, td.multiTx1Tr2.BlkNumber, details.ChainDetails[1].BlockNumber)
-	require.Equal(t, td.multiTx1Tr2.Hash, details.ChainDetails[1].Hash)
-	require.Equal(t, td.multiTx1Tr2.Contract, *details.ChainDetails[1].Contract)
-}
-
 func TestGetActivityEntriesSkipEthGasFeeOnlyTransfers(t *testing.T) {
 	deps, close := setupTestActivityDB(t)
 	defer close()
