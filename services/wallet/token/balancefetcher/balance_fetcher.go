@@ -320,5 +320,8 @@ func (bf *DefaultBalanceFetcher) GetBalancesAtByChain(parent context.Context, cl
 	case <-parent.Done():
 		return nil, parent.Err()
 	}
+	if group.Error() != nil {
+		return nil, group.Error()
+	}
 	return response, nil
 }
