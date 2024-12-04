@@ -191,7 +191,7 @@ func (t *Transport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Fil
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
-	return t.filters.LoadPublic(chatID, "")
+	return t.filters.LoadPublic(chatID, "", "")
 }
 
 func (t *Transport) LeavePublic(chatID string) error {
@@ -223,6 +223,8 @@ func (t *Transport) GetStats() types.StatsSummary {
 	return t.waku.GetStats()
 }
 
+// With change in filter used for communities, messages are indexed here with common filter and not their own chatID filter.
+// The caller should not use chatID from the filter to determine chatID of the message, rather should dervice it from messaage itself.
 func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 	result := make(map[Filter][]*types.Message)
 	logger := t.logger.With(zap.String("site", "retrieveRawAll"))
@@ -276,16 +278,16 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
 // SendPublic sends a new message using the Whisper service.
 // For public filters, chat name is used as an ID as well as
 // a topic.
+// In case of communities a single topic is used to send all messages.
 func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage, chatName string) ([]byte, error) {
 	if err := t.addSig(newMessage); err != nil {
 		return nil, err
 	}
-
-	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic)
+	//passing content-topic override, it will be used if set. otherwise chatName will be used to load filter.
+	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic, newMessage.ContentTopicOverride)
 	if err != nil {
 		return nil, err
 	}
-
 	newMessage.SymKeyID = filter.SymKeyID
 	newMessage.Topic = filter.ContentTopic
 	newMessage.PubsubTopic = filter.PubsubTopic
@@ -362,7 +364,8 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 	}
 
 	// We load the filter to make sure we can post on it
-	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic)
+	//passing content-topic override, it will be used if set. otherwise chatName will be used to load filter.
+	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic, newMessage.ContentTopicOverride)
 	if err != nil {
 		return nil, err
 	}

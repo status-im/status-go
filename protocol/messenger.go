@@ -2016,7 +2016,8 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			)
 			return rawMessage, fmt.Errorf("can't post message type '%d' on chat '%s'", rawMessage.MessageType, chat.ID)
 		}
-
+		//setting content-topic over-ride for community messages to use memberUpdatesChannelID
+		rawMessage.ContentTopicOverride = community.MemberUpdateChannelID()
 		logger.Debug("sending community chat message", zap.String("chatName", chat.Name))
 		isCommunityEncrypted, err := m.communitiesManager.IsEncrypted(chat.CommunityID)
 		if err != nil {
@@ -3336,6 +3337,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	controlledCommunitiesChatIDs, err := m.communitiesManager.GetOwnedCommunitiesChatIDs()
 	if err != nil {
 		logger.Info("failed to retrieve admin communities", zap.Error(err))
+	}
+
+	//fetch universal chatIDs as well.
+	controlledCommunitiesUniversalChatIDs, err := m.communitiesManager.GetOwnedCommunitiesUniversalChatIDs()
+	if err != nil {
+		logger.Info("failed to retrieve admin communities", zap.Error(err))
+	}
+	for chatID, flag := range controlledCommunitiesUniversalChatIDs {
+		controlledCommunitiesChatIDs[chatID] = flag
 	}
 
 	iterator := m.retrievedMessagesIteratorFactory(chatWithMessages)
