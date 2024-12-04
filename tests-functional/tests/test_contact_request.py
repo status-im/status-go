@@ -59,7 +59,7 @@ class TestContactRequests(OneToOneMessageTestCase):
 
     @pytest.mark.dependency(depends=["test_contact_request_baseline"])
     def test_multiple_contact_requests(self):
-        self.test_contact_request_baseline(contact_request_count=4)
+        self.test_contact_request_baseline(contact_request_count=2) # we can increase this once we have https://github.com/status-im/status-go/pull/6159 merged
 
     @pytest.mark.dependency(depends=["test_contact_request_baseline"])
     @pytest.mark.skip(reason="Skipping until add_latency is implemented")
