@@ -162,6 +162,18 @@ class StatusBackend(RpcClient, SignalClient):
         self.verify_is_valid_json_rpc_response(response)
         return response.json()
 
+    def accept_contact_request(self, params=[]):
+        method = "wakuext_acceptContactRequest"
+        response = self.rpc_request(method, params)
+        self.verify_is_valid_json_rpc_response(response)
+        return response.json()
+
+    def get_contacts(self, params=[]):
+        method = "wakuext_contacts"
+        response = self.rpc_request(method, params)
+        self.verify_is_valid_json_rpc_response(response)
+        return response.json()
+
     def send_message(self, params=[]):
         method = "wakuext_sendOneToOneMessage"
         response = self.rpc_request(method, params)
