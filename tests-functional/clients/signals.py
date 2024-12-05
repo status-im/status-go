@@ -87,6 +87,12 @@ class SignalClient:
             return self.received_signals[signal_type]["received"][-1]
         return self.received_signals[signal_type]["received"][-delta_count:]
 
+    def wait_for_login(self):
+        signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
+        if "error" in signal["event"]:
+            assert not signal["event"]["error"]
+        return signal
+
     def find_signal_containing_pattern(self, signal_type, event_pattern, timeout=20):
         start_time = time.time()
         while True:

@@ -30,7 +30,7 @@ class TestInitialiseApp:
         backend_client.verify_json_schema(
             backend_client.wait_for_signal(SignalType.NODE_READY.value), "signal_node_ready")
         backend_client.verify_json_schema(
-            backend_client.wait_for_signal(SignalType.NODE_LOGIN.value), "signal_node_login")
+            backend_client.wait_for_login(), "signal_node_login")
 
 
 @pytest.mark.rpc

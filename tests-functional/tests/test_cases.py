@@ -25,7 +25,7 @@ class StatusDTestCase:
 class StatusBackendTestCase:
 
     await_signals = [
-        SignalType.NODE_READY.value
+        SignalType.NODE_LOGIN.value
     ]
 
     def setup_class(self):
@@ -33,7 +33,7 @@ class StatusBackendTestCase:
 
         self.rpc_client.init_status_backend()
         self.rpc_client.restore_account_and_login()
-        self.rpc_client.wait_for_signal(SignalType.NODE_READY.value)
+        self.rpc_client.wait_for_login()
 
         self.network_id = 31337
 
