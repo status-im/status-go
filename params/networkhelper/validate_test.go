@@ -1,7 +1,9 @@
-package networkhelper
+package networkhelper_test
 
 import (
 	"testing"
+
+	"github.com/status-im/status-go/params/networkhelper"
 
 	"github.com/stretchr/testify/require"
 
@@ -11,7 +13,7 @@ import (
 )
 
 func TestValidation(t *testing.T) {
-	validate := GetValidator()
+	validate := networkhelper.GetValidator()
 
 	// Test cases for RpcProvider
 	providerTests := []struct {

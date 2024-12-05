@@ -338,7 +338,6 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 		Networks:        nil,
 		DB:              appDB,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	rpcClient, _ := rpc.NewClient(config)
 

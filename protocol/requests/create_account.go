@@ -110,9 +110,6 @@ type WalletSecretsConfig struct {
 	StatusProxyMarketPassword     string `json:"statusProxyMarketPassword"`
 	StatusProxyBlockchainUser     string `json:"statusProxyBlockchainUser"`
 	StatusProxyBlockchainPassword string `json:"statusProxyBlockchainPassword"`
-
-	// Testing
-	GanacheURL string `json:"ganacheURL"`
 }
 
 func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
