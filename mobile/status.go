@@ -1072,12 +1072,12 @@ func writeHeapProfile(dataDir string) string { //nolint: deadcode
 	return makeJSONResponse(err)
 }
 
-// StartMutexProfiling starts mutex profiling and HTTP server for pprof
-func StartMutexProfiling(address string) string {
-	return callWithResponse(startMutexProfiling, address)
+// StartProfiling starts profiling and HTTP server for pprof
+func StartProfiling(address string) string {
+	return callWithResponse(startProfiling, address)
 }
 
-func startMutexProfiling(address string) string {
+func startProfiling(address string) string {
 	runtime.SetMutexProfileFraction(5)
 	profiling.NewProfiler(address).Go()
 	return makeJSONResponse(nil)
