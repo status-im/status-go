@@ -125,14 +125,6 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	chainID := uint64(1)
 	address := "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-	providerConfig := params.ProviderConfig{
-		Enabled:  true,
-		Name:     rpc.ProviderStatusProxy,
-		User:     "user1",
-		Password: "pass1",
-	}
-	providerConfigs := []params.ProviderConfig{providerConfig}
-
 	// Create a new server that delays the response by 1 second
 	serverWith1SecDelay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(1 * time.Second)
@@ -146,13 +138,16 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 			DefaultRPCURL: serverWith1SecDelay.URL + "/nodefleet/",
 		},
 	}
+
+	networks, err = rpc.UpdateEmbeddedProxyProviders(networks, true, "user1", "pass1")
+	require.NoError(t, err)
+
 	config := rpc.ClientConfig{
 		Client:          nil,
 		UpstreamChainID: chainID,
 		Networks:        networks,
 		DB:              appDB,
 		WalletFeed:      nil,
-		ProviderConfigs: providerConfigs,
 	}
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)

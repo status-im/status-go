@@ -73,7 +73,7 @@ func setupTests(t *testing.T) (state testState, close func()) {
 	networkManager := network.NewManager(state.db)
 	require.NotNil(t, networkManager)
 
-	err = networkManager.Init([]params.Network{
+	err = networkManager.InitEmbeddedNetworks([]params.Network{
 		{
 			ChainID: walletCommon.EthereumMainnet,
 			Layer:   1,

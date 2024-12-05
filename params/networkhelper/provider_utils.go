@@ -104,6 +104,7 @@ func OverrideEmbeddedProxyProviders(networks []params.Network, enabled bool, use
 		for j, provider := range network.RpcProviders {
 			if provider.Type == params.EmbeddedProxyProviderType {
 				provider.Enabled = enabled
+				provider.AuthType = params.BasicAuth
 				provider.AuthLogin = user
 				provider.AuthPassword = password
 			}
@@ -154,25 +155,6 @@ func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[strin
 				}
 			}
 		}
-	}
-	return updatedNetworks
-}
-
-func OverrideGanacheToken(networks []params.Network, ganacheURL string, chainID uint64, tokenOverride params.TokenOverride) []params.Network {
-	updatedNetworks := deepCopyNetworks(networks)
-
-	for i := range updatedNetworks {
-		network := &updatedNetworks[i]
-
-		if network.ChainID != chainID {
-			continue
-		}
-		for j := range network.RpcProviders {
-			if ganacheURL != "" {
-				network.RpcProviders[j].URL = ganacheURL
-			}
-		}
-		network.TokenOverrides = []params.TokenOverride{tokenOverride}
 	}
 	return updatedNetworks
 }

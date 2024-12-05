@@ -1,7 +1,6 @@
 package networkhelper_test
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"reflect"
 	"strings"
 	"testing"
@@ -86,6 +85,7 @@ func TestUpdateEmbeddedProxyProviders(t *testing.T) {
 				assert.True(t, provider.Enabled, "Provider Enabled state should be overridden")
 				assert.Equal(t, user, provider.AuthLogin, "Provider AuthLogin should be overridden")
 				assert.Equal(t, password, provider.AuthPassword, "Provider AuthPassword should be overridden")
+				assert.Equal(t, params.BasicAuth, provider.AuthType, "Provider AuthType should be set to BasicAuth")
 			} else {
 				assert.Equal(t, expectedProvider.Enabled, provider.Enabled, "Provider Enabled state should remain unchanged")
 				assert.Equal(t, expectedProvider.AuthLogin, provider.AuthLogin, "Provider AuthLogin should remain unchanged")
@@ -138,33 +138,6 @@ func TestOverrideDirectProvidersAuth(t *testing.T) {
 				assert.Equal(t, expectedProvider.AuthType, provider.AuthType)
 				assert.Equal(t, expectedProvider.AuthToken, provider.AuthToken)
 			}
-		}
-	}
-}
-
-func TestOverrideGanacheTokenOverrides(t *testing.T) {
-	// Create a sample list of networks with various ChainIDs
-	networks := []params.Network{
-		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", nil),
-		*testutil.CreateNetwork(api.OptimismChainID, "Optimism", nil),
-		*testutil.CreateNetwork(api.MainnetChainID, "Mainnet Duplicate", nil),
-	}
-
-	ganacheTokenOverride := params.TokenOverride{
-		Symbol:  "SNT",
-		Address: common.HexToAddress("0x8571Ddc46b10d31EF963aF49b6C7799Ea7eff818"),
-	}
-
-	// Call OverrideGanacheTokenOverrides
-	updatedNetworks := networkhelper.OverrideGanacheToken(networks, "url", api.MainnetChainID, ganacheTokenOverride)
-
-	// Verify that only networks with the specified ChainID have the token override applied
-	for _, network := range updatedNetworks {
-		if network.ChainID == api.MainnetChainID {
-			require.NotNil(t, network.TokenOverrides, "TokenOverrides should not be nil for ChainID %d", network.ChainID)
-			assert.Contains(t, network.TokenOverrides, ganacheTokenOverride, "TokenOverrides should contain the ganache token")
-		} else {
-			assert.Nil(t, network.TokenOverrides, "TokenOverrides should be nil for ChainID %d", network.ChainID)
 		}
 	}
 }

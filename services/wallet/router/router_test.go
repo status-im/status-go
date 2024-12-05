@@ -97,7 +97,6 @@ func setupRouter(t *testing.T) (*Router, func()) {
 		Networks:        defaultNetworks,
 		DB:              db,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := rpc.NewClient(config)
 

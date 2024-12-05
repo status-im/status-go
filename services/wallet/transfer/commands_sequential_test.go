@@ -1086,7 +1086,6 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 		Networks:        []params.Network{},
 		DB:              db,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1357,7 +1356,6 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		Networks:        []params.Network{},
 		DB:              db,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1489,7 +1487,6 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 			Networks:        []params.Network{},
 			DB:              db,
 			WalletFeed:      nil,
-			ProviderConfigs: nil,
 		}
 		client, _ := statusRpc.NewClient(config)
 
@@ -1578,7 +1575,6 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 		Networks:        []params.Network{},
 		DB:              db,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1701,7 +1697,6 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 		Networks:        []params.Network{},
 		DB:              db,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1849,7 +1844,6 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 		Networks:        []params.Network{},
 		DB:              db,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
