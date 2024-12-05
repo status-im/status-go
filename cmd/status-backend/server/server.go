@@ -53,13 +53,11 @@ func (s *Server) signalHandler(data []byte) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	var disconnected []*websocket.Conn
-
 	for connection := range s.connections {
 		err := connection.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		if err != nil {
 			log.Error("failed to set write deadline", "error", err)
-			disconnected = append(disconnected, connection)
+			delete(s.connections, connection)
 			_ = connection.Close()
 			continue
 		}
@@ -67,13 +65,9 @@ func (s *Server) signalHandler(data []byte) {
 		err = connection.WriteMessage(websocket.TextMessage, data)
 		if err != nil {
 			log.Error("failed to write signal message", "error", err)
-			disconnected = append(disconnected, connection)
+			delete(s.connections, connection)
 			_ = connection.Close()
 		}
-	}
-
-	for _, conn := range disconnected {
-		delete(s.connections, conn)
 	}
 }
 
