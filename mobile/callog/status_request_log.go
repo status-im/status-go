@@ -168,11 +168,11 @@ func dataField(name string, data any) zap.Field {
 }
 
 func marshalData(data any) string {
-	switch data.(type) {
+	switch d := data.(type) {
 	case string:
-		return data.(string)
+		return d
 	default:
-		bytes, err := json.Marshal(data)
+		bytes, err := json.Marshal(d)
 		if err != nil {
 			return "<failed to marshal value>"
 		}
