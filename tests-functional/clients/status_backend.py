@@ -64,6 +64,9 @@ class StatusBackend(RpcClient, SignalClient):
         method = "InitializeApplication"
         data = {
             "dataDir": data_dir,
+            "logEnabled": True,
+            "logLevel": "DEBUG",
+            "apiLogging": True,
         }
         return self.api_valid_request(method, data)
 
@@ -76,7 +79,7 @@ class StatusBackend(RpcClient, SignalClient):
             "password": password,
             "customizationColor": "primary",
             "logEnabled": True,
-            "logLevel": "INFO",
+            "logLevel": "DEBUG",
         }
         return self.api_valid_request(method, data)
 
@@ -90,7 +93,7 @@ class StatusBackend(RpcClient, SignalClient):
             "mnemonic": user.passphrase,
             "customizationColor": "blue",
             "logEnabled": True,
-            "logLevel": "INFO",
+            "logLevel": "DEBUG",
             "testNetworksEnabled": True,
             "networkId": 31337,
             "networksOverride": [

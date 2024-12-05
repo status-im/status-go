@@ -530,7 +530,7 @@ func createAccountAndLogin(requestJSON string) string {
 		_, err := statusBackend.CreateAccountAndLogin(&request)
 		if err != nil {
 			logutils.ZapLogger().Error("failed to create account", zap.Error(err))
-			return err
+			return statusBackend.LoggedIn("", err)
 		}
 		logutils.ZapLogger().Debug("started a node, and created account")
 		return nil
@@ -602,7 +602,7 @@ func restoreAccountAndLogin(requestJSON string) string {
 
 		if err != nil {
 			logutils.ZapLogger().Error("failed to restore account", zap.Error(err))
-			return err
+			return statusBackend.LoggedIn("", err)
 		}
 		logutils.ZapLogger().Debug("started a node, and restored account")
 		return nil
