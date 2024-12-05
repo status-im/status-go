@@ -1250,6 +1250,7 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
  			WHERE
  				pm.pinned = 1
  				AND NOT(m1.hide) AND m1.local_chat_id IN %s %s
+				AND m1.deleted = 0
  			ORDER BY cursor DESC
  			%s
  		`, allFields, cursorField, "(?"+strings.Repeat(",?", len(chatIDs)-1)+")", cursorWhere, limitStr),

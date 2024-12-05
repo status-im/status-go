@@ -666,6 +666,50 @@ func TestDeleteMessagesByChatID(t *testing.T) {
 
 }
 
+func TestDeletePinnedMessageByID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+	id := "1"
+
+	err = insertMinimalMessage(p, id)
+	require.NoError(t, err)
+
+	m, err := p.MessageByID(id)
+	require.NoError(t, err)
+	require.Equal(t, id, m.ID)
+
+	pinMessageProto := protobuf.PinMessage{
+		ChatId:      testPublicChatID,
+		MessageId:   m.ID,
+		Pinned:      true,
+		Clock:       2,
+		MessageType: protobuf.MessageType_PUBLIC_GROUP,
+	}
+
+	pinMessage := &common.PinMessage{
+		PinMessage: &pinMessageProto,
+	}
+
+	inserted, err := p.SavePinMessage(pinMessage)
+	require.NoError(t, err)
+	require.True(t, inserted)
+
+	pinnedMsgs, _, err := p.PinnedMessageByChatID(testPublicChatID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, pinnedMsgs, 1)
+
+	err = p.DeleteMessage(m.ID)
+	require.NoError(t, err)
+
+	_, err = p.MessageByID(id)
+	require.EqualError(t, err, "record not found")
+
+	pinnedMsgs, _, err = p.PinnedMessageByChatID(testPublicChatID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, pinnedMsgs, 0)
+}
+
 func TestMarkMessageSeen(t *testing.T) {
 	chatID := "test-chat"
 	db, err := openTestDB()
