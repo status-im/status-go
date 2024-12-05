@@ -973,35 +973,13 @@ func (m *Messenger) BlockContact(ctx context.Context, contactID string, fromSync
 	//		 https://github.com/status-im/status-go/issues/3720
 	if !fromSyncing {
 		updatedAt := m.GetCurrentTimeInMillis()
-		_, err = m.DismissAllActivityCenterNotificationsFromUser(ctx, contactID, updatedAt)
+		notifications, err := m.DismissAllActivityCenterNotificationsFromUser(ctx, contactID, updatedAt)
 		if err != nil {
 			return nil, err
 		}
+		response.AddActivityCenterNotifications(notifications)
 	}
 
-	return response, nil
-}
-
-// The same function as the one above.
-// Should be removed with https://github.com/status-im/status-desktop/issues/8805
-func (m *Messenger) BlockContactDesktop(ctx context.Context, contactID string) (*MessengerResponse, error) {
-	response := &MessengerResponse{}
-
-	err := m.blockContact(ctx, response, contactID, true, false)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err = m.DeclineAllPendingGroupInvitesFromUser(ctx, response, contactID)
-	if err != nil {
-		return nil, err
-	}
-
-	notifications, err := m.DismissAllActivityCenterNotificationsFromUser(ctx, contactID, m.GetCurrentTimeInMillis())
-	if err != nil {
-		return nil, err
-	}
-	response.AddActivityCenterNotifications(notifications)
 	return response, nil
 }
 
