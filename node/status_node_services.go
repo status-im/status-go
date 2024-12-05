@@ -58,7 +58,6 @@ import (
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
@@ -481,7 +480,7 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB,
 func (b *StatusNode) localNotificationsService(network uint64) (*localnotifications.Service, error) {
 	var err error
 	if b.localNotificationsSrvc == nil {
-		b.localNotificationsSrvc, err = localnotifications.NewService(b.appDB, transfer.NewDB(b.walletDB), network)
+		b.localNotificationsSrvc, err = localnotifications.NewService(b.appDB)
 		if err != nil {
 			return nil, err
 		}
@@ -550,13 +549,6 @@ func (b *StatusNode) StartLocalNotifications() error {
 			b.logger.Error("LocalNotifications service start failed on StartLocalNotifications", zap.Error(err))
 			return nil
 		}
-	}
-
-	err := b.localNotificationsSrvc.SubscribeWallet(&b.walletFeed)
-
-	if err != nil {
-		b.logger.Error("LocalNotifications service could not subscribe to wallet on StartLocalNotifications", zap.Error(err))
-		return nil
 	}
 
 	return nil

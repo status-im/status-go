@@ -3,18 +3,11 @@ package localnotifications
 import (
 	"database/sql"
 	"encoding/json"
-	"sync"
-
-	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -79,41 +72,17 @@ type MessageEvent struct{}
 // CustomEvent - structure used to pass custom user set messages to bus
 type CustomEvent struct{}
 
-type transmitter struct {
-	publisher *event.Feed
-
-	wg   sync.WaitGroup
-	quit chan struct{}
-}
-
 // Service keeps the state of message bus
 type Service struct {
-	started           bool
-	WatchingEnabled   bool
-	chainID           uint64
-	transmitter       *transmitter
-	walletTransmitter *transmitter
-	db                *Database
-	walletDB          *transfer.Database
-	accountsDB        *accounts.Database
+	started bool
+	db      *Database
 }
 
-func NewService(appDB *sql.DB, walletDB *transfer.Database, chainID uint64) (*Service, error) {
-	db := NewDB(appDB, chainID)
-	accountsDB, err := accounts.NewDB(appDB)
-	if err != nil {
-		return nil, err
-	}
-	trans := &transmitter{}
-	walletTrans := &transmitter{}
+func NewService(appDB *sql.DB) (*Service, error) {
+	db := NewDB(appDB)
 
 	return &Service{
-		db:                db,
-		chainID:           chainID,
-		walletDB:          walletDB,
-		accountsDB:        accountsDB,
-		transmitter:       trans,
-		walletTransmitter: walletTrans,
+		db: db,
 	}, nil
 }
 
@@ -165,54 +134,13 @@ func pushMessage(notification *Notification) {
 // Start Worker which processes all incoming messages
 func (s *Service) Start() error {
 	s.started = true
-
-	s.transmitter.quit = make(chan struct{})
-	s.transmitter.publisher = &event.Feed{}
-
-	events := make(chan TransactionEvent, 10)
-	sub := s.transmitter.publisher.Subscribe(events)
-
-	s.transmitter.wg.Add(1)
-	go func() {
-		defer gocommon.LogOnPanic()
-		defer s.transmitter.wg.Done()
-		for {
-			select {
-			case <-s.transmitter.quit:
-				sub.Unsubscribe()
-				return
-			case err := <-sub.Err():
-				if err != nil {
-					logutils.ZapLogger().Error("Local notifications transmitter failed with", zap.Error(err))
-				}
-				return
-			case event := <-events:
-				s.transactionsHandler(event)
-			}
-		}
-	}()
-
 	logutils.ZapLogger().Info("Successful start")
-
 	return nil
 }
 
 // Stop worker
 func (s *Service) Stop() error {
 	s.started = false
-
-	if s.transmitter.quit != nil {
-		close(s.transmitter.quit)
-		s.transmitter.wg.Wait()
-		s.transmitter.quit = nil
-	}
-
-	if s.walletTransmitter.quit != nil {
-		close(s.walletTransmitter.quit)
-		s.walletTransmitter.wg.Wait()
-		s.walletTransmitter.quit = nil
-	}
-
 	return nil
 }
 
