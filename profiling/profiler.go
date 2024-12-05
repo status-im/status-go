@@ -1,7 +1,6 @@
 package profiling
 
 import (
-	"fmt"
 	"net/http"
 	hpprof "net/http/pprof"
 	"time"
@@ -19,7 +18,7 @@ type Profiler struct {
 
 // NewProfiler creates an instance of the profiler with
 // the given port.
-func NewProfiler(port int) *Profiler {
+func NewProfiler(address string) *Profiler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/debug/pprof/", hpprof.Index)
 	mux.HandleFunc("/debug/pprof/cmdline", hpprof.Cmdline)
@@ -28,7 +27,7 @@ func NewProfiler(port int) *Profiler {
 	mux.HandleFunc("/debug/pprof/trace", hpprof.Trace)
 	p := Profiler{
 		server: &http.Server{
-			Addr:              fmt.Sprintf(":%d", port),
+			Addr:              address,
 			ReadHeaderTimeout: 5 * time.Second,
 			Handler:           mux,
 		},

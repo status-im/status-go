@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/pprof"
 	"runtime"
 	"unsafe"
 
@@ -1081,22 +1079,7 @@ func StartMutexProfiling(address string) string {
 
 func startMutexProfiling(address string) string {
 	runtime.SetMutexProfileFraction(5)
-
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/debug/pprof/", pprof.Index)
-	mux.HandleFunc("/debug/pprof/mutex", pprof.Index)
-	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-
-	go func() {
-		if err := http.ListenAndServe(address, mux); err != nil {
-			logutils.ZapLogger().Error("failed to start pprof server", zap.Error(err))
-		}
-	}()
-
+	profiling.NewProfiler(address).Go()
 	return makeJSONResponse(nil)
 }
 

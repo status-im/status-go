@@ -318,7 +318,7 @@ func main() {
 
 		// Check if profiling shall be enabled.
 		if *pprofEnabled {
-			profiling.NewProfiler(*pprofPort).Go()
+			profiling.NewProfiler(fmt.Sprintf(":%d", *pprofPort)).Go()
 		}
 
 		if config.PushNotificationServerConfig.Enabled {
