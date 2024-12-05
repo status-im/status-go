@@ -13,7 +13,6 @@ from conftest import option
 from constants import user_1, DEFAULT_DISPLAY_NAME
 
 
-
 class StatusBackend(RpcClient, SignalClient):
 
     def __init__(self, await_signals=[], url=None):
@@ -26,7 +25,6 @@ class StatusBackend(RpcClient, SignalClient):
         self.api_url = f"{url}/statusgo"
         self.ws_url = f"{url}".replace("http", "ws")
         self.rpc_url = f"{url}/statusgo/CallRPC"
-
 
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
@@ -83,7 +81,8 @@ class StatusBackend(RpcClient, SignalClient):
         }
         return self.api_valid_request(method, data)
 
-    def restore_account_and_login(self, data_dir="/",display_name=DEFAULT_DISPLAY_NAME, user=user_1):
+    def restore_account_and_login(self, data_dir="/",display_name=DEFAULT_DISPLAY_NAME, user=user_1,
+                                  network_id=31337):
         method = "RestoreAccountAndLogin"
         data = {
             "rootDataDir": data_dir,
@@ -95,10 +94,10 @@ class StatusBackend(RpcClient, SignalClient):
             "logEnabled": True,
             "logLevel": "DEBUG",
             "testNetworksEnabled": False,
-            "networkId": 31337,
+            "networkId": network_id,
             "networksOverride": [
                 {
-                    "ChainID": 31337,
+                    "ChainID": network_id,
                     "ChainName": "Anvil",
                     "DefaultRPCURL": "http://anvil:8545",
                     "RPCURL": "http://anvil:8545",

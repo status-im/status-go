@@ -6,6 +6,7 @@ from tenacity import retry, stop_after_delay, wait_fixed
 from conftest import option
 from json import JSONDecodeError
 
+
 class RpcClient:
 
     def __init__(self, rpc_url, client=requests.Session()):
@@ -43,7 +44,9 @@ class RpcClient:
         self._check_decode_and_key_errors_in_response(response, "error")
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.5), reraise=True)
-    def rpc_request(self, method, params=[], request_id=13, url=None):
+    def rpc_request(self, method, params=None, request_id=13, url=None):
+        if params is None:
+            params = []
         url = url if url else self.rpc_url
         data = {"jsonrpc": "2.0", "method": method, "id": request_id}
         if params:
@@ -59,7 +62,7 @@ class RpcClient:
             logging.info(f"Got response: {response.content}")
         return response
 
-    def rpc_valid_request(self, method, params=[], _id=None, url=None):
+    def rpc_valid_request(self, method, params=None, _id=None, url=None):
         response = self.rpc_request(method, params, _id, url)
         self.verify_is_valid_json_rpc_response(response, _id)
         return response

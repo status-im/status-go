@@ -7,6 +7,7 @@ from collections import namedtuple
 
 import pytest
 
+from clients.services.wallet import WalletService
 from clients.signals import SignalClient, SignalType
 from clients.status_backend import RpcClient, StatusBackend
 from conftest import option
@@ -28,14 +29,15 @@ class StatusBackendTestCase:
         SignalType.NODE_LOGIN.value
     ]
 
+    network_id = 31337
+
     def setup_class(self):
         self.rpc_client = StatusBackend(await_signals=self.await_signals)
+        self.wallet_service = WalletService(self.rpc_client)
 
         self.rpc_client.init_status_backend()
         self.rpc_client.restore_account_and_login()
         self.rpc_client.wait_for_login()
-
-        self.network_id = 31337
 
 
 class WalletTestCase(StatusBackendTestCase):
