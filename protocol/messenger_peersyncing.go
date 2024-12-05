@@ -415,6 +415,15 @@ func (m *Messenger) sendDataSync(receiver state.PeerID, payload *datasyncproto.P
 	}
 
 	m.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.Strings("hashes", types.EncodeHexes(hashes)))
+	if m.telemetryClient != nil {
+		m.telemetryClient.PushRawMessageByType(ctx, struct {
+			MessageType string
+			Size        uint32
+		}{
+			MessageType: "DATASYNC",
+			Size:        uint32(len(marshalledPayload)),
+		})
+	}
 	m.transport.TrackMany(messageIDs, hashes, newMessages)
 
 	return nil

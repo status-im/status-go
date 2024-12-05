@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"slices"
 	"sync"
 	"testing"
@@ -477,11 +478,29 @@ type testCase struct {
 	expectedFields map[string]interface{}
 }
 
-func runTestCase(t *testing.T, tc testCase) {
+func runTestCase(t *testing.T, tc testCase, methodName string) {
 	ctx := context.Background()
 	client := createClient(t, "")
 
-	go client.processAndPushTelemetry(ctx, tc.input)
+	if methodName == "" {
+		// Default to just calling processAndPushTelemetry directly
+		go client.processAndPushTelemetry(ctx, tc.input)
+	} else {
+		// Get the method by name using reflection
+		method := reflect.ValueOf(client).MethodByName(methodName)
+		if !method.IsValid() {
+			t.Fatalf("Method %s not found on Client", methodName)
+		}
+
+		// Create the arguments for the method call
+		args := []reflect.Value{
+			reflect.ValueOf(ctx),
+			reflect.ValueOf(tc.input),
+		}
+
+		// Call the method
+		go method.Call(args)
+	}
 
 	telemetryRequest := <-client.telemetryCh
 
@@ -514,16 +533,14 @@ func runTestCase(t *testing.T, tc testCase) {
 
 func TestProcessMessageDeliveryConfirmed(t *testing.T) {
 	tc := testCase{
-		name: "MessageDeliveryConfirmed",
-		input: MessageDeliveryConfirmed{
-			MessageHash: "0x1234567890abcdef",
-		},
+		name:         "MessageDeliveryConfirmed",
+		input:        "0x1234567890abcdef",
 		expectedType: MessageDeliveryConfirmedMetric,
 		expectedFields: map[string]interface{}{
 			"messageHash": "0x1234567890abcdef",
 		},
 	}
-	runTestCase(t, tc)
+	runTestCase(t, tc, "PushMessageDeliveryConfirmed")
 }
 
 func TestProcessMissedRelevantMessage(t *testing.T) {
@@ -539,10 +556,8 @@ func TestProcessMissedRelevantMessage(t *testing.T) {
 		common.MissingMessageType,
 	)
 	tc := testCase{
-		name: "MissedRelevantMessage",
-		input: MissedRelevantMessage{
-			ReceivedMessage: message,
-		},
+		name:         "MissedRelevantMessage",
+		input:        message,
 		expectedType: MissedRelevantMessageMetric,
 		expectedFields: map[string]interface{}{
 			"messageHash":  message.Envelope.Hash().String(),
@@ -550,7 +565,7 @@ func TestProcessMissedRelevantMessage(t *testing.T) {
 			"contentTopic": "0x12345679",
 		},
 	}
-	runTestCase(t, tc)
+	runTestCase(t, tc, "PushMissedRelevantMessage")
 }
 
 func TestProcessMissedMessage(t *testing.T) {
@@ -566,10 +581,8 @@ func TestProcessMissedMessage(t *testing.T) {
 		common.MissingMessageType,
 	)
 	tc := testCase{
-		name: "MissedMessage",
-		input: MissedMessage{
-			Envelope: message.Envelope,
-		},
+		name:         "MissedMessage",
+		input:        message.Envelope,
 		expectedType: MissedMessageMetric,
 		expectedFields: map[string]interface{}{
 			"messageHash":  message.Envelope.Hash().String(),
@@ -577,15 +590,15 @@ func TestProcessMissedMessage(t *testing.T) {
 			"contentTopic": message.Envelope.Message().ContentTopic,
 		},
 	}
-	runTestCase(t, tc)
+	runTestCase(t, tc, "PushMissedMessage")
 }
 
 func TestProcessDialFailure(t *testing.T) {
 	tc := testCase{
 		name: "DialFailure",
-		input: DialFailure{
-			ErrorType: common.ErrorUnknown,
-			ErrorMsg:  "test error message",
+		input: common.DialError{
+			ErrType:   common.ErrorUnknown,
+			ErrMsg:    "test error message",
 			Protocols: "test-protocols",
 		},
 		expectedType: DialFailureMetric,
@@ -595,19 +608,36 @@ func TestProcessDialFailure(t *testing.T) {
 			"protocols": "test-protocols",
 		},
 	}
-	runTestCase(t, tc)
+	runTestCase(t, tc, "PushDialFailure")
 }
 
 func TestProcessSentMessageTotal(t *testing.T) {
 	tc := testCase{
-		name: "SentMessageTotal",
-		input: SentMessageTotal{
-			Size: uint32(1234),
-		},
+		name:         "SentMessageTotal",
+		input:        uint32(1234),
 		expectedType: SentMessageTotalMetric,
 		expectedFields: map[string]interface{}{
 			"size": float64(1234),
 		},
 	}
-	runTestCase(t, tc)
+	runTestCase(t, tc, "PushSentMessageTotal")
+}
+
+func TestProcessRawMessageByType(t *testing.T) {
+	tc := testCase{
+		name: "RawMessageByType",
+		input: struct {
+			MessageType string
+			Size        uint32
+		}{
+			MessageType: "test-message-type",
+			Size:        1234,
+		},
+		expectedType: RawMessageByTypeMetric,
+		expectedFields: map[string]interface{}{
+			"messageType": "test-message-type",
+			"size":        float64(1234),
+		},
+	}
+	runTestCase(t, tc, "PushRawMessageByType")
 }

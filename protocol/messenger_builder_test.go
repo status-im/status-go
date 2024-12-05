@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"crypto/ecdsa"
 
 	"github.com/google/uuid"
@@ -52,6 +53,14 @@ func (tmc *testMessengerConfig) complete() error {
 	return nil
 }
 
+type mockTelemetryService struct{}
+
+func (m *mockTelemetryService) PushRawMessageByType(ctx context.Context, msg struct {
+	MessageType string
+	Size        uint32
+}) {
+}
+
 func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, error) {
 	err := config.complete()
 	if err != nil {
@@ -96,6 +105,9 @@ func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, 
 		"testVersion",
 		options...,
 	)
+
+	mockTelemetry := &mockTelemetryService{}
+	m.sender.WithTelemetryClient(mockTelemetry)
 	if err != nil {
 		return nil, err
 	}

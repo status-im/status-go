@@ -26,6 +26,13 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
+type TelemetryService interface {
+	PushRawMessageByType(ctx context.Context, msg struct {
+		MessageType string
+		Size        uint32
+	})
+}
+
 // Whisper message properties.
 const (
 	whisperTTL        = 15
@@ -88,6 +95,8 @@ type MessageSender struct {
 
 	// handleSharedSecrets is a callback that is called every time a new shared secret is negotiated
 	handleSharedSecrets func([]*sharedsecret.Secret) error
+
+	telemetryClient TelemetryService
 }
 
 func NewMessageSender(
@@ -111,6 +120,10 @@ func NewMessageSender(
 	}
 
 	return p, nil
+}
+
+func (s *MessageSender) WithTelemetryClient(client TelemetryService) {
+	s.telemetryClient = client
 }
 
 func (s *MessageSender) Stop() {
@@ -432,6 +445,9 @@ func (s *MessageSender) sendCommunity(
 		zap.String("messageType", "community"),
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
+	if s.telemetryClient != nil {
+		s.sendBandwidthMetric(ctx, rawMessage)
+	}
 	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
@@ -550,6 +566,10 @@ func (s *MessageSender) sendPrivate(
 		s.transport.Track(messageID, hashes, newMessages)
 	}
 
+	if s.telemetryClient != nil {
+		s.sendBandwidthMetric(ctx, rawMessage)
+	}
+
 	return messageID, nil
 }
 
@@ -578,6 +598,9 @@ func (s *MessageSender) SendPairInstallation(
 		return nil, errors.Wrap(err, "failed to send a message spec")
 	}
 
+	if s.telemetryClient != nil {
+		s.sendBandwidthMetric(ctx, &rawMessage)
+	}
 	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
@@ -808,6 +831,9 @@ func (s *MessageSender) SendPublic(
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.String("messageType", "public"),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
+	if s.telemetryClient != nil {
+		s.sendBandwidthMetric(ctx, &rawMessage)
+	}
 	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
@@ -1380,4 +1406,14 @@ func (s *MessageSender) CleanupHashRatchetEncryptedMessages() error {
 	}
 
 	return nil
+}
+
+func (s *MessageSender) sendBandwidthMetric(ctx context.Context, rawMessage *RawMessage) {
+	s.telemetryClient.PushRawMessageByType(ctx, struct {
+		MessageType string
+		Size        uint32
+	}{
+		MessageType: rawMessage.MessageType.String(),
+		Size:        uint32(len(rawMessage.Payload)),
+	})
 }

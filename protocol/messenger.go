@@ -533,6 +533,8 @@ func NewMessenger(
 			c.wakuService.SetStatusTelemetryClient(telemetryClient)
 		}
 		telemetryClient.Start(ctx)
+
+		sender.WithTelemetryClient(telemetryClient)
 	}
 
 	messenger = &Messenger{

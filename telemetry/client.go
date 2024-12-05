@@ -60,6 +60,8 @@ const (
 	MessageDeliveryConfirmedMetric TelemetryType = "MessageDeliveryConfirmed"
 	// Total number and size of Waku messages sent by this node
 	SentMessageTotalMetric TelemetryType = "SentMessageTotal"
+	// Size and type of raw message successfully returned by dispatchMessage
+	RawMessageByTypeMetric TelemetryType = "RawMessageByType"
 )
 
 const MaxRetryCache = 5000
@@ -151,6 +153,13 @@ func (c *Client) PushSentMessageTotal(ctx context.Context, messageSize uint32) {
 	c.processAndPushTelemetry(ctx, SentMessageTotal{Size: messageSize})
 }
 
+func (c *Client) PushRawMessageByType(ctx context.Context, msg struct {
+	MessageType string
+	Size        uint32
+}) {
+	c.processAndPushTelemetry(ctx, RawMessageByType{MessageType: msg.MessageType, Size: msg.Size})
+}
+
 type ReceivedMessages struct {
 	Filter     transport.Filter
 	SSHMessage *types.Message
@@ -204,6 +213,11 @@ type MessageDeliveryConfirmed struct {
 
 type SentMessageTotal struct {
 	Size uint32
+}
+
+type RawMessageByType struct {
+	MessageType string
+	Size        uint32
 }
 
 type Client struct {
@@ -287,6 +301,7 @@ func (c *Client) Start(ctx context.Context) {
 			}
 		}
 	}()
+
 	go func() {
 		defer common.LogOnPanic()
 		sendPeriod := c.sendPeriod
@@ -317,7 +332,6 @@ func (c *Client) Start(ctx context.Context) {
 				return
 			}
 		}
-
 	}()
 }
 
@@ -407,6 +421,12 @@ func (c *Client) processAndPushTelemetry(ctx context.Context, data interface{}) 
 			Id:            c.nextId,
 			TelemetryType: SentMessageTotalMetric,
 			TelemetryData: c.ProcessSentMessageTotal(v),
+		}
+	case RawMessageByType:
+		telemetryRequest = TelemetryRequest{
+			Id:            c.nextId,
+			TelemetryType: RawMessageByTypeMetric,
+			TelemetryData: c.ProcessRawMessageByType(v),
 		}
 	default:
 		c.logger.Error("Unknown telemetry data type")
@@ -586,6 +606,13 @@ func (c *Client) ProcessMessageDeliveryConfirmed(messageDeliveryConfirmed Messag
 func (c *Client) ProcessSentMessageTotal(sentMessageTotal SentMessageTotal) *json.RawMessage {
 	postBody := c.commonPostBody()
 	postBody["size"] = sentMessageTotal.Size
+	return c.marshalPostBody(postBody)
+}
+
+func (c *Client) ProcessRawMessageByType(rawMessageByType RawMessageByType) *json.RawMessage {
+	postBody := c.commonPostBody()
+	postBody["messageType"] = rawMessageByType.MessageType
+	postBody["size"] = rawMessageByType.Size
 	return c.marshalPostBody(postBody)
 }
 

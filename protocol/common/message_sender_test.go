@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -38,6 +39,14 @@ type MessageSenderSuite struct {
 	sender      *MessageSender
 	testMessage protobuf.ChatMessage
 	logger      *zap.Logger
+}
+
+type mockTelemetryService struct{}
+
+func (m *mockTelemetryService) PushRawMessageByType(ctx context.Context, msg struct {
+	MessageType string
+	Size        uint32
+}) {
 }
 
 func (s *MessageSenderSuite) SetupTest() {
@@ -95,6 +104,9 @@ func (s *MessageSenderSuite) SetupTest() {
 			Datasync: true,
 		},
 	)
+
+	mockTelemetry := &mockTelemetryService{}
+	s.sender.WithTelemetryClient(mockTelemetry)
 	s.Require().NoError(err)
 }
 

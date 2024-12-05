@@ -23,6 +23,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -227,6 +228,7 @@ type NewMessage struct {
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
 func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
+	logutils.ZapLogger().Info("AK Post", zap.String("stack", string(debug.Stack())))
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
