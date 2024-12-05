@@ -2,6 +2,8 @@ package callog
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -10,6 +12,8 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/brianvoe/gofakeit/v6"
 
 	"github.com/status-im/status-go/logutils/requestlog"
 )
@@ -23,22 +27,22 @@ func TestRemoveSensitiveInfo(t *testing.T) {
 		{
 			name:     "basic test",
 			input:    `{"username":"user1","password":"secret123","mnemonic":"mnemonic123 xyz"}`,
-			expected: `{"username":"user1","password":"***","mnemonic":"***"}`,
+			expected: fmt.Sprintf(`{"username":"user1","password":"%s","mnemonic":"%s"}`, placeholder, placeholder),
 		},
 		{
 			name:     "uppercase password field",
 			input:    `{"USERNAME":"user1","PASSWORD":"secret123"}`,
-			expected: `{"USERNAME":"user1","PASSWORD":"***"}`,
+			expected: fmt.Sprintf(`{"USERNAME":"user1","PASSWORD":"%s"}`, placeholder),
 		},
 		{
 			name:     "password field with spaces",
 			input:    `{"username":"user1", "password" : "secret123"}`,
-			expected: `{"username":"user1", "password":"***"}`,
+			expected: fmt.Sprintf(`{"username":"user1", "password":"%s"}`, placeholder),
 		},
 		{
 			name:     "multiple password fields",
 			input:    `{"password":"secret123","data":{"nested_password":"nested_secret"}}`,
-			expected: `{"password":"***","data":{"nested_password":"***"}}`,
+			expected: fmt.Sprintf(`{"password":"%s","data":{"nested_password":"%s"}}`, placeholder, placeholder),
 		},
 		{
 			name:     "no password field",
@@ -178,4 +182,56 @@ func TestDataField(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, buf)
 	require.Equal(t, `{"root":"{non-json content}"}`+"\n", buf.String())
+}
+
+func TestSignal(t *testing.T) {
+	entry := zapcore.Entry{}
+	enc := zapcore.NewJSONEncoder(zapcore.EncoderConfig{})
+
+	// Simulate pairing.AccountData and pairing.Event without importing the package
+	type Data struct {
+		Name     string `json:"name" fake:"{firstname}"`
+		Password string `json:"password"`
+	}
+	type Event struct {
+		Data any `json:"data,omitempty"`
+	}
+
+	data := Data{}
+	err := gofakeit.Struct(&data)
+	require.NoError(t, err)
+
+	event := Event{Data: data}
+
+	f := dataField("event", event)
+	require.NotNil(t, f)
+	require.Equal(t, "event", f.Key)
+	require.Equal(t, zapcore.ReflectType, f.Type)
+
+	buf, err := enc.EncodeEntry(entry, []zapcore.Field{f})
+	require.NoError(t, err)
+	require.NotNil(t, buf)
+
+	t.Logf("encoded event: %s", buf.String())
+
+	var result map[string]interface{}
+	err = json.Unmarshal(buf.Bytes(), &result)
+	require.NoError(t, err)
+
+	resultEvent, ok := result["event"]
+	require.True(t, ok)
+	require.NotNil(t, resultEvent)
+
+	resultEventMap, ok := resultEvent.(map[string]interface{})
+	require.True(t, ok)
+	require.NotNil(t, resultEventMap)
+
+	resultData, ok := resultEventMap["data"]
+	require.True(t, ok)
+	require.NotNil(t, resultData)
+
+	resultDataMap, ok := resultData.(map[string]interface{})
+	require.True(t, ok)
+	require.NotNil(t, resultDataMap)
+	require.Equal(t, placeholder, resultDataMap["password"])
 }

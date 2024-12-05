@@ -14,6 +14,8 @@ import (
 	"github.com/status-im/status-go/internal/sentry"
 )
 
+const placeholder = "***"
+
 var sensitiveKeys = []string{
 	"password",
 	"newPassword",
@@ -32,6 +34,7 @@ var sensitiveKeys = []string{
 	"alchemyOptimismSepoliaToken",
 	"verifyENSURL",
 	"verifyTransactionURL",
+	"gifs/api-key",
 }
 
 var sensitiveRegexString = fmt.Sprintf(`(?i)(".*?(%s).*?")\s*:\s*("[^"]*")`, strings.Join(sensitiveKeys, "|"))
@@ -106,7 +109,7 @@ func removeSensitiveInfo(jsonStr string) string {
 	// see related test for the usage of this function
 	return sensitiveRegex.ReplaceAllStringFunc(jsonStr, func(match string) string {
 		parts := sensitiveRegex.FindStringSubmatch(match)
-		return fmt.Sprintf(`%s:"***"`, parts[1])
+		return fmt.Sprintf(`%s:"%s"`, parts[1], placeholder)
 	})
 }
 
@@ -156,10 +159,23 @@ func LogSignal(logger *zap.Logger, eventType string, event interface{}) {
 }
 
 func dataField(name string, data any) zap.Field {
-	dataString := removeSensitiveInfo(fmt.Sprintf("%+v", data))
+	dataString := removeSensitiveInfo(marshalData(data))
 	var paramsParsed any
 	if json.Unmarshal([]byte(dataString), &paramsParsed) == nil {
 		return zap.Any(name, paramsParsed)
 	}
 	return zap.String(name, dataString)
+}
+
+func marshalData(data any) string {
+	switch data.(type) {
+	case string:
+		return data.(string)
+	default:
+		bytes, err := json.Marshal(data)
+		if err != nil {
+			return "<failed to marshal value>"
+		}
+		return string(bytes)
+	}
 }
