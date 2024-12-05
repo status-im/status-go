@@ -1,0 +1,171 @@
+package networkhelper_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/rpc/network/testutil"
+)
+
+func TestMergeProvidersPreserveEnabledAndOrder(t *testing.T) {
+	chainID := uint64(1)
+
+	// Current providers with mixed types
+	currentProviders := []params.RpcProvider{
+		*params.NewUserProvider(chainID, "UserProvider1", "https://userprovider1.example.com", true),
+		*params.NewUserProvider(chainID, "UserProvider2", "https://userprovider2.example.com", true),
+		*params.NewDirectProvider(chainID, "EmbeddedProvider1", "https://embeddedprovider1.example.com", true),
+		*params.NewProxyProvider(chainID, "EmbeddedProvider2", "https://embeddedprovider2.example.com", true),
+	}
+	currentProviders[1].Enabled = false // UserProvider2 is disabled
+	currentProviders[2].Enabled = false // EmbeddedProvider1 is disabled
+
+	// New providers to merge
+	newProviders := []params.RpcProvider{
+		*params.NewDirectProvider(chainID, "EmbeddedProvider1", "https://embeddedprovider1-new.example.com", true), // Should retain Enabled: false
+		*params.NewProxyProvider(chainID, "EmbeddedProvider3", "https://embeddedprovider3.example.com", true),      // New embedded provider
+		*params.NewDirectProvider(chainID, "EmbeddedProvider4", "https://embeddedprovider4.example.com", true),     // New embedded provider
+	}
+
+	// Call MergeProviders
+	mergedProviders := networkhelper.MergeProvidersPreservingUsersAndEnabledState(currentProviders, newProviders)
+
+	expectedEmbeddedProvider1 := newProviders[0]
+	expectedEmbeddedProvider1.Enabled = false // Should retain Enabled: false
+	// Expected providers after merging
+	expectedProviders := []params.RpcProvider{
+		currentProviders[0],       // UserProvider1
+		currentProviders[1],       // UserProvider2
+		expectedEmbeddedProvider1, // EmbeddedProvider1 (should retain Enabled: false)
+		newProviders[1],           // EmbeddedProvider3
+		newProviders[2],           // EmbeddedProvider4
+	}
+
+	// Assertions
+	require.Len(t, mergedProviders, len(expectedProviders), "Expected %d providers after merging", len(expectedProviders))
+
+	// Compare providers
+	for i, expectedProvider := range expectedProviders {
+		actualProvider := mergedProviders[i]
+		testutil.CompareProviders(t, expectedProvider, actualProvider)
+	}
+}
+func TestUpdateEmbeddedProxyProviders(t *testing.T) {
+	// Arrange: Create a sample list of networks with various provider types
+	networks := []params.Network{
+		*testutil.CreateNetwork(testutil.EthereumChainID, "Ethereum Mainnet", []params.RpcProvider{
+			*params.NewUserProvider(testutil.EthereumChainID, "Provider1", "https://userprovider.example.com", true),
+			*params.NewProxyProvider(testutil.EthereumChainID, "Provider2", "https://proxyprovider.example.com", true),
+		}),
+		*testutil.CreateNetwork(testutil.OptimismChainID, "Optimism", []params.RpcProvider{
+			*params.NewDirectProvider(testutil.OptimismChainID, "Provider3", "https://directprovider.example.com", true),
+			*params.NewProxyProvider(testutil.OptimismChainID, "Provider4", "https://proxyprovider2.example.com", true),
+		}),
+	}
+	networks[0].RpcProviders[1].Enabled = false
+	networks[1].RpcProviders[1].Enabled = false
+
+	user := "test_user"
+	password := "test_password"
+
+	// Call the function to update embedded-proxy providers
+	updatedNetworks := networkhelper.OverrideEmbeddedProxyProviders(networks, true, user, password)
+
+	// Verify the networks
+	for i, network := range updatedNetworks {
+		networkCopy := network
+		expectedNetwork := &networks[i]
+		testutil.CompareNetworks(t, expectedNetwork, &networkCopy)
+
+		for j, provider := range networkCopy.RpcProviders {
+			expectedProvider := expectedNetwork.RpcProviders[j]
+			if provider.Type == params.EmbeddedProxyProviderType {
+				assert.Equal(t, true, provider.Enabled, "Provider Enabled state should be overridden")
+				assert.Equal(t, user, provider.AuthLogin, "Provider AuthLogin should be overridden")
+				assert.Equal(t, password, provider.AuthPassword, "Provider AuthPassword should be overridden")
+			} else {
+				assert.Equal(t, expectedProvider.Enabled, provider.Enabled, "Provider Enabled state should remain unchanged")
+				assert.Equal(t, expectedProvider.AuthLogin, provider.AuthLogin, "Provider AuthLogin should remain unchanged")
+				assert.Equal(t, expectedProvider.AuthPassword, provider.AuthPassword, "Provider AuthPassword should remain unchanged")
+			}
+		}
+	}
+
+}
+
+func TestOverrideDirectProvidersAuth(t *testing.T) {
+	// Create a sample list of networks with various provider types
+	networks := []params.Network{
+		*testutil.CreateNetwork(testutil.EthereumChainID, "Ethereum Mainnet", []params.RpcProvider{
+			*params.NewUserProvider(testutil.EthereumChainID, "Provider1", "https://user.example.com/", true),
+			*params.NewDirectProvider(testutil.EthereumChainID, "Provider2", "https://mainnet.infura.io/v3/", true),
+			*params.NewDirectProvider(testutil.EthereumChainID, "Provider3", "https://eth-archival.rpc.grove.city/v1/", true),
+		}),
+		*testutil.CreateNetwork(testutil.OptimismChainID, "Optimism", []params.RpcProvider{
+			*params.NewDirectProvider(testutil.OptimismChainID, "Provider4", "https://optimism.infura.io/v3/", true),
+			*params.NewDirectProvider(testutil.OptimismChainID, "Provider5", "https://op.grove.city/v1/", true),
+		}),
+	}
+
+	authTokens := map[string]string{
+		"infura.io":   "infura-test-token",
+		"grove.city":  "grove-test-token",
+		"example.com": "example-test-token",
+	}
+
+	// Call OverrideDirectProvidersAuth
+	updatedNetworks := networkhelper.OverrideDirectProvidersAuth(networks, authTokens)
+
+	// Verify the networks have updated auth tokens correctly
+	for i, network := range updatedNetworks {
+		for j, provider := range network.RpcProviders {
+			expectedProvider := networks[i].RpcProviders[j]
+			switch {
+			case strings.Contains(provider.URL, "infura.io"):
+				assert.Equal(t, params.TokenAuth, provider.AuthType)
+				assert.Equal(t, authTokens["infura.io"], provider.AuthToken)
+			case strings.Contains(provider.URL, "grove.city"):
+				assert.Equal(t, params.TokenAuth, provider.AuthType)
+				assert.Equal(t, authTokens["grove.city"], provider.AuthToken)
+			case strings.Contains(provider.URL, "example.com"):
+				assert.Equal(t, params.NoAuth, provider.AuthType) // should not update user providers
+			default:
+				assert.Equal(t, expectedProvider.AuthType, provider.AuthType)
+				assert.Equal(t, expectedProvider.AuthToken, provider.AuthToken)
+			}
+		}
+	}
+}
+
+func TestOverrideGanacheTokenOverrides(t *testing.T) {
+	// Create a sample list of networks with various ChainIDs
+	networks := []params.Network{
+		*testutil.CreateNetwork(testutil.EthereumChainID, "Ethereum Mainnet", nil),
+		*testutil.CreateNetwork(testutil.OptimismChainID, "Optimism", nil),
+		*testutil.CreateNetwork(testutil.EthereumChainID, "Mainnet Duplicate", nil),
+	}
+
+	ganacheTokenOverride := params.TokenOverride{
+		Symbol:  "SNT",
+		Address: common.HexToAddress("0x8571Ddc46b10d31EF963aF49b6C7799Ea7eff818"),
+	}
+
+	// Call OverrideGanacheTokenOverrides
+	updatedNetworks := networkhelper.OverrideGanacheToken(networks, "url", testutil.EthereumChainID, ganacheTokenOverride)
+
+	// Verify that only networks with the specified ChainID have the token override applied
+	for _, network := range updatedNetworks {
+		if network.ChainID == testutil.EthereumChainID {
+			require.NotNil(t, network.TokenOverrides, "TokenOverrides should not be nil for ChainID %d", network.ChainID)
+			assert.Contains(t, network.TokenOverrides, ganacheTokenOverride, "TokenOverrides should contain the ganache token")
+		} else {
+			assert.Nil(t, network.TokenOverrides, "TokenOverrides should be nil for ChainID %d", network.ChainID)
+		}
+	}
+}

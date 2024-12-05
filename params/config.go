@@ -14,7 +14,6 @@ import (
 	"go.uber.org/zap"
 	validator "gopkg.in/go-playground/validator.v9"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
 
@@ -514,35 +513,6 @@ type NodeConfig struct {
 	ProcessBackedupMessages bool
 }
 
-type TokenOverride struct {
-	Symbol  string         `json:"symbol"`
-	Address common.Address `json:"address"`
-}
-
-type Network struct {
-	ChainID                uint64          `json:"chainId"`
-	ChainName              string          `json:"chainName"`
-	DefaultRPCURL          string          `json:"defaultRpcUrl"`       // proxy rpc url
-	DefaultFallbackURL     string          `json:"defaultFallbackURL"`  // proxy fallback url
-	DefaultFallbackURL2    string          `json:"defaultFallbackURL2"` // second proxy fallback url
-	RPCURL                 string          `json:"rpcUrl"`
-	OriginalRPCURL         string          `json:"originalRpcUrl"`
-	FallbackURL            string          `json:"fallbackURL"`
-	OriginalFallbackURL    string          `json:"originalFallbackURL"`
-	BlockExplorerURL       string          `json:"blockExplorerUrl,omitempty"`
-	IconURL                string          `json:"iconUrl,omitempty"`
-	NativeCurrencyName     string          `json:"nativeCurrencyName,omitempty"`
-	NativeCurrencySymbol   string          `json:"nativeCurrencySymbol,omitempty"`
-	NativeCurrencyDecimals uint64          `json:"nativeCurrencyDecimals"`
-	IsTest                 bool            `json:"isTest"`
-	Layer                  uint64          `json:"layer"`
-	Enabled                bool            `json:"enabled"`
-	ChainColor             string          `json:"chainColor"`
-	ShortName              string          `json:"shortName"`
-	TokenOverrides         []TokenOverride `json:"tokenOverrides"`
-	RelatedChainID         uint64          `json:"relatedChainId"`
-}
-
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
 	Enabled                       bool
@@ -598,7 +568,7 @@ type MailserversConfig struct {
 	Enabled bool
 }
 
-// ProviderConfig extra configuration for provider.Service
+// ProviderAuthConfig extra configuration for provider.Service
 type Web3ProviderConfig struct {
 	Enabled bool
 }
