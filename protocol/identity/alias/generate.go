@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 )
@@ -31,7 +32,8 @@ func GenerateFromPublicKey(publicKey *ecdsa.PublicKey) string {
 // GenerateFromPublicKeyString returns the 3 words name given a public key
 // prefixed with 0x
 func GenerateFromPublicKeyString(publicKeyString string) (string, error) {
-	publicKeyBytes, err := hex.DecodeString(publicKeyString[2:])
+	pk := strings.TrimPrefix(publicKeyString, "0x")
+	publicKeyBytes, err := hex.DecodeString(pk)
 	if err != nil {
 		return "", err
 	}
