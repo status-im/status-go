@@ -21,21 +21,23 @@ class TestOneToOneMessages(OneToOneMessageTestCase):
     def test_one_to_one_message_baseline(self, message_count=1):
         pk_receiver = self.receiver.get_pubkey(DEFAULT_DISPLAY_NAME)
 
-        self.sender.send_contact_request([{"id": pk_receiver, "message": "contact_request"}])
+        self.sender.send_contact_request(pk_receiver, "contact_request")
 
         sent_messages = []
         for i in range(message_count):
             message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.send_message([{"id": pk_receiver, "message": message_text}])
-            sent_messages.append((message_text, response))
+            response = self.sender.send_message(pk_receiver, message_text)
+            message_id = self.get_message_id(response)
+            sent_messages.append((message_id, response))
             sleep(0.01)
 
-        for i, (message_text, response) in enumerate(sent_messages):
-            messages_new_event = self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text, timeout=60)
+        for i, (message_id, response) in enumerate(sent_messages):
+            messages_new_event = self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id, timeout=60)
             self.validate_event_against_response(
                 messages_new_event,
                 fields_to_validate={"text": "text"},
                 response=response,
+                expected_message_id=message_id
             )
 
     @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
@@ -64,10 +66,10 @@ class TestOneToOneMessages(OneToOneMessageTestCase):
     @pytest.mark.skip(reason="Skipping until node_pause is implemented")
     def test_one_to_one_message_with_node_pause_30_seconds(self):
         pk_receiver = self.receiver.get_pubkey("Receiver")
-        self.sender.send_contact_request([{"id": pk_receiver, "message": "contact_request"}])
+        self.sender.send_contact_request(pk_receiver, "contact_request")
         with self.node_pause(self.receiver):
             message_text = f"test_message_{uuid4()}"
-            self.sender.send_message([{"id": pk_receiver, "message": message_text}])
+            self.sender.send_message(pk_receiver, message_text)
             sleep(30)
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
         self.sender.wait_for_signal("messages.delivered")

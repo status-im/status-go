@@ -185,14 +185,13 @@ class OneToOneMessageTestCase(NetworkConditionTestCase):
         return backend
 
 
-    def validate_event_against_response(self, event, fields_to_validate, response):
+    def validate_event_against_response(self, event, fields_to_validate, response, expected_message_id):
         messages_in_event = event["event"]["messages"]
         assert len(messages_in_event) > 0, "No messages found in the event"
         response_chat = response["result"]["chats"][0]
 
-        message_id = response_chat["lastMessage"]["id"]
-        message = next((message for message in messages_in_event if message["id"] == message_id), None)
-        assert message, f"Message with ID {message_id} not found in the event"
+        message = next((message for message in messages_in_event if message["id"] == expected_message_id), None)
+        assert message, f"Message with ID {expected_message_id} not found in the event"
 
         message_mismatch = []
         for response_field, event_field in fields_to_validate.items():
@@ -211,3 +210,16 @@ class OneToOneMessageTestCase(NetworkConditionTestCase):
             "Details of mismatches:\n" +
             "\n".join(message_mismatch)
         )
+
+    def get_message_id(self, response):
+        message_id = (
+            response.get("result", {})
+            .get("chats", [{}])[0]
+            .get("lastMessage", {})
+            .get("id")
+        )
+
+        if message_id is None:
+            raise ValueError("Failed to extract message_id from response")
+
+        return message_id
