@@ -382,4 +382,13 @@ func TestBalanceFetcherGetBalancesAtByChain(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, expectedBalances, balances)
+
+	// Test errors
+	chainClients = map[uint64]chain.ClientInterface{
+		w_common.ArbitrumMainnet: chainClientArb,
+	}
+	balances, err = bf.GetBalancesAtByChain(ctx, chainClients, nil, nil, atBlocks)
+	require.Error(t, err)
+	require.ErrorContains(t, err, errScanningContract.Error())
+	require.Nil(t, balances)
 }

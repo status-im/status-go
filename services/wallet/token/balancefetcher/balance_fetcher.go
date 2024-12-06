@@ -24,6 +24,10 @@ import (
 var NativeChainAddress = common.HexToAddress("0x")
 var requestTimeout = 20 * time.Second
 
+var (
+	errScanningContract = errors.New("error scanning contract")
+)
+
 const (
 	tokenChunkSize = 500
 )
@@ -70,7 +74,7 @@ func (bf *DefaultBalanceFetcher) fetchBalancesForChain(parent context.Context, c
 
 	ethScanContract, availableAtBlock, err := bf.contractMaker.NewEthScan(client.NetworkID())
 	if err != nil {
-		return nil, errors.Wrap(err, "error scanning contract")
+		return nil, errors.Wrap(err, errScanningContract.Error())
 	}
 
 	fetchChainBalance := false
