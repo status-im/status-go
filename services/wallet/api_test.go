@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/stretchr/testify/require"
@@ -19,9 +20,11 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	mock_reader "github.com/status-im/status-go/services/wallet/mock/reader"
 	"github.com/status-im/status-go/services/wallet/onramp"
 	mock_onramp "github.com/status-im/status-go/services/wallet/onramp/mock"
 	"github.com/status-im/status-go/services/wallet/requests"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
@@ -200,4 +203,85 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, true, details.HasActivity)
+}
+
+// TestAPI_FetchOrGetCachedWalletBalances
+func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
+	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+	defer appDB.Close()
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockReader := mock_reader.NewMockReaderInterface(mockCtrl)
+	providerConfig := params.ProviderConfig{
+		Enabled:  true,
+		Name:     rpc.ProviderStatusProxy,
+		User:     "user1",
+		Password: "pass1",
+	}
+	providerConfigs := []params.ProviderConfig{providerConfig}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, `{"result": "0x10"}`)
+	}))
+	defer server.Close()
+
+	chainID := uint64(1)
+
+	networks := []params.Network{
+		{
+			ChainID:       chainID,
+			DefaultRPCURL: server.URL + "/nodefleet/",
+		},
+	}
+	config := rpc.ClientConfig{
+		Client:          nil,
+		UpstreamChainID: chainID,
+		Networks:        networks,
+		DB:              appDB,
+		WalletFeed:      nil,
+		ProviderConfigs: providerConfigs,
+	}
+	c, err := rpc.NewClient(config)
+	require.NoError(t, err)
+
+	testTokenAddress1 := common.Address{0x34}
+	testAccAddress1 := common.Address{0x12}
+	storageToken := token.StorageToken{
+		Token: token.Token{
+			Name:     "USD Tether",
+			Symbol:   "USDT",
+			Decimals: 18,
+		},
+		BalancesPerChain: map[uint64]token.ChainBalance{
+			1: {
+				RawBalance: "1000000000000000000",
+				Balance:    nil,
+				Address:    testAccAddress1,
+				ChainID:    1,
+				HasError:   false,
+			},
+		},
+	}
+	expectedTokens := map[common.Address][]token.StorageToken{
+		testAccAddress1: {storageToken},
+	}
+
+	mockReader.EXPECT().FetchOrGetCachedWalletBalances(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(expectedTokens, nil)
+
+	service := &Service{
+		rpcClient: c,
+	}
+
+	api := &API{
+		s:      service,
+		reader: mockReader,
+	}
+
+	forceRefresh := true
+	balances, err := api.FetchOrGetCachedWalletBalances(context.Background(), []common.Address{testTokenAddress1}, forceRefresh)
+	require.NoError(t, err)
+	require.NotNil(t, balances)
 }
