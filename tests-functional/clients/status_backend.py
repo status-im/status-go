@@ -94,7 +94,7 @@ class StatusBackend(RpcClient, SignalClient):
             "customizationColor": "blue",
             "logEnabled": True,
             "logLevel": "DEBUG",
-            "testNetworksEnabled": True,
+            "testNetworksEnabled": False,
             "networkId": 31337,
             "networksOverride": [
                 {
