@@ -1,5 +1,7 @@
 package wallet
 
+//go:generate mockgen -package=mock_reader -source=reader.go -destination=mock/reader/reader.go
+
 import (
 	"context"
 	"math"
@@ -40,6 +42,16 @@ func belongsToMandatoryTokens(symbol string) bool {
 		}
 	}
 	return false
+}
+
+type ReaderInterface interface {
+	Start() error
+	Stop()
+	Restart() error
+	FetchOrGetCachedWalletBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address, forceRefresh bool) (map[common.Address][]token.StorageToken, error)
+	FetchBalances(ctx context.Context, clients map[uint64]chain.ClientInterface, addresses []common.Address) (map[common.Address][]token.StorageToken, error)
+	GetCachedBalances(clients map[uint64]chain.ClientInterface, addresses []common.Address) (map[common.Address][]token.StorageToken, error)
+	GetLastTokenUpdateTimestamps() map[common.Address]int64
 }
 
 func NewReader(tokenManager token.ManagerInterface, marketManager *market.Manager, persistence token.TokenBalancesStorage, walletFeed *event.Feed) *Reader {
