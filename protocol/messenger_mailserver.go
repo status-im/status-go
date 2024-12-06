@@ -111,10 +111,7 @@ func (m *Messenger) performStorenodeTask(task func() (*MessengerResponse, error)
 
 	select {
 	case r := <-responseCh:
-		if r != nil {
-			return r, nil
-		}
-		return nil, errors.New("no response available")
+		return r, nil
 	case <-m.ctx.Done():
 		return nil, m.ctx.Err()
 	}
