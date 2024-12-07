@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/internal/sentry"
 )
 
-const placeholder = "***"
+const redactionPlaceholder = "***"
 
 var sensitiveKeys = []string{
 	"password",
@@ -109,7 +109,7 @@ func removeSensitiveInfo(jsonStr string) string {
 	// see related test for the usage of this function
 	return sensitiveRegex.ReplaceAllStringFunc(jsonStr, func(match string) string {
 		parts := sensitiveRegex.FindStringSubmatch(match)
-		return fmt.Sprintf(`%s:"%s"`, parts[1], placeholder)
+		return fmt.Sprintf(`%s:"%s"`, parts[1], redactionPlaceholder)
 	})
 }
 

@@ -27,22 +27,22 @@ func TestRemoveSensitiveInfo(t *testing.T) {
 		{
 			name:     "basic test",
 			input:    `{"username":"user1","password":"secret123","mnemonic":"mnemonic123 xyz"}`,
-			expected: fmt.Sprintf(`{"username":"user1","password":"%s","mnemonic":"%s"}`, placeholder, placeholder),
+			expected: fmt.Sprintf(`{"username":"user1","password":"%s","mnemonic":"%s"}`, redactionPlaceholder, redactionPlaceholder),
 		},
 		{
 			name:     "uppercase password field",
 			input:    `{"USERNAME":"user1","PASSWORD":"secret123"}`,
-			expected: fmt.Sprintf(`{"USERNAME":"user1","PASSWORD":"%s"}`, placeholder),
+			expected: fmt.Sprintf(`{"USERNAME":"user1","PASSWORD":"%s"}`, redactionPlaceholder),
 		},
 		{
 			name:     "password field with spaces",
 			input:    `{"username":"user1", "password" : "secret123"}`,
-			expected: fmt.Sprintf(`{"username":"user1", "password":"%s"}`, placeholder),
+			expected: fmt.Sprintf(`{"username":"user1", "password":"%s"}`, redactionPlaceholder),
 		},
 		{
 			name:     "multiple password fields",
 			input:    `{"password":"secret123","data":{"nested_password":"nested_secret"}}`,
-			expected: fmt.Sprintf(`{"password":"%s","data":{"nested_password":"%s"}}`, placeholder, placeholder),
+			expected: fmt.Sprintf(`{"password":"%s","data":{"nested_password":"%s"}}`, redactionPlaceholder, redactionPlaceholder),
 		},
 		{
 			name:     "no password field",
@@ -233,5 +233,5 @@ func TestSignal(t *testing.T) {
 	resultDataMap, ok := resultData.(map[string]interface{})
 	require.True(t, ok)
 	require.NotNil(t, resultDataMap)
-	require.Equal(t, placeholder, resultDataMap["password"])
+	require.Equal(t, redactionPlaceholder, resultDataMap["password"])
 }
