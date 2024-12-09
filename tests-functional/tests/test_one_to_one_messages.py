@@ -1,43 +1,32 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from test_cases import OneToOneMessageTestCase
+from test_cases import MessengerTestCase
 from constants import DEFAULT_DISPLAY_NAME
 from clients.signals import SignalType
 
+@pytest.mark.usefixtures("setup_two_nodes")
 @pytest.mark.rpc
-class TestOneToOneMessages(OneToOneMessageTestCase):
-
-    @pytest.fixture(scope="class", autouse=True)
-    def setup_nodes(self, request):
-        await_signals = [
-            SignalType.MESSAGES_NEW.value,
-            SignalType.MESSAGE_DELIVERED.value,
-        ]
-        request.cls.sender = self.sender = self.initialize_backend(await_signals=await_signals)
-        request.cls.receiver = self.receiver = self.initialize_backend(await_signals=await_signals)
+class TestOneToOneMessages(MessengerTestCase):
 
     @pytest.mark.dependency(name="test_one_to_one_message_baseline")
     def test_one_to_one_message_baseline(self, message_count=1):
         pk_receiver = self.receiver.get_pubkey(DEFAULT_DISPLAY_NAME)
 
-        self.sender.send_contact_request(pk_receiver, "contact_request")
-
         sent_messages = []
         for i in range(message_count):
             message_text = f"test_message_{i+1}_{uuid4()}"
             response = self.sender.send_message(pk_receiver, message_text)
-            message_id = self.get_message_id(response)
-            sent_messages.append((message_id, response))
+            expected_message = self.get_last_message(response)
+            sent_messages.append(expected_message)
             sleep(0.01)
 
-        for i, (message_id, response) in enumerate(sent_messages):
-            messages_new_event = self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id, timeout=60)
-            self.validate_event_against_response(
-                messages_new_event,
+        for i, expected_message in enumerate(sent_messages):
+            messages_new_event = self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"), timeout=60)
+            self.validate_signal_event_against_response(
+                signal_event=messages_new_event,
                 fields_to_validate={"text": "text"},
-                response=response,
-                expected_message_id=message_id
+                expected_message=expected_message
             )
 
     @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])

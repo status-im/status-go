@@ -163,9 +163,21 @@ class StatusBackend(RpcClient, SignalClient):
         self.verify_is_valid_json_rpc_response(response)
         return response.json()
 
-    def accept_contact_request(self, chat_id: str):
+    def accept_contact_request(self, chat_id: str, retry_timeout: int = 10):
         method = "wakuext_acceptContactRequest"
         params = [{"id": chat_id}]
+        
+        @retry(stop=stop_after_delay(retry_timeout), wait=wait_fixed(0.5), reraise=True)
+        def make_request():
+            response = self.rpc_request(method, params)
+            self.verify_is_valid_json_rpc_response(response)
+            return response.json()
+
+        return make_request()
+
+    def send_message(self, contact_id: str, message: str):
+        method = "wakuext_sendOneToOneMessage"
+        params = [{"id": contact_id, "message": message}]
         response = self.rpc_request(method, params)
         self.verify_is_valid_json_rpc_response(response)
         return response.json()
@@ -176,9 +188,16 @@ class StatusBackend(RpcClient, SignalClient):
         self.verify_is_valid_json_rpc_response(response)
         return response.json()
 
-    def send_message(self, contact_id: str, message: str):
-        method = "wakuext_sendOneToOneMessage"
-        params = [{"id": contact_id, "message": message}]
-        response = self.rpc_request(method, params)
-        self.verify_is_valid_json_rpc_response(response)
-        return response.json()
+    def create_group_chat_with_members(self, pubkey_list: list, group_chat_name: str, retry_timeout: int = 10):
+        if not isinstance(pubkey_list, list):
+            raise TypeError("pubkey_list needs to be list")
+        method = "wakuext_createGroupChatWithMembers"
+        params = [None, group_chat_name, pubkey_list]
+
+        @retry(stop=stop_after_delay(retry_timeout), wait=wait_fixed(0.5), reraise=True)
+        def make_request():
+            response = self.rpc_request(method, params)
+            self.verify_is_valid_json_rpc_response(response)
+            return response.json()
+
+        return make_request()

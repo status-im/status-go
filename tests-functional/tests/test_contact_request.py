@@ -1,12 +1,12 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from test_cases import OneToOneMessageTestCase
+from test_cases import MessengerTestCase
 from constants import DEFAULT_DISPLAY_NAME
 from clients.signals import SignalType
 
 @pytest.mark.rpc
-class TestContactRequests(OneToOneMessageTestCase):
+class TestContactRequests(MessengerTestCase):
 
 
     @pytest.mark.dependency(name="test_contact_request_baseline")
@@ -28,9 +28,9 @@ class TestContactRequests(OneToOneMessageTestCase):
         existing_contacts = receiver.get_contacts()
 
         response = sender.send_contact_request(pk_receiver, message_text)
-        message_id = self.get_message_id(response)
+        expected_message = self.get_last_message(response)
 
-        messages_new_event = receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id, timeout=60)
+        messages_new_event = receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"), timeout=60)
 
         signal_texts = []
         if "messages" in messages_new_event.get("event", {}):
@@ -47,11 +47,10 @@ class TestContactRequests(OneToOneMessageTestCase):
         if pk_sender not in str(existing_contacts): # we check that the contact request wasn"t already sent for this sender
             assert f"@{pk_sender} sent you a contact request" in signal_texts, "Couldn't find the signal corresponding to the contact request"
 
-        self.validate_event_against_response(
-            messages_new_event,
+        self.validate_signal_event_against_response(
+            signal_event=messages_new_event,
             fields_to_validate={"text": "text"},
-            response=response,
-            expected_message_id=message_id
+            expected_message=expected_message
         )
 
     @pytest.mark.skip(reason="Skipping because of error 'Not enough status-backend containers, please add more'. Unkipping when we merge https://github.com/status-im/status-go/pull/6159")

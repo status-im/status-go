@@ -25,7 +25,7 @@ class StatusDTestCase:
 class StatusBackendTestCase:
 
     await_signals = [
-        SignalType.NODE_READY.value
+        SignalType.NODE_LOGIN.value
     ]
 
     def setup_class(self):
@@ -33,7 +33,7 @@ class StatusBackendTestCase:
 
         self.rpc_client.init_status_backend()
         self.rpc_client.restore_account_and_login()
-        self.rpc_client.wait_for_signal(SignalType.NODE_READY.value)
+        self.rpc_client.wait_for_login()
 
         self.network_id = 31337
 
@@ -175,7 +175,16 @@ class NetworkConditionTestCase:
         pass
         #TODO: To be implemented when we have docker exec capability
 
-class OneToOneMessageTestCase(NetworkConditionTestCase):
+class MessengerTestCase(NetworkConditionTestCase):
+
+    @pytest.fixture(scope="class", autouse=False)
+    def setup_two_nodes(self, request):
+        await_signals = [
+            SignalType.MESSAGES_NEW.value,
+            SignalType.MESSAGE_DELIVERED.value,
+        ]
+        request.cls.sender = self.sender = self.initialize_backend(await_signals=await_signals)
+        request.cls.receiver = self.receiver = self.initialize_backend(await_signals=await_signals)
 
     def initialize_backend(self, await_signals, display_name=DEFAULT_DISPLAY_NAME, url=None):
         backend = StatusBackend(await_signals=await_signals, url=url)
@@ -184,18 +193,17 @@ class OneToOneMessageTestCase(NetworkConditionTestCase):
         backend.start_messenger()
         return backend
 
+    def validate_signal_event_against_response(self, signal_event, fields_to_validate, expected_message):
+        expected_message_id = expected_message.get("id")
+        signal_event_messages = signal_event.get("event", {}).get("messages")
+        assert len(signal_event_messages) > 0, "No messages found in the signal event"
 
-    def validate_event_against_response(self, event, fields_to_validate, response, expected_message_id):
-        messages_in_event = event["event"]["messages"]
-        assert len(messages_in_event) > 0, "No messages found in the event"
-        response_chat = response["result"]["chats"][0]
-
-        message = next((message for message in messages_in_event if message["id"] == expected_message_id), None)
-        assert message, f"Message with ID {expected_message_id} not found in the event"
+        message = next((message for message in signal_event_messages if message["id"] == expected_message_id), None)
+        assert message, f"Message with ID {expected_message_id} not found in the signal event"
 
         message_mismatch = []
         for response_field, event_field in fields_to_validate.items():
-            response_value = response_chat["lastMessage"][response_field]
+            response_value = expected_message[response_field]
             event_value = message[event_field]
             if response_value != event_value:
                 message_mismatch.append(
@@ -211,15 +219,19 @@ class OneToOneMessageTestCase(NetworkConditionTestCase):
             "\n".join(message_mismatch)
         )
 
-    def get_message_id(self, response):
-        message_id = (
+    def get_last_message(self, response):
+        last_message = (
             response.get("result", {})
             .get("chats", [{}])[0]
             .get("lastMessage", {})
-            .get("id")
         )
+        if not last_message:
+            raise ValueError("Failed to extract lastMessage from response")
+        return last_message
 
+    def get_message_id(self, response):
+        last_message = self.get_last_message(response)
+        message_id = last_message.get("id")
         if message_id is None:
             raise ValueError("Failed to extract message_id from response")
-
         return message_id
