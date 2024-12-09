@@ -228,32 +228,6 @@ type statementCreator interface {
 	Prepare(query string) (*sql.Stmt, error)
 }
 
-// Only used by status-mobile
-func (db *Database) InsertBlock(chainID uint64, account common.Address, blockNumber *big.Int, blockHash common.Hash) error {
-	var (
-		tx *sql.Tx
-	)
-	tx, err := db.client.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		_ = tx.Rollback()
-	}()
-
-	blockDB := blockDBFields{
-		chainID:     chainID,
-		account:     account,
-		blockNumber: blockNumber,
-		blockHash:   blockHash,
-	}
-	return insertBlockDBFields(tx, blockDB)
-}
-
 type blockDBFields struct {
 	chainID     uint64
 	account     common.Address

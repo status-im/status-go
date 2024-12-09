@@ -3,13 +3,45 @@ import time
 from collections import namedtuple
 import pytest
 from steps.wallet import WalletSteps
-
+from clients.signals import SignalType
+from resources.constants import user_1, user_2
+from utils import wallet_utils
+from uuid import uuid4
 
 class EthRpcSteps(WalletSteps):
+    await_signals = [        
+        SignalType.NODE_LOGIN.value,
+        SignalType.WALLET.value,
+        SignalType.WALLET_SUGGESTED_ROUTES.value,
+        SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value,
+        SignalType.WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED.value,
+        SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
+    ]
 
     @pytest.fixture(autouse=True, scope="class")
     def tx_data(self):
-        tx_hash = self.send_valid_multi_transaction()
+        uuid = str(uuid4())
+
+        input_params = {
+            "uuid": uuid,
+            "sendType": 0,
+            "addrFrom": user_1.address,
+            "addrTo": user_2.address,
+            "amountIn": "0xde0b6b3a7640000",
+            "amountOut": "0x0",
+            "tokenID": "ETH",
+            "tokenIDIsOwnerToken": False,
+            "toTokenID": "",
+            "disabledFromChainIDs": [],
+            "disabledToChainIDs": [],
+            "gasFeeMode": 1,
+            "fromLockedAmount": {},
+            # params for building tx from route
+            "slippagePercentage": 0,
+        }
+
+        tx_data = wallet_utils.send_router_transaction(self.rpc_client, **input_params)
+        tx_hash = tx_data["tx_status"]["hash"]
         self.wait_until_tx_not_pending(tx_hash)
 
         receipt = self.get_transaction_receipt(tx_hash)

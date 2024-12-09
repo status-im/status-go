@@ -15,10 +15,10 @@ from utils import wallet_utils
 class TestRouter(StatusBackendSteps):
     await_signals = [
         SignalType.NODE_LOGIN.value,
+        SignalType.WALLET.value,
         SignalType.WALLET_SUGGESTED_ROUTES.value,
         SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value,
         SignalType.WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED.value,
-        SignalType.WALLET_TRANSACTION_STATUS_CHANGED.value,
         SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
     ]
 

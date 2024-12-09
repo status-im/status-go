@@ -2,6 +2,7 @@ import json
 import logging
 import jsonschema
 import resources.constants as constants
+from clients.signals import SignalType, WalletEventType
 
 from conftest import option
 
@@ -155,13 +156,18 @@ def check_fees_for_path(path_name, gas_fee_mode, check_approval, route):
 def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
     method = "wallet_sendRouterTransactionsWithSignatures"
     params = [{"uuid": uuid, "Signatures": tx_signatures}]
+    rpc_client.prepare_wait_for_signal(
+        SignalType.WALLET.value,
+        1,
+        lambda signal: signal["event"]["type"] == WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value,
+    )
     _ = rpc_client.rpc_valid_request(method, params)
+    event_response = rpc_client.wait_for_signal(SignalType.WALLET.value)["event"]
+    tx_status = json.loads(event_response["message"].replace("'", '"'))
 
-    tx_status = rpc_client.wait_for_signal("wallet.transaction.status-changed")
+    assert tx_status["status"] == "Success"
 
-    assert tx_status["event"]["status"] == "Success"
-
-    return tx_status["event"]
+    return tx_status
 
 
 def send_router_transaction(rpc_client, **kwargs):

@@ -9,12 +9,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-
-	"github.com/status-im/status-go/logutils"
 
 	status_common "github.com/status-im/status-go/common"
 	statusErrors "github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
@@ -208,7 +206,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 		response.SentTransactions, fromChainID, toChainID, err = m.transactionManager.SendRouterTransactions(ctx, multiTx)
 		if err != nil {
 			response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
-			log.Error("Error sending router transactions", "error", err)
+			logutils.ZapLogger().Error("Error sending router transactions", zap.Error(err))
 			// TODO #16556: Handle partially successful Tx sends?
 			// Don't return, store whichever transactions were successfully sent
 		}
@@ -219,28 +217,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 		routeData := wallettypes.NewRouteData(&routeInputParams, m.buildInputParams, routerTransactions)
 		tmpErr = m.db.PutRouteData(routeData)
 		if tmpErr != nil {
-			log.Error("Error storing route data", "error", tmpErr)
-		}
-
-		var (
-			chainIDs  []uint64
-			addresses []common.Address
-		)
-		for _, tx := range response.SentTransactions {
-			chainIDs = append(chainIDs, tx.FromChain)
-			addresses = append(addresses, common.Address(tx.FromAddress))
-			go func(chainId uint64, txHash common.Hash) {
-				defer status_common.LogOnPanic()
-				tmpErr = m.transactionManager.WatchTransaction(context.Background(), chainId, txHash)
-				if tmpErr != nil {
-					logutils.ZapLogger().Error("Error watching transaction", zap.Error(tmpErr))
-					return
-				}
-			}(tx.FromChain, common.Hash(tx.Hash))
-		}
-		tmpErr = m.transferController.CheckRecentHistory(chainIDs, addresses)
-		if tmpErr != nil {
-			logutils.ZapLogger().Error("Error checking recent history", zap.Error(tmpErr))
+			logutils.ZapLogger().Error("Error storing route data", zap.Error(tmpErr))
 		}
 	}()
 }

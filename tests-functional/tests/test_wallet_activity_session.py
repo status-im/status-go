@@ -23,12 +23,11 @@ def validate_entry(entry, tx_data):
 class TestWalletActivitySession(StatusBackendSteps):
     await_signals = [
         SignalType.NODE_LOGIN.value,
-        "wallet",
-        "wallet.suggested.routes",
-        "wallet.router.sign-transactions",
-        "wallet.router.sending-transactions-started",
-        "wallet.transaction.status-changed",
-        "wallet.router.transactions-sent",
+        SignalType.WALLET.value,
+        SignalType.WALLET_SUGGESTED_ROUTES.value,
+        SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value,
+        SignalType.WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED.value,
+        SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
     ]
 
     def setup_method(self):

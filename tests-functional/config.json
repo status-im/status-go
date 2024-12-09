@@ -27,7 +27,7 @@
                     "ChainID": 31337,
                     "Name": "Local Anvil",
                     "URL": "http://anvil:8545",
-                    "EnableRPSLimiter": true,
+                    "EnableRPSLimiter": false,
                     "Type": "embedded-direct",
                     "Enabled": true,
                     "AuthType": "no-auth"

@@ -40,30 +40,3 @@ class TestWalletSignals(StatusBackendSteps):
         message = json.loads(signal_response["event"]["message"].replace("'", '"'))
         assert user_1.address in message["ownershipStatus"].keys()
 
-    @pytest.mark.skip
-    def test_wallet_filter_activity_async(self):
-        method = "wallet_filterActivityAsync"
-        params = [
-            1,
-            [user_1.address],
-            [self.network_id],
-            {
-                "period": {"startTimestamp": 0, "endTimestamp": 0},
-                "types": [],
-                "statuses": [],
-                "counterpartyAddresses": [],
-                "assets": [],
-                "collectibles": [],
-                "filterOutAssets": False,
-                "filterOutCollectibles": False,
-            },
-            0,
-            50,
-        ]
-        self.rpc_client.rpc_valid_request(method, params, self.request_id)
-        signal_response = self.rpc_client.wait_for_signal("wallet", timeout=60)
-        self.rpc_client.verify_json_schema(signal_response, method)
-        assert signal_response["event"]["type"] == "wallet-activity-filtering-done"
-        message = json.loads(signal_response["event"]["message"].replace("'", '"'))
-        for item in message["activities"]:
-            assert user_1.address in item["sender"], item["recipient"]

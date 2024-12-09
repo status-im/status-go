@@ -105,30 +105,6 @@ func addSignaturesToTransactions(transactions map[common.Hash]*TransactionDescri
 	return nil
 }
 
-func multiTransactionFromCommand(command *MultiTransactionCommand) *MultiTransaction {
-	toAmount := new(hexutil.Big)
-	if command.ToAmount != nil {
-		toAmount = command.ToAmount
-	}
-	multiTransaction := NewMultiTransaction(
-		/* Timestamp:     */ uint64(time.Now().Unix()),
-		/* FromNetworkID: */ 0,
-		/* ToNetworkID:	  */ 0,
-		/* FromTxHash:    */ common.Hash{},
-		/* ToTxHash:      */ common.Hash{},
-		/* FromAddress:   */ command.FromAddress,
-		/* ToAddress:     */ command.ToAddress,
-		/* FromAsset:     */ command.FromAsset,
-		/* ToAsset:       */ command.ToAsset,
-		/* FromAmount:    */ command.FromAmount,
-		/* ToAmount:      */ toAmount,
-		/* Type:		  */ command.Type,
-		/* CrossTxID:	  */ "",
-	)
-
-	return multiTransaction
-}
-
 func updateDataFromMultiTx(data []*pathprocessor.MultipathProcessorTxArgs, multiTransaction *MultiTransaction) {
 	for _, tx := range data {
 		if tx.TransferTx != nil {

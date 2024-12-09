@@ -18,11 +18,19 @@ class SignalType(Enum):
     NODE_LOGIN = "node.login"
     NODE_LOGOUT = "node.stopped"
     MEDIASERVER_STARTED = "mediaserver.started"
+    WALLET = "wallet"
     WALLET_SUGGESTED_ROUTES = "wallet.suggested.routes"
     WALLET_ROUTER_SIGN_TRANSACTIONS = "wallet.router.sign-transactions"
     WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED = "wallet.router.sending-transactions-started"
-    WALLET_TRANSACTION_STATUS_CHANGED = "wallet.transaction.status-changed"
     WALLET_ROUTER_TRANSACTIONS_SENT = "wallet.router.transactions-sent"
+
+
+class WalletEventType(Enum):
+    WALLET_ACTIVITY_FILTERING_DONE = "wallet-activity-filtering-done"
+    WALLET_ACTIVITY_FILTERING_ENTRIES_UPDATED = "wallet-activity-filtering-entries-updated"
+    WALLET_ACTIVITY_SESSION_UPDATED = "wallet-activity-session-updated"
+    TRANSACTIONS_PENDING_TRANSACTION_UPDATE = "pending-transaction-update"
+    TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED = "pending-transaction-status-changed"
 
 
 class SignalClient:

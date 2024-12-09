@@ -1484,7 +1484,7 @@ func (c *loadBlocksAndTransfersCommand) areAllTransfersLoaded(account common.Add
 	if allBlocksLoaded {
 		headers, err := c.blockDAO.GetBlocksToLoadByAddress(c.chainClient.NetworkID(), account, 1)
 		if err != nil {
-			logutils.ZapLogger().Error("loadBlocksAndTransfersCommand GetFirstSavedBlock", zap.Error(err))
+			logutils.ZapLogger().Error("loadBlocksAndTransfersCommand GetBlocksToLoadByAddress", zap.Error(err))
 			return false, err
 		}
 

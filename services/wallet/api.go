@@ -35,7 +35,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router"
 	"github.com/status-im/status-go/services/wallet/router/fees"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -107,56 +106,6 @@ type DerivedAddress struct {
 	Path           string         `json:"path"`
 	HasActivity    bool           `json:"hasActivity"`
 	AlreadyCreated bool           `json:"alreadyCreated"`
-}
-
-// @deprecated
-func (api *API) CheckRecentHistory(ctx context.Context, addresses []common.Address) error {
-	return api.s.transferController.CheckRecentHistory([]uint64{api.s.rpcClient.UpstreamChainID}, addresses)
-}
-
-// @deprecated
-func (api *API) CheckRecentHistoryForChainIDs(ctx context.Context, chainIDs []uint64, addresses []common.Address) error {
-	return api.s.transferController.CheckRecentHistory(chainIDs, addresses)
-}
-
-func hexBigToBN(hexBig *hexutil.Big) *big.Int {
-	var bN *big.Int
-	if hexBig != nil {
-		bN = hexBig.ToInt()
-	}
-	return bN
-}
-
-// @deprecated
-// GetTransfersByAddress returns transfers for a single address
-func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
-	logutils.ZapLogger().Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", zap.Stringer("address", address))
-	var intLimit = int64(1)
-	if limit != nil {
-		intLimit = limit.ToInt().Int64()
-	}
-	return api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, address, hexBigToBN(toBlock), intLimit, fetchMore)
-}
-
-// @deprecated
-// LoadTransferByHash loads transfer to the database
-// Only used by status-mobile
-func (api *API) LoadTransferByHash(ctx context.Context, address common.Address, hash common.Hash) error {
-	logutils.ZapLogger().Debug("[WalletAPI:: LoadTransferByHash] get transfer by hash", zap.Stringer("address", address), zap.Stringer("hash", hash))
-	return api.s.transferController.LoadTransferByHash(ctx, api.s.rpcClient, address, hash)
-}
-
-// @deprecated
-func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
-	logutils.ZapLogger().Debug("[WalletAPI:: GetTransfersByAddressAndChainIDs] get transfers for an address", zap.Stringer("address", address))
-	return api.s.transferController.GetTransfersByAddress(ctx, chainID, address, hexBigToBN(toBlock), limit.ToInt().Int64(), fetchMore)
-}
-
-// @deprecated
-func (api *API) GetTransfersForIdentities(ctx context.Context, identities []transfer.TransactionIdentity) ([]transfer.View, error) {
-	logutils.ZapLogger().Debug("wallet.api.GetTransfersForIdentities", zap.Int("identities.len", len(identities)))
-
-	return api.s.transferController.GetTransfersForIdentities(ctx, identities)
 }
 
 func (api *API) FetchDecodedTxData(ctx context.Context, data string) (*thirdparty.DataParsed, error) {
@@ -274,24 +223,6 @@ func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.Pen
 	rst, err := api.s.pendingTxManager.GetAllPending()
 	logutils.ZapLogger().Debug("wallet.api.GetPendingTransactions RESULT", zap.Int("len", len(rst)))
 	return rst, err
-}
-
-// @deprecated
-// Not used by status-desktop anymore
-func (api *API) GetPendingTransactionsForIdentities(ctx context.Context, identities []transfer.TransactionIdentity) (
-	result []*transactions.PendingTransaction, err error) {
-
-	logutils.ZapLogger().Debug("wallet.api.GetPendingTransactionsForIdentities")
-
-	result = make([]*transactions.PendingTransaction, 0, len(identities))
-	var pt *transactions.PendingTransaction
-	for _, identity := range identities {
-		pt, err = api.s.pendingTxManager.GetPendingEntry(identity.ChainID, identity.Hash)
-		result = append(result, pt)
-	}
-
-	logutils.ZapLogger().Debug("wallet.api.GetPendingTransactionsForIdentities RES", zap.Int("len", len(result)))
-	return
 }
 
 // @deprecated
@@ -743,45 +674,6 @@ func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64
 		return hash, err
 	}
 	return api.s.transactionManager.SendTransactionWithSignature(chainID, params, sig)
-}
-
-// Deprecated: `CreateMultiTransaction` is the old way of sending transactions and should not be used anymore.
-//
-// The flow that should be used instead:
-// - call `BuildTransactionsFromRoute`
-// - wait for the `wallet.router.sign-transactions` signal
-// - sign received hashes using `SignMessage` call or sign on keycard
-// - call `SendRouterTransactionsWithSignatures` with the signatures of signed hashes from the previous step
-//
-// TODO: remove this struct once mobile switches to the new approach
-func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionCommand *transfer.MultiTransactionCommand, data []*pathprocessor.MultipathProcessorTxArgs, password string) (*transfer.MultiTransactionCommandResult, error) {
-	logutils.ZapLogger().Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
-
-	cmd, err := api.s.transactionManager.CreateMultiTransactionFromCommand(multiTransactionCommand, data)
-	if err != nil {
-		return nil, err
-	}
-
-	if password != "" {
-		selectedAccount, err := api.getVerifiedWalletAccount(multiTransactionCommand.FromAddress.Hex(), password)
-		if err != nil {
-			return nil, err
-		}
-
-		cmdRes, err := api.s.transactionManager.SendTransactions(ctx, cmd, data, api.s.router.GetPathProcessors(), selectedAccount)
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = api.s.transactionManager.InsertMultiTransaction(cmd)
-		if err != nil {
-			logutils.ZapLogger().Error("Failed to save multi transaction", zap.Error(err)) // not critical
-		}
-
-		return cmdRes, nil
-	}
-
-	return nil, api.s.transactionManager.SendTransactionForSigningToKeycard(ctx, cmd, data, api.s.router.GetPathProcessors())
 }
 
 func (api *API) BuildTransactionsFromRoute(ctx context.Context, buildInputParams *requests.RouterBuildTransactionsParams) {
