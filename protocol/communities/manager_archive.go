@@ -357,7 +357,7 @@ func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, 
 			// adding the content-topic used for member updates.
 			// since member updates would not be too frequent i.e only addition/deletion would add a new message,
 			// this shouldn't cause too much increase in size of archive generated.
-			topics = append(topics, m.transport.FilterByChatID(community.MemberUpdateChannelID()).ContentTopic)
+			topics = append(topics, m.transport.FilterByChatID(community.UniversalChatID()).ContentTopic)
 
 			ts := time.Now().Unix()
 			to := time.Unix(ts, 0)
