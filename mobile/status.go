@@ -2218,37 +2218,6 @@ func deserializeAndCompressKey(DesktopKey string) string {
 	return CompressPublicKey(sanitisedKey)
 }
 
-type InitLoggingRequest struct {
-	logutils.LogSettings
-	LogRequestGo   bool   `json:"LogRequestGo"`
-	LogRequestFile string `json:"LogRequestFile"`
-}
-
-// InitLogging The InitLogging function should be called when the application starts.
-// This ensures that we can capture logs before the user login. Subsequent calls will update the logger settings.
-// Before this, we can only capture logs after user login since we will only configure the logging after the login process.
-// Deprecated: Use InitializeApplication instead
-func InitLogging(logSettingsJSON string) string {
-	var logSettings InitLoggingRequest
-	var err error
-	if err = json.Unmarshal([]byte(logSettingsJSON), &logSettings); err != nil {
-		return makeJSONResponse(err)
-	}
-
-	if err = logutils.OverrideRootLoggerWithConfig(logSettings.LogSettings); err == nil {
-		logutils.ZapLogger().Info("logging initialised", zap.String("logSettings", logSettingsJSON))
-	}
-
-	if logSettings.LogRequestGo {
-		err = requestlog.ConfigureAndEnableRequestLogging(logSettings.LogRequestFile)
-		if err != nil {
-			return makeJSONResponse(err)
-		}
-	}
-
-	return makeJSONResponse(err)
-}
-
 func GetRandomMnemonic() string {
 	mnemonic, err := account.GetRandomMnemonic()
 	if err != nil {
