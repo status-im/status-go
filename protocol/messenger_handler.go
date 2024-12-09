@@ -478,6 +478,10 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 }
 
 func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, state *ReceivedMessageState, chat *Chat, outgoing bool) error {
+	if contact.mutual() {
+		// We only need to generate a contact request if we are not mutual
+		return nil
+	}
 
 	if chat == nil {
 		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", contact.ID)

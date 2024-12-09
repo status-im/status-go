@@ -619,7 +619,7 @@ func (s *SyncDeviceSuite) TestPairPendingContactRequest() {
 type contactRequestAction func(messenger *protocol.Messenger, contactRequestID string) (*protocol.MessengerResponse, error)
 type notificationValidateFunc func(r *protocol.ActivityCenterPaginationResponse)
 
-func (s *SyncDeviceSuite) testPairContactRequest(requestAction contactRequestAction, validateFunc notificationValidateFunc) {
+func (s *SyncDeviceSuite) testPairContactRequest(requestAction contactRequestAction, validateFunc notificationValidateFunc, validateFuncPaired notificationValidateFunc) {
 	bobBackend, _ := s.createUser("bob")
 	defer func() {
 		s.Require().NoError(bobBackend.Logout())
@@ -648,7 +648,7 @@ func (s *SyncDeviceSuite) testPairContactRequest(requestAction contactRequestAct
 	}()
 	s.pairAccounts(alice1Backend, alice1TmpDir, alice2Backend, alice2TmpDir)
 
-	internalNotificationValidateFunc := func(m *protocol.Messenger) {
+	internalNotificationValidateFunc := func(m *protocol.Messenger, isPairedDevice bool) {
 		acRequest := protocol.ActivityCenterNotificationsRequest{
 			ActivityTypes: []protocol.ActivityCenterType{
 				protocol.ActivityCenterNotificationTypeContactRequest,
@@ -658,35 +658,51 @@ func (s *SyncDeviceSuite) testPairContactRequest(requestAction contactRequestAct
 		}
 		r, err := m.ActivityCenterNotifications(acRequest)
 		s.Require().NoError(err)
-		validateFunc(r)
+		if isPairedDevice {
+			validateFuncPaired(r)
+		} else {
+			validateFunc(r)
+		}
 	}
 
-	internalNotificationValidateFunc(alice1Backend.Messenger())
-	internalNotificationValidateFunc(alice2Backend.Messenger())
+	internalNotificationValidateFunc(alice1Backend.Messenger(), false)
+	internalNotificationValidateFunc(alice2Backend.Messenger(), true)
 }
 
 func (s *SyncDeviceSuite) TestPairDeclineContactRequest() {
 	declineContactRequest := func(messenger *protocol.Messenger, contactRequestID string) (*protocol.MessengerResponse, error) {
 		return messenger.DeclineContactRequest(context.Background(), &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequestID)})
 	}
-	s.testPairContactRequest(declineContactRequest, func(r *protocol.ActivityCenterPaginationResponse) {
+	validateFunc := func(r *protocol.ActivityCenterPaginationResponse) {
 		s.Require().Len(r.Notifications, 1)
 		s.Require().False(r.Notifications[0].Accepted)
 		s.Require().True(r.Notifications[0].Dismissed)
 		s.Require().True(r.Notifications[0].Read)
-	})
+	}
+	s.testPairContactRequest(
+		declineContactRequest,
+		validateFunc,
+		// The paired device will get a notification because the request will not be fulfilled (not mutual)
+		validateFunc,
+	)
 }
 
 func (s *SyncDeviceSuite) TestPairAcceptContactRequest() {
 	acceptContactRequest := func(messenger *protocol.Messenger, contactRequestID string) (*protocol.MessengerResponse, error) {
 		return messenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequestID)})
 	}
-	s.testPairContactRequest(acceptContactRequest, func(r *protocol.ActivityCenterPaginationResponse) {
-		s.Require().Len(r.Notifications, 1)
-		s.Require().True(r.Notifications[0].Accepted)
-		s.Require().False(r.Notifications[0].Dismissed)
-		s.Require().True(r.Notifications[0].Read)
-	})
+	s.testPairContactRequest(
+		acceptContactRequest,
+		func(r *protocol.ActivityCenterPaginationResponse) {
+			s.Require().Len(r.Notifications, 1)
+			s.Require().True(r.Notifications[0].Accepted)
+			s.Require().False(r.Notifications[0].Dismissed)
+			s.Require().True(r.Notifications[0].Read)
+		},
+		// The paired device doesn't need a notification because it will receive the fully mutual contact
+		func(r *protocol.ActivityCenterPaginationResponse) {
+			s.Require().Len(r.Notifications, 0)
+		})
 }
 
 type testTimeSource struct{}

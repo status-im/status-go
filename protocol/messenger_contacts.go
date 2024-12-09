@@ -601,6 +601,7 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 	contactRequest := common.NewMessage()
 	contactRequest.ChatId = contact.ID
 	contactRequest.WhisperTimestamp = timestamp
+	contactRequest.Timestamp = timestamp
 	contactRequest.Seen = true
 	contactRequest.Text = text
 	if outgoing {
