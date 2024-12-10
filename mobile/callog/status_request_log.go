@@ -37,7 +37,7 @@ var sensitiveKeys = []string{
 	"gifs/api-key",
 }
 
-var sensitiveRegexString = fmt.Sprintf(`(?i)(".*?(%s).*?")\s*:\s*("[^"]*")`, strings.Join(sensitiveKeys, "|"))
+var sensitiveRegexString = fmt.Sprintf(`(?i)("\w*?(%s)\w*?")\s*:\s*(".*?")`, strings.Join(sensitiveKeys, "|"))
 
 var sensitiveRegex = regexp.MustCompile(sensitiveRegexString)
 

@@ -49,6 +49,11 @@ func TestRemoveSensitiveInfo(t *testing.T) {
 			input:    `{"username":"user1","email":"user1@example.com"}`,
 			expected: `{"username":"user1","email":"user1@example.com"}`,
 		},
+		{
+			name:     "should not match password substring in field names",
+			input:    `{"eventValue":{"flowType":"UserProfileCreatePassword","viewId":"UserProfileCreatePassword"}}`,
+			expected: `{"eventValue":{"flowType":"UserProfileCreatePassword","viewId":"UserProfileCreatePassword"}}`,
+		},
 	}
 
 	for _, tc := range testCases {
