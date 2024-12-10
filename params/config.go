@@ -1048,12 +1048,19 @@ func LesTopic(netid int) string {
 	}
 }
 
+func (c *NodeConfig) LogFilePath() string {
+	if c.LogDir == "" {
+		return filepath.Join(c.RootDataDir, c.LogFile)
+	}
+	return filepath.Join(c.LogDir, c.LogFile)
+}
+
 func (c *NodeConfig) DefaultLogSettings() logutils.LogSettings {
 	return logutils.LogSettings{
 		Enabled:         c.LogEnabled,
 		Level:           c.LogLevel,
 		Namespaces:      c.LogNamespaces,
-		File:            c.LogFile,
+		File:            c.LogFilePath(),
 		MaxSize:         c.LogMaxSize,
 		MaxBackups:      c.LogMaxBackups,
 		CompressRotated: c.LogCompressRotated,

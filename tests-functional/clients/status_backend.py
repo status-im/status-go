@@ -335,6 +335,9 @@ class StatusBackend(RpcClient, SignalClient):
     def find_public_key(self):
         self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
 
+    def find_key_uid(self):
+        return self.node_login_event.get("event", {}).get("account", {}).get("key-uid")
+
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.1), reraise=True)
     def change_container_ip(self, new_ipv4=None, new_ipv6=None):
         if not self.container:

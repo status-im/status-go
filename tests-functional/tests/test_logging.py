@@ -1,10 +1,11 @@
+from resources.constants import USER_DIR
 import re
 from clients.status_backend import StatusBackend
 import pytest
+import os
 
 
 @pytest.mark.rpc
-@pytest.mark.skip("waiting for status-backend to be executed on the same host/container")
 class TestLogging:
 
     @pytest.mark.init
@@ -20,50 +21,41 @@ class TestLogging:
         assert backend_client is not None
 
         # Init and login
-        backend_client.init_status_backend(data_dir=str(tmp_path))
-        backend_client.create_account_and_login(data_dir=str(tmp_path))
-        key_uid = self.ensure_logged_in(backend_client)
+        backend_client.init_status_backend()
+        backend_client.create_account_and_login()
 
         # Configure logging
-        backend_client.rpc_valid_request("wakuext_setLogLevel", [{"logLevel": "ERROR"}])
-        backend_client.rpc_valid_request(
-            "wakuext_setLogNamespaces",
-            [{"logNamespaces": "test1.test2:debug,test1.test2.test3:info"}],
-        )
+        backend_client.api_valid_request("SetLogLevel", {"logLevel": "ERROR"})
+        backend_client.api_valid_request("SetLogNamespaces", {"logNamespaces": "test1.test2:debug,test1.test2.test3:info"})
 
-        # Re-login (logging settings take effect after re-login)
-        backend_client.logout()
-        backend_client.login(str(key_uid))
-        self.ensure_logged_in(backend_client)
+        log_pattern = [
+            r"DEBUG\s+test1\.test2\s+",
+            r"INFO\s+test1\.test2\s+",
+            r"INFO\s+test1\.test2\.test3\s+",
+            r"WARN\s+test1\.test2\s+",
+            r"WARN\s+test1\.test2\.test3\s+",
+            r"ERROR\s+test1\s+",
+            r"ERROR\s+test1\.test2\s+",
+            r"ERROR\s+test1\.test2\.test3\s+",
+        ]
 
-        # Test logging
+        # Ensure changes take effect at runtime
         backend_client.rpc_valid_request("wakuext_logTest")
-        self.expect_logs(
-            tmp_path / "geth.log",
-            "test message",
-            [
-                r"DEBUG\s+test1\.test2",
-                r"INFO\s+test1\.test2",
-                r"INFO\s+test1\.test2\.test3",
-                r"WARN\s+test1\.test2",
-                r"WARN\s+test1\.test2\.test3",
-                r"ERROR\s+test1",
-                r"ERROR\s+test1\.test2",
-                r"ERROR\s+test1\.test2\.test3",
-            ],
-        )
+        geth_log = backend_client.extract_data(os.path.join(USER_DIR, "geth.log"))
+        self.expect_logs(geth_log, "test message", log_pattern, count=1)
 
-    def expect_logs(self, log_file, filter_keyword, expected_logs):
+        # Ensure changes are persisted after re-login
+        backend_client.logout()
+        backend_client.login(str(backend_client.find_key_uid()))
+        backend_client.wait_for_login()
+        backend_client.rpc_valid_request("wakuext_logTest")
+        geth_log = backend_client.extract_data(os.path.join(USER_DIR, "geth.log"))
+        self.expect_logs(geth_log, "test message", log_pattern, count=2)
+
+    def expect_logs(self, log_file, filter_keyword, expected_logs, count):
         with open(log_file, "r") as f:
             log_content = f.read()
 
         filtered_logs = [line for line in log_content.splitlines() if filter_keyword in line]
         for expected_log in expected_logs:
-            assert any(re.search(expected_log, log) for log in filtered_logs), f"Log entry not found: {expected_log}"
-
-    def ensure_logged_in(self, backend_client):
-        login_response = backend_client.wait_for_signal("node.login")
-        backend_client.verify_json_schema(login_response, "signal_node_login")
-        key_uid = login_response.get("event", {}).get("account", {}).get("key-uid")
-        assert key_uid is not None, "key-uid not found in login response"
-        return key_uid
+            assert sum(1 for log in filtered_logs if re.search(expected_log, log)) == count, f"Log entry not found or count mismatch: {expected_log}"

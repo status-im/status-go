@@ -1248,7 +1248,7 @@ func exportNodeLogs() string {
 	if config == nil {
 		return makeJSONResponse(errors.New("config and log file are not available"))
 	}
-	data, err := json.Marshal(exportlogs.ExportFromBaseFile(config.LogFile))
+	data, err := json.Marshal(exportlogs.ExportFromBaseFile(config.LogFilePath()))
 	if err != nil {
 		return makeJSONResponse(fmt.Errorf("error marshalling to json: %v", err))
 	}
@@ -2321,6 +2321,44 @@ func addCentralizedMetric(requestJSON string) string {
 	}
 
 	return metric.ID
+}
+
+func SetLogLevel(requestJSON string) string {
+	return callWithResponse(setLogLevel, requestJSON)
+}
+
+func setLogLevel(requestJSON string) string {
+	var request requests.SetLogLevel
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(statusBackend.SetLogLevel(request.LogLevel))
+}
+
+func SetLogNamespaces(requestJSON string) string {
+	return callWithResponse(setLogNamespaces, requestJSON)
+}
+
+func setLogNamespaces(requestJSON string) string {
+	var request requests.SetLogNamespaces
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(statusBackend.SetLogNamespaces(request.LogNamespaces))
 }
 
 func IntendedPanic(message string) string {

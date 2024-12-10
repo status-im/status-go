@@ -107,7 +107,8 @@ func (core *Core) Sync() error {
 }
 
 func (core *Core) UpdateSyncer(newSyncer zapcore.WriteSyncer) {
-	core.syncer.Store(writeSyncerWrapper{WriteSyncer: newSyncer})
+	oldSyncer := core.syncer.Swap(writeSyncerWrapper{WriteSyncer: newSyncer})
+	_ = oldSyncer.(zapcore.WriteSyncer).Sync() // may fail but doesn't impact syncer update
 }
 
 func (core *Core) UpdateEncoder(newEncoder zapcore.Encoder) {

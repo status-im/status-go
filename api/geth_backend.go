@@ -2198,12 +2198,6 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 		}
 	}
 
-	if len(conf.LogDir) == 0 {
-		conf.LogFile = filepath.Join(b.rootDataDir, conf.LogFile)
-	} else {
-		conf.LogFile = filepath.Join(conf.LogDir, conf.LogFile)
-	}
-
 	b.config = conf
 
 	if inputNodeCfg != nil && inputNodeCfg.RuntimeLogLevel != "" {
@@ -2983,4 +2977,30 @@ func (b *GethStatusBackend) TogglePanicReporting(enabled bool) error {
 		return b.EnablePanicReporting()
 	}
 	return b.DisablePanicReporting()
+}
+
+func (b *GethStatusBackend) SetLogLevel(level string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	err := nodecfg.SetLogLevel(b.appDB, level)
+	if err != nil {
+		return err
+	}
+	b.config.LogLevel = level
+
+	return logutils.OverrideRootLoggerWithConfig(b.config.DefaultLogSettings())
+}
+
+func (b *GethStatusBackend) SetLogNamespaces(namespaces string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	err := nodecfg.SetLogNamespaces(b.appDB, namespaces)
+	if err != nil {
+		return err
+	}
+	b.config.LogNamespaces = namespaces
+
+	return logutils.OverrideRootLoggerWithConfig(b.config.DefaultLogSettings())
 }
