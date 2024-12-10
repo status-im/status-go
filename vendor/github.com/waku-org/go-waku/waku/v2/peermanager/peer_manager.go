@@ -102,7 +102,6 @@ const maxFailedAttempts = 5
 const prunePeerStoreInterval = 10 * time.Minute
 const peerConnectivityLoopSecs = 15
 const maxConnsToPeerRatio = 3
-const badPeersCleanupInterval = 1 * time.Minute
 const maxDialFailures = 2
 
 // 80% relay peers 20% service peers
@@ -258,14 +257,13 @@ func (pm *PeerManager) Start(ctx context.Context) {
 	}
 }
 
-func (pm *PeerManager) removeBadPeers() {
-	if !pm.RelayEnabled {
-		for _, peerID := range pm.host.Peerstore().Peers() {
-			if pm.host.Peerstore().(wps.WakuPeerstore).ConnFailures(peerID) > maxDialFailures {
-				//delete peer from peerStore
-				pm.logger.Debug("removing bad peer due to recurring dial failures", zap.Stringer("peerID", peerID))
-				pm.RemovePeer(peerID)
-			}
+func (pm *PeerManager) CheckAndRemoveBadPeer(peerID peer.ID) {
+	if pm.host.Peerstore().(wps.WakuPeerstore).ConnFailures(peerID) > maxDialFailures &&
+		pm.peerConnector.onlineChecker.IsOnline() {
+		if origin, _ := pm.host.Peerstore().(wps.WakuPeerstore).Origin(peerID); origin != wps.Static { // delete only if a peer is discovered and not configured statically.
+			//delete peer from peerStore
+			pm.logger.Debug("removing bad peer due to recurring dial failures", zap.Stringer("peerID", peerID))
+			pm.RemovePeer(peerID)
 		}
 	}
 }
@@ -273,17 +271,13 @@ func (pm *PeerManager) removeBadPeers() {
 func (pm *PeerManager) peerStoreLoop(ctx context.Context) {
 	defer utils.LogOnPanic()
 	t := time.NewTicker(prunePeerStoreInterval)
-	t1 := time.NewTicker(badPeersCleanupInterval)
 	defer t.Stop()
-	defer t1.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 			pm.prunePeerStore()
-		case <-t1.C:
-			pm.removeBadPeers()
 		}
 	}
 }
@@ -749,6 +743,7 @@ func (pm *PeerManager) HandleDialError(err error, peerID peer.ID) {
 	if err == nil || errors.Is(err, context.Canceled) {
 		return
 	}
+
 	if pm.peerConnector != nil {
 		pm.peerConnector.addConnectionBackoff(peerID)
 	}
@@ -761,10 +756,5 @@ func (pm *PeerManager) HandleDialError(err error, peerID peer.ID) {
 		if emitterErr != nil {
 			pm.logger.Error("failed to emit DialError", zap.Error(emitterErr))
 		}
-	}
-	if !pm.RelayEnabled && pm.host.Peerstore().(wps.WakuPeerstore).ConnFailures(peerID) >= maxDialFailures {
-		//delete peer from peerStore
-		pm.logger.Debug("removing bad peer due to recurring dial failures", zap.Stringer("peerID", peerID))
-		pm.RemovePeer(peerID)
 	}
 }

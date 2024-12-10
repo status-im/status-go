@@ -35,6 +35,7 @@ type MessageTracker interface {
 // MissingMessageVerifier is used to periodically retrieve missing messages from store nodes that have some specific criteria
 type MissingMessageVerifier struct {
 	ctx    context.Context
+	cancel context.CancelFunc
 	params missingMessageVerifierParams
 
 	storenodeRequestor common.StorenodeRequestor
@@ -43,10 +44,12 @@ type MissingMessageVerifier struct {
 	criteriaInterest   map[string]criteriaInterest // Track message verification requests and when was the last time a pubsub topic was verified for missing messages
 	criteriaInterestMu sync.RWMutex
 
-	C <-chan *protocol.Envelope
+	C chan *protocol.Envelope
 
-	timesource timesource.Timesource
-	logger     *zap.Logger
+	timesource   timesource.Timesource
+	logger       *zap.Logger
+	isRunning    bool
+	runningMutex sync.RWMutex
 }
 
 // NewMissingMessageVerifier creates an instance of a MissingMessageVerifier
@@ -63,6 +66,8 @@ func NewMissingMessageVerifier(storenodeRequester common.StorenodeRequestor, mes
 		messageTracker:     messageTracker,
 		logger:             logger.Named("missing-msg-verifier"),
 		params:             params,
+		criteriaInterest:   make(map[string]criteriaInterest),
+		C:                  make(chan *protocol.Envelope, 1000),
 	}
 }
 
@@ -97,12 +102,24 @@ func (m *MissingMessageVerifier) SetCriteriaInterest(peerID peer.ID, contentFilt
 	m.criteriaInterest[contentFilter.PubsubTopic] = criteriaInterest
 }
 
-func (m *MissingMessageVerifier) Start(ctx context.Context) {
-	m.ctx = ctx
-	m.criteriaInterest = make(map[string]criteriaInterest)
+func (m *MissingMessageVerifier) setRunning(running bool) {
+	m.runningMutex.Lock()
+	defer m.runningMutex.Unlock()
+	m.isRunning = running
+}
 
-	c := make(chan *protocol.Envelope, 1000)
-	m.C = c
+func (m *MissingMessageVerifier) Start(ctx context.Context) {
+	m.runningMutex.Lock()
+	if m.isRunning { //make sure verifier only runs once.
+		m.runningMutex.Unlock()
+		return
+	}
+	m.isRunning = true
+	m.runningMutex.Unlock()
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+	m.ctx = ctx
+	m.cancel = cancelFunc
 
 	go func() {
 		defer utils.LogOnPanic()
@@ -123,22 +140,31 @@ func (m *MissingMessageVerifier) Start(ctx context.Context) {
 				for _, interest := range critIntList {
 					select {
 					case <-ctx.Done():
+						m.setRunning(false)
 						return
 					default:
 						semaphore <- struct{}{}
 						go func(interest criteriaInterest) {
 							defer utils.LogOnPanic()
-							m.fetchHistory(c, interest)
+							m.fetchHistory(m.C, interest)
 							<-semaphore
 						}(interest)
 					}
 				}
 
 			case <-ctx.Done():
+				m.setRunning(false)
 				return
 			}
 		}
 	}()
+}
+
+func (m *MissingMessageVerifier) Stop() {
+	m.cancel()
+	m.runningMutex.Lock()
+	defer m.runningMutex.Unlock()
+	m.isRunning = false
 }
 
 func (m *MissingMessageVerifier) fetchHistory(c chan<- *protocol.Envelope, interest criteriaInterest) {
