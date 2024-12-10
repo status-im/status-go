@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
 	"github.com/status-im/status-go/services/communitytokens"
+	"github.com/status-im/status-go/services/communitytokensv2"
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/eth"
@@ -129,6 +130,7 @@ type StatusNode struct {
 	wakuV2ExtSrvc          *wakuv2ext.Service
 	ensSrvc                *ens.Service
 	communityTokensSrvc    *communitytokens.Service
+	communityTokensSrvcV2  *communitytokensv2.Service
 	gifSrvc                *gif.Service
 	stickersSrvc           *stickers.Service
 	chatSrvc               *chat.Service
