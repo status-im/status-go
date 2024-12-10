@@ -1957,6 +1957,10 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec co
 }
 
 func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMessage) (common.RawMessage, error) {
+	if rawMessage.ContentTopic == "" {
+		rawMessage.ContentTopic = rawMessage.LocalChatID
+	}
+
 	var err error
 	var id []byte
 	logger := m.logger.With(zap.String("site", "dispatchMessage"), zap.String("chatID", rawMessage.LocalChatID))
@@ -1991,7 +1995,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 
 	case ChatTypePublic, ChatTypeProfile:
 		logger.Debug("sending public message", zap.String("chatName", chat.Name))
-		id, err = m.sender.SendPublic(ctx, chat.ID, rawMessage)
+		id, err = m.sender.SendPublic(ctx, rawMessage.ContentTopic, rawMessage)
 		if err != nil {
 			return rawMessage, err
 		}
@@ -2001,6 +2005,9 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		if err != nil {
 			return rawMessage, err
 		}
+		// Use a single content-topic for all community chats.
+		// Reasoning: https://github.com/status-im/status-go/pull/5864
+		rawMessage.ContentTopic = community.UniversalChatID()
 		rawMessage.PubsubTopic = community.PubsubTopic()
 
 		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID(), rawMessage.MessageType)
@@ -2028,7 +2035,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		}
 		isEncrypted := isCommunityEncrypted || isChannelEncrypted
 		if !isEncrypted {
-			id, err = m.sender.SendPublic(ctx, chat.ID, rawMessage)
+			id, err = m.sender.SendPublic(ctx, rawMessage.ContentTopic, rawMessage)
 			if err != nil {
 				return rawMessage, err
 			}
