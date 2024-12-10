@@ -99,7 +99,7 @@ func (f *FiltersManager) Init(
 
 	// Add public, one-to-one and negotiated filters.
 	for _, fi := range filtersToInit {
-		_, err := f.LoadPublic(fi.ChatID, fi.PubsubTopic, fi.ContentTopicOverrideID)
+		_, err := f.LoadPublic(fi.ChatID, fi.PubsubTopic)
 		if err != nil {
 			return nil, err
 		}
@@ -123,16 +123,15 @@ func (f *FiltersManager) Init(
 }
 
 type FiltersToInitialize struct {
-	ChatID                 string
-	PubsubTopic            string
-	ContentTopicOverrideID string //litte hacky but this is used to override content-topic in filtersManager.
+	ChatID      string
+	PubsubTopic string
 }
 
 func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitialize) ([]*Filter, error) {
 	var filters []*Filter
 	// Add public, one-to-one and negotiated filters.
 	for _, pf := range publicFiltersToInit {
-		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic, pf.ContentTopicOverrideID)
+		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic)
 		if err != nil {
 			return nil, err
 		}
@@ -456,7 +455,7 @@ func (f *FiltersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter,
 	}
 
 	keyString := hex.EncodeToString(secret.Key)
-	filter, err := f.addSymmetric(keyString, "", "")
+	filter, err := f.addSymmetric(keyString, "")
 	if err != nil {
 		f.logger.Debug("could not register negotiated topic", zap.Error(err))
 		return nil, err
@@ -535,16 +534,11 @@ func (f *FiltersManager) PersonalTopicFilter() *Filter {
 }
 
 // LoadPublic adds a filter for a public chat.
-func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, contentTopicID string) (*Filter, error) {
+func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	chatIDToLoad := chatID
-	if contentTopicID != "" {
-		chatIDToLoad = contentTopicID
-	}
-
-	if chat, ok := f.filters[chatIDToLoad]; ok {
+	if chat, ok := f.filters[chatID]; ok {
 		if chat.PubsubTopic != pubsubTopic {
 			f.logger.Debug("updating pubsub topic for filter",
 				zap.String("chatID", chatID),
@@ -553,13 +547,13 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string, contentTo
 				zap.String("newTopic", pubsubTopic),
 			)
 			chat.PubsubTopic = pubsubTopic
-			f.filters[chatIDToLoad] = chat //TODO: Do we need to update watchers as well on modification?
+			f.filters[chatID] = chat
 		}
 
 		return chat, nil
 	}
 
-	filterAndTopic, err := f.addSymmetric(chatID, pubsubTopic, contentTopicID)
+	filterAndTopic, err := f.addSymmetric(chatID, pubsubTopic)
 	if err != nil {
 		f.logger.Debug("could not register public chat topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -598,7 +592,7 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 		return f.filters[chatID], nil
 	}
 
-	contactCodeFilter, err := f.addSymmetric(chatID, "", "")
+	contactCodeFilter, err := f.addSymmetric(chatID, "")
 	if err != nil {
 		f.logger.Debug("could not register contact code topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
@@ -621,7 +615,7 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 }
 
 // addSymmetric adds a symmetric key filter
-func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string, contentTopicID string) (*RawFilter, error) {
+func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (*RawFilter, error) {
 	var symKeyID string
 	var err error
 
@@ -648,12 +642,6 @@ func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string, content
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	if contentTopicID != "" {
-		//add receive filter for the single default contentTopic for all community chats
-		topic = ToTopic(contentTopicID)
-		topics = append(topics, topic)
 	}
 
 	id, err := f.service.Subscribe(&types.SubscriptionOptions{

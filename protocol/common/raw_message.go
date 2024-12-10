@@ -84,5 +84,4 @@ type RawMessage struct {
 	ResendType            ResendType
 	ResendMethod          ResendMethod
 	Priority              *MessagePriority
-	ContentTopicOverride  string
 }
