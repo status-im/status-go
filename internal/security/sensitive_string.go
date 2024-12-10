@@ -1,0 +1,54 @@
+package security
+
+import (
+	"encoding/json"
+)
+
+const redactionPlaceholder = "***"
+
+// SensitiveString is a type for handling sensitive information securely.
+// This helps to achieve the following goals:
+// 	1. Prevent accidental logging of sensitive information.
+//	2. Provide controlled visibility (e.g., redacted output for String() or MarshalJSON()).
+//	3. Enable controlled access to the sensitive value when needed.
+type SensitiveString struct {
+	value string
+}
+
+// NewSensitiveString creates a new SensitiveString
+func NewSensitiveString(value string) *SensitiveString {
+	return &SensitiveString{value: value}
+}
+
+// SetValue updates the sensitive string value.
+func (s *SensitiveString) SetValue(value string) {
+	s.value = value
+}
+
+// String provides a redacted version of the sensitive string
+func (s *SensitiveString) String() string {
+	if s.value == "" {
+		return ""
+	}
+	return redactionPlaceholder
+}
+
+// MarshalJSON ensures that sensitive strings are redacted when marshaled to JSON
+func (s *SensitiveString) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+// UnmarshalJSON implements unmarshalling a sensitive string from JSON
+func (s *SensitiveString) UnmarshalJSON(data []byte) error {
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	s.value = value
+	return nil
+}
+
+// Reveal exposes the sensitive value (use with caution)
+func (s *SensitiveString) Reveal() string {
+	return s.value
+}
