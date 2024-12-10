@@ -41,6 +41,7 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
 	"github.com/status-im/status-go/services/communitytokens"
+	"github.com/status-im/status-go/services/communitytokensv2"
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/eth"
@@ -97,6 +98,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.pendingTrackerService(&b.walletFeed))
 	services = append(services, b.ensService(b.timeSourceNow()))
 	services = append(services, b.CommunityTokensService())
+	services = append(services, b.CommunityTokensServiceV2())
 	services = append(services, b.stickersService(accDB))
 	services = append(services, b.updatesService())
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(&b.accountsFeed, accDB, mediaServer))
@@ -507,6 +509,13 @@ func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
 		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountManager, b.pendingTracker, b.config, b.appDB, &b.walletFeed, b.transactor)
 	}
 	return b.communityTokensSrvc
+}
+
+func (b *StatusNode) CommunityTokensServiceV2() *communitytokensv2.Service {
+	if b.communityTokensSrvcV2 == nil {
+		b.communityTokensSrvcV2 = communitytokensv2.NewService(b.rpcClient, b.gethAccountManager, b.pendingTracker, b.config, b.appDB, &b.walletFeed, b.transactor)
+	}
+	return b.communityTokensSrvcV2
 }
 
 func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
