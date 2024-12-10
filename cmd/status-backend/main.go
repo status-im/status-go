@@ -4,6 +4,8 @@ import (
 	"flag"
 	stdlog "log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"golang.org/x/crypto/ssh/terminal"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/status-im/status-go/internal/sentry"
 	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
+	statusgo "github.com/status-im/status-go/mobile"
 )
 
 var (
@@ -39,6 +42,7 @@ func main() {
 	defer sentry.Recover()
 
 	flag.Parse()
+	go handleInterrupts()
 
 	srv := server.NewServer()
 	srv.Setup()
@@ -56,4 +60,18 @@ func main() {
 	)
 	srv.RegisterMobileAPI()
 	srv.Serve()
+}
+
+// haltOnInterruptSignal catches interrupt signal (SIGINT) and
+// stops the node. It times out after 5 seconds
+// if the node can not be stopped.
+func handleInterrupts() {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(ch)
+
+	receivedSignal := <-ch
+	logger.Info("interrupt signal received", "signal", receivedSignal)
+	_ = statusgo.Logout()
+	os.Exit(0)
 }
