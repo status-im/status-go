@@ -61,7 +61,8 @@ type EnevelopeProcessor interface {
 	OnNewEnvelope(env *protocol.Envelope) error
 }
 
-func NewFilterManager(ctx context.Context, logger *zap.Logger, minPeersPerFilter int, envProcessor EnevelopeProcessor, node *filter.WakuFilterLightNode, opts ...SubscribeOptions) *FilterManager {
+func NewFilterManager(ctx context.Context, logger *zap.Logger, minPeersPerFilter int,
+	envProcessor EnevelopeProcessor, node *filter.WakuFilterLightNode, opts ...SubscribeOptions) *FilterManager {
 	// This fn is being mocked in test
 	mgr := new(FilterManager)
 	mgr.ctx = ctx
@@ -162,6 +163,7 @@ func (mgr *FilterManager) subscribeAndRunLoop(f filterConfig) {
 	defer utils.LogOnPanic()
 	ctx, cancel := context.WithCancel(mgr.ctx)
 	config := FilterConfig{MaxPeers: mgr.minPeersPerFilter}
+
 	sub, err := Subscribe(ctx, mgr.node, f.contentFilter, config, mgr.logger, mgr.params)
 	mgr.Lock()
 	mgr.filterSubscriptions[f.ID] = SubDetails{cancel, sub}
@@ -188,6 +190,7 @@ func (mgr *FilterManager) OnConnectionStatusChange(pubsubTopic string, newStatus
 	mgr.logger.Debug("inside on connection status change", zap.Bool("new-status", newStatus),
 		zap.Int("agg filters count", len(mgr.filterSubscriptions)), zap.Int("filter subs count", len(subs)))
 	if newStatus && !mgr.onlineChecker.IsOnline() { // switched from offline to Online
+		mgr.onlineChecker.SetOnline(newStatus)
 		mgr.NetworkChange()
 		mgr.logger.Debug("switching from offline to online")
 		mgr.Lock()
