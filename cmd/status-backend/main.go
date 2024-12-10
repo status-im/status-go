@@ -62,9 +62,8 @@ func main() {
 	srv.Serve()
 }
 
-// haltOnInterruptSignal catches interrupt signal (SIGINT) and
-// stops the node. It times out after 5 seconds
-// if the node can not be stopped.
+// handleInterrupts catches interrupt signal (SIGTERM/SIGINT) and
+// gracefully logouts and stops the node.
 func handleInterrupts() {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
