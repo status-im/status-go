@@ -245,6 +245,12 @@ Access the exposed API with any HTTP client you prefer:
     - [Python](https://pypi.org/project/requests/)
     - [Go](https://pkg.go.dev/net/http)
 
+## `status-backend` API
+
+- `/health`
+This is a basic health check endpoint. Response contains a single `version` property.
+Returns HTTP code 200 if alive. 
+
 # 👌 Simple flows
 
 In most cases to start testing you'll need some boilerplate. Below are the simple call flows for common cases.

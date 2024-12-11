@@ -15,6 +15,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/status-im/status-go/cmd/status-backend/server/api"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -93,6 +94,7 @@ func (s *Server) Listen(address string) error {
 	}
 
 	s.mux = http.NewServeMux()
+	s.mux.HandleFunc("/health", api.Health)
 	s.mux.HandleFunc("/signals", s.signals)
 	s.server.Handler = s.mux
 
