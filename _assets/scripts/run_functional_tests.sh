@@ -13,7 +13,6 @@ coverage_reports_path="${root_path}/coverage"
 binary_coverage_reports_path="${coverage_reports_path}/binary"
 merged_coverage_reports_path="${coverage_reports_path}/merged"
 test_results_path="${root_path}/reports"
-status_backend_logs="${root_path}/logs/status-backend"
 
 # Cleanup any previous coverage reports
 rm -rf "${coverage_reports_path}"
@@ -23,7 +22,6 @@ rm -rf "${test_results_path}"
 mkdir -p "${binary_coverage_reports_path}"
 mkdir -p "${merged_coverage_reports_path}"
 mkdir -p "${test_results_path}"
-mkdir -p "${status_backend_logs}"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.test.status-go.yml"
 project_name="status-go-func-tests-$(date +%s)"
@@ -55,7 +53,7 @@ pip install --upgrade pip
 pip install -r "${root_path}/requirements.txt"
 
 # Run functional tests
-pytest -m rpc --docker_project_name=${project_name} --junitxml=${test_results_path}/report.xml
+pytest -m rpc --docker_project_name=${project_name} --codecov_dir=${binary_coverage_reports_path} --junitxml=${test_results_path}/report.xml
 exit_code=$?
 
 # Stop containers

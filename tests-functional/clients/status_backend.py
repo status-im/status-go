@@ -51,7 +51,7 @@ class StatusBackend(RpcClient, SignalClient):
         image_name = f"{docker_project_name}-status-backend:latest"
         container_name = f"{docker_project_name}-status-backend-{timestamp}"
 
-        coverage_path = os.path.abspath("./coverage/binary")
+        coverage_path = option.codecov_dir if option.codecov_dir else os.path.abspath("./coverage/binary")
 
         container_args = {
             "image": image_name,
@@ -75,7 +75,8 @@ class StatusBackend(RpcClient, SignalClient):
             "stop_signal": "SIGINT"
         }
 
-        container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
+        if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
+            container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
 
         container = self.docker_client.containers.run(**container_args)
 

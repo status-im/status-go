@@ -42,6 +42,12 @@ def pytest_addoption(parser):
         help="",
         default="tests-functional",
     )
+    parser.addoption(
+        "--codecov_dir",
+        action="store",
+        help="",
+        default=None,
+    )
 
 @dataclass
 class Option:
