@@ -20,6 +20,7 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/internal/security"
 )
 
 const ownedNFTLimit = 100
@@ -85,17 +86,17 @@ func getCollectionBaseURL(chainID walletCommon.ChainID) (string, error) {
 type Client struct {
 	thirdparty.CollectibleContractOwnershipProvider
 	client           *http.Client
-	mainnetAPIKey    string
-	testnetAPIKey    string
+	mainnetAPIKey    security.SensitiveString
+	testnetAPIKey    security.SensitiveString
 	connectionStatus *connection.Status
 }
 
-func NewClient(mainnetAPIKey string, testnetAPIKey string) *Client {
-	if mainnetAPIKey == "" {
+func NewClient(mainnetAPIKey security.SensitiveString, testnetAPIKey security.SensitiveString) *Client {
+	if mainnetAPIKey.Empty() {
 		logutils.ZapLogger().Warn("Rarible API key not available for Mainnet")
 	}
 
-	if testnetAPIKey == "" {
+	if testnetAPIKey.Empty() {
 		logutils.ZapLogger().Warn("Rarible API key not available for Testnet")
 	}
 
@@ -107,14 +108,14 @@ func NewClient(mainnetAPIKey string, testnetAPIKey string) *Client {
 	}
 }
 
-func (o *Client) getAPIKey(chainID walletCommon.ChainID) string {
+func (o *Client) getAPIKey(chainID walletCommon.ChainID) security.SensitiveString {
 	if chainID.IsMainnet() {
 		return o.mainnetAPIKey
 	}
 	return o.testnetAPIKey
 }
 
-func (o *Client) doQuery(ctx context.Context, url string, apiKey string) (*http.Response, error) {
+func (o *Client) doQuery(ctx context.Context, url string, apiKey security.SensitiveString) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -125,7 +126,7 @@ func (o *Client) doQuery(ctx context.Context, url string, apiKey string) (*http.
 	return o.doWithRetries(req, apiKey)
 }
 
-func (o *Client) doPostWithJSON(ctx context.Context, url string, payload any, apiKey string) (*http.Response, error) {
+func (o *Client) doPostWithJSON(ctx context.Context, url string, payload any, apiKey security.SensitiveString) (*http.Response, error) {
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -145,7 +146,7 @@ func (o *Client) doPostWithJSON(ctx context.Context, url string, payload any, ap
 	return o.doWithRetries(req, apiKey)
 }
 
-func (o *Client) doWithRetries(req *http.Request, apiKey string) (*http.Response, error) {
+func (o *Client) doWithRetries(req *http.Request, apiKey security.SensitiveString) (*http.Response, error) {
 	b := backoff.NewExponentialBackOff()
 	b.InitialInterval = time.Millisecond * 1000
 	b.RandomizationFactor = 0.1
@@ -155,7 +156,7 @@ func (o *Client) doWithRetries(req *http.Request, apiKey string) (*http.Response
 
 	b.Reset()
 
-	req.Header.Set("X-API-KEY", apiKey)
+	req.Header.Set("X-API-KEY", apiKey.Reveal())
 
 	op := func() (*http.Response, error) {
 		resp, err := o.client.Do(req)

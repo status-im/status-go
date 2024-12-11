@@ -64,3 +64,16 @@ func TestCopySensitiveString(t *testing.T) {
 	sCopy := s
 	require.Equal(t, secretValue, sCopy.Reveal())
 }
+
+func TestPlus(t *testing.T) {
+	secretValue := gofakeit.LetterN(10)
+	s1 := NewSensitiveString(secretValue)
+	s2 := NewSensitiveString(secretValue)
+	require.Equal(t, s1.Plus(s2), NewSensitiveString(secretValue+secretValue))
+}
+
+func TestPlusString(t *testing.T) {
+	secretValue := gofakeit.LetterN(10)
+	s1 := NewSensitiveString(secretValue)
+	require.Equal(t, s1.PlusString(secretValue), NewSensitiveString(secretValue+secretValue))
+}

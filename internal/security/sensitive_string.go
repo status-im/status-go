@@ -2,6 +2,7 @@ package security
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 const RedactionPlaceholder = "***"
@@ -18,6 +19,11 @@ type SensitiveString struct {
 // NewSensitiveString creates a new SensitiveString
 func NewSensitiveString(value string) SensitiveString {
 	return SensitiveString{value: value}
+}
+
+func NewSensitiveStringPrintf(format string, args ...interface{}) SensitiveString {
+	str := fmt.Sprintf(format, args...)
+	return NewSensitiveString(str)
 }
 
 // String provides a redacted version of the sensitive string
@@ -55,4 +61,16 @@ func (s SensitiveString) Reveal() string {
 // Empty checks if the value is empty
 func (s SensitiveString) Empty() bool {
 	return s.value == ""
+}
+
+func (s SensitiveString) NotEmpty() bool {
+	return !s.Empty()
+}
+
+func (s SensitiveString) Plus(other SensitiveString) SensitiveString {
+	return NewSensitiveString(s.value + other.value)
+}
+
+func (s SensitiveString) PlusString(other string) SensitiveString {
+	return NewSensitiveString(s.value + other)
 }

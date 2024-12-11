@@ -15,6 +15,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/logutils"
 )
 
@@ -25,8 +26,8 @@ const (
 )
 
 type BasicCreds struct {
-	User     string
-	Password string
+	User     security.SensitiveString
+	Password security.SensitiveString
 }
 
 // HTTPClient represents an HTTP client with configurable options
@@ -52,7 +53,7 @@ func WithGzip() RequestOption {
 func WithCredentials(creds *BasicCreds) RequestOption {
 	return func(req *http.Request, _ *requestModifiers) {
 		if creds != nil {
-			req.SetBasicAuth(creds.User, creds.Password)
+			req.SetBasicAuth(creds.User.Reveal(), creds.Password.Reveal())
 		}
 	}
 }
@@ -258,7 +259,7 @@ func (c *HTTPClient) DoPostRequest(ctx context.Context, url string, params map[s
 	}
 
 	if creds != nil {
-		req.SetBasicAuth(creds.User, creds.Password)
+		req.SetBasicAuth(creds.User.Reveal(), creds.Password.Reveal())
 	}
 
 	req.Header.Set("Content-Type", "application/json")

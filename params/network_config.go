@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/status-im/status-go/internal/security"
 )
 
 // RpcProviderAuthType defines the different types of authentication for RPC providers
@@ -37,15 +39,15 @@ type RpcProvider struct {
 	Enabled          bool            `json:"enabled"` // Whether the provider is enabled
 	// Authentication
 	AuthType     RpcProviderAuthType `json:"authType" validate:"required,oneof=no-auth basic-auth token-auth"` // Type of authentication
-	AuthLogin    string              `json:"authLogin" validate:"omitempty,min=1"`                             // Login for BasicAuth (empty string if not used)
-	AuthPassword string              `json:"authPassword" validate:"omitempty,min=1"`                          // Password for BasicAuth (empty string if not used)
-	AuthToken    string              `json:"authToken" validate:"omitempty,min=1"`                             // Token for TokenAuth (empty string if not used)
+	AuthLogin    security.SensitiveString              `json:"authLogin" validate:"omitempty,min=1"`                             // Login for BasicAuth (empty string if not used)
+	AuthPassword security.SensitiveString              `json:"authPassword" validate:"omitempty,min=1"`                          // Password for BasicAuth (empty string if not used)
+	AuthToken    security.SensitiveString              `json:"authToken" validate:"omitempty,min=1"`                             // Token for TokenAuth (empty string if not used)
 }
 
 // GetFullURL returns the URL with auth token if TokenAuth is used
 func (p RpcProvider) GetFullURL() string {
-	if p.AuthType == TokenAuth && p.AuthToken != "" {
-		return strings.TrimRight(p.URL, "/") + "/" + p.AuthToken
+	if p.AuthType == TokenAuth && p.AuthToken.NotEmpty() {
+		return strings.TrimRight(p.URL, "/") + "/" + p.AuthToken.Reveal()
 	}
 	return p.URL
 }

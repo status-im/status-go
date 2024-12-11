@@ -15,6 +15,8 @@ import (
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/internal/security"
+	"github.com/brianvoe/gofakeit/v6"
 )
 
 func TestNewNodeConfigWithDefaults(t *testing.T) {
@@ -309,8 +311,8 @@ func TestNodeConfigValidate(t *testing.T) {
 
 func TestMarshalWalletConfigJSON(t *testing.T) {
 	walletConfig := params.WalletConfig{
-		OpenseaAPIKey:        "some-key",
-		RaribleMainnetAPIKey: "some-key2",
+		OpenseaAPIKey:        security.NewSensitiveString(gofakeit.LetterN(10)),
+		RaribleMainnetAPIKey: security.NewSensitiveString(gofakeit.LetterN(10)),
 	}
 	bytes, err := json.Marshal(walletConfig)
 	require.NoError(t, err)

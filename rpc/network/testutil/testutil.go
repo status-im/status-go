@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"github.com/status-im/status-go/internal/security"
 	"github.com/stretchr/testify/require"
 
 	api_common "github.com/status-im/status-go/api/common"
@@ -17,9 +18,9 @@ func CreateProvider(chainID uint64, name string, providerType params.RpcProvider
 		Type:             providerType,
 		Enabled:          enabled,
 		AuthType:         params.BasicAuth,
-		AuthLogin:        "user1",
-		AuthPassword:     "password1",
-		AuthToken:        "",
+		AuthLogin:        security.NewSensitiveString("user1"),
+		AuthPassword:     security.NewSensitiveString("password1"),
+		AuthToken:        security.NewSensitiveString(""),
 	}
 }
 

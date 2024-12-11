@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/api/common"
+	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/protocol/requests"
@@ -462,14 +463,14 @@ func defaultNetworks(proxyHost, stageName string) []params.Network {
 }
 
 func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConfig) []params.Network {
-	authTokens := map[string]string{
+	authTokens := map[string]security.SensitiveString{
 		"infura.io":  walletConfig.InfuraToken,
 		"grove.city": walletConfig.PoktToken,
 	}
 	networks = networkhelper.OverrideDirectProvidersAuth(networks, authTokens)
 
 	// Apply auth for new smart proxy
-	hasSmartProxyCredentials := walletConfig.EthRpcProxyUser != "" && walletConfig.EthRpcProxyPassword != ""
+	hasSmartProxyCredentials := walletConfig.EthRpcProxyUser.NotEmpty() && walletConfig.EthRpcProxyPassword.NotEmpty()
 	networks = networkhelper.OverrideBasicAuth(
 		networks,
 		params.EmbeddedEthRpcProxyProviderType,
@@ -478,7 +479,7 @@ func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConf
 		walletConfig.EthRpcProxyPassword)
 
 	// Apply auth for old proxy
-	hasOldProxyCredentials := walletConfig.StatusProxyBlockchainUser != "" && walletConfig.StatusProxyBlockchainPassword != ""
+	hasOldProxyCredentials := walletConfig.StatusProxyBlockchainUser.NotEmpty() && walletConfig.StatusProxyBlockchainPassword.NotEmpty()
 	networks = networkhelper.OverrideBasicAuth(
 		networks,
 		params.EmbeddedProxyProviderType,
@@ -490,6 +491,6 @@ func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConf
 }
 
 func BuildDefaultNetworks(walletSecretsConfig *requests.WalletSecretsConfig) []params.Network {
-	proxyHost := getProxyHost(walletSecretsConfig.EthRpcProxyUrl, walletSecretsConfig.StatusProxyStageName)
+	proxyHost := getProxyHost(walletSecretsConfig.EthRpcProxyUrl.Reveal(), walletSecretsConfig.StatusProxyStageName)
 	return setRPCs(defaultNetworks(proxyHost, walletSecretsConfig.StatusProxyStageName), walletSecretsConfig)
 }
