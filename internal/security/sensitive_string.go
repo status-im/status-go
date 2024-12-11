@@ -30,14 +30,14 @@ func (s SensitiveString) String() string {
 
 // MarshalJSON ensures that sensitive strings are redacted when marshaled to JSON
 // NOTE: It's important to define this method on the value receiver,
-//       otherwise `json.Marshal` will not call this method.
+// otherwise `json.Marshal` will not call this method.
 func (s SensitiveString) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.String())
 }
 
 // UnmarshalJSON implements unmarshalling a sensitive string from JSON
 // NOTE: It's important to define this method on the pointer receiver,
-//       otherwise `json.Marshal` will not call this method.
+// otherwise `json.Marshal` will not call this method.
 func (s *SensitiveString) UnmarshalJSON(data []byte) error {
 	var value string
 	if err := json.Unmarshal(data, &value); err != nil {
