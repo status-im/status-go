@@ -75,8 +75,7 @@ class StatusBackend(RpcClient, SignalClient):
             "stop_signal": "SIGINT"
         }
 
-        if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
-            container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
+        container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
 
         container = self.docker_client.containers.run(**container_args)
 
