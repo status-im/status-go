@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 )
 
-const redactionPlaceholder = "***"
+const RedactionPlaceholder = "***"
 
 // SensitiveString is a type for handling sensitive information securely.
 // This helps to achieve the following goals:
@@ -25,7 +25,7 @@ func (s *SensitiveString) String() string {
 	if s.value == "" {
 		return ""
 	}
-	return redactionPlaceholder
+	return RedactionPlaceholder
 }
 
 // MarshalJSON ensures that sensitive strings are redacted when marshaled to JSON
