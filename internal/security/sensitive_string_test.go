@@ -50,10 +50,9 @@ func TestUnamarshalJSONError(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSetValue(t *testing.T) {
-	initialValue := gofakeit.LetterN(10)
-	newValue := gofakeit.LetterN(10)
-	s := NewSensitiveString(initialValue)
-	s.SetValue(newValue)
-	require.Equal(t, newValue, s.Reveal())
+func TestCopySensitiveString(t *testing.T) {
+	secretValue := gofakeit.LetterN(10)
+	s := NewSensitiveString(secretValue)
+	sCopy := s
+	require.Equal(t, secretValue, sCopy.Reveal())
 }

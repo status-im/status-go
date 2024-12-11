@@ -16,13 +16,8 @@ type SensitiveString struct {
 }
 
 // NewSensitiveString creates a new SensitiveString
-func NewSensitiveString(value string) *SensitiveString {
-	return &SensitiveString{value: value}
-}
-
-// SetValue updates the sensitive string value.
-func (s *SensitiveString) SetValue(value string) {
-	s.value = value
+func NewSensitiveString(value string) SensitiveString {
+	return SensitiveString{value: value}
 }
 
 // String provides a redacted version of the sensitive string
@@ -51,4 +46,9 @@ func (s *SensitiveString) UnmarshalJSON(data []byte) error {
 // Reveal exposes the sensitive value (use with caution)
 func (s *SensitiveString) Reveal() string {
 	return s.value
+}
+
+// Empty checks if the value is empty
+func (s *SensitiveString) Empty() bool {
+	return s.value == ""
 }
