@@ -138,7 +138,7 @@ func (v *Verifier) ReverseResolve(address gethcommon.Address) (string, error) {
 
 // Verify verifies that a registered ENS name matches the expected public key
 func (v *Verifier) verify(rpcEndpoint, contractAddress string) error {
-	v.logger.Debug("verifying ENS Names", zap.String("endpoint", rpcEndpoint))
+	v.logger.Debug("verifying ENS Names")
 	verifier := v.node.NewENSVerifier(v.logger)
 
 	var ensDetails []enstypes.ENSDetails
