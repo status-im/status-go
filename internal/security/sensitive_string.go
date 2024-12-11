@@ -8,9 +8,9 @@ const redactionPlaceholder = "***"
 
 // SensitiveString is a type for handling sensitive information securely.
 // This helps to achieve the following goals:
-// 	1. Prevent accidental logging of sensitive information.
-//	2. Provide controlled visibility (e.g., redacted output for String() or MarshalJSON()).
-//	3. Enable controlled access to the sensitive value when needed.
+//  1. Prevent accidental logging of sensitive information.
+//  2. Provide controlled visibility (e.g., redacted output for String() or MarshalJSON()).
+//  3. Enable controlled access to the sensitive value when needed.
 type SensitiveString struct {
 	value string
 }
