@@ -28,6 +28,14 @@ func TestEmptyStringRedaction(t *testing.T) {
 func TestMarshalJSON(t *testing.T) {
 	secretValue := gofakeit.LetterN(10)
 	s := NewSensitiveString(secretValue)
+	data, err := json.Marshal(s)
+	require.NoError(t, err)
+	require.JSONEq(t, `"`+RedactionPlaceholder+`"`, string(data))
+}
+
+func TestMarshalJSONPointer(t *testing.T) {
+	secretValue := gofakeit.LetterN(10)
+	s := NewSensitiveString(secretValue)
 	data, err := json.Marshal(&s)
 	require.NoError(t, err)
 	require.JSONEq(t, `"`+RedactionPlaceholder+`"`, string(data))

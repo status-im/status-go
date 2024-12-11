@@ -29,7 +29,8 @@ func (s *SensitiveString) String() string {
 }
 
 // MarshalJSON ensures that sensitive strings are redacted when marshaled to JSON
-func (s *SensitiveString) MarshalJSON() ([]byte, error) {
+// NOTE: It's important to define this method on the value receiver, other wise `json.Marshal` will not call this method
+func (s SensitiveString) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.String())
 }
 
