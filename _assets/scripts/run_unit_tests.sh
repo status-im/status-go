@@ -137,22 +137,17 @@ fi
 
 # Gather test coverage results
 merged_coverage_report="coverage_merged.out"
-final_coverage_report="c.out"
 coverage_reports=$(find . -iname "*.coverage.out")
-rm -f ${final_coverage_report} ${merged_coverage_report}
+rm -f ${merged_coverage_report}
 
 echo -e "${GRN}Gathering test coverage results: ${RST} output: ${merged_coverage_report}, input: ${coverage_reports}"
 echo $coverage_reports | xargs go run ./cmd/test-coverage-utils/gocovmerge.go > ${merged_coverage_report}
 
-# Filter out test coverage for packages in ./cmd
-echo -e "${GRN}Filtering test coverage packages:${RST} ./cmd"
-grep -v '^github.com/status-im/status-go/cmd/' ${merged_coverage_report} > ${final_coverage_report}
-
 # Generate HTML coverage report
-convert_coverage_to_html ${final_coverage_report} "test-coverage.html"
+convert_coverage_to_html ${merged_coverage_report} "test-coverage.html"
 
 if [[ $UNIT_TEST_REPORT_CODECOV == 'true' ]]; then
-  report_to_codecov "report_*.xml" ${final_coverage_report} "unit"
+  report_to_codecov "report_*.xml" ${merged_coverage_report} "unit"
 fi
 
 # Generate report with test stats
