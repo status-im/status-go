@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/services/wallet/router"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
+	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -88,12 +89,14 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 
 		m.buildInputParams = buildInputParams
 
-		response.SendDetails.UpdateFields(routeInputParams)
+		fromChainID, toChainID := route.GetFirstPathChains()
+
+		response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
 
 		// notify client that sending transactions started (has 3 steps, building txs, signing txs, sending txs)
 		signal.SendWalletEvent(signal.RouterSendingTransactionsStarted, response.SendDetails)
 
-		response.SigningDetails, err = m.transactionManager.BuildTransactionsFromRoute(
+		response.SigningDetails, fromChainID, toChainID, err = m.transactionManager.BuildTransactionsFromRoute(
 			route,
 			m.router.GetPathProcessors(),
 			transfer.BuildRouteExtraParams{
@@ -105,6 +108,9 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 				SlippagePercentage: buildInputParams.SlippagePercentage,
 			},
 		)
+		if err != nil {
+			response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
+		}
 	}()
 }
 
@@ -114,6 +120,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 
 		var (
 			err              error
+			route            routes.Route
 			routeInputParams requests.RouteInputParams
 		)
 		response := &responses.RouterSentTransactions{
@@ -150,16 +157,19 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			m.eventFeed.Send(event)
 		}()
 
-		_, routeInputParams = m.router.GetBestRouteAndAssociatedInputParams()
+		route, routeInputParams = m.router.GetBestRouteAndAssociatedInputParams()
 		if routeInputParams.Uuid != sendInputParams.Uuid {
 			err = ErrCannotResolveRouteId
 			return
 		}
 
-		response.SendDetails.UpdateFields(routeInputParams)
+		fromChainID, toChainID := route.GetFirstPathChains()
 
-		err = m.transactionManager.ValidateAndAddSignaturesToRouterTransactions(sendInputParams.Signatures)
+		response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
+
+		fromChainID, toChainID, err = m.transactionManager.ValidateAndAddSignaturesToRouterTransactions(sendInputParams.Signatures)
 		if err != nil {
+			response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
 			return
 		}
 
@@ -194,8 +204,9 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 		}
 		//////////////////////////////////////////////////////////////////////////////
 
-		response.SentTransactions, err = m.transactionManager.SendRouterTransactions(ctx, multiTx)
+		response.SentTransactions, fromChainID, toChainID, err = m.transactionManager.SendRouterTransactions(ctx, multiTx)
 		if err != nil {
+			response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)
 			log.Error("Error sending router transactions", "error", err)
 			// TODO #16556: Handle partially successful Tx sends?
 			// Don't return, store whichever transactions were successfully sent

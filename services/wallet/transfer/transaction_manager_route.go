@@ -214,19 +214,19 @@ func buildTxForPath(transactor transactions.TransactorIface, path *routes.Path, 
 }
 
 func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pathProcessors map[string]pathprocessor.PathProcessor,
-	params BuildRouteExtraParams) (*responses.SigningDetails, error) {
+	params BuildRouteExtraParams) (*responses.SigningDetails, uint64, uint64, error) {
 	if len(route) == 0 {
-		return nil, ErrNoRoute
+		return nil, 0, 0, ErrNoRoute
 	}
 
 	accFrom, err := tm.accountsDB.GetAccountByAddress(types.Address(params.AddressFrom))
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
 	keypair, err := tm.accountsDB.GetKeypairByKeyUID(accFrom.KeyUID)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
 	response := &responses.SigningDetails{
@@ -246,7 +246,7 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 		if path.ApprovalRequired && !tm.ApprovalPlacedForPath(path.ProcessorName) {
 			txDetails.ApprovalTxData, err = buildApprovalTxForPath(tm.transactor, path, params.AddressFrom, usedNonces, signer)
 			if err != nil {
-				return nil, err
+				return nil, path.FromChain.ChainID, path.ToChain.ChainID, err
 			}
 			response.Hashes = append(response.Hashes, txDetails.ApprovalTxData.HashToSign)
 
@@ -259,12 +259,12 @@ func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pat
 		// build tx for the path
 		txDetails.TxData, err = buildTxForPath(tm.transactor, path, pathProcessors, usedNonces, signer, params)
 		if err != nil {
-			return nil, err
+			return nil, path.FromChain.ChainID, path.ToChain.ChainID, err
 		}
 		response.Hashes = append(response.Hashes, txDetails.TxData.HashToSign)
 	}
 
-	return response, nil
+	return response, 0, 0, nil
 }
 
 func getSignatureForTxHash(txHash string, signatures map[string]requests.SignatureDetails) ([]byte, error) {
@@ -309,9 +309,9 @@ func validateAndAddSignature(txData *wallettypes.TransactionData, signatures map
 	return nil
 }
 
-func (tm *TransactionManager) ValidateAndAddSignaturesToRouterTransactions(signatures map[string]requests.SignatureDetails) error {
+func (tm *TransactionManager) ValidateAndAddSignaturesToRouterTransactions(signatures map[string]requests.SignatureDetails) (uint64, uint64, error) {
 	if len(tm.routerTransactions) == 0 {
-		return ErrNoTrsansactionsBeingBuilt
+		return 0, 0, ErrNoTrsansactionsBeingBuilt
 	}
 
 	// check if all transactions have been signed
@@ -319,16 +319,16 @@ func (tm *TransactionManager) ValidateAndAddSignaturesToRouterTransactions(signa
 	for _, desc := range tm.routerTransactions {
 		err = validateAndAddSignature(desc.ApprovalTxData, signatures)
 		if err != nil {
-			return err
+			return desc.RouterPath.FromChain.ChainID, desc.RouterPath.ToChain.ChainID, err
 		}
 
 		err = validateAndAddSignature(desc.TxData, signatures)
 		if err != nil {
-			return err
+			return desc.RouterPath.FromChain.ChainID, desc.RouterPath.ToChain.ChainID, err
 		}
 	}
 
-	return nil
+	return 0, 0, nil
 }
 
 func addSignatureAndSendTransaction(
@@ -355,11 +355,13 @@ func addSignatureAndSendTransaction(
 	return responses.NewRouterSentTransaction(txData.TxArgs, txData.SentHash, isApproval), nil
 }
 
-func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiTx *MultiTransaction) (transactions []*responses.RouterSentTransaction, err error) {
+func (tm *TransactionManager) SendRouterTransactions(ctx context.Context, multiTx *MultiTransaction) (transactions []*responses.RouterSentTransaction, fromChainID uint64, toChainID uint64, err error) {
 	transactions = make([]*responses.RouterSentTransaction, 0)
 
 	// send transactions
 	for _, desc := range tm.routerTransactions {
+		fromChainID = desc.RouterPath.FromChain.ChainID
+		toChainID = desc.RouterPath.ToChain.ChainID
 		if desc.ApprovalTxData != nil && !desc.IsApprovalPlaced() {
 			var response *responses.RouterSentTransaction
 			response, err = addSignatureAndSendTransaction(tm.transactor, desc.ApprovalTxData, multiTx.ID, true)
