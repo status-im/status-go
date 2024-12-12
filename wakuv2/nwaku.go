@@ -313,6 +313,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"runtime"
 	"strconv"
 	"strings"
@@ -408,8 +409,7 @@ type WakuContentTopic = string
 
 type WakuConfig struct {
 	Host                 string   `json:"host,omitempty"`
-	Port                 int      `json:"port,omitempty"`
-	NodeKey              string   `json:"key,omitempty"`
+	NodeKey              string   `json:"nodekey,omitempty"`
 	EnableRelay          bool     `json:"relay"`
 	LogLevel             string   `json:"logLevel"`
 	DnsDiscovery         bool     `json:"dnsDiscovery,omitempty"`
@@ -418,12 +418,12 @@ type WakuConfig struct {
 	Staticnodes          []string `json:"staticnodes,omitempty"`
 	Discv5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
 	Discv5Discovery      bool     `json:"discv5Discovery,omitempty"`
-	Discv5UdpPort        uint16   `json:"discv5UdpPort,omitempty"`
+	Discv5UdpPort        int      `json:"discv5UdpPort,omitempty"`
 	ClusterID            uint16   `json:"clusterId,omitempty"`
 	Shards               []uint16 `json:"shards,omitempty"`
 	PeerExchange         bool     `json:"peerExchange,omitempty"`
 	PeerExchangeNode     string   `json:"peerExchangeNode,omitempty"`
-	TcpPort              uint16   `json:"tcpPort,omitempty"`
+	TcpPort              int      `json:"tcpPort,omitempty"`
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -533,18 +533,6 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuCon
 
 	// TODO-nwaku
 	/*
-		var err error
-		if logger == nil {
-			logger, err = zap.NewDevelopment()
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if ts == nil {
-			ts = timesource.Default()
-		}
-
 		cfg = setDefaults(cfg)
 		if err = cfg.Validate(logger); err != nil {
 			return nil, err
@@ -582,19 +570,6 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuCon
 		}
 
 		waku.bandwidthCounter = metrics.NewBandwidthCounter()
-
-		if nodeKey == nil {
-			// No nodekey is provided, create an ephemeral key
-			nodeKey, err = crypto.GenerateKey()
-			if err != nil {
-				return nil, fmt.Errorf("failed to generate a random go-waku private key: %v", err)
-			}
-		}
-
-		hostAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprint(cfg.Host, ":", cfg.Port))
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup the network interface: %v", err)
-		}
 
 		libp2pOpts := node.DefaultLibP2POptions
 		libp2pOpts = append(libp2pOpts, libp2p.BandwidthReporter(waku.bandwidthCounter))
@@ -991,9 +966,6 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 	topic = w.GetPubsubTopic(topic)
 
 	/* TODO nwaku
-	if w.node.Relay().IsSubscribed(topic) {
-		return nil
-	}
 
 	if pubkey != nil {
 		err := w.node.Relay().AddSignedTopicValidator(topic, pubkey)
@@ -1375,21 +1347,12 @@ func (w *Waku) Start() error {
 		return fmt.Errorf("failed to start nwaku node: %v", err)
 	}
 
-	/* TODO-nwaku
 	if w.ctx == nil {
 		w.ctx, w.cancel = context.WithCancel(context.Background())
 	}
 
-	var err error
-	if w.node, err = node.New(w.options...); err != nil {
-		return fmt.Errorf("failed to create a go-waku node: %v", err)
-	}
-
+	/* TODO-nwaku
 	w.goingOnline = make(chan struct{})
-
-	if err = w.node.Start(w.ctx); err != nil {
-		return fmt.Errorf("failed to start go-waku node: %v", err)
-	}
 	*/
 	w.StorenodeCycle = history.NewStorenodeCycle(w.logger, newPinger(w.node))
 	w.HistoryRetriever = history.NewHistoryRetriever(newStorenodeRequestor(w.node, w.logger), NewHistoryProcessorWrapper(w), w.logger)
@@ -1937,6 +1900,7 @@ func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 		AllPeers:      w.node.Relay().PubSub().ListPeers(topic),
 	}, nil
 }
+*/
 
 func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) error {
 	topic = w.GetPubsubTopic(topic)
@@ -1971,6 +1935,7 @@ func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 	return w.protectedTopicStore.FetchPrivateKey(topic)
 }
 
+/* TODO-nwaku
 func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
 	topic = w.GetPubsubTopic(topic)
 	if w.protectedTopicStore == nil {
@@ -2314,7 +2279,16 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 		ts = timesource.Default()
 	}
 
+	if nodeKey == nil {
+		// No nodekey is provided, create an ephemeral key
+		nodeKey, err = crypto.GenerateKey()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate a random private key: %v", err)
+		}
+	}
 	nwakuCfg.NodeKey = hex.EncodeToString(crypto.FromECDSA(nodeKey))
+
+	nwakuCfg.TcpPort, nwakuCfg.Discv5UdpPort, err = getFreePortIfNeeded(nwakuCfg.TcpPort, nwakuCfg.Discv5UdpPort, logger)
 
 	// TODO-nwaku
 	// TODO: merge Config and WakuConfig
@@ -3153,4 +3127,52 @@ func getContextTimeoutMilliseconds(ctx context.Context) int {
 		return int(time.Until(deadline).Milliseconds())
 	}
 	return 0
+}
+
+func getFreePortIfNeeded(tcpPort int, discV5UDPPort int, logger *zap.Logger) (int, int, error) {
+	if tcpPort == 0 {
+		for i := 0; i < 10; i++ {
+			tcpAddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("localhost", "0"))
+			if err != nil {
+				logger.Warn("unable to resolve tcp addr: %v", zap.Error(err))
+				continue
+			}
+			tcpListener, err := net.ListenTCP("tcp", tcpAddr)
+			if err != nil {
+				logger.Warn("unable to listen on addr", zap.Stringer("addr", tcpAddr), zap.Error(err))
+				continue
+			}
+			tcpPort = tcpListener.Addr().(*net.TCPAddr).Port
+			tcpListener.Close()
+			break
+		}
+		if tcpPort == 0 {
+			return -1, -1, errors.New("could not obtain a free TCP port")
+		}
+	}
+
+	if discV5UDPPort == 0 {
+		for i := 0; i < 10; i++ {
+			udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("localhost", "0"))
+			if err != nil {
+				logger.Warn("unable to resolve udp addr: %v", zap.Error(err))
+				continue
+			}
+
+			udpListener, err := net.ListenUDP("udp", udpAddr)
+			if err != nil {
+				logger.Warn("unable to listen on addr", zap.Stringer("addr", udpAddr), zap.Error(err))
+				continue
+			}
+
+			discV5UDPPort = udpListener.LocalAddr().(*net.UDPAddr).Port
+			udpListener.Close()
+			break
+		}
+		if discV5UDPPort == 0 {
+			return -1, -1, errors.New("could not obtain a free UDP port")
+		}
+	}
+
+	return tcpPort, discV5UDPPort, nil
 }
