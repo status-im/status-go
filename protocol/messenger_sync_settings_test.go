@@ -11,6 +11,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
@@ -310,4 +311,32 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_PreferredName() {
 	opn, err := s.alice2.settings.GetPreferredUsername()
 	s.Require().NoError(err)
 	s.Require().Equal(pf2, opn)
+}
+
+func (s *MessengerSyncSettingsSuite) TestUpdateLogConfig() {
+	// ensure log level is empty and log is disabled before the test
+	cfg, err := nodecfg.GetNodeConfigFromDB(s.alice.database)
+	s.Require().NoError(err)
+	s.Require().Equal(cfg.LogLevel, "")
+	s.Require().False(cfg.LogEnabled)
+
+	// case 1
+	// WHEN
+	expectedLogLevel := "debug"
+	s.alice.updateLogConfig(expectedLogLevel, s.logger)
+	// THEN
+	cfg, err = nodecfg.GetNodeConfigFromDB(s.alice.database)
+	s.Require().NoError(err)
+	s.Require().Equal(expectedLogLevel, cfg.LogLevel)
+	s.Require().True(cfg.LogEnabled)
+
+	// case 2
+	// empty log level should disable logging, but keep the log level
+	// WHEN
+	s.alice.updateLogConfig("", s.logger)
+	// THEN
+	cfg, err = nodecfg.GetNodeConfigFromDB(s.alice.database)
+	s.Require().NoError(err)
+	s.Require().Equal(expectedLogLevel, cfg.LogLevel)
+	s.Require().False(cfg.LogEnabled)
 }
