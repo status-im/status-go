@@ -17,7 +17,6 @@ def validate_entry(entry, tx_data):
 
 @pytest.mark.wallet
 @pytest.mark.rpc
-@pytest.mark.takoe
 class TestWalletActivitySession(StatusBackendTestCase):
     await_signals = [
         SignalType.NODE_LOGIN.value,

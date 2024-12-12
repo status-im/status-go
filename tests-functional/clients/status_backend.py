@@ -17,19 +17,18 @@ from constants import user_1, DEFAULT_DISPLAY_NAME, USER_DIR
 
 class StatusBackend(RpcClient, SignalClient):
 
-    def __init__(self, await_signals=[], new_container=True):
+    def __init__(self, await_signals=[]):
 
-        if new_container:
-
+        if option.status_backend_url:
+            url = option.status_backend_url
+        else:
             self.docker_client = docker.from_env()
             host_port = random.choice(option.status_backend_port_range)
 
             self.container = self._start_container(host_port)
-            url = f"http://0.0.0.0:{host_port}"
+            url = f"http://127.0.0.1:{host_port}"
             option.status_backend_port_range.remove(host_port)
 
-        else:
-            url = option.status_backend_url
 
         self.api_url = f"{url}/statusgo"
         self.ws_url = f"{url}".replace("http", "ws")
@@ -72,7 +71,6 @@ class StatusBackend(RpcClient, SignalClient):
                     "mode": "rw",
                 }
             },
-            "stop_signal": "SIGINT"
         }
 
         if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:

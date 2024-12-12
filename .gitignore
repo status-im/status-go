@@ -126,7 +126,6 @@ internal/version/GIT_COMMIT
 internal/sentry/SENTRY_CONTEXT_NAME
 internal/sentry/SENTRY_CONTEXT_VERSION
 internal/sentry/SENTRY_PRODUCTION
-logs/status-backend/*
 
 # Don't ignore generated files in the vendor/ directory
 !vendor/**/*.pb.go

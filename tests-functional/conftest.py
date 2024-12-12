@@ -7,22 +7,10 @@ from dataclasses import dataclass
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--rpc_url_statusd",
-        action="store",
-        help="",
-        default="http://0.0.0.0:3333",
-    )
-    parser.addoption(
-        "--ws_url_statusd",
-        action="store",
-        help="",
-        default="ws://0.0.0.0:8354",
-    )
-    parser.addoption(
         "--status_backend_url",
         action="store",
         help="",
-        default="http://0.0.0.0:3334",
+        default=None,
     )
     parser.addoption(
         "--anvil_url",
@@ -44,6 +32,12 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--codecov_dir",
+        action="store",
+        help="",
+        default=None,
+    )
+    parser.addoption(
+        "--user_dir",
         action="store",
         help="",
         default=None,

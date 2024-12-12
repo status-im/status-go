@@ -2,10 +2,6 @@ services:
   anvil:
     ports:
       - 8545:8545
-  status-go:
-    ports:
-      - 3333:3333
-      - 8354:8354
   status-backend:
     ports:
       - 3314-3324:3333
