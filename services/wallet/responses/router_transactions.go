@@ -15,6 +15,8 @@ type SendDetails struct {
 	SendType            int                   `json:"sendType"`
 	FromAddress         types.Address         `json:"fromAddress"`
 	ToAddress           types.Address         `json:"toAddress"`
+	FromChain           uint64                `json:"fromChain"` // this chain should be used only if en error occurred while sending a transaction
+	ToChain             uint64                `json:"toChain"`   // this chain should be used only if en error occurred while sending a transaction
 	FromToken           string                `json:"fromToken"`
 	ToToken             string                `json:"toToken"`
 	FromAmount          string                `json:"fromAmount"` // total amount
@@ -88,7 +90,7 @@ func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types.Hash,
 	}
 }
 
-func (sd *SendDetails) UpdateFields(inputParams requests.RouteInputParams) {
+func (sd *SendDetails) UpdateFields(inputParams requests.RouteInputParams, fromChain uint64, toChain uint64) {
 	sd.SendType = int(inputParams.SendType)
 	sd.FromAddress = types.Address(inputParams.AddrFrom)
 	sd.ToAddress = types.Address(inputParams.AddrTo)
@@ -106,4 +108,8 @@ func (sd *SendDetails) UpdateFields(inputParams requests.RouteInputParams) {
 	if inputParams.PackID != nil {
 		sd.PackID = inputParams.PackID.String()
 	}
+
+	// Set chain IDs, in case of an error while sending a transaction
+	sd.FromChain = fromChain
+	sd.ToChain = toChain
 }

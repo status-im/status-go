@@ -358,7 +358,7 @@ func (tm *PendingTxTracker) updateTxDetails(txDetails *TxDetails, chainID uint64
 	}
 	if routeData != nil {
 		if routeData.RouteInputParams != nil {
-			txDetails.SendDetails.UpdateFields(*routeData.RouteInputParams)
+			txDetails.SendDetails.UpdateFields(*routeData.RouteInputParams, 0, 0)
 		}
 
 		for _, pd := range routeData.PathsData {
