@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.6'
+library 'status-jenkins-lib@v1.9.16'
 
 pipeline {
   agent { label 'linux && x86_64 && nix-2.19' }
@@ -35,7 +35,7 @@ pipeline {
     PKG_URL = "${currentBuild.absoluteUrl}/consoleText"
 
     /* Hack-fix for params not being set in env on first job run. */
-    BRANCH =                           "${params.BRANCH}"
+    BRANCH =                          "${params.BRANCH}"
     FUNCTIONAL_TESTS_REPORT_CODECOV = "${params.FUNCTIONAL_TESTS_REPORT_CODECOV}"
   }
 
@@ -46,6 +46,11 @@ pipeline {
           string(
             credentialsId: 'codecov-repository-upload-token',
             variable: 'CODECOV_TOKEN'
+          ),
+          usernamePassword(
+            credentialsId: "api-proxy-devel",
+            usernameVariable: 'STATUS_BUILD_PROXY_USER',
+            passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
           ),
         ]) {
           nix.shell('make test-functional', pure: false)
