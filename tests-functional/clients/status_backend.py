@@ -134,8 +134,8 @@ class StatusBackend(RpcClient, SignalClient):
         return self.api_valid_request(method, data)
 
     def _set_proxy_credentials(self, data):
-        if not "STATUS_BUILD_PROXY_USER" in os.environ:
-            return data
+        # if not "STATUS_BUILD_PROXY_USER" in os.environ:
+        #     return data
 
         user = os.environ["STATUS_BUILD_PROXY_USER"]
         password = os.environ["STATUS_BUILD_PROXY_PASSWORD"]
