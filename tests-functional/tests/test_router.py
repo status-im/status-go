@@ -3,7 +3,7 @@ import uuid
 import pytest
 
 from conftest import option
-from constants import user_1, user_2
+from resources.constants import user_1, user_2
 from test_cases import StatusBackendTestCase
 from clients.signals import SignalType
 
@@ -69,8 +69,10 @@ class TestTransactionFromRoute(StatusBackendTestCase):
 
             response = self.rpc_client.rpc_valid_request(method, params)
 
-            if response.json()["result"].startswith("0x"):
-                tx_signature = response.json()["result"][2:]
+            result = response.json().get("result")
+            assert result and result.startswith("0x"), f"Invalid transaction signature for hash {hash}: {result}"
+
+            tx_signature = result[2:]
 
             signature = {
                 "r": tx_signature[:64],

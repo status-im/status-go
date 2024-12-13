@@ -3,7 +3,7 @@ import random
 
 import pytest
 
-from constants import user_1
+from resources.constants import user_1
 from test_cases import StatusBackendTestCase
 
 
@@ -13,7 +13,7 @@ class TestWalletSignals(StatusBackendTestCase):
 
     def setup_class(self):
         self.await_signals.append("wallet")
-        super().setup_class(self)
+        super().setup_class()
 
     def setup_method(self):
         self.request_id = str(random.randint(1, 8888))

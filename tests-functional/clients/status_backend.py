@@ -12,7 +12,7 @@ from clients.signals import SignalClient
 from clients.rpc import RpcClient
 from datetime import datetime
 from conftest import option
-from constants import user_1, DEFAULT_DISPLAY_NAME, USER_DIR
+from resources.constants import user_1, DEFAULT_DISPLAY_NAME, USER_DIR
 
 
 class StatusBackend(RpcClient, SignalClient):

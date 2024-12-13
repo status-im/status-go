@@ -1,9 +1,9 @@
 import json
 import random
-import wallet_utils
+from utils import wallet_utils
 import pytest
 
-from constants import user_1
+from resources.constants import user_1
 from test_cases import StatusBackendTestCase
 from clients.signals import SignalType
 

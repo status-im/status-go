@@ -5,7 +5,7 @@ import jsonschema
 import pytest
 
 from conftest import option
-from constants import user_1
+from resources.constants import user_1
 from test_cases import StatusBackendTestCase, TransactionTestCase
 
 
@@ -42,7 +42,7 @@ class TestTransactionRpc(TransactionTestCase):
         self.rpc_client.verify_is_valid_json_rpc_response(response)
 
         # how to create schema:
-        # from schema_builder import CustomSchemaBuilder
+        # from utils.schema_builder import CustomSchemaBuilder
         # CustomSchemaBuilder(method).create_schema(response.json())
 
         with open(

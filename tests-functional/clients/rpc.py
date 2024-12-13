@@ -40,7 +40,9 @@ class RpcClient:
         self._check_decode_and_key_errors_in_response(response, "error")
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.5), reraise=True)
-    def rpc_request(self, method, params=None, request_id=13, url=None):
+    def rpc_request(self, method, params=None, request_id=None, url=None):
+        if not request_id:
+            request_id = 13
         if params is None:
             params = []
         url = url if url else self.rpc_url

@@ -1,7 +1,8 @@
 import os
 import docker
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import List
 
 
 def pytest_addoption(parser):
@@ -45,7 +46,9 @@ def pytest_addoption(parser):
 
 @dataclass
 class Option:
-    pass
+    status_backend_port_range: List[int] = field(default_factory=list)
+    status_backend_containers: List[str] = field(default_factory=list)
+    base_dir: str = ""
 
 
 option = Option()

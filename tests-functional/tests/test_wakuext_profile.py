@@ -27,7 +27,7 @@ class TestProfile(StatusBackendTestCase):
             ("wakuext_backupData", []),
         ],
     )
-    def test_(self, method, params):  # noqa: F811
+    def test_wakuext_(self, method, params):
         _id = str(random.randint(1, 8888))
         self.rpc_client.rpc_valid_request(method, params, _id)
 
@@ -53,7 +53,7 @@ class TestProfile(StatusBackendTestCase):
             ),  # obsolete from v1
         ],
     )
-    def test_(self, method, setting_name, default_value, changed_value):  # noqa: F811
+    def test_settings_(self, method, setting_name, default_value, changed_value):
         _id = str(random.randint(1, 8888))
 
         logging.info("Step: check that %s is %s by default " % (setting_name, default_value))

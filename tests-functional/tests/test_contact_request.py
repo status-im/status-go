@@ -2,7 +2,7 @@ from time import sleep
 from uuid import uuid4
 import pytest
 from test_cases import OneToOneMessageTestCase
-from constants import DEFAULT_DISPLAY_NAME
+from resources.constants import DEFAULT_DISPLAY_NAME
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 

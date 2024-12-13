@@ -11,7 +11,7 @@ from clients.services.wallet import WalletService
 from clients.signals import SignalClient, SignalType
 from clients.status_backend import RpcClient, StatusBackend
 from conftest import option
-from constants import user_1, user_2, DEFAULT_DISPLAY_NAME
+from resources.constants import user_1, user_2, DEFAULT_DISPLAY_NAME
 
 
 class StatusDTestCase:
@@ -152,23 +152,35 @@ class NetworkConditionTestCase:
 
     @contextmanager
     def add_latency(self):
-        pass
-        # TODO: To be implemented when we have docker exec capability
+        try:
+            # TODO: To be implemented when we have docker exec capability
+            yield
+        finally:
+            pass
 
     @contextmanager
     def add_packet_loss(self):
-        pass
-        # TODO: To be implemented when we have docker exec capability
+        try:
+            # TODO: To be implemented when we have docker exec capability
+            yield
+        finally:
+            pass
 
     @contextmanager
     def add_low_bandwith(self):
-        pass
-        # TODO: To be implemented when we have docker exec capability
+        try:
+            # TODO: To be implemented when we have docker exec capability
+            yield
+        finally:
+            pass
 
     @contextmanager
     def node_pause(self, node):
-        pass
-        # TODO: To be implemented when we have docker exec capability
+        try:
+            # TODO: To be implemented when we have docker exec capability
+            yield
+        finally:
+            pass
 
 
 class OneToOneMessageTestCase(NetworkConditionTestCase):

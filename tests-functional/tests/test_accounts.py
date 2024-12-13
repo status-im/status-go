@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from constants import user_1
+from resources.constants import user_1
 from test_cases import StatusBackendTestCase
 
 

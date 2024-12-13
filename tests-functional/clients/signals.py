@@ -5,7 +5,7 @@ import time
 import websocket
 import os
 from pathlib import Path
-from constants import SIGNALS_DIR, LOG_SIGNALS_TO_FILE
+from resources.constants import SIGNALS_DIR, LOG_SIGNALS_TO_FILE
 from datetime import datetime
 from enum import Enum
 
