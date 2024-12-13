@@ -133,6 +133,20 @@ class StatusBackend(RpcClient, SignalClient):
         }
         return self.api_valid_request(method, data)
 
+    def _set_proxy_credentials(self, data):
+        if "STATUS_BUILD_PROXY_USER" in os.environ:
+            user = os.environ["STATUS_BUILD_PROXY_USER"]
+            password = os.environ["STATUS_BUILD_PROXY_PASSWORD"]
+
+            data["StatusProxyMarketUser"] = user
+            data["StatusProxyMarketPassword"] = password
+            data["StatusProxyBlockchainUser"] = user
+            data["StatusProxyBlockchainPassword"] = password
+
+            data["StatusProxyEnabled"] = True
+            data["StatusProxyStageName"] = "test"
+        return data
+
     def create_account_and_login(self, data_dir=USER_DIR, display_name=DEFAULT_DISPLAY_NAME, password=user_1.password):
         method = "CreateAccountAndLogin"
         data = {
@@ -144,6 +158,7 @@ class StatusBackend(RpcClient, SignalClient):
             "logEnabled": True,
             "logLevel": "DEBUG",
         }
+        data = self._set_proxy_credentials(data)
         return self.api_valid_request(method, data)
 
     def restore_account_and_login(self, data_dir=USER_DIR, display_name=DEFAULT_DISPLAY_NAME, user=user_1,
@@ -176,6 +191,7 @@ class StatusBackend(RpcClient, SignalClient):
                 }
             ]
         }
+        data = self._set_proxy_credentials(data)
         return self.api_valid_request(method, data)
 
     def login(self, keyUid, user=user_1):
