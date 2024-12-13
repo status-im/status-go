@@ -48,3 +48,20 @@ Functional tests for status-go
     - `verify_is_valid_json_rpc_response()` checks for status code 200, non-empty response, JSON-RPC structure, presence of the `result` field, and expected ID.
     - `jsonschema.validate()` is used to check that the response contains expected data, including required fields and types. Schemas are stored in `/schemas/wallet_MethodName`
     - New schemas can be generated using `./tests-functional/utils/schema_builder.py` by passing a response to the `CustomSchemaBuilder(schema_name).create_schema(response.json())` method, should be used only on test creation phase, please search `how to create schema:` to see an example in a test
+
+# Known issues
+
+## Docker permission denied
+
+When running tests with auto-creating status-backend containers, you might face this:
+```shell
+sock.connect(self.unix_socket)
+PermissionError: [Errno 13] Permission denied
+```
+
+Please follow this fix: https://github.com/docker/compose/issues/10299#issuecomment-1438247730
+
+If you're on MacOS and `/var/run/docker.sock` doesn't exist, you need to create a symlink to the docker socket:
+```shell
+sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
+```

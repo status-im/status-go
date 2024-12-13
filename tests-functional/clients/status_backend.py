@@ -14,6 +14,8 @@ from datetime import datetime
 from conftest import option
 from resources.constants import user_1, DEFAULT_DISPLAY_NAME, USER_DIR
 
+NANOSECONDS_PER_SECOND = 1_000_000_000
+
 
 class StatusBackend(RpcClient, SignalClient):
 
@@ -26,6 +28,7 @@ class StatusBackend(RpcClient, SignalClient):
             host_port = random.choice(option.status_backend_port_range)
 
             self.container = self._start_container(host_port)
+            assert self._wait_for_container_healthy()
             url = f"http://127.0.0.1:{host_port}"
             option.status_backend_port_range.remove(host_port)
 
@@ -35,8 +38,6 @@ class StatusBackend(RpcClient, SignalClient):
 
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
-
-        self._health_check()
 
         websocket_thread = threading.Thread(target=self._connect)
         websocket_thread.daemon = True
@@ -71,8 +72,15 @@ class StatusBackend(RpcClient, SignalClient):
                     "mode": "rw",
                 }
             },
+            # Add health check
+            "healthcheck": {
+                "Test": ["CMD-SHELL", "curl -f http://localhost:3333/health || exit 1"],
+                "Interval": 1 * NANOSECONDS_PER_SECOND,
+                "Timeout": 1 * NANOSECONDS_PER_SECOND,
+                "StartPeriod": 1 * NANOSECONDS_PER_SECOND,
+                "Retries": 0,
+            },
         }
-
         if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
             container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
 
@@ -84,16 +92,19 @@ class StatusBackend(RpcClient, SignalClient):
         option.status_backend_containers.append(container.id)
         return container
 
-    def _health_check(self):
+    def _wait_for_container_healthy(self, timeout=5):
         start_time = time.time()
-        while True:
-            try:
-                self.api_valid_request(method="Fleets", data=[])
-                break
-            except Exception as e:
-                if time.time() - start_time > 20:
-                    raise Exception(e)
-                time.sleep(1)
+        while time.time() - start_time < timeout:
+            self.container.reload()  # Reload container attributes
+            status = self.container.attrs['State'].get('Health', {}).get('Status')
+            if status == 'healthy':
+                logging.debug("Container is healthy!")
+                return True
+            if status in ['unhealthy', 'exited', 'dead']:
+                return False
+            time.sleep(0.1)  # Wait before checking again
+        logging.error("Timeout reached while waiting for container health.")
+        return False
 
     def api_request(self, method, data, url=None):
         url = url if url else self.api_url
