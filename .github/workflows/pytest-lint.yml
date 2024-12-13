@@ -29,5 +29,5 @@ jobs:
     - name: Install dependencies based on requirements.txt
       run: pip install -r tests-functional/requirements.txt
 
-    - name: Run pytest-lint from Makefile
-      run: make pytest-lint
+    - name: Run pytest-lint
+      run: pre-commit run --all-files --verbose --config tests-functional/.pre-commit-config.yaml
