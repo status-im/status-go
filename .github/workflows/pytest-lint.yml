@@ -27,7 +27,7 @@ jobs:
         echo "tests-functional/.venv/bin" >> $GITHUB_PATH  # Add virtualenv to PATH for subsequent steps
 
     - name: Install dependencies based on requirements.txt
-      run: pip install -r requirements.txt
+      run: pip install -r tests-functional/requirements.txt
 
     - name: Run pytest-lint from Makefile
       run: make pytest-lint
