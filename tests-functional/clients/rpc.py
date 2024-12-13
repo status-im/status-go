@@ -17,11 +17,9 @@ class RpcClient:
         try:
             return response.json()[key]
         except json.JSONDecodeError:
-            raise AssertionError(
-                f"Invalid JSON in response: {response.content}")
+            raise AssertionError(f"Invalid JSON in response: {response.content}")
         except KeyError:
-            raise AssertionError(
-                f"Key '{key}' not found in the JSON response: {response.content}")
+            raise AssertionError(f"Key '{key}' not found in the JSON response: {response.content}")
 
     def verify_is_valid_json_rpc_response(self, response, _id=None):
         assert response.status_code == 200, f"Got response {response.content}, status code {response.status_code}"
@@ -31,9 +29,7 @@ class RpcClient:
         if _id:
             try:
                 if _id != response.json()["id"]:
-                    raise AssertionError(
-                        f"got id: {response.json()['id']} instead of expected id: {_id}"
-                    )
+                    raise AssertionError(f"got id: {response.json()['id']} instead of expected id: {_id}")
             except KeyError:
                 raise AssertionError(f"no id in response {response.json()}")
         return response
@@ -69,5 +65,4 @@ class RpcClient:
 
     def verify_json_schema(self, response, method):
         with open(f"{option.base_dir}/schemas/{method}", "r") as schema:
-            jsonschema.validate(instance=response,
-                                schema=json.load(schema))
+            jsonschema.validate(instance=response, schema=json.load(schema))

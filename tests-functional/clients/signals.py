@@ -9,6 +9,7 @@ from constants import SIGNALS_DIR, LOG_SIGNALS_TO_FILE
 from datetime import datetime
 from enum import Enum
 
+
 class SignalType(Enum):
     MESSAGES_NEW = "messages.new"
     MESSAGE_DELIVERED = "message.delivered"
@@ -21,6 +22,7 @@ class SignalType(Enum):
     WALLET_ROUTER_SENDING_TRANSACTIONS_STARTED = "wallet.router.sending-transactions-started"
     WALLET_TRANSACTION_STATUS_CHANGED = "wallet.transaction.status-changed"
     WALLET_ROUTER_TRANSACTIONS_SENT = "wallet.router.transactions-sent"
+
 
 class SignalClient:
     def __init__(self, ws_url, await_signals):
@@ -37,11 +39,15 @@ class SignalClient:
                 "received": [],
                 "delta_count": 1,
                 "expected_count": 1,
-                "accept_fn": None
-            } for signal in self.await_signals
+                "accept_fn": None,
+            }
+            for signal in self.await_signals
         }
         if LOG_SIGNALS_TO_FILE:
-            self.signal_file_path = os.path.join(SIGNALS_DIR, f"signal_{ws_url.split(':')[-1]}_{datetime.now().strftime('%H%M%S')}.log")
+            self.signal_file_path = os.path.join(
+                SIGNALS_DIR,
+                f"signal_{ws_url.split(':')[-1]}_{datetime.now().strftime('%H%M%S')}.log",
+            )
             Path(SIGNALS_DIR).mkdir(parents=True, exist_ok=True)
 
     def on_message(self, ws, signal):
@@ -77,8 +83,7 @@ class SignalClient:
         received_signals = self.received_signals.get(signal_type)
         while (not received_signals) or len(received_signals["received"]) < received_signals["expected_count"]:
             if time.time() - start_time >= timeout:
-                raise TimeoutError(
-                    f"Signal {signal_type} is not received in {timeout} seconds")
+                raise TimeoutError(f"Signal {signal_type} is not received in {timeout} seconds")
             time.sleep(0.2)
         logging.debug(f"Signal {signal_type} is received in {round(time.time() - start_time)} seconds")
         delta_count = received_signals["delta_count"]
@@ -97,17 +102,13 @@ class SignalClient:
         start_time = time.time()
         while True:
             if time.time() - start_time >= timeout:
-                raise TimeoutError(
-                    f"Signal {signal_type} containing {event_pattern} is not received in {timeout} seconds"
-                )
+                raise TimeoutError(f"Signal {signal_type} containing {event_pattern} is not received in {timeout} seconds")
             if not self.received_signals.get(signal_type):
                 time.sleep(0.2)
                 continue
             for event in self.received_signals[signal_type]["received"]:
                 if event_pattern in str(event):
-                    logging.info(
-                        f"Signal {signal_type} containing {event_pattern} is received in {round(time.time() - start_time)} seconds"
-                    )
+                    logging.info(f"Signal {signal_type} containing {event_pattern} is received in {round(time.time() - start_time)} seconds")
                     return event
             time.sleep(0.2)
 
@@ -121,10 +122,12 @@ class SignalClient:
         logging.info("Connection opened")
 
     def _connect(self):
-        ws = websocket.WebSocketApp(self.url,
-                                    on_message=self.on_message,
-                                    on_error=self._on_error,
-                                    on_close=self._on_close)
+        ws = websocket.WebSocketApp(
+            self.url,
+            on_message=self.on_message,
+            on_error=self._on_error,
+            on_close=self._on_close,
+        )
         ws.on_open = self._on_open
         ws.run_forever()
 

@@ -35,13 +35,17 @@ class TestEth(EthRpcTestCase):
         self.rpc_client.rpc_valid_request("ethclient_suggestGasPrice", [self.network_id])
 
     def test_header_by_number(self, tx_data):
-        response = self.rpc_client.rpc_valid_request("ethclient_headerByNumber",
-                                                     [self.network_id, tx_data.block_number])
+        response = self.rpc_client.rpc_valid_request("ethclient_headerByNumber", [self.network_id, tx_data.block_number])
         validate_header(response.json()["result"], tx_data.block_number, tx_data.block_hash)
 
     def test_block_by_number(self, tx_data):
         response = self.rpc_client.rpc_valid_request("ethclient_blockByNumber", [self.network_id, tx_data.block_number])
-        validate_block(response.json()["result"], tx_data.block_number, tx_data.block_hash, tx_data.tx_hash)
+        validate_block(
+            response.json()["result"],
+            tx_data.block_number,
+            tx_data.block_hash,
+            tx_data.tx_hash,
+        )
 
     def test_header_by_hash(self, tx_data):
         response = self.rpc_client.rpc_valid_request("ethclient_headerByHash", [self.network_id, tx_data.block_hash])
@@ -49,7 +53,12 @@ class TestEth(EthRpcTestCase):
 
     def test_block_by_hash(self, tx_data):
         response = self.rpc_client.rpc_valid_request("ethclient_blockByHash", [self.network_id, tx_data.block_hash])
-        validate_block(response.json()["result"], tx_data.block_number, tx_data.block_hash, tx_data.tx_hash)
+        validate_block(
+            response.json()["result"],
+            tx_data.block_number,
+            tx_data.block_hash,
+            tx_data.tx_hash,
+        )
 
     def test_transaction_by_hash(self, tx_data):
         response = self.rpc_client.rpc_valid_request("ethclient_transactionByHash", [self.network_id, tx_data.tx_hash])
@@ -57,4 +66,9 @@ class TestEth(EthRpcTestCase):
 
     def test_transaction_receipt(self, tx_data):
         response = self.rpc_client.rpc_valid_request("ethclient_transactionReceipt", [self.network_id, tx_data.tx_hash])
-        validate_receipt(response.json()["result"], tx_data.tx_hash, tx_data.block_number, tx_data.block_hash)
+        validate_receipt(
+            response.json()["result"],
+            tx_data.tx_hash,
+            tx_data.block_number,
+            tx_data.block_hash,
+        )

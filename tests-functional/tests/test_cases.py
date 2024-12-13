@@ -18,16 +18,12 @@ class StatusDTestCase:
     network_id = 31337
 
     def setup_method(self):
-        self.rpc_client = RpcClient(
-            option.rpc_url_statusd
-        )
+        self.rpc_client = RpcClient(option.rpc_url_statusd)
 
 
 class StatusBackendTestCase:
 
-    await_signals = [
-        SignalType.NODE_LOGIN.value
-    ]
+    await_signals = [SignalType.NODE_LOGIN.value]
 
     network_id = 31337
 
@@ -59,8 +55,7 @@ class WalletTestCase(StatusBackendTestCase):
             if key in transfer_tx_data:
                 transfer_tx_data[key] = new_value
             else:
-                logging.info(
-                    f"Warning: The key '{key}' does not exist in the transferTx parameters and will be ignored.")
+                logging.info(f"Warning: The key '{key}' does not exist in the transferTx parameters and will be ignored.")
         params = [
             {
                 "fromAddress": user_1.address,
@@ -74,7 +69,7 @@ class WalletTestCase(StatusBackendTestCase):
                 {
                     "bridgeName": "Transfer",
                     "chainID": 31337,
-                    "transferTx": transfer_tx_data
+                    "transferTx": transfer_tx_data,
                 }
             ],
             f"{option.password}",
@@ -87,8 +82,7 @@ class WalletTestCase(StatusBackendTestCase):
         tx_hash = None
         self.rpc_client.verify_is_valid_json_rpc_response(response)
         try:
-            tx_hash = response.json(
-            )["result"]["hashes"][str(self.network_id)][0]
+            tx_hash = response.json()["result"]["hashes"][str(self.network_id)][0]
         except (KeyError, json.JSONDecodeError):
             raise Exception(response.content)
         return tx_hash
@@ -102,7 +96,7 @@ class TransactionTestCase(WalletTestCase):
 
 class EthRpcTestCase(WalletTestCase):
 
-    @pytest.fixture(autouse=True, scope='class')
+    @pytest.fixture(autouse=True, scope="class")
     def tx_data(self):
         tx_hash = self.send_valid_multi_transaction()
         self.wait_until_tx_not_pending(tx_hash)
@@ -133,11 +127,10 @@ class EthRpcTestCase(WalletTestCase):
         response = self.rpc_client.rpc_valid_request(method, params)
 
         start_time = time.time()
-        while response.json()["result"]["isPending"] == True:
+        while response.json()["result"]["isPending"] is True:
             time_passed = time.time() - start_time
             if time_passed >= timeout:
-                raise TimeoutError(
-                    f"Tx {tx_hash} is still pending after {timeout} seconds")
+                raise TimeoutError(f"Tx {tx_hash} is still pending after {timeout} seconds")
             time.sleep(0.5)
             response = self.rpc_client.rpc_valid_request(method, params)
         return response.json()["result"]["tx"]
@@ -160,22 +153,23 @@ class NetworkConditionTestCase:
     @contextmanager
     def add_latency(self):
         pass
-        #TODO: To be implemented when we have docker exec capability
+        # TODO: To be implemented when we have docker exec capability
 
     @contextmanager
     def add_packet_loss(self):
         pass
-        #TODO: To be implemented when we have docker exec capability
+        # TODO: To be implemented when we have docker exec capability
 
     @contextmanager
     def add_low_bandwith(self):
         pass
-        #TODO: To be implemented when we have docker exec capability
+        # TODO: To be implemented when we have docker exec capability
 
     @contextmanager
     def node_pause(self, node):
         pass
-        #TODO: To be implemented when we have docker exec capability
+        # TODO: To be implemented when we have docker exec capability
+
 
 class OneToOneMessageTestCase(NetworkConditionTestCase):
 
@@ -186,13 +180,15 @@ class OneToOneMessageTestCase(NetworkConditionTestCase):
         backend.start_messenger()
         return backend
 
-
     def validate_signal_event_against_response(self, signal_event, fields_to_validate, expected_message):
         expected_message_id = expected_message.get("id")
         signal_event_messages = signal_event.get("event", {}).get("messages")
         assert len(signal_event_messages) > 0, "No messages found in the signal event"
 
-        message = next((message for message in signal_event_messages if message.get("id") == expected_message_id), None)
+        message = next(
+            (message for message in signal_event_messages if message.get("id") == expected_message_id),
+            None,
+        )
         assert message, f"Message with ID {expected_message_id} not found in the signal event"
 
         message_mismatch = []
@@ -200,17 +196,14 @@ class OneToOneMessageTestCase(NetworkConditionTestCase):
             response_value = expected_message[response_field]
             event_value = message[event_field]
             if response_value != event_value:
-                message_mismatch.append(
-                    f"Field '{response_field}': Expected '{response_value}', Found '{event_value}'"
-                )
+                message_mismatch.append(f"Field '{response_field}': Expected '{response_value}', Found '{event_value}'")
 
         if not message_mismatch:
             return
 
         raise AssertionError(
             "Some Sender RPC responses are not matching the signals received by the receiver.\n"
-            "Details of mismatches:\n" +
-            "\n".join(message_mismatch)
+            "Details of mismatches:\n" + "\n".join(message_mismatch)
         )
 
     def get_message_by_content_type(self, response, content_type):

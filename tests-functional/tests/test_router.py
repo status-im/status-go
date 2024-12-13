@@ -7,6 +7,7 @@ from constants import user_1, user_2
 from test_cases import StatusBackendTestCase
 from clients.signals import SignalType
 
+
 @pytest.mark.rpc
 @pytest.mark.transaction
 @pytest.mark.wallet
@@ -19,6 +20,7 @@ class TestTransactionFromRoute(StatusBackendTestCase):
         SignalType.WALLET_TRANSACTION_STATUS_CHANGED.value,
         SignalType.WALLET_ROUTER_TRANSACTIONS_SENT.value,
     ]
+
     def test_tx_from_route(self):
 
         _uuid = str(uuid.uuid4())
@@ -39,28 +41,22 @@ class TestTransactionFromRoute(StatusBackendTestCase):
                 "disabledFromChainIDs": [10, 42161],
                 "disabledToChainIDs": [10, 42161],
                 "gasFeeMode": 1,
-                "fromLockedAmount": {}
+                "fromLockedAmount": {},
             }
         ]
         response = self.rpc_client.rpc_valid_request(method, params)
 
         routes = self.rpc_client.wait_for_signal(SignalType.WALLET_SUGGESTED_ROUTES.value)
-        assert routes['event']['Uuid'] == _uuid
+        assert routes["event"]["Uuid"] == _uuid
 
         method = "wallet_buildTransactionsFromRoute"
-        params = [
-            {
-                "uuid": _uuid,
-                "slippagePercentage": 0
-            }
-        ]
+        params = [{"uuid": _uuid, "slippagePercentage": 0}]
         response = self.rpc_client.rpc_valid_request(method, params)
 
-        wallet_router_sign_transactions = self.rpc_client.wait_for_signal(
-            SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value)
+        wallet_router_sign_transactions = self.rpc_client.wait_for_signal(SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value)
 
-        assert wallet_router_sign_transactions['event']['signingDetails']['signOnKeycard'] == False
-        transaction_hashes = wallet_router_sign_transactions['event']['signingDetails']['hashes']
+        assert wallet_router_sign_transactions["event"]["signingDetails"]["signOnKeycard"] is False
+        transaction_hashes = wallet_router_sign_transactions["event"]["signingDetails"]["hashes"]
 
         assert transaction_hashes, "Transaction hashes are empty!"
 
@@ -69,11 +65,7 @@ class TestTransactionFromRoute(StatusBackendTestCase):
         for hash in transaction_hashes:
 
             method = "wallet_signMessage"
-            params = [
-                hash,
-                user_1.address,
-                option.password
-            ]
+            params = [hash, user_1.address, option.password]
 
             response = self.rpc_client.rpc_valid_request(method, params)
 
@@ -83,22 +75,16 @@ class TestTransactionFromRoute(StatusBackendTestCase):
             signature = {
                 "r": tx_signature[:64],
                 "s": tx_signature[64:128],
-                "v": tx_signature[128:]
+                "v": tx_signature[128:],
             }
 
             tx_signatures[hash] = signature
 
         method = "wallet_sendRouterTransactionsWithSignatures"
-        params = [
-            {
-                "uuid": _uuid,
-                "Signatures": tx_signatures
-            }
-        ]
+        params = [{"uuid": _uuid, "Signatures": tx_signatures}]
         response = self.rpc_client.rpc_valid_request(method, params)
 
-        tx_status = self.rpc_client.wait_for_signal(
-            SignalType.WALLET_TRANSACTION_STATUS_CHANGED.value)
+        tx_status = self.rpc_client.wait_for_signal(SignalType.WALLET_TRANSACTION_STATUS_CHANGED.value)
 
         assert tx_status["event"]["chainId"] == 31337
         assert tx_status["event"]["status"] == "Success"

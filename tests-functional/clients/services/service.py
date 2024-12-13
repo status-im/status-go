@@ -3,7 +3,7 @@ from clients.rpc import RpcClient
 
 class Service:
     def __init__(self, client: RpcClient, name: str):
-        assert name is not ""
+        assert name != ""
         self.rpc_client = client
         self.name = name
 

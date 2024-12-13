@@ -6,6 +6,7 @@ from constants import DEFAULT_DISPLAY_NAME
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 
+
 @pytest.mark.rpc
 class TestOneToOneMessages(OneToOneMessageTestCase):
 
@@ -33,11 +34,15 @@ class TestOneToOneMessages(OneToOneMessageTestCase):
             sleep(0.01)
 
         for i, expected_message in enumerate(sent_messages):
-            messages_new_event = self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"), timeout=60)
+            messages_new_event = self.receiver.find_signal_containing_pattern(
+                SignalType.MESSAGES_NEW.value,
+                event_pattern=expected_message.get("id"),
+                timeout=60,
+            )
             self.validate_signal_event_against_response(
                 signal_event=messages_new_event,
                 fields_to_validate={"text": "text"},
-                expected_message=expected_message
+                expected_message=expected_message,
             )
 
     @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
@@ -73,5 +78,3 @@ class TestOneToOneMessages(OneToOneMessageTestCase):
             sleep(30)
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
         self.sender.wait_for_signal("messages.delivered")
-
-    

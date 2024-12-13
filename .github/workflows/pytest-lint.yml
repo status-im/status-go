@@ -1,0 +1,31 @@
+name: Pytest Lint
+
+on:
+  pull_request:
+    branches:
+      - master
+      - test-linting
+
+jobs:
+  pytest-lint:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Set up virtual environment in /tests-functional/
+      run: |
+        python -m venv tests-functional/.venv
+        echo "tests-functional/.venv/bin" >> $GITHUB_PATH  # Add virtualenv to PATH for subsequent steps
+
+    - name: Install dependencies based on requirements.txt
+      run: pip install -r requirements.txt
+
+    - name: Run pytest-lint from Makefile
+      run: make pytest-lint

@@ -1,8 +1,7 @@
 import re
-import time
 from test_cases import StatusBackend
 import pytest
-import os
+
 
 @pytest.mark.rpc
 @pytest.mark.skip("waiting for status-backend to be executed on the same host/container")
@@ -27,7 +26,10 @@ class TestLogging:
 
         # Configure logging
         backend_client.rpc_valid_request("wakuext_setLogLevel", [{"logLevel": "ERROR"}])
-        backend_client.rpc_valid_request("wakuext_setLogNamespaces", [{"logNamespaces": "test1.test2:debug,test1.test2.test3:info"}])
+        backend_client.rpc_valid_request(
+            "wakuext_setLogNamespaces",
+            [{"logNamespaces": "test1.test2:debug,test1.test2.test3:info"}],
+        )
 
         # Re-login (logging settings take effect after re-login)
         backend_client.logout()
@@ -36,19 +38,23 @@ class TestLogging:
 
         # Test logging
         backend_client.rpc_valid_request("wakuext_logTest")
-        self.expect_logs(tmp_path / "geth.log", "test message", [
-            r"DEBUG\s+test1\.test2",
-            r"INFO\s+test1\.test2",
-            r"INFO\s+test1\.test2\.test3",
-            r"WARN\s+test1\.test2",
-            r"WARN\s+test1\.test2\.test3",
-            r"ERROR\s+test1",
-            r"ERROR\s+test1\.test2",
-            r"ERROR\s+test1\.test2\.test3",
-        ])
+        self.expect_logs(
+            tmp_path / "geth.log",
+            "test message",
+            [
+                r"DEBUG\s+test1\.test2",
+                r"INFO\s+test1\.test2",
+                r"INFO\s+test1\.test2\.test3",
+                r"WARN\s+test1\.test2",
+                r"WARN\s+test1\.test2\.test3",
+                r"ERROR\s+test1",
+                r"ERROR\s+test1\.test2",
+                r"ERROR\s+test1\.test2\.test3",
+            ],
+        )
 
     def expect_logs(self, log_file, filter_keyword, expected_logs):
-        with open(log_file, 'r') as f:
+        with open(log_file, "r") as f:
             log_content = f.read()
 
         filtered_logs = [line for line in log_content.splitlines() if filter_keyword in line]

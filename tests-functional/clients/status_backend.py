@@ -29,7 +29,6 @@ class StatusBackend(RpcClient, SignalClient):
             url = f"http://127.0.0.1:{host_port}"
             option.status_backend_port_range.remove(host_port)
 
-
         self.api_url = f"{url}/statusgo"
         self.ws_url = f"{url}".replace("http", "ws")
         self.rpc_url = f"{url}/statusgo/CallRPC"
@@ -59,7 +58,8 @@ class StatusBackend(RpcClient, SignalClient):
             "labels": {"com.docker.compose.project": docker_project_name},
             "entrypoint": [
                 "status-backend",
-                "--address", "0.0.0.0:3333",
+                "--address",
+                "0.0.0.0:3333",
             ],
             "ports": {"3333/tcp": host_port},
             "environment": {
@@ -78,8 +78,7 @@ class StatusBackend(RpcClient, SignalClient):
 
         container = self.docker_client.containers.run(**container_args)
 
-        network = self.docker_client.networks.get(
-            f"{docker_project_name}_default")
+        network = self.docker_client.networks.get(f"{docker_project_name}_default")
         network.connect(container)
 
         option.status_backend_containers.append(container.id)
@@ -99,8 +98,7 @@ class StatusBackend(RpcClient, SignalClient):
     def api_request(self, method, data, url=None):
         url = url if url else self.api_url
         url = f"{url}/{method}"
-        logging.info(
-            f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True, indent=4)}")
+        logging.info(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True, indent=4)}")
         response = requests.post(url, json=data)
         logging.info(f"Got response: {response.content}")
         return response
@@ -113,8 +111,7 @@ class StatusBackend(RpcClient, SignalClient):
             error = response.json()["error"]
             assert not error, f"Error: {error}"
         except json.JSONDecodeError:
-            raise AssertionError(
-                f"Invalid JSON in response: {response.content}")
+            raise AssertionError(f"Invalid JSON in response: {response.content}")
         except KeyError:
             pass
 
@@ -133,7 +130,12 @@ class StatusBackend(RpcClient, SignalClient):
         }
         return self.api_valid_request(method, data)
 
-    def create_account_and_login(self, data_dir=USER_DIR, display_name=DEFAULT_DISPLAY_NAME, password=user_1.password):
+    def create_account_and_login(
+        self,
+        data_dir=USER_DIR,
+        display_name=DEFAULT_DISPLAY_NAME,
+        password=user_1.password,
+    ):
         method = "CreateAccountAndLogin"
         data = {
             "rootDataDir": data_dir,
@@ -146,8 +148,13 @@ class StatusBackend(RpcClient, SignalClient):
         }
         return self.api_valid_request(method, data)
 
-    def restore_account_and_login(self, data_dir=USER_DIR, display_name=DEFAULT_DISPLAY_NAME, user=user_1,
-                                  network_id=31337):
+    def restore_account_and_login(
+        self,
+        data_dir=USER_DIR,
+        display_name=DEFAULT_DISPLAY_NAME,
+        user=user_1,
+        network_id=31337,
+    ):
         method = "RestoreAccountAndLogin"
         data = {
             "rootDataDir": data_dir,
@@ -172,9 +179,9 @@ class StatusBackend(RpcClient, SignalClient):
                     "NativeCurrencyDecimals": 18,
                     "IsTest": False,
                     "Layer": 1,
-                    "Enabled": True
+                    "Enabled": True,
                 }
-            ]
+            ],
         }
         return self.api_valid_request(method, data)
 
@@ -197,12 +204,11 @@ class StatusBackend(RpcClient, SignalClient):
         # ToDo: change this part for waiting for `node.login` signal when websockets are migrated to StatusBackend
         while time.time() - start_time <= timeout:
             try:
-                self.rpc_valid_request(method='accounts_getKeypairs')
+                self.rpc_valid_request(method="accounts_getKeypairs")
                 return
             except AssertionError:
                 time.sleep(3)
-        raise TimeoutError(
-            f"RPC client was not started after {timeout} seconds")
+        raise TimeoutError(f"RPC client was not started after {timeout} seconds")
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.5), reraise=True)
     def start_messenger(self, params=[]):
@@ -210,9 +216,9 @@ class StatusBackend(RpcClient, SignalClient):
         response = self.rpc_request(method, params)
         json_response = response.json()
 
-        if 'error' in json_response:
-            assert json_response['error']['code'] == -32000
-            assert json_response['error']['message'] == "messenger already started"
+        if "error" in json_response:
+            assert json_response["error"]["code"] == -32000
+            assert json_response["error"]["message"] == "messenger already started"
             return
 
         self.verify_is_valid_json_rpc_response(response)
@@ -239,8 +245,7 @@ class StatusBackend(RpcClient, SignalClient):
         for account in accounts:
             if account.get("name") == display_name:
                 return account.get("public-key")
-        raise ValueError(
-            f"Public key not found for display name: {display_name}")
+        raise ValueError(f"Public key not found for display name: {display_name}")
 
     def send_contact_request(self, contact_id: str, message: str):
         method = "wakuext_sendContactRequest"

@@ -109,7 +109,6 @@ tests-functional/coverage
 tests-functional/reports
 tests-functional/signals
 tests-functional/*.log
-pyrightconfig.json
 .venv
 
 

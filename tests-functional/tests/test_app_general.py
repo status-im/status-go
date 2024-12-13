@@ -13,7 +13,6 @@ class TestAppGeneral(StatusBackendTestCase):
         "method, params",
         [
             ("appgeneral_getCurrencies", []),
-
         ],
     )
     def test_(self, method, params):

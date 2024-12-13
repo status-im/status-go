@@ -428,3 +428,8 @@ run-anvil:
 codecov-validate: SHELL := /bin/sh
 codecov-validate:
 	curl -X POST --data-binary @.codecov.yml https://codecov.io/validate
+
+.PHONY: pytest-lint
+pytest-lint:
+	@echo "Running python linting on all files..."
+	pre-commit run --all-files --verbose --config tests-functional/.pre-commit-config.yaml

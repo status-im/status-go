@@ -7,3 +7,6 @@ websocket-client~=1.4.2
 tenacity~=9.0.0
 pytest-dependency~=0.6.0
 docker==7.1.0
+pyright==1.1.388
+black==24.10.0
+pre-commit==3.6.2
