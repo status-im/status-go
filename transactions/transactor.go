@@ -119,7 +119,11 @@ func (t *Transactor) NextNonce(rpcClient rpc.ClientInterface, chainID uint64, fr
 			if err != nil {
 				return 0, err
 			}
-			return nonce + countOfPendingTXs, nil
+			nonce = nonce + countOfPendingTXs
+		}
+		// sepolia optimism returns nonce differently than mainnet optimism, that's why we need to increment it by 1
+		if chainID == wallet_common.OptimismSepolia {
+			nonce++
 		}
 	}
 
