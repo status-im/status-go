@@ -1,6 +1,5 @@
 {
     "include": ["tests-functional"],
     "venvPath": "./tests-functional", // Ensure the virtual environment (.venv) is located in ./tests-functional
-    "venv": ".venv",
-    "typeCheckingMode": "off"
+    "venv": ".venv"
 }
