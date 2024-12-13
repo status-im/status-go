@@ -9,6 +9,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -166,6 +167,7 @@ func (m *Messenger) startSettingsChangesLoop() {
 	channel := m.settings.SubscribeToChanges()
 	go func() {
 		defer gocommon.LogOnPanic()
+		logger := m.logger.Named("SettingsChangesLoop")
 		for {
 			select {
 			case s := <-channel:
@@ -179,10 +181,35 @@ func (m *Messenger) startSettingsChangesLoop() {
 				case settings.Bio.GetReactName():
 					m.selfContact.Bio = s.Value.(string)
 					m.publishSelfContactSubscriptions(&SelfContactChangeEvent{BioChanged: true})
+				case settings.LogLevel.GetReactName():
+					level := s.Value.(string)
+					m.updateLogConfig(level, logger)
 				}
 			case <-m.quit:
 				return
 			}
 		}
 	}()
+}
+
+func (m *Messenger) updateLogConfig(level string, logger *zap.Logger) {
+	m.setLogLevel(level, logger)
+	m.setLogEnabled(level != "", logger)
+}
+
+func (m *Messenger) setLogLevel(level string, logger *zap.Logger) {
+	if level == "" {
+		return
+	}
+	err := nodecfg.SetLogLevel(m.database, level)
+	if err != nil {
+		logger.Error("nodecfg.SetLogLevel", zap.Error(err))
+	}
+}
+
+func (m *Messenger) setLogEnabled(logEnabled bool, logger *zap.Logger) {
+	err := nodecfg.SetLogEnabled(m.database, logEnabled)
+	if err != nil {
+		logger.Error("nodecfg.SetLogEnabled", zap.Error(err))
+	}
 }

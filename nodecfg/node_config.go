@@ -791,6 +791,11 @@ func SetLogLevel(db *sql.DB, logLevel string) error {
 	return err
 }
 
+func SetLogEnabled(db *sql.DB, enabled bool) error {
+	_, err := db.Exec(`UPDATE log_config SET enabled = ?`, enabled)
+	return err
+}
+
 func SetLogNamespaces(db *sql.DB, logNamespaces string) error {
 	_, err := db.Exec(`UPDATE log_config SET log_namespaces = ?`, logNamespaces)
 	return err

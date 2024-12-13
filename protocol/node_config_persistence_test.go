@@ -92,3 +92,18 @@ func (s *NodeConfigPersistenceTestSuite) Test_SetLogLevelDebug() {
 	s.Require().NoError(err)
 	s.Require().Equal("DEBUG", dbNodeConfig.LogLevel)
 }
+
+func (s *NodeConfigPersistenceTestSuite) Test_SetLogEnabled() {
+	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(s.db)
+	s.Require().NoError(err)
+	s.Require().False(dbNodeConfig.LogEnabled)
+
+	// WHEN
+	err = nodecfg.SetLogEnabled(s.db, true)
+	s.Require().NoError(err)
+
+	// THEN
+	dbNodeConfig, err = nodecfg.GetNodeConfigFromDB(s.db)
+	s.Require().NoError(err)
+	s.Require().True(dbNodeConfig.LogEnabled)
+}
