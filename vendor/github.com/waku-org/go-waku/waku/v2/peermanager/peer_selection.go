@@ -130,6 +130,7 @@ func (pm *PeerManager) selectServicePeer(criteria PeerSelectionCriteria) (PeerSe
 			if len(criteria.PubsubTopics) == 0 || (len(criteria.PubsubTopics) == 1 && criteria.PubsubTopics[0] == "") {
 				return slot.getRandom(criteria.MaxPeers, criteria.ExcludePeers)
 			} else { //PubsubTopic based selection
+				slot.mu.RLock()
 				keys := make([]peer.ID, 0, len(slot.m))
 				for i := range slot.m {
 					if PeerInSet(criteria.ExcludePeers, i) {
@@ -137,6 +138,7 @@ func (pm *PeerManager) selectServicePeer(criteria PeerSelectionCriteria) (PeerSe
 					}
 					keys = append(keys, i)
 				}
+				slot.mu.RUnlock()
 				selectedPeers := pm.host.Peerstore().(wps.WakuPeerstore).PeersByPubSubTopics(criteria.PubsubTopics, keys...)
 				tmpPeers, err := selectRandomPeers(selectedPeers, criteria.ExcludePeers, criteria.MaxPeers)
 				for tmpPeer := range tmpPeers {
