@@ -47,6 +47,11 @@ pipeline {
             credentialsId: 'codecov-repository-upload-token',
             variable: 'CODECOV_TOKEN'
           ),
+          usernamePassword(
+            credentialsId: "api-proxy-devel",
+            usernameVariable: 'STATUS_BUILD_PROXY_USER',
+            passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD'
+    ),
         ]) {
           nix.shell('make test-functional', pure: false)
         }
