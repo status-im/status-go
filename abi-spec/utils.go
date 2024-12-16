@@ -1,14 +1,18 @@
 package abispec
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"regexp"
 	"strings"
 	"unicode"
 
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/logutils"
 )
 
 var unicodeZeroPattern = regexp.MustCompile("^(?:\u0000)*")
@@ -19,6 +23,8 @@ var hexPrefixPattern = regexp.MustCompile("(?i)^0x")
 var addressBasicPattern = regexp.MustCompile("(?i)^(0x)?[0-9a-f]{40}$")
 var addressLowerCasePattern = regexp.MustCompile("^(0x|0X)?[0-9a-f]{40}$")
 var addressUpperCasePattern = regexp.MustCompile("^(0x|0X)?[0-9A-F]{40}$")
+
+var hexStrictPattern = regexp.MustCompile(`(?i)^((-)?0x[0-9a-f]+|(0x))$`)
 
 func HexToNumber(hex string) string {
 	num, success := big.NewInt(0).SetString(hex, 16)
@@ -37,7 +43,18 @@ func NumberToHex(numString string) string {
 }
 
 func Sha3(str string) string {
-	bytes := crypto.Keccak256([]byte(str))
+	var bytes []byte
+	var err error
+	if hexStrictPattern.MatchString(str) {
+		bytes, err = hex.DecodeString(str[2:])
+		if err != nil {
+			logutils.ZapLogger().Error("failed to decode hex string when sha3", zap.String("hex", str), zap.Error(err))
+			return ""
+		}
+	} else {
+		bytes = []byte(str)
+	}
+	bytes = crypto.Keccak256(bytes)
 	return common.Bytes2Hex(bytes)
 }
 
