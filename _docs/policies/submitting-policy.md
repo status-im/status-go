@@ -38,6 +38,29 @@ proposal PR.
   GitHub team.
   - MUST receive a minimum of six approvals from CCs.
 
+# Policy Overrides
+On rare occasions, circumstances may necessitate that an established
+policy is circumvented when merging a feature PR. This is considered
+an **override** and MUST follow the process outlined below to ensure
+transparency and collective agreement:
+
+- Any override MUST be documented in textual form in the circumventing
+feature PR and MUST include:
+  - The specific policy being overridden,
+  - The rationale for taking this action,
+  - The potential risks and impacts of the override, and
+  - Steps taken to minimise those risks.
+- Before proceeding, the override MUST be approved in writing in the
+circumventing feature PR by:
+  - At least one team lead from the Status Desktop or Mobile teams, AND
+  - At least one member of the @status-im/status-go-guild GitHub team.
+- In exceptional circumstances if an override MUST be executed
+immediately due to urgency, the action SHOULD be documented as soon
+as possible, and retrospective approval MUST be sought and recorded
+at the earliest possible opportunity.
+- Policies MAY define additional rules for handling overrides, provided
+these baseline requirements are also met.
+
 # Policy Amendments and Archival
 
 Policies can be amended or archived to ensure they remain relevant
