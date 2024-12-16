@@ -15,7 +15,7 @@ a voice in how the repository operates, including Core Contributors
 - All policies MUST be submitted to the `_docs/policies`
  directory as a pull request (PR) within the `status-go` repository.
 - All policies MUST be in Markdown format.
-- Policy file names MUST follow [File name conventions for ADRs](https://github.com/joelparkerhenderson/architecture-decision-record?tab=readme-ov-file#file-name-conventions-for-adrs), e.g. `000-submitting-policy.md`.
+- Policy file names MUST follow [File name conventions for ADRs](https://github.com/joelparkerhenderson/architecture-decision-record?tab=readme-ov-file#file-name-conventions-for-adrs), e.g. `submitting-policy.md`.
 
 # Review and Approval Process
 
