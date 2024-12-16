@@ -158,6 +158,15 @@ package wakuv2
 							resp) );
 	}
 
+	static void cGoWakuRelayAddProtectedShard(void* wakuCtx, int clusterId, int shardId, char* publicKey, void* resp) {
+		WAKU_CALL ( waku_relay_add_protected_shard(wakuCtx,
+							clusterId,
+							shardId,
+							publicKey,
+							(WakuCallBack) GoCallback,
+							resp) );
+	}
+
 	static void cGoWakuRelayUnsubscribe(void* wakuCtx, char* pubSubTopic, void* resp) {
 
 		WAKU_CALL ( waku_relay_unsubscribe(wakuCtx,
@@ -685,13 +694,6 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuCon
 			opts = append(opts, node.WithMessageProvider(dbStore))
 		}
 
-		if appDB != nil {
-			waku.protectedTopicStore, err = persistence.NewProtectedTopicsStore(logger, appDB)
-			if err != nil {
-				return nil, err
-			}
-		}
-
 		waku.options = opts
 
 		waku.logger.Info("setup the go-waku node successfully")
@@ -1001,17 +1003,24 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 
 	topic = w.GetPubsubTopic(topic)
 
-	/* TODO nwaku
+	rs, err := protocol.TopicsToRelayShards(topic)
+	if err != nil {
+		return err
+	}
+
+	if len(rs) == 0 {
+		w.logger.Warn("could not obtain shards from topic", zap.String("topic", topic))
+		return nil
+	}
 
 	if pubkey != nil {
-		err := w.node.Relay().AddSignedTopicValidator(topic, pubkey)
+		err := w.node.RelayAddProtectedShard(rs[0].ClusterID, rs[0].ShardIDs[0], pubkey)
 		if err != nil {
 			return err
 		}
 	}
-	*/
 
-	err := w.node.RelaySubscribe(topic)
+	err = w.node.RelaySubscribe(topic)
 	if err != nil {
 		return err
 	}
@@ -1729,7 +1738,6 @@ func (w *Waku) Stop() error {
 		return err
 	}
 
-	/* TODO-nwaku
 	if w.protectedTopicStore != nil {
 		err := w.protectedTopicStore.Close()
 		if err != nil {
@@ -1737,6 +1745,7 @@ func (w *Waku) Stop() error {
 		}
 	}
 
+	/* TODO-nwaku
 	close(w.goingOnline)*/
 
 	w.wg.Wait()
@@ -1971,7 +1980,6 @@ func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
 	return w.protectedTopicStore.FetchPrivateKey(topic)
 }
 
-/* TODO-nwaku
 func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
 	topic = w.GetPubsubTopic(topic)
 	if w.protectedTopicStore == nil {
@@ -1988,7 +1996,7 @@ func (w *Waku) RemovePubsubTopicKey(topic string) error {
 	}
 
 	return w.protectedTopicStore.Delete(topic)
-} */
+}
 
 func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
 	// TODO-nwaku
@@ -2355,6 +2363,15 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 		return nil, err
 	}
 
+	var protectedTopicStore *persistence.ProtectedTopicsStore
+	if appDB != nil {
+		protectedTopicStore, err = persistence.NewProtectedTopicsStore(logger, appDB)
+		if err != nil {
+			cancel()
+			return nil, err
+		}
+	}
+
 	// Notice that the events for self node are handled by the 'MyEventCallback' method
 
 	return &Waku{
@@ -2384,6 +2401,7 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 		onlineChecker:                   onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
 		sendQueue:                       publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
 		filters:                         common.NewFilters(cfg.DefaultShardPubsubTopic, logger),
+		protectedTopicStore:             protectedTopicStore,
 	}, nil
 
 }
@@ -2639,6 +2657,37 @@ func (n *WakuNode) RelaySubscribe(pubsubTopic string) error {
 	}
 
 	errMsg := "error WakuRelaySubscribe: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	return errors.New(errMsg)
+}
+
+func (n *WakuNode) RelayAddProtectedShard(clusterId uint16, shardId uint16, pubkey *ecdsa.PublicKey) error {
+	if pubkey == nil {
+		return nil // Nothing to do here
+	}
+
+	keyHexStr := hex.EncodeToString(crypto.FromECDSAPub(pubkey))
+
+	wg := sync.WaitGroup{}
+
+	var resp = C.allocResp(unsafe.Pointer(&wg))
+	var cPublicKey = C.CString(keyHexStr)
+
+	defer C.freeResp(resp)
+	defer C.free(unsafe.Pointer(cPublicKey))
+
+	if n.wakuCtx == nil {
+		return errors.New("wakuCtx is nil")
+	}
+
+	wg.Add(1)
+	C.cGoWakuRelayAddProtectedShard(n.wakuCtx, C.int(clusterId), C.int(shardId), cPublicKey, resp)
+	wg.Wait()
+
+	if C.getRet(resp) == C.RET_OK {
+		return nil
+	}
+
+	errMsg := "error WakuRelayAddProtectedShard: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return errors.New(errMsg)
 }
 

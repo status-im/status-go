@@ -200,7 +200,7 @@ func TestBasicWakuV2(t *testing.T) {
 	}
 
 	nwakuConfig := WakuConfig{
-		Port:            30303,
+		TcpPort:         30303,
 		NodeKey:         "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
 		EnableRelay:     true,
 		LogLevel:        "DEBUG",
