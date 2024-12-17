@@ -408,22 +408,67 @@ type WakuPubsubTopic = string
 type WakuContentTopic = string
 
 type WakuConfig struct {
-	Host                 string   `json:"host,omitempty"`
-	NodeKey              string   `json:"nodekey,omitempty"`
-	EnableRelay          bool     `json:"relay"`
-	LogLevel             string   `json:"logLevel"`
-	DnsDiscovery         bool     `json:"dnsDiscovery,omitempty"`
-	DnsDiscoveryUrl      string   `json:"dnsDiscoveryUrl,omitempty"`
-	MaxMessageSize       string   `json:"maxMessageSize,omitempty"`
-	Staticnodes          []string `json:"staticnodes,omitempty"`
-	Discv5BootstrapNodes []string `json:"discv5BootstrapNodes,omitempty"`
-	Discv5Discovery      bool     `json:"discv5Discovery,omitempty"`
-	Discv5UdpPort        int      `json:"discv5UdpPort,omitempty"`
-	ClusterID            uint16   `json:"clusterId,omitempty"`
-	Shards               []uint16 `json:"shards,omitempty"`
-	PeerExchange         bool     `json:"peerExchange,omitempty"`
-	PeerExchangeNode     string   `json:"peerExchangeNode,omitempty"`
-	TcpPort              int      `json:"tcpPort,omitempty"`
+	Host                  string           `json:"host,omitempty"`
+	NodeKey               string           `json:"nodekey,omitempty"`
+	EnableRelay           bool             `json:"relay"`
+	LogLevel              string           `json:"logLevel"`
+	DnsDiscovery          bool             `json:"dnsDiscovery,omitempty"`
+	DnsDiscoveryUrl       string           `json:"dnsDiscoveryUrl,omitempty"`
+	MaxMessageSize        string           `json:"maxMessageSize,omitempty"`
+	Staticnodes           []string         `json:"staticnodes,omitempty"`
+	Discv5BootstrapNodes  []string         `json:"discv5BootstrapNodes,omitempty"`
+	Discv5Discovery       bool             `json:"discv5Discovery,omitempty"`
+	Discv5UdpPort         int              `json:"discv5UdpPort,omitempty"`
+	ClusterID             uint16           `json:"clusterId,omitempty"`
+	Shards                []uint16         `json:"shards,omitempty"`
+	PeerExchange          bool             `json:"peerExchange,omitempty"`
+	PeerExchangeNode      string           `json:"peerExchangeNode,omitempty"`
+	Filter                bool             `json:"filter,omitempty"`
+	FilterMaxPeersToServe int              `json:"filterMaxPeersToServe,omitempty"`
+	Lightpush             bool             `json:"lightpush,omitempty"`
+	TcpPort               int              `json:"tcpPort,omitempty"`
+	RateLimits            RateLimitsConfig `json:"rateLimits,omitempty"`
+}
+
+type RateLimitsConfig struct {
+	Filter       *RateLimit `json:"-"`
+	Lightpush    *RateLimit `json:"-"`
+	PeerExchange *RateLimit `json:"-"`
+}
+
+func (rlc RateLimitsConfig) MarshalJSON() ([]byte, error) {
+	output := []string{}
+	if rlc.Filter != nil {
+		output = append(output, fmt.Sprintf("filter:%s", rlc.Filter.String()))
+	}
+	if rlc.Lightpush != nil {
+		output = append(output, fmt.Sprintf("lightpush:%s", rlc.Lightpush.String()))
+	}
+	if rlc.PeerExchange != nil {
+		output = append(output, fmt.Sprintf("px:%s", rlc.PeerExchange.String()))
+	}
+	return json.Marshal(output)
+}
+
+type RateLimitUnit string
+
+const Hour RateLimitUnit = "h"
+const Minute RateLimitUnit = "m"
+const Second RateLimitUnit = "s"
+const Millisecond RateLimitUnit = "ms"
+
+type RateLimit struct {
+	Volume int
+	Period int
+	Unit   RateLimitUnit
+}
+
+func (rl RateLimit) String() string {
+	return fmt.Sprintf("%d/%d%s", rl.Volume, rl.Period, rl.Unit)
+}
+
+func (rl RateLimit) MarshalJSON() ([]byte, error) {
+	return json.Marshal(rl.String())
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -640,20 +685,11 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuCon
 			opts = append(opts, node.WithMessageProvider(dbStore))
 		}
 
-		if !cfg.LightClient {
-			opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
-			opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(1, 1)))
-		}
-
 		if appDB != nil {
 			waku.protectedTopicStore, err = persistence.NewProtectedTopicsStore(logger, appDB)
 			if err != nil {
 				return nil, err
 			}
-		}
-
-		if cfg.EnablePeerExchangeServer {
-			opts = append(opts, node.WithPeerExchange(peer_exchange.WithRateLimiter(1, 1)))
 		}
 
 		waku.options = opts
@@ -2299,6 +2335,19 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 	logger.Info("starting wakuv2 with config", zap.Any("nwakuCfg", nwakuCfg), zap.Any("wakuCfg", cfg))
 
 	ctx, cancel := context.WithCancel(context.Background())
+
+	if !cfg.LightClient {
+		nwakuCfg.Filter = true
+		nwakuCfg.FilterMaxPeersToServe = 20
+		nwakuCfg.Lightpush = true
+		nwakuCfg.RateLimits.Filter = &RateLimit{Volume: 100, Period: 1, Unit: Second}
+		nwakuCfg.RateLimits.Lightpush = &RateLimit{Volume: 5, Period: 1, Unit: Second}
+	}
+
+	if cfg.EnablePeerExchangeServer {
+		nwakuCfg.PeerExchange = true
+		nwakuCfg.RateLimits.PeerExchange = &RateLimit{Volume: 5, Period: 1, Unit: Second}
+	}
 
 	wakunode, err := newWakuNode(ctx, nwakuCfg, logger)
 	if err != nil {
