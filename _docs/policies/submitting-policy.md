@@ -39,6 +39,7 @@ proposal PR.
   - MUST receive a minimum of six approvals from CCs.
 
 # Policy Overrides
+
 On rare occasions, circumstances may necessitate that an established
 policy is circumvented when merging a feature PR. This is considered
 an **override** and MUST follow the process outlined below to ensure
