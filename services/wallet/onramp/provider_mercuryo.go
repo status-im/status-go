@@ -53,7 +53,7 @@ func (p *MercuryoProvider) GetCryptoOnRamp(ctx context.Context) (CryptoOnRamp, e
 		Hostname:                  "mercuryo.io",
 		SupportsSinglePurchase:    true,
 		SupportsRecurrentPurchase: true,
-		SupportedChainIDs:         []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet},
+		SupportedChainIDs:         []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet},
 		URLsNeedParameters:        true,
 		SiteURL:                   mercuryioNoFeesBaseURL,
 		RecurrentSiteURL:          mercuryioNoFeesBaseURL + "&widget_flow=recurrent",

@@ -16,6 +16,8 @@ const (
 	OptimismSepoliaChainID uint64 = 11155420
 	ArbitrumChainID        uint64 = 42161
 	ArbitrumSepoliaChainID uint64 = 421614
+	BaseChainID            uint64 = 8453
+	BaseSepoliaChainID     uint64 = 84532
 	sntSymbol                     = "SNT"
 	sttSymbol                     = "STT"
 )
@@ -114,6 +116,52 @@ func optimismSepolia(stageName string) params.Network {
 	}
 }
 
+func base(stageName string) params.Network {
+	return params.Network{
+		ChainID:                BaseChainID,
+		ChainName:              "Base",
+		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/base/mainnet/", stageName),
+		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/base/mainnet/", stageName),
+		DefaultFallbackURL2:    fmt.Sprintf("https://%s.api.status.im/grove/base/mainnet/", stageName),
+		RPCURL:                 "https://base-mainnet.infura.io/v3/",
+		FallbackURL:            "https://base-archival.rpc.grove.city/v1/",
+		BlockExplorerURL:       "https://basescan.org",
+		IconURL:                "network/Network=Base",
+		ChainColor:             "#0052FF",
+		ShortName:              "base",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 false,
+		Layer:                  2,
+		Enabled:                true,
+		RelatedChainID:         BaseSepoliaChainID,
+	}
+}
+
+func baseSepolia(stageName string) params.Network {
+	return params.Network{
+		ChainID:                BaseSepoliaChainID,
+		ChainName:              "Base",
+		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/base/sepolia/", stageName),
+		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/base/sepolia/", stageName),
+		DefaultFallbackURL2:    fmt.Sprintf("https://%s.api.status.im/grove/base/sepolia/", stageName),
+		RPCURL:                 "https://base-sepolia.infura.io/v3/",
+		FallbackURL:            "https://base-sepolia-archival.rpc.grove.city/v1/",
+		BlockExplorerURL:       "https://sepolia.basescan.org/",
+		IconURL:                "network/Network=Base",
+		ChainColor:             "#0052FF",
+		ShortName:              "base",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 true,
+		Layer:                  2,
+		Enabled:                false,
+		RelatedChainID:         BaseChainID,
+	}
+}
+
 func arbitrum(stageName string) params.Network {
 	return params.Network{
 		ChainID:                ArbitrumChainID,
@@ -168,6 +216,8 @@ func defaultNetworks(stageName string) []params.Network {
 		optimismSepolia(stageName),
 		arbitrum(stageName),
 		arbitrumSepolia(stageName),
+		base(stageName),
+		baseSepolia(stageName),
 	}
 }
 

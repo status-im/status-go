@@ -102,6 +102,8 @@ type WalletSecretsConfig struct {
 	AlchemyArbitrumSepoliaToken string `json:"alchemyArbitrumSepoliaToken"`
 	AlchemyOptimismMainnetToken string `json:"alchemyOptimismMainnetToken"`
 	AlchemyOptimismSepoliaToken string `json:"alchemyOptimismSepoliaToken"`
+	AlchemyBaseMainnetToken     string `json:"alchemyBaseMainnetToken"`
+	AlchemyBaseSepoliaToken     string `json:"alchemyBaseSepoliaToken"`
 
 	StatusProxyStageName          string `json:"statusProxyStageName"`
 	StatusProxyMarketUser         string `json:"statusProxyMarketUser"`

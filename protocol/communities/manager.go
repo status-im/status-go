@@ -289,7 +289,7 @@ func NewDefaultTokenManager(tm *token.Manager, nm network.ManagerInterface) *Def
 type BalancesByChain = map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
 
 func (m *DefaultTokenManager) GetAllChainIDs() ([]uint64, error) {
-	networks, err := m.networkManager.Get(false)
+	networks, err := m.networkManager.GetAll()
 	if err != nil {
 		return nil, err
 	}

@@ -20,9 +20,9 @@ const assetLimitV2 = 50
 
 func getV2BaseURL(chainID walletCommon.ChainID) (string, error) {
 	switch uint64(chainID) {
-	case walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet:
+	case walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet:
 		return "https://api.opensea.io/v2", nil
-	case walletCommon.EthereumSepolia, walletCommon.ArbitrumSepolia, walletCommon.OptimismSepolia:
+	case walletCommon.EthereumSepolia, walletCommon.ArbitrumSepolia, walletCommon.OptimismSepolia, walletCommon.BaseSepolia:
 		return "https://testnets-api.opensea.io/v2", nil
 	}
 

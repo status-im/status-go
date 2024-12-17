@@ -48,6 +48,11 @@ var hopBridgeContractAddresses = map[string]map[uint64]map[string]common.Address
 			CctpL2Bridge:           common.HexToAddress("0x6504BFcaB789c35325cA4329f1f41FaC340bf982"),
 			CctpMessageTransmitter: common.HexToAddress("0xC30362313FBBA5cf9163F0bb16a0e01f01A896ca"),
 		},
+		walletCommon.BaseMainnet: {
+			L2CanonicalToken:       common.HexToAddress("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 "),
+			CctpL2Bridge:           common.HexToAddress("0xe7F40BF16AB09f4a6906Ac2CAA4094aD2dA48Cc2"),
+			CctpMessageTransmitter: common.HexToAddress("0xAD09780d193884d503182aD4588450C416D6F9D4"),
+		},
 		walletCommon.EthereumSepolia: {
 			L1CanonicalToken: common.HexToAddress("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"),
 			CctpL1Bridge:     common.HexToAddress("0x05fda2db623fa6a89a2db33550848ab2006a4427"),
@@ -58,6 +63,10 @@ var hopBridgeContractAddresses = map[string]map[uint64]map[string]common.Address
 		},
 		walletCommon.ArbitrumSepolia: {
 			L2CanonicalToken: common.HexToAddress("0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"),
+			CctpL2Bridge:     common.HexToAddress("0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5"),
+		},
+		walletCommon.BaseSepolia: {
+			L2CanonicalToken: common.HexToAddress("0x036CbD53842c5426634e7929541eC2318f3dCF7e"),
 			CctpL2Bridge:     common.HexToAddress("0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5"),
 		},
 	},
@@ -93,6 +102,19 @@ var hopBridgeContractAddresses = map[string]map[uint64]map[string]common.Address
 			L2AmmWrapper:           common.HexToAddress("0xe22D2beDb3Eca35E6397e0C6D62857094aA26F52"),
 			L2SaddleSwap:           common.HexToAddress("0x10541b07d8Ad2647Dc6cD67abd4c03575dade261"),
 			L2SaddleLpToken:        common.HexToAddress("0xB67c014FA700E69681a673876eb8BAFAA36BFf71"),
+		},
+		walletCommon.BaseMainnet: {
+			L1CanonicalBridge:      common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L1MessengerWrapper:     common.HexToAddress("0x4a55e8e407609A3046804ca500BeF6F5ebaCb6F9"),
+			L2CanonicalBridge:      common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L2CanonicalToken:       common.HexToAddress("0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA"),
+			L2Bridge:               common.HexToAddress("0x46ae9BaB8CEA96610807a275EBD36f8e916b5C61"),
+			CctpL2Bridge:           common.HexToAddress("0xe7F40BF16AB09f4a6906Ac2CAA4094aD2dA48Cc2"),
+			CctpMessageTransmitter: common.HexToAddress("0xAD09780d193884d503182aD4588450C416D6F9D4"),
+			L2HopBridgeToken:       common.HexToAddress("0x74fa978EaFFa312bC92e76dF40FcC1bFE7637Aeb"),
+			L2AmmWrapper:           common.HexToAddress("0x7D269D3E0d61A05a0bA976b7DBF8805bF844AF3F"),
+			L2SaddleSwap:           common.HexToAddress("0x022C5cE6F1Add7423268D41e08Df521D5527C2A0"),
+			L2SaddleLpToken:        common.HexToAddress("0x3b507422EBe64440f03BCbE5EEe4bdF76517f320"),
 		},
 		walletCommon.EthereumSepolia: {
 			L1CanonicalToken: common.HexToAddress("0x95B01328BA6f4de261C4907fB35eE3c4968e9CEF"),
@@ -191,6 +213,17 @@ var hopBridgeContractAddresses = map[string]map[uint64]map[string]common.Address
 			L2SaddleSwap:       common.HexToAddress("0x652d27c0F72771Ce5C76fd400edD61B406Ac6D97"),
 			L2SaddleLpToken:    common.HexToAddress("0x59745774Ed5EfF903e615F5A2282Cae03484985a"),
 		},
+		walletCommon.BaseMainnet: {
+			L1CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L1MessengerWrapper: common.HexToAddress("0x17B5ACE1cD6b0d033431873826937F499Eec2C95"),
+			L2CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L2CanonicalToken:   common.HexToAddress("0x4200000000000000000000000000000000000006"),
+			L2Bridge:           common.HexToAddress("0x3666f603Cc164936C1b87e207F36BEBa4AC5f18a"),
+			L2HopBridgeToken:   common.HexToAddress("0xC1985d7a3429cDC85E59E2E4Fcc805b857e6Ee2E"),
+			L2AmmWrapper:       common.HexToAddress("0x10541b07d8Ad2647Dc6cD67abd4c03575dade261"),
+			L2SaddleSwap:       common.HexToAddress("0x0ce6c85cF43553DE10FC56cecA0aef6Ff0DD444d"),
+			L2SaddleLpToken:    common.HexToAddress("0x0ce6c85cF43553DE10FC56cecA0aef6Ff0DD444d"),
+		},
 	},
 	"HOP": {
 		walletCommon.EthereumMainnet: {
@@ -214,6 +247,17 @@ var hopBridgeContractAddresses = map[string]map[uint64]map[string]common.Address
 			L2CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
 			L2CanonicalToken:   common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"),
 			L2Bridge:           common.HexToAddress("0x25FB92E505F752F730cAD0Bd4fa17ecE4A384266"),
+			L2HopBridgeToken:   common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"),
+			L2AmmWrapper:       common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L2SaddleSwap:       common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L2SaddleLpToken:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
+		},
+		walletCommon.BaseMainnet: {
+			L1CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L1MessengerWrapper: common.HexToAddress("0x86eD3B8AD6b721fD3a2Fa73c227987Fb9AD3D1Ae"),
+			L2CanonicalBridge:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
+			L2CanonicalToken:   common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"),
+			L2Bridge:           common.HexToAddress("0xe22D2beDb3Eca35E6397e0C6D62857094aA26F52"),
 			L2HopBridgeToken:   common.HexToAddress("0xc5102fE9359FD9a28f877a67E36B0F050d81a3CC"),
 			L2AmmWrapper:       common.HexToAddress("0x0000000000000000000000000000000000000000"),
 			L2SaddleSwap:       common.HexToAddress("0x0000000000000000000000000000000000000000"),

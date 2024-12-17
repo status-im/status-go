@@ -106,6 +106,7 @@ func (s SendType) IsAvailableFor(network *params.Network) bool {
 		walletCommon.EthereumMainnet: true,
 		walletCommon.OptimismMainnet: true,
 		walletCommon.ArbitrumMainnet: true,
+		walletCommon.BaseMainnet:     true,
 	}
 
 	// Check for Swap specific networks

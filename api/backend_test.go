@@ -1527,8 +1527,10 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	alchemyArbitrumSepoliaToken := "alchemy-arbitrum-sepolia-token"
 	alchemyOptimismMainnetToken := "alchemy-optimism-mainnet-token"
 	alchemyOptimismSepoliaToken := "alchemy-optimism-sepolia-token"
-	raribleMainnetAPIKey := "rarible-mainnet-api-key" // nolint: gosec
-	raribleTestnetAPIKey := "rarible-testnet-api-key" // nolint: gosec
+	alchemyBaseMainnetToken := "alchemy-base-mainnet-token" // nolint: gosec
+	alchemyBaseSepoliaToken := "alchemy-base-sepolia-token" // nolint: gosec
+	raribleMainnetAPIKey := "rarible-mainnet-api-key"       // nolint: gosec
+	raribleTestnetAPIKey := "rarible-testnet-api-key"       // nolint: gosec
 
 	b := NewGethStatusBackend(tt.MustCreateTestLogger())
 	createAccountRequest := &requests.CreateAccount{
@@ -1565,6 +1567,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 			AlchemyArbitrumSepoliaToken: alchemyArbitrumSepoliaToken,
 			AlchemyOptimismMainnetToken: alchemyOptimismMainnetToken,
 			AlchemyOptimismSepoliaToken: alchemyOptimismSepoliaToken,
+			AlchemyBaseMainnetToken:     alchemyBaseMainnetToken,
+			AlchemyBaseSepoliaToken:     alchemyBaseSepoliaToken,
 			RaribleMainnetAPIKey:        raribleMainnetAPIKey,
 			RaribleTestnetAPIKey:        raribleTestnetAPIKey,
 		},
@@ -1585,6 +1589,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[ArbitrumSepoliaChainID], alchemyArbitrumSepoliaToken)
 	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[OptimismChainID], alchemyOptimismMainnetToken)
 	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[OptimismSepoliaChainID], alchemyOptimismSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[BaseChainID], alchemyBaseMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[BaseSepoliaChainID], alchemyBaseSepoliaToken)
 	require.Equal(t, b.config.WalletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
 	require.Equal(t, b.config.WalletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
 
@@ -1846,6 +1852,8 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 				"alchemyArbitrumSepoliaToken": "",
 				"alchemyOptimismMainnetToken": "",
 				"alchemyOptimismSepoliaToken": "",
+				"alchemyBaseMainnetToken":     "",
+				"alchemyBaseSepoliaToken":     "",
 			},
 			"torrentConfigEnabled":   false,
 			"torrentConfigPort":      0,

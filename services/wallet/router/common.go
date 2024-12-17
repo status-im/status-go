@@ -41,6 +41,8 @@ func getChainPriority(chainID uint64) int {
 		return 2
 	case common.ArbitrumMainnet, common.ArbitrumSepolia:
 		return 3
+	case common.BaseMainnet, common.BaseSepolia:
+		return 4
 	default:
 		return 0
 	}

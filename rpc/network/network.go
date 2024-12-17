@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
-var SepoliaChainIDs = []uint64{11155111, 421614, 11155420}
+var SepoliaChainIDs = []uint64{11155111, 421614, 11155420, 84532}
 
 type CombinedNetwork struct {
 	Prod *params.Network
@@ -319,7 +319,7 @@ func (nm *Manager) GetActiveNetworks() ([]*params.Network, error) {
 		return nil, err
 	}
 
-	networks, err := nm.Get(false)
+	networks, err := nm.GetAll()
 	if err != nil {
 		return nil, err
 	}

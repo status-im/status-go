@@ -23,7 +23,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig)
 
-	require.Len(t, actualNetworks, 6)
+	require.Len(t, actualNetworks, 8)
 
 	for _, n := range actualNetworks {
 		var err error
@@ -34,6 +34,8 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		case OptimismSepoliaChainID:
 		case ArbitrumChainID:
 		case ArbitrumSepoliaChainID:
+		case BaseChainID:
+		case BaseSepoliaChainID:
 		default:
 			err = errors.Errorf("unexpected chain id: %d", n.ChainID)
 		}
@@ -63,7 +65,7 @@ func TestBuildDefaultNetworksGanache(t *testing.T) {
 
 	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig)
 
-	require.Len(t, actualNetworks, 6)
+	require.Len(t, actualNetworks, 8)
 
 	for _, n := range actualNetworks {
 		require.True(t, strings.Contains(n.RPCURL, ganacheURL))

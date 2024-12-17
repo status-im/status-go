@@ -16,6 +16,7 @@ var (
 	newBlockCheckIntervalMainnet      = 3 * time.Second
 	newBlockCheckIntervalOptimism     = 1 * time.Second
 	newBlockCheckIntervalArbitrum     = 200 * time.Millisecond
+	newBlockCheckIntervalBase         = 1 * time.Second
 	newBlockCheckIntervalAnvilMainnet = 2 * time.Second
 
 	feeRecalculationTimeout      = 5 * time.Minute
@@ -63,6 +64,9 @@ func (r *Router) subscribeForUdates(chainID uint64) error {
 	case walletCommon.ArbitrumMainnet,
 		walletCommon.ArbitrumSepolia:
 		ticker = time.NewTicker(newBlockCheckIntervalArbitrum)
+	case walletCommon.BaseMainnet,
+		walletCommon.BaseSepolia:
+		ticker = time.NewTicker(newBlockCheckIntervalBase)
 	case walletCommon.AnvilMainnet:
 		ticker = time.NewTicker(newBlockCheckIntervalAnvilMainnet)
 	}

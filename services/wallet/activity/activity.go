@@ -454,7 +454,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		networks = joinItems(chainIDs, nil)
 	}
 
-	layer2Chains := []uint64{common.OptimismMainnet, common.OptimismSepolia, common.ArbitrumMainnet, common.ArbitrumSepolia}
+	layer2Chains := []uint64{common.OptimismMainnet, common.OptimismSepolia, common.ArbitrumMainnet, common.ArbitrumSepolia, common.BaseMainnet, common.BaseSepolia}
 	layer2Networks := joinItems(layer2Chains, func(chainID uint64) string {
 		return fmt.Sprintf("%d", chainID)
 	})

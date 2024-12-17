@@ -32,6 +32,8 @@ var sensitiveKeys = []string{
 	"alchemyArbitrumSepoliaToken",
 	"alchemyOptimismMainnetToken",
 	"alchemyOptimismSepoliaToken",
+	"alchemyBaseMainnetToken",
+	"alchemyBaseSepoliaToken",
 	"statusProxyMarketUser",
 	"statusProxyMarketPassword",
 	"statusProxyBlockchainUser",

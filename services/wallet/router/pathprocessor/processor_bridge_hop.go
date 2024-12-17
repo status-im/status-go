@@ -25,6 +25,7 @@ import (
 	hopL1HopBridge "github.com/status-im/status-go/contracts/hop/l1Contracts/l1HopBridge"
 	hopL2AmmWrapper "github.com/status-im/status-go/contracts/hop/l2Contracts/l2AmmWrapper"
 	hopL2ArbitrumBridge "github.com/status-im/status-go/contracts/hop/l2Contracts/l2ArbitrumBridge"
+	hopL2BaseBridge "github.com/status-im/status-go/contracts/hop/l2Contracts/l2BaseBridge"
 	hopL2CctpImplementation "github.com/status-im/status-go/contracts/hop/l2Contracts/l2CctpImplementation"
 	hopL2OptimismBridge "github.com/status-im/status-go/contracts/hop/l2Contracts/l2OptimismBridge"
 	"github.com/status-im/status-go/eth-node/types"
@@ -183,6 +184,10 @@ func (c *HopBridgeProcessor) getAppropriateABI(contractType string, chainID uint
 		if chainID == walletCommon.ArbitrumMainnet ||
 			chainID == walletCommon.ArbitrumSepolia {
 			return abi.JSON(strings.NewReader(hopL2ArbitrumBridge.HopL2ArbitrumBridgeABI))
+		}
+		if chainID == walletCommon.BaseMainnet ||
+			chainID == walletCommon.BaseSepolia {
+			return abi.JSON(strings.NewReader(hopL2BaseBridge.HopL2BaseBridgeABI))
 		}
 	}
 
@@ -468,6 +473,7 @@ func (h *HopBridgeProcessor) CalculateFees(params ProcessorInputParams) (*big.In
 		walletCommon.EthereumMainnet: "ethereum",
 		walletCommon.OptimismMainnet: "optimism",
 		walletCommon.ArbitrumMainnet: "arbitrum",
+		walletCommon.BaseMainnet:     "base",
 	}
 
 	fromChainName, ok := hopChainsMap[params.FromChain.ChainID]
@@ -730,6 +736,24 @@ func (h *HopBridgeProcessor) sendL2BridgeTx(contractAddress common.Address, ethC
 			bonderFee.AmountOutMin.Int,
 			big.NewInt(bonderFee.Deadline))
 	}
+	if fromChainID == walletCommon.BaseMainnet ||
+		fromChainID == walletCommon.BaseSepolia {
+		contractInstance, err := hopL2BaseBridge.NewHopL2BaseBridge(
+			contractAddress,
+			ethClient,
+		)
+		if err != nil {
+			return tx, createBridgeHopErrorResponse(err)
+		}
 
+		return contractInstance.Send(
+			txOpts,
+			big.NewInt(int64(toChainID)),
+			to,
+			bonderFee.AmountIn.Int,
+			bonderFee.BonderFee.Int,
+			bonderFee.AmountOutMin.Int,
+			big.NewInt(bonderFee.Deadline))
+	}
 	return tx, ErrTxForChainNotSupported
 }

@@ -37,6 +37,8 @@ const (
 	BinanceChainID     uint64 = 56 // obsolete?
 	BinanceTestChainID uint64 = 97 // obsolete?
 	AnvilMainnet       uint64 = 31337
+	BaseMainnet        uint64 = 8453
+	BaseSepolia        uint64 = 84532
 )
 
 var (
@@ -44,12 +46,14 @@ var (
 		EthereumMainnet: true,
 		OptimismMainnet: true,
 		ArbitrumMainnet: true,
+		BaseMainnet:     true,
 	}
 
 	SupportedTestNetworks = map[uint64]bool{
 		EthereumSepolia: true,
 		OptimismSepolia: true,
 		ArbitrumSepolia: true,
+		BaseSepolia:     true,
 	}
 )
 
@@ -84,9 +88,9 @@ func (c ChainID) ToUint() uint64 {
 
 func (c ChainID) IsMainnet() bool {
 	switch uint64(c) {
-	case EthereumMainnet, OptimismMainnet, ArbitrumMainnet:
+	case EthereumMainnet, OptimismMainnet, ArbitrumMainnet, BaseMainnet:
 		return true
-	case EthereumSepolia, OptimismSepolia, ArbitrumSepolia:
+	case EthereumSepolia, OptimismSepolia, ArbitrumSepolia, BaseSepolia:
 		return false
 	case UnknownChainID:
 		return false
@@ -102,6 +106,8 @@ func AllChainIDs() []ChainID {
 		ChainID(OptimismSepolia),
 		ChainID(ArbitrumMainnet),
 		ChainID(ArbitrumSepolia),
+		ChainID(BaseMainnet),
+		ChainID(BaseSepolia),
 	}
 }
 
@@ -110,4 +116,5 @@ var AverageBlockDurationForChain = map[ChainID]time.Duration{
 	ChainID(EthereumMainnet): time.Duration(12000) * time.Millisecond,
 	ChainID(OptimismMainnet): time.Duration(400) * time.Millisecond,
 	ChainID(ArbitrumMainnet): time.Duration(300) * time.Millisecond,
+	ChainID(BaseMainnet):     time.Duration(400) * time.Millisecond,
 }

@@ -114,9 +114,9 @@ const (
 	AccountPartiallyOperable AccountOperable = "partially" // an account is partially operable if it is not a keycard account and there is created keystore file for the address it is derived from
 	AccountFullyOperable     AccountOperable = "fully"     // an account is fully operable if it is not a keycard account and there is a keystore file for it
 
-	ProdPreferredChainIDsDefault        = "1:10:42161"
+	ProdPreferredChainIDsDefault        = "1:10:42161:8453"
 	TestPreferredChainIDsDefault        = "5:420:421613"
-	TestSepoliaPreferredChainIDsDefault = "11155111:11155420:421614"
+	TestSepoliaPreferredChainIDsDefault = "11155111:11155420:421614:84532"
 )
 
 // Returns true if an account is a wallet account that logged in user has a control over, otherwise returns false.

@@ -38,6 +38,10 @@ func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 		return "https://arb-mainnet.g.alchemy.com", nil
 	case walletCommon.ArbitrumSepolia:
 		return "https://arb-sepolia.g.alchemy.com", nil
+	case walletCommon.BaseMainnet:
+		return "https://base-mainnet.g.alchemy.com", nil
+	case walletCommon.BaseSepolia:
+		return "https://base-sepolia.g.alchemy.com", nil
 	}
 
 	return "", thirdparty.ErrChainIDNotSupported

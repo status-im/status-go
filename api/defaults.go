@@ -215,6 +215,12 @@ func buildWalletConfig(request *requests.WalletSecretsConfig, statusProxyEnabled
 	if request.AlchemyOptimismSepoliaToken != "" {
 		walletConfig.AlchemyAPIKeys[OptimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
 	}
+	if request.AlchemyBaseMainnetToken != "" {
+		walletConfig.AlchemyAPIKeys[BaseChainID] = request.AlchemyBaseMainnetToken
+	}
+	if request.AlchemyBaseSepoliaToken != "" {
+		walletConfig.AlchemyAPIKeys[BaseSepoliaChainID] = request.AlchemyBaseSepoliaToken
+	}
 	if request.StatusProxyMarketUser != "" {
 		walletConfig.StatusProxyMarketUser = request.StatusProxyMarketUser
 	}

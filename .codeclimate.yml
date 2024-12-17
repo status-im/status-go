@@ -42,3 +42,4 @@ exclude_patterns:
   - "static/"
   - "t/"
   - "images/qr-assets.go"
+  - "contracts/hop/l2Contracts/l2BaseBridge/l2BaseBridge.go"
