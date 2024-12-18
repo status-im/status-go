@@ -23,7 +23,7 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 
 class StatusBackend(RpcClient, SignalClient):
 
-    def __init__(self, await_signals=[]):
+    def __init__(self, await_signals=[], privileged=False):
 
         if option.status_backend_url:
             url = option.status_backend_url
@@ -31,7 +31,7 @@ class StatusBackend(RpcClient, SignalClient):
             self.docker_client = docker.from_env()
             host_port = random.choice(option.status_backend_port_range)
 
-            self.container = self._start_container(host_port)
+            self.container = self._start_container(host_port, privileged)
             url = f"http://127.0.0.1:{host_port}"
             option.status_backend_port_range.remove(host_port)
 
@@ -54,7 +54,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.accounts_service = AccountService(self)
         self.settings_service = SettingsService(self)
 
-    def _start_container(self, host_port):
+    def _start_container(self, host_port, privileged):
         docker_project_name = option.docker_project_name
 
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -66,7 +66,7 @@ class StatusBackend(RpcClient, SignalClient):
         container_args = {
             "image": image_name,
             "detach": True,
-            "privileged": True,
+            "privileged": privileged,
             "name": container_name,
             "labels": {"com.docker.compose.project": docker_project_name},
             "entrypoint": [
