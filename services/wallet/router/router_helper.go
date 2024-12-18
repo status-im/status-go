@@ -381,6 +381,11 @@ func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collecti
 		return tokenManager.FindToken(network, tokenID)
 	}
 
+	if sendType.IsCommunityRelatedTransfer() {
+		// TODO: optimize tokens to handle community tokens
+		return nil
+	}
+
 	contractAddress, collectibleTokenID, success := ParseCollectibleID(tokenID)
 	if !success {
 		return nil

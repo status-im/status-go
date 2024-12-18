@@ -44,6 +44,17 @@ type PathProcessorClearable interface {
 	Clear()
 }
 
+type ProcessorCommunityTokenParams struct {
+	Name               string
+	Symbol             string
+	TokenURI           string
+	Transferable       bool
+	RemoteSelfDestruct bool
+	Supply             *big.Int
+	OwnerTokenAddress  string
+	MasterTokenAddress string
+}
+
 type ProcessorInputParams struct {
 	FromChain *params.Network
 	ToChain   *params.Network
@@ -55,10 +66,14 @@ type ProcessorInputParams struct {
 	AmountOut *big.Int
 
 	// extra params
-	BonderFee *big.Int
-	Username  string
-	PublicKey string
-	PackID    *big.Int
+	BonderFee          *big.Int
+	Username           string
+	PublicKey          string
+	PackID             *big.Int
+	SlippagePercentage float32
+
+	// community related params
+	CommunityParams *requests.CommunityRouteInputParams
 
 	// for testing purposes
 	TestsMode                 bool

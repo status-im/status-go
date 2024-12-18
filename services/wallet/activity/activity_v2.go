@@ -214,7 +214,10 @@ func dataToEntriesV2(deps FilterDependencies, data []*entryDataV2) ([]Entry, err
 		entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
 
 		if entry.transferType == nil || TokenType(*entry.transferType) != Native {
-			interactedAddress := eth.BytesToAddress(d.Tx.To().Bytes())
+			var interactedAddress eth.Address
+			if d.Tx.To() != nil {
+				interactedAddress = eth.BytesToAddress(d.Tx.To().Bytes())
+			}
 			entry.interactedContractAddress = &interactedAddress
 		}
 

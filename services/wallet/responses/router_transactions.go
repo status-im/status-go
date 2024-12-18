@@ -27,6 +27,9 @@ type SendDetails struct {
 	Username  string `json:"username"`
 	PublicKey string `json:"publicKey"`
 	PackID    string `json:"packId"`
+
+	// community related params
+	CommunityParams *requests.CommunityRouteInputParams `json:"communityParams"`
 }
 
 type SigningDetails struct {
@@ -112,4 +115,8 @@ func (sd *SendDetails) UpdateFields(inputParams requests.RouteInputParams, fromC
 	// Set chain IDs, in case of an error while sending a transaction
 	sd.FromChain = fromChain
 	sd.ToChain = toChain
+
+	if inputParams.CommunityRouteInputParams != nil {
+		sd.CommunityParams = inputParams.CommunityRouteInputParams
+	}
 }

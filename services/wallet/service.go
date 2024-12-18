@@ -280,6 +280,27 @@ func buildPathProcessors(
 	buyStickers := pathprocessor.NewStickersBuyProcessor(rpcClient, transactor)
 	ret = append(ret, buyStickers)
 
+	communityBurn := pathprocessor.NewCommunityBurnProcessor(rpcClient, transactor)
+	ret = append(ret, communityBurn)
+
+	communityDeployAssets := pathprocessor.NewCommunityDeployAssetsProcessor(rpcClient, transactor)
+	ret = append(ret, communityDeployAssets)
+
+	communityDeployCollectibles := pathprocessor.NewCommunityDeployCollectiblesProcessor(rpcClient, transactor)
+	ret = append(ret, communityDeployCollectibles)
+
+	communityDeployOwnerToken := pathprocessor.NewCommunityDeployOwnerTokenProcessor(rpcClient, transactor)
+	ret = append(ret, communityDeployOwnerToken)
+
+	communityMintTokens := pathprocessor.NewCommunityMintTokensProcessor(rpcClient, transactor)
+	ret = append(ret, communityMintTokens)
+
+	communityRemoteBurn := pathprocessor.NewCommunityRemoteBurnProcessor(rpcClient, transactor)
+	ret = append(ret, communityRemoteBurn)
+
+	communitySetSignerPubKey := pathprocessor.NewCommunitySetSignerPubKeyProcessor(rpcClient, transactor)
+	ret = append(ret, communitySetSignerPubKey)
+
 	return ret
 }
 
