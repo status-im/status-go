@@ -20,6 +20,13 @@ const (
 	ERC721Transfer
 	ERC1155Transfer
 	Swap
+	CommunityBurn
+	CommunityDeployAssets
+	CommunityDeployCollectibles
+	CommunityDeployOwnerToken
+	CommunityMintTokens
+	CommunityRemoteBurn
+	CommunitySetSignerPubKey
 )
 
 func (s SendType) IsCollectiblesTransfer() bool {
@@ -32,6 +39,11 @@ func (s SendType) IsEnsTransfer() bool {
 
 func (s SendType) IsStickersTransfer() bool {
 	return s == StickersBuy
+}
+
+func (s SendType) IsCommunityRelatedTransfer() bool {
+	return s == CommunityDeployOwnerToken || s == CommunityDeployCollectibles || s == CommunityDeployAssets ||
+		s == CommunityMintTokens || s == CommunityRemoteBurn || s == CommunityBurn || s == CommunitySetSignerPubKey
 }
 
 // canUseProcessor is used to check if certain SendType can be used with a given path processor
@@ -56,6 +68,20 @@ func (s SendType) CanUseProcessor(pathProcessorName string) bool {
 		return pathProcessorName == pathProcessorCommon.ProcessorENSPublicKeyName
 	case StickersBuy:
 		return pathProcessorName == pathProcessorCommon.ProcessorStickersBuyName
+	case CommunityBurn:
+		return pathProcessorName == pathProcessorCommon.ProcessorCommunityBurnName
+	case CommunityDeployAssets:
+		return pathProcessorName == pathProcessorCommon.ProcessorCommunityDeployAssetsName
+	case CommunityDeployCollectibles:
+		return pathProcessorName == pathProcessorCommon.ProcessorCommunityDeployCollectiblesName
+	case CommunityDeployOwnerToken:
+		return pathProcessorName == pathProcessorCommon.ProcessorCommunityDeployOwnerTokenName
+	case CommunityMintTokens:
+		return pathProcessorName == pathProcessorCommon.ProcessorCommunityMintTokensName
+	case CommunityRemoteBurn:
+		return pathProcessorName == pathProcessorCommon.ProcessorCommunityRemoteBurnName
+	case CommunitySetSignerPubKey:
+		return pathProcessorName == pathProcessorCommon.ProcessorCommunitySetSignerPubKeyName
 	default:
 		return true
 	}
@@ -71,6 +97,8 @@ func (s SendType) ProcessZeroAmountInProcessor(amountIn *big.Int, amountOut *big
 			if amountOut.Cmp(walletCommon.ZeroBigIntValue()) == 0 {
 				return false
 			}
+		} else if s.IsCommunityRelatedTransfer() {
+			return true
 		} else if s != ENSRelease {
 			return false
 		}
@@ -83,6 +111,7 @@ func (s SendType) IsAvailableBetween(from, to *params.Network) bool {
 	if s.IsCollectiblesTransfer() ||
 		s.IsEnsTransfer() ||
 		s.IsStickersTransfer() ||
+		s.IsCommunityRelatedTransfer() ||
 		s == Swap {
 		return from.ChainID == to.ChainID
 	}
@@ -95,33 +124,21 @@ func (s SendType) IsAvailableBetween(from, to *params.Network) bool {
 }
 
 func (s SendType) IsAvailableFor(network *params.Network) bool {
-	// Set of network ChainIDs allowed for any type of transaction
-	allAllowedNetworks := map[uint64]bool{
-		walletCommon.EthereumMainnet: true,
-		walletCommon.EthereumSepolia: true,
-	}
-
-	// Additional specific networks for the Swap SendType
-	swapAllowedNetworks := map[uint64]bool{
-		walletCommon.EthereumMainnet: true,
-		walletCommon.OptimismMainnet: true,
-		walletCommon.ArbitrumMainnet: true,
-		walletCommon.BaseMainnet:     true,
-	}
-
 	// Check for Swap specific networks
 	if s == Swap {
-		return swapAllowedNetworks[network.ChainID]
+		swapAllowedNetworks := map[uint64]bool{
+			walletCommon.EthereumMainnet: true,
+			walletCommon.OptimismMainnet: true,
+			walletCommon.ArbitrumMainnet: true,
+			walletCommon.BaseMainnet:     true,
+		}
+		_, ok := swapAllowedNetworks[network.ChainID]
+		return ok
 	}
 
 	if s.IsEnsTransfer() || s.IsStickersTransfer() {
 		return network.ChainID == walletCommon.EthereumMainnet || network.ChainID == walletCommon.EthereumSepolia
 	}
 
-	// Check for any SendType available for all networks
-	if s == Transfer || s == Bridge || s.IsCollectiblesTransfer() || allAllowedNetworks[network.ChainID] {
-		return true
-	}
-
-	return false
+	return true
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/responses"
 	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
 	"github.com/status-im/status-go/services/wallet/router"
+	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
@@ -87,6 +88,13 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 			return
 		}
 
+		// re-use path processor input params structure to pass extra params to transaction manager
+		var extraParams pathprocessor.ProcessorInputParams
+		extraParams, err = m.router.CreateProcessorInputParams(&routeInputParams, nil, nil, nil, nil, nil, buildInputParams.SlippagePercentage, 0)
+		if err != nil {
+			return
+		}
+
 		m.buildInputParams = buildInputParams
 
 		fromChainID, toChainID := route.GetFirstPathChains()
@@ -99,14 +107,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 		response.SigningDetails, fromChainID, toChainID, err = m.transactionManager.BuildTransactionsFromRoute(
 			route,
 			m.router.GetPathProcessors(),
-			transfer.BuildRouteExtraParams{
-				AddressFrom:        routeInputParams.AddrFrom,
-				AddressTo:          routeInputParams.AddrTo,
-				Username:           routeInputParams.Username,
-				PublicKey:          routeInputParams.PublicKey,
-				PackID:             routeInputParams.PackID.ToInt(),
-				SlippagePercentage: buildInputParams.SlippagePercentage,
-			},
+			&extraParams,
 		)
 		if err != nil {
 			response.SendDetails.UpdateFields(routeInputParams, fromChainID, toChainID)

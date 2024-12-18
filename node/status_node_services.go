@@ -513,7 +513,7 @@ func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
 
 func (b *StatusNode) CommunityTokensServiceV2() *communitytokensv2.Service {
 	if b.communityTokensSrvcV2 == nil {
-		b.communityTokensSrvcV2 = communitytokensv2.NewService(b.rpcClient, b.gethAccountManager, b.pendingTracker, b.config, b.appDB, &b.walletFeed, b.transactor)
+		b.communityTokensSrvcV2 = communitytokensv2.NewService(b.rpcClient, b.gethAccountManager, b.config, b.appDB, &b.walletFeed, b.transactor)
 	}
 	return b.communityTokensSrvcV2
 }

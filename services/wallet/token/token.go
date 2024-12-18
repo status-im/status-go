@@ -28,6 +28,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/server"
@@ -621,6 +622,20 @@ func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address co
 		Decimals: uint(decimal),
 		ChainID:  chainID,
 	}, nil
+}
+
+func (tm *Manager) GetCommunityTokenType(chainID uint64, tokenContractAddress string) (protobuf.CommunityTokenType, error) {
+	if tm.communityTokensDB != nil {
+		return tm.communityTokensDB.GetTokenType(chainID, tokenContractAddress)
+	}
+	return protobuf.CommunityTokenType_UNKNOWN_TOKEN_TYPE, nil
+}
+
+func (tm *Manager) GetCommunityTokenPrivilegesLevel(chainID uint64, tokenContractAddress string) (token.PrivilegesLevel, error) {
+	if tm.communityTokensDB != nil {
+		return tm.communityTokensDB.GetTokenPrivilegesLevel(chainID, tokenContractAddress)
+	}
+	return token.CommunityLevel, nil
 }
 
 func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*Token, error) {
