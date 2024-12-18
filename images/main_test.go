@@ -44,3 +44,27 @@ func TestGenerateBannerImage_ShrinkOnly(t *testing.T) {
 	require.Exactly(t, identityImage.Width, int(BannerDim))
 	require.Exactly(t, identityImage.Height, 805)
 }
+
+func TestGenerateIdentityImages(t *testing.T) {
+	// Create image data
+	testImage := image.NewRGBA(image.Rect(0, 0, int(BannerDim)+10, int(BannerDim)+20))
+
+	// Create a temporary file for storing the image data
+	tmpTestFilePath := t.TempDir() + "/test.png"
+	file, err := os.Create(tmpTestFilePath)
+	require.NoError(t, err)
+	defer file.Close()
+
+	// Save the image data to the temporary file
+	err = png.Encode(file, testImage)
+	require.NoError(t, err)
+
+	// Generate the identity images
+	identityImages, err := GenerateIdentityImages(tmpTestFilePath, 100, 100, 500, 500)
+	require.NoError(t, err)
+
+	// Check the identity images have a valid clock value
+	for _, image := range identityImages {
+		require.NotEqual(t, image.Clock, uint64(0))
+	}
+}

@@ -3,6 +3,7 @@ package images
 import (
 	"bytes"
 	"image"
+	"time"
 )
 
 func GenerateImageVariants(cImg image.Image) ([]IdentityImage, error) {
@@ -25,6 +26,7 @@ func GenerateImageVariants(cImg image.Image) ([]IdentityImage, error) {
 			Height:       rImg.Bounds().Dy(),
 			FileSize:     bb.Len(),
 			ResizeTarget: int(s),
+			Clock:        uint64(time.Now().UnixMilli()),
 		}
 
 		iis = append(iis, ii)
