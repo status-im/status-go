@@ -11,7 +11,8 @@ from clients.services.wallet import WalletService
 from clients.signals import SignalClient, SignalType
 from clients.status_backend import RpcClient, StatusBackend
 from conftest import option
-from resources.constants import user_1, user_2, DEFAULT_DISPLAY_NAME
+from resources.constants import user_1, user_2
+from resources.enums import MessageContentType
 
 
 class StatusDTestCase:
@@ -151,46 +152,74 @@ class SignalTestCase(StatusDTestCase):
 class NetworkConditionTestCase:
 
     @contextmanager
-    def add_latency(self):
+    def add_latency(self, node, latency=300, jitter=50):
+        logging.info("Entering context manager: add_latency")
+        node.exec_command_in_container(f"apk add iproute2 && tc qdisc add dev eth0 root netem delay {latency}ms {jitter}ms distribution normal")
         try:
-            # TODO: To be implemented when we have docker exec capability
             yield
         finally:
-            pass
+            logging.info("Exiting context manager: add_latency")
+            node.exec_command_in_container("tc qdisc del dev eth0 root")
 
     @contextmanager
-    def add_packet_loss(self):
+    def add_packet_loss(self, node, packet_loss=2):
+        logging.info("Entering context manager: add_packet_loss")
+        node.exec_command_in_container(f"apk add iproute2 && tc qdisc add dev eth0 root netem loss {packet_loss}%")
         try:
-            # TODO: To be implemented when we have docker exec capability
             yield
         finally:
-            pass
+            logging.info("Exiting context manager: add_packet_loss")
+            node.exec_command_in_container("tc qdisc del dev eth0 root netem")
 
     @contextmanager
-    def add_low_bandwith(self):
+    def add_low_bandwith(self, node, rate="1mbit", burst="32kbit"):
+        logging.info("Entering context manager: add_low_bandwith")
+        node.exec_command_in_container(f"apk add iproute2 && tc qdisc add dev eth0 root tbf rate {rate} burst {burst}")
         try:
-            # TODO: To be implemented when we have docker exec capability
             yield
         finally:
-            pass
+            logging.info("Exiting context manager: add_low_bandwith")
+            node.exec_command_in_container("tc qdisc del dev eth0 root")
 
     @contextmanager
     def node_pause(self, node):
+        logging.info("Entering context manager: node_pause")
+        node.pause_container()
         try:
-            # TODO: To be implemented when we have docker exec capability
             yield
         finally:
-            pass
+            logging.info("Exiting context manager: node_pause")
+            node.unpause_container()
 
 
-class OneToOneMessageTestCase(NetworkConditionTestCase):
+class MessengerTestCase(NetworkConditionTestCase):
 
-    def initialize_backend(self, await_signals, display_name=DEFAULT_DISPLAY_NAME):
+    @pytest.fixture(scope="class", autouse=False)
+    def setup_two_nodes(self, request):
+        await_signals = [
+            SignalType.MESSAGES_NEW.value,
+            SignalType.MESSAGE_DELIVERED.value,
+        ]
+        request.cls.sender = self.sender = self.initialize_backend(await_signals=await_signals)
+        request.cls.receiver = self.receiver = self.initialize_backend(await_signals=await_signals)
+
+    def initialize_backend(self, await_signals):
         backend = StatusBackend(await_signals=await_signals)
         backend.init_status_backend()
-        backend.create_account_and_login(display_name=display_name)
-        backend.start_messenger()
+        backend.create_account_and_login()
+        backend.wakuext_service.start_messenger()
         return backend
+
+    def connect_accounts_via_contact_request(self):
+        self.pk_sender = self.sender.accounts_service.get_pubkey(self.sender.display_name)
+        self.pk_receiver = self.receiver.accounts_service.get_pubkey(self.receiver.display_name)
+
+        existing_contacts = self.receiver.wakuext_service.get_contacts()
+
+        if self.pk_sender not in str(existing_contacts):
+            response = self.sender.wakuext_service.send_contact_request(self.pk_receiver, "contact_request")
+            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
+            self.receiver.wakuext_service.accept_contact_request(expected_message.get("id"))
 
     def validate_signal_event_against_response(self, signal_event, fields_to_validate, expected_message):
         expected_message_id = expected_message.get("id")
@@ -218,10 +247,16 @@ class OneToOneMessageTestCase(NetworkConditionTestCase):
             "Details of mismatches:\n" + "\n".join(message_mismatch)
         )
 
-    def get_message_by_content_type(self, response, content_type):
+    def get_message_by_content_type(self, response, content_type, message_pattern=""):
+        matched_messages = []
         messages = response.get("result", {}).get("messages", [])
         for message in messages:
             if message.get("contentType") == content_type:
-                return message
-
-        raise ValueError(f"Failed to find a message with contentType '{content_type}' in response")
+                if message_pattern and message_pattern in str(message):
+                    matched_messages.append(message)
+                else:
+                    matched_messages.append(message)
+        if matched_messages:
+            return matched_messages
+        else:
+            raise ValueError(f"Failed to find a message with contentType '{content_type}' in response")

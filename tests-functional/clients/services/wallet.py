@@ -9,3 +9,6 @@ class WalletService(Service):
     def get_balances_at_by_chain(self, chains: list, addresses: list, tokens: list):
         params = [chains, addresses, tokens]
         return self.rpc_request("getBalancesByChain", params)
+
+    def start_wallet(self):
+        return self.rpc_request("startWallet")

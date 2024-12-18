@@ -1,35 +1,24 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from test_cases import OneToOneMessageTestCase
-from resources.constants import DEFAULT_DISPLAY_NAME
+from test_cases import MessengerTestCase
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 
 
-@pytest.mark.rpc
-class TestOneToOneMessages(OneToOneMessageTestCase):
-
-    @pytest.fixture(scope="class", autouse=True)
-    def setup_nodes(self, request):
-        await_signals = [
-            SignalType.MESSAGES_NEW.value,
-            SignalType.MESSAGE_DELIVERED.value,
-        ]
-        request.cls.sender = self.sender = self.initialize_backend(await_signals=await_signals)
-        request.cls.receiver = self.receiver = self.initialize_backend(await_signals=await_signals)
+@pytest.mark.usefixtures("setup_two_nodes")
+@pytest.mark.reliability
+class TestOneToOneMessages(MessengerTestCase):
 
     @pytest.mark.dependency(name="test_one_to_one_message_baseline")
     def test_one_to_one_message_baseline(self, message_count=1):
-        pk_receiver = self.receiver.get_pubkey(DEFAULT_DISPLAY_NAME)
-
-        self.sender.send_contact_request(pk_receiver, "contact_request")
+        pk_receiver = self.receiver.accounts_service.get_pubkey(self.receiver.display_name)
 
         sent_messages = []
         for i in range(message_count):
             message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.send_message(pk_receiver, message_text)
-            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)
+            response = self.sender.wakuext_service.send_message(pk_receiver, message_text)
+            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
             sent_messages.append(expected_message)
             sleep(0.01)
 
@@ -52,29 +41,33 @@ class TestOneToOneMessages(OneToOneMessageTestCase):
     @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
     @pytest.mark.skip(reason="Skipping until add_latency is implemented")
     def test_one_to_one_message_with_latency(self):
-        with self.add_latency():
-            self.test_one_to_one_message_baseline()
+        # with self.add_latency():
+        #     self.test_one_to_one_message_baseline()
+        # to be done in the next PR
+        pass
 
     @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
     @pytest.mark.skip(reason="Skipping until add_packet_loss is implemented")
     def test_one_to_one_message_with_packet_loss(self):
-        with self.add_packet_loss():
-            self.test_one_to_one_message_baseline()
+        # with self.add_packet_loss():
+        #     self.test_one_to_one_message_baseline()
+        # to be done in the next PR
+        pass
 
     @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
     @pytest.mark.skip(reason="Skipping until add_low_bandwith is implemented")
     def test_one_to_one_message_with_low_bandwidth(self):
-        with self.add_low_bandwith():
-            self.test_one_to_one_message_baseline()
+        # with self.add_low_bandwith():
+        #     self.test_one_to_one_message_baseline()
+        # to be done in the next PR
+        pass
 
     @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
-    @pytest.mark.skip(reason="Skipping until node_pause is implemented")
     def test_one_to_one_message_with_node_pause_30_seconds(self):
-        pk_receiver = self.receiver.get_pubkey("Receiver")
-        self.sender.send_contact_request(pk_receiver, "contact_request")
+        pk_receiver = self.receiver.accounts_service.get_pubkey(self.receiver.display_name)
         with self.node_pause(self.receiver):
             message_text = f"test_message_{uuid4()}"
-            self.sender.send_message(pk_receiver, message_text)
+            self.sender.wakuext_service.send_message(pk_receiver, message_text)
             sleep(30)
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
-        self.sender.wait_for_signal("messages.delivered")
+        self.sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)

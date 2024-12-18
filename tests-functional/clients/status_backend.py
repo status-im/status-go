@@ -1,13 +1,17 @@
 import json
 import logging
+import string
+import subprocess
 import time
 import random
 import threading
 import requests
 import docker
 import os
-
-from tenacity import retry, stop_after_delay, wait_fixed
+from clients.services.wallet import WalletService
+from clients.services.wakuext import WakuextService
+from clients.services.accounts import AccountService
+from clients.services.settings import SettingsService
 from clients.signals import SignalClient
 from clients.rpc import RpcClient
 from datetime import datetime
@@ -45,6 +49,11 @@ class StatusBackend(RpcClient, SignalClient):
         websocket_thread.daemon = True
         websocket_thread.start()
 
+        self.wallet_service = WalletService(self)
+        self.wakuext_service = WakuextService(self)
+        self.accounts_service = AccountService(self)
+        self.settings_service = SettingsService(self)
+
     def _start_container(self, host_port):
         docker_project_name = option.docker_project_name
 
@@ -57,6 +66,7 @@ class StatusBackend(RpcClient, SignalClient):
         container_args = {
             "image": image_name,
             "detach": True,
+            "privileged": True,
             "name": container_name,
             "labels": {"com.docker.compose.project": docker_project_name},
             "entrypoint": [
@@ -156,14 +166,17 @@ class StatusBackend(RpcClient, SignalClient):
     def create_account_and_login(
         self,
         data_dir=USER_DIR,
-        display_name=DEFAULT_DISPLAY_NAME,
+        display_name=None,
         password=user_1.password,
     ):
+        self.display_name = (
+            display_name if display_name else f"DISP_NAME_{''.join(random.choices(string.ascii_letters + string.digits + '_-', k=10))}"
+        )
         method = "CreateAccountAndLogin"
         data = {
             "rootDataDir": data_dir,
             "kdfIterations": 256000,
-            "displayName": display_name,
+            "displayName": self.display_name,
             "password": password,
             "customizationColor": "primary",
             "logEnabled": True,
@@ -230,72 +243,35 @@ class StatusBackend(RpcClient, SignalClient):
         # ToDo: change this part for waiting for `node.login` signal when websockets are migrated to StatusBackend
         while time.time() - start_time <= timeout:
             try:
-                self.rpc_valid_request(method="accounts_getKeypairs")
+                self.accounts_service.get_account_keypairs()
                 return
             except AssertionError:
                 time.sleep(3)
         raise TimeoutError(f"RPC client was not started after {timeout} seconds")
 
-    @retry(stop=stop_after_delay(10), wait=wait_fixed(0.5), reraise=True)
-    def start_messenger(self, params=[]):
-        method = "wakuext_startMessenger"
-        response = self.rpc_request(method, params)
-        json_response = response.json()
+    def pause_container(self):
+        if not self.container:
+            raise RuntimeError("Container is not initialized.")
+        self.container.pause()
+        logging.info(f"Container {self.container.name} paused.")
 
-        if "error" in json_response:
-            assert json_response["error"]["code"] == -32000
-            assert json_response["error"]["message"] == "messenger already started"
-            return
+    def unpause_container(self):
+        if not self.container:
+            raise RuntimeError("Container is not initialized.")
+        self.container.unpause()
+        logging.info(f"Container {self.container.name} unpaused.")
 
-        self.verify_is_valid_json_rpc_response(response)
-
-    def start_wallet(self, params=[]):
-        method = "wallet_startWallet"
-        response = self.rpc_request(method, params)
-        self.verify_is_valid_json_rpc_response(response)
-
-    def get_settings(self, params=[]):
-        method = "settings_getSettings"
-        response = self.rpc_request(method, params)
-        self.verify_is_valid_json_rpc_response(response)
-
-    def get_accounts(self, params=[]):
-        method = "accounts_getAccounts"
-        response = self.rpc_request(method, params)
-        self.verify_is_valid_json_rpc_response(response)
-        return response.json()
-
-    def get_pubkey(self, display_name):
-        response = self.get_accounts()
-        accounts = response.get("result", [])
-        for account in accounts:
-            if account.get("name") == display_name:
-                return account.get("public-key")
-        raise ValueError(f"Public key not found for display name: {display_name}")
-
-    def send_contact_request(self, contact_id: str, message: str):
-        method = "wakuext_sendContactRequest"
-        params = [{"id": contact_id, "message": message}]
-        response = self.rpc_request(method, params)
-        self.verify_is_valid_json_rpc_response(response)
-        return response.json()
-
-    def accept_contact_request(self, chat_id: str):
-        method = "wakuext_acceptContactRequest"
-        params = [{"id": chat_id}]
-        response = self.rpc_request(method, params)
-        self.verify_is_valid_json_rpc_response(response)
-        return response.json()
-
-    def get_contacts(self):
-        method = "wakuext_contacts"
-        response = self.rpc_request(method)
-        self.verify_is_valid_json_rpc_response(response)
-        return response.json()
-
-    def send_message(self, contact_id: str, message: str):
-        method = "wakuext_sendOneToOneMessage"
-        params = [{"id": contact_id, "message": message}]
-        response = self.rpc_request(method, params)
-        self.verify_is_valid_json_rpc_response(response)
-        return response.json()
+    def exec_command_in_container(self, command):
+        try:
+            result = subprocess.run(
+                ["docker", "exec", "-it", self.container.id, "sh", "-c", command],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"Failed to execute command in container {self.container.id}:\n" f"STDOUT: {e.stdout.strip()}\n" f"STDERR: {e.stderr.strip()}"
+            ) from e

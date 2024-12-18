@@ -1,14 +1,13 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from test_cases import OneToOneMessageTestCase
-from resources.constants import DEFAULT_DISPLAY_NAME
+from test_cases import MessengerTestCase
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 
 
-@pytest.mark.rpc
-class TestContactRequests(OneToOneMessageTestCase):
+@pytest.mark.reliability
+class TestContactRequests(MessengerTestCase):
 
     @pytest.mark.dependency(name="test_contact_request_baseline")
     def test_contact_request_baseline(self, execution_number=1):
@@ -23,16 +22,16 @@ class TestContactRequests(OneToOneMessageTestCase):
         sender = self.initialize_backend(await_signals=await_signals)
         receiver = self.initialize_backend(await_signals=await_signals)
 
-        pk_sender = sender.get_pubkey(DEFAULT_DISPLAY_NAME)
-        pk_receiver = receiver.get_pubkey(DEFAULT_DISPLAY_NAME)
+        pk_sender = sender.accounts_service.get_pubkey(sender.display_name)
+        pk_receiver = receiver.accounts_service.get_pubkey(receiver.display_name)
 
-        existing_contacts = receiver.get_contacts()
+        existing_contacts = receiver.wakuext_service.get_contacts()
 
         if pk_sender in str(existing_contacts):
             pytest.skip("Contact request was already sent for this sender<->receiver. Skipping test!!")
 
-        response = sender.send_contact_request(pk_receiver, message_text)
-        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)
+        response = sender.wakuext_service.send_contact_request(pk_receiver, message_text)
+        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
 
         messages_new_event = receiver.find_signal_containing_pattern(
             SignalType.MESSAGES_NEW.value,
@@ -67,23 +66,28 @@ class TestContactRequests(OneToOneMessageTestCase):
     @pytest.mark.dependency(depends=["test_contact_request_baseline"])
     @pytest.mark.skip(reason="Skipping until add_latency is implemented")
     def test_contact_request_with_latency(self):
-        with self.add_latency():
-            self.test_contact_request_baseline()
+        # with self.add_latency():
+        #     self.test_contact_request_baseline()
+        # to be done in the next PR
+        pass
 
     @pytest.mark.dependency(depends=["test_contact_request_baseline"])
     @pytest.mark.skip(reason="Skipping until add_packet_loss is implemented")
     def test_contact_request_with_packet_loss(self):
-        with self.add_packet_loss():
-            self.test_contact_request_baseline()
+        # with self.add_packet_loss():
+        #     self.test_contact_request_baseline()
+        # to be done in the next PR
+        pass
 
     @pytest.mark.dependency(depends=["test_contact_request_baseline"])
     @pytest.mark.skip(reason="Skipping until add_low_bandwith is implemented")
     def test_contact_request_with_low_bandwidth(self):
-        with self.add_low_bandwith():
-            self.test_contact_request_baseline()
+        # with self.add_low_bandwith():
+        #     self.test_contact_request_baseline()
+        # to be done in the next PR
+        pass
 
     @pytest.mark.dependency(depends=["test_contact_request_baseline"])
-    @pytest.mark.skip(reason="Skipping until node_pause is implemented")
     def test_contact_request_with_node_pause_30_seconds(self):
         await_signals = [
             SignalType.MESSAGES_NEW.value,
@@ -91,11 +95,11 @@ class TestContactRequests(OneToOneMessageTestCase):
         ]
         sender = self.initialize_backend(await_signals=await_signals)
         receiver = self.initialize_backend(await_signals=await_signals)
-        pk_receiver = receiver.get_pubkey(DEFAULT_DISPLAY_NAME)
+        pk_receiver = receiver.accounts_service.get_pubkey(receiver.display_name)
 
         with self.node_pause(receiver):
             message_text = f"test_contact_request_{uuid4()}"
-            sender.send_contact_request(pk_receiver, message_text)
+            sender.wakuext_service.send_contact_request(pk_receiver, message_text)
             sleep(30)
         receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
-        sender.wait_for_signal("messages.delivered")
+        sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
