@@ -44,53 +44,45 @@ class TestInitialiseApp:
         )
 
 
+def assert_file_first_line(path, pattern: str, expected: bool):
+    if not expected:
+        assert path is None
+        return
+    assert os.path.exists(path)
+    with open(path) as file:
+        line = file.readline()
+        line_found = line.find(pattern) >= 0
+        assert line_found == expected
+
 @pytest.mark.rpc
-class TestInitializeLogging:
+@pytest.mark.init
+@pytest.mark.parametrize("log_enabled,api_logging_enabled", [(True, True), (False, False)])
+def test_check_logs(log_enabled: bool, api_logging_enabled: bool):
+    data_dir = os.path.join(USER_DIR, "data")
+    logs_dir = os.path.join(USER_DIR, "logs")
 
-    @pytest.mark.init
-    def test_init_logging(self):
-        self.check_logs(log_enabled=True, api_logging_enabled=True)
+    backend = StatusBackend()
+    backend.api_valid_request(
+        "InitializeApplication",
+        {
+            "dataDir": str(data_dir),
+            "logDir": str(logs_dir),
+            "logEnabled": log_enabled,
+            "apiLoggingEnabled": api_logging_enabled,
+        },
+    )
 
-    @pytest.mark.init
-    def test_no_logging(self):
-        self.check_logs(log_enabled=False, api_logging_enabled=False)
+    local_geth_log = backend.load_statusgo_data(os.path.join(logs_dir, "geth.log"))
+    local_api_log = backend.load_statusgo_data(os.path.join(logs_dir, "api.log"))
 
-    def assert_file_first_line(self, path, pattern: str, expected: bool):
-        if not expected:
-            assert path is None
-            return
-        assert os.path.exists(path)
-        with open(path) as file:
-            line = file.readline()
-            line_found = line.find(pattern) >= 0
-            assert line_found == expected
+    assert_file_first_line(
+        path=local_geth_log,
+        pattern="logging initialised",
+        expected=log_enabled
+    )
 
-    def check_logs(self, log_enabled: bool, api_logging_enabled: bool):
-        data_dir = os.path.join(USER_DIR, "data")
-        logs_dir = os.path.join(USER_DIR, "logs")
-
-        backend = StatusBackend()
-        backend.api_valid_request(
-            "InitializeApplication",
-            {
-                "dataDir": str(data_dir),
-                "logDir": str(logs_dir),
-                "logEnabled": log_enabled,
-                "apiLoggingEnabled": api_logging_enabled,
-            },
-        )
-
-        local_geth_log = backend.load_statusgo_data(os.path.join(logs_dir, "geth.log"))
-        local_api_log = backend.load_statusgo_data(os.path.join(logs_dir, "api.log"))
-
-        self.assert_file_first_line(
-            path=local_geth_log,
-            pattern="logging initialised",
-            expected=log_enabled
-        )
-
-        self.assert_file_first_line(
-            path=local_api_log,
-            pattern='"method": "InitializeApplication"',
-            expected=api_logging_enabled,
-        )
+    assert_file_first_line(
+        path=local_api_log,
+        pattern='"method": "InitializeApplication"',
+        expected=api_logging_enabled,
+    )
