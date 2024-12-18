@@ -1,5 +1,8 @@
+import io
 import json
 import logging
+import tarfile
+import tempfile
 import time
 import random
 import threading
@@ -18,6 +21,8 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 
 
 class StatusBackend(RpcClient, SignalClient):
+
+    container = None
 
     def __init__(self, await_signals=[]):
 
@@ -152,6 +157,27 @@ class StatusBackend(RpcClient, SignalClient):
         data["StatusProxyEnabled"] = True
         data["StatusProxyStageName"] = "test"
         return data
+
+    def load_statusgo_data(self, path: str):
+        if not self.container:
+            return path
+
+        try:
+            stream, _ = self.container.get_archive(path)
+        except docker.errors.NotFound:
+            return None
+
+        temp_dir = tempfile.mkdtemp()
+        tar_bytes = io.BytesIO(b"".join(stream))
+
+        with tarfile.open(fileobj=tar_bytes) as tar:
+            tar.extractall(path=temp_dir)
+            # If the tar contains a single file, return the path to that file
+            # Otherwise it's a directory, just return temp_dir.
+            if len(tar.getmembers()) == 1:
+                return os.path.join(temp_dir, tar.getmembers()[0].name)
+
+        return temp_dir
 
     def create_account_and_login(
         self,
