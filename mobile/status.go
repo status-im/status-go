@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path"
 	"runtime"
+	"time"
 	"unsafe"
 
 	"go.uber.org/zap"
@@ -29,6 +32,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/requestlog"
+	"github.com/status-im/status-go/mobile/callog"
 	m_requests "github.com/status-im/status-go/mobile/requests"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -49,11 +53,6 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
-
-	"path"
-	"time"
-
-	"github.com/status-im/status-go/mobile/callog"
 )
 
 func call(fn any, params ...any) any {
@@ -106,6 +105,11 @@ func initializeApplication(requestJSON string) string {
 	providers.MixpanelAppID = request.MixpanelAppID
 	providers.MixpanelToken = request.MixpanelToken
 
+	err = os.MkdirAll(request.DataDir, 0700)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
 	statusBackend.StatusNode().SetMediaServerEnableTLS(request.MediaServerEnableTLS)
 	statusBackend.UpdateRootDataDir(request.DataDir)
 
@@ -153,7 +157,12 @@ func initializeLogging(request *requests.InitializeApplication) error {
 		File:    path.Join(request.LogDir, api.DefaultLogFile),
 	}
 
-	err := logutils.OverrideRootLoggerWithConfig(logSettings)
+	err := os.MkdirAll(request.LogDir, 0700)
+	if err != nil {
+		return err
+	}
+
+	err = logutils.OverrideRootLoggerWithConfig(logSettings)
 	if err != nil {
 		return err
 	}
