@@ -221,6 +221,9 @@ type Message struct {
 	ContactVerificationState ContactVerificationState `json:"contactVerificationState,omitempty"`
 
 	DiscordMessage *protobuf.DiscordMessage `json:"discordMessage,omitempty"`
+
+	// When a message is pinned, the pubkey of the user that pinned it is stored here
+	PinnedBy string `json:"pinnedBy,omitempty"`
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
@@ -284,6 +287,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		DiscordMessage           *protobuf.DiscordMessage         `json:"discordMessage,omitempty"`
 		BridgeMessage            *protobuf.BridgeMessage          `json:"bridgeMessage,omitempty"`
 		PaymentRequests          []*protobuf.PaymentRequest       `json:"paymentRequests,omitempty"`
+		PinnedBy                 string                           `json:"pinnedBy,omitempty"`
 	}
 	item := MessageStructType{
 		ID:                       m.ID,
@@ -327,6 +331,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ContactRequestState:      m.ContactRequestState,
 		ContactVerificationState: m.ContactVerificationState,
 		PaymentRequests:          m.PaymentRequests,
+		PinnedBy:                 m.PinnedBy,
 	}
 
 	if sticker := m.GetSticker(); sticker != nil {

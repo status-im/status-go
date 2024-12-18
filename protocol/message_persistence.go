@@ -36,6 +36,8 @@ LEFT JOIN bridge_messages bm
 ON        m1.id = bm.user_messages_id
 LEFT JOIN bridge_messages bm_response
 ON        m2.id = bm_response.user_messages_id
+LEFT JOIN pin_messages pm
+ON 	      m1.id = pm.message_id AND pm.pinned = 1
 `
 
 var basicInsertDiscordMessageAuthorQuery = `INSERT OR REPLACE INTO discord_message_authors(id,name,discriminator,nickname,avatar_url, avatar_image_payload) VALUES (?,?,?,?,?,?)`
@@ -135,6 +137,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
     		m1.seen,
     		m1.outgoing_status,
 		m1.parsed_text,
+		pm.pinned_by,
 		m1.sticker_pack,
 		m1.sticker_hash,
 		m1.image_payload,
@@ -257,6 +260,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var deletedForMe sql.NullBool
 	var contactRequestState sql.NullInt64
 	var contactVerificationState sql.NullInt64
+	var pinnedBy sql.NullString
 
 	sticker := &protobuf.StickerMessage{}
 	command := &common.CommandParameters{}
@@ -292,6 +296,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.Seen,
 		&message.OutgoingStatus,
 		&message.ParsedText,
+		&pinnedBy,
 		&sticker.Pack,
 		&sticker.Hash,
 		&image.Payload,
@@ -403,6 +408,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if contactVerificationState.Valid {
 		message.ContactVerificationState = common.ContactVerificationState(contactVerificationState.Int64)
+	}
+
+	if pinnedBy.Valid {
+		message.PinnedBy = pinnedBy.String
 	}
 
 	if quotedText.Valid {
@@ -1199,7 +1208,6 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
  			SELECT
  				%s,
  				pm.clock_value as pinnedAt,
- 				pm.pinned_by as pinnedBy,
                                 %s
  			FROM
  				pin_messages pm
@@ -2940,18 +2948,17 @@ func getPinnedMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Row
 	for rows.Next() {
 		var (
 			pinnedAt uint64
-			pinnedBy string
 			cursor   string
 		)
 		message := common.NewMessage()
-		if err := db.tableUserMessagesScanAllFields(rows, message, &pinnedAt, &pinnedBy, &cursor); err != nil {
+		if err := db.tableUserMessagesScanAllFields(rows, message, &pinnedAt, &cursor); err != nil {
 			return nil, nil, err
 		}
 		if msg, ok := messageIdx[message.ID]; !ok {
 			pinnedMessage := &common.PinnedMessage{
 				Message:  message,
 				PinnedAt: pinnedAt,
-				PinnedBy: pinnedBy,
+				PinnedBy: message.PinnedBy,
 			}
 			messageIdx[message.ID] = pinnedMessage
 			messages = append(messages, pinnedMessage)

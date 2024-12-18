@@ -476,6 +476,23 @@ func TestPinMessageByChatID(t *testing.T) {
 	for i := 0; i < len(result)-1; i++ {
 		require.Equal(t, testPK, result[i].PinnedBy)
 	}
+
+	// The Message itself should have the pinnedBy field
+	pinnedMessageID := result[len(result)-1].Message.ID
+
+	m, err := p.MessagesByIDs([]string{pinnedMessageID})
+	require.NoError(t, err)
+	require.Len(t, m, 1)
+	require.Equal(t, "them", m[0].PinnedBy)
+
+	msgs, _, err := p.MessageByChatID(chatID, cursor, 10)
+	require.NoError(t, err)
+	require.Len(t, msgs, 10)
+	for _, msg := range msgs {
+		if msg.ID == pinnedMessageID {
+			require.Equal(t, "them", msg.PinnedBy)
+		}
+	}
 }
 
 func TestMessageReplies(t *testing.T) {
