@@ -54,8 +54,8 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 	address, tx, _, err := collectibles.DeployCollectibles(transactOpts, ethClient, deploymentParameters.Name,
 		deploymentParameters.Symbol, deploymentParameters.GetSupply(),
 		deploymentParameters.RemoteSelfDestruct, deploymentParameters.Transferable,
-		deploymentParameters.TokenURI, common.HexToAddress(deploymentParameters.OwnerTokenAddress),
-		common.HexToAddress(deploymentParameters.MasterTokenAddress))
+		deploymentParameters.TokenURI, deploymentParameters.OwnerTokenAddress,
+		deploymentParameters.MasterTokenAddress)
 	if err != nil {
 		logutils.ZapLogger().Error(err.Error())
 		return responses.DeploymentDetails{}, err
@@ -229,8 +229,8 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 	address, tx, _, err := assets.DeployAssets(transactOpts, ethClient, deploymentParameters.Name,
 		deploymentParameters.Symbol, decimals, deploymentParameters.GetSupply(),
 		deploymentParameters.TokenURI,
-		common.HexToAddress(deploymentParameters.OwnerTokenAddress),
-		common.HexToAddress(deploymentParameters.MasterTokenAddress))
+		deploymentParameters.OwnerTokenAddress,
+		deploymentParameters.MasterTokenAddress)
 	if err != nil {
 		logutils.ZapLogger().Error(err.Error())
 		return responses.DeploymentDetails{}, err

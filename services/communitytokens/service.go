@@ -142,7 +142,7 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 			errorStr = tokenErr.Error()
 		}
 
-		signal.SendCommunityTokenTransactionStatusSignal(string(pendingTransaction.Type), p.Status == transactions.Success, pendingTransaction.Hash,
+		signal.SendCommunityTokenTransactionStatusSignal(0, p.Status == transactions.Success, pendingTransaction.Hash,
 			communityToken, ownerToken, masterToken, errorStr)
 	}
 }

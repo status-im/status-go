@@ -6,6 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/services/wallet/router/fees"
+
+	"gopkg.in/go-playground/validator.v9"
 )
 
 var (
@@ -14,11 +16,21 @@ var (
 )
 
 type PathTxCustomParams struct {
-	GasFeeMode    fees.GasFeeMode `json:"gasFeeMode" validate:"required"`
+	GasFeeMode    fees.GasFeeMode `json:"gasFeeMode" validate:"gasFeeModeValid"`
 	Nonce         uint64          `json:"nonce"`
 	GasAmount     uint64          `json:"gasAmount"`
 	MaxFeesPerGas *hexutil.Big    `json:"maxFeesPerGas"`
 	PriorityFee   *hexutil.Big    `json:"priorityFee"`
+}
+
+func gasFeeModeValid(fl validator.FieldLevel) bool {
+	mode := fl.Field().Interface().(fees.GasFeeMode)
+	switch mode {
+	case fees.GasFeeLow, fees.GasFeeMedium, fees.GasFeeHigh, fees.GasFeeCustom:
+		return true
+	default:
+		return false
+	}
 }
 
 type PathTxIdentity struct {
@@ -26,17 +38,32 @@ type PathTxIdentity struct {
 	PathName              string `json:"pathName" validate:"required"`
 	ChainID               uint64 `json:"chainID" validate:"required"`
 	IsApprovalTx          bool   `json:"isApprovalTx"`
+	CommunityID           string `json:"communityId"`
 }
 
 func (p *PathTxIdentity) PathIdentity() string {
-	return fmt.Sprintf("%s-%s-%d", p.RouterInputParamsUuid, p.PathName, p.ChainID)
+	return fmt.Sprintf("%s-%s-%d-%s", p.RouterInputParamsUuid, p.PathName, p.ChainID, p.CommunityID)
 }
 
 func (p *PathTxIdentity) TxIdentityKey() string {
 	return fmt.Sprintf("%s-%v", p.PathIdentity(), p.IsApprovalTx)
 }
 
+func (p *PathTxIdentity) Validate() error {
+	validate := validator.New()
+	return validate.Struct(p)
+}
+
 func (p *PathTxCustomParams) Validate() error {
+	validate := validator.New()
+	err := validate.RegisterValidation("gasFeeModeValid", gasFeeModeValid)
+	if err != nil {
+		return err
+	}
+	err = validate.Struct(p)
+	if err != nil {
+		return err
+	}
 	if p.GasFeeMode != fees.GasFeeCustom {
 		return nil
 	}

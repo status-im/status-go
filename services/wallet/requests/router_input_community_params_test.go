@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -17,37 +18,37 @@ func TestDeploymentParameters(t *testing.T) {
 	}{
 		{
 			name:       "emptyName",
-			parameters: DeploymentParameters{"", "SYMBOL", &bigint.BigInt{Int: big.NewInt(int64(123))}, false, false, false, "", "", "", "", "", nil, "", 0},
+			parameters: DeploymentParameters{"", "SYMBOL", &bigint.BigInt{Int: big.NewInt(int64(123))}, false, false, false, "", common.Address{}, common.Address{}, "", "", nil, "", 0},
 			isError:    true,
 		},
 		{
 			name:       "emptySymbol",
-			parameters: DeploymentParameters{"NAME", "", &bigint.BigInt{Int: big.NewInt(123)}, false, false, false, "", "", "", "", "", nil, "", 0},
+			parameters: DeploymentParameters{"NAME", "", &bigint.BigInt{Int: big.NewInt(123)}, false, false, false, "", common.Address{}, common.Address{}, "", "", nil, "", 0},
 			isError:    true,
 		},
 		{
 			name:       "negativeSupply",
-			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(-123)}, false, false, false, "", "", "", "", "", nil, "", 0},
+			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(-123)}, false, false, false, "", common.Address{}, common.Address{}, "", "", nil, "", 0},
 			isError:    true,
 		},
 		{
 			name:       "zeroSupply",
-			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(0)}, false, false, false, "", "", "", "", "", nil, "", 0},
+			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(0)}, false, false, false, "", common.Address{}, common.Address{}, "", "", nil, "", 0},
 			isError:    false,
 		},
 		{
 			name:       "negativeSupplyAndInfinite",
-			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(-123)}, true, false, false, "", "", "", "", "", nil, "", 0},
+			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(-123)}, true, false, false, "", common.Address{}, common.Address{}, "", "", nil, "", 0},
 			isError:    false,
 		},
 		{
 			name:       "supplyGreaterThanMax",
-			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(maxSupply + 1)}, false, false, false, "", "", "", "", "", nil, "", 0},
+			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(maxSupply + 1)}, false, false, false, "", common.Address{}, common.Address{}, "", "", nil, "", 0},
 			isError:    true,
 		},
 		{
 			name:       "supplyIsMax",
-			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(maxSupply)}, false, false, false, "", "", "", "", "", nil, "", 0},
+			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(maxSupply)}, false, false, false, "", common.Address{}, common.Address{}, "", "", nil, "", 0},
 			isError:    false,
 		},
 	}
@@ -63,10 +64,10 @@ func TestDeploymentParameters(t *testing.T) {
 		})
 	}
 
-	notInfiniteSupplyParams := DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(123)}, false, false, false, "", "", "", "", "", nil, "", 0}
+	notInfiniteSupplyParams := DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(123)}, false, false, false, "", common.Address{}, common.Address{}, "", "", nil, "", 0}
 	requiredSupply := big.NewInt(123)
 	require.Equal(t, notInfiniteSupplyParams.GetSupply(), requiredSupply)
-	infiniteSupplyParams := DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(123)}, true, false, false, "", "", "", "", "", nil, "", 0}
+	infiniteSupplyParams := DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(123)}, true, false, false, "", common.Address{}, common.Address{}, "", "", nil, "", 0}
 	requiredSupply = infiniteSupplyParams.GetInfiniteSupply()
 	require.Equal(t, infiniteSupplyParams.GetSupply(), requiredSupply)
 }
