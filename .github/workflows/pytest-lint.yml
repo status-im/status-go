@@ -3,7 +3,8 @@ name: Pytest Lint
 on:
   pull_request:
     branches:
-      - master
+      - develop
+      - release/**
   push:
     branches:
       - "test-linting"
