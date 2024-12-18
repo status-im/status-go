@@ -24,7 +24,7 @@ class TestInitialiseApp:
 
         assert backend_client is not None
         backend_client.verify_json_schema(
-            backend_client.wait_for_login(), 
+            backend_client.wait_for_login(),
             "signal_node_login",
         )
         backend_client.verify_json_schema(

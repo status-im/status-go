@@ -93,10 +93,9 @@ class StatusBackend(RpcClient, SignalClient):
                 self.health(enable_logging=False)
                 logging.info(f"StatusBackend is healthy after {time.time() - start_time} seconds")
                 return
-            except Exception as e:
+            except Exception:
                 time.sleep(0.1)
-        raise TimeoutError(
-            f"StatusBackend was not healthy after {timeout} seconds")
+        raise TimeoutError(f"StatusBackend was not healthy after {timeout} seconds")
 
     def health(self, enable_logging=True):
         return self.api_request("health", data=[], url=self.base_url, enable_logging=enable_logging)
@@ -139,7 +138,7 @@ class StatusBackend(RpcClient, SignalClient):
         return self.api_valid_request(method, data)
 
     def _set_proxy_credentials(self, data):
-        if not "STATUS_BUILD_PROXY_USER" in os.environ:
+        if "STATUS_BUILD_PROXY_USER" not in os.environ:
             return data
 
         user = os.environ["STATUS_BUILD_PROXY_USER"]
