@@ -1,3 +1,6 @@
+import docker.errors
+
+from resources.constants import USER_DIR
 from test_cases import StatusBackend
 import pytest
 from clients.signals import SignalType
@@ -42,32 +45,29 @@ class TestInitialiseApp:
 
 
 @pytest.mark.rpc
-@pytest.mark.skip("waiting for status-backend to be executed on the same host/container")
 class TestInitializeLogging:
 
     @pytest.mark.init
-    def test_init_logging(self, tmp_path):
-        self.check_logs(tmp_path, log_enabled=True, api_logging_enabled=True)
+    def test_init_logging(self):
+        self.check_logs(log_enabled=True, api_logging_enabled=True)
 
     @pytest.mark.init
-    def test_no_logging(self, tmp_path):
-        self.check_logs(tmp_path, log_enabled=False, api_logging_enabled=False)
+    def test_no_logging(self):
+        self.check_logs(log_enabled=False, api_logging_enabled=False)
 
     def assert_file_first_line(self, path, pattern: str, expected: bool):
-        assert os.path.exists(path) == expected
         if not expected:
+            assert path is None
             return
+        assert os.path.exists(path)
         with open(path) as file:
             line = file.readline()
             line_found = line.find(pattern) >= 0
             assert line_found == expected
 
-    def check_logs(self, path, log_enabled: bool, api_logging_enabled: bool):
-        data_dir = path / "data"
-        logs_dir = path / "logs"
-
-        data_dir.mkdir()
-        logs_dir.mkdir()
+    def check_logs(self, log_enabled: bool, api_logging_enabled: bool):
+        data_dir = os.path.join(USER_DIR, "data")
+        logs_dir = os.path.join(USER_DIR, "logs")
 
         backend = StatusBackend()
         backend.api_valid_request(
@@ -80,10 +80,17 @@ class TestInitializeLogging:
             },
         )
 
-        self.assert_file_first_line(logs_dir / "geth.log", pattern="logging initialised", expected=log_enabled)
+        local_geth_log = backend.load_statusgo_data(os.path.join(logs_dir, "geth.log"))
+        local_api_log = backend.load_statusgo_data(os.path.join(logs_dir, "api.log"))
 
         self.assert_file_first_line(
-            logs_dir / "api.log",
+            path=local_geth_log,
+            pattern="logging initialised",
+            expected=log_enabled
+        )
+
+        self.assert_file_first_line(
+            path=local_api_log,
             pattern='"method": "InitializeApplication"',
             expected=api_logging_enabled,
         )
