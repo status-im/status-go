@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -73,6 +74,7 @@ type WakuStore struct {
 
 	defaultRatelimit rate.Limit
 	rateLimiters     map[peer.ID]*rate.Limiter
+	rateLimitersMux  sync.Mutex
 }
 
 // NewWakuStore is used to instantiate a StoreV3 client
@@ -297,11 +299,13 @@ func (s *WakuStore) queryFrom(ctx context.Context, storeRequest *pb.StoreQueryRe
 	logger.Debug("sending store request")
 
 	if !params.skipRatelimit {
+		s.rateLimitersMux.Lock()
 		rateLimiter, ok := s.rateLimiters[params.selectedPeer]
 		if !ok {
 			rateLimiter = rate.NewLimiter(s.defaultRatelimit, 1)
 			s.rateLimiters[params.selectedPeer] = rateLimiter
 		}
+		s.rateLimitersMux.Unlock()
 		err := rateLimiter.Wait(ctx)
 		if err != nil {
 			return nil, err

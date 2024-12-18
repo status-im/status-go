@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
@@ -268,6 +269,10 @@ func (wf *WakuFilterLightNode) request(ctx context.Context, requestID []byte,
 		wf.metrics.RecordError(dialFailure)
 		if wf.pm != nil {
 			wf.pm.HandleDialError(err, peerID)
+			if errors.Is(err, swarm.ErrAllDialsFailed) ||
+				errors.Is(err, swarm.ErrDialBackoff) || errors.Is(err, swarm.ErrNoAddresses) {
+				wf.pm.CheckAndRemoveBadPeer(peerID)
+			}
 		}
 		return err
 	}
@@ -356,7 +361,7 @@ func (wf *WakuFilterLightNode) handleFilterSubscribeOptions(ctx context.Context,
 	if params.pm != nil && reqPeerCount > 0 {
 
 		wf.log.Debug("handleFilterSubscribeOptions", zap.Int("peerCount", reqPeerCount), zap.Int("excludePeersLen", len(params.peersToExclude)))
-		params.selectedPeers, err = wf.pm.SelectPeers(
+		selectedPeers, err := wf.pm.SelectPeers(
 			peermanager.PeerSelectionCriteria{
 				SelectionType: params.peerSelectionType,
 				Proto:         FilterSubscribeID_v20beta1,
@@ -369,7 +374,12 @@ func (wf *WakuFilterLightNode) handleFilterSubscribeOptions(ctx context.Context,
 		)
 		if err != nil {
 			wf.log.Error("peer selection returned err", zap.Error(err))
-			return nil, nil, err
+			if len(params.selectedPeers) == 0 {
+				return nil, nil, err
+			}
+		}
+		if len(selectedPeers) > 0 {
+			params.selectedPeers = append(params.selectedPeers, selectedPeers...)
 		}
 	}
 	wf.log.Debug("handleFilterSubscribeOptions exit", zap.Int("selectedPeerCount", len(params.selectedPeers)))

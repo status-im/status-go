@@ -191,7 +191,7 @@ type DialFailure struct {
 }
 
 type MissedMessage struct {
-	Envelope *v2protocol.Envelope
+	Envelope v2common.Envelope
 }
 
 type MissedRelevantMessage struct {

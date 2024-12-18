@@ -16,8 +16,8 @@ import (
 )
 
 const DefaultPeersToPublishForLightpush = 2
-const DefaultPublishingLimiterRate = rate.Limit(2)
-const DefaultPublishingLimitBurst = 4
+const DefaultPublishingLimiterRate = rate.Limit(5)
+const DefaultPublishingLimitBurst = 10
 
 type PublishMethod int
 
