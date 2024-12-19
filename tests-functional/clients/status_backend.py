@@ -1,11 +1,15 @@
+import io
 import json
 import logging
 import string
+import tarfile
+import tempfile
 import time
 import random
 import threading
 import requests
 import docker
+import docker.errors
 import os
 from clients.services.wallet import WalletService
 from clients.services.wakuext import WakuextService
@@ -13,7 +17,6 @@ from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
 from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
-from datetime import datetime
 from conftest import option
 from resources.constants import user_1, DEFAULT_DISPLAY_NAME, USER_DIR
 from docker.errors import APIError
@@ -22,6 +25,8 @@ NANOSECONDS_PER_SECOND = 1_000_000_000
 
 
 class StatusBackend(RpcClient, SignalClient):
+
+    container = None
 
     def __init__(self, await_signals=[], privileged=False):
 
@@ -58,7 +63,7 @@ class StatusBackend(RpcClient, SignalClient):
     def _start_container(self, host_port, privileged):
         docker_project_name = option.docker_project_name
 
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        timestamp = int(time.time() * 1000)  # Keep in sync with run_functional_tests.sh
         image_name = f"{docker_project_name}-status-backend:latest"
         container_name = f"{docker_project_name}-status-backend-{timestamp}"
 
@@ -164,6 +169,27 @@ class StatusBackend(RpcClient, SignalClient):
         data["StatusProxyStageName"] = "test"
         return data
 
+    def extract_data(self, path: str):
+        if not self.container:
+            return path
+
+        try:
+            stream, _ = self.container.get_archive(path)
+        except docker.errors.NotFound:
+            return None
+
+        temp_dir = tempfile.mkdtemp()
+        tar_bytes = io.BytesIO(b"".join(stream))
+
+        with tarfile.open(fileobj=tar_bytes) as tar:
+            tar.extractall(path=temp_dir)
+            # If the tar contains a single file, return the path to that file
+            # Otherwise it's a directory, just return temp_dir.
+            if len(tar.getmembers()) == 1:
+                return os.path.join(temp_dir, tar.getmembers()[0].name)
+
+        return temp_dir
+
     def create_account_and_login(
         self,
         data_dir=USER_DIR,
@@ -265,6 +291,8 @@ class StatusBackend(RpcClient, SignalClient):
         logging.info(f"Container {self.container.name} unpaused.")
 
     def container_exec(self, command):
+        if not self.container:
+            raise RuntimeError("Container is not initialized.")
         try:
             exec_result = self.container.exec_run(cmd=["sh", "-c", command], stdout=True, stderr=True, tty=False)
             if exec_result.exit_code != 0:

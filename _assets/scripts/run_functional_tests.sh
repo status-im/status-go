@@ -24,7 +24,8 @@ mkdir -p "${merged_coverage_reports_path}"
 mkdir -p "${test_results_path}"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.test.status-go.yml"
-project_name="status-go-func-tests-$(date +%s)"
+timestamp=$(python3 -c "import time; print(int(time.time() * 1000))") # Keep in sync with status_backend.py
+project_name="status-go-func-tests-${timestamp}"
 
 export STATUS_BACKEND_URLS=$(eval echo http://${project_name}-status-backend-{1..${STATUS_BACKEND_COUNT}}:3333 | tr ' ' ,)
 
