@@ -1,5 +1,3 @@
-import docker.errors
-
 from resources.constants import USER_DIR
 from test_cases import StatusBackend
 import pytest
@@ -54,6 +52,7 @@ def assert_file_first_line(path, pattern: str, expected: bool):
         line_found = line.find(pattern) >= 0
         assert line_found == expected
 
+
 @pytest.mark.rpc
 @pytest.mark.init
 @pytest.mark.parametrize("log_enabled,api_logging_enabled", [(True, True), (False, False)])
@@ -75,11 +74,7 @@ def test_check_logs(log_enabled: bool, api_logging_enabled: bool):
     local_geth_log = backend.extract_data(os.path.join(logs_dir, "geth.log"))
     local_api_log = backend.extract_data(os.path.join(logs_dir, "api.log"))
 
-    assert_file_first_line(
-        path=local_geth_log,
-        pattern="logging initialised",
-        expected=log_enabled
-    )
+    assert_file_first_line(path=local_geth_log, pattern="logging initialised", expected=log_enabled)
 
     assert_file_first_line(
         path=local_api_log,

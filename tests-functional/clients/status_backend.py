@@ -8,6 +8,7 @@ import random
 import threading
 import requests
 import docker
+import docker.errors
 import os
 
 from tenacity import retry, stop_after_delay, wait_fixed
