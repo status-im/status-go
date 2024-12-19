@@ -216,13 +216,15 @@ class MessengerTestCase(NetworkConditionTestCase):
     def make_contacts(self):
         existing_contacts = self.receiver.wakuext_service.get_contacts()
 
-        if self.sender.public_key not in str(existing_contacts):
-            response = self.sender.wakuext_service.send_contact_request(self.receiver.public_key, "contact_request")
-            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
-            self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"))
-            self.receiver.wakuext_service.accept_contact_request(expected_message.get("id"))
-            accepted_signal = f"@{self.receiver.public_key} accepted your contact request"
-            self.sender.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=accepted_signal)
+        if self.sender.public_key in str(existing_contacts):
+            return
+
+        response = self.sender.wakuext_service.send_contact_request(self.receiver.public_key, "contact_request")
+        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
+        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"))
+        self.receiver.wakuext_service.accept_contact_request(expected_message.get("id"))
+        accepted_signal = f"@{self.receiver.public_key} accepted your contact request"
+        self.sender.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=accepted_signal)
 
     def validate_signal_event_against_response(self, signal_event, fields_to_validate, expected_message):
         expected_message_id = expected_message.get("id")
