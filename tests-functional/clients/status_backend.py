@@ -14,7 +14,6 @@ import os
 from tenacity import retry, stop_after_delay, wait_fixed
 from clients.signals import SignalClient
 from clients.rpc import RpcClient
-from datetime import datetime
 from conftest import option
 from resources.constants import user_1, DEFAULT_DISPLAY_NAME, USER_DIR
 
@@ -54,7 +53,7 @@ class StatusBackend(RpcClient, SignalClient):
     def _start_container(self, host_port):
         docker_project_name = option.docker_project_name
 
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        timestamp = int(time.time() * 1000)  # Keep in sync with run_functional_tests.sh
         image_name = f"{docker_project_name}-status-backend:latest"
         container_name = f"{docker_project_name}-status-backend-{timestamp}"
 
