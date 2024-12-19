@@ -158,7 +158,7 @@ class StatusBackend(RpcClient, SignalClient):
         data["StatusProxyStageName"] = "test"
         return data
 
-    def load_statusgo_data(self, path: str):
+    def extract_data(self, path: str):
         if not self.container:
             return path
 

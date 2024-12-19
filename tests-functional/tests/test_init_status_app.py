@@ -72,8 +72,8 @@ def test_check_logs(log_enabled: bool, api_logging_enabled: bool):
         },
     )
 
-    local_geth_log = backend.load_statusgo_data(os.path.join(logs_dir, "geth.log"))
-    local_api_log = backend.load_statusgo_data(os.path.join(logs_dir, "api.log"))
+    local_geth_log = backend.extract_data(os.path.join(logs_dir, "geth.log"))
+    local_api_log = backend.extract_data(os.path.join(logs_dir, "api.log"))
 
     assert_file_first_line(
         path=local_geth_log,
