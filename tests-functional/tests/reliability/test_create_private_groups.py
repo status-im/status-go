@@ -13,14 +13,14 @@ class TestCreatePrivateGroups(MessengerTestCase):
     @pytest.mark.rpc  # until we have dedicated functional tests for this we can still run this test as part of the functional tests suite
     @pytest.mark.dependency(name="test_create_private_group_baseline")
     def test_create_private_group_baseline(self, private_groups_count=1):
-        self.connect_accounts_via_contact_request()
+        self.make_contacts()
 
         private_groups = []
         for i in range(private_groups_count):
             private_group_name = f"private_group_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.create_group_chat_with_members([self.pk_receiver], private_group_name)
+            response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
 
-            expected_group_creation_msg = f"@{self.pk_sender} created the group {private_group_name}"
+            expected_group_creation_msg = f"@{self.sender.public_key} created the group {private_group_name}"
             expected_message = self.get_message_by_content_type(
                 response, content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value, message_pattern=expected_group_creation_msg
             )[0]
@@ -68,11 +68,10 @@ class TestCreatePrivateGroups(MessengerTestCase):
 
     @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
     def test_create_private_groups_with_node_pause_30_seconds(self):
-        self.connect_accounts_via_contact_request()
+        self.make_contacts()
 
-        sleep(5)  # we need some sleep to make sure that contacts are paired before pausing a node
         with self.node_pause(self.receiver):
             private_group_name = f"private_group_{uuid4()}"
-            self.sender.wakuext_service.create_group_chat_with_members([self.pk_receiver], private_group_name)
+            self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
             sleep(30)
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=private_group_name)

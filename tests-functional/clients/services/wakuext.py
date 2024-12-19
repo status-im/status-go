@@ -1,6 +1,5 @@
 from clients.rpc import RpcClient
 from clients.services.service import Service
-from tenacity import retry, stop_after_delay, wait_fixed
 
 
 class WakuextService(Service):
@@ -12,15 +11,10 @@ class WakuextService(Service):
         response = self.rpc_request("sendContactRequest", params)
         return response.json()
 
-    def accept_contact_request(self, chat_id: str, retry_timeout: int = 10):
-        params = [{"id": chat_id}]
-
-        @retry(stop=stop_after_delay(retry_timeout), wait=wait_fixed(0.5), reraise=True)
-        def make_request():
-            response = self.rpc_request("acceptContactRequest", params)
-            return response.json()
-
-        return make_request()
+    def accept_contact_request(self, request_id: str):
+        params = [{"id": request_id}]
+        response = self.rpc_request("acceptContactRequest", params)
+        return response.json()
 
     def get_contacts(self):
         response = self.rpc_request("contacts")
@@ -31,27 +25,16 @@ class WakuextService(Service):
         response = self.rpc_request("sendOneToOneMessage", params)
         return response.json()
 
-    @retry(stop=stop_after_delay(10), wait=wait_fixed(0.5), reraise=True)
-    def start_messenger(self, retry_timeout: int = 10):
+    def start_messenger(self):
+        response = self.rpc_request("startMessenger")
+        json_response = response.json()
 
-        @retry(stop=stop_after_delay(retry_timeout), wait=wait_fixed(0.5), reraise=True)
-        def make_request():
-            response = self.rpc_request("startMessenger")
-            json_response = response.json()
+        if "error" in json_response:
+            assert json_response["error"]["code"] == -32000
+            assert json_response["error"]["message"] == "messenger already started"
+            return
 
-            if "error" in json_response:
-                assert json_response["error"]["code"] == -32000
-                assert json_response["error"]["message"] == "messenger already started"
-                return
-
-        make_request()
-
-    def create_group_chat_with_members(self, pubkey_list: list, group_chat_name: str, retry_timeout: int = 10):
+    def create_group_chat_with_members(self, pubkey_list: list, group_chat_name: str):
         params = [None, group_chat_name, pubkey_list]
-
-        @retry(stop=stop_after_delay(retry_timeout), wait=wait_fixed(0.5), reraise=True)
-        def make_request():
-            response = self.rpc_request("createGroupChatWithMembers", params)
-            return response.json()
-
-        return make_request()
+        response = self.rpc_request("createGroupChatWithMembers", params)
+        return response.json()

@@ -13,12 +13,10 @@ class TestOneToOneMessages(MessengerTestCase):
     @pytest.mark.rpc  # until we have dedicated functional tests for this we can still run this test as part of the functional tests suite
     @pytest.mark.dependency(name="test_one_to_one_message_baseline")
     def test_one_to_one_message_baseline(self, message_count=1):
-        pk_receiver = self.receiver.accounts_service.get_pubkey(self.receiver.display_name)
-
         sent_messages = []
         for i in range(message_count):
             message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.send_message(pk_receiver, message_text)
+            response = self.sender.wakuext_service.send_message(self.receiver.public_key, message_text)
             expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
             sent_messages.append(expected_message)
             sleep(0.01)
@@ -65,10 +63,9 @@ class TestOneToOneMessages(MessengerTestCase):
 
     @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
     def test_one_to_one_message_with_node_pause_30_seconds(self):
-        pk_receiver = self.receiver.accounts_service.get_pubkey(self.receiver.display_name)
         with self.node_pause(self.receiver):
             message_text = f"test_message_{uuid4()}"
-            self.sender.wakuext_service.send_message(pk_receiver, message_text)
+            self.sender.wakuext_service.send_message(self.receiver.public_key, message_text)
             sleep(30)
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
         self.sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)

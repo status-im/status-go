@@ -1,7 +1,6 @@
 import json
 import logging
 import string
-import subprocess
 import time
 import random
 import threading
@@ -12,11 +11,12 @@ from clients.services.wallet import WalletService
 from clients.services.wakuext import WakuextService
 from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
-from clients.signals import SignalClient
+from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
 from datetime import datetime
 from conftest import option
 from resources.constants import user_1, DEFAULT_DISPLAY_NAME, USER_DIR
+from docker.errors import APIError
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
@@ -39,6 +39,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.api_url = f"{url}/statusgo"
         self.ws_url = f"{url}".replace("http", "ws")
         self.rpc_url = f"{url}/statusgo/CallRPC"
+        self.public_key = ""
 
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
@@ -183,7 +184,9 @@ class StatusBackend(RpcClient, SignalClient):
             "logLevel": "DEBUG",
         }
         data = self._set_proxy_credentials(data)
-        return self.api_valid_request(method, data)
+        resp = self.api_valid_request(method, data)
+        self.node_login_event = self.find_signal_containing_pattern(SignalType.NODE_LOGIN.value, event_pattern=self.display_name)
+        return resp
 
     def restore_account_and_login(
         self,
@@ -249,29 +252,26 @@ class StatusBackend(RpcClient, SignalClient):
                 time.sleep(3)
         raise TimeoutError(f"RPC client was not started after {timeout} seconds")
 
-    def pause_container(self):
+    def container_pause(self):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
         self.container.pause()
         logging.info(f"Container {self.container.name} paused.")
 
-    def unpause_container(self):
+    def container_unpause(self):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
         self.container.unpause()
         logging.info(f"Container {self.container.name} unpaused.")
 
-    def exec_command_in_container(self, command):
+    def container_exec(self, command):
         try:
-            result = subprocess.run(
-                ["docker", "exec", "-it", self.container.id, "sh", "-c", command],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(
-                f"Failed to execute command in container {self.container.id}:\n" f"STDOUT: {e.stdout.strip()}\n" f"STDERR: {e.stderr.strip()}"
-            ) from e
+            exec_result = self.container.exec_run(cmd=["sh", "-c", command], stdout=True, stderr=True, tty=False)
+            if exec_result.exit_code != 0:
+                raise RuntimeError(f"Failed to execute command in container {self.container.id}:\n" f"OUTPUT: {exec_result.output.decode().strip()}")
+            return exec_result.output.decode().strip()
+        except APIError as e:
+            raise RuntimeError(f"API error during container execution: {str(e)}") from e
+
+    def find_public_key(self):
+        self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")

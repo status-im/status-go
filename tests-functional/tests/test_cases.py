@@ -154,72 +154,75 @@ class NetworkConditionTestCase:
     @contextmanager
     def add_latency(self, node, latency=300, jitter=50):
         logging.info("Entering context manager: add_latency")
-        node.exec_command_in_container(f"apk add iproute2 && tc qdisc add dev eth0 root netem delay {latency}ms {jitter}ms distribution normal")
+        node.container_exec(f"apk add iproute2 && tc qdisc add dev eth0 root netem delay {latency}ms {jitter}ms distribution normal")
         try:
             yield
         finally:
             logging.info("Exiting context manager: add_latency")
-            node.exec_command_in_container("tc qdisc del dev eth0 root")
+            node.container_exec("tc qdisc del dev eth0 root")
 
     @contextmanager
     def add_packet_loss(self, node, packet_loss=2):
         logging.info("Entering context manager: add_packet_loss")
-        node.exec_command_in_container(f"apk add iproute2 && tc qdisc add dev eth0 root netem loss {packet_loss}%")
+        node.container_exec(f"apk add iproute2 && tc qdisc add dev eth0 root netem loss {packet_loss}%")
         try:
             yield
         finally:
             logging.info("Exiting context manager: add_packet_loss")
-            node.exec_command_in_container("tc qdisc del dev eth0 root netem")
+            node.container_exec("tc qdisc del dev eth0 root netem")
 
     @contextmanager
     def add_low_bandwith(self, node, rate="1mbit", burst="32kbit"):
         logging.info("Entering context manager: add_low_bandwith")
-        node.exec_command_in_container(f"apk add iproute2 && tc qdisc add dev eth0 root tbf rate {rate} burst {burst}")
+        node.container_exec(f"apk add iproute2 && tc qdisc add dev eth0 root tbf rate {rate} burst {burst}")
         try:
             yield
         finally:
             logging.info("Exiting context manager: add_low_bandwith")
-            node.exec_command_in_container("tc qdisc del dev eth0 root")
+            node.container_exec("tc qdisc del dev eth0 root")
 
     @contextmanager
     def node_pause(self, node):
         logging.info("Entering context manager: node_pause")
-        node.pause_container()
+        node.container_pause()
         try:
             yield
         finally:
             logging.info("Exiting context manager: node_pause")
-            node.unpause_container()
+            node.container_unpause()
 
 
 class MessengerTestCase(NetworkConditionTestCase):
 
+    await_signals = [
+        SignalType.MESSAGES_NEW.value,
+        SignalType.MESSAGE_DELIVERED.value,
+        SignalType.NODE_LOGIN.value,
+    ]
+
     @pytest.fixture(scope="class", autouse=False)
     def setup_two_nodes(self, request):
-        await_signals = [
-            SignalType.MESSAGES_NEW.value,
-            SignalType.MESSAGE_DELIVERED.value,
-        ]
-        request.cls.sender = self.sender = self.initialize_backend(await_signals=await_signals)
-        request.cls.receiver = self.receiver = self.initialize_backend(await_signals=await_signals)
+        request.cls.sender = self.sender = self.initialize_backend(await_signals=self.await_signals)
+        request.cls.receiver = self.receiver = self.initialize_backend(await_signals=self.await_signals)
 
     def initialize_backend(self, await_signals):
         backend = StatusBackend(await_signals=await_signals)
         backend.init_status_backend()
         backend.create_account_and_login()
+        backend.find_public_key()
         backend.wakuext_service.start_messenger()
         return backend
 
-    def connect_accounts_via_contact_request(self):
-        self.pk_sender = self.sender.accounts_service.get_pubkey(self.sender.display_name)
-        self.pk_receiver = self.receiver.accounts_service.get_pubkey(self.receiver.display_name)
-
+    def make_contacts(self):
         existing_contacts = self.receiver.wakuext_service.get_contacts()
 
-        if self.pk_sender not in str(existing_contacts):
-            response = self.sender.wakuext_service.send_contact_request(self.pk_receiver, "contact_request")
+        if self.sender.public_key not in str(existing_contacts):
+            response = self.sender.wakuext_service.send_contact_request(self.receiver.public_key, "contact_request")
             expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
+            self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"))
             self.receiver.wakuext_service.accept_contact_request(expected_message.get("id"))
+            accepted_signal = f"@{self.receiver.public_key} accepted your contact request"
+            self.sender.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=accepted_signal)
 
     def validate_signal_event_against_response(self, signal_event, fields_to_validate, expected_message):
         expected_message_id = expected_message.get("id")
@@ -251,11 +254,10 @@ class MessengerTestCase(NetworkConditionTestCase):
         matched_messages = []
         messages = response.get("result", {}).get("messages", [])
         for message in messages:
-            if message.get("contentType") == content_type:
-                if message_pattern and message_pattern in str(message):
-                    matched_messages.append(message)
-                else:
-                    matched_messages.append(message)
+            if message.get("contentType") != content_type:
+                continue
+            if not message_pattern or message_pattern in str(message):
+                matched_messages.append(message)
         if matched_messages:
             return matched_messages
         else:
