@@ -9,6 +9,7 @@ from resources.enums import MessageContentType
 @pytest.mark.reliability
 class TestContactRequests(MessengerTestCase):
 
+    @pytest.mark.rpc  # until we have dedicated functional tests for this we can still run this test as part of the functional tests suite
     @pytest.mark.dependency(name="test_contact_request_baseline")
     def test_contact_request_baseline(self, execution_number=1):
 

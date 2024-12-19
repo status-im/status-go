@@ -10,6 +10,7 @@ from resources.enums import MessageContentType
 @pytest.mark.reliability
 class TestCreatePrivateGroups(MessengerTestCase):
 
+    @pytest.mark.rpc  # until we have dedicated functional tests for this we can still run this test as part of the functional tests suite
     @pytest.mark.dependency(name="test_create_private_group_baseline")
     def test_create_private_group_baseline(self, private_groups_count=1):
         self.connect_accounts_via_contact_request()
