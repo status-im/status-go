@@ -1,19 +1,8 @@
-CREATE TABLE pin_messages_new (
-  id VARCHAR PRIMARY KEY NOT NULL,
-  message_id VARCHAR NOT NULL,
-  whisper_timestamp INTEGER NOT NULL,
-  chat_id VARCHAR NOT NULL,
-  local_chat_id VARCHAR NOT NULL,
-  clock_value INT NOT NULL,
-  pinned BOOLEAN NOT NULL,
-  pinned_by TEXT,
-  FOREIGN KEY (message_id) REFERENCES user_messages(id) ON DELETE CASCADE
-);
-
-INSERT INTO pin_messages_new (id, message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned, pinned_by)
-SELECT id, message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned, pinned_by
-FROM pin_messages;
-
-DROP TABLE pin_messages;
-
-ALTER TABLE pin_messages_new RENAME TO pin_messages;
+-- Leave this migration empty
+-- This used to be a migration to add ON DELETE CASCADE to the pinned_messages table
+-- However, we found that it had the side effect of preventing pinned messages to arrive before the messages they are pinned to
+-- Leaving this migration here to prevent the migration from being run again
+-- People that ran the migraiton already will have the wrong behavior on edge cases, but we can't fix that easily
+-- People that didn't run this migration will have the correct behavior
+-- This was never run on a release
+-- See more info here: https://github.com/status-im/status-go/pull/6231#discussion_r1904038990
