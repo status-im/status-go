@@ -349,7 +349,7 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 
 	if !cfg.LightClient {
 		opts = append(opts, node.WithWakuFilterFullNode(filter.WithMaxSubscribers(20)))
-		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(1, 1)))
+		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(5, 10)))
 	}
 
 	if appDB != nil {
@@ -1371,7 +1371,6 @@ func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic s
 	if !w.cfg.EnableMissingMessageVerification {
 		return
 	}
-
 	w.missingMsgVerifier.SetCriteriaInterest(peerID, protocol.NewContentFilter(pubsubTopic, contentTopics...))
 }
 
@@ -1721,12 +1720,22 @@ func (w *Waku) isGoingOnline(state connection.State) bool {
 	return !state.Offline && !w.onlineChecker.IsOnline()
 }
 
+func (w *Waku) isGoingOffline(state connection.State) bool {
+	return state.Offline && w.onlineChecker.IsOnline()
+}
+
 func (w *Waku) ConnectionChanged(state connection.State) {
 	if w.isGoingOnline(state) {
-		//TODO: analyze if we need to discover and connect to peers for relay.
 		w.discoverAndConnectPeers()
+		if w.cfg.EnableMissingMessageVerification {
+			w.missingMsgVerifier.Start(w.ctx)
+		}
+	}
+	if w.isGoingOffline(state) && w.cfg.EnableMissingMessageVerification {
+		w.missingMsgVerifier.Stop()
 	}
 	isOnline := !state.Offline
+
 	if w.cfg.LightClient {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
 		go func() {
@@ -1743,9 +1752,9 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 				w.logger.Warn("could not write on connection changed channel")
 			}
 		}
-		// update state
-		w.onlineChecker.SetOnline(isOnline)
 	}
+	// update state
+	w.onlineChecker.SetOnline(isOnline)
 	w.state = state
 }
 

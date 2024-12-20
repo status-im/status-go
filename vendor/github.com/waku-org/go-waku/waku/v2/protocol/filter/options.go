@@ -83,7 +83,7 @@ func WithLightNodeRateLimiter(r rate.Limit, b int) LightNodeOption {
 
 func DefaultLightNodeOptions() []LightNodeOption {
 	return []LightNodeOption{
-		WithLightNodeRateLimiter(1, 1),
+		WithLightNodeRateLimiter(15, 20),
 	}
 }
 
