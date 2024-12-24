@@ -1303,7 +1303,7 @@ func (w *Waku) startMessageSender() error {
 		publishMethod = publish.LightPush
 	}
 
-	sender, err := publish.NewMessageSender(publishMethod, publish.NewDefaultPublisher(w.node.Lightpush(), w.node.Relay()), w.logger)
+	sender, err := publish.NewMessageSender(publishMethod, publish.NewDefaultPublisher(w.node.Lightpush(), w.node.Relay()), nil, w.logger)
 	if err != nil {
 		w.logger.Error("failed to create message sender", zap.Error(err))
 		return err
@@ -1351,7 +1351,7 @@ func (w *Waku) startMessageSender() error {
 	if !w.cfg.UseThrottledPublish || testing.Testing() {
 		// To avoid delaying the tests, or for when we dont want to rate limit, we set up an infinite rate limiter,
 		// basically disabling the rate limit functionality
-		limiter := publish.NewPublishRateLimiter(rate.Inf, 1)
+		limiter := publish.NewDefaultRateLimiter(rate.Inf, 1)
 		sender.WithRateLimiting(limiter)
 	}
 

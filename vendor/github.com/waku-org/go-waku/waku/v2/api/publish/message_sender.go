@@ -12,12 +12,9 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"go.uber.org/zap"
-	"golang.org/x/time/rate"
 )
 
 const DefaultPeersToPublishForLightpush = 2
-const DefaultPublishingLimiterRate = rate.Limit(5)
-const DefaultPublishingLimitBurst = 10
 
 type PublishMethod int
 
@@ -53,7 +50,7 @@ type MessageSender struct {
 	publishMethod    PublishMethod
 	publisher        Publisher
 	messageSentCheck ISentCheck
-	rateLimiter      *PublishRateLimiter
+	rateLimiter      PublishRateLimiter
 	logger           *zap.Logger
 	evtMessageSent   event.Emitter
 }
@@ -82,14 +79,19 @@ func (r *Request) WithPublishMethod(publishMethod PublishMethod) *Request {
 	return r
 }
 
-func NewMessageSender(publishMethod PublishMethod, publisher Publisher, logger *zap.Logger) (*MessageSender, error) {
+func NewMessageSender(publishMethod PublishMethod, publisher Publisher, rateLimiter PublishRateLimiter, logger *zap.Logger) (*MessageSender, error) {
 	if publishMethod == UnknownMethod {
 		return nil, errors.New("publish method is required")
 	}
+
+	if rateLimiter == nil {
+		rateLimiter = NewDefaultRateLimiter(DefaultPublishingLimiterRate, DefaultPublishingLimitBurst)
+	}
+
 	return &MessageSender{
 		publishMethod: publishMethod,
 		publisher:     publisher,
-		rateLimiter:   NewPublishRateLimiter(DefaultPublishingLimiterRate, DefaultPublishingLimitBurst),
+		rateLimiter:   rateLimiter,
 		logger:        logger,
 	}, nil
 }
@@ -99,7 +101,7 @@ func (ms *MessageSender) WithMessageSentCheck(messageSentCheck ISentCheck) *Mess
 	return ms
 }
 
-func (ms *MessageSender) WithRateLimiting(rateLimiter *PublishRateLimiter) *MessageSender {
+func (ms *MessageSender) WithRateLimiting(rateLimiter PublishRateLimiter) *MessageSender {
 	ms.rateLimiter = rateLimiter
 	return ms
 }
