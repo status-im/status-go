@@ -1,0 +1,34 @@
+name: Test Reliability
+
+on:
+  push:
+    branches:
+      - "test-reliability-workflow"
+  workflow_dispatch:
+
+jobs:
+  test-reliability:
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Set up virtual environment in /tests-functional/
+      run: |
+        python -m venv tests-functional/.venv
+        echo "tests-functional/.venv/bin" >> $GITHUB_PATH  # Add virtualenv to PATH for subsequent steps
+
+    - name: Install dependencies based on requirements.txt
+      run: pip install -r tests-functional/requirements.txt
+
+    - name: Build status-backend
+      run: cd tests-functional; docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f docker-compose.status-go.local.yml up --build --remove-orphans
+
+    - name: Run tests
+      run: pytest -m "reliability"
