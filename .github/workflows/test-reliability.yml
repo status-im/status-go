@@ -6,6 +6,9 @@ on:
       - "test-reliability-workflow"
   workflow_dispatch:
 
+env:
+  FORCE_COLOR: "1"
+
 jobs:
   test-reliability:
     timeout-minutes: 90

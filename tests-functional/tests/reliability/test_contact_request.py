@@ -82,12 +82,8 @@ class TestContactRequests(MessengerTestCase):
 
     @pytest.mark.dependency(depends=["test_contact_request_baseline"])
     def test_contact_request_with_node_pause_30_seconds(self):
-        await_signals = [
-            SignalType.MESSAGES_NEW.value,
-            SignalType.MESSAGE_DELIVERED.value,
-        ]
-        sender = self.initialize_backend(await_signals=await_signals)
-        receiver = self.initialize_backend(await_signals=await_signals)
+        sender = self.initialize_backend(await_signals=self.await_signals)
+        receiver = self.initialize_backend(await_signals=self.await_signals)
 
         with self.node_pause(receiver):
             message_text = f"test_contact_request_{uuid4()}"
