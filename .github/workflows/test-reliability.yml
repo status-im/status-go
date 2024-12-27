@@ -31,4 +31,4 @@ jobs:
       run: cd tests-functional; docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f docker-compose.status-go.local.yml up --build --remove-orphans -d
 
     - name: Run tests
-      run: pytest -m "reliability"
+      run: cd tests-functional; pytest -m "reliability"
