@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
+    - name: Get workflow status
+      uses: technote-space/workflow-conclusion-action@v3
+
     - uses: actions/checkout@v4
 
     - uses: actions/setup-python@v4
@@ -34,4 +37,50 @@ jobs:
       run: cd tests-functional; docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f docker-compose.status-go.local.yml up --build --remove-orphans -d
 
     - name: Run tests
-      run: pytest -m "reliability" -c tests-functional/pytest.ini
+      run: pytest -m "reliability" -c tests-functional/pytest.ini --alluredir=allure-results
+
+    - name: Get allure history
+      if: env.WORKFLOW_CONCLUSION != 'cancelled'
+      uses: actions/checkout@v4
+      continue-on-error: true
+      with:
+        repository: status-im/status-cli-tests
+        ref: gh-pages
+        path: gh-pages
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup allure report
+      uses: simple-elf/allure-report-action@master
+      if: env.WORKFLOW_CONCLUSION != 'cancelled'
+      id: allure-report
+      with:
+        allure_results: allure-results
+        gh_pages: gh-pages
+        allure_history: allure-history
+        keep_reports: 30
+        report_url: `https://status-im.github.io/status-cli-tests/`
+
+    - name: Deploy report to Github Pages
+      uses: peaceiris/actions-gh-pages@v4
+      if: env.WORKFLOW_CONCLUSION != 'cancelled'
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        external_repository: status-im/status-cli-tests
+        publish_branch: gh-pages
+        publish_dir: allure-history
+
+    - name: Create job summary
+      if: always()
+      env:
+        JOB_STATUS: ${{ job.status }}
+      run: |
+        echo "## Run Information" >> $GITHUB_STEP_SUMMARY
+        echo "- **Event**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "Allure report will be available at: https://status-im.github.io/status-cli-tests/${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        {
+          echo 'JOB_SUMMARY<<EOF'
+          cat $GITHUB_STEP_SUMMARY
+          echo EOF
+        } >> $GITHUB_ENV
