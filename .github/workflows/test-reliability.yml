@@ -64,7 +64,7 @@ jobs:
       uses: peaceiris/actions-gh-pages@v4
       if: env.WORKFLOW_CONCLUSION != 'cancelled'
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        personal_token: ${{ secrets.GITHUB_TOKEN }}
         external_repository: status-im/status-cli-tests
         publish_branch: gh-pages
         publish_dir: allure-history
