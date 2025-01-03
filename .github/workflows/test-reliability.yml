@@ -58,7 +58,7 @@ jobs:
         gh_pages: gh-pages
         allure_history: allure-history
         keep_reports: 30
-        report_url: `https://status-im.github.io/status-cli-tests/`
+        report_url: 'https://status-im.github.io/status-cli-tests/'
 
     - name: Deploy report to Github Pages
       uses: peaceiris/actions-gh-pages@v4
