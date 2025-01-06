@@ -101,7 +101,7 @@ func (p *RpcProvidersPersistence) GetRpcProvidersByType(chainID uint64, provider
 		return nil, err
 	}
 
-	var result []params.RpcProvider
+	result := make([]params.RpcProvider, 0, len(allProviders))
 	for _, provider := range allProviders {
 		if provider.Type == providerType {
 			result = append(result, provider)

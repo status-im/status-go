@@ -81,7 +81,7 @@ func (n *NetworksPersistence) GetNetworks(onlyEnabled bool, chainID *uint64) ([]
 	}
 	defer rows.Close()
 
-	var result []*params.Network
+	result := make([]*params.Network, 0, 10)
 	for rows.Next() {
 		network := &params.Network{}
 		err := rows.Scan(

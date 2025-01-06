@@ -47,7 +47,7 @@ type Network struct {
 	RpcProviders []RpcProvider `json:"rpcProviders" validate:"dive,required"` // List of RPC providers, in the order in which they are accessed
 
 	// Deprecated fields (kept for backward compatibility)
-	// FIXME: remove deprecated fields (keeping until client integrate this). TODO: add ticket URL
+	// FIXME: Removal of deprecated fields in integration PR https://github.com/status-im/status-go/pull/6178
 	DefaultRPCURL       string `json:"defaultRpcUrl" validate:"omitempty,url"`       // Deprecated: proxy rpc url
 	DefaultFallbackURL  string `json:"defaultFallbackURL" validate:"omitempty,url"`  // Deprecated: proxy fallback url
 	DefaultFallbackURL2 string `json:"defaultFallbackURL2" validate:"omitempty,url"` // Deprecated: second proxy fallback url

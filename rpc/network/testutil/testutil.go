@@ -83,7 +83,7 @@ func CompareNetworks(t require.TestingT, expected, actual *params.Network) {
 // Helper function to compare lists of providers
 func CompareProvidersList(t require.TestingT, expectedProviders, actualProviders []params.RpcProvider) {
 	require.Len(t, actualProviders, len(expectedProviders))
-	expectedMap := make(map[string]params.RpcProvider)
+	expectedMap := make(map[string]params.RpcProvider, len(expectedProviders))
 	for _, provider := range expectedProviders {
 		expectedMap[provider.Name] = provider
 	}
@@ -98,7 +98,7 @@ func CompareProvidersList(t require.TestingT, expectedProviders, actualProviders
 // Helper function to compare lists of networks
 func CompareNetworksList(t require.TestingT, expectedNetworks, actualNetworks []*params.Network) {
 	require.Len(t, actualNetworks, len(expectedNetworks))
-	expectedMap := make(map[uint64]*params.Network)
+	expectedMap := make(map[uint64]*params.Network, len(expectedNetworks))
 	for _, network := range expectedNetworks {
 		expectedMap[network.ChainID] = network
 	}
@@ -108,14 +108,4 @@ func CompareNetworksList(t require.TestingT, expectedNetworks, actualNetworks []
 		require.True(t, exists, "Unexpected network with ChainID %d", network.ChainID)
 		CompareNetworks(t, expectedNetwork, network)
 	}
-}
-func ConvertNetworksToPointers(networks []params.Network) []*params.Network {
-	result := make([]*params.Network, len(networks))
-	for i := range networks {
-		// Create a copy of the current network
-		network := networks[i]
-		// Store a pointer to the copy
-		result[i] = &network
-	}
-	return result
 }

@@ -11,7 +11,7 @@ import (
 // preserving user-defined providers and maintaining the Enabled state.
 func MergeProvidersPreservingUsersAndEnabledState(currentProviders, newProviders []params.RpcProvider) []params.RpcProvider {
 	// Create a map for quick lookup of the Enabled state by Name
-	enabledState := make(map[string]bool)
+	enabledState := make(map[string]bool, len(currentProviders))
 	for _, provider := range currentProviders {
 		enabledState[provider.Name] = provider.Enabled
 	}
@@ -24,7 +24,7 @@ func MergeProvidersPreservingUsersAndEnabledState(currentProviders, newProviders
 	}
 
 	// Retain current providers of type UserProviderType and add them to the beginning of the list
-	var mergedProviders []params.RpcProvider
+	mergedProviders := make([]params.RpcProvider, 0, len(currentProviders)+len(newProviders))
 	for _, provider := range currentProviders {
 		if provider.Type == params.UserProviderType {
 			mergedProviders = append(mergedProviders, provider)
@@ -119,58 +119,51 @@ func OverrideEmbeddedProxyProviders(networks []params.Network, enabled bool, use
 
 func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[string]string) []params.Network {
 	updatedNetworks := make([]params.Network, len(networks))
-	for i, network := range networks {
-		updatedNetwork := network
-		updatedProviders := make([]params.RpcProvider, len(network.RpcProviders))
+	copy(updatedNetworks, networks)
 
-		for j, provider := range network.RpcProviders {
-			updatedProvider := provider
+	for i := range updatedNetworks {
+		network := &updatedNetworks[i]
 
-			if provider.Type == params.EmbeddedDirectProviderType {
-				host, err := extractHost(provider.URL)
-				if err == nil {
-					for suffix, token := range authTokens {
-						if strings.HasSuffix(host, suffix) && token != "" {
-							updatedProvider.AuthType = params.TokenAuth
-							updatedProvider.AuthToken = token
-							break
-						}
-					}
-				}
+		for j := range network.RpcProviders {
+			provider := &network.RpcProviders[j]
+
+			if provider.Type != params.EmbeddedDirectProviderType {
+				continue
 			}
 
-			updatedProviders[j] = updatedProvider
-		}
+			host, err := extractHost(provider.URL)
+			if err != nil {
+				continue
+			}
 
-		updatedNetwork.RpcProviders = updatedProviders
-		updatedNetworks[i] = updatedNetwork
+			for suffix, token := range authTokens {
+				if strings.HasSuffix(host, suffix) && token != "" {
+					provider.AuthType = params.TokenAuth
+					provider.AuthToken = token
+					break
+				}
+			}
+		}
 	}
 	return updatedNetworks
 }
 
 func OverrideGanacheToken(networks []params.Network, ganacheURL string, chainID uint64, tokenOverride params.TokenOverride) []params.Network {
 	updatedNetworks := make([]params.Network, len(networks))
-	for i, network := range networks {
-		updatedNetwork := network
+	copy(updatedNetworks, networks)
 
-		if network.ChainID == chainID {
-			updatedProviders := make([]params.RpcProvider, len(network.RpcProviders))
+	for i := range updatedNetworks {
+		network := &updatedNetworks[i]
 
-			for j, provider := range network.RpcProviders {
-				updatedProvider := provider
-				if ganacheURL != "" {
-					updatedProvider.URL = ganacheURL
-				}
-				updatedProviders[j] = updatedProvider
-			}
-
-			updatedNetwork.RpcProviders = updatedProviders
-			updatedNetwork.TokenOverrides = []params.TokenOverride{
-				tokenOverride,
+		if network.ChainID != chainID {
+			continue
+		}
+		for j := range network.RpcProviders {
+			if ganacheURL != "" {
+				network.RpcProviders[j].URL = ganacheURL
 			}
 		}
-
-		updatedNetworks[i] = updatedNetwork
+		network.TokenOverrides = []params.TokenOverride{tokenOverride}
 	}
 	return updatedNetworks
 }

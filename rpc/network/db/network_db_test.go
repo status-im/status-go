@@ -66,7 +66,7 @@ func DefaultProviders(chainID uint64) []params.RpcProvider {
 
 // Helper function to add and verify networks
 func (s *NetworksPersistenceTestSuite) addAndVerifyNetworks(networks []*params.Network) {
-	var networkValues []params.Network
+	networkValues := make([]params.Network, 0, len(networks))
 	for _, network := range networks {
 		networkValues = append(networkValues, *network)
 	}
