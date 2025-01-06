@@ -1,9 +1,11 @@
 package networkhelper_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -48,13 +50,7 @@ func TestMergeProvidersPreserveEnabledAndOrder(t *testing.T) {
 	}
 
 	// Assertions
-	require.Len(t, mergedProviders, len(expectedProviders), "Expected %d providers after merging", len(expectedProviders))
-
-	// Compare providers
-	for i, expectedProvider := range expectedProviders {
-		actualProvider := mergedProviders[i]
-		testutil.CompareProviders(t, expectedProvider, actualProvider)
-	}
+	require.True(t, reflect.DeepEqual(mergedProviders, expectedProviders), "Merged providers should match the expected providers")
 }
 func TestUpdateEmbeddedProxyProviders(t *testing.T) {
 	// Arrange: Create a sample list of networks with various provider types
@@ -71,8 +67,8 @@ func TestUpdateEmbeddedProxyProviders(t *testing.T) {
 	networks[0].RpcProviders[1].Enabled = false
 	networks[1].RpcProviders[1].Enabled = false
 
-	user := "test_user"
-	password := "test_password"
+	user := gofakeit.Username()
+	password := gofakeit.LetterN(5)
 
 	// Call the function to update embedded-proxy providers
 	updatedNetworks := networkhelper.OverrideEmbeddedProxyProviders(networks, true, user, password)

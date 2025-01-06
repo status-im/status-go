@@ -481,7 +481,7 @@ type NodeConfig struct {
 	// (persistent storage of user's mailserver records).
 	MailserversConfig MailserversConfig
 
-	// Web3ProviderConfig extra configuration for provider.Service
+	// Web3ProviderConfig extra configuration for provider.Service.
 	// (desktop provider API)
 	Web3ProviderConfig Web3ProviderConfig
 
