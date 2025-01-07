@@ -10,12 +10,12 @@ import (
 )
 
 const (
-	mainnetChainID         uint64 = 1
-	sepoliaChainID         uint64 = 11155111
-	optimismChainID        uint64 = 10
-	optimismSepoliaChainID uint64 = 11155420
-	arbitrumChainID        uint64 = 42161
-	arbitrumSepoliaChainID uint64 = 421614
+	MainnetChainID         uint64 = 1
+	SepoliaChainID         uint64 = 11155111
+	OptimismChainID        uint64 = 10
+	OptimismSepoliaChainID uint64 = 11155420
+	ArbitrumChainID        uint64 = 42161
+	ArbitrumSepoliaChainID uint64 = 421614
 	sntSymbol                     = "SNT"
 	sttSymbol                     = "STT"
 )
@@ -24,7 +24,7 @@ var ganacheTokenAddress = common.HexToAddress("0x8571Ddc46b10d31EF963aF49b6C7799
 
 func mainnet(stageName string) params.Network {
 	return params.Network{
-		ChainID:                mainnetChainID,
+		ChainID:                MainnetChainID,
 		ChainName:              "Mainnet",
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/ethereum/mainnet/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/ethereum/mainnet/", stageName),
@@ -41,13 +41,13 @@ func mainnet(stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  1,
 		Enabled:                true,
-		RelatedChainID:         sepoliaChainID,
+		RelatedChainID:         SepoliaChainID,
 	}
 }
 
 func sepolia(stageName string) params.Network {
 	return params.Network{
-		ChainID:                sepoliaChainID,
+		ChainID:                SepoliaChainID,
 		ChainName:              "Mainnet",
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/ethereum/sepolia/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/ethereum/sepolia/", stageName),
@@ -64,13 +64,13 @@ func sepolia(stageName string) params.Network {
 		IsTest:                 true,
 		Layer:                  1,
 		Enabled:                true,
-		RelatedChainID:         mainnetChainID,
+		RelatedChainID:         MainnetChainID,
 	}
 }
 
 func optimism(stageName string) params.Network {
 	return params.Network{
-		ChainID:                optimismChainID,
+		ChainID:                OptimismChainID,
 		ChainName:              "Optimism",
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/optimism/mainnet/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/optimism/mainnet/", stageName),
@@ -87,13 +87,13 @@ func optimism(stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  2,
 		Enabled:                true,
-		RelatedChainID:         optimismSepoliaChainID,
+		RelatedChainID:         OptimismSepoliaChainID,
 	}
 }
 
 func optimismSepolia(stageName string) params.Network {
 	return params.Network{
-		ChainID:                optimismSepoliaChainID,
+		ChainID:                OptimismSepoliaChainID,
 		ChainName:              "Optimism",
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/optimism/sepolia/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/optimism/sepolia/", stageName),
@@ -110,13 +110,13 @@ func optimismSepolia(stageName string) params.Network {
 		IsTest:                 true,
 		Layer:                  2,
 		Enabled:                false,
-		RelatedChainID:         optimismChainID,
+		RelatedChainID:         OptimismChainID,
 	}
 }
 
 func arbitrum(stageName string) params.Network {
 	return params.Network{
-		ChainID:                arbitrumChainID,
+		ChainID:                ArbitrumChainID,
 		ChainName:              "Arbitrum",
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/arbitrum/mainnet/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/arbitrum/mainnet/", stageName),
@@ -133,13 +133,13 @@ func arbitrum(stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  2,
 		Enabled:                true,
-		RelatedChainID:         arbitrumSepoliaChainID,
+		RelatedChainID:         ArbitrumSepoliaChainID,
 	}
 }
 
 func arbitrumSepolia(stageName string) params.Network {
 	return params.Network{
-		ChainID:                arbitrumSepoliaChainID,
+		ChainID:                ArbitrumSepoliaChainID,
 		ChainName:              "Arbitrum",
 		DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/arbitrum/sepolia/", stageName),
 		DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/arbitrum/sepolia/", stageName),
@@ -156,7 +156,7 @@ func arbitrumSepolia(stageName string) params.Network {
 		IsTest:                 true,
 		Layer:                  2,
 		Enabled:                false,
-		RelatedChainID:         arbitrumChainID,
+		RelatedChainID:         ArbitrumChainID,
 	}
 }
 
@@ -204,7 +204,7 @@ func setRPCs(networks []params.Network, request *requests.WalletSecretsConfig) [
 		if request.GanacheURL != "" {
 			n.RPCURL = request.GanacheURL
 			n.FallbackURL = request.GanacheURL
-			if n.ChainID == mainnetChainID {
+			if n.ChainID == MainnetChainID {
 				n.TokenOverrides = []params.TokenOverride{
 					mainnetGanacheTokenOverrides,
 				}

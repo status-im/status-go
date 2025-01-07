@@ -28,12 +28,12 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	for _, n := range actualNetworks {
 		var err error
 		switch n.ChainID {
-		case mainnetChainID:
-		case sepoliaChainID:
-		case optimismChainID:
-		case optimismSepoliaChainID:
-		case arbitrumChainID:
-		case arbitrumSepoliaChainID:
+		case MainnetChainID:
+		case SepoliaChainID:
+		case OptimismChainID:
+		case OptimismSepoliaChainID:
+		case ArbitrumChainID:
+		case ArbitrumSepoliaChainID:
 		default:
 			err = errors.Errorf("unexpected chain id: %d", n.ChainID)
 		}
@@ -70,7 +70,7 @@ func TestBuildDefaultNetworksGanache(t *testing.T) {
 		require.True(t, strings.Contains(n.FallbackURL, ganacheURL))
 	}
 
-	require.Equal(t, mainnetChainID, actualNetworks[0].ChainID)
+	require.Equal(t, MainnetChainID, actualNetworks[0].ChainID)
 
 	require.NotNil(t, actualNetworks[0].TokenOverrides)
 	require.Len(t, actualNetworks[0].TokenOverrides, 1)
