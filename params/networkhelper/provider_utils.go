@@ -117,9 +117,19 @@ func OverrideEmbeddedProxyProviders(networks []params.Network, enabled bool, use
 	return updatedNetworks
 }
 
-func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[string]string) []params.Network {
+func deepCopyNetworks(networks []params.Network) []params.Network {
 	updatedNetworks := make([]params.Network, len(networks))
-	copy(updatedNetworks, networks)
+	for i, network := range networks {
+		updatedNetwork := network
+		updatedNetwork.RpcProviders = make([]params.RpcProvider, len(network.RpcProviders))
+		copy(updatedNetwork.RpcProviders, network.RpcProviders)
+		updatedNetworks[i] = updatedNetwork
+	}
+	return updatedNetworks
+}
+
+func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[string]string) []params.Network {
+	updatedNetworks := deepCopyNetworks(networks)
 
 	for i := range updatedNetworks {
 		network := &updatedNetworks[i]
@@ -149,8 +159,7 @@ func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[strin
 }
 
 func OverrideGanacheToken(networks []params.Network, ganacheURL string, chainID uint64, tokenOverride params.TokenOverride) []params.Network {
-	updatedNetworks := make([]params.Network, len(networks))
-	copy(updatedNetworks, networks)
+	updatedNetworks := deepCopyNetworks(networks)
 
 	for i := range updatedNetworks {
 		network := &updatedNetworks[i]

@@ -1,6 +1,7 @@
 package networkhelper_test
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"reflect"
 	"strings"
 	"testing"
@@ -9,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
@@ -127,9 +127,11 @@ func TestOverrideDirectProvidersAuth(t *testing.T) {
 			case strings.Contains(provider.URL, "infura.io"):
 				assert.Equal(t, params.TokenAuth, provider.AuthType)
 				assert.Equal(t, authTokens["infura.io"], provider.AuthToken)
+				assert.NotEqual(t, expectedProvider.AuthToken, provider.AuthToken)
 			case strings.Contains(provider.URL, "grove.city"):
 				assert.Equal(t, params.TokenAuth, provider.AuthType)
 				assert.Equal(t, authTokens["grove.city"], provider.AuthToken)
+				assert.NotEqual(t, expectedProvider.AuthToken, provider.AuthToken)
 			case strings.Contains(provider.URL, "example.com"):
 				assert.Equal(t, params.NoAuth, provider.AuthType) // should not update user providers
 			default:
