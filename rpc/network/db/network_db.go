@@ -139,11 +139,10 @@ func (n *NetworksPersistence) SetNetworks(networks []params.Network) error {
 	}
 
 	// Upsert networks and their providers
-	for _, network := range networks {
-		networkCopy := network
-		err := n.UpsertNetwork(&networkCopy)
+	for i := range networks {
+		err := n.UpsertNetwork(&networks[i])
 		if err != nil {
-			return fmt.Errorf("failed to upsert network with chain_id %d: %w", network.ChainID, err)
+			return fmt.Errorf("failed to upsert network with chain_id %d: %w", networks[i].ChainID, err)
 		}
 	}
 

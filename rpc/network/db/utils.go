@@ -1,9 +1,6 @@
 package db
 
 import (
-	"database/sql"
-	"fmt"
-
 	"github.com/status-im/status-go/params"
 )
 
@@ -57,26 +54,4 @@ func FillDeprecatedURLs(network *params.Network, providers []params.RpcProvider)
 			network.DefaultFallbackURL2 = embeddedProxy[2].URL
 		}
 	}
-}
-
-func ExecuteWithinTransaction(db *sql.DB, fn func(tx *sql.Tx) error) (err error) {
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback()
-			panic(p)
-		} else if err != nil {
-			_ = tx.Rollback()
-		} else {
-			if commitErr := tx.Commit(); commitErr != nil {
-				err = fmt.Errorf("transaction commit failed: %w", commitErr)
-			}
-		}
-	}()
-
-	err = fn(tx)
-	return err
 }

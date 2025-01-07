@@ -198,22 +198,22 @@ func buildWalletConfig(request *requests.WalletSecretsConfig, statusProxyEnabled
 	}
 
 	if request.AlchemyEthereumMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[mainnetChainID] = request.AlchemyEthereumMainnetToken
+		walletConfig.AlchemyAPIKeys[MainnetChainID] = request.AlchemyEthereumMainnetToken
 	}
 	if request.AlchemyEthereumSepoliaToken != "" {
-		walletConfig.AlchemyAPIKeys[sepoliaChainID] = request.AlchemyEthereumSepoliaToken
+		walletConfig.AlchemyAPIKeys[SepoliaChainID] = request.AlchemyEthereumSepoliaToken
 	}
 	if request.AlchemyArbitrumMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[arbitrumChainID] = request.AlchemyArbitrumMainnetToken
+		walletConfig.AlchemyAPIKeys[ArbitrumChainID] = request.AlchemyArbitrumMainnetToken
 	}
 	if request.AlchemyArbitrumSepoliaToken != "" {
-		walletConfig.AlchemyAPIKeys[arbitrumSepoliaChainID] = request.AlchemyArbitrumSepoliaToken
+		walletConfig.AlchemyAPIKeys[ArbitrumSepoliaChainID] = request.AlchemyArbitrumSepoliaToken
 	}
 	if request.AlchemyOptimismMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[optimismChainID] = request.AlchemyOptimismMainnetToken
+		walletConfig.AlchemyAPIKeys[OptimismChainID] = request.AlchemyOptimismMainnetToken
 	}
 	if request.AlchemyOptimismSepoliaToken != "" {
-		walletConfig.AlchemyAPIKeys[optimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
+		walletConfig.AlchemyAPIKeys[OptimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
 	}
 	if request.StatusProxyMarketUser != "" {
 		walletConfig.StatusProxyMarketUser = request.StatusProxyMarketUser

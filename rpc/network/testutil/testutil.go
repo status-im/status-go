@@ -3,15 +3,8 @@ package testutil
 import (
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/params"
-)
-
-// Common chain IDs
-var (
-	OptimismChainID        = uint64(10)
-	OptimismSepoliaChainID = uint64(11155111)
-	EthereumChainID        = uint64(1)
-	SepoliaChainID         = uint64(11155111)
 )
 
 // Helper function to create a provider
@@ -45,7 +38,7 @@ func CreateNetwork(chainID uint64, chainName string, providers []params.RpcProvi
 		Enabled:                true,
 		ChainColor:             "#E90101",
 		ShortName:              "eth",
-		RelatedChainID:         OptimismSepoliaChainID,
+		RelatedChainID:         api.OptimismSepoliaChainID,
 		RpcProviders:           providers,
 	}
 }

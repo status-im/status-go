@@ -1579,12 +1579,12 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	}
 
 	require.Equal(t, b.config.WalletConfig.InfuraAPIKey, infuraToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[mainnetChainID], alchemyEthereumMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[sepoliaChainID], alchemyEthereumSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[arbitrumChainID], alchemyArbitrumMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[arbitrumSepoliaChainID], alchemyArbitrumSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[optimismChainID], alchemyOptimismMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[optimismSepoliaChainID], alchemyOptimismSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[MainnetChainID], alchemyEthereumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[SepoliaChainID], alchemyEthereumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[ArbitrumChainID], alchemyArbitrumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[ArbitrumSepoliaChainID], alchemyArbitrumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[OptimismChainID], alchemyOptimismMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[OptimismSepoliaChainID], alchemyOptimismSepoliaToken)
 	require.Equal(t, b.config.WalletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
 	require.Equal(t, b.config.WalletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
 

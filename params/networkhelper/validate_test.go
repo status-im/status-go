@@ -3,14 +3,15 @@ package networkhelper
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/params"
 )
 
-// Test suite for Network and RpcProvider validation
 func TestValidation(t *testing.T) {
-	validate := validator.New()
+	validate := GetValidator()
 
 	// Test cases for RpcProvider
 	providerTests := []struct {
@@ -51,21 +52,58 @@ func TestValidation(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name: "BasicAuth without Login",
+			provider: params.RpcProvider{
+				ChainID:  1,
+				Name:     "BasicAuth Provider",
+				URL:      "https://provider.example.com",
+				Type:     params.UserProviderType,
+				AuthType: params.BasicAuth,
+			},
+			expectErr: true,
+		},
+		{
+			name: "TokenAuth without Token",
+			provider: params.RpcProvider{
+				ChainID:  1,
+				Name:     "TokenAuth Provider",
+				URL:      "https://provider.example.com",
+				Type:     params.UserProviderType,
+				AuthType: params.TokenAuth,
+			},
+			expectErr: true,
+		},
+		{
+			name: "NoAuth with Login",
+			provider: params.RpcProvider{
+				ChainID:   1,
+				Name:      "NoAuth Provider",
+				URL:       "https://provider.example.com",
+				Type:      params.UserProviderType,
+				AuthType:  params.NoAuth,
+				AuthLogin: "user",
+			},
+			expectErr: true,
+		},
 	}
 
 	for _, test := range providerTests {
 		t.Run("RpcProvider: "+test.name, func(t *testing.T) {
 			err := validate.Struct(test.provider)
-			if test.expectErr && err == nil {
-				t.Errorf("Expected error but got nil for test case '%s'", test.name)
-			}
-			if !test.expectErr && err != nil {
-				t.Errorf("Did not expect error but got '%v' for test case '%s'", err, test.name)
+			if test.expectErr {
+				require.Error(t, err, "Expected error but got nil for test case '%s'", test.name)
+			} else {
+				require.NoError(t, err, "Did not expect error but got '%v' for test case '%s'", err, test.name)
 			}
 		})
 	}
+}
 
-	// Test cases for Network
+// Test cases for Network
+func TestNetworkValidation(t *testing.T) {
+	validate := validator.New()
+
 	networkTests := []struct {
 		name      string
 		network   params.Network
@@ -136,11 +174,10 @@ func TestValidation(t *testing.T) {
 	for _, test := range networkTests {
 		t.Run("Network: "+test.name, func(t *testing.T) {
 			err := validate.Struct(test.network)
-			if test.expectErr && err == nil {
-				t.Errorf("Expected error but got nil for test case '%s'", test.name)
-			}
-			if !test.expectErr && err != nil {
-				t.Errorf("Did not expect error but got '%v' for test case '%s'", err, test.name)
+			if test.expectErr {
+				require.Error(t, err, "Expected error but got nil for test case '%s'", test.name)
+			} else {
+				require.NoError(t, err, "Did not expect error but got '%v' for test case '%s'", err, test.name)
 			}
 		})
 	}
