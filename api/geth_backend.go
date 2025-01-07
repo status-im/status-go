@@ -1750,7 +1750,7 @@ func (b *GethStatusBackend) getDerivedAddresses(id string) (map[string]generator
 // NOTE: requests.CreateAccount is used for public, params.Option maybe used for internal usage.
 func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount, opts ...params.Option) (*multiaccounts.Account, error) {
 	validation := &requests.CreateAccountValidation{
-		AllowEmptyDisplayName: false,
+		AllowEmptyDisplayName: true,
 	}
 	if err := request.Validate(validation); err != nil {
 		return nil, err
