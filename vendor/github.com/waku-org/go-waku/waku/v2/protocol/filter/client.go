@@ -175,7 +175,7 @@ func (wf *WakuFilterLightNode) onRequest(ctx context.Context) func(network.Strea
 		}
 
 		if !wf.subscriptions.IsSubscribedTo(peerID) {
-			logger.Warn("received message push from unknown peer", logging.HostID("peerID", peerID))
+			logger.Warn("received message push from unknown peer")
 			wf.metrics.RecordError(unknownPeerMessagePush)
 			//Send a wildcard unsubscribe to this peer so that further requests are not forwarded to us
 			if err := stream.Reset(); err != nil {

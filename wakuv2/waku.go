@@ -1740,7 +1740,7 @@ func (w *Waku) ConnectionChanged(state connection.State) {
 		//TODO: Update this as per  https://github.com/waku-org/go-waku/issues/1114
 		go func() {
 			defer gocommon.LogOnPanic()
-			w.filterManager.OnConnectionStatusChange("", isOnline)
+			w.filterManager.OnConnectionStatusChange("", isOnline, byte(state.Type))
 		}()
 		w.handleNetworkChangeFromApp(state)
 	} else {
