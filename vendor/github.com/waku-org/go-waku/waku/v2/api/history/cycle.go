@@ -98,6 +98,12 @@ func (m *StorenodeCycle) DisconnectActiveStorenode(backoff time.Duration) {
 func (m *StorenodeCycle) connectToNewStorenodeAndWait(ctx context.Context) error {
 	// Handle pinned storenodes
 	m.logger.Info("disconnecting storenode")
+
+	if m.storenodeConfigProvider == nil {
+		m.logger.Debug("storenodeConfigProvider not yet setup")
+		return nil
+	}
+
 	pinnedStorenode, err := m.storenodeConfigProvider.GetPinnedStorenode()
 	if err != nil {
 		m.logger.Error("could not obtain the pinned storenode", zap.Error(err))
@@ -252,6 +258,11 @@ func (m *StorenodeCycle) findNewStorenode(ctx context.Context) error {
 		}
 	}
 
+	if m.storenodeConfigProvider == nil {
+		m.logger.Debug("storenodeConfigProvider not yet setup")
+		return nil
+	}
+
 	pinnedStorenode, err := m.storenodeConfigProvider.GetPinnedStorenode()
 	if err != nil {
 		m.logger.Error("Could not obtain the pinned storenode", zap.Error(err))
@@ -341,6 +352,11 @@ func (m *StorenodeCycle) GetActiveStorenode() peer.ID {
 func (m *StorenodeCycle) GetActiveStorenodePeerInfo() peer.AddrInfo {
 	m.RLock()
 	defer m.RUnlock()
+
+	if m.storenodeConfigProvider == nil {
+		m.logger.Debug("storenodeConfigProvider not yet setup")
+		return peer.AddrInfo{}
+	}
 
 	storeNodes, err := m.storenodeConfigProvider.Storenodes()
 	if err != nil {

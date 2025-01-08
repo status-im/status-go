@@ -127,7 +127,7 @@ func (w *GethWakuWrapper) SubscribeToConnStatusChanges() (*types.ConnStatusSubsc
 	return nil, errors.New("not available in WakuV1")
 }
 
-func (w *GethWakuWrapper) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []types.TopicType) error {
+func (w *GethWakuWrapper) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
 	return errors.New("not available in WakuV1")
 }
 
@@ -311,7 +311,7 @@ func (w *GethWakuWrapper) PeerID() peer.ID {
 	panic("not available in WakuV1")
 }
 
-func (w *GethWakuWrapper) GetActiveStorenode() peer.ID {
+func (w *GethWakuWrapper) GetActiveStorenode() peer.AddrInfo {
 	panic("not available in WakuV1")
 }
 
@@ -338,7 +338,7 @@ func (w *GethWakuWrapper) SetStorenodeConfigProvider(c history.StorenodeConfigPr
 func (w *GethWakuWrapper) ProcessMailserverBatch(
 	ctx context.Context,
 	batch types.MailserverBatch,
-	storenodeID peer.ID,
+	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
