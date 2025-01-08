@@ -1,9 +1,10 @@
 import json
 import random
 from utils import wallet_utils
+import uuid as uuid_lib
 import pytest
 
-from resources.constants import user_1
+from resources.constants import user_1, user_2
 from test_cases import StatusBackendTestCase
 from clients.signals import SignalType
 
@@ -34,9 +35,30 @@ class TestWalletActivitySession(StatusBackendTestCase):
         self.request_id = str(random.randint(1, 8888))
 
     def test_wallet_start_activity_filter_session(self):
+        uuid = str(uuid_lib.uuid4())
+        amount_in = "0xde0b6b3a7640000"
+
+        input_params = {
+            "uuid": uuid,
+            "sendType": 0,
+            "addrFrom": user_1.address,
+            "addrTo": user_2.address,
+            "amountIn": amount_in,
+            "amountOut": "0x0",
+            "tokenID": "ETH",
+            "tokenIDIsOwnerToken": False,
+            "toTokenID": "",
+            "disabledFromChainIDs": [10, 42161],
+            "disabledToChainIDs": [10, 42161],
+            "gasFeeMode": 1,
+            "fromLockedAmount": {},
+            # params for building tx from route
+            "slippagePercentage": 0,
+        }
+
         tx_data = []  # (routes, build_tx, tx_signatures, tx_status)
         # Set up a transactions for account before starting session
-        tx_data.append(wallet_utils.send_router_transaction(self.rpc_client))
+        tx_data.append(wallet_utils.send_router_transaction(self.rpc_client, **input_params))
 
         # Start activity session
         method = "wallet_startActivityFilterSessionV2"
@@ -76,13 +98,15 @@ class TestWalletActivitySession(StatusBackendTestCase):
         validate_entry(message["activities"][0], tx_data[-1])
 
         # Trigger new transaction
+        uuid = str(uuid_lib.uuid4())
+        input_params["uuid"] = uuid
+
         self.rpc_client.prepare_wait_for_signal(
             "wallet",
             1,
             lambda signal: signal["event"]["type"] == EventActivitySessionUpdated and signal["event"]["requestId"] == sessionID,
         )
-        tx_data.append(wallet_utils.send_router_transaction(self.rpc_client))
-        print(tx_data[-1])
+        tx_data.append(wallet_utils.send_router_transaction(self.rpc_client, **input_params))
         event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
 
         # Check response event

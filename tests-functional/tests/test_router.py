@@ -1,17 +1,18 @@
-import uuid
+import uuid as uuid_lib
 
 import pytest
+import logging
+import resources.constants as constants
 
-from conftest import option
-from resources.constants import user_1, user_2
 from test_cases import StatusBackendTestCase
 from clients.signals import SignalType
+from utils import wallet_utils
 
 
 @pytest.mark.rpc
 @pytest.mark.transaction
 @pytest.mark.wallet
-class TestTransactionFromRoute(StatusBackendTestCase):
+class TestRouter(StatusBackendTestCase):
     await_signals = [
         SignalType.NODE_LOGIN.value,
         SignalType.WALLET_SUGGESTED_ROUTES.value,
@@ -22,81 +23,193 @@ class TestTransactionFromRoute(StatusBackendTestCase):
     ]
 
     def test_tx_from_route(self):
-
-        _uuid = str(uuid.uuid4())
+        uuid = str(uuid_lib.uuid4())
         amount_in = "0xde0b6b3a7640000"
 
-        method = "wallet_getSuggestedRoutesAsync"
-        params = [
-            {
-                "uuid": _uuid,
-                "sendType": 0,
-                "addrFrom": user_1.address,
-                "addrTo": user_2.address,
-                "amountIn": amount_in,
-                "amountOut": "0x0",
-                "tokenID": "ETH",
-                "tokenIDIsOwnerToken": False,
-                "toTokenID": "",
-                "disabledFromChainIDs": [10, 42161],
-                "disabledToChainIDs": [10, 42161],
-                "gasFeeMode": 1,
-                "fromLockedAmount": {},
-            }
-        ]
-        response = self.rpc_client.rpc_valid_request(method, params)
+        params = {
+            "uuid": uuid,
+            "sendType": 0,
+            "addrFrom": constants.user_1.address,
+            "addrTo": constants.user_2.address,
+            "amountIn": amount_in,
+            "amountOut": "0x0",
+            "tokenID": "ETH",
+            "tokenIDIsOwnerToken": False,
+            "toTokenID": "",
+            "disabledFromChainIDs": [1, 10, 42161],
+            "disabledToChainIDs": [1, 10, 42161],
+            "gasFeeMode": 1,
+            "fromLockedAmount": {},
+        }
 
-        routes = self.rpc_client.wait_for_signal(SignalType.WALLET_SUGGESTED_ROUTES.value)
-        assert routes["event"]["Uuid"] == _uuid
+        routes = wallet_utils.get_suggested_routes(self.rpc_client, **params)
+        assert len(routes["Best"]) > 0
+        wallet_router_sign_transactions = wallet_utils.build_transactions_from_route(self.rpc_client, **params)
+        transaction_hashes = wallet_router_sign_transactions["signingDetails"]["hashes"]
+        tx_signatures = wallet_utils.sign_messages(self.rpc_client, transaction_hashes, constants.user_1.address)
+        tx_status = wallet_utils.send_router_transactions_with_signatures(self.rpc_client, uuid, tx_signatures)
+        wallet_utils.check_tx_details(self.rpc_client, tx_status["hash"], self.network_id, constants.user_2.address, amount_in)
 
-        method = "wallet_buildTransactionsFromRoute"
-        params = [{"uuid": _uuid, "slippagePercentage": 0}]
-        response = self.rpc_client.rpc_valid_request(method, params)
+    def test_setting_different_fee_modes(self):
+        uuid = str(uuid_lib.uuid4())
+        gas_fee_mode = constants.gas_fee_mode_medium
+        amount_in = "0xde0b6b3a7640000"
 
-        wallet_router_sign_transactions = self.rpc_client.wait_for_signal(SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS.value)
+        router_input_params = {
+            "uuid": uuid,
+            "sendType": 0,
+            "addrFrom": constants.user_1.address,
+            "addrTo": constants.user_2.address,
+            "amountIn": amount_in,
+            "amountOut": "0x0",
+            "tokenID": "ETH",
+            "tokenIDIsOwnerToken": False,
+            "toTokenID": "",
+            "disabledFromChainIDs": [1, 10, 42161],
+            "disabledToChainIDs": [1, 10, 42161],
+            "gasFeeMode": gas_fee_mode,
+            "fromLockedAmount": {},
+        }
 
-        assert wallet_router_sign_transactions["event"]["signingDetails"]["signOnKeycard"] is False
-        transaction_hashes = wallet_router_sign_transactions["event"]["signingDetails"]["hashes"]
+        logging.info("Step: getting the best route")
+        routes = wallet_utils.get_suggested_routes(self.rpc_client, **router_input_params)
+        assert len(routes["Best"]) > 0
+        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
 
-        assert transaction_hashes, "Transaction hashes are empty!"
+        logging.info("Step: update gas fee mode without providing path tx identity params via wallet_setFeeMode endpoint")
+        method = "wallet_setFeeMode"
+        response = self.rpc_client.rpc_request(method, [None, gas_fee_mode])
+        self.rpc_client.verify_is_json_rpc_error(response)
 
-        tx_signatures = {}
+        logging.info("Step: update gas fee mode with incomplete details for path tx identity params via wallet_setFeeMode endpoint")
+        tx_identity_params = {
+            "routerInputParamsUuid": uuid,
+        }
+        response = self.rpc_client.rpc_request(method, [tx_identity_params, gas_fee_mode])
+        self.rpc_client.verify_is_json_rpc_error(response)
 
-        for hash in transaction_hashes:
+        logging.info("Step: update gas fee mode to low")
+        gas_fee_mode = constants.gas_fee_mode_low
+        tx_identity_params = {
+            "routerInputParamsUuid": uuid,
+            "pathName": routes["Best"][0]["ProcessorName"],
+            "chainID": routes["Best"][0]["FromChain"]["chainId"],
+            "isApprovalTx": routes["Best"][0]["ApprovalRequired"],
+        }
+        self.rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
+        _ = self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
+        response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
+        routes = response["event"]
+        assert len(routes["Best"]) > 0
+        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
 
-            method = "wallet_signMessage"
-            params = [hash, user_1.address, option.password]
+        logging.info("Step: update gas fee mode to high")
+        gas_fee_mode = constants.gas_fee_mode_high
+        self.rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
+        _ = self.rpc_client.rpc_valid_request(method, [tx_identity_params, gas_fee_mode])
+        response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
+        routes = response["event"]
+        assert len(routes["Best"]) > 0
+        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
 
-            response = self.rpc_client.rpc_valid_request(method, params)
+        logging.info("Step: try to set custom gas fee mode via wallet_setFeeMode endpoint")
+        gas_fee_mode = constants.gas_fee_mode_custom
+        response = self.rpc_client.rpc_request(method, [tx_identity_params, gas_fee_mode])
+        self.rpc_client.verify_is_json_rpc_error(response)
 
-            result = response.json().get("result")
-            assert result and result.startswith("0x"), f"Invalid transaction signature for hash {hash}: {result}"
+    def test_setting_custom_fee_mode(self):
+        uuid = str(uuid_lib.uuid4())
+        gas_fee_mode = constants.gas_fee_mode_medium
+        amount_in = "0xde0b6b3a7640000"
 
-            tx_signature = result[2:]
+        router_input_params = {
+            "uuid": uuid,
+            "sendType": 0,
+            "addrFrom": constants.user_1.address,
+            "addrTo": constants.user_2.address,
+            "amountIn": amount_in,
+            "amountOut": "0x0",
+            "tokenID": "ETH",
+            "tokenIDIsOwnerToken": False,
+            "toTokenID": "",
+            "disabledFromChainIDs": [1, 10, 42161],
+            "disabledToChainIDs": [1, 10, 42161],
+            "gasFeeMode": gas_fee_mode,
+            "fromLockedAmount": {},
+        }
 
-            signature = {
-                "r": tx_signature[:64],
-                "s": tx_signature[64:128],
-                "v": tx_signature[128:],
-            }
+        logging.info("Step: getting the best route")
+        routes = wallet_utils.get_suggested_routes(self.rpc_client, **router_input_params)
+        assert len(routes["Best"]) > 0
+        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])
 
-            tx_signatures[hash] = signature
+        logging.info("Step: try to set custom tx details with empty params via wallet_setCustomTxDetails endpoint")
+        method = "wallet_setCustomTxDetails"
+        response = self.rpc_client.rpc_request(method, [None, None])
+        self.rpc_client.verify_is_json_rpc_error(response)
 
-        method = "wallet_sendRouterTransactionsWithSignatures"
-        params = [{"uuid": _uuid, "Signatures": tx_signatures}]
-        response = self.rpc_client.rpc_valid_request(method, params)
+        logging.info("Step: try to set custom tx details with incomplete details for path tx identity params via wallet_setCustomTxDetails endpoint")
+        tx_identity_params = {
+            "routerInputParamsUuid": uuid,
+        }
+        response = self.rpc_client.rpc_request(method, [tx_identity_params, None])
+        self.rpc_client.verify_is_json_rpc_error(response)
 
-        tx_status = self.rpc_client.wait_for_signal(SignalType.WALLET_TRANSACTION_STATUS_CHANGED.value)
+        logging.info("Step: try to set custom tx details providing other than the custom gas fee mode via wallet_setCustomTxDetails endpoint")
+        tx_identity_params = {
+            "routerInputParamsUuid": uuid,
+            "pathName": routes["Best"][0]["ProcessorName"],
+            "chainID": routes["Best"][0]["FromChain"]["chainId"],
+            "isApprovalTx": routes["Best"][0]["ApprovalRequired"],
+        }
+        tx_custom_params = {
+            "gasFeeMode": constants.gas_fee_mode_low,
+        }
+        response = self.rpc_client.rpc_request(method, [tx_identity_params, tx_custom_params])
+        self.rpc_client.verify_is_json_rpc_error(response)
 
-        assert tx_status["event"]["chainId"] == 31337
-        assert tx_status["event"]["status"] == "Success"
-        tx_hash = tx_status["event"]["hash"]
+        logging.info("Step: try to set custom tx details without providing maxFeesPerGas via wallet_setCustomTxDetails endpoint")
+        tx_custom_params = {
+            "gasFeeMode": gas_fee_mode,
+        }
+        response = self.rpc_client.rpc_request(method, [tx_identity_params, tx_custom_params])
+        self.rpc_client.verify_is_json_rpc_error(response)
 
-        method = "ethclient_transactionByHash"
-        params = [self.network_id, tx_hash]
+        logging.info("Step: try to set custom tx details without providing PriorityFee via wallet_setCustomTxDetails endpoint")
+        tx_custom_params = {
+            "gasFeeMode": gas_fee_mode,
+            "maxFeesPerGas": "0x77359400",
+        }
+        response = self.rpc_client.rpc_request(method, [tx_identity_params, tx_custom_params])
+        self.rpc_client.verify_is_json_rpc_error(response)
 
-        response = self.rpc_client.rpc_valid_request(method, params)
-        tx_details = response.json()["result"]["tx"]
-
-        assert tx_details["value"] == amount_in
-        assert tx_details["to"].upper() == user_2.address.upper()
+        logging.info("Step: try to set custom tx details via wallet_setCustomTxDetails endpoint")
+        gas_fee_mode = constants.gas_fee_mode_custom
+        tx_nonce = 4
+        tx_gas_amount = 30000
+        tx_max_fees_per_gas = "0x77359400"
+        tx_priority_fee = "0x1DCD6500"
+        tx_identity_params = {
+            "routerInputParamsUuid": uuid,
+            "pathName": routes["Best"][0]["ProcessorName"],
+            "chainID": routes["Best"][0]["FromChain"]["chainId"],
+            "isApprovalTx": routes["Best"][0]["ApprovalRequired"],
+        }
+        tx_custom_params = {
+            "gasFeeMode": gas_fee_mode,
+            "nonce": tx_nonce,
+            "gasAmount": tx_gas_amount,
+            "maxFeesPerGas": tx_max_fees_per_gas,
+            "priorityFee": tx_priority_fee,
+        }
+        self.rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
+        _ = self.rpc_client.rpc_valid_request(method, [tx_identity_params, tx_custom_params])
+        response = self.rpc_client.wait_for_signal("wallet.suggested.routes")
+        routes = response["event"]
+        assert len(routes["Best"]) > 0
+        tx_nonce_int = int(routes["Best"][0]["TxNonce"], 16)
+        assert tx_nonce_int == tx_nonce
+        assert routes["Best"][0]["TxGasAmount"] == tx_gas_amount
+        assert routes["Best"][0]["TxMaxFeesPerGas"].upper() == tx_max_fees_per_gas.upper()
+        assert routes["Best"][0]["TxPriorityFee"].upper() == tx_priority_fee.upper()
+        wallet_utils.check_fees_for_path(constants.processor_name_transfer, gas_fee_mode, routes["Best"][0]["ApprovalRequired"], routes["Best"])

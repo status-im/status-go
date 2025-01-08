@@ -1,11 +1,9 @@
 import json
 import logging
 import jsonschema
-import uuid
-
+import resources.constants as constants
 
 from conftest import option
-from resources.constants import user_1, user_2
 
 
 def verify_json_schema(response, method):
@@ -14,49 +12,38 @@ def verify_json_schema(response, method):
 
 
 def get_suggested_routes(rpc_client, **kwargs):
-    _uuid = str(uuid.uuid4())
-    amount_in = "0xde0b6b3a7640000"
-
     method = "wallet_getSuggestedRoutesAsync"
-    input_params = {
-        "uuid": _uuid,
-        "sendType": 0,
-        "addrFrom": user_1.address,
-        "addrTo": user_2.address,
-        "amountIn": amount_in,
-        "amountOut": "0x0",
-        "tokenID": "ETH",
-        "tokenIDIsOwnerToken": False,
-        "toTokenID": "",
-        "disabledFromChainIDs": [10, 42161],
-        "disabledToChainIDs": [10, 42161],
-        "gasFeeMode": 1,
-        "fromLockedAmount": {},
-    }
+    required_params = ["uuid", "sendType", "addrFrom", "addrTo", "amountIn", "tokenID", "gasFeeMode"]
+    input_params = {}
+
     for key, new_value in kwargs.items():
-        if key in input_params:
-            input_params[key] = new_value
-        else:
+        input_params[key] = new_value
+
+    for key in required_params:
+        if key not in input_params:
             logging.info(f"Warning: The key '{key}' does not exist in the input_params parameters and will be ignored.")
+
     params = [input_params]
 
     rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
     _ = rpc_client.rpc_valid_request(method, params)
 
     routes = rpc_client.wait_for_signal("wallet.suggested.routes")
-    assert routes["event"]["Uuid"] == _uuid
 
     return routes["event"]
 
 
-def build_transactions_from_route(rpc_client, uuid, **kwargs):
+def build_transactions_from_route(rpc_client, **kwargs):
     method = "wallet_buildTransactionsFromRoute"
-    build_tx_params = {"uuid": uuid, "slippagePercentage": 0}
+    required_params = []
+    build_tx_params = {}
     for key, new_value in kwargs.items():
-        if key in build_tx_params:
-            build_tx_params[key] = new_value
-        else:
+        build_tx_params[key] = new_value
+
+    for key in required_params:
+        if key not in build_tx_params:
             logging.info(f"Warning: The key '{key}' does not exist in the build_tx_params parameters and will be ignored.")
+
     params = [build_tx_params]
     _ = rpc_client.rpc_valid_request(method, params)
 
@@ -70,13 +57,13 @@ def build_transactions_from_route(rpc_client, uuid, **kwargs):
     return wallet_router_sign_transactions["event"]
 
 
-def sign_messages(rpc_client, hashes):
+def sign_messages(rpc_client, hashes, address):
     tx_signatures = {}
 
     for hash in hashes:
 
         method = "wallet_signMessage"
-        params = [hash, user_1.address, option.password]
+        params = [hash, address, option.password]
 
         response = rpc_client.rpc_valid_request(method, params)
 
@@ -95,6 +82,49 @@ def sign_messages(rpc_client, hashes):
     return tx_signatures
 
 
+def check_tx_details(rpc_client, tx_hash, network_id, address_to, expected_amount_in):
+    method = "ethclient_transactionByHash"
+    params = [network_id, tx_hash]
+
+    response = rpc_client.rpc_valid_request(method, params)
+    tx_details = response.json()["result"]["tx"]
+
+    assert tx_details["value"] == expected_amount_in
+    assert tx_details["to"].upper() == address_to.upper()
+
+
+def check_fees(fee_mode, base_fee, max_priority_fee_per_gas, max_fee_per_gas):
+    assert base_fee.startswith("0x")
+    assert max_priority_fee_per_gas.startswith("0x")
+    assert max_fee_per_gas.startswith("0x")
+
+    base_fee_int = int(base_fee, 16)
+    max_priority_fee_per_gas_int = int(max_priority_fee_per_gas, 16)
+    max_fee_per_gas_int = int(max_fee_per_gas, 16)
+
+    if fee_mode == constants.gas_fee_mode_low:
+        assert base_fee_int + max_priority_fee_per_gas_int == max_fee_per_gas_int
+    elif fee_mode == constants.gas_fee_mode_medium:
+        assert (2 * base_fee_int + max_priority_fee_per_gas_int) == max_fee_per_gas_int
+    elif fee_mode == constants.gas_fee_mode_high:
+        assert 3 * base_fee_int + max_priority_fee_per_gas_int == max_fee_per_gas_int
+    elif fee_mode == constants.gas_fee_mode_custom:
+        assert base_fee_int + max_priority_fee_per_gas_int == max_fee_per_gas_int
+    else:
+        assert False, "Invalid gas fee mode"
+
+
+def check_fees_for_path(path_name, gas_fee_mode, check_approval, route):
+    for path_tx in route:
+        if path_tx["ProcessorName"] != path_name:
+            continue
+        if check_approval:
+            assert path_tx["ApprovalRequired"]
+            check_fees(gas_fee_mode, path_tx["ApprovalBaseFee"], path_tx["ApprovalPriorityFee"], path_tx["ApprovalMaxFeesPerGas"])
+            return
+        check_fees(gas_fee_mode, path_tx["TxBaseFee"], path_tx["TxPriorityFee"], path_tx["TxMaxFeesPerGas"])
+
+
 def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
     method = "wallet_sendRouterTransactionsWithSignatures"
     params = [{"uuid": uuid, "Signatures": tx_signatures}]
@@ -109,8 +139,16 @@ def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
 
 def send_router_transaction(rpc_client, **kwargs):
     routes = get_suggested_routes(rpc_client, **kwargs)
-    build_tx = build_transactions_from_route(rpc_client, routes["Uuid"])
-    tx_signatures = sign_messages(rpc_client, build_tx["signingDetails"]["hashes"])
+
+    router_build_tx_params = {}
+    for key in kwargs:
+        if key in ["uuid", "slippagePercentage"]:
+            router_build_tx_params[key] = kwargs[key]
+
+    build_tx = build_transactions_from_route(rpc_client, **router_build_tx_params)
+
+    tx_signatures = sign_messages(rpc_client, build_tx["signingDetails"]["hashes"], kwargs.get("addrFrom"))
+
     tx_status = send_router_transactions_with_signatures(rpc_client, routes["Uuid"], tx_signatures)
     return {
         "routes": routes,
