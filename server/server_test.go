@@ -145,6 +145,15 @@ func (s *ServerURLSuite) TestServer_MakeStickerURL() {
 		s.serverNoPort.MakeStickerURL("0xdeadbeef4ac0"))
 }
 
+func (s *ServerURLSuite) TestServer_MakeContactImageURL() {
+	s.Require().Equal(
+		baseURLWithCustomPort+"/contactImages?clock=1&imageName=Test&publicKey=0x1",
+		s.server.MakeContactImageURL("0x1", "Test", uint64(1)))
+	s.testNoPort(
+		baseURLWithDefaultPort+"/contactImages?clock=1&imageName=Test&publicKey=0x1",
+		s.serverNoPort.MakeContactImageURL("0x1", "Test", uint64(1)))
+}
+
 // TestQRCodeGeneration tests if we provide all the correct parameters to the media server
 // do we get a valid QR code or not as part of the response payload.
 // we have stored a generated QR code in tests folder, and we compare their bytes.

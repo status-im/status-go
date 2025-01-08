@@ -230,10 +230,10 @@ func (s *MediaServer) MakeQRURL(qurul string,
 	return u.String()
 }
 
-func (s *MediaServer) MakeContactImageURL(publicKey string, imageType string) string {
+func (s *MediaServer) MakeContactImageURL(publicKey string, imageType string, imageClock uint64) string {
 	u := s.MakeBaseURL()
 	u.Path = contactImagesPath
-	u.RawQuery = url.Values{"publicKey": {publicKey}, "imageName": {imageType}}.Encode()
+	u.RawQuery = url.Values{"publicKey": {publicKey}, "imageName": {imageType}, "clock": {fmt.Sprint(imageClock)}}.Encode()
 
 	return u.String()
 }
