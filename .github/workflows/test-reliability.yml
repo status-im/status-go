@@ -45,7 +45,7 @@ jobs:
       uses: actions/checkout@v4
       continue-on-error: true
       with:
-        repository: status-im/status-cli-tests
+        repository: status-im/status-go-allure
         ref: gh-pages
         path: gh-pages
         token: ${{ env.DEPLOY_TEST_REPORTS_PAT }}
@@ -59,14 +59,14 @@ jobs:
         gh_pages: gh-pages
         allure_history: allure-history
         keep_reports: 30
-        report_url: 'https://status-im.github.io/status-cli-tests/'
+        report_url: 'https://status-im.github.io/status-go-allure/'
 
     - name: Deploy report to Github Pages
       uses: peaceiris/actions-gh-pages@v4
       if: always()
       with:
         personal_token: ${{ env.DEPLOY_TEST_REPORTS_PAT }}
-        external_repository: status-im/status-cli-tests
+        external_repository: status-im/status-go-allure
         publish_branch: gh-pages
         publish_dir: allure-history
 
@@ -79,7 +79,7 @@ jobs:
         echo "- **Event**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
         echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-        echo "Allure report will be available at: https://status-im.github.io/status-cli-tests/${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        echo "Allure report will be available at: https://status-im.github.io/status-go-allure/${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
         {
           echo 'JOB_SUMMARY<<EOF'
           cat $GITHUB_STEP_SUMMARY
