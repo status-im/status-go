@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 from collections import namedtuple
+from uuid import uuid4
 
 import pytest
 
@@ -264,3 +265,13 @@ class MessengerTestCase(NetworkConditionTestCase):
             return matched_messages
         else:
             raise ValueError(f"Failed to find a message with contentType '{content_type}' in response")
+
+    def join_private_group(self):
+        private_group_name = f"private_group_{uuid4()}"
+        response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
+        expected_group_creation_msg = f"@{self.sender.public_key} created the group {private_group_name}"
+        expected_message = self.get_message_by_content_type(
+            response, content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value, message_pattern=expected_group_creation_msg
+        )[0]
+        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"), timeout=60)
+        return response.get("result", {}).get("chats", [])[0].get("id")

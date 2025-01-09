@@ -38,3 +38,8 @@ class WakuextService(Service):
         params = [None, group_chat_name, pubkey_list]
         response = self.rpc_request("createGroupChatWithMembers", params)
         return response.json()
+
+    def send_group_chat_message(self, group_id: str, message: str):
+        params = [{"id": group_id, "message": message}]
+        response = self.rpc_request("sendGroupChatMessage", params)
+        return response.json()
