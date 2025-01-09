@@ -1,9 +1,6 @@
 name: Test Reliability
 
 on:
-  push:
-    branches:
-      - "test-reliability-workflow"
   workflow_dispatch:
 
 env:
