@@ -186,6 +186,19 @@ func (r *Router) applyCustomFields(ctx context.Context, path *routes.Path, fetch
 	r.lastInputParamsMutex.Lock()
 	defer r.lastInputParamsMutex.Unlock()
 
+	// set network fields
+	if fetchedFees.CurrentBaseFee != nil {
+		path.CurrentBaseFee = (*hexutil.Big)(fetchedFees.CurrentBaseFee)
+	}
+	if fetchedFees.MaxPriorityFeeSuggestedBounds != nil {
+		if fetchedFees.MaxPriorityFeeSuggestedBounds.Lower != nil {
+			path.SuggestedMinPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeeSuggestedBounds.Lower)
+		}
+		if fetchedFees.MaxPriorityFeeSuggestedBounds.Upper != nil {
+			path.SuggestedMaxPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeeSuggestedBounds.Upper)
+		}
+	}
+
 	// set appropriate nonce/s, and update later in this function if custom nonce/s are provided
 	err := r.resolveNonceForPath(ctx, path, r.lastInputParams.AddrFrom, usedNonces)
 	if err != nil {
@@ -341,7 +354,11 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 
 	path.TxEstimatedTime = r.feesManager.TransactionEstimatedTime(ctx, path.FromChain.ChainID, path.TxMaxFeesPerGas.ToInt())
 	if path.ApprovalRequired {
-		path.ApprovalEstimatedTime = r.feesManager.TransactionEstimatedTime(ctx, path.FromChain.ChainID, path.ApprovalMaxFeesPerGas.ToInt())
+		if path.TxMaxFeesPerGas.ToInt().Cmp(path.ApprovalMaxFeesPerGas.ToInt()) == 0 {
+			path.ApprovalEstimatedTime = path.TxEstimatedTime
+		} else {
+			path.ApprovalEstimatedTime = r.feesManager.TransactionEstimatedTime(ctx, path.FromChain.ChainID, path.ApprovalMaxFeesPerGas.ToInt())
+		}
 	}
 
 	return

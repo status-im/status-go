@@ -2,7 +2,6 @@ package commands
 
 import (
 	"encoding/json"
-	"errors"
 	"math/big"
 	"testing"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/eth-node/types"
 	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
+	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 )
@@ -82,9 +82,10 @@ func TestSendTransactionWithSignalTimout(t *testing.T) {
 	WalletResponseMaxInterval = 1 * time.Millisecond
 
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
+	feeHistory := &fees.FeeHistory{}
+	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(300), "latest", []int{25, 50, 75}).Times(1).Return(nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
-	mockedChainClient.EXPECT().SuggestGasTipCap(state.ctx).Times(1).Return(big.NewInt(0), errors.New("EIP-1559 is not enabled"))
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().PendingNonceAt(state.ctx, common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
 
@@ -127,9 +128,10 @@ func TestSendTransactionWithSignalAccepted(t *testing.T) {
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
+	feeHistory := &fees.FeeHistory{}
+	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(300), "latest", []int{25, 50, 75}).Times(1).Return(nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
-	mockedChainClient.EXPECT().SuggestGasTipCap(state.ctx).Times(1).Return(big.NewInt(0), errors.New("EIP-1559 is not enabled"))
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().PendingNonceAt(state.ctx, common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
 
@@ -169,9 +171,10 @@ func TestSendTransactionWithSignalRejected(t *testing.T) {
 	t.Cleanup(signal.ResetMobileSignalHandler)
 
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
+	feeHistory := &fees.FeeHistory{}
+	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(300), "latest", []int{25, 50, 75}).Times(1).Return(nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
-	mockedChainClient.EXPECT().SuggestGasTipCap(state.ctx).Times(1).Return(big.NewInt(0), errors.New("EIP-1559 is not enabled"))
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().PendingNonceAt(state.ctx, common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
 

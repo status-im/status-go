@@ -438,6 +438,7 @@ func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[st
 	return api.s.marketManager.FetchTokenDetails(symbols)
 }
 
+// @deprecated we should remove it once clients fully switched to wallet router, `GetSuggestedRoutesAsync` should be used instead
 func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*fees.SuggestedFeesGwei, error) {
 	logutils.ZapLogger().Debug("call to GetSuggestedFees")
 	return api.s.router.GetFeesManager().SuggestedFeesGwei(ctx, chainID)
@@ -448,6 +449,7 @@ func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint6
 	return api.s.blockChainState.GetEstimatedLatestBlockNumber(ctx, chainID)
 }
 
+// @deprecated we should remove it once clients fully switched to wallet router, `GetSuggestedRoutesAsync` should be used instead
 func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (fees.TransactionEstimation, error) {
 	logutils.ZapLogger().Debug("call to getTransactionEstimatedTime")
 	return api.s.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, gweiToWei(maxFeePerGas)), nil

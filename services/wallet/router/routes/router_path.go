@@ -22,7 +22,10 @@ type Path struct {
 	AmountInLocked        bool               // Is the amount locked
 	AmountOut             *hexutil.Big       // Amount that will be received on the destination chain
 
-	SuggestedLevelsForMaxFeesPerGas *fees.MaxFeesLevels // Suggested max fees for the transaction (in ETH WEI)
+	SuggestedLevelsForMaxFeesPerGas *fees.MaxFeesLevels // Suggested max fees by the network (in ETH WEI)
+	SuggestedMinPriorityFee         *hexutil.Big        // Suggested min priority fee by the network (in ETH WEI)
+	SuggestedMaxPriorityFee         *hexutil.Big        // Suggested max priority fee by the network (in ETH WEI)
+	CurrentBaseFee                  *hexutil.Big        // Current network base fee (in ETH WEI)
 
 	TxNonce         *hexutil.Uint64 // Nonce for the transaction
 	TxMaxFeesPerGas *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
@@ -115,6 +118,18 @@ func (p *Path) Copy() *Path {
 			Medium: (*hexutil.Big)(big.NewInt(0).Set(p.SuggestedLevelsForMaxFeesPerGas.Medium.ToInt())),
 			High:   (*hexutil.Big)(big.NewInt(0).Set(p.SuggestedLevelsForMaxFeesPerGas.High.ToInt())),
 		}
+	}
+
+	if p.SuggestedMinPriorityFee != nil {
+		newPath.SuggestedMinPriorityFee = (*hexutil.Big)(big.NewInt(0).Set(p.SuggestedMinPriorityFee.ToInt()))
+	}
+
+	if p.SuggestedMaxPriorityFee != nil {
+		newPath.SuggestedMaxPriorityFee = (*hexutil.Big)(big.NewInt(0).Set(p.SuggestedMaxPriorityFee.ToInt()))
+	}
+
+	if p.CurrentBaseFee != nil {
+		newPath.CurrentBaseFee = (*hexutil.Big)(big.NewInt(0).Set(p.CurrentBaseFee.ToInt()))
 	}
 
 	if p.TxNonce != nil {

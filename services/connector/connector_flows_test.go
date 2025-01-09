@@ -2,7 +2,6 @@ package connector
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"testing"
@@ -15,6 +14,7 @@ import (
 	"github.com/status-im/status-go/services/connector/chainutils"
 	"github.com/status-im/status-go/services/connector/commands"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -104,9 +104,10 @@ func TestRequestAccountsSwitchChainAndSendTransactionFlow(t *testing.T) {
 
 	// Send transaction
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
+	feeHistory := &fees.FeeHistory{}
+	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(300), "latest", []int{25, 50, 75}).Times(1).Return(nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
-	mockedChainClient.EXPECT().SuggestGasTipCap(state.ctx).Times(1).Return(big.NewInt(0), errors.New("EIP-1559 is not enabled"))
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().PendingNonceAt(state.ctx, common.Address(accountAddress)).Times(1).Return(uint64(10), nil)
 

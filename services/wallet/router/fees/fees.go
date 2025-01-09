@@ -2,16 +2,11 @@ package fees
 
 import (
 	"context"
-	"math"
 	"math/big"
-	"sort"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/params"
-	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
@@ -29,6 +24,8 @@ const (
 
 var (
 	ErrCustomFeeModeNotAvailableInSuggestedFees = &errors.ErrorResponse{Code: errors.ErrorCode("WRF-001"), Details: "custom fee mode is not available in suggested fees"}
+	ErrEIP1559IncompaibleChain                  = &errors.ErrorResponse{Code: errors.ErrorCode("WRF-002"), Details: "EIP-1559 is not supported on this chain"}
+	ErrInvalidRewardData                        = &errors.ErrorResponse{Code: errors.ErrorCode("WRF-003"), Details: "invalid reward data"}
 )
 
 type MaxFeesLevels struct {
@@ -37,13 +34,20 @@ type MaxFeesLevels struct {
 	High   *hexutil.Big `json:"high"`
 }
 
+type MaxPriorityFeesSuggestedBounds struct {
+	Lower *big.Int
+	Upper *big.Int
+}
+
 type SuggestedFees struct {
-	GasPrice             *big.Int       `json:"gasPrice"`
-	BaseFee              *big.Int       `json:"baseFee"`
-	MaxFeesLevels        *MaxFeesLevels `json:"maxFeesLevels"`
-	MaxPriorityFeePerGas *big.Int       `json:"maxPriorityFeePerGas"`
-	L1GasFee             *big.Float     `json:"l1GasFee,omitempty"`
-	EIP1559Enabled       bool           `json:"eip1559Enabled"`
+	GasPrice                      *big.Int
+	BaseFee                       *big.Int
+	CurrentBaseFee                *big.Int // Current network base fee (in ETH WEI)
+	MaxFeesLevels                 *MaxFeesLevels
+	MaxPriorityFeePerGas          *big.Int
+	MaxPriorityFeeSuggestedBounds *MaxPriorityFeesSuggestedBounds
+	L1GasFee                      *big.Float
+	EIP1559Enabled                bool
 }
 
 // //////////////////////////////////////////////////////////////////////////////
@@ -81,58 +85,29 @@ func (s *SuggestedFees) FeeFor(mode GasFeeMode) (*big.Int, error) {
 	return s.MaxFeesLevels.FeeFor(mode)
 }
 
-const inclusionThreshold = 0.95
-
-type TransactionEstimation int
-
-const (
-	Unknown TransactionEstimation = iota
-	LessThanOneMinute
-	LessThanThreeMinutes
-	LessThanFiveMinutes
-	MoreThanFiveMinutes
-)
-
-type FeeHistory struct {
-	BaseFeePerGas []string `json:"baseFeePerGas"`
-}
-
 type FeeManager struct {
 	RPCClient rpc.ClientInterface
 }
 
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
-	backend, err := f.RPCClient.EthClient(chainID)
+	feeHistory, err := f.getFeeHistory(ctx, chainID, 300, "latest", []int{25, 50, 75})
 	if err != nil {
-		return nil, err
+		return f.getNonEIP1559SuggestedFees(ctx, chainID)
 	}
-	gasPrice, err := backend.SuggestGasPrice(ctx)
+
+	maxPriorityFeePerGasLowerBound, maxPriorityFeePerGas, maxPriorityFeePerGasUpperBound, baseFee, err := getEIP1559SuggestedFees(feeHistory)
 	if err != nil {
-		return nil, err
-	}
-	maxPriorityFeePerGas, err := backend.SuggestGasTipCap(ctx)
-	if err != nil {
-		return &SuggestedFees{
-			GasPrice:             gasPrice,
-			BaseFee:              big.NewInt(0),
-			MaxPriorityFeePerGas: big.NewInt(0),
-			MaxFeesLevels: &MaxFeesLevels{
-				Low:    (*hexutil.Big)(gasPrice),
-				Medium: (*hexutil.Big)(gasPrice),
-				High:   (*hexutil.Big)(gasPrice),
-			},
-			EIP1559Enabled: false,
-		}, nil
-	}
-	baseFee, err := f.getBaseFee(ctx, backend)
-	if err != nil {
-		return nil, err
+		return f.getNonEIP1559SuggestedFees(ctx, chainID)
 	}
 
 	return &SuggestedFees{
-		GasPrice:             gasPrice,
 		BaseFee:              baseFee,
+		CurrentBaseFee:       baseFee,
 		MaxPriorityFeePerGas: maxPriorityFeePerGas,
+		MaxPriorityFeeSuggestedBounds: &MaxPriorityFeesSuggestedBounds{
+			Lower: maxPriorityFeePerGasLowerBound,
+			Upper: maxPriorityFeePerGasUpperBound,
+		},
 		MaxFeesLevels: &MaxFeesLevels{
 			Low:    (*hexutil.Big)(new(big.Int).Add(baseFee, maxPriorityFeePerGas)),
 			Medium: (*hexutil.Big)(new(big.Int).Add(new(big.Int).Mul(baseFee, big.NewInt(2)), maxPriorityFeePerGas)),
@@ -142,6 +117,9 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 	}, nil
 }
 
+// //////////////////////////////////////////////////////////////////////////////
+// TODO: remove `SuggestedFeesGwei` once mobile app fully switched to router, this function should not be exposed via api
+// //////////////////////////////////////////////////////////////////////////////
 func (f *FeeManager) SuggestedFeesGwei(ctx context.Context, chainID uint64) (*SuggestedFeesGwei, error) {
 	fees, err := f.SuggestedFees(ctx, chainID)
 	if err != nil {
@@ -174,127 +152,4 @@ func (f *FeeManager) getBaseFee(ctx context.Context, client chain.ClientInterfac
 	}
 	baseFee := misc.CalcBaseFee(config, header)
 	return baseFee, nil
-}
-
-func (f *FeeManager) TransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Int) TransactionEstimation {
-	fees, err := f.getFeeHistorySorted(chainID)
-	if err != nil {
-		return Unknown
-	}
-
-	// pEvent represents the probability of the transaction being included in a block,
-	// we assume this one is static over time, in reality it is not.
-	pEvent := 0.0
-	for idx, fee := range fees {
-		if fee.Cmp(maxFeePerGas) == 1 || idx == len(fees)-1 {
-			pEvent = float64(idx) / float64(len(fees))
-			break
-		}
-	}
-
-	// Probability of next 4 blocks including the transaction (less than 1 minute)
-	// Generalising the formula: P(AUB) = P(A) + P(B) - P(A∩B) for 4 events and in our context P(A) == P(B) == pEvent
-	// The factors are calculated using the combinations formula
-	probability := pEvent*4 - 6*(math.Pow(pEvent, 2)) + 4*(math.Pow(pEvent, 3)) - (math.Pow(pEvent, 4))
-	if probability >= inclusionThreshold {
-		return LessThanOneMinute
-	}
-
-	// Probability of next 12 blocks including the transaction (less than 5 minutes)
-	// Generalising the formula: P(AUB) = P(A) + P(B) - P(A∩B) for 20 events and in our context P(A) == P(B) == pEvent
-	// The factors are calculated using the combinations formula
-	probability = pEvent*12 -
-		66*(math.Pow(pEvent, 2)) +
-		220*(math.Pow(pEvent, 3)) -
-		495*(math.Pow(pEvent, 4)) +
-		792*(math.Pow(pEvent, 5)) -
-		924*(math.Pow(pEvent, 6)) +
-		792*(math.Pow(pEvent, 7)) -
-		495*(math.Pow(pEvent, 8)) +
-		220*(math.Pow(pEvent, 9)) -
-		66*(math.Pow(pEvent, 10)) +
-		12*(math.Pow(pEvent, 11)) -
-		math.Pow(pEvent, 12)
-	if probability >= inclusionThreshold {
-		return LessThanThreeMinutes
-	}
-
-	// Probability of next 20 blocks including the transaction (less than 5 minutes)
-	// Generalising the formula: P(AUB) = P(A) + P(B) - P(A∩B) for 20 events and in our context P(A) == P(B) == pEvent
-	// The factors are calculated using the combinations formula
-	probability = pEvent*20 -
-		190*(math.Pow(pEvent, 2)) +
-		1140*(math.Pow(pEvent, 3)) -
-		4845*(math.Pow(pEvent, 4)) +
-		15504*(math.Pow(pEvent, 5)) -
-		38760*(math.Pow(pEvent, 6)) +
-		77520*(math.Pow(pEvent, 7)) -
-		125970*(math.Pow(pEvent, 8)) +
-		167960*(math.Pow(pEvent, 9)) -
-		184756*(math.Pow(pEvent, 10)) +
-		167960*(math.Pow(pEvent, 11)) -
-		125970*(math.Pow(pEvent, 12)) +
-		77520*(math.Pow(pEvent, 13)) -
-		38760*(math.Pow(pEvent, 14)) +
-		15504*(math.Pow(pEvent, 15)) -
-		4845*(math.Pow(pEvent, 16)) +
-		1140*(math.Pow(pEvent, 17)) -
-		190*(math.Pow(pEvent, 18)) +
-		20*(math.Pow(pEvent, 19)) -
-		math.Pow(pEvent, 20)
-	if probability >= inclusionThreshold {
-		return LessThanFiveMinutes
-	}
-
-	return MoreThanFiveMinutes
-}
-
-func (f *FeeManager) getFeeHistorySorted(chainID uint64) ([]*big.Int, error) {
-	var feeHistory FeeHistory
-
-	err := f.RPCClient.Call(&feeHistory, chainID, "eth_feeHistory", 101, "latest", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	fees := []*big.Int{}
-	for _, fee := range feeHistory.BaseFeePerGas {
-		i := new(big.Int)
-		i.SetString(strings.Replace(fee, "0x", "", 1), 16)
-		fees = append(fees, i)
-	}
-
-	sort.Slice(fees, func(i, j int) bool { return fees[i].Cmp(fees[j]) < 0 })
-	return fees, nil
-}
-
-// Returns L1 fee for placing a transaction to L1 chain, appicable only for txs made from L2.
-func (f *FeeManager) GetL1Fee(ctx context.Context, chainID uint64, input []byte) (uint64, error) {
-	if chainID == common.EthereumMainnet || chainID == common.EthereumSepolia {
-		return 0, nil
-	}
-
-	ethClient, err := f.RPCClient.EthClient(chainID)
-	if err != nil {
-		return 0, err
-	}
-
-	contractAddress, err := gaspriceoracle.ContractAddress(chainID)
-	if err != nil {
-		return 0, err
-	}
-
-	contract, err := gaspriceoracle.NewGaspriceoracleCaller(contractAddress, ethClient)
-	if err != nil {
-		return 0, err
-	}
-
-	callOpt := &bind.CallOpts{}
-
-	result, err := contract.GetL1Fee(callOpt, input)
-	if err != nil {
-		return 0, err
-	}
-
-	return result.Uint64(), nil
 }
