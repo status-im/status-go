@@ -41,7 +41,7 @@ jobs:
       run: pytest -m "reliability" -c tests-functional/pytest.ini --alluredir=allure-results
 
     - name: Get allure history
-      if: env.WORKFLOW_CONCLUSION != 'cancelled'
+      if: always()
       uses: actions/checkout@v4
       continue-on-error: true
       with:
@@ -52,7 +52,7 @@ jobs:
 
     - name: Setup allure report
       uses: simple-elf/allure-report-action@master
-      if: env.WORKFLOW_CONCLUSION != 'cancelled'
+      if: always()
       id: allure-report
       with:
         allure_results: allure-results
@@ -63,7 +63,7 @@ jobs:
 
     - name: Deploy report to Github Pages
       uses: peaceiris/actions-gh-pages@v4
-      if: env.WORKFLOW_CONCLUSION != 'cancelled'
+      if: always()
       with:
         personal_token: ${{ env.DEPLOY_TEST_REPORTS_PAT }}
         external_repository: status-im/status-cli-tests
