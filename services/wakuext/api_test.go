@@ -39,7 +39,7 @@ func TestInitProtocol(t *testing.T) {
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	nodeWrapper := ext.NewTestNodeWrapper(nil, waku)
+	nodeWrapper := ext.NewTestNodeWrapper(waku)
 	service := New(config, nodeWrapper, nil, nil, db)
 
 	appDB, cleanupDB, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "db.sql")

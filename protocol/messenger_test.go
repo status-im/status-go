@@ -74,10 +74,6 @@ func (n *testNode) GetWakuV2(_ interface{}) (types.Waku, error) {
 	return nil, errors.New("No waku v2 support")
 }
 
-func (n *testNode) GetWhisper(_ interface{}) (types.Whisper, error) {
-	return nil, nil
-}
-
 func (n *testNode) PeersCount() int {
 	return 1
 }

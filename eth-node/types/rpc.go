@@ -48,30 +48,6 @@ type Criteria struct {
 	AllowP2P     bool        `json:"allowP2P"`
 }
 
-// PublicWhisperAPI provides the whisper RPC service that can be
-// use publicly without security implications.
-type PublicWhisperAPI interface {
-	// AddPrivateKey imports the given private key.
-	AddPrivateKey(ctx context.Context, privateKey HexBytes) (string, error)
-	// GenerateSymKeyFromPassword derives a key from the given password, stores it, and returns its ID.
-	GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error)
-	// DeleteKeyPair removes the key with the given key if it exists.
-	DeleteKeyPair(ctx context.Context, key string) (bool, error)
-
-	// Post posts a message on the Whisper network.
-	// returns the hash of the message in case of success.
-	Post(ctx context.Context, req NewMessage) ([]byte, error)
-
-	// NewMessageFilter creates a new filter that can be used to poll for
-	// (new) messages that satisfy the given criteria.
-	NewMessageFilter(req Criteria) (string, error)
-	// GetFilterMessages returns the messages that match the filter criteria and
-	// are received between the last poll and now.
-	GetFilterMessages(id string) ([]*Message, error)
-	// BloomFilter returns the current bloomfilter of the node
-	BloomFilter() []byte
-}
-
 // PublicWakuAPI provides the waku RPC service that can be
 // use publicly without security implications.
 type PublicWakuAPI interface {

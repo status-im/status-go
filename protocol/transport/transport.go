@@ -107,7 +107,7 @@ func NewTransport(
 		envelopesMonitor.Start()
 	}
 
-	var api types.PublicWhisperAPI
+	var api types.PublicWakuAPI
 	if waku != nil {
 		api = waku.PublicWakuAPI()
 	}
