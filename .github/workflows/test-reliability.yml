@@ -16,9 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Get workflow status
-      uses: technote-space/workflow-conclusion-action@v3
-
     - uses: actions/checkout@v4
 
     - uses: actions/setup-python@v4
