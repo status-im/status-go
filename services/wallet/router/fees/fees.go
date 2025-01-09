@@ -5,11 +5,8 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/consensus/misc"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/common"
 )
 
@@ -134,22 +131,4 @@ func (f *FeeManager) SuggestedFeesGwei(ctx context.Context, chainID uint64) (*Su
 		MaxFeePerGasHigh:     common.WeiToGwei(fees.MaxFeesLevels.High.ToInt()),
 		EIP1559Enabled:       fees.EIP1559Enabled,
 	}, nil
-}
-
-func (f *FeeManager) getBaseFee(ctx context.Context, client chain.ClientInterface) (*big.Int, error) {
-	header, err := client.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	chainID := client.NetworkID()
-	config := params.MainnetChainConfig
-	switch chainID {
-	case common.EthereumSepolia,
-		common.OptimismSepolia,
-		common.ArbitrumSepolia:
-		config = params.SepoliaChainConfig
-	}
-	baseFee := misc.CalcBaseFee(config, header)
-	return baseFee, nil
 }
