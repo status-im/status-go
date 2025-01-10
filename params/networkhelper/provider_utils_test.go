@@ -1,10 +1,11 @@
 package networkhelper_test
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
