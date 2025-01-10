@@ -143,3 +143,24 @@ func TestOverrideDirectProvidersAuth(t *testing.T) {
 		}
 	}
 }
+
+func TestDeepCopyNetwork(t *testing.T) {
+	originalNetwork := testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+		*params.NewUserProvider(api.MainnetChainID, "Provider1", "https://userprovider.example.com", true),
+		*params.NewDirectProvider(api.MainnetChainID, "Provider2", "https://mainnet.infura.io/v3/", true),
+	})
+
+	originalNetwork.TokenOverrides = []params.TokenOverride{
+		{Symbol: "token1", Address: common.HexToAddress("0x123")},
+	}
+
+	copiedNetwork := networkhelper.DeepCopyNetwork(*originalNetwork)
+
+	assert.True(t, reflect.DeepEqual(originalNetwork, &copiedNetwork), "Copied network should be deeply equal to the original")
+
+	// Modify the copied network and verify that the original network remains unchanged
+	copiedNetwork.RpcProviders[0].Enabled = false
+	copiedNetwork.TokenOverrides[0].Symbol = "modifiedSymbol"
+	assert.NotEqual(t, originalNetwork.RpcProviders[0].Enabled, copiedNetwork.RpcProviders[0].Enabled, "Original network should remain unchanged")
+	assert.NotEqual(t, originalNetwork.TokenOverrides[0].Symbol, copiedNetwork.TokenOverrides[0].Symbol, "Original network should remain unchanged")
+}

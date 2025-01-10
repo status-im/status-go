@@ -2,7 +2,9 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+
 	"github.com/status-im/status-go/params"
 )
 
@@ -65,13 +67,17 @@ func ExecuteWithinTransaction(db *sql.DB, fn func(tx *sql.Tx) error) (err error)
 	}
 	defer func() {
 		if p := recover(); p != nil {
+			err = fmt.Errorf("panic: %v", p)
 			_ = tx.Rollback()
 			panic(p)
 		} else if err != nil {
-			_ = tx.Rollback()
+			rollbackErr := tx.Rollback()
+			if rollbackErr != nil {
+				err = errors.Join(err, fmt.Errorf("transaction rollback failed: %w", rollbackErr))
+			}
 		} else {
 			if commitErr := tx.Commit(); commitErr != nil {
-				err = fmt.Errorf("transaction commit failed: %w", commitErr)
+				err = errors.Join(err, fmt.Errorf("transaction commit failed: %w", commitErr))
 			}
 		}
 	}()
