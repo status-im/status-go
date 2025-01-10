@@ -613,6 +613,8 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	}
 
 	defaultCfg := &params.NodeConfig{
+		LogDir:  "/tmp/importexport-logs",
+		LogFile: "/tmp/importexport-logs/geth.log",
 		// why we need this? relate PR: https://github.com/status-im/status-go/pull/4014
 		KeycardPairingDataFile: DefaultKeycardPairingDataFile,
 	}

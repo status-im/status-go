@@ -21,10 +21,14 @@ const AddFlag = "add"
 const PortFlag = "port"
 const APIModulesFlag = "api-modules"
 const TelemetryServerURLFlag = "telemetry-server-url"
+const RootDataDirFlag = "root-data-dir"
+const InputFlag = "input"
+const OutputFlag = "output"
 const KeyUIDFlag = "key-uid"
 const FleetFlag = "fleet"
 const DebugLevel = "debug"
 const MessageFailureFlag = "fail"
+const PasswordFlag = "password"
 
 const RetrieveInterval = 300 * time.Millisecond
 const SendInterval = 1 * time.Second
@@ -81,6 +85,52 @@ var SimulateFlags = append([]cli.Flag{
 	},
 }, CommonFlags...)
 
+var ExportUnencryptedDBFlags = append([]cli.Flag{
+	&cli.StringFlag{
+		Name:     PasswordFlag,
+		Usage:    "Profile password",
+		Required: true,
+	},
+	&cli.StringFlag{
+		Name:     RootDataDirFlag,
+		Usage:    "Path to the root data directory",
+		Required: true,
+	},
+	&cli.StringFlag{
+		Name:     OutputFlag,
+		Usage:    "/path/to/exported/unencrypted/db/file",
+		Required: true,
+	},
+	&cli.StringFlag{
+		Name:     KeyUIDFlag,
+		Usage:    "Key ID of the existing user (find them under '<data-dir>/keystore' on in logs when using the 'serve' command)",
+		Required: true,
+	},
+}, CommonFlags...)
+
+var ImportUnencryptedDBFlags = append([]cli.Flag{
+	&cli.StringFlag{
+		Name:     PasswordFlag,
+		Usage:    "Profile password",
+		Required: true,
+	},
+	&cli.StringFlag{
+		Name:     RootDataDirFlag,
+		Usage:    "Path to the root data directory",
+		Required: true,
+	},
+	&cli.StringFlag{
+		Name:     InputFlag,
+		Usage:    "/path/to/exported/unencrypted/db/file",
+		Required: true,
+	},
+	&cli.StringFlag{
+		Name:     KeyUIDFlag,
+		Usage:    "Key ID of the existing user (find them under '<data-dir>/keystore' on in logs when using the 'serve' command)",
+		Required: true,
+	},
+}, CommonFlags...)
+
 var ServeFlags = append([]cli.Flag{
 	&cli.StringFlag{
 		Name:    NameFlag,
@@ -104,6 +154,22 @@ var ServeFlags = append([]cli.Flag{
 		Aliases: []string{"i"},
 		Usage:   "Use interactive mode to input the messages",
 	},
+	&cli.StringFlag{
+		Name:     RootDataDirFlag,
+		Usage:    "Path to the root data directory",
+		Required: true,
+	},
+	&cli.StringFlag{
+		Name:     KeyUIDFlag,
+		Aliases:  []string{"kid"},
+		Usage:    "Key ID of the existing user (find them under '<data-dir>/keystore' on in logs when using the 'serve' command)",
+		Required: true,
+	},
+	&cli.StringFlag{
+		Name:     PasswordFlag,
+		Usage:    "Profile password",
+		Required: true,
+	},
 }, CommonFlags...)
 
 type StatusCLI struct {
@@ -122,6 +188,22 @@ func main() {
 				Flags: SimulateFlags,
 				Action: func(cCtx *cli.Context) error {
 					return simulate(cCtx)
+				},
+			},
+			{
+				Name:  "export-unencrypted-db",
+				Usage: "Export unencrypted DB",
+				Flags: ExportUnencryptedDBFlags,
+				Action: func(cCtx *cli.Context) error {
+					return exportUnencryptedDB(cCtx)
+				},
+			},
+			{
+				Name:  "import-unencrypted-db",
+				Usage: "Import unencrypted DB",
+				Flags: ImportUnencryptedDBFlags,
+				Action: func(cCtx *cli.Context) error {
+					return importUnencryptedDB(cCtx)
 				},
 			},
 			{

@@ -42,15 +42,25 @@ type StartParams struct {
 	Port         int
 	APIModules   string
 	TelemetryURL string
+	RootDataDir  string
 	KeyUID       string
+	Password     string
 	Fleet        string
 }
 
 func start(p StartParams, logger *zap.SugaredLogger) (*StatusCLI, error) {
-	var (
+	var rootDataDir string
+	if p.RootDataDir != "" {
+		rootDataDir = p.RootDataDir
+	} else {
 		rootDataDir = fmt.Sprintf("./test-%s", strings.ToLower(p.Name))
-		password    = "some-password"
-	)
+	}
+
+	password := p.Password
+	if password == "" {
+		password = "some-password"
+	}
+
 	setupLogger(p.Name)
 	logger.Info("starting messenger")
 

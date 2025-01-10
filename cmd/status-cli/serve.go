@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	statusgo "github.com/status-im/status-go/mobile"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	msignal "github.com/status-im/status-go/signal"
@@ -22,10 +23,15 @@ func serve(cCtx *cli.Context) error {
 	telemetryUrl := cCtx.String(TelemetryServerURLFlag)
 	interactive := cCtx.Bool(InteractiveFlag)
 	dest := cCtx.String(AddFlag)
+	rootDataDir := cCtx.String(RootDataDirFlag)
 	keyUID := cCtx.String(KeyUIDFlag)
 	isDebugLevel := cCtx.Bool(DebugLevel)
 	fleet := cCtx.String(FleetFlag)
 	cmdName := cCtx.Command.Name
+	password := cCtx.String(PasswordFlag)
+	if password != "" {
+		password = statusgo.Sha3(password)
+	}
 
 	logger, err := getSLogger(isDebugLevel)
 	if err != nil {
@@ -41,6 +47,8 @@ func serve(cCtx *cli.Context) error {
 		APIModules:   apiModules,
 		TelemetryURL: telemetryUrl,
 		KeyUID:       keyUID,
+		Password:     password,
+		RootDataDir:  rootDataDir,
 		Fleet:        fleet,
 	}, logger)
 	if err != nil {
