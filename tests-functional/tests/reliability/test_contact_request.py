@@ -44,13 +44,6 @@ class TestContactRequests(MessengerTestCase):
             expected_message=expected_message,
         )
 
-    @pytest.mark.skip(
-        reason=(
-            "Skipping because of error 'Not enough status-backend containers, "
-            "please add more'. Unkipping when we merge "
-            "https://github.com/status-im/status-go/pull/6159"
-        )
-    )
     @pytest.mark.parametrize("execution_number", range(10))
     @pytest.mark.dependency(depends=["test_contact_request_baseline"])
     def test_multiple_contact_requests(self, execution_number):

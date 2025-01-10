@@ -11,8 +11,8 @@ from resources.enums import MessageContentType
 class TestPrivateGroupMessages(MessengerTestCase):
 
     @pytest.mark.rpc  # until we have dedicated functional tests for this we can still run this test as part of the functional tests suite
-    @pytest.mark.dependency(name="test_group_chat_messages_baseline")
-    def test_group_chat_messages_baseline(self, message_count=1):
+    @pytest.mark.dependency(name="test_private_group_messages_baseline")
+    def test_private_group_messages_baseline(self, message_count=1):
         self.make_contacts()
         self.private_group_id = self.join_private_group()
 
@@ -36,9 +36,9 @@ class TestPrivateGroupMessages(MessengerTestCase):
                 expected_message=expected_message,
             )
 
-    @pytest.mark.dependency(depends=["test_group_chat_messages_baseline"])
+    @pytest.mark.dependency(depends=["test_private_group_messages_baseline"])
     def test_multiple_group_chat_messages(self):
-        self.test_group_chat_messages_baseline(message_count=50)
+        self.test_private_group_messages_baseline(message_count=50)
 
     # @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
     # @pytest.mark.skip(reason="Skipping until add_latency is implemented")
@@ -64,8 +64,8 @@ class TestPrivateGroupMessages(MessengerTestCase):
     #     # to be done in the next PR
     #     pass
 
-    @pytest.mark.dependency(depends=["test_group_chat_messages_baseline"])
-    def test_group_chat_messages_with_node_pause_30_seconds(self):
+    @pytest.mark.dependency(depends=["test_private_group_messages_baseline"])
+    def test_private_group_messages_with_node_pause_30_seconds(self):
         self.make_contacts()
         self.private_group_id = self.join_private_group()
 
