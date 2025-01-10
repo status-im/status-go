@@ -51,7 +51,7 @@ func ToggleUserProviders(providers []params.RpcProvider, enabled bool) []params.
 
 // GetEmbeddedProviders returns the embedded providers from the list.
 func GetEmbeddedProviders(providers []params.RpcProvider) []params.RpcProvider {
-	var embeddedProviders []params.RpcProvider
+	embeddedProviders := make([]params.RpcProvider, 0, len(providers))
 	for _, provider := range providers {
 		if provider.Type != params.UserProviderType {
 			embeddedProviders = append(embeddedProviders, provider)
@@ -62,7 +62,7 @@ func GetEmbeddedProviders(providers []params.RpcProvider) []params.RpcProvider {
 
 // GetUserProviders returns the user-defined providers from the list.
 func GetUserProviders(providers []params.RpcProvider) []params.RpcProvider {
-	var userProviders []params.RpcProvider
+	userProviders := make([]params.RpcProvider, 0, len(providers))
 	for _, provider := range providers {
 		if provider.Type == params.UserProviderType {
 			userProviders = append(userProviders, provider)
@@ -118,19 +118,25 @@ func OverrideEmbeddedProxyProviders(networks []params.Network, enabled bool, use
 	return updatedNetworks
 }
 
-func deepCopyNetworks(networks []params.Network) []params.Network {
+func DeepCopyNetwork(network params.Network) params.Network {
+	updatedNetwork := network
+	updatedNetwork.RpcProviders = make([]params.RpcProvider, len(network.RpcProviders))
+	copy(updatedNetwork.RpcProviders, network.RpcProviders)
+	updatedNetwork.TokenOverrides = make([]params.TokenOverride, len(network.TokenOverrides))
+	copy(updatedNetwork.TokenOverrides, network.TokenOverrides)
+	return updatedNetwork
+}
+
+func DeepCopyNetworks(networks []params.Network) []params.Network {
 	updatedNetworks := make([]params.Network, len(networks))
 	for i, network := range networks {
-		updatedNetwork := network
-		updatedNetwork.RpcProviders = make([]params.RpcProvider, len(network.RpcProviders))
-		copy(updatedNetwork.RpcProviders, network.RpcProviders)
-		updatedNetworks[i] = updatedNetwork
+		updatedNetworks[i] = DeepCopyNetwork(network)
 	}
 	return updatedNetworks
 }
 
 func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[string]string) []params.Network {
-	updatedNetworks := deepCopyNetworks(networks)
+	updatedNetworks := DeepCopyNetworks(networks)
 
 	for i := range updatedNetworks {
 		network := &updatedNetworks[i]
