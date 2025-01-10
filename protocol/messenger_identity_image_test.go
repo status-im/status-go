@@ -23,7 +23,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/wakuv1"
 )
 
 func TestMessengerProfilePictureHandlerSuite(t *testing.T) {
@@ -45,10 +45,10 @@ func (s *MessengerProfilePictureHandlerSuite) SetupSuite() {
 	s.logger = tt.MustCreateTestLogger()
 
 	// Setup Waku things
-	config := waku.DefaultConfig
+	config := wakuv1.DefaultConfig
 	config.MinimumAcceptedPoW = 0
 	wakuLogger := s.logger.Named("Waku")
-	shh := waku.New(&config, wakuLogger)
+	shh := wakuv1.New(&config, wakuLogger)
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 }

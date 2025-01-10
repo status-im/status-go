@@ -36,8 +36,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/waku"
-	wakucommon "github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv1"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
 
 const (
@@ -83,14 +83,14 @@ type Config struct {
 
 type WakuMailServer struct {
 	ms            *mailServer
-	shh           *waku.Waku
+	shh           *wakuv1.Waku
 	minRequestPoW float64
 
-	symFilter  *wakucommon.Filter
-	asymFilter *wakucommon.Filter
+	symFilter  *wakuv1common.Filter
+	asymFilter *wakuv1common.Filter
 }
 
-func (s *WakuMailServer) Init(waku *waku.Waku, cfg *params.WakuConfig) error {
+func (s *WakuMailServer) Init(waku *wakuv1.Waku, cfg *params.WakuConfig) error {
 	s.shh = waku
 	s.minRequestPoW = cfg.MinimumPoW
 
@@ -124,11 +124,11 @@ func (s *WakuMailServer) Close() {
 	s.ms.Close()
 }
 
-func (s *WakuMailServer) Archive(env *wakucommon.Envelope) {
+func (s *WakuMailServer) Archive(env *wakuv1common.Envelope) {
 	s.ms.Archive(gethbridge.NewWakuEnvelope(env))
 }
 
-func (s *WakuMailServer) Deliver(peerID []byte, req wakucommon.MessagesRequest) {
+func (s *WakuMailServer) Deliver(peerID []byte, req wakuv1common.MessagesRequest) {
 	s.ms.DeliverMail(types.BytesToHash(peerID), types.BytesToHash(req.ID), MessagesRequestPayload{
 		Lower:  req.From,
 		Upper:  req.To,
@@ -141,7 +141,7 @@ func (s *WakuMailServer) Deliver(peerID []byte, req wakucommon.MessagesRequest) 
 }
 
 // DEPRECATED; user Deliver instead
-func (s *WakuMailServer) DeliverMail(peerID []byte, req *wakucommon.Envelope) {
+func (s *WakuMailServer) DeliverMail(peerID []byte, req *wakuv1common.Envelope) {
 	payload, err := s.decodeRequest(peerID, req)
 	if err != nil {
 		deliveryFailuresCounter.WithLabelValues("validation").Inc()
@@ -160,21 +160,21 @@ func (s *WakuMailServer) DeliverMail(peerID []byte, req *wakucommon.Envelope) {
 
 // bloomFromReceivedMessage for a given whisper.ReceivedMessage it extracts the
 // used bloom filter.
-func (s *WakuMailServer) bloomFromReceivedMessage(msg *wakucommon.ReceivedMessage) ([]byte, error) {
+func (s *WakuMailServer) bloomFromReceivedMessage(msg *wakuv1common.ReceivedMessage) ([]byte, error) {
 	payloadSize := len(msg.Payload)
 
 	if payloadSize < 8 {
 		return nil, errors.New("Undersized p2p request")
 	} else if payloadSize == 8 {
-		return wakucommon.MakeFullNodeBloom(), nil
-	} else if payloadSize < 8+wakucommon.BloomFilterSize {
+		return wakuv1common.MakeFullNodeBloom(), nil
+	} else if payloadSize < 8+wakuv1common.BloomFilterSize {
 		return nil, errors.New("Undersized bloom filter in p2p request")
 	}
 
-	return msg.Payload[8 : 8+wakucommon.BloomFilterSize], nil
+	return msg.Payload[8 : 8+wakuv1common.BloomFilterSize], nil
 }
 
-func (s *WakuMailServer) decompositeRequest(peerID []byte, request *wakucommon.Envelope) (MessagesRequestPayload, error) {
+func (s *WakuMailServer) decompositeRequest(peerID []byte, request *wakuv1common.Envelope) (MessagesRequestPayload, error) {
 	var (
 		payload MessagesRequestPayload
 		err     error
@@ -213,12 +213,12 @@ func (s *WakuMailServer) decompositeRequest(peerID []byte, request *wakucommon.E
 		return payload, err
 	}
 
-	if len(decrypted.Payload) >= requestTimeRangeLength+wakucommon.BloomFilterSize+requestLimitLength {
-		payload.Limit = binary.BigEndian.Uint32(decrypted.Payload[requestTimeRangeLength+wakucommon.BloomFilterSize:])
+	if len(decrypted.Payload) >= requestTimeRangeLength+wakuv1common.BloomFilterSize+requestLimitLength {
+		payload.Limit = binary.BigEndian.Uint32(decrypted.Payload[requestTimeRangeLength+wakuv1common.BloomFilterSize:])
 	}
 
-	if len(decrypted.Payload) == requestTimeRangeLength+wakucommon.BloomFilterSize+requestLimitLength+DBKeyLength {
-		payload.Cursor = decrypted.Payload[requestTimeRangeLength+wakucommon.BloomFilterSize+requestLimitLength:]
+	if len(decrypted.Payload) == requestTimeRangeLength+wakuv1common.BloomFilterSize+requestLimitLength+DBKeyLength {
+		payload.Cursor = decrypted.Payload[requestTimeRangeLength+wakuv1common.BloomFilterSize+requestLimitLength:]
 	}
 
 	return payload, nil
@@ -239,7 +239,7 @@ func (s *WakuMailServer) setupDecryptor(password, asymKey string) error {
 			return fmt.Errorf("save symmetric key: %v", err)
 		}
 
-		s.symFilter = &wakucommon.Filter{KeySym: symKey}
+		s.symFilter = &wakuv1common.Filter{KeySym: symKey}
 	}
 
 	if asymKey != "" {
@@ -247,7 +247,7 @@ func (s *WakuMailServer) setupDecryptor(password, asymKey string) error {
 		if err != nil {
 			return err
 		}
-		s.asymFilter = &wakucommon.Filter{KeyAsym: keyAsym}
+		s.asymFilter = &wakuv1common.Filter{KeyAsym: keyAsym}
 	}
 
 	return nil
@@ -255,7 +255,7 @@ func (s *WakuMailServer) setupDecryptor(password, asymKey string) error {
 
 // openEnvelope tries to decrypt an envelope, first based on asymetric key (if
 // provided) and second on the symetric key (if provided)
-func (s *WakuMailServer) openEnvelope(request *wakucommon.Envelope) *wakucommon.ReceivedMessage {
+func (s *WakuMailServer) openEnvelope(request *wakuv1common.Envelope) *wakuv1common.ReceivedMessage {
 	if s.asymFilter != nil {
 		if d := request.Open(s.asymFilter); d != nil {
 			return d
@@ -269,7 +269,7 @@ func (s *WakuMailServer) openEnvelope(request *wakucommon.Envelope) *wakucommon.
 	return nil
 }
 
-func (s *WakuMailServer) decodeRequest(peerID []byte, request *wakucommon.Envelope) (MessagesRequestPayload, error) {
+func (s *WakuMailServer) decodeRequest(peerID []byte, request *wakuv1common.Envelope) (MessagesRequestPayload, error) {
 	var payload MessagesRequestPayload
 
 	if s.minRequestPoW > 0.0 && request.PoW() < s.minRequestPoW {
@@ -323,11 +323,11 @@ type wakuAdapter struct{}
 var _ adapter = (*wakuAdapter)(nil)
 
 func (wakuAdapter) CreateRequestFailedPayload(reqID types.Hash, err error) []byte {
-	return waku.CreateMailServerRequestFailedPayload(common.Hash(reqID), err)
+	return wakuv1.CreateMailServerRequestFailedPayload(common.Hash(reqID), err)
 }
 
 func (wakuAdapter) CreateRequestCompletedPayload(reqID, lastEnvelopeHash types.Hash, cursor []byte) []byte {
-	return waku.CreateMailServerRequestCompletedPayload(common.Hash(reqID), common.Hash(lastEnvelopeHash), cursor)
+	return wakuv1.CreateMailServerRequestCompletedPayload(common.Hash(reqID), common.Hash(lastEnvelopeHash), cursor)
 }
 
 func (wakuAdapter) CreateSyncResponse(_ []types.Envelope, _ []byte, _ bool, _ string) interface{} {
@@ -355,7 +355,7 @@ type service interface {
 // -----------
 
 type wakuService struct {
-	*waku.Waku
+	*wakuv1.Waku
 }
 
 func (s *wakuService) SendRawSyncResponse(peerID []byte, data interface{}) error {
@@ -928,7 +928,7 @@ func (s *mailServer) sendHistoricMessageErrorResponse(peerID, reqID types.Hash, 
 }
 
 func extractBloomFromEncodedEnvelope(rawValue rlp.RawValue) ([]byte, error) {
-	var envelope wakucommon.Envelope
+	var envelope wakuv1common.Envelope
 	decodeErr := rlp.DecodeBytes(rawValue, &envelope)
 	if decodeErr != nil {
 		return nil, decodeErr

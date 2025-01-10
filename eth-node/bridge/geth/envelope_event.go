@@ -2,26 +2,26 @@ package gethbridge
 
 import (
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/wakuv1"
 
-	wakucommon "github.com/status-im/status-go/waku/common"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
 
 // NewWakuEnvelopeEventWrapper returns a types.EnvelopeEvent object that mimics Geth's EnvelopeEvent
-func NewWakuEnvelopeEventWrapper(envelopeEvent *wakucommon.EnvelopeEvent) *types.EnvelopeEvent {
+func NewWakuEnvelopeEventWrapper(envelopeEvent *wakuv1common.EnvelopeEvent) *types.EnvelopeEvent {
 	if envelopeEvent == nil {
 		panic("envelopeEvent should not be nil")
 	}
 
 	wrappedData := envelopeEvent.Data
 	switch data := envelopeEvent.Data.(type) {
-	case []wakucommon.EnvelopeError:
+	case []wakuv1common.EnvelopeError:
 		wrappedData := make([]types.EnvelopeError, len(data))
 		for index := range data {
 			wrappedData[index] = *NewWakuEnvelopeErrorWrapper(&data[index])
 		}
-	case *waku.MailServerResponse:
+	case *wakuv1.MailServerResponse:
 		wrappedData = NewWakuMailServerResponseWrapper(data)
 	}
 	return &types.EnvelopeEvent{

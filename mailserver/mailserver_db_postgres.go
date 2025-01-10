@@ -22,7 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/status-im/status-go/eth-node/types"
-	waku "github.com/status-im/status-go/waku/common"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
 
 type PostgresDB struct {
@@ -294,7 +294,7 @@ func (i *PostgresDB) SaveEnvelope(env types.Envelope) error {
 
 	archivedEnvelopesGauge.WithLabelValues(i.name).Inc()
 	archivedEnvelopeSizeMeter.WithLabelValues(i.name).Observe(
-		float64(waku.EnvelopeHeaderLength + env.Size()))
+		float64(wakuv1common.EnvelopeHeaderLength + env.Size()))
 
 	return nil
 }

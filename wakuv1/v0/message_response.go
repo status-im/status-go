@@ -1,9 +1,9 @@
-package v1
+package v0
 
 import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv1/common"
 )
 
 // MultiVersionResponse allows to decode response into chosen version.

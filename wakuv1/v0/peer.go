@@ -23,7 +23,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv1/common"
 )
 
 // Peer is the implementation of the Peer interface and represents a remote Waku client with which the local host Waku

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv1/common"
 )
 
 func TestEncodeDecodeRLP(t *testing.T) {

@@ -5,15 +5,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/eth-node/types"
-	waku "github.com/status-im/status-go/waku/common"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
 
 type wakuEnvelope struct {
-	env *waku.Envelope
+	env *wakuv1common.Envelope
 }
 
 // NewWakuEnvelope returns an object that wraps Geth's Waku Envelope in a types interface.
-func NewWakuEnvelope(e *waku.Envelope) types.Envelope {
+func NewWakuEnvelope(e *wakuv1common.Envelope) types.Envelope {
 	return &wakuEnvelope{env: e}
 }
 

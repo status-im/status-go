@@ -2,12 +2,12 @@ package gethbridge
 
 import (
 	"github.com/status-im/status-go/eth-node/types"
-	waku "github.com/status-im/status-go/waku/common"
-	wakuv2 "github.com/status-im/status-go/wakuv2/common"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
+	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
 
 // NewWakuEnvelopeErrorWrapper returns a types.EnvelopeError object that mimics Geth's EnvelopeError
-func NewWakuEnvelopeErrorWrapper(envelopeError *waku.EnvelopeError) *types.EnvelopeError {
+func NewWakuEnvelopeErrorWrapper(envelopeError *wakuv1common.EnvelopeError) *types.EnvelopeError {
 	if envelopeError == nil {
 		panic("envelopeError should not be nil")
 	}
@@ -20,7 +20,7 @@ func NewWakuEnvelopeErrorWrapper(envelopeError *waku.EnvelopeError) *types.Envel
 }
 
 // NewWakuEnvelopeErrorWrapper returns a types.EnvelopeError object that mimics Geth's EnvelopeError
-func NewWakuV2EnvelopeErrorWrapper(envelopeError *wakuv2.EnvelopeError) *types.EnvelopeError {
+func NewWakuV2EnvelopeErrorWrapper(envelopeError *wakuv2common.EnvelopeError) *types.EnvelopeError {
 	if envelopeError == nil {
 		panic("envelopeError should not be nil")
 	}
@@ -34,9 +34,9 @@ func NewWakuV2EnvelopeErrorWrapper(envelopeError *wakuv2.EnvelopeError) *types.E
 
 func mapGethErrorCode(code uint) uint {
 	switch code {
-	case waku.EnvelopeTimeNotSynced:
+	case wakuv1common.EnvelopeTimeNotSynced:
 		return types.EnvelopeTimeNotSynced
-	case waku.EnvelopeOtherError:
+	case wakuv1common.EnvelopeOtherError:
 		return types.EnvelopeOtherError
 	}
 	return types.EnvelopeOtherError

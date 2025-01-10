@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
-	waku "github.com/status-im/status-go/waku/common"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
 
 type LevelDB struct {
@@ -221,7 +221,7 @@ func (db *LevelDB) SaveEnvelope(env types.Envelope) error {
 	}
 	archivedEnvelopesGauge.WithLabelValues(db.name).Inc()
 	archivedEnvelopeSizeMeter.WithLabelValues(db.name).Observe(
-		float64(waku.EnvelopeHeaderLength + env.Size()))
+		float64(wakuv1common.EnvelopeHeaderLength + env.Size()))
 	return err
 }
 

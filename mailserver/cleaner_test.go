@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/status-im/status-go/eth-node/types"
-	waku "github.com/status-im/status-go/waku/common"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
 
 func TestCleaner(t *testing.T) {
@@ -103,7 +103,7 @@ func setupTestServer(t *testing.T) *WakuMailServer {
 	return &s
 }
 
-func archiveEnvelope(t *testing.T, sentTime time.Time, server *WakuMailServer) *waku.Envelope {
+func archiveEnvelope(t *testing.T, sentTime time.Time, server *WakuMailServer) *wakuv1common.Envelope {
 	env, err := generateEnvelope(sentTime)
 	require.NoError(t, err)
 	server.Archive(env)
@@ -142,7 +142,7 @@ func countMessages(t *testing.T, db DB) int {
 	defer func() { _ = i.Release() }()
 
 	for i.Next() {
-		var env waku.Envelope
+		var env wakuv1common.Envelope
 		value, err := i.GetEnvelopeByBloomFilter(query.bloom)
 		if err != nil {
 			t.Fatal(err)

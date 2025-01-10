@@ -28,7 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv1/common"
 )
 
 var seed int64

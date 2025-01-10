@@ -6,16 +6,16 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/waku"
-	wakucommon "github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv1"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
 
 type GethPublicWakuAPIWrapper struct {
-	api *waku.PublicWakuAPI
+	api *wakuv1.PublicWakuAPI
 }
 
 // NewGethPublicWakuAPIWrapper returns an object that wraps Geth's PublicWakuAPI in a types interface
-func NewGethPublicWakuAPIWrapper(api *waku.PublicWakuAPI) types.PublicWakuAPI {
+func NewGethPublicWakuAPIWrapper(api *wakuv1.PublicWakuAPI) types.PublicWakuAPI {
 	if api == nil {
 		panic("PublicWakuAPI cannot be nil")
 	}
@@ -43,12 +43,12 @@ func (w *GethPublicWakuAPIWrapper) DeleteKeyPair(ctx context.Context, key string
 // NewMessageFilter creates a new filter that can be used to poll for
 // (new) messages that satisfy the given criteria.
 func (w *GethPublicWakuAPIWrapper) NewMessageFilter(req types.Criteria) (string, error) {
-	topics := make([]wakucommon.TopicType, len(req.Topics))
+	topics := make([]wakuv1common.TopicType, len(req.Topics))
 	for index, tt := range req.Topics {
-		topics[index] = wakucommon.TopicType(tt)
+		topics[index] = wakuv1common.TopicType(tt)
 	}
 
-	criteria := waku.Criteria{
+	criteria := wakuv1.Criteria{
 		SymKeyID:     req.SymKeyID,
 		PrivateKeyID: req.PrivateKeyID,
 		Sig:          req.Sig,
@@ -92,12 +92,12 @@ func (w *GethPublicWakuAPIWrapper) GetFilterMessages(id string) ([]*types.Messag
 // Post posts a message on the network.
 // returns the hash of the message in case of success.
 func (w *GethPublicWakuAPIWrapper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
-	msg := waku.NewMessage{
+	msg := wakuv1.NewMessage{
 		SymKeyID:   req.SymKeyID,
 		PublicKey:  req.PublicKey,
 		Sig:        req.SigID, // Sig is really a SigID
 		TTL:        req.TTL,
-		Topic:      wakucommon.TopicType(req.Topic),
+		Topic:      wakuv1common.TopicType(req.Topic),
 		Payload:    req.Payload,
 		Padding:    req.Padding,
 		PowTime:    req.PowTime,

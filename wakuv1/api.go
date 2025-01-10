@@ -16,7 +16,7 @@
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
 
-package waku
+package wakuv1
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv1/common"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"

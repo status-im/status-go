@@ -23,7 +23,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv1/common"
 )
 
 type Peer struct {

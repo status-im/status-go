@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/wakuv1"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -35,7 +35,7 @@ func TestInitProtocol(t *testing.T) {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
 
-	waku := gethbridge.NewGethWakuWrapper(waku.New(nil, nil))
+	waku := gethbridge.NewGethWakuWrapper(wakuv1.New(nil, nil))
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 

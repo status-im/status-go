@@ -59,7 +59,7 @@ import (
 	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/wakuv1"
 	"github.com/status-im/status-go/wakuv2"
 )
 
@@ -123,7 +123,7 @@ type StatusNode struct {
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         *timesource.NTPTimeSource
-	wakuSrvc               *waku.Waku
+	wakuSrvc               *wakuv1.Waku
 	wakuExtSrvc            *wakuext.Service
 	wakuV2Srvc             *wakuv2.Waku
 	wakuV2ExtSrvc          *wakuv2ext.Service

@@ -1,4 +1,4 @@
-package v0
+package v1
 
 import (
 	"errors"
@@ -6,15 +6,16 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv1/common"
 )
 
 // statusOptionKey is a current type used in StatusOptions as a key.
-type statusOptionKey string
+type statusOptionKey uint64
 
 var (
 	defaultMinPoW = math.Float64bits(0.001)
@@ -24,7 +25,7 @@ var (
 
 // StatusOptions defines additional information shared between peers
 // during the handshake.
-// There might be more options provided than fields in StatusOptions
+// There might be more options provided then fields in StatusOptions
 // and they should be ignored during deserialization to stay forward compatible.
 // In the case of RLP, options should be serialized to an array of tuples
 // where the first item is a field name and the second is a RLP-serialized value.
@@ -33,15 +34,19 @@ type StatusOptions struct {
 	BloomFilter          []byte             `rlp:"key=1"`
 	LightNodeEnabled     *bool              `rlp:"key=2"`
 	ConfirmationsEnabled *bool              `rlp:"key=3"`
-	RateLimits           *common.RateLimits `rlp:"key=4"`
+	PacketRateLimits     *common.RateLimits `rlp:"key=4"`
 	TopicInterest        []common.TopicType `rlp:"key=5"`
+	BytesRateLimits      *common.RateLimits `rlp:"key=6"`
 }
 
 func StatusOptionsFromHost(host common.WakuHost) StatusOptions {
 	opts := StatusOptions{}
 
-	rateLimits := host.PacketRateLimits()
-	opts.RateLimits = &rateLimits
+	packetRateLimits := host.PacketRateLimits()
+	opts.PacketRateLimits = &packetRateLimits
+
+	bytesRateLimits := host.BytesRateLimits()
+	opts.BytesRateLimits = &bytesRateLimits
 
 	lightNode := host.LightClientMode()
 	opts.LightNodeEnabled = &lightNode
@@ -84,10 +89,14 @@ func initRLPKeyFields() {
 		if len(keys) != 2 || keys[0] != "key" {
 			panic("invalid value of \"rlp\" tag, expected \"key=N\" where N is uint")
 		}
+		key, err := strconv.ParseUint(keys[1], 10, 64)
+		if err != nil {
+			panic("could not parse \"rlp\" key")
+		}
 
 		// typecast key to be of statusOptionKey type
-		keyFieldIdx[statusOptionKey(keys[1])] = i
-		idxFieldKey[i] = statusOptionKey(keys[1])
+		keyFieldIdx[statusOptionKey(key)] = i
+		idxFieldKey[i] = statusOptionKey(key)
 	}
 }
 
@@ -109,8 +118,12 @@ func (o StatusOptions) WithDefaults() StatusOptions {
 		o.ConfirmationsEnabled = &confirmationsEnabled
 	}
 
-	if o.RateLimits == nil {
-		o.RateLimits = &common.RateLimits{}
+	if o.PacketRateLimits == nil {
+		o.PacketRateLimits = &common.RateLimits{}
+	}
+
+	if o.BytesRateLimits == nil {
+		o.BytesRateLimits = &common.RateLimits{}
 	}
 
 	if o.BloomFilter == nil {
@@ -184,12 +197,12 @@ loop:
 			// Read the rest of the list items and dump peer.
 			_, err := s.Raw()
 			if err != nil {
-				return fmt.Errorf("failed to read the value of key %s: %v", key, err)
+				return fmt.Errorf("failed to read the value of key %d: %v", key, err)
 			}
 			continue
 		}
 		if err := s.Decode(v.Elem().Field(idx).Addr().Interface()); err != nil {
-			return fmt.Errorf("failed to decode an option %s: %v", key, err)
+			return fmt.Errorf("failed to decode an option %d: %v", key, err)
 		}
 		if err := s.ListEnd(); err != nil {
 			return err

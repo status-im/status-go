@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/wakuv1"
 )
 
 func TestMessengerSyncKeycardChangeSuite(t *testing.T) {
@@ -37,9 +37,9 @@ type MessengerSyncKeycardChangeSuite struct {
 func (s *MessengerSyncKeycardChangeSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := waku.DefaultConfig
+	config := wakuv1.DefaultConfig
 	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
+	shh := wakuv1.New(&config, s.logger)
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 

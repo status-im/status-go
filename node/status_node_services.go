@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/wakuv1"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
@@ -63,8 +64,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
-	"github.com/status-im/status-go/waku"
-	wakucommon "github.com/status-im/status-go/waku/common"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 	"github.com/status-im/status-go/wakuv2"
 )
 
@@ -259,7 +259,7 @@ func (b *StatusNode) EnsService() *ens.Service {
 	return b.ensSrvc
 }
 
-func (b *StatusNode) WakuService() *waku.Waku {
+func (b *StatusNode) WakuService() *wakuv1.Waku {
 	return b.wakuSrvc
 }
 
@@ -274,10 +274,10 @@ func (b *StatusNode) WakuV2Service() *wakuv2.Waku {
 	return b.wakuV2Srvc
 }
 
-func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*waku.Waku, error) {
+func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*wakuv1.Waku, error) {
 	if b.wakuSrvc == nil {
-		cfg := &waku.Config{
-			MaxMessageSize:         wakucommon.DefaultMaxMessageSize,
+		cfg := &wakuv1.Config{
+			MaxMessageSize:         wakuv1common.DefaultMaxMessageSize,
 			BloomFilterMode:        wakuCfg.BloomFilterMode,
 			FullNode:               wakuCfg.FullNode,
 			SoftBlacklistedPeerIDs: wakuCfg.SoftBlacklistedPeerIDs,
@@ -292,7 +292,7 @@ func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.
 			cfg.MinimumAcceptedPoW = wakuCfg.MinimumPoW
 		}
 
-		w := waku.New(cfg, logutils.ZapLogger())
+		w := wakuv1.New(cfg, logutils.ZapLogger())
 
 		if wakuCfg.EnableRateLimiter {
 			r := wakuRateLimiter(wakuCfg, clusterCfg)
@@ -325,7 +325,7 @@ func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.
 func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku, error) {
 	if b.wakuV2Srvc == nil {
 		cfg := &wakuv2.Config{
-			MaxMessageSize:                         wakucommon.DefaultMaxMessageSize,
+			MaxMessageSize:                         wakuv1common.DefaultMaxMessageSize,
 			Host:                                   nodeConfig.WakuV2Config.Host,
 			Port:                                   nodeConfig.WakuV2Config.Port,
 			LightClient:                            nodeConfig.WakuV2Config.LightClient,
@@ -404,7 +404,7 @@ func setSettingsNotifier(db *accounts.Database, feed *event.Feed) {
 	})
 }
 
-func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) *wakucommon.PeerRateLimiter {
+func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) *wakuv1common.PeerRateLimiter {
 	enodes := append(
 		parseNodes(clusterCfg.StaticNodes),
 		parseNodes(clusterCfg.TrustedMailServers)...,
@@ -417,8 +417,8 @@ func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfi
 		ips = append(ips, item.IP().String())
 		peerIDs = append(peerIDs, item.ID())
 	}
-	return wakucommon.NewPeerRateLimiter(
-		&wakucommon.PeerRateLimiterConfig{
+	return wakuv1common.NewPeerRateLimiter(
+		&wakuv1common.PeerRateLimiterConfig{
 			PacketLimitPerSecIP:     wakuCfg.PacketRateLimitIP,
 			PacketLimitPerSecPeerID: wakuCfg.PacketRateLimitPeerID,
 			BytesLimitPerSecIP:      wakuCfg.BytesRateLimitIP,
@@ -426,8 +426,8 @@ func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfi
 			WhitelistedIPs:          ips,
 			WhitelistedPeerIDs:      peerIDs,
 		},
-		&wakucommon.MetricsRateLimiterHandler{},
-		&wakucommon.DropPeerRateLimiterHandler{
+		&wakuv1common.MetricsRateLimiterHandler{},
+		&wakuv1common.DropPeerRateLimiterHandler{
 			Tolerance: wakuCfg.RateLimitTolerance,
 		},
 	)
@@ -628,7 +628,7 @@ func (b *StatusNode) ethService() *eth.Service {
 	return b.ethSrvc
 }
 
-func registerWakuMailServer(wakuService *waku.Waku, config *params.WakuConfig) (err error) {
+func registerWakuMailServer(wakuService *wakuv1.Waku, config *params.WakuConfig) (err error) {
 	var mailServer mailserver.WakuMailServer
 	wakuService.RegisterMailServer(&mailServer)
 

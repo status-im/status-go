@@ -7,7 +7,7 @@ import (
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/wakuv1"
 )
 
 type testWakuWrapper struct {
@@ -16,11 +16,11 @@ type testWakuWrapper struct {
 	publicWakuAPIWrapper *testPublicWakuAPIWrapper
 }
 
-func newTestWaku(w *waku.Waku) types.Waku {
+func newTestWaku(w *wakuv1.Waku) types.Waku {
 	wrapper := gethbridge.NewGethWakuWrapper(w)
 	return &testWakuWrapper{
 		GethWakuWrapper:      wrapper.(*gethbridge.GethWakuWrapper),
-		publicWakuAPIWrapper: newTestPublicWakuAPI(waku.NewPublicWakuAPI(w)).(*testPublicWakuAPIWrapper),
+		publicWakuAPIWrapper: newTestPublicWakuAPI(wakuv1.NewPublicWakuAPI(w)).(*testPublicWakuAPIWrapper),
 	}
 }
 
@@ -45,7 +45,7 @@ type testPublicWakuAPIWrapper struct {
 	postSubscriptions []chan *PostMessageSubscription
 }
 
-func newTestPublicWakuAPI(api *waku.PublicWakuAPI) types.PublicWakuAPI {
+func newTestPublicWakuAPI(api *wakuv1.PublicWakuAPI) types.PublicWakuAPI {
 	wrapper := gethbridge.NewGethPublicWakuAPIWrapper(api)
 	return &testPublicWakuAPIWrapper{
 		GethPublicWakuAPIWrapper: wrapper.(*gethbridge.GethPublicWakuAPIWrapper),
@@ -67,10 +67,10 @@ func (tp *testPublicWakuAPIWrapper) Post(ctx context.Context, req types.NewMessa
 	return id, err
 }
 
-func newTestWakuWrapper(config *waku.Config, logger *zap.Logger) (*testWakuWrapper, error) {
+func newTestWakuWrapper(config *wakuv1.Config, logger *zap.Logger) (*testWakuWrapper, error) {
 	if config == nil {
-		config = &waku.DefaultConfig
+		config = &wakuv1.DefaultConfig
 	}
-	w := waku.New(config, logger)
+	w := wakuv1.New(config, logger)
 	return newTestWaku(w).(*testWakuWrapper), w.Start()
 }

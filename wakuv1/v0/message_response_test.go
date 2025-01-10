@@ -16,7 +16,7 @@
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
 
-package v1
+package v0
 
 import (
 	"testing"
@@ -26,7 +26,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv1/common"
 )
 
 func TestEncodeDecodeVersionedResponse(t *testing.T) {

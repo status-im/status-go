@@ -16,7 +16,7 @@
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
 
-package waku
+package wakuv1
 
 import (
 	"bytes"
@@ -47,9 +47,9 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/waku/common"
-	v0 "github.com/status-im/status-go/waku/v0"
-	v1 "github.com/status-im/status-go/waku/v1"
+	"github.com/status-im/status-go/wakuv1/common"
+	v0 "github.com/status-im/status-go/wakuv1/v0"
+	v1 "github.com/status-im/status-go/wakuv1/v1"
 )
 
 const messageQueueLimit = 1024

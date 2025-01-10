@@ -16,7 +16,7 @@
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
 
-package waku
+package wakuv1
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv1/common"
 )
 
 var keys = []string{

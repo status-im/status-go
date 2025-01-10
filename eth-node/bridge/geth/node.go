@@ -5,7 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/wakuv1"
 	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/ethereum/go-ethereum/node"
@@ -18,11 +18,11 @@ import (
 
 type gethNodeWrapper struct {
 	stack *node.Node
-	waku1 *waku.Waku
+	waku1 *wakuv1.Waku
 	waku2 *wakuv2.Waku
 }
 
-func NewNodeBridge(stack *node.Node, waku1 *waku.Waku, waku2 *wakuv2.Waku) types.Node {
+func NewNodeBridge(stack *node.Node, waku1 *wakuv1.Waku, waku2 *wakuv2.Waku) types.Node {
 	return &gethNodeWrapper{stack: stack, waku1: waku1, waku2: waku2}
 }
 
@@ -34,7 +34,7 @@ func (w *gethNodeWrapper) NewENSVerifier(logger *zap.Logger) enstypes.ENSVerifie
 	return gethens.NewVerifier(logger)
 }
 
-func (w *gethNodeWrapper) SetWaku1(waku *waku.Waku) {
+func (w *gethNodeWrapper) SetWaku1(waku *wakuv1.Waku) {
 	w.waku1 = waku
 }
 

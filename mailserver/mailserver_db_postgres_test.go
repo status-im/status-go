@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/postgres"
-	waku "github.com/status-im/status-go/waku/common"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
 
 func TestMailServerPostgresDBSuite(t *testing.T) {
@@ -59,10 +59,10 @@ func (s *MailServerPostgresDBSuite) TestPostgresDB_BuildIteratorWithBloomFilter(
 	rawValue, err := iter.GetEnvelopeByBloomFilter(nil)
 	s.NoError(err)
 	s.NotEmpty(rawValue)
-	var receivedEnvelope waku.Envelope
+	var receivedEnvelope wakuv1common.Envelope
 	err = rlp.DecodeBytes(rawValue, &receivedEnvelope)
 	s.NoError(err)
-	s.EqualValues(waku.BytesToTopic(topic), receivedEnvelope.Topic)
+	s.EqualValues(wakuv1common.BytesToTopic(topic), receivedEnvelope.Topic)
 
 	err = iter.Release()
 	s.NoError(err)
@@ -93,10 +93,10 @@ func (s *MailServerPostgresDBSuite) TestPostgresDB_BuildIteratorWithTopic() {
 	rawValue, err := iter.GetEnvelopeByBloomFilter(nil)
 	s.NoError(err)
 	s.NotEmpty(rawValue)
-	var receivedEnvelope waku.Envelope
+	var receivedEnvelope wakuv1common.Envelope
 	err = rlp.DecodeBytes(rawValue, &receivedEnvelope)
 	s.NoError(err)
-	s.EqualValues(waku.BytesToTopic(topic), receivedEnvelope.Topic)
+	s.EqualValues(wakuv1common.BytesToTopic(topic), receivedEnvelope.Topic)
 
 	err = iter.Release()
 	s.NoError(err)
@@ -108,15 +108,15 @@ func newTestEnvelope(topic []byte) (types.Envelope, error) {
 	if err != nil {
 		return nil, err
 	}
-	params := waku.MessageParams{
+	params := wakuv1common.MessageParams{
 		TTL:      10,
 		PoW:      2.0,
 		Payload:  []byte("hello world"),
 		WorkTime: 1,
-		Topic:    waku.BytesToTopic(topic),
+		Topic:    wakuv1common.BytesToTopic(topic),
 		Dst:      &privateKey.PublicKey,
 	}
-	message, err := waku.NewSentMessage(&params)
+	message, err := wakuv1common.NewSentMessage(&params)
 	if err != nil {
 		return nil, err
 	}

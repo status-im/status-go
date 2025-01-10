@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/eth-node/types"
-	waku "github.com/status-im/status-go/waku/common"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
 
 func TestLevelDB_BuildIteratorWithTopic(t *testing.T) {
@@ -36,10 +36,10 @@ func TestLevelDB_BuildIteratorWithTopic(t *testing.T) {
 	rawValue, err := iter.GetEnvelopeByTopicsMap(topicsMap)
 	require.NoError(t, err)
 	require.NotEmpty(t, rawValue)
-	var receivedEnvelope waku.Envelope
+	var receivedEnvelope wakuv1common.Envelope
 	err = rlp.DecodeBytes(rawValue, &receivedEnvelope)
 	require.NoError(t, err)
-	require.EqualValues(t, waku.BytesToTopic(topic), receivedEnvelope.Topic)
+	require.EqualValues(t, wakuv1common.BytesToTopic(topic), receivedEnvelope.Topic)
 
 	err = iter.Release()
 	require.NoError(t, err)

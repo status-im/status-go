@@ -23,7 +23,7 @@ import (
 	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/static"
-	wakucommon "github.com/status-im/status-go/waku/common"
+	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
 
@@ -943,7 +943,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			DataDir:        wakuDir,
 			MinimumPoW:     WakuMinimumPoW,
 			TTL:            WakuTTL,
-			MaxMessageSize: wakucommon.DefaultMaxMessageSize,
+			MaxMessageSize: wakuv1common.DefaultMaxMessageSize,
 		},
 		WakuV2Config: WakuV2Config{
 			Host:           "0.0.0.0",
