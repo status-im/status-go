@@ -502,7 +502,7 @@ func (tm *Manager) GetAllTokens() ([]*Token, error) {
 
 	allTokens = append(tm.getTokens(), allTokens...)
 
-	overrideTokensInPlace(tm.networkManager.GetConfiguredNetworks(), allTokens)
+	overrideTokensInPlace(tm.networkManager.GetEmbeddedNetworks(), allTokens)
 
 	native, err := tm.getNativeTokens()
 	if err != nil {

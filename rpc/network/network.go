@@ -6,8 +6,13 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
+
 	persistence "github.com/status-im/status-go/rpc/network/db"
 )
 
@@ -27,7 +32,7 @@ type ManagerInterface interface {
 	GetAll() ([]*params.Network, error)
 	GetActiveNetworks() ([]*params.Network, error)
 	GetCombinedNetworks() ([]*CombinedNetwork, error)
-	GetConfiguredNetworks() []params.Network
+	GetEmbeddedNetworks() []params.Network // Networks that are embedded in the app binary code
 	GetTestNetworksEnabled() (bool, error)
 
 	SetUserRpcProviders(chainID uint64, providers []params.RpcProvider) error
@@ -37,7 +42,9 @@ type Manager struct {
 	db                 *sql.DB
 	accountsDB         *accounts.Database
 	networkPersistence persistence.NetworksPersistenceInterface
-	configuredNetworks []params.Network
+	embeddedNetworks   []params.Network
+
+	logger *zap.Logger
 }
 
 // NewManager creates a new instance of Manager.
@@ -46,18 +53,29 @@ func NewManager(db *sql.DB) *Manager {
 	if err != nil {
 		return nil
 	}
+
+	logger := logutils.ZapLogger().Named("NetworkManager")
+
 	return &Manager{
 		db:                 db,
 		accountsDB:         accountsDB,
 		networkPersistence: persistence.NewNetworksPersistence(db),
+		logger:             logger,
 	}
 }
 
-// Init initializes the networks, merging with existing ones and wrapping the operation in a transaction.
-func (nm *Manager) InitEmbeddedNetworks(networks []params.Network) error {
-	if networks == nil {
+// Init initializes the nets, merges them with existing ones, and wraps the operation in a transaction.
+// We should store the following information in the DB:
+// - User's RPC providers
+// - Enabled state of the network
+// Embedded RPC providers should only be stored in memory
+func (nm *Manager) InitEmbeddedNetworks(embeddedNetworks []params.Network) error {
+	if embeddedNetworks == nil {
 		return nil
 	}
+
+	// Update embedded networks
+	nm.embeddedNetworks = embeddedNetworks
 
 	// Begin a transaction
 	return persistence.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
@@ -70,39 +88,67 @@ func (nm *Manager) InitEmbeddedNetworks(networks []params.Network) error {
 		}
 
 		// Create a map for quick access to current networks
-		currentNetworkMap := make(map[uint64]params.Network)
+		currentNetworskMap := make(map[uint64]params.Network)
 		for _, currentNetwork := range currentNetworks {
-			currentNetworkMap[currentNetwork.ChainID] = *currentNetwork
+			currentNetworskMap[currentNetwork.ChainID] = *currentNetwork
 		}
 
-		// Process new networks
+		// Keep user's rpc providers and enabled state
 		var updatedNetworks []params.Network
-		for _, newNetwork := range networks {
-			if existingNetwork, exists := currentNetworkMap[newNetwork.ChainID]; exists {
-				// If network already exists, merge providers
-				newNetwork.RpcProviders = networkhelper.ReplaceEmbeddedProviders(existingNetwork.RpcProviders, newNetwork.RpcProviders)
+		for _, newNetwork := range embeddedNetworks {
+			if existingNetwork, exists := currentNetworskMap[newNetwork.ChainID]; exists {
+				newNetwork.RpcProviders = networkhelper.GetUserProviders(existingNetwork.RpcProviders)
+				newNetwork.Enabled = existingNetwork.Enabled
+			} else {
+				newNetwork.RpcProviders = networkhelper.GetUserProviders(newNetwork.RpcProviders)
 			}
 			updatedNetworks = append(updatedNetworks, newNetwork)
 		}
 
-		// Use SetNetworks to replace all networks in the database
+		// Use SetNetworks to replace all networks in the database without embedded RPC providers
 		err = txNetworksPersistence.SetNetworks(updatedNetworks)
 		if err != nil {
 			return fmt.Errorf("error setting networks: %w", err)
 		}
 
-		// Update configured networks
-		nm.configuredNetworks = networks
-
 		return nil
 	})
+}
+
+// GetEmbeddedProviders returns embedded providers for a given chainID.
+func (nm *Manager) getEmbeddedProviders(chainID uint64) []params.RpcProvider {
+	for _, network := range nm.embeddedNetworks {
+		if network.ChainID == chainID {
+			return networkhelper.GetEmbeddedProviders(network.RpcProviders)
+		}
+	}
+	return nil
+}
+
+// setEmbeddedProviders adds embedded providers to a network.
+func (nm *Manager) setNetworkEmbeddedProviders(network *params.Network) {
+	network.RpcProviders = networkhelper.ReplaceEmbeddedProviders(
+		network.RpcProviders, nm.getEmbeddedProviders(network.ChainID))
+}
+
+func (nm *Manager) setEmbeddedProviders(networks []*params.Network) {
+	for _, network := range networks {
+		nm.setNetworkEmbeddedProviders(network)
+	}
+}
+
+// networkWithoutEmbeddedProviders returns a copy of the given network without embedded RPC providers.
+func (nm *Manager) networkWithoutEmbeddedProviders(network *params.Network) *params.Network {
+	networkCopy := networkhelper.DeepCopyNetwork(*network)
+	networkCopy.RpcProviders = networkhelper.GetUserProviders(network.RpcProviders)
+	return &networkCopy
 }
 
 // Upsert adds or updates a network, synchronizing RPC providers, wrapped in a transaction.
 func (nm *Manager) Upsert(network *params.Network) error {
 	return persistence.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
 		txNetworksPersistence := persistence.NewNetworksPersistence(tx)
-		err := txNetworksPersistence.UpsertNetwork(network)
+		err := txNetworksPersistence.UpsertNetwork(nm.networkWithoutEmbeddedProviders(network))
 		if err != nil {
 			return fmt.Errorf("failed to upsert network: %w", err)
 		}
@@ -124,51 +170,45 @@ func (nm *Manager) Delete(chainID uint64) error {
 
 // SetUserRpcProviders updates user RPC providers, wrapped in a transaction.
 func (nm *Manager) SetUserRpcProviders(chainID uint64, userProviders []params.RpcProvider) error {
-	return persistence.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
-		// Create temporary persistence instances with the transaction
-		txRpcPersistence := persistence.NewRpcProvidersPersistence(tx)
-
-		// Get all providers using the transactional RPC persistence
-		allProviders, err := txRpcPersistence.GetRpcProviders(chainID)
-		if err != nil {
-			return fmt.Errorf("failed to get all providers: %w", err)
-		}
-
-		// Replace user providers
-		providers := networkhelper.ReplaceUserProviders(allProviders, userProviders)
-
-		// Set RPC providers using the transactional RPC persistence
-		err = txRpcPersistence.SetRpcProviders(chainID, providers)
-		if err != nil {
-			return fmt.Errorf("failed to set RPC providers: %w", err)
-		}
-
-		return nil
-	})
+	rpcPersistence := nm.networkPersistence.GetRpcPersistence()
+	return rpcPersistence.SetRpcProviders(chainID, networkhelper.GetUserProviders(userProviders))
 }
 
 // Find locates a network by ChainID.
 func (nm *Manager) Find(chainID uint64) *params.Network {
 	networks, err := nm.networkPersistence.GetNetworkByChainID(chainID)
 	if len(networks) != 1 || err != nil {
+		nm.logger.Warn("Failed to find network", zap.Uint64("chainID", chainID), zap.Error(err))
 		return nil
 	}
-	return networks[0]
+	result := networks[0]
+	nm.setNetworkEmbeddedProviders(result)
+	return result
 }
 
 // GetAll returns all networks.
 func (nm *Manager) GetAll() ([]*params.Network, error) {
-	return nm.networkPersistence.GetAllNetworks()
+	networks, err := nm.networkPersistence.GetAllNetworks()
+	if err != nil {
+		return nil, err
+	}
+	nm.setEmbeddedProviders(networks)
+	return networks, nil
 }
 
 // Get returns networks filtered by the enabled status.
 func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
-	return nm.networkPersistence.GetNetworks(onlyEnabled, nil)
+	networks, err := nm.networkPersistence.GetNetworks(onlyEnabled, nil)
+	if err != nil {
+		return nil, err
+	}
+	nm.setEmbeddedProviders(networks)
+	return networks, nil
 }
 
 // GetConfiguredNetworks returns the configured networks.
-func (nm *Manager) GetConfiguredNetworks() []params.Network {
-	return nm.configuredNetworks
+func (nm *Manager) GetEmbeddedNetworks() []params.Network {
+	return nm.embeddedNetworks
 }
 
 // GetTestNetworksEnabled checks if test networks are enabled.
