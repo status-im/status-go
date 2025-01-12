@@ -3,6 +3,7 @@ package nodecfg
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
@@ -31,21 +32,17 @@ func nodeConfigWasMigrated(tx *sql.Tx) (migrated bool, err error) {
 
 type insertFn func(tx *sql.Tx, c *params.NodeConfig) error
 
-func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`
+func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig, includeConnector bool) error {
+	query := `
 	INSERT OR REPLACE INTO node_config (
 		network_id, data_dir, keystore_dir, node_key, no_discovery, 
 		listen_addr, advertise_addr, name, version, api_modules, tls_enabled,
 		max_peers, max_pending_peers, enable_status_service, enable_ntp_sync,
 		bridge_enabled, wallet_enabled, local_notifications_enabled,
-		browser_enabled, permissions_enabled, mailservers_enabled,
-		swarm_enabled, mailserver_registry_address, web3provider_enabled, connector_enabled,
-		synthetic_id
-	) VALUES (
-		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-		?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-		?, ?, ?, ?, ?, 'id'
-	)`,
+		 browser_enabled, permissions_enabled, mailservers_enabled,
+		 swarm_enabled, mailserver_registry_address, web3provider_enabled`
+
+	args := []any{
 		c.NetworkID, c.DataDir, c.KeyStoreDir, c.NodeKey, c.NoDiscovery,
 		c.ListenAddr, c.AdvertiseAddr, c.Name, c.Version, c.APIModules,
 		c.TLSEnabled, c.MaxPeers, c.MaxPendingPeers,
@@ -53,9 +50,26 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 		c.BridgeConfig.Enabled, c.WalletConfig.Enabled, c.LocalNotificationsConfig.Enabled,
 		c.BrowsersConfig.Enabled, c.PermissionsConfig.Enabled, c.MailserversConfig.Enabled,
 		c.SwarmConfig.Enabled, c.MailServerRegistryAddress, c.Web3ProviderConfig.Enabled,
-		c.ConnectorConfig.Enabled,
-	)
+	}
+
+	if includeConnector {
+		query += `, connector_enabled`
+		args = append(args, c.ConnectorConfig.Enabled)
+	}
+
+	query += `, synthetic_id) VALUES (?` + strings.Repeat(",?", len(args)) + `)`
+	args = append(args, "id")
+
+	_, err := tx.Exec(query, args...)
 	return err
+}
+
+func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
+	return insertNodeConfigBase(tx, c, false)
+}
+
+func insertNodeConfigWithConnector(tx *sql.Tx, c *params.NodeConfig) error {
+	return insertNodeConfigBase(tx, c, true)
 }
 
 func insertHTTPConfig(tx *sql.Tx, c *params.NodeConfig) error {
@@ -86,17 +100,35 @@ func insertHTTPConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return nil
 }
 
-func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`
+func insertLogConfigBase(tx *sql.Tx, c *params.NodeConfig, includeNamespaces bool) error {
+	query := `
 	INSERT OR REPLACE INTO log_config (
-		enabled, log_dir, log_level, log_namespaces, max_backups, max_size,
-		file, compress_rotated, log_to_stderr, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
-		c.LogEnabled, c.LogDir, c.LogLevel, c.LogNamespaces, c.LogMaxBackups, c.LogMaxSize,
-		c.LogFile, c.LogCompressRotated, c.LogToStderr,
-	)
+		enabled, log_dir, log_level, max_backups, max_size,
+		file, compress_rotated, log_to_stderr`
 
+	args := []any{
+		c.LogEnabled, c.LogDir, c.LogLevel, c.LogMaxBackups, c.LogMaxSize,
+		c.LogFile, c.LogCompressRotated, c.LogToStderr,
+	}
+
+	if includeNamespaces {
+		query += `, log_namespaces`
+		args = append(args, c.LogNamespaces)
+	}
+
+	query += `, synthetic_id) VALUES (?` + strings.Repeat(",?", len(args)) + `)`
+	args = append(args, "id")
+
+	_, err := tx.Exec(query, args...)
 	return err
+}
+
+func insertLogConfigWithNamespaces(tx *sql.Tx, c *params.NodeConfig) error {
+	return insertLogConfigBase(tx, c, true)
+}
+
+func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
+	return insertLogConfigBase(tx, c, false)
 }
 
 func insertLightETHConfigTrustedNodes(tx *sql.Tx, c *params.NodeConfig) error {
@@ -350,10 +382,10 @@ func nodeConfigNormalInserts() []insertFn {
 	// the selects being used there are not affected.
 
 	return []insertFn{
-		insertNodeConfig,
+		insertNodeConfigWithConnector,
 		insertHTTPConfig,
 		insertIPCConfig,
-		insertLogConfig,
+		insertLogConfigWithNamespaces,
 		insertClusterConfig,
 		insertClusterConfigNodes,
 		insertLightETHConfig,
@@ -731,7 +763,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	return nodecfg, nil
 }
 
-func MigrateNodeConfig(db *sql.DB) error {
+func MigrateNodeConfig(db *sql.DB) (err error) {
 	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err

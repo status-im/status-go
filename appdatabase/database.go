@@ -55,8 +55,16 @@ func doMigration(db *sql.DB) error {
 		if err != nil {
 			return err
 		}
+	}
 
-		// NodeConfig migration cannot be done with SQL
+	if lastMigration > 0 && lastMigration <= nodeCfgMigrationDate {
+		// Check if migration needs to handle node config updates
+		// This condition handles a specific edge case where:
+		// 1. The last migration may have stopped at nodeCfgMigrationDate due to MigrateNodeConfig failure
+		// 2. This typically happens when columns (e.g. 'connector_enabled') are missing because they
+		//    were added in later migrations, we should not query missing columns when during invoke MigrateNodeConfig
+		// 3. Using <= instead of < ensures we don't skip this step if a user logs in again after MigrateNodeConfig failed
+		//    it should stop here rather than ignore this step and continue other migrations
 		err = nodecfg.MigrateNodeConfig(db)
 		if err != nil {
 			return err
