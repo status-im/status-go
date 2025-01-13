@@ -347,14 +347,24 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	return
 }
 
+func ParseCollectibleID(ID string) (contractAddress common.Address, tokenID *big.Int, success bool) {
+	success = false
+
+	parts := strings.Split(ID, ":")
+	if len(parts) != 2 {
+		return
+	}
+	contractAddress = common.HexToAddress(parts[0])
+	tokenID, success = new(big.Int).SetString(parts[1], 10)
+	return
+}
+
 func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *token.Token {
 	if !sendType.IsCollectiblesTransfer() {
 		return tokenManager.FindToken(network, tokenID)
 	}
 
-	parts := strings.Split(tokenID, ":")
-	contractAddress := common.HexToAddress(parts[0])
-	collectibleTokenID, success := new(big.Int).SetString(parts[1], 10)
+	contractAddress, collectibleTokenID, success := ParseCollectibleID(tokenID)
 	if !success {
 		return nil
 	}

@@ -84,3 +84,17 @@ func (s *CalculateFeesTestSuite) TestCalculateApprovalL1Fee_ZeroFeeOnContractCal
 func TestCalculateFeesTestSuite(t *testing.T) {
 	suite.Run(t, new(CalculateFeesTestSuite))
 }
+
+func TestParseCollectibleID(t *testing.T) {
+	collectibleID := "RANDOM"
+	_, _, success := router.ParseCollectibleID(collectibleID)
+	require.False(t, success)
+
+	collectibleID = "0xfC43ac5f309499385e91e059862bDb0Bfa2Cd16c:123"
+	expectedContractAddress := common.HexToAddress("0xfC43ac5f309499385e91e059862bDb0Bfa2Cd16c")
+	expectedCollectibleID := big.NewInt(123)
+	parsedContractAddress, parsedCollectibleID, success := router.ParseCollectibleID(collectibleID)
+	require.True(t, success)
+	require.Equal(t, expectedContractAddress, parsedContractAddress)
+	require.Equal(t, expectedCollectibleID, parsedCollectibleID)
+}
