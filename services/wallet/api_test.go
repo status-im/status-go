@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 
 	gomock "go.uber.org/mock/gomock"
@@ -139,7 +140,7 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 		},
 	}
 
-	networks, err = rpc.UpdateEmbeddedProxyProviders(networks, true, "user1", "pass1")
+	networks, err = rpc.UpdateEmbeddedProxyProviders(networks, true, gofakeit.Username(), gofakeit.LetterN(5))
 	require.NoError(t, err)
 
 	config := rpc.ClientConfig{

@@ -14,6 +14,7 @@ import (
 
 	"github.com/status-im/status-go/params/networkhelper"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -129,7 +130,7 @@ func TestGetClientsUsingCache(t *testing.T) {
 		"/api.status.im/infura/bar",
 		"/api.status.im/infura.io/baz",
 	}
-	user, password := "user1", "pass1"
+	user, password := gofakeit.Username(), gofakeit.LetterN(5)
 
 	authHandler := func(w http.ResponseWriter, r *http.Request) {
 		authToken := base64.StdEncoding.EncodeToString([]byte(user + ":" + password))
