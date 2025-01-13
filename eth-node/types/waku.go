@@ -110,7 +110,7 @@ type Waku interface {
 	Version() uint
 
 	// PeerCount
-	PeerCount() int
+	PeerCount() (int, error)
 
 	ListenAddresses() ([]multiaddr.Multiaddr, error)
 
@@ -195,7 +195,7 @@ type Waku interface {
 	ConfirmMessageDelivered(hash []common.Hash)
 
 	// PeerID returns node's PeerID
-	PeerID() peer.ID
+	PeerID() (peer.ID, error)
 
 	// GetActiveStorenode returns the AddrInfo of the currently active storenode. It will be empty if no storenode is active
 	GetActiveStorenode() peer.AddrInfo

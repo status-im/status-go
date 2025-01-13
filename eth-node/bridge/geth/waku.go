@@ -49,8 +49,8 @@ func (w *GethWakuWrapper) Version() uint {
 }
 
 // Added for compatibility with waku V2
-func (w *GethWakuWrapper) PeerCount() int {
-	return -1
+func (w *GethWakuWrapper) PeerCount() (int, error) {
+	return -1, nil
 }
 
 // Added for compatibility with waku V2
@@ -307,7 +307,7 @@ func (w *wakuFilterWrapper) ID() string {
 func (w *GethWakuWrapper) ConfirmMessageDelivered(hashes []common.Hash) {
 }
 
-func (w *GethWakuWrapper) PeerID() peer.ID {
+func (w *GethWakuWrapper) PeerID() (peer.ID, error) {
 	panic("not available in WakuV1")
 }
 

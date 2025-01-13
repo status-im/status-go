@@ -4,8 +4,17 @@
 package wakuv2
 
 /*
-	#cgo LDFLAGS: -L../third_party/nwaku/build/ -lnegentropy -lwaku
-	#cgo LDFLAGS: -L../third_party/nwaku -Wl,-rpath,../third_party/nwaku/build/
+	#cgo !android,!ios LDFLAGS: -L${SRCDIR}/../third_party/nwaku/build/ -lwaku
+	#cgo !android,!ios LDFLAGS: -L${SRCDIR}/../third_party/nwaku -Wl,-rpath,../third_party/nwaku/build/
+
+	#cgo amd64,android LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/android/x86_64 -lwaku
+	#cgo arm64,android LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/android/arm64-v8a -lwaku
+	#cgo arm,android LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/android/armeabi-v7a -lwaku
+	#cgo 386,android LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/android/x86 -lwaku
+
+	#cgo darwin,arm64,ios LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/ios/iphone -lwaku
+	#cgo darwin,amd64,ios LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/ios/simulator -lwaku
+
 
 	#include "../third_party/nwaku/library/libwaku.h"
 	#include <stdio.h>
@@ -932,6 +941,15 @@ func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
 		}
 	}
 }
+*/
+
+func (w *Waku) StartDiscV5() error {
+	return w.node.StartDiscV5()
+}
+
+func (w *Waku) StopDiscV5() error {
+	return w.node.StopDiscV5()
+}
 
 func (w *Waku) GetStats() types.StatsSummary {
 	stats := w.bandwidthCounter.GetBandwidthTotals()
@@ -941,6 +959,7 @@ func (w *Waku) GetStats() types.StatsSummary {
 	}
 }
 
+/* TODO-nwaku
 func (w *Waku) runPeerExchangeLoop() {
 	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
@@ -1987,9 +2006,8 @@ func (w *Waku) Peers() types.PeerStats {
 	// return FormatPeerStats(w.node)
 }
 
-/* TODO-nwaku
 func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
-	if w.cfg.LightClient {
+	/* TODO-nwaku
 		return nil, errors.New("only available in relay mode")
 	}
 
@@ -1997,8 +2015,13 @@ func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 		FullMeshPeers: w.node.Relay().PubSub().MeshPeers(topic),
 		AllPeers:      w.node.Relay().PubSub().ListPeers(topic),
 	}, nil
+	*/
+	return &types.PeerList{}, nil
 }
-*/
+
+func (w *Waku) ENR() (*enode.Node, error) {
+	return w.node.ENR()
+}
 
 func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) error {
 	topic = w.GetPubsubTopic(topic)
@@ -2049,6 +2072,10 @@ func (w *Waku) RemovePubsubTopicKey(topic string) error {
 	}
 
 	return w.protectedTopicStore.Delete(topic)
+}
+
+func (w *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
+	return w.node.ListenAddresses()
 }
 
 func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
@@ -2414,6 +2441,8 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if !cfg.LightClient {
+		nwakuCfg.Discv5Discovery = true
+		nwakuCfg.EnableRelay = true
 		nwakuCfg.Filter = true
 		nwakuCfg.FilterMaxPeersToServe = 20
 		nwakuCfg.Lightpush = true

@@ -3,6 +3,7 @@ package node
 import (
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -382,7 +383,16 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			}
 		}
 
-		w, err := wakuv2.New(nodeKey, nodeConfig.ClusterConfig.Fleet, cfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
+		nwakuCfg := &wakuv2.WakuConfig{
+			NodeKey:   hex.EncodeToString(crypto.FromECDSA(nodeKey)),
+			Host:      nodeConfig.WakuV2Config.Host,
+			TcpPort:   nodeConfig.WakuV2Config.Port,
+			LogLevel:  "DEBUG", // TODO-nwaku ?
+			ClusterID: nodeConfig.ClusterConfig.ClusterID,
+			Shards:    []uint16{wakuv2.DefaultShardIndex, wakuv2.NonProtectedShardIndex},
+		}
+
+		w, err := wakuv2.New(nodeKey, nodeConfig.ClusterConfig.Fleet, cfg, nwakuCfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
 
 		if err != nil {
 			return nil, err

@@ -51,7 +51,7 @@ func (w *gethWakuV2Wrapper) Version() uint {
 	return 2
 }
 
-func (w *gethWakuV2Wrapper) PeerCount() int {
+func (w *gethWakuV2Wrapper) PeerCount() (int, error) {
 	return w.waku.PeerCount()
 }
 
@@ -302,7 +302,7 @@ func (w *gethWakuV2Wrapper) ConfirmMessageDelivered(hashes []common.Hash) {
 	w.waku.ConfirmMessageDelivered(hashes)
 }
 
-func (w *gethWakuV2Wrapper) PeerID() peer.ID {
+func (w *gethWakuV2Wrapper) PeerID() (peer.ID, error) {
 	return w.waku.PeerID()
 }
 
