@@ -195,6 +195,8 @@ type Messenger struct {
 	peersyncingRequests map[string]uint64
 
 	mvdsStatusChangeEvent chan datasyncnode.PeerStatusChangeEvent
+
+	backedUpFetchingStatus *BackupFetchingStatus
 }
 
 type EnvelopeEventsInterceptor struct {
@@ -914,6 +916,18 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		if err := m.SetDisplayName(replacementDisplayName); err != nil {
 			// We do not return the error as we do not want to block the login for it
 			m.logger.Warn("error setting display name", zap.Error(err))
+		}
+	}
+
+	if m.processBackedupMessages {
+		m.backedUpFetchingStatus = &BackupFetchingStatus{
+			dataProgress:      make(map[string]FetchingBackedUpDataTracking),
+			lastKnownMsgClock: 0,
+			fetchingCompleted: false,
+		}
+		err = m.startBackupFetchingTracking(response)
+		if err != nil {
+			return nil, err
 		}
 	}
 

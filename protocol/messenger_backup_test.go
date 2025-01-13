@@ -260,6 +260,160 @@ func (s *MessengerBackupSuite) TestBackupProfileWithInvalidDisplayName() {
 	s.Require().Equal("", storedBob1DisplayName)
 }
 
+func (s *MessengerBackupSuite) TestFetchingDuringBackup() {
+	bob1 := s.m
+	bob1.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
+
+	state := ReceivedMessageState{
+		Response: &MessengerResponse{},
+	}
+
+	backup := &protobuf.Backup{
+		Clock: 1,
+		ContactsDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(1),
+		},
+		CommunitiesDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(1),
+		},
+		ProfileDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(1),
+		},
+	}
+
+	err := bob1.HandleBackup(
+		&state,
+		backup,
+		&v1protocol.StatusMessage{},
+	)
+	s.Require().NoError(err)
+	// The backup is not done, so no signal should be sent
+	s.Require().Len(state.Response.ActivityCenterNotifications(), 0)
+	s.Require().Len(bob1.backedUpFetchingStatus.dataProgress, 3)
+	s.Require().Equal(uint32(1), bob1.backedUpFetchingStatus.dataProgress[SyncWakuSectionKeyContacts].TotalNumber)
+
+	// Parse a backup with a higher clock so reset the fetching
+	backup = &protobuf.Backup{
+		Clock: 2,
+		ContactsDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(2),
+		},
+		CommunitiesDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(1),
+		},
+		ProfileDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(1),
+		},
+		SettingsDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(1),
+		},
+		KeypairDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(1),
+		},
+		WatchOnlyAccountDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(1),
+		},
+	}
+	err = bob1.HandleBackup(
+		&state,
+		backup,
+		&v1protocol.StatusMessage{},
+	)
+	s.Require().NoError(err)
+	// The backup is not done, so no signal should be sent
+	s.Require().Len(state.Response.ActivityCenterNotifications(), 0)
+	s.Require().Len(bob1.backedUpFetchingStatus.dataProgress, 6)
+	s.Require().Equal(uint32(2), bob1.backedUpFetchingStatus.dataProgress[SyncWakuSectionKeyContacts].TotalNumber)
+
+	// Backup with a smaller clock is ignored
+	backup = &protobuf.Backup{
+		Clock: 2,
+		ContactsDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(5),
+		},
+		CommunitiesDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(1),
+		},
+	}
+	err = bob1.HandleBackup(
+		&state,
+		backup,
+		&v1protocol.StatusMessage{},
+	)
+	s.Require().NoError(err)
+	// The backup is not done, so no signal should be sent
+	s.Require().Len(state.Response.ActivityCenterNotifications(), 0)
+	// The values are gonna be the same as before as the backup was ignored
+	s.Require().Len(bob1.backedUpFetchingStatus.dataProgress, 6)
+	s.Require().Equal(uint32(2), bob1.backedUpFetchingStatus.dataProgress[SyncWakuSectionKeyContacts].TotalNumber)
+
+	// Parse the backup with almost all the correct data numbers
+	backup = &protobuf.Backup{
+		Clock: 2,
+		ContactsDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(1),
+			TotalNumber: uint32(2),
+		},
+		CommunitiesDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(1),
+			TotalNumber: uint32(1),
+		},
+		ProfileDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(1),
+			TotalNumber: uint32(1),
+		},
+		SettingsDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(1),
+			TotalNumber: uint32(1),
+		},
+		KeypairDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(1),
+			TotalNumber: uint32(1),
+		},
+		WatchOnlyAccountDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(1),
+			TotalNumber: uint32(1),
+		},
+	}
+	err = bob1.HandleBackup(
+		&state,
+		backup,
+		&v1protocol.StatusMessage{},
+	)
+	s.Require().NoError(err)
+	// The backup is not done, so no signal should be sent
+	s.Require().Len(state.Response.ActivityCenterNotifications(), 0)
+
+	// Parse the remaining backup so the notification should be sent now
+	backup = &protobuf.Backup{
+		Clock: 2,
+		ContactsDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(2),
+			TotalNumber: uint32(2),
+		},
+	}
+	err = bob1.HandleBackup(
+		&state,
+		backup,
+		&v1protocol.StatusMessage{},
+	)
+	s.Require().NoError(err)
+	// The backup is done, so the signal should be sent
+	s.Require().Len(state.Response.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeBackupSyncingSuccess, state.Response.ActivityCenterNotifications()[0].Type)
+}
+
 func (s *MessengerBackupSuite) TestBackupSettings() {
 	s.T().Skip("flaky test")
 	const (
