@@ -400,6 +400,16 @@ func (api *API) AddEthereumChain(ctx context.Context, network params.Network) er
 	return api.s.rpcClient.NetworkManager.Upsert(&network)
 }
 
+func (api *API) SetChainUserRpcProviders(ctx context.Context, chainID uint64, rpcProviders []params.RpcProvider) error {
+	logutils.ZapLogger().Debug("call to SetChainUserRpcProviders")
+	return api.s.rpcClient.NetworkManager.SetUserRpcProviders(chainID, rpcProviders)
+}
+
+func (api *API) SetChainEnabled(ctx context.Context, chainID uint64, enabled bool) error {
+	logutils.ZapLogger().Debug("call to SetChainEnabled")
+	return api.s.rpcClient.NetworkManager.SetEnabled(chainID, enabled)
+}
+
 func (api *API) DeleteEthereumChain(ctx context.Context, chainID uint64) error {
 	logutils.ZapLogger().Debug("call to DeleteEthereumChain")
 	return api.s.rpcClient.NetworkManager.Delete(chainID)

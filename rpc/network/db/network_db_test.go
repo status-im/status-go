@@ -195,3 +195,28 @@ func (s *NetworksPersistenceTestSuite) TestValidationForNetworksAndProviders() {
 	s.Require().NoError(err)
 	s.Require().Len(allNetworks, 0, "No invalid networks should be saved")
 }
+
+func (s *NetworksPersistenceTestSuite) TestSetEnabled() {
+	network := testutil.CreateNetwork(api.OptimismChainID, "Optimism Mainnet", DefaultProviders(api.OptimismChainID))
+	s.addAndVerifyNetworks([]*params.Network{network})
+
+	// Disable the network
+	err := s.networksPersistence.SetEnabled(network.ChainID, false)
+	s.Require().NoError(err)
+
+	// Verify the network is disabled
+	updatedNetwork, err := s.networksPersistence.GetNetworkByChainID(network.ChainID)
+	s.Require().NoError(err)
+	s.Require().Len(updatedNetwork, 1)
+	s.Require().False(updatedNetwork[0].Enabled)
+
+	// Enable the network
+	err = s.networksPersistence.SetEnabled(network.ChainID, true)
+	s.Require().NoError(err)
+
+	// Verify the network is enabled
+	updatedNetwork, err = s.networksPersistence.GetNetworkByChainID(network.ChainID)
+	s.Require().NoError(err)
+	s.Require().Len(updatedNetwork, 1)
+	s.Require().True(updatedNetwork[0].Enabled)
+}

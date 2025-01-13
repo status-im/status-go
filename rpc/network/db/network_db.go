@@ -30,6 +30,7 @@ type NetworksPersistenceInterface interface {
 	DeleteAllNetworks() error
 
 	GetRpcPersistence() RpcProvidersPersistenceInterface
+	SetEnabled(chainID uint64, enabled bool) error
 }
 
 // NetworksPersistence manages networks and their providers.
@@ -251,6 +252,25 @@ func (n *NetworksPersistence) DeleteNetwork(chainID uint64) error {
 	_, err = n.db.Exec(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to execute delete query for chain_id %d: %w", chainID, err)
+	}
+
+	return nil
+}
+
+// SetEnabled updates the enabled status of a network.
+func (n *NetworksPersistence) SetEnabled(chainID uint64, enabled bool) error {
+	q := sq.Update("networks").
+		Set("enabled", enabled).
+		Where(sq.Eq{"chain_id": chainID})
+
+	query, args, err := q.ToSql()
+	if err != nil {
+		return fmt.Errorf("failed to build update query: %w", err)
+	}
+
+	_, err = n.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to execute update query for chain_id %d: %w", chainID, err)
 	}
 
 	return nil

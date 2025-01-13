@@ -36,6 +36,7 @@ type ManagerInterface interface {
 	GetTestNetworksEnabled() (bool, error)
 
 	SetUserRpcProviders(chainID uint64, providers []params.RpcProvider) error
+	SetEnabled(chainID uint64, enabled bool) error
 }
 
 type Manager struct {
@@ -172,6 +173,15 @@ func (nm *Manager) Delete(chainID uint64) error {
 func (nm *Manager) SetUserRpcProviders(chainID uint64, userProviders []params.RpcProvider) error {
 	rpcPersistence := nm.networkPersistence.GetRpcPersistence()
 	return rpcPersistence.SetRpcProviders(chainID, networkhelper.GetUserProviders(userProviders))
+}
+
+// SetEnabled updates the enabled status of a network
+func (nm *Manager) SetEnabled(chainID uint64, enabled bool) error {
+	err := nm.networkPersistence.SetEnabled(chainID, enabled)
+	if err != nil {
+		return fmt.Errorf("failed to set enabled status: %w", err)
+	}
+	return nil
 }
 
 // Find locates a network by ChainID.
