@@ -303,7 +303,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 				authEncoded := base64.StdEncoding.EncodeToString([]byte(provider.AuthLogin + ":" + provider.AuthPassword))
 				headers.Set("Authorization", "Basic "+authEncoded)
 			case params.TokenAuth:
-				headers.Set("Authorization", "Bearer "+provider.AuthToken)
+				provider.URL = provider.URL + provider.AuthToken
 			}
 		}
 
