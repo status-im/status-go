@@ -216,7 +216,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, _ *WakuConfig, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -1261,7 +1261,8 @@ func (w *Waku) checkForConnectionChanges() {
 func (w *Waku) reportPeerMetrics() {
 	if w.statusTelemetryClient != nil {
 		connFailures := FormatPeerConnFailures(w.node)
-		w.statusTelemetryClient.PushPeerCount(w.ctx, w.PeerCount())
+		pc, _ := w.PeerCount() // PeerCount's err will never be != nil
+		w.statusTelemetryClient.PushPeerCount(w.ctx, pc)
 		w.statusTelemetryClient.PushPeerConnFailures(w.ctx, connFailures)
 
 		peerCountByOrigin := make(map[wps.Origin]uint)
@@ -1608,8 +1609,8 @@ func (w *Waku) ClearEnvelopesCache() {
 	w.envelopeCache = newTTLCache()
 }
 
-func (w *Waku) PeerCount() int {
-	return w.node.PeerCount()
+func (w *Waku) PeerCount() (int, error) {
+	return w.node.PeerCount(), nil
 }
 
 func (w *Waku) Peers() types.PeerStats {
@@ -1931,8 +1932,8 @@ func (w *Waku) Clean() error {
 	return nil
 }
 
-func (w *Waku) PeerID() peer.ID {
-	return w.node.Host().ID()
+func (w *Waku) PeerID() (peer.ID, error) {
+	return w.node.Host().ID(), nil
 }
 
 func (w *Waku) Peerstore() peerstore.Peerstore {
@@ -2009,3 +2010,42 @@ func (w *Waku) ListPeersInMesh(pubsubTopic string) (int, error) {
 	listPeers := w.node.Relay().PubSub().ListPeers(pubsubTopic)
 	return len(listPeers), nil
 }
+
+// Added just for compatibility with nwaku
+
+type WakuConfig struct {
+	Host                  string           `json:"host,omitempty"`
+	NodeKey               string           `json:"nodekey,omitempty"`
+	EnableRelay           bool             `json:"relay"`
+	LogLevel              string           `json:"logLevel"`
+	DnsDiscovery          bool             `json:"dnsDiscovery,omitempty"`
+	DnsDiscoveryUrl       string           `json:"dnsDiscoveryUrl,omitempty"`
+	MaxMessageSize        string           `json:"maxMessageSize,omitempty"`
+	Staticnodes           []string         `json:"staticnodes,omitempty"`
+	Discv5BootstrapNodes  []string         `json:"discv5BootstrapNodes,omitempty"`
+	Discv5Discovery       bool             `json:"discv5Discovery,omitempty"`
+	Discv5UdpPort         int              `json:"discv5UdpPort,omitempty"`
+	ClusterID             uint16           `json:"clusterId,omitempty"`
+	Shards                []uint16         `json:"shards,omitempty"`
+	PeerExchange          bool             `json:"peerExchange,omitempty"`
+	PeerExchangeNode      string           `json:"peerExchangeNode,omitempty"`
+	Filter                bool             `json:"filter,omitempty"`
+	FilterMaxPeersToServe int              `json:"filterMaxPeersToServe,omitempty"`
+	Lightpush             bool             `json:"lightpush,omitempty"`
+	TcpPort               int              `json:"tcpPort,omitempty"`
+	RateLimits            RateLimitsConfig `json:"rateLimits,omitempty"`
+}
+
+type RateLimitsConfig struct {
+	Filter       *RateLimit `json:"-"`
+	Lightpush    *RateLimit `json:"-"`
+	PeerExchange *RateLimit `json:"-"`
+}
+
+type RateLimit struct {
+	Volume int
+	Period int
+	Unit   RateLimitUnit
+}
+
+type RateLimitUnit string
