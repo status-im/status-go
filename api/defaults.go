@@ -169,8 +169,9 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 
 func buildWalletConfig(request *requests.WalletSecretsConfig, statusProxyEnabled bool) params.WalletConfig {
 	walletConfig := params.WalletConfig{
-		Enabled:        true,
-		AlchemyAPIKeys: make(map[uint64]string),
+		Enabled:                true,
+		EnableMercuryoProvider: true,
+		AlchemyAPIKeys:         make(map[uint64]string),
 	}
 
 	if request.StatusProxyStageName != "" {
