@@ -195,7 +195,7 @@ func NewService(
 	)
 	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, networksFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
 
-	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed, pendingTxManager)
+	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
 	router := router.NewRouter(rpcClient, transactor, tokenManager, marketManager, collectibles,
 		collectiblesManager)

@@ -17,13 +17,13 @@ import (
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/transactions"
 )
 
 const (
@@ -75,15 +75,13 @@ type Service struct {
 	// sessionsRWMutex is used to protect all sessions related members
 	sessionsRWMutex  sync.RWMutex
 	debounceDuration time.Duration
-
-	pendingTracker *transactions.PendingTxTracker
 }
 
 func (s *Service) nextSessionID() SessionID {
 	return SessionID(s.lastSessionID.Add(1))
 }
 
-func NewService(db *sql.DB, accountsDB *accounts.Database, tokenManager token.ManagerInterface, collectibles collectibles.ManagerInterface, eventFeed *event.Feed, pendingTracker *transactions.PendingTxTracker) *Service {
+func NewService(db *sql.DB, accountsDB *accounts.Database, tokenManager token.ManagerInterface, collectibles collectibles.ManagerInterface, eventFeed *event.Feed) *Service {
 	return &Service{
 		db:           db,
 		accountsDB:   accountsDB,
@@ -95,8 +93,6 @@ func NewService(db *sql.DB, accountsDB *accounts.Database, tokenManager token.Ma
 		sessions: make(map[SessionID]*Session),
 		// here to be overwritten by tests
 		debounceDuration: 1 * time.Second,
-
-		pendingTracker: pendingTracker,
 	}
 }
 
@@ -176,8 +172,8 @@ func (s *Service) GetActivityCollectiblesAsync(requestID int32, chainIDs []w_com
 }
 
 // getActivityDetails check if any of the entries have details that are not loaded then fetch and emit result
-func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*EntryData, error) {
-	res := make([]*EntryData, 0)
+func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*ac.EntryData, error) {
+	res := make([]*ac.EntryData, 0)
 	var err error
 	ids := make([]thirdparty.CollectibleUniqueID, 0)
 	entriesForIds := make(map[string][]*Entry)
@@ -235,12 +231,12 @@ func (s *Service) getActivityDetails(ctx context.Context, entries []Entry) ([]*E
 				continue
 			}
 			for _, e := range entryList {
-				data := &EntryData{
+				data := &ac.EntryData{
 					Key:     e.Key(),
 					NftName: nftName,
 					NftURL:  nftURL,
 				}
-				if e.payloadType == MultiTransactionPT {
+				if e.payloadType == ac.MultiTransactionPT {
 					data.ID = w_common.NewAndSet(e.id)
 				} else {
 					data.Transaction = e.transaction
@@ -328,14 +324,14 @@ func (s *Service) Stop() {
 func (s *Service) getDeps() FilterDependencies {
 	return FilterDependencies{
 		db: s.db,
-		tokenSymbol: func(t Token) string {
-			info := s.tokenManager.LookupTokenIdentity(uint64(t.ChainID), t.Address, t.TokenType == Native)
+		tokenSymbol: func(t ac.Token) string {
+			info := s.tokenManager.LookupTokenIdentity(uint64(t.ChainID), t.Address, t.TokenType == ac.Native)
 			if info == nil {
 				return ""
 			}
 			return info.Symbol
 		},
-		tokenFromSymbol: func(chainID *w_common.ChainID, symbol string) *Token {
+		tokenFromSymbol: func(chainID *w_common.ChainID, symbol string) *ac.Token {
 			var cID *uint64
 			if chainID != nil {
 				cID = new(uint64)
@@ -345,11 +341,11 @@ func (s *Service) getDeps() FilterDependencies {
 			if t == nil {
 				return nil
 			}
-			tokenType := Native
+			tokenType := ac.Native
 			if !detectedNative {
-				tokenType = Erc20
+				tokenType = ac.Erc20
 			}
-			return &Token{
+			return &ac.Token{
 				TokenType: tokenType,
 				ChainID:   w_common.ChainID(t.ChainID),
 				Address:   t.Address,

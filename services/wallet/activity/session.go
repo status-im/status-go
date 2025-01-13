@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	eth "github.com/ethereum/go-ethereum/common"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
@@ -12,7 +13,7 @@ import (
 const nilStr = "nil"
 
 type EntryIdentity struct {
-	payloadType PayloadType
+	payloadType ac.PayloadType
 	transaction *transfer.TransactionIdentity
 	id          common.MultiTransactionIDType
 }

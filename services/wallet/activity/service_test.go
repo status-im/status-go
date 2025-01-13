@@ -88,7 +88,7 @@ func setupTestService(tb testing.TB) (state testState) {
 	pendingCheckInterval := time.Second
 	state.pendingTracker = transactions.NewPendingTxTracker(db, state.rpcClient, nil, state.eventFeed, pendingCheckInterval)
 
-	state.service = NewService(db, accountsDB, state.tokenMock, state.collectiblesMock, state.eventFeed, state.pendingTracker)
+	state.service = NewService(db, accountsDB, state.tokenMock, state.collectiblesMock, state.eventFeed)
 	state.service.debounceDuration = 0
 	state.close = func() {
 		require.NoError(tb, state.pendingTracker.Stop())

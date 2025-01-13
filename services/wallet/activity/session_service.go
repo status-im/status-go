@@ -13,6 +13,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/responses"
@@ -362,7 +363,7 @@ func (s *Service) processChangesForSession(session *Session, eventCount int, cha
 	defer session.mu.Unlock()
 
 	f := session.getFullFilterParams()
-	limit := NoLimit
+	limit := ac.NoLimit
 	activities, err := s.getActivityEntries(context.Background(), f, 0, limit)
 	if err != nil {
 		logutils.ZapLogger().Error("Error getting activity entries", zap.Error(err))
@@ -420,11 +421,11 @@ func (s *Service) processChanges(eventCount int, changedTxs []TransactionID) {
 }
 
 func (s *Service) processEntryDataUpdates(sessionID SessionID, entries []Entry, changedTxs []TransactionID) {
-	updateData := make([]*EntryData, 0, len(changedTxs))
+	updateData := make([]*ac.EntryData, 0, len(changedTxs))
 
 	entriesMap := make(map[string]Entry, len(entries))
 	for _, e := range entries {
-		if e.payloadType == MultiTransactionPT {
+		if e.payloadType == ac.MultiTransactionPT {
 			if e.id != common.NoMultiTransactionID {
 				for _, tx := range e.transactions {
 					id := TransactionID{
@@ -449,11 +450,11 @@ func (s *Service) processEntryDataUpdates(sessionID SessionID, entries []Entry, 
 			continue
 		}
 
-		data := &EntryData{
+		data := &ac.EntryData{
 			Key:            e.Key(),
 			ActivityStatus: &e.activityStatus,
 		}
-		if e.payloadType == MultiTransactionPT {
+		if e.payloadType == ac.MultiTransactionPT {
 			data.ID = common.NewAndSet(e.id)
 		} else {
 			data.Transaction = e.transaction
