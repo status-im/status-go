@@ -222,7 +222,7 @@ var hopBridgeContractAddresses = map[string]map[uint64]map[string]common.Address
 			L2HopBridgeToken:   common.HexToAddress("0xC1985d7a3429cDC85E59E2E4Fcc805b857e6Ee2E"),
 			L2AmmWrapper:       common.HexToAddress("0x10541b07d8Ad2647Dc6cD67abd4c03575dade261"),
 			L2SaddleSwap:       common.HexToAddress("0x0ce6c85cF43553DE10FC56cecA0aef6Ff0DD444d"),
-			L2SaddleLpToken:    common.HexToAddress("0x0ce6c85cF43553DE10FC56cecA0aef6Ff0DD444d"),
+			L2SaddleLpToken:    common.HexToAddress("0xe9605BEc1c5C3E81F974F80b8dA9fBEFF4845d4D"),
 		},
 	},
 	"HOP": {

@@ -1850,14 +1850,6 @@ func newDefaultStore() *DefaultStore {
 				ChainID:     11155420,
 				TokenListID: "status",
 			},
-			&Token{
-				Address:     common.HexToAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
-				Name:        "USD Coin",
-				Symbol:      "USDC",
-				Decimals:    6,
-				ChainID:     8453,
-				TokenListID: "status",
-			},
 		},
 	}
 }
