@@ -45,7 +45,7 @@ func mainnet(stageName string) params.Network {
 		*params.NewProxyProvider(chainID, proxyGrove, proxyUrl(stageName, grove, chainName, networkName), false),
 		// Direct providers
 		*params.NewDirectProvider(chainID, directInfura, "https://mainnet.infura.io/v3/", true),
-		*params.NewDirectProvider(chainID, directGrove, "https://eth-archival.rpc.grove.city/v1/", false),
+		*params.NewDirectProvider(chainID, directGrove, "https://eth.rpc.grove.city/v1/", false),
 	}
 
 	return params.Network{
@@ -78,7 +78,7 @@ func sepolia(stageName string) params.Network {
 		*params.NewProxyProvider(chainID, proxyGrove, proxyUrl(stageName, grove, chainName, networkName), true),
 		// Direct providers
 		*params.NewDirectProvider(chainID, directInfura, "https://sepolia.infura.io/v3/", true),
-		*params.NewDirectProvider(chainID, directGrove, "https://sepolia-archival.rpc.grove.city/v1/", false),
+		*params.NewDirectProvider(chainID, directGrove, "https://eth-sepolia-testnet.rpc.grove.city/v1/", false),
 	}
 
 	return params.Network{
@@ -111,7 +111,7 @@ func optimism(stageName string) params.Network {
 		*params.NewProxyProvider(chainID, proxyGrove, proxyUrl(stageName, grove, chainName, networkName), true),
 		// Direct providers
 		*params.NewDirectProvider(chainID, directInfura, "https://optimism-mainnet.infura.io/v3/", true),
-		*params.NewDirectProvider(chainID, directGrove, "https://optimism-archival.rpc.grove.city/v1/", false),
+		*params.NewDirectProvider(chainID, directGrove, "https://optimism.rpc.grove.city/v1/", false),
 	}
 
 	return params.Network{
@@ -144,7 +144,7 @@ func optimismSepolia(stageName string) params.Network {
 		*params.NewProxyProvider(chainID, proxyGrove, proxyUrl(stageName, grove, chainName, networkName), true),
 		// Direct providers
 		*params.NewDirectProvider(chainID, directInfura, "https://optimism-sepolia.infura.io/v3/", true),
-		*params.NewDirectProvider(chainID, directGrove, "https://optimism-sepolia-archival.rpc.grove.city/v1/", false),
+		*params.NewDirectProvider(chainID, directGrove, "https://optimism-sepolia-testnet.rpc.grove.city/v1/", false),
 	}
 
 	return params.Network{
@@ -210,7 +210,7 @@ func arbitrumSepolia(stageName string) params.Network {
 		*params.NewProxyProvider(chainID, proxyGrove, proxyUrl(stageName, grove, chainName, networkName), true),
 		// Direct providers
 		*params.NewDirectProvider(chainID, directInfura, "https://arbitrum-sepolia.infura.io/v3/", true),
-		*params.NewDirectProvider(chainID, directGrove, "https://arbitrum-sepolia-archival.rpc.grove.city/v1/", false),
+		*params.NewDirectProvider(chainID, directGrove, "https://arbitrum-sepolia-testnet.rpc.grove.city/v1/", false),
 	}
 
 	return params.Network{

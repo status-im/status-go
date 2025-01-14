@@ -311,29 +311,6 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 
 		opts = append(opts, gethrpc.WithHeaders(headers))
 
-		// print provider details:
-		c.logger.Info("RPC provider",
-			zap.String("name", provider.Name),
-			zap.String("url", provider.URL),
-			zap.Bool("enabled", provider.Enabled),
-			zap.Bool("rps_limiter", provider.EnableRPSLimiter),
-			// token
-			zap.String("auth_login", provider.AuthLogin),
-			zap.String("auth_password", provider.AuthPassword),
-			zap.String("auth_token", provider.AuthToken),
-		)
-		// print the same with fmt.println
-		fmt.Println("RPC provider",
-			"name", provider.Name,
-			"url", provider.URL,
-			"enabled", provider.Enabled,
-			"rps_limiter", provider.EnableRPSLimiter,
-			// token
-			"auth_login", provider.AuthLogin,
-			"auth_password", provider.AuthPassword,
-			"auth_token", provider.AuthToken,
-		)
-
 		// Dial the RPC client
 		rpcClient, err := gethrpc.DialOptions(context.Background(), provider.URL, opts...)
 		if err != nil {

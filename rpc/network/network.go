@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
-
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
