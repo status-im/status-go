@@ -207,7 +207,7 @@ class MessengerTestCase(NetworkConditionTestCase):
         request.cls.receiver = self.receiver = self.initialize_backend(await_signals=self.await_signals)
 
     def initialize_backend(self, await_signals):
-        backend = StatusBackend(await_signals=await_signals)
+        backend = StatusBackend(await_signals=await_signals, privileged=True)
         backend.init_status_backend()
         backend.create_account_and_login()
         backend.find_public_key()
