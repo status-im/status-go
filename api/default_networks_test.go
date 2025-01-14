@@ -65,12 +65,13 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 		// Check direct providers for tokens
 		for _, provider := range n.RpcProviders {
-			if provider.Type == params.EmbeddedDirectProviderType {
-				if strings.Contains(provider.URL, "infura.io") {
-					require.Equal(t, provider.AuthToken, infuraToken, "Direct provider URL should have infuraToken")
-				} else if strings.Contains(provider.URL, "grove.city") {
-					require.Equal(t, provider.AuthToken, poktToken, "Direct provider URL should have poktToken")
-				}
+			if provider.Type != params.EmbeddedDirectProviderType {
+				continue
+			}
+			if strings.Contains(provider.URL, "infura.io") {
+				require.Equal(t, provider.AuthToken, infuraToken, "Direct provider URL should have infuraToken")
+			} else if strings.Contains(provider.URL, "grove.city") {
+				require.Equal(t, provider.AuthToken, poktToken, "Direct provider URL should have poktToken")
 			}
 		}
 	}

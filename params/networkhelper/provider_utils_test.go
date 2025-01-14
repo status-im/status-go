@@ -154,7 +154,7 @@ func TestDeepCopyNetwork(t *testing.T) {
 		{Symbol: "token1", Address: common.HexToAddress("0x123")},
 	}
 
-	copiedNetwork := networkhelper.DeepCopyNetwork(*originalNetwork)
+	copiedNetwork := originalNetwork.DeepCopy()
 
 	assert.True(t, reflect.DeepEqual(originalNetwork, &copiedNetwork), "Copied network should be deeply equal to the original")
 

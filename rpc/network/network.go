@@ -140,7 +140,7 @@ func (nm *Manager) setEmbeddedProviders(networks []*params.Network) {
 
 // networkWithoutEmbeddedProviders returns a copy of the given network without embedded RPC providers.
 func (nm *Manager) networkWithoutEmbeddedProviders(network *params.Network) *params.Network {
-	networkCopy := networkhelper.DeepCopyNetwork(*network)
+	networkCopy := network.DeepCopy()
 	networkCopy.RpcProviders = networkhelper.GetUserProviders(network.RpcProviders)
 	return &networkCopy
 }

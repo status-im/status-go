@@ -297,17 +297,42 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 		headers.Set("User-Agent", rpcUserAgentName)
 
 		// Set up authentication if needed
-		if provider.AuthType != params.NoAuth {
-			switch provider.AuthType {
-			case params.BasicAuth:
-				authEncoded := base64.StdEncoding.EncodeToString([]byte(provider.AuthLogin + ":" + provider.AuthPassword))
-				headers.Set("Authorization", "Basic "+authEncoded)
-			case params.TokenAuth:
-				provider.URL = provider.URL + provider.AuthToken
-			}
+		switch provider.AuthType {
+		case params.BasicAuth:
+			authEncoded := base64.StdEncoding.EncodeToString([]byte(provider.AuthLogin + ":" + provider.AuthPassword))
+			headers.Set("Authorization", "Basic "+authEncoded)
+		case params.TokenAuth:
+			provider.URL = provider.URL + provider.AuthToken
+		case params.NoAuth:
+			// no-op
+		default:
+			c.logger.Error("unknown auth type", zap.String("auth_type", string(provider.AuthType)))
 		}
 
 		opts = append(opts, gethrpc.WithHeaders(headers))
+
+		// print provider details:
+		c.logger.Info("RPC provider",
+			zap.String("name", provider.Name),
+			zap.String("url", provider.URL),
+			zap.Bool("enabled", provider.Enabled),
+			zap.Bool("rps_limiter", provider.EnableRPSLimiter),
+			// token
+			zap.String("auth_login", provider.AuthLogin),
+			zap.String("auth_password", provider.AuthPassword),
+			zap.String("auth_token", provider.AuthToken),
+		)
+		// print the same with fmt.println
+		fmt.Println("RPC provider",
+			"name", provider.Name,
+			"url", provider.URL,
+			"enabled", provider.Enabled,
+			"rps_limiter", provider.EnableRPSLimiter,
+			// token
+			"auth_login", provider.AuthLogin,
+			"auth_password", provider.AuthPassword,
+			"auth_token", provider.AuthToken,
+		)
 
 		// Dial the RPC client
 		rpcClient, err := gethrpc.DialOptions(context.Background(), provider.URL, opts...)

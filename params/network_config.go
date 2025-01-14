@@ -70,6 +70,15 @@ type Network struct {
 	RelatedChainID         uint64          `json:"relatedChainId" validate:"omitempty"`
 }
 
+func (n *Network) DeepCopy() Network {
+	updatedNetwork := *n
+	updatedNetwork.RpcProviders = make([]RpcProvider, len(n.RpcProviders))
+	copy(updatedNetwork.RpcProviders, n.RpcProviders)
+	updatedNetwork.TokenOverrides = make([]TokenOverride, len(n.TokenOverrides))
+	copy(updatedNetwork.TokenOverrides, n.TokenOverrides)
+	return updatedNetwork
+}
+
 func newRpcProvider(chainID uint64, name, url string, enableRpsLimiter bool, providerType RpcProviderType) *RpcProvider {
 	return &RpcProvider{
 		ChainID:          chainID,

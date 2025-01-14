@@ -118,19 +118,10 @@ func OverrideEmbeddedProxyProviders(networks []params.Network, enabled bool, use
 	return updatedNetworks
 }
 
-func DeepCopyNetwork(network params.Network) params.Network {
-	updatedNetwork := network
-	updatedNetwork.RpcProviders = make([]params.RpcProvider, len(network.RpcProviders))
-	copy(updatedNetwork.RpcProviders, network.RpcProviders)
-	updatedNetwork.TokenOverrides = make([]params.TokenOverride, len(network.TokenOverrides))
-	copy(updatedNetwork.TokenOverrides, network.TokenOverrides)
-	return updatedNetwork
-}
-
 func DeepCopyNetworks(networks []params.Network) []params.Network {
 	updatedNetworks := make([]params.Network, len(networks))
 	for i, network := range networks {
-		updatedNetworks[i] = DeepCopyNetwork(network)
+		updatedNetworks[i] = network.DeepCopy()
 	}
 	return updatedNetworks
 }
