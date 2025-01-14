@@ -243,6 +243,14 @@ func newDefaultStore() *DefaultStore {
 				TokenListID: "status",
 			},
 			&Token{
+				Address:     common.HexToAddress("0x662015EC830DF08C0FC45896FaB726542e8AC09E"),
+				Name:        "Status Network Token",
+				Symbol:      "SNT",
+				Decimals:    18,
+				ChainID:     8453,
+				TokenListID: "status",
+			},
+			&Token{
 				Address:     common.HexToAddress("0xaec2e87e0a235266d9c5adc9deb4b2e29b54d009"),
 				Name:        "SingularDTV",
 				Symbol:      "SNGLS",
@@ -1768,6 +1776,14 @@ func newDefaultStore() *DefaultStore {
 				Symbol:      "STT",
 				Decimals:    18,
 				ChainID:     11155111,
+				TokenListID: "status",
+			},
+			&Token{
+				Address:     common.HexToAddress("0xfDB3b57944943a7724fCc0520eE2B10659969a06"),
+				Name:        "Status Test Token",
+				Symbol:      "STT",
+				Decimals:    18,
+				ChainID:     84532,
 				TokenListID: "status",
 			},
 			&Token{
