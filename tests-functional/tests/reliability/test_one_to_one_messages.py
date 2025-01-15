@@ -11,7 +11,6 @@ from resources.enums import MessageContentType
 class TestOneToOneMessages(MessengerTestCase):
 
     @pytest.mark.rpc  # until we have dedicated functional tests for this we can still run this test as part of the functional tests suite
-    @pytest.mark.dependency(name="test_one_to_one_message_baseline")
     def test_one_to_one_message_baseline(self, message_count=1):
         sent_messages = []
         for i in range(message_count):
@@ -33,26 +32,21 @@ class TestOneToOneMessages(MessengerTestCase):
                 expected_message=expected_message,
             )
 
-    @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
     def test_multiple_one_to_one_messages(self):
         self.test_one_to_one_message_baseline(message_count=50)
 
-    @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
     def test_one_to_one_message_with_latency(self):
         with self.add_latency(self.receiver):
             self.test_one_to_one_message_baseline(message_count=50)
 
-    @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
     def test_one_to_one_message_with_packet_loss(self):
         with self.add_packet_loss(self.receiver):
             self.test_one_to_one_message_baseline(message_count=50)
 
-    @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
     def test_one_to_one_message_with_low_bandwidth(self):
         with self.add_low_bandwith(self.receiver):
             self.test_one_to_one_message_baseline(message_count=50)
 
-    @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
     def test_one_to_one_message_with_node_pause_30_seconds(self):
         with self.node_pause(self.receiver):
             message_text = f"test_message_{uuid4()}"

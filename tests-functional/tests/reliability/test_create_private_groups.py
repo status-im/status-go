@@ -11,7 +11,6 @@ from resources.enums import MessageContentType
 class TestCreatePrivateGroups(MessengerTestCase):
 
     @pytest.mark.rpc  # until we have dedicated functional tests for this we can still run this test as part of the functional tests suite
-    @pytest.mark.dependency(name="test_create_private_group_baseline")
     def test_create_private_group_baseline(self, private_groups_count=1):
         self.make_contacts()
 
@@ -38,11 +37,9 @@ class TestCreatePrivateGroups(MessengerTestCase):
                 fields_to_validate={"text": "text"},
             )
 
-    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
     def test_multiple_one_create_private_groups(self):
         self.test_create_private_group_baseline(private_groups_count=50)
 
-    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
     def test_create_private_groups_with_node_pause_30_seconds(self):
         self.make_contacts()
 
