@@ -40,18 +40,18 @@ class TestPrivateGroupMessages(MessengerTestCase):
     def test_multiple_group_chat_messages(self):
         self.test_private_group_messages_baseline(message_count=50)
 
-    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
-    def test_create_private_groups_with_latency(self):
+    @pytest.mark.dependency(depends=["test_private_group_messages_baseline"])
+    def test_multiple_group_chat_messages_with_latency(self):
         with self.add_latency(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
 
-    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
-    def test_create_private_groups_with_packet_loss(self):
+    @pytest.mark.dependency(depends=["test_private_group_messages_baseline"])
+    def test_multiple_group_chat_messages_with_packet_loss(self):
         with self.add_packet_loss(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
 
-    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
-    def test_create_private_groups_with_low_bandwidth(self):
+    @pytest.mark.dependency(depends=["test_private_group_messages_baseline"])
+    def test_multiple_group_chat_messages_with_low_bandwidth(self):
         with self.add_low_bandwith(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
 
