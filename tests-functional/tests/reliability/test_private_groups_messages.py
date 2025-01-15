@@ -40,29 +40,20 @@ class TestPrivateGroupMessages(MessengerTestCase):
     def test_multiple_group_chat_messages(self):
         self.test_private_group_messages_baseline(message_count=50)
 
-    # @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
-    # @pytest.mark.skip(reason="Skipping until add_latency is implemented")
-    # def test_create_private_groups_with_latency(self):
-    #     # with self.add_latency():
-    #     #     self.test_create_private_group_baseline()
-    #     # to be done in the next PR
-    #     pass
+    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
+    def test_create_private_groups_with_latency(self):
+        with self.add_latency(self.receiver):
+            self.test_private_group_messages_baseline(message_count=50)
 
-    # @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
-    # @pytest.mark.skip(reason="Skipping until add_packet_loss is implemented")
-    # def test_create_private_groups_with_packet_loss(self):
-    #     # with self.add_packet_loss():
-    #     #     self.test_create_private_group_baseline()
-    #     # to be done in the next PR
-    #     pass
+    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
+    def test_create_private_groups_with_packet_loss(self):
+        with self.add_packet_loss(self.receiver):
+            self.test_private_group_messages_baseline(message_count=50)
 
-    # @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
-    # @pytest.mark.skip(reason="Skipping until add_low_bandwith is implemented")
-    # def test_create_private_groups_with_low_bandwidth(self):
-    #     # with self.add_low_bandwith():
-    #     #     self.test_create_private_group_baseline()
-    #     # to be done in the next PR
-    #     pass
+    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
+    def test_create_private_groups_with_low_bandwidth(self):
+        with self.add_low_bandwith(self.receiver):
+            self.test_private_group_messages_baseline(message_count=50)
 
     @pytest.mark.dependency(depends=["test_private_group_messages_baseline"])
     def test_private_group_messages_with_node_pause_30_seconds(self):
