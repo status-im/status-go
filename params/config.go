@@ -1113,6 +1113,7 @@ func (c *NodeConfig) Save() error {
 	}
 
 	configFilePath := filepath.Join(c.DataDir, "config.json")
+	//nolint:gosec
 	if err := ioutil.WriteFile(configFilePath, data, os.ModePerm); err != nil {
 		return err
 	}

@@ -1,5 +1,5 @@
 # Build status-go in a Go builder container
-FROM golang:1.21-alpine3.18 as builder
+FROM golang:1.22-alpine3.18 as builder
 
 # Set environment variables to use Clang
 ENV CC=clang

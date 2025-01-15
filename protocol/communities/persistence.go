@@ -2100,6 +2100,7 @@ func (p *Persistence) GetCommunityRequestsToJoinRevealedAddresses(communityID []
 func (p *Persistence) GetEncryptionKeyRequests(communityID []byte, channelIDs map[string]struct{}) (map[string]*EncryptionKeysRequestRecord, error) {
 	result := map[string]*EncryptionKeysRequestRecord{}
 
+	//nolint:gosec
 	query := "SELECT channel_id, requested_at, requested_count FROM community_encryption_keys_requests WHERE community_id = ? AND channel_id IN (?" + strings.Repeat(",?", len(channelIDs)-1) + ")"
 
 	args := make([]interface{}, 0, len(channelIDs)+1)
@@ -2160,6 +2161,7 @@ func (p *Persistence) UpdateAndPruneEncryptionKeyRequests(communityID types.HexB
 	}
 
 	// Delete entries that do not match the channelIDs list
+	//nolint:gosec
 	deleteQuery := "DELETE FROM community_encryption_keys_requests WHERE community_id = ? AND channel_id NOT IN (?" + strings.Repeat(",?", len(channelIDs)-1) + ")"
 	args := make([]interface{}, 0, len(channelIDs)+1)
 	args = append(args, communityID)

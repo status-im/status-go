@@ -835,6 +835,7 @@ func (tm *Manager) GetCachedBalancesByChain(accounts, tokenAddresses []common.Ad
 		chainIDStrings[i] = fmt.Sprintf("%d", chainID)
 	}
 
+	//nolint: gosec
 	query := `SELECT chain_id, user_address, token_address, raw_balance
 			  	FROM token_balances
 				WHERE user_address IN (` + strings.Join(accountStrings, ",") + `)

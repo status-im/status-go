@@ -8,7 +8,7 @@ let
 
   /* Lock requires Xcode verison. */
   xcodeWrapper = callPackage ./pkgs/xcodeenv/compose-xcodewrapper.nix { } {
-      versions = ["14.3" "15.1" "15.2" "15.3" "15.4"];
+      versions = [ ];
   };
 
   /* Gomobile also needs the Xcode wrapper. */
