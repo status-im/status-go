@@ -35,7 +35,7 @@ func (s *MailRequestMonitorSuite) TestRequestCompleted() {
 	mock := NewHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
-	s.monitor.handleEvent(types.EnvelopeEvent{
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
 		Event: types.EventMailServerRequestCompleted,
 		Hash:  testHash,
 		Data:  &types.MailServerResponse{},
@@ -53,7 +53,7 @@ func (s *MailRequestMonitorSuite) TestRequestFailed() {
 	mock := NewHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
-	s.monitor.handleEvent(types.EnvelopeEvent{
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
 		Event: types.EventMailServerRequestCompleted,
 		Hash:  testHash,
 		Data:  &types.MailServerResponse{Error: errors.New("test error")},
@@ -71,7 +71,7 @@ func (s *MailRequestMonitorSuite) TestRequestExpiration() {
 	mock := NewHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
-	s.monitor.handleEvent(types.EnvelopeEvent{
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
 		Event: types.EventMailServerRequestExpired,
 		Hash:  testHash,
 	})

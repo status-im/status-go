@@ -73,7 +73,7 @@ func (m *MailRequestMonitor) GetState(hash types.Hash) EnvelopeState {
 
 // handleEnvelopeEvents processes whisper envelope events
 func (m *MailRequestMonitor) handleEnvelopeEvents() {
-	events := make(chan types.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
+	events := make(chan wakutypes.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
 	sub := m.eventSub.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
 	for {
@@ -88,8 +88,8 @@ func (m *MailRequestMonitor) handleEnvelopeEvents() {
 
 // handleEvent based on type of the event either triggers
 // confirmation handler or removes hash from MailRequestMonitor
-func (m *MailRequestMonitor) handleEvent(event types.EnvelopeEvent) {
-	handlers := map[types.EventType]func(types.EnvelopeEvent){
+func (m *MailRequestMonitor) handleEvent(event wakutypes.EnvelopeEvent) {
+	handlers := map[wakutypes.EventType]func(wakutypes.EnvelopeEvent){
 		types.EventMailServerRequestSent:      m.handleRequestSent,
 		types.EventMailServerRequestCompleted: m.handleEventMailServerRequestCompleted,
 		types.EventMailServerRequestExpired:   m.handleEventMailServerRequestExpired,
@@ -100,13 +100,13 @@ func (m *MailRequestMonitor) handleEvent(event types.EnvelopeEvent) {
 	}
 }
 
-func (m *MailRequestMonitor) handleRequestSent(event types.EnvelopeEvent) {
+func (m *MailRequestMonitor) handleRequestSent(event wakutypes.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.cache[event.Hash] = MailServerRequestSent
 }
 
-func (m *MailRequestMonitor) handleEventMailServerRequestCompleted(event types.EnvelopeEvent) {
+func (m *MailRequestMonitor) handleEventMailServerRequestCompleted(event wakutypes.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.requestsRegistry.Unregister(event.Hash)
@@ -123,7 +123,7 @@ func (m *MailRequestMonitor) handleEventMailServerRequestCompleted(event types.E
 	}
 }
 
-func (m *MailRequestMonitor) handleEventMailServerRequestExpired(event types.EnvelopeEvent) {
+func (m *MailRequestMonitor) handleEventMailServerRequestExpired(event wakutypes.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.requestsRegistry.Unregister(event.Hash)

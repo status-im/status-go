@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/db"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/waku/types"
 )
 
 // NewPeerRecord returns instance of the peer record.

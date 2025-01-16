@@ -9,14 +9,15 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
+
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerCommunitiesShardingSuite(t *testing.T) {
@@ -27,10 +28,10 @@ type MessengerCommunitiesShardingSuite struct {
 	suite.Suite
 
 	owner     *Messenger
-	ownerWaku types.Waku
+	ownerWaku wakutypes.Waku
 
 	alice                         *Messenger
-	aliceWaku                     types.Waku
+	aliceWaku                     wakutypes.Waku
 	aliceUnhandledMessagesTracker *unhandledMessagesTracker
 
 	logger *zap.Logger
@@ -97,13 +98,13 @@ func (s *MessengerCommunitiesShardingSuite) TearDownTest() {
 		TearDownMessenger(&s.Suite, s.owner)
 	}
 	if s.ownerWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.ownerWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.ownerWaku).Stop())
 	}
 	if s.alice != nil {
 		TearDownMessenger(&s.Suite, s.alice)
 	}
 	if s.aliceWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.aliceWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.aliceWaku).Stop())
 	}
 	_ = s.logger.Sync()
 }

@@ -706,7 +706,7 @@ func (s *mailServer) exceedsPeerRequests(peerID types.Hash) bool {
 func (s *mailServer) createIterator(req MessagesRequestPayload) (Iterator, error) {
 	var (
 		emptyHash  types.Hash
-		emptyTopic types.TopicType
+		emptyTopic wakutypes.TopicType
 		ku, kl     *DBKey
 	)
 
@@ -753,12 +753,12 @@ func (s *mailServer) processRequestInBundles(
 		zap.Int("limit", limit),
 	)
 
-	var topicsMap map[types.TopicType]bool
+	var topicsMap map[wakutypes.TopicType]bool
 
 	if len(topics) != 0 {
-		topicsMap = make(map[types.TopicType]bool)
+		topicsMap = make(map[wakutypes.TopicType]bool)
 		for _, t := range topics {
-			topicsMap[types.BytesToTopic(t)] = true
+			topicsMap[wakutypes.BytesToTopic(t)] = true
 		}
 	}
 

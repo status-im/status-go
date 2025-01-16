@@ -60,7 +60,7 @@ func TestMessagesRequest_setDefaults(t *testing.T) {
 }
 
 func TestMakeMessagesRequestPayload(t *testing.T) {
-	var emptyTopic types.TopicType
+	var emptyTopic wakutypes.TopicType
 	testCases := []struct {
 		Name string
 		Req  MessagesRequest
@@ -129,18 +129,18 @@ func TestCreateBloomFilter(t *testing.T) {
 	bloom := createBloomFilter(req)
 	assert.Equal(t, topicsToBloom(t1), bloom)
 
-	req = MessagesRequest{Topics: []types.TopicType{t1, t2}}
+	req = MessagesRequest{Topics: []wakutypes.TopicType{t1, t2}}
 	bloom = createBloomFilter(req)
 	assert.Equal(t, topicsToBloom(t1, t2), bloom)
 }
 
-func stringToTopic(s string) types.TopicType {
-	return types.BytesToTopic([]byte(s))
+func stringToTopic(s string) wakutypes.TopicType {
+	return wakutypes.BytesToTopic([]byte(s))
 }
 
 func TestExpiredOrCompleted(t *testing.T) {
 	timeout := time.Millisecond
-	events := make(chan types.EnvelopeEvent)
+	events := make(chan wakutypes.EnvelopeEvent)
 	errors := make(chan error, 1)
 	hash := types.Hash{1}
 	go func() {

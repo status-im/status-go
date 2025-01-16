@@ -1,9 +1,9 @@
-package gethbridge
+package bridge
 
 import (
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/waku/types"
 )
 
 type gethSubscriptionWrapper struct {

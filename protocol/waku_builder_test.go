@@ -10,11 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/appdatabase"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/t/helpers"
 	waku2 "github.com/status-im/status-go/wakuv2"
+
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type testWakuV2Config struct {
@@ -70,9 +71,9 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 	return wakuNode
 }
 
-func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []string) []types.Waku {
+func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []string) []wakutypes.Waku {
 	nodes := make([]*waku2.Waku, len(nodeNames))
-	wrappers := make([]types.Waku, len(nodes))
+	wrappers := make([]wakutypes.Waku, len(nodes))
 
 	for i, name := range nodeNames {
 		nodes[i] = NewTestWakuV2(s, testWakuV2Config{
@@ -98,7 +99,7 @@ func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []s
 		}
 	}
 	for i, n := range nodes {
-		wrappers[i] = gethbridge.NewGethWakuV2Wrapper(n)
+		wrappers[i] = bridge.NewGethWakuV2Wrapper(n)
 	}
 	return wrappers
 }

@@ -29,8 +29,8 @@ func (k *DBKey) Bytes() []byte {
 	return k.raw
 }
 
-func (k *DBKey) Topic() types.TopicType {
-	return types.BytesToTopic(k.raw[timestampLength+types.HashLength:])
+func (k *DBKey) Topic() wakutypes.TopicType {
+	return wakutypes.BytesToTopic(k.raw[timestampLength+types.HashLength:])
 }
 
 func (k *DBKey) EnvelopeHash() types.Hash {
@@ -43,7 +43,7 @@ func (k *DBKey) Cursor() []byte {
 }
 
 // NewDBKey creates a new DBKey with the given values.
-func NewDBKey(timestamp uint32, topic types.TopicType, h types.Hash) *DBKey {
+func NewDBKey(timestamp uint32, topic wakutypes.TopicType, h types.Hash) *DBKey {
 	var k DBKey
 	k.raw = make([]byte, DBKeyLength)
 	binary.BigEndian.PutUint32(k.raw, timestamp)

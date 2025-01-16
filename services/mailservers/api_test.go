@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
@@ -78,14 +77,14 @@ func TestTopic(t *testing.T) {
 		// Existing topic, is not updated
 		{
 			PubsubTopic:  shard.DefaultShardPubsubTopic(),
-			ContentTopic: types.BytesToTopic([]byte{0x61}),
+			ContentTopic: wakutypes.BytesToTopic([]byte{0x61}),
 		},
 		// Non existing topic is not inserted
 		{
 			Discovery:    true,
 			Negotiated:   true,
 			PubsubTopic:  shard.DefaultShardPubsubTopic(),
-			ContentTopic: types.BytesToTopic([]byte{0x64}),
+			ContentTopic: wakutypes.BytesToTopic([]byte{0x64}),
 		},
 	}
 

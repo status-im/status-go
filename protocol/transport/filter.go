@@ -1,6 +1,6 @@
 package transport
 
-import "github.com/status-im/status-go/eth-node/types"
+import wakutypes "github.com/status-im/status-go/waku/types"
 
 // TODO: revise fields encoding/decoding. Some are encoded using hexutil and some using encoding/hex.
 type Filter struct {
@@ -18,7 +18,7 @@ type Filter struct {
 	// PubsubTopic is the waku2 pubsub topic
 	PubsubTopic string `json:"pubsubTopic"`
 	// ContentTopic is the waku topic
-	ContentTopic types.TopicType `json:"topic"`
+	ContentTopic wakutypes.TopicType `json:"topic"`
 	// Discovery is whether this is a discovery topic
 	Discovery bool `json:"discovery"`
 	// Negotiated tells us whether is a negotiated topic

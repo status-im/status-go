@@ -8,12 +8,13 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
+
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerRawMessageResendTestSuite(t *testing.T) {
@@ -27,8 +28,8 @@ type MessengerRawMessageResendTest struct {
 	aliceMessenger *Messenger
 	bobMessenger   *Messenger
 
-	aliceWaku types.Waku
-	bobWaku   types.Waku
+	aliceWaku wakutypes.Waku
+	bobWaku   wakutypes.Waku
 
 	mockedBalances communities.BalancesByChain
 }
@@ -76,10 +77,10 @@ func (s *MessengerRawMessageResendTest) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.aliceMessenger)
 	TearDownMessenger(&s.Suite, s.bobMessenger)
 	if s.aliceWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.aliceWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.aliceWaku).Stop())
 	}
 	if s.bobWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.bobWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.bobWaku).Stop())
 	}
 	_ = s.logger.Sync()
 }

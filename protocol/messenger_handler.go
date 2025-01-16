@@ -38,6 +38,8 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const (
@@ -1452,15 +1454,15 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 
 func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage) (*MessengerResponse, error) {
 
-	messagesToHandle := make(map[transport.Filter][]*types.Message)
+	messagesToHandle := make(map[transport.Filter][]*wakutypes.Message)
 
 	for _, message := range archiveMessages {
 		filter := m.transport.FilterByTopic(message.Topic)
 		if filter != nil {
-			shhMessage := &types.Message{
+			shhMessage := &wakutypes.Message{
 				Sig:          message.Sig,
 				Timestamp:    uint32(message.Timestamp),
-				Topic:        types.BytesToTopic(message.Topic),
+				Topic:        wakutypes.BytesToTopic(message.Topic),
 				Payload:      message.Payload,
 				Padding:      message.Padding,
 				Hash:         message.Hash,
@@ -1470,8 +1472,8 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 		}
 	}
 
-	importedMessages := make(map[transport.Filter][]*types.Message, 0)
-	otherMessages := make(map[transport.Filter][]*types.Message, 0)
+	importedMessages := make(map[transport.Filter][]*wakutypes.Message, 0)
+	otherMessages := make(map[transport.Filter][]*wakutypes.Message, 0)
 
 	for filter, messages := range messagesToHandle {
 		for _, message := range messages {

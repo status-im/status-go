@@ -126,7 +126,7 @@ func countMessages(t *testing.T, db DB) int {
 	var (
 		count      int
 		zero       types.Hash
-		emptyTopic types.TopicType
+		emptyTopic wakutypes.TopicType
 	)
 
 	now := time.Now()

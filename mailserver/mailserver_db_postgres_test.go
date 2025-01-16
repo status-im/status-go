@@ -48,9 +48,9 @@ func (s *MailServerPostgresDBSuite) TestPostgresDB_BuildIteratorWithBloomFilter(
 	s.NoError(err)
 
 	iter, err := db.BuildIterator(CursorQuery{
-		start: NewDBKey(uint32(time.Now().Add(-time.Hour).Unix()), types.BytesToTopic(topic), types.Hash{}).Bytes(),
-		end:   NewDBKey(uint32(time.Now().Add(time.Second).Unix()), types.BytesToTopic(topic), types.Hash{}).Bytes(),
-		bloom: types.TopicToBloom(types.BytesToTopic(topic)),
+		start: NewDBKey(uint32(time.Now().Add(-time.Hour).Unix()), wakutypes.BytesToTopic(topic), types.Hash{}).Bytes(),
+		end:   NewDBKey(uint32(time.Now().Add(time.Second).Unix()), wakutypes.BytesToTopic(topic), types.Hash{}).Bytes(),
+		bloom: types.TopicToBloom(wakutypes.BytesToTopic(topic)),
 		limit: 10,
 	})
 	s.NoError(err)
@@ -82,8 +82,8 @@ func (s *MailServerPostgresDBSuite) TestPostgresDB_BuildIteratorWithTopic() {
 	s.NoError(err)
 
 	iter, err := db.BuildIterator(CursorQuery{
-		start:  NewDBKey(uint32(time.Now().Add(-time.Hour).Unix()), types.BytesToTopic(topic), types.Hash{}).Bytes(),
-		end:    NewDBKey(uint32(time.Now().Add(time.Second).Unix()), types.BytesToTopic(topic), types.Hash{}).Bytes(),
+		start:  NewDBKey(uint32(time.Now().Add(-time.Hour).Unix()), wakutypes.BytesToTopic(topic), types.Hash{}).Bytes(),
+		end:    NewDBKey(uint32(time.Now().Add(time.Second).Unix()), wakutypes.BytesToTopic(topic), types.Hash{}).Bytes(),
 		topics: [][]byte{topic},
 		limit:  10,
 	})

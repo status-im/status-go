@@ -13,6 +13,8 @@ import (
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const (
@@ -31,9 +33,9 @@ type PeerEventsSubscriber interface {
 	SubscribeEvents(chan *p2p.PeerEvent) event.Subscription
 }
 
-// EnvelopeEventSubscriber interface to subscribe for types.EnvelopeEvent's.
+// EnvelopeEventSubscriber interface to subscribe for wakutypes.EnvelopeEvent's.
 type EnvelopeEventSubscriber interface {
-	SubscribeEnvelopeEvents(chan<- types.EnvelopeEvent) types.Subscription
+	SubscribeEnvelopeEvents(chan<- wakutypes.EnvelopeEvent) wakutypes.Subscription
 }
 
 type p2pServer interface {
@@ -90,10 +92,10 @@ func (ps *ConnectionManager) Start() {
 		state := newInternalState(ps.server, ps.connectedTarget, ps.timeoutWaitAdded)
 		events := make(chan *p2p.PeerEvent, peerEventsBuffer)
 		sub := ps.server.SubscribeEvents(events)
-		whisperEvents := make(chan types.EnvelopeEvent, whisperEventsBuffer)
+		whisperEvents := make(chan wakutypes.EnvelopeEvent, whisperEventsBuffer)
 		whisperSub := ps.eventSub.SubscribeEnvelopeEvents(whisperEvents)
 		requests := map[types.Hash]struct{}{}
-		failuresPerServer := map[types.EnodeID]int{}
+		failuresPerServer := map[wakutypes.EnodeID]int{}
 
 		defer sub.Unsubscribe()
 		defer whisperSub.Unsubscribe()
@@ -115,13 +117,13 @@ func (ps *ConnectionManager) Start() {
 			case ev := <-whisperEvents:
 				// TODO treat failed requests the same way as expired
 				switch ev.Event {
-				case types.EventMailServerRequestSent:
+				case wakutypes.EventMailServerRequestSent:
 					requests[ev.Hash] = struct{}{}
-				case types.EventMailServerRequestCompleted:
+				case wakutypes.EventMailServerRequestCompleted:
 					// reset failures count on first success
 					failuresPerServer[ev.Peer] = 0
 					delete(requests, ev.Hash)
-				case types.EventMailServerRequestExpired:
+				case wakutypes.EventMailServerRequestExpired:
 					_, exist := requests[ev.Hash]
 					if !exist {
 						continue
@@ -153,9 +155,9 @@ func (ps *ConnectionManager) Stop() {
 }
 
 func (state *internalState) processReplacement(newNodes []*enode.Node, events <-chan *p2p.PeerEvent) {
-	replacement := map[types.EnodeID]*enode.Node{}
+	replacement := map[wakutypes.EnodeID]*enode.Node{}
 	for _, n := range newNodes {
-		replacement[types.EnodeID(n.ID())] = n
+		replacement[wakutypes.EnodeID(n.ID())] = n
 	}
 	state.replaceNodes(replacement)
 	if state.ReachedTarget() {
@@ -176,8 +178,8 @@ func newInternalState(srv PeerAdderRemover, target int, timeout time.Duration) *
 	return &internalState{
 		options:      options{target: target, timeout: timeout},
 		srv:          srv,
-		connected:    map[types.EnodeID]struct{}{},
-		currentNodes: map[types.EnodeID]*enode.Node{},
+		connected:    map[wakutypes.EnodeID]struct{}{},
+		currentNodes: map[wakutypes.EnodeID]*enode.Node{},
 	}
 }
 
@@ -190,15 +192,15 @@ type internalState struct {
 	options
 	srv PeerAdderRemover
 
-	connected    map[types.EnodeID]struct{}
-	currentNodes map[types.EnodeID]*enode.Node
+	connected    map[wakutypes.EnodeID]struct{}
+	currentNodes map[wakutypes.EnodeID]*enode.Node
 }
 
 func (state *internalState) ReachedTarget() bool {
 	return len(state.connected) >= state.target
 }
 
-func (state *internalState) replaceNodes(new map[types.EnodeID]*enode.Node) {
+func (state *internalState) replaceNodes(new map[wakutypes.EnodeID]*enode.Node) {
 	for nid, n := range state.currentNodes {
 		if _, exist := new[nid]; !exist {
 			delete(state.connected, nid)
@@ -213,7 +215,7 @@ func (state *internalState) replaceNodes(new map[types.EnodeID]*enode.Node) {
 	state.currentNodes = new
 }
 
-func (state *internalState) nodeAdded(peer types.EnodeID) {
+func (state *internalState) nodeAdded(peer wakutypes.EnodeID) {
 	n, exist := state.currentNodes[peer]
 	if !exist {
 		return
@@ -221,11 +223,11 @@ func (state *internalState) nodeAdded(peer types.EnodeID) {
 	if state.ReachedTarget() {
 		state.srv.RemovePeer(n)
 	} else {
-		state.connected[types.EnodeID(n.ID())] = struct{}{}
+		state.connected[wakutypes.EnodeID(n.ID())] = struct{}{}
 	}
 }
 
-func (state *internalState) nodeDisconnected(peer types.EnodeID) {
+func (state *internalState) nodeDisconnected(peer wakutypes.EnodeID) {
 	n, exist := state.currentNodes[peer] // unrelated event
 	if !exist {
 		return
@@ -254,10 +256,10 @@ func processPeerEvent(state *internalState, ev *p2p.PeerEvent) {
 	switch ev.Type {
 	case p2p.PeerEventTypeAdd:
 		logutils.ZapLogger().Debug("connected to a mailserver", zap.Stringer("address", ev.Peer))
-		state.nodeAdded(types.EnodeID(ev.Peer))
+		state.nodeAdded(wakutypes.EnodeID(ev.Peer))
 	case p2p.PeerEventTypeDrop:
 		logutils.ZapLogger().Debug("mailserver disconnected", zap.Stringer("address", ev.Peer))
-		state.nodeDisconnected(types.EnodeID(ev.Peer))
+		state.nodeDisconnected(wakutypes.EnodeID(ev.Peer))
 	}
 }
 

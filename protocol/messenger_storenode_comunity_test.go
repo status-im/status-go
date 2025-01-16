@@ -11,7 +11,6 @@ import (
 
 	"github.com/status-im/status-go/protocol/storenodes"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/tt"
@@ -21,7 +20,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -30,6 +28,9 @@ import (
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	waku2 "github.com/status-im/status-go/wakuv2"
 	wakuV2common "github.com/status-im/status-go/wakuv2/common"
+
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerStoreNodeCommunitySuite(t *testing.T) {
@@ -43,10 +44,10 @@ type MessengerStoreNodeCommunitySuite struct {
 	cancel chan struct{}
 
 	owner     *Messenger
-	ownerWaku types.Waku
+	ownerWaku wakutypes.Waku
 
 	bob     *Messenger
-	bobWaku types.Waku
+	bobWaku wakutypes.Waku
 
 	storeNode                 *waku2.Waku
 	storeNodeAddress          multiaddr.Multiaddr
@@ -101,7 +102,7 @@ func (s *MessengerStoreNodeCommunitySuite) createStore(name string) (*waku2.Waku
 	return storeNode, addresses[0]
 }
 
-func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAddress *multiaddr.Multiaddr) (*Messenger, types.Waku) {
+func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAddress *multiaddr.Multiaddr) (*Messenger, wakutypes.Waku) {
 	localMailserverID := "local-mailserver-007"
 	localFleet := "local-fleet-007"
 
@@ -112,7 +113,7 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAd
 		clusterID:   shard.MainStatusShardCluster,
 	}
 	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
-	wakuV2Wrapper := gethbridge.NewGethWakuV2Wrapper(wakuV2)
+	wakuV2Wrapper := bridge.NewGethWakuV2Wrapper(wakuV2)
 
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -294,8 +295,8 @@ func (s *MessengerStoreNodeCommunitySuite) TestSetStorenodeForCommunity_fetchMes
 	err = s.bob.DialPeer(s.storeNodeAddress)
 	s.Require().NoError(err)
 
-	ownerPeerID := gethbridge.GetGethWakuV2From(s.ownerWaku).PeerID()
-	bobPeerID := gethbridge.GetGethWakuV2From(s.bobWaku).PeerID()
+	ownerPeerID := bridge.GetGethWakuV2From(s.ownerWaku).PeerID()
+	bobPeerID := bridge.GetGethWakuV2From(s.bobWaku).PeerID()
 
 	// 1. Owner creates a community
 	community, chat := s.createCommunityWithChat(s.owner)

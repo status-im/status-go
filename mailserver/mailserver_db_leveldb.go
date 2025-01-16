@@ -34,7 +34,7 @@ func (i *LevelDBIterator) DBKey() (*DBKey, error) {
 	}, nil
 }
 
-func (i *LevelDBIterator) GetEnvelopeByTopicsMap(topics map[types.TopicType]bool) ([]byte, error) {
+func (i *LevelDBIterator) GetEnvelopeByTopicsMap(topics map[wakutypes.TopicType]bool) ([]byte, error) {
 	rawValue := make([]byte, len(i.Value()))
 	copy(rawValue, i.Value())
 
@@ -144,7 +144,7 @@ func (db *LevelDB) Prune(t time.Time, batchSize int) (int, error) {
 	defer recoverLevelDBPanics("Prune")
 
 	var zero types.Hash
-	var emptyTopic types.TopicType
+	var emptyTopic wakutypes.TopicType
 	kl := NewDBKey(0, emptyTopic, zero)
 	ku := NewDBKey(uint32(t.Unix()), emptyTopic, zero)
 	query := CursorQuery{

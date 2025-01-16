@@ -24,6 +24,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // Whisper message properties.
@@ -359,7 +361,7 @@ func (s *MessageSender) sendCommunity(
 	s.notifyOnScheduledMessage(nil, rawMessage)
 
 	var hashes [][]byte
-	var newMessages []*types.NewMessage
+	var newMessages []*wakutypes.NewMessage
 
 	forceRekey := rawMessage.CommunityKeyExMsgType == KeyExMsgRekey
 
@@ -634,7 +636,7 @@ func (s *MessageSender) EncodeAbridgedMembershipUpdate(
 	return s.encodeMembershipUpdate(message, chatEntity)
 }
 
-func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMessage *RawMessage, wrappedMessage []byte, rekey bool) ([][]byte, []*types.NewMessage, error) {
+func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMessage *RawMessage, wrappedMessage []byte, rekey bool) ([][]byte, []*wakutypes.NewMessage, error) {
 	payload := wrappedMessage
 	var err error
 	if rekey && len(rawMessage.HashRatchetGroupID) != 0 {
@@ -659,7 +661,7 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 		}
 	}
 
-	newMessage := &types.NewMessage{
+	newMessage := &wakutypes.NewMessage{
 		TTL:         whisperTTL,
 		Payload:     payload,
 		PowTarget:   calculatePoW(payload),
@@ -715,7 +717,7 @@ func (s *MessageSender) SendPublic(
 		}
 	}
 
-	var newMessage *types.NewMessage
+	var newMessage *wakutypes.NewMessage
 
 	messageSpec, err := s.protocol.BuildPublicMessage(s.identity, wrappedMessage)
 	if err != nil {
@@ -754,7 +756,7 @@ func (s *MessageSender) SendPublic(
 			return nil, err
 		}
 	} else {
-		newMessage = &types.NewMessage{
+		newMessage = &wakutypes.NewMessage{
 			TTL:       whisperTTL,
 			Payload:   wrappedMessage,
 			PowTarget: calculatePoW(wrappedMessage),
@@ -851,7 +853,7 @@ func (s *MessageSender) unwrapDatasyncMessage(m *v1protocol.StatusMessage, respo
 // layer message, or in case of Raw methods, the processing stops at the layer
 // before.
 // It returns an error only if the processing of required steps failed.
-func (s *MessageSender) HandleMessages(wakuMessage *types.Message) (*HandleMessageResponse, error) {
+func (s *MessageSender) HandleMessages(wakuMessage *wakutypes.Message) (*HandleMessageResponse, error) {
 	logger := s.logger.With(zap.String("site", "HandleMessages"))
 	hlogger := logger.With(zap.String("hash", types.HexBytes(wakuMessage.Hash).String()))
 
@@ -945,7 +947,7 @@ func (h *handleMessageResponse) Messages() []*v1protocol.StatusMessage {
 	return []*v1protocol.StatusMessage{h.Message}
 }
 
-func (s *MessageSender) handleMessage(wakuMessage *types.Message) (*handleMessageResponse, error) {
+func (s *MessageSender) handleMessage(wakuMessage *wakutypes.Message) (*handleMessageResponse, error) {
 	logger := s.logger.With(zap.String("site", "handleMessage"))
 	hlogger := logger.With(zap.String("hash", types.EncodeHex(wakuMessage.Hash)))
 
@@ -1101,8 +1103,8 @@ func (s *MessageSender) addToDataSync(publicKey *ecdsa.PublicKey, message []byte
 }
 
 // sendPrivateRawMessage sends a message not wrapped in an encryption layer
-func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *RawMessage, publicKey *ecdsa.PublicKey, payload []byte) ([][]byte, []*types.NewMessage, error) {
-	newMessage := &types.NewMessage{
+func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *RawMessage, publicKey *ecdsa.PublicKey, payload []byte) ([][]byte, []*wakutypes.NewMessage, error) {
+	newMessage := &wakutypes.NewMessage{
 		TTL:         whisperTTL,
 		Payload:     payload,
 		PowTarget:   calculatePoW(payload),
@@ -1134,7 +1136,7 @@ func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *R
 
 // sendCommunityMessage sends a message not wrapped in an encryption layer
 // to a community
-func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, wrappedMessage []byte, pubsubTopic string, rekey bool, rawMessage *RawMessage) ([][]byte, []*types.NewMessage, error) {
+func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, wrappedMessage []byte, pubsubTopic string, rekey bool, rawMessage *RawMessage) ([][]byte, []*wakutypes.NewMessage, error) {
 	payload := wrappedMessage
 	if rekey && len(rawMessage.HashRatchetGroupID) != 0 {
 
@@ -1164,7 +1166,7 @@ func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey 
 		}
 	}
 
-	newMessage := &types.NewMessage{
+	newMessage := &wakutypes.NewMessage{
 		TTL:         whisperTTL,
 		Payload:     payload,
 		PowTarget:   calculatePoW(payload),
@@ -1189,12 +1191,12 @@ func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey 
 	return hashes, newMessages, nil
 }
 
-func (s *MessageSender) SendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec, messageIDs [][]byte) ([][]byte, []*types.NewMessage, error) {
+func (s *MessageSender) SendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec, messageIDs [][]byte) ([][]byte, []*wakutypes.NewMessage, error) {
 	return s.sendMessageSpec(ctx, publicKey, messageSpec, messageIDs)
 }
 
 // sendMessageSpec analyses the spec properties and selects a proper transport method.
-func (s *MessageSender) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec, messageIDs [][]byte) ([][]byte, []*types.NewMessage, error) {
+func (s *MessageSender) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec, messageIDs [][]byte) ([][]byte, []*wakutypes.NewMessage, error) {
 	logger := s.logger.With(zap.String("site", "sendMessageSpec"))
 
 	newMessage, err := MessageSpecToWhisper(messageSpec)
@@ -1327,15 +1329,15 @@ func (s *MessageSender) GetEphemeralKey() (*ecdsa.PrivateKey, error) {
 	return privateKey, nil
 }
 
-func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*types.NewMessage, error) {
-	var newMessage *types.NewMessage
+func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*wakutypes.NewMessage, error) {
+	var newMessage *wakutypes.NewMessage
 
 	payload, err := proto.Marshal(spec.Message)
 	if err != nil {
 		return newMessage, err
 	}
 
-	newMessage = &types.NewMessage{
+	newMessage = &wakutypes.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   payload,
 		PowTarget: calculatePoW(payload),

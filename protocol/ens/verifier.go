@@ -8,9 +8,10 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/protocol/common"
+
+	"github.com/status-im/status-go/waku/types"
 )
 
 type Verifier struct {

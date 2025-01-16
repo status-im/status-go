@@ -10,7 +10,6 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -18,6 +17,8 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type testMessengerConfig struct {
@@ -52,7 +53,7 @@ func (tmc *testMessengerConfig) complete() error {
 	return nil
 }
 
-func newTestMessenger(waku types.Waku, config testMessengerConfig) (*Messenger, error) {
+func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messenger, error) {
 	err := config.complete()
 	if err != nil {
 		return nil, err

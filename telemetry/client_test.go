@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
 	"github.com/status-im/status-go/wakuv2/common"
 )
@@ -136,9 +137,9 @@ func TestClient_ProcessReceivedMessages(t *testing.T) {
 			Filter: transport.Filter{
 				ChatID:       "testChat",
 				PubsubTopic:  "testTopic",
-				ContentTopic: types.StringToTopic(testContentTopic),
+				ContentTopic: wakutypes.StringToTopic(testContentTopic),
 			},
-			SSHMessage: &types.Message{
+			SSHMessage: &wakutypes.Message{
 				Hash:      []byte("hash"),
 				Timestamp: uint32(time.Now().Unix()),
 			},

@@ -1,4 +1,4 @@
-package gethbridge
+package bridge
 
 import (
 	"errors"
@@ -12,8 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	gethens "github.com/status-im/status-go/eth-node/bridge/geth/ens"
-	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+
+	"github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type gethNodeWrapper struct {
@@ -42,7 +44,7 @@ func (w *gethNodeWrapper) SetWaku2(waku *wakuv2.Waku) {
 	w.waku2 = waku
 }
 
-func (w *gethNodeWrapper) GetWaku(ctx interface{}) (types.Waku, error) {
+func (w *gethNodeWrapper) GetWaku(ctx interface{}) (wakutypes.Waku, error) {
 	if w.waku1 == nil {
 		return nil, errors.New("waku service is not available")
 	}
@@ -50,7 +52,7 @@ func (w *gethNodeWrapper) GetWaku(ctx interface{}) (types.Waku, error) {
 	return NewGethWakuWrapper(w.waku1), nil
 }
 
-func (w *gethNodeWrapper) GetWakuV2(ctx interface{}) (types.Waku, error) {
+func (w *gethNodeWrapper) GetWakuV2(ctx interface{}) (wakutypes.Waku, error) {
 	if w.waku2 == nil {
 		return nil, errors.New("waku service is not available")
 	}

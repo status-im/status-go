@@ -18,6 +18,8 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/protobuf"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // TransportLayer is the lowest layer and represents waku message.
@@ -27,7 +29,7 @@ type TransportLayer struct {
 	Hash      []byte           `json:"-"`
 	SigPubKey *ecdsa.PublicKey `json:"-"`
 	Dst       *ecdsa.PublicKey
-	Message   *types.Message `json:"message"`
+	Message   *wakutypes.Message `json:"message"`
 }
 
 // EncryptionLayer handles optional encryption.
@@ -90,7 +92,7 @@ func (m *StatusMessage) Clone() (*StatusMessage, error) {
 	return copy, err
 }
 
-func (m *StatusMessage) HandleTransportLayer(wakuMessage *types.Message) error {
+func (m *StatusMessage) HandleTransportLayer(wakuMessage *wakutypes.Message) error {
 	publicKey, err := crypto.UnmarshalPubkey(wakuMessage.Sig)
 	if err != nil {
 		return errors.Wrap(err, "failed to get signature")

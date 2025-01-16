@@ -47,7 +47,7 @@ func (h PublisherSignalHandler) NewMessages(response *protocol.MessengerResponse
 	signal.SendNewMessages(response)
 }
 
-func (h PublisherSignalHandler) Stats(stats types.StatsSummary) {
+func (h PublisherSignalHandler) Stats(stats wakutypes.StatsSummary) {
 	signal.SendStats(stats)
 }
 

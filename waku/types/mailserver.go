@@ -1,8 +1,10 @@
 package types
 
+import "github.com/status-im/status-go/eth-node/types"
+
 // MailServerResponse is the response payload sent by the mailserver.
 type MailServerResponse struct {
-	LastEnvelopeHash Hash
+	LastEnvelopeHash types.Hash
 	Cursor           []byte
 	Error            error
 }

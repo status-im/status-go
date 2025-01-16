@@ -29,7 +29,7 @@ type Iterator interface {
 	Release() error
 	Error() error
 	GetEnvelopeByBloomFilter(bloom []byte) ([]byte, error)
-	GetEnvelopeByTopicsMap(topics map[types.TopicType]bool) ([]byte, error)
+	GetEnvelopeByTopicsMap(topics map[wakutypes.TopicType]bool) ([]byte, error)
 }
 
 type CursorQuery struct {

@@ -94,10 +94,10 @@ type MessagesRequest struct {
 
 	// Topic is a regular Whisper topic.
 	// DEPRECATED
-	Topic types.TopicType `json:"topic"`
+	Topic wakutypes.TopicType `json:"topic"`
 
 	// Topics is a list of Whisper topics.
-	Topics []types.TopicType `json:"topics"`
+	Topics []wakutypes.TopicType `json:"topics"`
 
 	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
 	// It's derived from MailServer password.
@@ -175,12 +175,12 @@ type RetryConfig struct {
 	MaxRetries  int
 }
 
-func WaitForExpiredOrCompleted(requestID types.Hash, events chan types.EnvelopeEvent, timeout time.Duration) (*types.MailServerResponse, error) {
+func WaitForExpiredOrCompleted(requestID types.Hash, events chan wakutypes.EnvelopeEvent, timeout time.Duration) (*types.MailServerResponse, error) {
 	expired := fmt.Errorf("request %x expired", requestID)
 	after := time.NewTimer(timeout)
 	defer after.Stop()
 	for {
-		var ev types.EnvelopeEvent
+		var ev wakutypes.EnvelopeEvent
 		select {
 		case ev = <-events:
 		case <-after.C:
@@ -1488,11 +1488,11 @@ func (api *PublicAPI) DropPeer(peerID string) error {
 	return api.service.messenger.DropPeer(pID)
 }
 
-func (api *PublicAPI) Peers() types.PeerStats {
+func (api *PublicAPI) Peers() wakutypes.PeerStats {
 	return api.service.messenger.Peers()
 }
 
-func (api *PublicAPI) RelayPeersByTopic(topic string) (*types.PeerList, error) {
+func (api *PublicAPI) RelayPeersByTopic(topic string) (*wakutypes.PeerList, error) {
 	return api.service.messenger.RelayPeersByTopic(topic)
 }
 
@@ -1878,7 +1878,7 @@ func MakeMessagesRequestPayload(r MessagesRequest) ([]byte, error) {
 	return rlp.EncodeToBytes(payload)
 }
 
-func topicsToByteArray(topics []types.TopicType) [][]byte {
+func topicsToByteArray(topics []wakutypes.TopicType) [][]byte {
 
 	var response [][]byte
 	for idx := range topics {
@@ -1895,7 +1895,7 @@ func createBloomFilter(r MessagesRequest) []byte {
 	return types.TopicToBloom(r.Topic)
 }
 
-func topicsToBloom(topics ...types.TopicType) []byte {
+func topicsToBloom(topics ...wakutypes.TopicType) []byte {
 	i := new(big.Int)
 	for _, topic := range topics {
 		bloom := types.TopicToBloom(topic)
@@ -1910,6 +1910,6 @@ func topicsToBloom(topics ...types.TopicType) []byte {
 }
 
 // TopicsToBloom squashes all topics into a single bloom filter.
-func TopicsToBloom(topics ...types.TopicType) []byte {
+func TopicsToBloom(topics ...wakutypes.TopicType) []byte {
 	return topicsToBloom(topics...)
 }

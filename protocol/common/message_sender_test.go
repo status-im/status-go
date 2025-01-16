@@ -6,6 +6,8 @@ import (
 
 	transport2 "github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv1"
 
 	"github.com/golang/protobuf/proto"
@@ -15,9 +17,7 @@ import (
 
 	datasyncproto "github.com/status-im/mvds/protobuf"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/datasync"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -74,7 +74,7 @@ func (s *MessageSenderSuite) SetupTest() {
 	s.Require().NoError(shh.Start())
 
 	whisperTransport, err := transport2.NewTransport(
-		gethbridge.NewGethWakuWrapper(shh),
+		bridge.NewGethWakuWrapper(shh),
 		identity,
 		database,
 		"waku_keys",
@@ -114,7 +114,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesWrapped() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	message := &types.Message{}
+	message := &wakutypes.Message{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = wrappedPayload
 
@@ -152,7 +152,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	}
 	marshalledDataSyncMessage, err := proto.Marshal(&dataSyncMessage)
 	s.Require().NoError(err)
-	message := &types.Message{}
+	message := &wakutypes.Message{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = marshalledDataSyncMessage
 
@@ -218,7 +218,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	encryptedPayload, err := proto.Marshal(messageSpec.Message)
 	s.Require().NoError(err)
 
-	message := &types.Message{}
+	message := &wakutypes.Message{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = encryptedPayload
 
@@ -281,7 +281,7 @@ func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
 	encryptedPayload2, err := proto.Marshal(messageSpec2.Message)
 	s.Require().NoError(err)
 
-	message := &types.Message{}
+	message := &wakutypes.Message{}
 	message.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
 	message.Hash = []byte{0x1}
 	message.Payload = encryptedPayload2
@@ -297,7 +297,7 @@ func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
 
 	s.Require().Len(msgs, 1)
 
-	message = &types.Message{}
+	message = &wakutypes.Message{}
 	message.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
 	message.Hash = []byte{0x2}
 	message.Payload = encryptedPayload1
@@ -331,11 +331,11 @@ func (s *MessageSenderSuite) TestHandleSegmentMessages() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
-	segmentedMessages, err := segmentMessage(&types.NewMessage{Payload: wrappedPayload}, int(math.Ceil(float64(len(wrappedPayload))/2)))
+	segmentedMessages, err := segmentMessage(&wakutypes.NewMessage{Payload: wrappedPayload}, int(math.Ceil(float64(len(wrappedPayload))/2)))
 	s.Require().NoError(err)
 	s.Require().Len(segmentedMessages, 2)
 
-	message := &types.Message{}
+	message := &wakutypes.Message{}
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = segmentedMessages[0].Payload
 

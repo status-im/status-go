@@ -23,6 +23,8 @@ import (
 
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	v2common "github.com/status-im/status-go/wakuv2/common"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type TelemetryType string
@@ -153,7 +155,7 @@ func (c *Client) PushSentMessageTotal(ctx context.Context, messageSize uint32) {
 
 type ReceivedMessages struct {
 	Filter     transport.Filter
-	SSHMessage *types.Message
+	SSHMessage *wakutypes.Message
 	Messages   []*v1protocol.StatusMessage
 }
 
@@ -600,7 +602,7 @@ func (c *Client) marshalPostBody(postBody map[string]interface{}) *json.RawMessa
 	return &jsonRawMessage
 }
 
-func (c *Client) UpdateEnvelopeProcessingError(shhMessage *types.Message, processingError error) {
+func (c *Client) UpdateEnvelopeProcessingError(shhMessage *wakutypes.Message, processingError error) {
 	defer common.LogOnPanic()
 	c.logger.Debug("Pushing envelope update to telemetry server", zap.String("hash", types.EncodeHex(shhMessage.Hash)))
 	url := fmt.Sprintf("%s/update-envelope", c.serverURL)

@@ -6,7 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type Measure struct {
@@ -113,9 +114,9 @@ func (s *StatsTracker) GetRatePerSecond() (uploadRate uint64, downloadRate uint6
 	return
 }
 
-func (s *StatsTracker) GetStats() types.StatsSummary {
+func (s *StatsTracker) GetStats() wakutypes.StatsSummary {
 	uploadRate, downloadRate := s.GetRatePerSecond()
-	summary := types.StatsSummary{
+	summary := wakutypes.StatsSummary{
 		UploadRate:   uploadRate,
 		DownloadRate: downloadRate,
 	}

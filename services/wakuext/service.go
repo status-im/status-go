@@ -13,7 +13,7 @@ import (
 
 type Service struct {
 	*ext.Service
-	w types.Waku
+	w wakutypes.Waku
 }
 
 func New(config params.NodeConfig, n types.Node, rpcClient *rpc.Client, handler ext.EnvelopeEventsHandler, ldb *leveldb.DB) *Service {
@@ -33,7 +33,7 @@ func New(config params.NodeConfig, n types.Node, rpcClient *rpc.Client, handler 
 	}
 }
 
-func (s *Service) PublicWakuAPI() types.PublicWakuAPI {
+func (s *Service) PublicWakuAPI() wakutypes.PublicWakuAPI {
 	return s.w.PublicWakuAPI()
 }
 

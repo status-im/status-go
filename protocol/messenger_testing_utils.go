@@ -17,7 +17,6 @@ import (
 
 	"github.com/status-im/status-go/protocol/identity"
 
-	"github.com/status-im/status-go/eth-node/types"
 	waku2 "github.com/status-im/status-go/wakuv2"
 
 	"github.com/stretchr/testify/suite"
@@ -27,6 +26,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -229,7 +230,7 @@ func WaitForConnectionStatus(s *suite.Suite, waku *waku2.Waku, action func() boo
 	}
 }
 
-func hasAllPeers(m map[peer.ID]types.WakuV2Peer, checkSlice peer.IDSlice) bool {
+func hasAllPeers(m map[peer.ID]wakutypes.WakuV2Peer, checkSlice peer.IDSlice) bool {
 	for _, check := range checkSlice {
 		if _, ok := m[check]; !ok {
 			return false

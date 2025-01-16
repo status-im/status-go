@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/waku/types"
 )
 
 var (

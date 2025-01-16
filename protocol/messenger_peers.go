@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func (m *Messenger) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
@@ -31,11 +31,11 @@ func (m *Messenger) DropPeer(peerID peer.ID) error {
 	return m.transport.DropPeer(peerID)
 }
 
-func (m *Messenger) Peers() types.PeerStats {
+func (m *Messenger) Peers() wakutypes.PeerStats {
 	return m.transport.Peers()
 }
 
-func (m *Messenger) RelayPeersByTopic(topic string) (*types.PeerList, error) {
+func (m *Messenger) RelayPeersByTopic(topic string) (*wakutypes.PeerList, error) {
 	return m.transport.RelayPeersByTopic(topic)
 }
 
