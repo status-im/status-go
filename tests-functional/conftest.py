@@ -62,7 +62,7 @@ def pytest_configure(config):
     range_size = 100
 
     start_port = base_port + (executor_number * range_size)
-    end_port = 60000
+    end_port = 10000
 
     option.status_backend_port_range = list(range(start_port, end_port))
     option.base_dir = os.path.dirname(os.path.abspath(__file__))

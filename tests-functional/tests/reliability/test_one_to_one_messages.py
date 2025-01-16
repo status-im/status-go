@@ -10,7 +10,6 @@ from resources.enums import MessageContentType
 @pytest.mark.reliability
 class TestOneToOneMessages(MessengerTestCase):
 
-    @pytest.mark.rpc  # until we have dedicated functional tests for this we can still run this test as part of the functional tests suite
     def test_one_to_one_message_baseline(self, message_count=1):
         sent_messages = []
         for i in range(message_count):
