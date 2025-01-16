@@ -40,7 +40,6 @@ import (
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
-	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/communitytokensv2"
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
@@ -97,7 +96,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.statusPublicService())
 	services = append(services, b.pendingTrackerService(&b.walletFeed))
 	services = append(services, b.ensService(b.timeSourceNow()))
-	services = append(services, b.CommunityTokensService())
 	services = append(services, b.CommunityTokensServiceV2())
 	services = append(services, b.stickersService(accDB))
 	services = append(services, b.updatesService())
@@ -502,13 +500,6 @@ func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *transactions
 		}
 	}
 	return b.pendingTracker
-}
-
-func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
-	if b.communityTokensSrvc == nil {
-		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountManager, b.pendingTracker, b.config, b.appDB, &b.walletFeed, b.transactor)
-	}
-	return b.communityTokensSrvc
 }
 
 func (b *StatusNode) CommunityTokensServiceV2() *communitytokensv2.Service {

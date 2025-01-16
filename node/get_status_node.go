@@ -37,7 +37,6 @@ import (
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
-	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/communitytokensv2"
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
@@ -129,7 +128,6 @@ type StatusNode struct {
 	wakuV2Srvc             *wakuv2.Waku
 	wakuV2ExtSrvc          *wakuv2ext.Service
 	ensSrvc                *ens.Service
-	communityTokensSrvc    *communitytokens.Service
 	communityTokensSrvcV2  *communitytokensv2.Service
 	gifSrvc                *gif.Service
 	stickersSrvc           *stickers.Service
@@ -520,7 +518,7 @@ func (n *StatusNode) stop() error {
 	n.wakuV2Srvc = nil
 	n.wakuV2ExtSrvc = nil
 	n.ensSrvc = nil
-	n.communityTokensSrvc = nil
+	n.communityTokensSrvcV2 = nil
 	n.stickersSrvc = nil
 	n.connectorSrvc = nil
 	n.publicMethods = make(map[string]bool)
