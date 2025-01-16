@@ -12,6 +12,8 @@ import requests
 import docker
 import docker.errors
 import os
+
+from tenacity import retry, stop_after_delay, wait_fixed
 from clients.services.wallet import WalletService
 from clients.services.wakuext import WakuextService
 from clients.services.accounts import AccountService
@@ -107,7 +109,7 @@ class StatusBackend(RpcClient, SignalClient):
         network = self.docker_client.networks.get(f"{docker_project_name}_default")
         network.connect(container)
 
-        option.status_backend_containers.append(container.id)
+        option.status_backend_containers.append(self)
         return container
 
     def wait_for_healthy(self, timeout=10):
@@ -311,3 +313,16 @@ class StatusBackend(RpcClient, SignalClient):
 
     def find_public_key(self):
         self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
+
+    @retry(stop=stop_after_delay(5), wait=wait_fixed(0.1), reraise=True)
+    def kill(self):
+        if self.container:
+            logging.info(f"Killing container with id {self.container.short_id}")
+            self.container.kill()
+            try:
+                self.container.remove()
+            except Exception as e:
+                logging.warning(f"Failed to remove container {self.container.short_id}: {e}")
+            finally:
+                self.container = None
+                logging.info("Container stopped.")

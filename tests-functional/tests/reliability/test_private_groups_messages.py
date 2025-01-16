@@ -1,7 +1,7 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from test_cases import MessengerTestCase
+from tests.test_cases import MessengerTestCase
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 

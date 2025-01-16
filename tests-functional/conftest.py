@@ -1,8 +1,7 @@
 import os
-import docker
-
 from dataclasses import dataclass, field
 from typing import List
+import pytest
 
 
 def pytest_addoption(parser):
@@ -66,17 +65,12 @@ def pytest_configure(config):
     end_port = 60000
 
     option.status_backend_port_range = list(range(start_port, end_port))
-    option.status_backend_containers = []
-
     option.base_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-def pytest_unconfigure():
-    docker_client = docker.from_env()
-    for container_id in option.status_backend_containers:
-        try:
-            container = docker_client.containers.get(container_id)
-            container.stop(timeout=30)
-            container.remove()
-        except Exception as e:
-            print(e)
+@pytest.fixture(scope="function", autouse=True)
+def close_status_backend_containers():
+    option.status_backend_containers = []
+    yield
+    for container in option.status_backend_containers:
+        container.kill()

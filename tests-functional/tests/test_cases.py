@@ -201,7 +201,7 @@ class MessengerTestCase(NetworkConditionTestCase):
         SignalType.NODE_LOGIN.value,
     ]
 
-    @pytest.fixture(scope="class", autouse=False)
+    @pytest.fixture(scope="function", autouse=False)
     def setup_two_nodes(self, request):
         request.cls.sender = self.sender = self.initialize_backend(await_signals=self.await_signals)
         request.cls.receiver = self.receiver = self.initialize_backend(await_signals=self.await_signals)
