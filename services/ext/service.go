@@ -52,7 +52,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/services/communitytokens"
+	"github.com/status-im/status-go/services/communitytokensv2"
 	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
@@ -127,7 +127,11 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service, communityTokensService *communitytokens.Service, wakuService *wakuv2.Waku, logger *zap.Logger, accountsFeed *event.Feed) error {
+func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB,
+	httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account,
+	accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service,
+	communityTokensService *communitytokensv2.Service, wakuService *wakuv2.Waku, logger *zap.Logger,
+	accountsFeed *event.Feed) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
@@ -399,7 +403,7 @@ func buildMessengerOptions(
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
 	accountsDB *accounts.Database,
 	walletService *wallet.Service,
-	communityTokensService *communitytokens.Service,
+	communityTokensService *communitytokensv2.Service,
 	wakuService *wakuv2.Waku,
 	logger *zap.Logger,
 	messengerSignalsHandler protocol.MessengerSignalsHandler,

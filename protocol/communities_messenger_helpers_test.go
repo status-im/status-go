@@ -30,7 +30,6 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -201,10 +200,6 @@ func (c *CollectiblesServiceMock) SetSignerPubkeyForCommunity(communityID []byte
 		c.Signers = make(map[string]string)
 	}
 	c.Signers[types.EncodeHex(communityID)] = signerPubKey
-}
-
-func (c *CollectiblesServiceMock) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs wallettypes.SendTxArgs, password string, newSignerPubKey string) (string, error) {
-	return "", nil
 }
 
 func (c *CollectiblesServiceMock) GetCollectibleContractData(chainID uint64, contractAddress string) (*communities.CollectibleContractData, error) {
