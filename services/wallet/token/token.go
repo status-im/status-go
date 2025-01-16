@@ -33,7 +33,7 @@ import (
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
-	"github.com/status-im/status-go/services/communitytokensv2/communitytokensdatabase"
+	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/community"
