@@ -1,4 +1,4 @@
-package communitytokensv2
+package communitytokens
 
 const currentVersion = "1.0.0"
 

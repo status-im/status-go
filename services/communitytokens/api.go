@@ -1,4 +1,4 @@
-package communitytokensv2
+package communitytokens
 
 import (
 	"context"
