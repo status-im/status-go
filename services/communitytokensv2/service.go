@@ -24,7 +24,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
+	"github.com/status-im/status-go/services/communitytokensv2/communitytokensdatabase"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
