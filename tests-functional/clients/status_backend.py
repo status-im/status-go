@@ -47,7 +47,6 @@ class StatusBackend(RpcClient, SignalClient):
                 except Exception:
                     continue
             else:
-                # If all retries fail
                 raise RuntimeError("Failed to start container after multiple retries.")
 
         self.base_url = url
