@@ -1,4 +1,4 @@
-package communitytokensv2
+package communitytokens
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/communitytokensv2/communitytokensdatabase"
+	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
@@ -71,7 +71,7 @@ func (s *Service) Protocols() []p2p.Protocol {
 func (s *Service) APIs() []ethRpc.API {
 	return []ethRpc.API{
 		{
-			Namespace: "communitytokensv2",
+			Namespace: "communitytokens",
 			Version:   "0.1.0",
 			Service:   NewAPI(s),
 			Public:    true,
