@@ -1,11 +1,13 @@
 package types
 
+import "github.com/status-im/status-go/eth-node/types"
+
 // Envelope represents a clear-text data packet to transmit through the Whisper
 // network. Its contents may or may not be encrypted and signed.
 type Envelope interface {
 	Wrapped
 
-	Hash() Hash // cached hash of the envelope to avoid rehashing every time
+	Hash() types.Hash // cached hash of the envelope to avoid rehashing every time
 	Bloom() []byte
 	PoW() float64
 	Expiry() uint32
@@ -55,15 +57,15 @@ const (
 // EnvelopeEvent used for envelopes events.
 type EnvelopeEvent struct {
 	Event EventType
-	Hash  Hash
-	Batch Hash
-	Peer  EnodeID
+	Hash  types.Hash
+	Batch types.Hash
+	Peer  types.EnodeID
 	Data  interface{}
 }
 
 // EnvelopeError code and optional description of the error.
 type EnvelopeError struct {
-	Hash        Hash
+	Hash        types.Hash
 	Code        uint
 	Description string
 }

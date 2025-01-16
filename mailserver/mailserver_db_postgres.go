@@ -23,6 +23,8 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	wakuv1common "github.com/status-im/status-go/wakuv1/common"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type PostgresDB struct {
@@ -118,7 +120,7 @@ func (i *postgresIterator) GetEnvelopeByBloomFilter(bloom []byte) ([]byte, error
 	return value, nil
 }
 
-func (i *postgresIterator) GetEnvelopeByTopicsMap(topics map[types.TopicType]bool) ([]byte, error) {
+func (i *postgresIterator) GetEnvelopeByTopicsMap(topics map[wakutypes.TopicType]bool) ([]byte, error) {
 	var value []byte
 	var id []byte
 	if err := i.Scan(&id, &value); err != nil {
@@ -236,7 +238,7 @@ func (i *PostgresDB) GetEnvelope(key *DBKey) ([]byte, error) {
 
 func (i *PostgresDB) Prune(t time.Time, batch int) (int, error) {
 	var zero types.Hash
-	var emptyTopic types.TopicType
+	var emptyTopic wakutypes.TopicType
 	kl := NewDBKey(0, emptyTopic, zero)
 	ku := NewDBKey(uint32(t.Unix()), emptyTopic, zero)
 	statement := "DELETE FROM envelopes WHERE id BETWEEN $1 AND $2"
@@ -258,7 +260,7 @@ func (i *PostgresDB) Prune(t time.Time, batch int) (int, error) {
 	return int(rows), nil
 }
 
-func (i *PostgresDB) SaveEnvelope(env types.Envelope) error {
+func (i *PostgresDB) SaveEnvelope(env wakutypes.Envelope) error {
 	topic := env.Topic()
 	key := NewDBKey(env.Expiry()-env.TTL(), topic, env.Hash())
 	rawEnvelope, err := rlp.EncodeToBytes(env.Unwrap())
@@ -299,7 +301,7 @@ func (i *PostgresDB) SaveEnvelope(env types.Envelope) error {
 	return nil
 }
 
-func topicToByte(t types.TopicType) []byte {
+func topicToByte(t wakutypes.TopicType) []byte {
 	return []byte{t[0], t[1], t[2], t[3]}
 }
 

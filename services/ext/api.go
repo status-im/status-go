@@ -45,6 +45,8 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/services/ext/mailservers"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const (
@@ -94,10 +96,10 @@ type MessagesRequest struct {
 
 	// Topic is a regular Whisper topic.
 	// DEPRECATED
-	Topic types.TopicType `json:"topic"`
+	Topic wakutypes.TopicType `json:"topic"`
 
 	// Topics is a list of Whisper topics.
-	Topics []types.TopicType `json:"topics"`
+	Topics []wakutypes.TopicType `json:"topics"`
 
 	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
 	// It's derived from MailServer password.
@@ -175,12 +177,12 @@ type RetryConfig struct {
 	MaxRetries  int
 }
 
-func WaitForExpiredOrCompleted(requestID types.Hash, events chan types.EnvelopeEvent, timeout time.Duration) (*types.MailServerResponse, error) {
+func WaitForExpiredOrCompleted(requestID types.Hash, events chan wakutypes.EnvelopeEvent, timeout time.Duration) (*wakutypes.MailServerResponse, error) {
 	expired := fmt.Errorf("request %x expired", requestID)
 	after := time.NewTimer(timeout)
 	defer after.Stop()
 	for {
-		var ev types.EnvelopeEvent
+		var ev wakutypes.EnvelopeEvent
 		select {
 		case ev = <-events:
 		case <-after.C:
@@ -190,13 +192,13 @@ func WaitForExpiredOrCompleted(requestID types.Hash, events chan types.EnvelopeE
 			continue
 		}
 		switch ev.Event {
-		case types.EventMailServerRequestCompleted:
-			data, ok := ev.Data.(*types.MailServerResponse)
+		case wakutypes.EventMailServerRequestCompleted:
+			data, ok := ev.Data.(*wakutypes.MailServerResponse)
 			if ok {
 				return data, nil
 			}
 			return nil, errors.New("invalid event data type")
-		case types.EventMailServerRequestExpired:
+		case wakutypes.EventMailServerRequestExpired:
 			return nil, expired
 		}
 	}
@@ -1488,11 +1490,11 @@ func (api *PublicAPI) DropPeer(peerID string) error {
 	return api.service.messenger.DropPeer(pID)
 }
 
-func (api *PublicAPI) Peers() types.PeerStats {
+func (api *PublicAPI) Peers() wakutypes.PeerStats {
 	return api.service.messenger.Peers()
 }
 
-func (api *PublicAPI) RelayPeersByTopic(topic string) (*types.PeerList, error) {
+func (api *PublicAPI) RelayPeersByTopic(topic string) (*wakutypes.PeerList, error) {
 	return api.service.messenger.RelayPeersByTopic(topic)
 }
 
@@ -1878,7 +1880,7 @@ func MakeMessagesRequestPayload(r MessagesRequest) ([]byte, error) {
 	return rlp.EncodeToBytes(payload)
 }
 
-func topicsToByteArray(topics []types.TopicType) [][]byte {
+func topicsToByteArray(topics []wakutypes.TopicType) [][]byte {
 
 	var response [][]byte
 	for idx := range topics {
@@ -1892,24 +1894,24 @@ func createBloomFilter(r MessagesRequest) []byte {
 	if len(r.Topics) > 0 {
 		return topicsToBloom(r.Topics...)
 	}
-	return types.TopicToBloom(r.Topic)
+	return wakutypes.TopicToBloom(r.Topic)
 }
 
-func topicsToBloom(topics ...types.TopicType) []byte {
+func topicsToBloom(topics ...wakutypes.TopicType) []byte {
 	i := new(big.Int)
 	for _, topic := range topics {
-		bloom := types.TopicToBloom(topic)
+		bloom := wakutypes.TopicToBloom(topic)
 		i.Or(i, new(big.Int).SetBytes(bloom[:]))
 	}
 
-	combined := make([]byte, types.BloomFilterSize)
+	combined := make([]byte, wakutypes.BloomFilterSize)
 	data := i.Bytes()
-	copy(combined[types.BloomFilterSize-len(data):], data[:])
+	copy(combined[wakutypes.BloomFilterSize-len(data):], data[:])
 
 	return combined
 }
 
 // TopicsToBloom squashes all topics into a single bloom filter.
-func TopicsToBloom(topics ...types.TopicType) []byte {
+func TopicsToBloom(topics ...wakutypes.TopicType) []byte {
 	return topicsToBloom(topics...)
 }

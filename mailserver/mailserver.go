@@ -31,11 +31,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	gocommon "github.com/status-im/status-go/common"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv1"
 	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
@@ -125,7 +126,7 @@ func (s *WakuMailServer) Close() {
 }
 
 func (s *WakuMailServer) Archive(env *wakuv1common.Envelope) {
-	s.ms.Archive(gethbridge.NewWakuEnvelope(env))
+	s.ms.Archive(bridge.NewWakuEnvelope(env))
 }
 
 func (s *WakuMailServer) Deliver(peerID []byte, req wakuv1common.MessagesRequest) {
@@ -310,7 +311,7 @@ func (s *WakuMailServer) decodeRequest(peerID []byte, request *wakuv1common.Enve
 type adapter interface {
 	CreateRequestFailedPayload(reqID types.Hash, err error) []byte
 	CreateRequestCompletedPayload(reqID, lastEnvelopeHash types.Hash, cursor []byte) []byte
-	CreateSyncResponse(envelopes []types.Envelope, cursor []byte, final bool, err string) interface{}
+	CreateSyncResponse(envelopes []wakutypes.Envelope, cursor []byte, final bool, err string) interface{}
 	CreateRawSyncResponse(envelopes []rlp.RawValue, cursor []byte, final bool, err string) interface{}
 }
 
@@ -330,7 +331,7 @@ func (wakuAdapter) CreateRequestCompletedPayload(reqID, lastEnvelopeHash types.H
 	return wakuv1.CreateMailServerRequestCompletedPayload(common.Hash(reqID), common.Hash(lastEnvelopeHash), cursor)
 }
 
-func (wakuAdapter) CreateSyncResponse(_ []types.Envelope, _ []byte, _ bool, _ string) interface{} {
+func (wakuAdapter) CreateSyncResponse(_ []wakutypes.Envelope, _ []byte, _ bool, _ string) interface{} {
 	return nil
 }
 
@@ -437,7 +438,7 @@ func (s *mailServer) setupCleaner(retention time.Duration) {
 	s.cleaner.Start()
 }
 
-func (s *mailServer) Archive(env types.Envelope) {
+func (s *mailServer) Archive(env wakutypes.Envelope) {
 	err := s.db.SaveEnvelope(env)
 	if err != nil {
 		logutils.ZapLogger().Error("Could not save envelope", zap.Stringer("hash", env.Hash()))
@@ -706,7 +707,7 @@ func (s *mailServer) exceedsPeerRequests(peerID types.Hash) bool {
 func (s *mailServer) createIterator(req MessagesRequestPayload) (Iterator, error) {
 	var (
 		emptyHash  types.Hash
-		emptyTopic types.TopicType
+		emptyTopic wakutypes.TopicType
 		ku, kl     *DBKey
 	)
 
@@ -753,12 +754,12 @@ func (s *mailServer) processRequestInBundles(
 		zap.Int("limit", limit),
 	)
 
-	var topicsMap map[types.TopicType]bool
+	var topicsMap map[wakutypes.TopicType]bool
 
 	if len(topics) != 0 {
-		topicsMap = make(map[types.TopicType]bool)
+		topicsMap = make(map[wakutypes.TopicType]bool)
 		for _, t := range topics {
-			topicsMap[types.BytesToTopic(t)] = true
+			topicsMap[wakutypes.BytesToTopic(t)] = true
 		}
 	}
 

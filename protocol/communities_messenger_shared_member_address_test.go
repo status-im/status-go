@@ -10,7 +10,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -18,6 +17,9 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
+
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerCommunitiesSharedMemberAddressSuite(t *testing.T) {
@@ -30,9 +32,9 @@ type MessengerCommunitiesSharedMemberAddressSuite struct {
 	bob   *Messenger
 	alice *Messenger
 
-	ownerWaku types.Waku
-	bobWaku   types.Waku
-	aliceWaku types.Waku
+	ownerWaku wakutypes.Waku
+	bobWaku   wakutypes.Waku
+	aliceWaku wakutypes.Waku
 
 	logger *zap.Logger
 
@@ -87,18 +89,18 @@ func (s *MessengerCommunitiesSharedMemberAddressSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.bob)
 	TearDownMessenger(&s.Suite, s.alice)
 	if s.ownerWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.ownerWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.ownerWaku).Stop())
 	}
 	if s.bobWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.bobWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.bobWaku).Stop())
 	}
 	if s.aliceWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.aliceWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.aliceWaku).Stop())
 	}
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerCommunitiesSharedMemberAddressSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, name string, extraOptions []Option) *Messenger {
+func (s *MessengerCommunitiesSharedMemberAddressSuite) newMessenger(password string, walletAddresses []string, waku wakutypes.Waku, name string, extraOptions []Option) *Messenger {
 	communityManagerOptions := []communities.ManagerOption{
 		communities.WithAllowForcingCommunityMembersReevaluation(true),
 	}

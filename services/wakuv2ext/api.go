@@ -1,15 +1,15 @@
 package wakuv2ext
 
 import (
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/ext"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // PublicAPI extends waku public API.
 type PublicAPI struct {
 	*ext.PublicAPI
 	service   *Service
-	publicAPI types.PublicWakuAPI
+	publicAPI wakutypes.PublicWakuAPI
 }
 
 // NewPublicAPI returns instance of the public API.

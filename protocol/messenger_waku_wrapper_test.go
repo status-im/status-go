@@ -5,26 +5,26 @@ import (
 
 	"go.uber.org/zap"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv1"
 )
 
 type testWakuWrapper struct {
-	*gethbridge.GethWakuWrapper
+	*bridge.GethWakuWrapper
 
 	publicWakuAPIWrapper *testPublicWakuAPIWrapper
 }
 
-func newTestWaku(w *wakuv1.Waku) types.Waku {
-	wrapper := gethbridge.NewGethWakuWrapper(w)
+func newTestWaku(w *wakuv1.Waku) wakutypes.Waku {
+	wrapper := bridge.NewGethWakuWrapper(w)
 	return &testWakuWrapper{
-		GethWakuWrapper:      wrapper.(*gethbridge.GethWakuWrapper),
+		GethWakuWrapper:      wrapper.(*bridge.GethWakuWrapper),
 		publicWakuAPIWrapper: newTestPublicWakuAPI(wakuv1.NewPublicWakuAPI(w)).(*testPublicWakuAPIWrapper),
 	}
 }
 
-func (tw *testWakuWrapper) PublicWakuAPI() types.PublicWakuAPI {
+func (tw *testWakuWrapper) PublicWakuAPI() wakutypes.PublicWakuAPI {
 	return tw.publicWakuAPIWrapper
 }
 
@@ -36,23 +36,23 @@ func (tw *testWakuWrapper) SubscribePostEvents() chan *PostMessageSubscription {
 
 type PostMessageSubscription struct {
 	id  []byte
-	msg *types.NewMessage
+	msg *wakutypes.NewMessage
 }
 
 type testPublicWakuAPIWrapper struct {
-	*gethbridge.GethPublicWakuAPIWrapper
+	*bridge.GethPublicWakuAPIWrapper
 
 	postSubscriptions []chan *PostMessageSubscription
 }
 
-func newTestPublicWakuAPI(api *wakuv1.PublicWakuAPI) types.PublicWakuAPI {
-	wrapper := gethbridge.NewGethPublicWakuAPIWrapper(api)
+func newTestPublicWakuAPI(api *wakuv1.PublicWakuAPI) wakutypes.PublicWakuAPI {
+	wrapper := bridge.NewGethPublicWakuAPIWrapper(api)
 	return &testPublicWakuAPIWrapper{
-		GethPublicWakuAPIWrapper: wrapper.(*gethbridge.GethPublicWakuAPIWrapper),
+		GethPublicWakuAPIWrapper: wrapper.(*bridge.GethPublicWakuAPIWrapper),
 	}
 }
 
-func (tp *testPublicWakuAPIWrapper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
+func (tp *testPublicWakuAPIWrapper) Post(ctx context.Context, req wakutypes.NewMessage) ([]byte, error) {
 	id, err := tp.GethPublicWakuAPIWrapper.Post(ctx, req)
 	if err != nil {
 		return nil, err

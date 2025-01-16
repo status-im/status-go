@@ -1,4 +1,4 @@
-package gethbridge
+package bridge
 
 import (
 	"context"
@@ -15,9 +15,11 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/wakuv1"
 	wakuv1common "github.com/status-im/status-go/wakuv1/common"
+
+	"github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type GethWakuWrapper struct {
@@ -25,7 +27,7 @@ type GethWakuWrapper struct {
 }
 
 // NewGethWakuWrapper returns an object that wraps Geth's Waku in a types interface
-func NewGethWakuWrapper(w *wakuv1.Waku) types.Waku {
+func NewGethWakuWrapper(w *wakuv1.Waku) wakutypes.Waku {
 	if w == nil {
 		panic("waku cannot be nil")
 	}
@@ -36,11 +38,11 @@ func NewGethWakuWrapper(w *wakuv1.Waku) types.Waku {
 }
 
 // GetGethWhisperFrom retrieves the underlying whisper Whisper struct from a wrapped Whisper interface
-func GetGethWakuFrom(m types.Waku) *wakuv1.Waku {
+func GetGethWakuFrom(m wakutypes.Waku) *wakuv1.Waku {
 	return m.(*GethWakuWrapper).waku
 }
 
-func (w *GethWakuWrapper) PublicWakuAPI() types.PublicWakuAPI {
+func (w *GethWakuWrapper) PublicWakuAPI() wakutypes.PublicWakuAPI {
 	return NewGethPublicWakuAPIWrapper(wakuv1.NewPublicWakuAPI(w.waku))
 }
 
@@ -114,7 +116,7 @@ func (w *GethWakuWrapper) ListenAddresses() ([]multiaddr.Multiaddr, error) {
 	return nil, errors.New("not available in WakuV1")
 }
 
-func (w *GethWakuWrapper) RelayPeersByTopic(topic string) (*types.PeerList, error) {
+func (w *GethWakuWrapper) RelayPeersByTopic(topic string) (*wakutypes.PeerList, error) {
 	return nil, errors.New("not available in WakuV1")
 }
 
@@ -132,13 +134,13 @@ func (w *GethWakuWrapper) SubscribeToConnStatusChanges() (*types.ConnStatusSubsc
 	return nil, errors.New("not available in WakuV1")
 }
 
-func (w *GethWakuWrapper) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []types.TopicType) error {
+func (w *GethWakuWrapper) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []wakutypes.TopicType) error {
 	return errors.New("not available in WakuV1")
 }
 
 // Peers function only added for compatibility with waku V2
-func (w *GethWakuWrapper) Peers() types.PeerStats {
-	p := make(types.PeerStats)
+func (w *GethWakuWrapper) Peers() wakutypes.PeerStats {
+	p := make(wakutypes.PeerStats)
 	return p
 }
 
@@ -165,7 +167,7 @@ func (w *GethWakuWrapper) GetCurrentTime() time.Time {
 	return w.waku.CurrentTime()
 }
 
-func (w *GethWakuWrapper) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) types.Subscription {
+func (w *GethWakuWrapper) SubscribeEnvelopeEvents(eventsProxy chan<- wakutypes.EnvelopeEvent) types.Subscription {
 	events := make(chan wakuv1common.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
 	go func() {
 		defer gocommon.LogOnPanic()
@@ -241,11 +243,11 @@ func (w *GethWakuWrapper) Subscribe(opts *types.SubscriptionOptions) (string, er
 	return id, nil
 }
 
-func (w *GethWakuWrapper) GetStats() types.StatsSummary {
+func (w *GethWakuWrapper) GetStats() wakutypes.StatsSummary {
 	return w.waku.GetStats()
 }
 
-func (w *GethWakuWrapper) GetFilter(id string) types.Filter {
+func (w *GethWakuWrapper) GetFilter(id string) wakutypes.Filter {
 	return NewWakuFilterWrapper(w.waku.GetFilter(id), id)
 }
 
@@ -257,7 +259,7 @@ func (w *GethWakuWrapper) UnsubscribeMany(ids []string) error {
 	return w.waku.UnsubscribeMany(ids)
 }
 
-func (w *GethWakuWrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, topics [][]byte) (types.Filter, error) {
+func (w *GethWakuWrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, topics [][]byte) (wakutypes.Filter, error) {
 	return NewWakuFilterWrapper(&wakuv1common.Filter{
 		KeyAsym:  keyAsym,
 		KeySym:   keySym,
@@ -288,7 +290,7 @@ type wakuFilterWrapper struct {
 }
 
 // NewWakuFilterWrapper returns an object that wraps Geth's Filter in a types interface
-func NewWakuFilterWrapper(f *wakuv1common.Filter, id string) types.Filter {
+func NewWakuFilterWrapper(f *wakuv1common.Filter, id string) wakutypes.Filter {
 	if f.Messages == nil {
 		panic("Messages should not be nil")
 	}
@@ -300,7 +302,7 @@ func NewWakuFilterWrapper(f *wakuv1common.Filter, id string) types.Filter {
 }
 
 // GetWakuFilterFrom retrieves the underlying whisper Filter struct from a wrapped Filter interface
-func GetWakuFilterFrom(f types.Filter) *wakuv1common.Filter {
+func GetWakuFilterFrom(f wakutypes.Filter) *wakuv1common.Filter {
 	return f.(*wakuFilterWrapper).filter
 }
 
@@ -342,7 +344,7 @@ func (w *GethWakuWrapper) SetStorenodeConfigProvider(c history.StorenodeConfigPr
 
 func (w *GethWakuWrapper) ProcessMailserverBatch(
 	ctx context.Context,
-	batch types.MailserverBatch,
+	batch wakutypes.MailserverBatch,
 	storenodeID peer.ID,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),

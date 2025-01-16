@@ -15,6 +15,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 var ErrMessageSegmentsIncomplete = errors.New("message segments incomplete")
@@ -40,7 +42,7 @@ func (s *SegmentMessage) IsParityMessage() bool {
 	return s.SegmentsCount == 0 && s.ParitySegmentsCount > 0
 }
 
-func (s *MessageSender) segmentMessage(newMessage *types.NewMessage) ([]*types.NewMessage, error) {
+func (s *MessageSender) segmentMessage(newMessage *wakutypes.NewMessage) ([]*wakutypes.NewMessage, error) {
 	// We set the max message size to 3/4 of the allowed message size, to leave
 	// room for segment message metadata.
 	newMessages, err := segmentMessage(newMessage, int(s.transport.MaxMessageSize()/4*3))
@@ -48,8 +50,8 @@ func (s *MessageSender) segmentMessage(newMessage *types.NewMessage) ([]*types.N
 	return newMessages, err
 }
 
-func replicateMessageWithNewPayload(message *types.NewMessage, payload []byte) (*types.NewMessage, error) {
-	copy := &types.NewMessage{}
+func replicateMessageWithNewPayload(message *wakutypes.NewMessage, payload []byte) (*wakutypes.NewMessage, error) {
+	copy := &wakutypes.NewMessage{}
 	err := copier.Copy(copy, message)
 	if err != nil {
 		return nil, err
@@ -61,9 +63,9 @@ func replicateMessageWithNewPayload(message *types.NewMessage, payload []byte) (
 }
 
 // Segments message into smaller chunks if the size exceeds segmentSize.
-func segmentMessage(newMessage *types.NewMessage, segmentSize int) ([]*types.NewMessage, error) {
+func segmentMessage(newMessage *wakutypes.NewMessage, segmentSize int) ([]*wakutypes.NewMessage, error) {
 	if len(newMessage.Payload) <= segmentSize {
-		return []*types.NewMessage{newMessage}, nil
+		return []*wakutypes.NewMessage{newMessage}, nil
 	}
 
 	entireMessageHash := crypto.Keccak256(newMessage.Payload)
@@ -73,7 +75,7 @@ func segmentMessage(newMessage *types.NewMessage, segmentSize int) ([]*types.New
 	paritySegmentsCount := int(math.Floor(float64(segmentsCount) * segmentsParityRate))
 
 	segmentPayloads := make([][]byte, segmentsCount+paritySegmentsCount)
-	segmentMessages := make([]*types.NewMessage, segmentsCount)
+	segmentMessages := make([]*wakutypes.NewMessage, segmentsCount)
 
 	for start, index := 0, 0; start < entirePayloadSize; start += segmentSize {
 		end := start + segmentSize

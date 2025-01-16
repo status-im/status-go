@@ -32,6 +32,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv1"
 	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
@@ -43,7 +44,7 @@ var seed = time.Now().Unix()
 var testPayload = []byte("test payload")
 
 type ServerTestParams struct {
-	topic types.TopicType
+	topic wakutypes.TopicType
 	birth uint32
 	low   uint32
 	upp   uint32
@@ -148,7 +149,7 @@ func (s *MailserverSuite) TestArchive() {
 	s.NoError(err)
 
 	s.server.Archive(env)
-	key := NewDBKey(env.Expiry-env.TTL, types.TopicType(env.Topic), types.Hash(env.Hash()))
+	key := NewDBKey(env.Expiry-env.TTL, wakutypes.TopicType(env.Topic), types.Hash(env.Hash()))
 	archivedEnvelope, err := s.server.ms.db.GetEnvelope(key)
 	s.NoError(err)
 
@@ -171,7 +172,7 @@ func (s *MailserverSuite) TestManageLimits() {
 
 func (s *MailserverSuite) TestDBKey() {
 	var h types.Hash
-	var emptyTopic types.TopicType
+	var emptyTopic wakutypes.TopicType
 	i := uint32(time.Now().Unix())
 	k := NewDBKey(i, emptyTopic, h)
 	s.Equal(len(k.Bytes()), DBKeyLength, "wrong DB key length")
@@ -198,7 +199,7 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 		env, err := generateEnvelope(sentTime)
 		s.NoError(err)
 		s.server.Archive(env)
-		key := NewDBKey(env.Expiry-env.TTL, types.TopicType(env.Topic), types.Hash(env.Hash()))
+		key := NewDBKey(env.Expiry-env.TTL, wakutypes.TopicType(env.Topic), types.Hash(env.Hash()))
 		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.Cursor()))
 		sentEnvelopes = append(sentEnvelopes, env)
 		sentHashes = append(sentHashes, env.Hash())
@@ -313,7 +314,7 @@ func (s *MailserverSuite) TestMailServer() {
 				s.Equal(tc.params.low, payload.Lower)
 				s.Equal(tc.params.upp, payload.Upper)
 				s.Equal(tc.params.limit, payload.Limit)
-				s.Equal(types.TopicToBloom(tc.params.topic), payload.Bloom)
+				s.Equal(wakutypes.TopicToBloom(tc.params.topic), payload.Bloom)
 				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, payload.Bloom, tc.params.limit))
 
 				src[0]++
@@ -345,7 +346,7 @@ func (s *MailserverSuite) TestDecodeRequest() {
 	srcKey, err := s.shh.GetPrivateKey(id)
 	s.Require().NoError(err)
 
-	env := s.createEnvelope(types.TopicType{0x01}, data, srcKey)
+	env := s.createEnvelope(wakutypes.TopicType{0x01}, data, srcKey)
 
 	decodedPayload, err := s.server.decodeRequest(nil, env)
 	s.Require().NoError(err)
@@ -371,7 +372,7 @@ func (s *MailserverSuite) TestDecodeRequestNoUpper() {
 	srcKey, err := s.shh.GetPrivateKey(id)
 	s.Require().NoError(err)
 
-	env := s.createEnvelope(types.TopicType{0x01}, data, srcKey)
+	env := s.createEnvelope(wakutypes.TopicType{0x01}, data, srcKey)
 
 	decodedPayload, err := s.server.decodeRequest(nil, env)
 	s.Require().NoError(err)
@@ -544,7 +545,7 @@ func (s *MailserverSuite) defaultServerParams(env *wakuv1common.Envelope) *Serve
 	birth := env.Expiry - env.TTL
 
 	return &ServerTestParams{
-		topic: types.TopicType(env.Topic),
+		topic: wakutypes.TopicType(env.Topic),
 		birth: birth,
 		low:   birth - 1,
 		upp:   birth + 1,
@@ -554,7 +555,7 @@ func (s *MailserverSuite) defaultServerParams(env *wakuv1common.Envelope) *Serve
 }
 
 func (s *MailserverSuite) createRequest(p *ServerTestParams) *wakuv1common.Envelope {
-	bloom := types.TopicToBloom(p.topic)
+	bloom := wakutypes.TopicToBloom(p.topic)
 	data := make([]byte, 8)
 	binary.BigEndian.PutUint32(data, p.low)
 	binary.BigEndian.PutUint32(data[4:], p.upp)
@@ -569,7 +570,7 @@ func (s *MailserverSuite) createRequest(p *ServerTestParams) *wakuv1common.Envel
 	return s.createEnvelope(p.topic, data, p.key)
 }
 
-func (s *MailserverSuite) createEnvelope(topic types.TopicType, data []byte, srcKey *ecdsa.PrivateKey) *wakuv1common.Envelope {
+func (s *MailserverSuite) createEnvelope(topic wakutypes.TopicType, data []byte, srcKey *ecdsa.PrivateKey) *wakuv1common.Envelope {
 	key, err := s.shh.GetSymKey(keyID)
 	if err != nil {
 		s.T().Fatalf("failed to retrieve sym key with seed %d: %s.", seed, err)

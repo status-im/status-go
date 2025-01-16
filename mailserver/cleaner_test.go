@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
 
@@ -126,7 +127,7 @@ func countMessages(t *testing.T, db DB) int {
 	var (
 		count      int
 		zero       types.Hash
-		emptyTopic types.TopicType
+		emptyTopic wakutypes.TopicType
 	)
 
 	now := time.Now()

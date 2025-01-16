@@ -3,7 +3,7 @@ package mailserver
 import (
 	"time"
 
-	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // every this many seconds check real envelopes count
@@ -14,7 +14,7 @@ const envelopeCountCheckInterval = 60
 type DB interface {
 	Close() error
 	// SaveEnvelope stores an envelope
-	SaveEnvelope(types.Envelope) error
+	SaveEnvelope(wakutypes.Envelope) error
 	// GetEnvelope returns an rlp encoded envelope from the datastore
 	GetEnvelope(*DBKey) ([]byte, error)
 	// Prune removes envelopes older than time
@@ -29,7 +29,7 @@ type Iterator interface {
 	Release() error
 	Error() error
 	GetEnvelopeByBloomFilter(bloom []byte) ([]byte, error)
-	GetEnvelopeByTopicsMap(topics map[types.TopicType]bool) ([]byte, error)
+	GetEnvelopeByTopicsMap(topics map[wakutypes.TopicType]bool) ([]byte, error)
 }
 
 type CursorQuery struct {

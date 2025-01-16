@@ -11,10 +11,10 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/t/helpers"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessageSegmentationSuite(t *testing.T) {
@@ -150,7 +150,7 @@ func (s *MessageSegmentationSuite) TestHandleSegmentationLayer() {
 	for _, version := range []string{"V1", "V2"} {
 		for _, tc := range testCases {
 			s.Run(fmt.Sprintf("%s %s", version, tc.name), func() {
-				segmentedMessages, err := segmentMessage(&types.NewMessage{Payload: s.testPayload}, int(math.Ceil(float64(len(s.testPayload))/float64(tc.segmentsCount))))
+				segmentedMessages, err := segmentMessage(&wakutypes.NewMessage{Payload: s.testPayload}, int(math.Ceil(float64(len(s.testPayload))/float64(tc.segmentsCount))))
 				s.Require().NoError(err)
 				s.Require().Len(segmentedMessages, tc.segmentsCount+tc.expectedParitySegmentsCount)
 

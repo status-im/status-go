@@ -8,13 +8,14 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/protocol/common"
+
+	gethnode "github.com/status-im/status-go/eth-node/node"
 )
 
 type Verifier struct {
-	node            types.Node
+	node            gethnode.Node
 	online          bool
 	persistence     *Persistence
 	logger          *zap.Logger
@@ -25,7 +26,7 @@ type Verifier struct {
 	quit            chan struct{}
 }
 
-func New(node types.Node, logger *zap.Logger, timesource common.TimeSource, db *sql.DB, rpcEndpoint, contractAddress string) *Verifier {
+func New(node gethnode.Node, logger *zap.Logger, timesource common.TimeSource, db *sql.DB, rpcEndpoint, contractAddress string) *Verifier {
 	persistence := NewPersistence(db)
 	return &Verifier{
 		node:            node,

@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
 
@@ -34,7 +35,7 @@ func (i *LevelDBIterator) DBKey() (*DBKey, error) {
 	}, nil
 }
 
-func (i *LevelDBIterator) GetEnvelopeByTopicsMap(topics map[types.TopicType]bool) ([]byte, error) {
+func (i *LevelDBIterator) GetEnvelopeByTopicsMap(topics map[wakutypes.TopicType]bool) ([]byte, error) {
 	rawValue := make([]byte, len(i.Value()))
 	copy(rawValue, i.Value())
 
@@ -67,9 +68,9 @@ func (i *LevelDBIterator) GetEnvelopeByBloomFilter(bloom []byte) ([]byte, error)
 			return nil, err
 		}
 	} else {
-		envelopeBloom = types.TopicToBloom(key.Topic())
+		envelopeBloom = wakutypes.TopicToBloom(key.Topic())
 	}
-	if !types.BloomFilterMatch(bloom, envelopeBloom) {
+	if !wakutypes.BloomFilterMatch(bloom, envelopeBloom) {
 		return nil, nil
 	}
 	return rawValue, nil
@@ -144,7 +145,7 @@ func (db *LevelDB) Prune(t time.Time, batchSize int) (int, error) {
 	defer recoverLevelDBPanics("Prune")
 
 	var zero types.Hash
-	var emptyTopic types.TopicType
+	var emptyTopic wakutypes.TopicType
 	kl := NewDBKey(0, emptyTopic, zero)
 	ku := NewDBKey(uint32(t.Unix()), emptyTopic, zero)
 	query := CursorQuery{
@@ -204,7 +205,7 @@ func (db *LevelDB) envelopesCount() (int, error) {
 }
 
 // SaveEnvelope stores an envelope in leveldb and increments the metrics
-func (db *LevelDB) SaveEnvelope(env types.Envelope) error {
+func (db *LevelDB) SaveEnvelope(env wakutypes.Envelope) error {
 	defer recoverLevelDBPanics("SaveEnvelope")
 
 	key := NewDBKey(env.Expiry()-env.TTL(), env.Topic(), env.Hash())

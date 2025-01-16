@@ -60,6 +60,7 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -2669,7 +2670,7 @@ func (b *GethStatusBackend) LocalPairingStarted() error {
 	return accountDB.MnemonicWasShown()
 }
 
-func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager, st *ext.Service) error {
+func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyManager, st *ext.Service) error {
 	chatAccount, err := b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return err

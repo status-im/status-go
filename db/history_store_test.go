@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func createInMemStore(t *testing.T) HistoryStore {
@@ -16,7 +17,7 @@ func createInMemStore(t *testing.T) HistoryStore {
 }
 
 func TestGetNewHistory(t *testing.T) {
-	topic := types.TopicType{1}
+	topic := wakutypes.TopicType{1}
 	duration := time.Hour
 	store := createInMemStore(t)
 	th, err := store.GetHistory(topic, duration)
@@ -26,7 +27,7 @@ func TestGetNewHistory(t *testing.T) {
 }
 
 func TestGetExistingHistory(t *testing.T) {
-	topic := types.TopicType{1}
+	topic := wakutypes.TopicType{1}
 	duration := time.Hour
 	store := createInMemStore(t)
 	th, err := store.GetHistory(topic, duration)
@@ -49,7 +50,7 @@ func TestNewHistoryRequest(t *testing.T) {
 	req := store.NewRequest()
 	req.ID = id
 
-	th, err := store.GetHistory(types.TopicType{1}, time.Hour)
+	th, err := store.GetHistory(wakutypes.TopicType{1}, time.Hour)
 	require.NoError(t, err)
 	req.AddHistory(th)
 	require.NoError(t, req.Save())

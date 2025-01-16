@@ -51,7 +51,7 @@ func (api *NimbusPublicAPI) ConfirmMessagesProcessedByID(messageConfirmations []
 // in other words don't use PFS-enabled messages. Otherwise, SendDirectMessage is used.
 // It's important to call NimbusPublicAPI.afterSend() so that the client receives a signal
 // with confirmation that the message left the device.
-func (api *NimbusPublicAPI) Post(ctx context.Context, newMessage types.NewMessage) (types.HexBytes, error) {
+func (api *NimbusPublicAPI) Post(ctx context.Context, newMessage wakutypes.NewMessage) (types.HexBytes, error) {
 	return api.publicAPI.Post(ctx, newMessage)
 }
 

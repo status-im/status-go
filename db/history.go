@@ -9,6 +9,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 
 	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 var (
@@ -26,7 +27,7 @@ type DB interface {
 }
 
 // TopicHistoryKey defines bytes that are used as unique key for TopicHistory.
-// first 4 bytes are types.TopicType bytes
+// first 4 bytes are wakutypes.TopicType bytes
 // next 8 bytes are time.Duration encoded in big endian notation.
 type TopicHistoryKey [12]byte
 
@@ -36,7 +37,7 @@ func LoadTopicHistoryFromKey(db DB, key TopicHistoryKey) (th TopicHistory, err e
 	if (key == TopicHistoryKey{}) {
 		return th, ErrEmptyKey
 	}
-	topic := types.TopicType{}
+	topic := wakutypes.TopicType{}
 	copy(topic[:], key[:4])
 	duration := binary.BigEndian.Uint64(key[4:])
 	th = TopicHistory{db: db, Topic: topic, Duration: time.Duration(duration)}
@@ -47,7 +48,7 @@ func LoadTopicHistoryFromKey(db DB, key TopicHistoryKey) (th TopicHistory, err e
 type TopicHistory struct {
 	db DB
 	// whisper topic
-	Topic types.TopicType
+	Topic wakutypes.TopicType
 
 	Duration time.Duration
 	// Timestamp that was used for the first request with this topic.

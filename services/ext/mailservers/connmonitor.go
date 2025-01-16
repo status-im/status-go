@@ -7,8 +7,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
+
+	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // NewLastUsedConnectionMonitor returns pointer to the instance of LastUsedConnectionMonitor.
@@ -37,7 +39,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 	mon.wg.Add(1)
 	go func() {
 		defer common.LogOnPanic()
-		events := make(chan types.EnvelopeEvent, whisperEventsBuffer)
+		events := make(chan wakutypes.EnvelopeEvent, whisperEventsBuffer)
 		sub := mon.eventSub.SubscribeEnvelopeEvents(events)
 		defer sub.Unsubscribe()
 		defer mon.wg.Done()
@@ -53,7 +55,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 				if node == nil {
 					continue
 				}
-				if ev.Event == types.EventMailServerRequestCompleted {
+				if ev.Event == wakutypes.EventMailServerRequestCompleted {
 					err := mon.updateRecord(ev.Peer)
 					if err != nil {
 						logutils.ZapLogger().Error("unable to update storage", zap.Stringer("peer", ev.Peer), zap.Error(err))

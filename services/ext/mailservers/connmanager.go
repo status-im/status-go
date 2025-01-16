@@ -13,6 +13,8 @@ import (
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const (
@@ -31,9 +33,9 @@ type PeerEventsSubscriber interface {
 	SubscribeEvents(chan *p2p.PeerEvent) event.Subscription
 }
 
-// EnvelopeEventSubscriber interface to subscribe for types.EnvelopeEvent's.
+// EnvelopeEventSubscriber interface to subscribe for wakutypes.EnvelopeEvent's.
 type EnvelopeEventSubscriber interface {
-	SubscribeEnvelopeEvents(chan<- types.EnvelopeEvent) types.Subscription
+	SubscribeEnvelopeEvents(chan<- wakutypes.EnvelopeEvent) wakutypes.Subscription
 }
 
 type p2pServer interface {
@@ -90,7 +92,7 @@ func (ps *ConnectionManager) Start() {
 		state := newInternalState(ps.server, ps.connectedTarget, ps.timeoutWaitAdded)
 		events := make(chan *p2p.PeerEvent, peerEventsBuffer)
 		sub := ps.server.SubscribeEvents(events)
-		whisperEvents := make(chan types.EnvelopeEvent, whisperEventsBuffer)
+		whisperEvents := make(chan wakutypes.EnvelopeEvent, whisperEventsBuffer)
 		whisperSub := ps.eventSub.SubscribeEnvelopeEvents(whisperEvents)
 		requests := map[types.Hash]struct{}{}
 		failuresPerServer := map[types.EnodeID]int{}
@@ -115,13 +117,13 @@ func (ps *ConnectionManager) Start() {
 			case ev := <-whisperEvents:
 				// TODO treat failed requests the same way as expired
 				switch ev.Event {
-				case types.EventMailServerRequestSent:
+				case wakutypes.EventMailServerRequestSent:
 					requests[ev.Hash] = struct{}{}
-				case types.EventMailServerRequestCompleted:
+				case wakutypes.EventMailServerRequestCompleted:
 					// reset failures count on first success
 					failuresPerServer[ev.Peer] = 0
 					delete(requests, ev.Hash)
-				case types.EventMailServerRequestExpired:
+				case wakutypes.EventMailServerRequestExpired:
 					_, exist := requests[ev.Hash]
 					if !exist {
 						continue

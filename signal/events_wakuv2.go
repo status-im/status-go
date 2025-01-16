@@ -1,6 +1,6 @@
 package signal
 
-import "github.com/status-im/status-go/eth-node/types"
+import "github.com/status-im/status-go/waku/types"
 
 const (
 	// EventPeerStats is sent when peer is added or removed.

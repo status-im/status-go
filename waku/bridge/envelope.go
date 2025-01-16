@@ -1,4 +1,4 @@
-package gethbridge
+package bridge
 
 import (
 	"io"
@@ -6,6 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/eth-node/types"
 	wakuv1common "github.com/status-im/status-go/wakuv1/common"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type wakuEnvelope struct {
@@ -13,7 +15,7 @@ type wakuEnvelope struct {
 }
 
 // NewWakuEnvelope returns an object that wraps Geth's Waku Envelope in a types interface.
-func NewWakuEnvelope(e *wakuv1common.Envelope) types.Envelope {
+func NewWakuEnvelope(e *wakuv1common.Envelope) wakutypes.Envelope {
 	return &wakuEnvelope{env: e}
 }
 
@@ -41,8 +43,8 @@ func (w *wakuEnvelope) TTL() uint32 {
 	return w.env.TTL
 }
 
-func (w *wakuEnvelope) Topic() types.TopicType {
-	return types.TopicType(w.env.Topic)
+func (w *wakuEnvelope) Topic() wakutypes.TopicType {
+	return wakutypes.TopicType(w.env.Topic)
 }
 
 func (w *wakuEnvelope) Size() int {

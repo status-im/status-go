@@ -4,8 +4,9 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type messagesOrderType int
@@ -58,7 +59,7 @@ func (m *MessagesOrderController) Stop() {
 	})
 }
 
-func (m *MessagesOrderController) newMessagesIterator(chatWithMessages map[transport.Filter][]*types.Message) MessagesIterator {
+func (m *MessagesOrderController) newMessagesIterator(chatWithMessages map[transport.Filter][]*wakutypes.Message) MessagesIterator {
 	switch m.order {
 	case messagesOrderAsPosted, messagesOrderReversed:
 		return &messagesIterator{chatWithMessages: m.sort(chatWithMessages, m.order)}
@@ -76,7 +77,7 @@ func buildIndexMap(messages [][]byte) map[string]int {
 	return indexMap
 }
 
-func (m *MessagesOrderController) sort(chatWithMessages map[transport.Filter][]*types.Message, order messagesOrderType) []*chatWithMessage {
+func (m *MessagesOrderController) sort(chatWithMessages map[transport.Filter][]*wakutypes.Message, order messagesOrderType) []*chatWithMessage {
 	allMessages := make([]*chatWithMessage, 0)
 	for chat, messages := range chatWithMessages {
 		for _, message := range messages {
@@ -107,7 +108,7 @@ func (m *MessagesOrderController) sort(chatWithMessages map[transport.Filter][]*
 
 type chatWithMessage struct {
 	chat    transport.Filter
-	message *types.Message
+	message *wakutypes.Message
 }
 
 type messagesIterator struct {
@@ -119,11 +120,11 @@ func (it *messagesIterator) HasNext() bool {
 	return it.currentIndex < len(it.chatWithMessages)
 }
 
-func (it *messagesIterator) Next() (transport.Filter, []*types.Message) {
+func (it *messagesIterator) Next() (transport.Filter, []*wakutypes.Message) {
 	if it.HasNext() {
 		m := it.chatWithMessages[it.currentIndex]
 		it.currentIndex++
-		return m.chat, []*types.Message{m.message}
+		return m.chat, []*wakutypes.Message{m.message}
 	}
 
 	return transport.Filter{}, nil

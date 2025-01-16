@@ -11,6 +11,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
+
 	"github.com/status-im/status-go/protocol/common/shard"
 )
 
@@ -20,7 +23,7 @@ const (
 
 type RawFilter struct {
 	FilterID string
-	Topic    types.TopicType
+	Topic    wakutypes.TopicType
 	SymKeyID string
 }
 
@@ -38,7 +41,7 @@ type FiltersService interface {
 	GetSymKey(id string) ([]byte, error)
 	DeleteSymKey(id string) bool
 
-	Subscribe(opts *types.SubscriptionOptions) (string, error)
+	Subscribe(opts *wakutypes.SubscriptionOptions) (string, error)
 	Unsubscribe(ctx context.Context, id string) error
 	UnsubscribeMany(ids []string) error
 }
@@ -258,7 +261,7 @@ func (f *FiltersManager) FilterByTopic(topic []byte) *Filter {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	for _, f := range f.filters {
-		if bytes.Equal(types.TopicTypeToByteArray(f.ContentTopic), topic) {
+		if bytes.Equal(wakutypes.TopicTypeToByteArray(f.ContentTopic), topic) {
 			return f
 		}
 	}
@@ -644,7 +647,7 @@ func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (*RawFi
 		}
 	}
 
-	id, err := f.service.Subscribe(&types.SubscriptionOptions{
+	id, err := f.service.Subscribe(&wakutypes.SubscriptionOptions{
 		SymKeyID:    symKeyID,
 		PoW:         minPow,
 		Topics:      topics,
@@ -657,7 +660,7 @@ func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (*RawFi
 	return &RawFilter{
 		FilterID: id,
 		SymKeyID: symKeyID,
-		Topic:    types.BytesToTopic(topic),
+		Topic:    wakutypes.BytesToTopic(topic),
 	}, nil
 }
 
@@ -681,7 +684,7 @@ func (f *FiltersManager) addAsymmetric(chatID string, pubsubTopic string, identi
 		return nil, err
 	}
 
-	id, err := f.service.Subscribe(&types.SubscriptionOptions{
+	id, err := f.service.Subscribe(&wakutypes.SubscriptionOptions{
 		PrivateKeyID: privateKeyID,
 		PoW:          pow,
 		Topics:       topics,
@@ -690,7 +693,7 @@ func (f *FiltersManager) addAsymmetric(chatID string, pubsubTopic string, identi
 	if err != nil {
 		return nil, err
 	}
-	return &RawFilter{FilterID: id, Topic: types.BytesToTopic(topic)}, nil
+	return &RawFilter{FilterID: id, Topic: wakutypes.BytesToTopic(topic)}, nil
 }
 
 // GetNegotiated returns a negotiated chat given an identity

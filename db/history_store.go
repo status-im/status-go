@@ -6,6 +6,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/errors"
 
 	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // NewHistoryStore returns HistoryStore instance.
@@ -24,7 +25,7 @@ type HistoryStore struct {
 
 // GetHistory creates history instance and loads history from database.
 // Returns instance populated with topic and duration if history is not found in database.
-func (h HistoryStore) GetHistory(topic types.TopicType, duration time.Duration) (TopicHistory, error) {
+func (h HistoryStore) GetHistory(topic wakutypes.TopicType, duration time.Duration) (TopicHistory, error) {
 	thist := h.NewHistory(topic, duration)
 	err := thist.Load()
 	if err != nil && err != errors.ErrNotFound {
@@ -39,7 +40,7 @@ func (h HistoryStore) NewRequest() HistoryRequest {
 }
 
 // NewHistory creates TopicHistory object with required values.
-func (h HistoryStore) NewHistory(topic types.TopicType, duration time.Duration) TopicHistory {
+func (h HistoryStore) NewHistory(topic wakutypes.TopicType, duration time.Duration) TopicHistory {
 	return TopicHistory{db: h.topicDB, Duration: duration, Topic: topic}
 }
 
@@ -74,7 +75,7 @@ func (h HistoryStore) GetAllRequests() ([]HistoryRequest, error) {
 // GetHistoriesByTopic returns all histories with a given topic.
 // This is needed when we will have multiple range per single topic.
 // TODO explain
-func (h HistoryStore) GetHistoriesByTopic(topic types.TopicType) ([]TopicHistory, error) {
+func (h HistoryStore) GetHistoriesByTopic(topic wakutypes.TopicType) ([]TopicHistory, error) {
 	rst := []TopicHistory{}
 	iter := h.topicDB.NewIterator(h.topicDB.Range(topic[:], nil))
 	for iter.Next() {

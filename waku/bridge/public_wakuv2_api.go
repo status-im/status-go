@@ -1,4 +1,4 @@
-package gethbridge
+package bridge
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/wakuv2"
 	wakucommon "github.com/status-im/status-go/wakuv2/common"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type gethPublicWakuV2APIWrapper struct {
@@ -15,7 +17,7 @@ type gethPublicWakuV2APIWrapper struct {
 }
 
 // NewGethPublicWakuAPIWrapper returns an object that wraps Geth's PublicWakuAPI in a types interface
-func NewGethPublicWakuV2APIWrapper(api *wakuv2.PublicWakuAPI) types.PublicWakuAPI {
+func NewGethPublicWakuV2APIWrapper(api *wakuv2.PublicWakuAPI) wakutypes.PublicWakuAPI {
 	if api == nil {
 		panic("PublicWakuV2API cannot be nil")
 	}
@@ -46,7 +48,7 @@ func (w *gethPublicWakuV2APIWrapper) BloomFilter() []byte {
 
 // NewMessageFilter creates a new filter that can be used to poll for
 // (new) messages that satisfy the given criteria.
-func (w *gethPublicWakuV2APIWrapper) NewMessageFilter(req types.Criteria) (string, error) {
+func (w *gethPublicWakuV2APIWrapper) NewMessageFilter(req wakutypes.Criteria) (string, error) {
 	topics := make([]wakucommon.TopicType, len(req.Topics))
 	for index, tt := range req.Topics {
 		topics[index] = wakucommon.TopicType(tt)
@@ -64,19 +66,19 @@ func (w *gethPublicWakuV2APIWrapper) NewMessageFilter(req types.Criteria) (strin
 
 // GetFilterMessages returns the messages that match the filter criteria and
 // are received between the last poll and now.
-func (w *gethPublicWakuV2APIWrapper) GetFilterMessages(id string) ([]*types.Message, error) {
+func (w *gethPublicWakuV2APIWrapper) GetFilterMessages(id string) ([]*wakutypes.Message, error) {
 	msgs, err := w.api.GetFilterMessages(id)
 	if err != nil {
 		return nil, err
 	}
 
-	wrappedMsgs := make([]*types.Message, len(msgs))
+	wrappedMsgs := make([]*wakutypes.Message, len(msgs))
 	for index, msg := range msgs {
-		wrappedMsgs[index] = &types.Message{
+		wrappedMsgs[index] = &wakutypes.Message{
 			Sig:         msg.Sig,
 			Timestamp:   msg.Timestamp,
 			PubsubTopic: msg.PubsubTopic,
-			Topic:       types.TopicType(msg.ContentTopic),
+			Topic:       wakutypes.TopicType(msg.ContentTopic),
 			Payload:     msg.Payload,
 			Padding:     msg.Padding,
 			Hash:        msg.Hash,
@@ -88,7 +90,7 @@ func (w *gethPublicWakuV2APIWrapper) GetFilterMessages(id string) ([]*types.Mess
 
 // Post posts a message on the network.
 // returns the hash of the message in case of success.
-func (w *gethPublicWakuV2APIWrapper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
+func (w *gethPublicWakuV2APIWrapper) Post(ctx context.Context, req wakutypes.NewMessage) ([]byte, error) {
 	msg := wakuv2.NewMessage{
 		SymKeyID:     req.SymKeyID,
 		PublicKey:    req.PublicKey,

@@ -14,6 +14,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 var (
@@ -62,12 +63,12 @@ func (s *EnvelopesMonitorSuite) SetupTest() {
 }
 
 func (s *EnvelopesMonitorSuite) TestEnvelopePosted() {
-	err := s.monitor.Add(testIDs, testHashes, []*types.NewMessage{{}})
+	err := s.monitor.Add(testIDs, testHashes, []*wakutypes.NewMessage{{}})
 	s.Require().NoError(err)
 	s.Contains(s.monitor.envelopes, testHash)
 	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash].state)
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeSent,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeSent,
 		Hash:  testHash,
 	})
 	s.Contains(s.monitor.envelopes, testHash)
@@ -75,12 +76,12 @@ func (s *EnvelopesMonitorSuite) TestEnvelopePosted() {
 }
 
 func (s *EnvelopesMonitorSuite) TestEnvelopePostedOutOfOrder() {
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeSent,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeSent,
 		Hash:  testHash,
 	})
 
-	err := s.monitor.Add(testIDs, testHashes, []*types.NewMessage{{}})
+	err := s.monitor.Add(testIDs, testHashes, []*wakutypes.NewMessage{{}})
 	s.Require().NoError(err)
 	s.Require().Contains(s.monitor.envelopes, testHash)
 	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[testHash].state)
@@ -91,18 +92,18 @@ func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
 	pkey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	node := enode.NewV4(&pkey.PublicKey, nil, 0, 0)
-	err = s.monitor.Add(testIDs, testHashes, []*types.NewMessage{{}})
+	err = s.monitor.Add(testIDs, testHashes, []*wakutypes.NewMessage{{}})
 	s.Require().NoError(err)
 	s.Contains(s.monitor.envelopes, testHash)
 	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash].state)
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeSent,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeSent,
 		Hash:  testHash,
 		Batch: testBatch,
 	})
 	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash].state)
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventBatchAcknowledged,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventBatchAcknowledged,
 		Batch: testBatch,
 		Peer:  types.EnodeID(node.ID()),
 	})
@@ -111,11 +112,11 @@ func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
 }
 
 func (s *EnvelopesMonitorSuite) TestRemoved() {
-	err := s.monitor.Add(testIDs, testHashes, []*types.NewMessage{{}})
+	err := s.monitor.Add(testIDs, testHashes, []*wakutypes.NewMessage{{}})
 	s.Require().NoError(err)
 	s.Contains(s.monitor.envelopes, testHash)
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeExpired,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeExpired,
 		Hash:  testHash,
 	})
 	s.NotContains(s.monitor.envelopes, testHash)
@@ -124,10 +125,10 @@ func (s *EnvelopesMonitorSuite) TestRemoved() {
 func (s *EnvelopesMonitorSuite) TestIgnoreNotFromMailserver() {
 	// enables filter in the tracker to drop confirmations from non-mailserver peers
 	s.monitor.awaitOnlyMailServerConfirmations = true
-	err := s.monitor.Add(testIDs, testHashes, []*types.NewMessage{{}})
+	err := s.monitor.Add(testIDs, testHashes, []*wakutypes.NewMessage{{}})
 	s.Require().NoError(err)
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeSent,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeSent,
 		Hash:  testHash,
 		Peer:  types.EnodeID{1}, // could be empty, doesn't impact test behaviour
 	})
@@ -138,11 +139,11 @@ func (s *EnvelopesMonitorSuite) TestReceived() {
 	s.monitor.isMailserver = func(peer types.EnodeID) bool {
 		return true
 	}
-	err := s.monitor.Add(testIDs, testHashes, []*types.NewMessage{{}})
+	err := s.monitor.Add(testIDs, testHashes, []*wakutypes.NewMessage{{}})
 	s.Require().NoError(err)
 	s.Contains(s.monitor.envelopes, testHash)
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeReceived,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeReceived,
 		Hash:  testHash,
 	})
 	s.Require().Equal(EnvelopeSent, s.monitor.GetState(testHash))
@@ -151,7 +152,7 @@ func (s *EnvelopesMonitorSuite) TestReceived() {
 func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
 	messageIDs := [][]byte{[]byte("id1"), []byte("id2")}
 	hashes := []types.Hash{{0x01}, {0x02}, {0x03}}
-	messages := []*types.NewMessage{{}, {}, {}}
+	messages := []*wakutypes.NewMessage{{}, {}, {}}
 
 	err := s.monitor.Add(messageIDs, hashes, messages)
 	s.Require().NoError(err)
@@ -163,8 +164,8 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
 	s.Require().Equal(EnvelopePosted, s.monitor.envelopes[hashes[1]].state)
 	s.Require().Equal(EnvelopePosted, s.monitor.envelopes[hashes[2]].state)
 
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeSent,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeSent,
 		Hash:  hashes[0],
 	})
 	s.Require().Empty(s.eventsHandlerMock.envelopeSentCalls)
@@ -172,8 +173,8 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
 	s.Require().Equal(EnvelopePosted, s.monitor.envelopes[hashes[1]].state)
 	s.Require().Equal(EnvelopePosted, s.monitor.envelopes[hashes[2]].state)
 
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeSent,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeSent,
 		Hash:  hashes[1],
 	})
 	s.Require().Empty(s.eventsHandlerMock.envelopeSentCalls)
@@ -181,8 +182,8 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
 	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[hashes[1]].state)
 	s.Require().Equal(EnvelopePosted, s.monitor.envelopes[hashes[2]].state)
 
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeSent,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeSent,
 		Hash:  hashes[2],
 	})
 	// Identifiers should be marked as sent only if all corresponding envelopes are sent
@@ -196,22 +197,22 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes() {
 func (s *EnvelopesMonitorSuite) TestMultipleHashes_EnvelopeExpired() {
 	messageIDs := [][]byte{[]byte("id1"), []byte("id2")}
 	hashes := []types.Hash{{0x01}, {0x02}, {0x03}}
-	messages := []*types.NewMessage{{}, {}, {}}
+	messages := []*wakutypes.NewMessage{{}, {}, {}}
 
 	err := s.monitor.Add(messageIDs, hashes, messages)
 	s.Require().NoError(err)
 
 	// If any envelope fails, then messageIDs are considered as not sent
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeExpired,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeExpired,
 		Hash:  hashes[0],
 	})
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeSent,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeSent,
 		Hash:  hashes[1],
 	})
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeSent,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeSent,
 		Hash:  hashes[2],
 	})
 
@@ -221,13 +222,13 @@ func (s *EnvelopesMonitorSuite) TestMultipleHashes_EnvelopeExpired() {
 }
 
 func (s *EnvelopesMonitorSuite) TestMultipleHashes_Failure() {
-	err := s.monitor.Add(testIDs, []types.Hash{{0x01}, {0x02}}, []*types.NewMessage{{}})
+	err := s.monitor.Add(testIDs, []types.Hash{{0x01}, {0x02}}, []*wakutypes.NewMessage{{}})
 	s.Require().Error(err)
 }
 
 func (s *EnvelopesMonitorSuite) TestRetryOnce() {
 	s.monitor.api = &mockWakuAPI{}
-	err := s.monitor.Add(testIDs, testHashes, []*types.NewMessage{{}})
+	err := s.monitor.Add(testIDs, testHashes, []*wakutypes.NewMessage{{}})
 	s.Require().NoError(err)
 	envelope := s.monitor.envelopes[testHash]
 	envelope.attempts = 2
@@ -243,7 +244,7 @@ func (s *EnvelopesMonitorSuite) TestRetryOnce() {
 
 type mockWakuAPI struct{}
 
-func (m *mockWakuAPI) Post(ctx context.Context, msg types.NewMessage) ([]byte, error) {
+func (m *mockWakuAPI) Post(ctx context.Context, msg wakutypes.NewMessage) ([]byte, error) {
 	return []byte{0x01}, nil
 }
 
@@ -256,10 +257,10 @@ func (m *mockWakuAPI) GenerateSymKeyFromPassword(ctx context.Context, passwd str
 func (m *mockWakuAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
 	return false, nil
 }
-func (m *mockWakuAPI) NewMessageFilter(req types.Criteria) (string, error) {
+func (m *mockWakuAPI) NewMessageFilter(req wakutypes.Criteria) (string, error) {
 	return "", nil
 }
-func (m *mockWakuAPI) GetFilterMessages(id string) ([]*types.Message, error) {
+func (m *mockWakuAPI) GetFilterMessages(id string) ([]*wakutypes.Message, error) {
 	return nil, nil
 }
 func (m *mockWakuAPI) BloomFilter() []byte {

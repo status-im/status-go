@@ -9,6 +9,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/ext/mailservers"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // EnvelopeState in local tracker
@@ -73,7 +75,7 @@ func (m *MailRequestMonitor) GetState(hash types.Hash) EnvelopeState {
 
 // handleEnvelopeEvents processes whisper envelope events
 func (m *MailRequestMonitor) handleEnvelopeEvents() {
-	events := make(chan types.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
+	events := make(chan wakutypes.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
 	sub := m.eventSub.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
 	for {
@@ -88,11 +90,11 @@ func (m *MailRequestMonitor) handleEnvelopeEvents() {
 
 // handleEvent based on type of the event either triggers
 // confirmation handler or removes hash from MailRequestMonitor
-func (m *MailRequestMonitor) handleEvent(event types.EnvelopeEvent) {
-	handlers := map[types.EventType]func(types.EnvelopeEvent){
-		types.EventMailServerRequestSent:      m.handleRequestSent,
-		types.EventMailServerRequestCompleted: m.handleEventMailServerRequestCompleted,
-		types.EventMailServerRequestExpired:   m.handleEventMailServerRequestExpired,
+func (m *MailRequestMonitor) handleEvent(event wakutypes.EnvelopeEvent) {
+	handlers := map[wakutypes.EventType]func(wakutypes.EnvelopeEvent){
+		wakutypes.EventMailServerRequestSent:      m.handleRequestSent,
+		wakutypes.EventMailServerRequestCompleted: m.handleEventMailServerRequestCompleted,
+		wakutypes.EventMailServerRequestExpired:   m.handleEventMailServerRequestExpired,
 	}
 
 	if handler, ok := handlers[event.Event]; ok {
@@ -100,13 +102,13 @@ func (m *MailRequestMonitor) handleEvent(event types.EnvelopeEvent) {
 	}
 }
 
-func (m *MailRequestMonitor) handleRequestSent(event types.EnvelopeEvent) {
+func (m *MailRequestMonitor) handleRequestSent(event wakutypes.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.cache[event.Hash] = MailServerRequestSent
 }
 
-func (m *MailRequestMonitor) handleEventMailServerRequestCompleted(event types.EnvelopeEvent) {
+func (m *MailRequestMonitor) handleEventMailServerRequestCompleted(event wakutypes.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.requestsRegistry.Unregister(event.Hash)
@@ -117,13 +119,13 @@ func (m *MailRequestMonitor) handleEventMailServerRequestCompleted(event types.E
 	logutils.ZapLogger().Debug("mailserver response received", zap.Stringer("hash", event.Hash))
 	delete(m.cache, event.Hash)
 	if m.handler != nil {
-		if resp, ok := event.Data.(*types.MailServerResponse); ok {
+		if resp, ok := event.Data.(*wakutypes.MailServerResponse); ok {
 			m.handler.MailServerRequestCompleted(event.Hash, resp.LastEnvelopeHash, resp.Cursor, resp.Error)
 		}
 	}
 }
 
-func (m *MailRequestMonitor) handleEventMailServerRequestExpired(event types.EnvelopeEvent) {
+func (m *MailRequestMonitor) handleEventMailServerRequestExpired(event wakutypes.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.requestsRegistry.Unregister(event.Hash)

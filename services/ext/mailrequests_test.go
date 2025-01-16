@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 var (
@@ -35,10 +36,10 @@ func (s *MailRequestMonitorSuite) TestRequestCompleted() {
 	mock := NewHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventMailServerRequestCompleted,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventMailServerRequestCompleted,
 		Hash:  testHash,
-		Data:  &types.MailServerResponse{},
+		Data:  &wakutypes.MailServerResponse{},
 	})
 	select {
 	case requestID := <-mock.requestsCompleted:
@@ -53,10 +54,10 @@ func (s *MailRequestMonitorSuite) TestRequestFailed() {
 	mock := NewHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventMailServerRequestCompleted,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventMailServerRequestCompleted,
 		Hash:  testHash,
-		Data:  &types.MailServerResponse{Error: errors.New("test error")},
+		Data:  &wakutypes.MailServerResponse{Error: errors.New("test error")},
 	})
 	select {
 	case requestID := <-mock.requestsFailed:
@@ -71,8 +72,8 @@ func (s *MailRequestMonitorSuite) TestRequestExpiration() {
 	mock := NewHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventMailServerRequestExpired,
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventMailServerRequestExpired,
 		Hash:  testHash,
 	})
 	select {

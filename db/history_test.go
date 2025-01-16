@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestTopicHistoryStoreLoadFromKey(t *testing.T) {
@@ -14,7 +15,7 @@ func TestTopicHistoryStoreLoadFromKey(t *testing.T) {
 	require.NoError(t, err)
 	th := TopicHistory{
 		db:       db,
-		Topic:    types.TopicType{1, 1, 1},
+		Topic:    wakutypes.TopicType{1, 1, 1},
 		Duration: 10 * time.Hour,
 	}
 	require.NoError(t, th.Save())
@@ -71,7 +72,7 @@ func TestTopicHistorySameRange(t *testing.T) {
 }
 
 func TestAddHistory(t *testing.T) {
-	topic := types.TopicType{1, 1, 1}
+	topic := wakutypes.TopicType{1, 1, 1}
 	now := time.Now()
 
 	topicdb, err := NewMemoryDBNamespace(TopicHistoryBucket)
@@ -94,8 +95,8 @@ func TestAddHistory(t *testing.T) {
 }
 
 func TestRequestIncludesMethod(t *testing.T) {
-	topicOne := types.TopicType{1}
-	topicTwo := types.TopicType{2}
+	topicOne := wakutypes.TopicType{1}
+	topicTwo := wakutypes.TopicType{2}
 	testCases := []struct {
 		description string
 		result      bool

@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/appdatabase"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -36,6 +35,9 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 	waku2 "github.com/status-im/status-go/wakuv2"
 	wakuV2common "github.com/status-im/status-go/wakuv2/common"
+
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const (
@@ -61,8 +63,8 @@ type MessengerStoreNodeRequestSuite struct {
 	wakuStoreNode    *waku2.Waku
 	storeNodeAddress multiaddr.Multiaddr
 
-	ownerWaku types.Waku
-	bobWaku   types.Waku
+	ownerWaku wakutypes.Waku
+	bobWaku   wakutypes.Waku
 
 	collectiblesServiceMock *CollectiblesServiceMock
 
@@ -169,7 +171,7 @@ func (s *MessengerStoreNodeRequestSuite) createStore() {
 }
 
 func (s *MessengerStoreNodeRequestSuite) tearDownOwner() {
-	_ = gethbridge.GetGethWakuV2From(s.ownerWaku).Stop()
+	_ = bridge.GetGethWakuV2From(s.ownerWaku).Stop()
 	TearDownMessenger(&s.Suite, s.owner)
 }
 
@@ -182,13 +184,13 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 	}
 
 	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
-	s.ownerWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
+	s.ownerWaku = bridge.NewGethWakuV2Wrapper(wakuV2)
 
 	messengerLogger := s.logger.Named("owner-messenger")
 	s.owner = s.newMessenger(s.ownerWaku, messengerLogger, &s.storeNodeAddress)
 
 	// We force the owner to use the store node as relay peer
-	WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.ownerWaku), func() peer.IDSlice {
+	WaitForPeersConnected(&s.Suite, bridge.GetGethWakuV2From(s.ownerWaku), func() peer.IDSlice {
 		err := s.owner.DialPeer(s.storeNodeAddress)
 		s.Require().NoError(err)
 		return peer.IDSlice{s.wakuStoreNode.PeerID()}
@@ -202,18 +204,18 @@ func (s *MessengerStoreNodeRequestSuite) createBob() {
 		clusterID:   shard.MainStatusShardCluster,
 	}
 	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
-	s.bobWaku = gethbridge.NewGethWakuV2Wrapper(wakuV2)
+	s.bobWaku = bridge.NewGethWakuV2Wrapper(wakuV2)
 
 	messengerLogger := s.logger.Named("bob-messenger")
 	s.bob = s.newMessenger(s.bobWaku, messengerLogger, &s.storeNodeAddress)
 }
 
 func (s *MessengerStoreNodeRequestSuite) tearDownBob() {
-	_ = gethbridge.GetGethWakuV2From(s.bobWaku).Stop()
+	_ = bridge.GetGethWakuV2From(s.bobWaku).Stop()
 	TearDownMessenger(&s.Suite, s.bob)
 }
 
-func (s *MessengerStoreNodeRequestSuite) newMessenger(shh types.Waku, logger *zap.Logger, mailserverAddress *multiaddr.Multiaddr) *Messenger {
+func (s *MessengerStoreNodeRequestSuite) newMessenger(shh wakutypes.Waku, logger *zap.Logger, mailserverAddress *multiaddr.Multiaddr) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -421,7 +423,7 @@ func (s *MessengerStoreNodeRequestSuite) TestSimultaneousCommunityInfoRequests()
 	community := s.createCommunity(s.owner)
 
 	storeNodeRequestsCount := 0
-	s.bob.storeNodeRequestsManager.onPerformingBatch = func(batch types.MailserverBatch) {
+	s.bob.storeNodeRequestsManager.onPerformingBatch = func(batch wakutypes.MailserverBatch) {
 		storeNodeRequestsCount++
 	}
 
@@ -791,7 +793,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 	s.waitForEnvelopes(storeNodeSubscription, descriptionsCount-1)
 
 	// Subscribe to received envelope
-	bobWakuV2 := gethbridge.GetGethWakuV2From(s.bobWaku)
+	bobWakuV2 := bridge.GetGethWakuV2From(s.bobWaku)
 
 	var receivedEnvelopes []*wakuV2common.ReceivedMessage
 	s.setupEnvelopesWatcher(bobWakuV2, &contentTopic, func(envelope *wakuV2common.ReceivedMessage) {
@@ -1093,7 +1095,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 			}
 			wakuCreationMutex.Lock()
 			wakuV2 := NewTestWakuV2(&s.Suite, cfg)
-			userWaku := gethbridge.NewGethWakuV2Wrapper(wakuV2)
+			userWaku := bridge.NewGethWakuV2Wrapper(wakuV2)
 			wakuCreationMutex.Unlock()
 
 			//
@@ -1244,12 +1246,12 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 	s.createBob()
 
 	s.logger.Debug("store node info", zap.String("peerID", s.wakuStoreNode.PeerID().String()))
-	s.logger.Debug("owner node info", zap.String("peerID", gethbridge.GetGethWakuV2From(s.ownerWaku).PeerID().String()))
-	s.logger.Debug("bob node info", zap.String("peerID", gethbridge.GetGethWakuV2From(s.bobWaku).PeerID().String()))
+	s.logger.Debug("owner node info", zap.String("peerID", bridge.GetGethWakuV2From(s.ownerWaku).PeerID().String()))
+	s.logger.Debug("bob node info", zap.String("peerID", bridge.GetGethWakuV2From(s.bobWaku).PeerID().String()))
 
 	// Connect to store node to force "online" status
 	{
-		WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() peer.IDSlice {
+		WaitForPeersConnected(&s.Suite, bridge.GetGethWakuV2From(s.bobWaku), func() peer.IDSlice {
 			err := s.bob.DialPeer(storeAddress)
 			s.Require().NoError(err)
 			return peer.IDSlice{storePeerID}
@@ -1262,7 +1264,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 
 	// bob goes offline
 	{
-		WaitForConnectionStatus(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() bool {
+		WaitForConnectionStatus(&s.Suite, bridge.GetGethWakuV2From(s.bobWaku), func() bool {
 			err := s.bob.DropPeer(storePeerID)
 			s.Require().NoError(err)
 			return false
@@ -1293,7 +1295,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 
 	// owner goes offline to prevent message resend and any other side effects
 	// to go offline we disconnect from both relay and store peers
-	WaitForConnectionStatus(&s.Suite, gethbridge.GetGethWakuV2From(s.ownerWaku), func() bool {
+	WaitForConnectionStatus(&s.Suite, bridge.GetGethWakuV2From(s.ownerWaku), func() bool {
 		err := s.owner.DropPeer(storePeerID)
 		s.Require().NoError(err)
 		return false
@@ -1306,7 +1308,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 		// We don't enable it earlier to control when we connect to the store node.
 		s.bob.config.codeControlFlags.AutoRequestHistoricMessages = true
 
-		WaitForPeersConnected(&s.Suite, gethbridge.GetGethWakuV2From(s.bobWaku), func() peer.IDSlice {
+		WaitForPeersConnected(&s.Suite, bridge.GetGethWakuV2From(s.bobWaku), func() peer.IDSlice {
 			err := s.bob.DialPeer(storeAddress)
 			s.Require().NoError(err)
 			return peer.IDSlice{storePeerID}

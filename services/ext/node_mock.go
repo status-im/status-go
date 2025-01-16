@@ -3,15 +3,15 @@ package ext
 import (
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type TestNodeWrapper struct {
-	waku types.Waku
+	waku wakutypes.Waku
 }
 
-func NewTestNodeWrapper(waku types.Waku) *TestNodeWrapper {
+func NewTestNodeWrapper(waku wakutypes.Waku) *TestNodeWrapper {
 	return &TestNodeWrapper{waku: waku}
 }
 
@@ -19,11 +19,11 @@ func (w *TestNodeWrapper) NewENSVerifier(_ *zap.Logger) enstypes.ENSVerifier {
 	panic("not implemented")
 }
 
-func (w *TestNodeWrapper) GetWaku(_ interface{}) (types.Waku, error) {
+func (w *TestNodeWrapper) GetWaku(_ interface{}) (wakutypes.Waku, error) {
 	return w.waku, nil
 }
 
-func (w *TestNodeWrapper) GetWakuV2(_ interface{}) (types.Waku, error) {
+func (w *TestNodeWrapper) GetWakuV2(_ interface{}) (wakutypes.Waku, error) {
 	return w.waku, nil
 }
 

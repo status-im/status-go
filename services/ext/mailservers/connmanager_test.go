@@ -15,6 +15,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/t/utils"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type fakePeerEvents struct {
@@ -84,10 +85,10 @@ func newFakeServer() *fakePeerEvents {
 }
 
 type fakeEnvelopeEvents struct {
-	input chan types.EnvelopeEvent
+	input chan wakutypes.EnvelopeEvent
 }
 
-func (f *fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- types.EnvelopeEvent) types.Subscription {
+func (f *fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- wakutypes.EnvelopeEvent) wakutypes.Subscription {
 	return event.NewSubscription(func(quit <-chan struct{}) error {
 		for {
 			select {
@@ -103,7 +104,7 @@ func (f *fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- types.Envelop
 
 func newFakeEnvelopesEvents() *fakeEnvelopeEvents {
 	return &fakeEnvelopeEvents{
-		input: make(chan types.EnvelopeEvent),
+		input: make(chan wakutypes.EnvelopeEvent),
 	}
 }
 
@@ -295,8 +296,8 @@ func setupTestConnectionAfterExpiry(t *testing.T, server *fakePeerEvents, whispe
 	}, time.Second, 100*time.Millisecond))
 	// Send event that history request for connected peer was sent.
 	select {
-	case whisperMock.input <- types.EnvelopeEvent{
-		Event: types.EventMailServerRequestSent, Peer: initial, Hash: hash}:
+	case whisperMock.input <- wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventMailServerRequestSent, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send a 'sent' event")
 	}
@@ -314,8 +315,8 @@ func TestConnectionChangedAfterExpiry(t *testing.T) {
 
 	// And eventually expired.
 	select {
-	case whisperMock.input <- types.EnvelopeEvent{
-		Event: types.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
+	case whisperMock.input <- wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send an 'expiry' event")
 	}
@@ -342,8 +343,8 @@ func TestConnectionChangedAfterSecondExpiry(t *testing.T) {
 
 	// First expired is sent. Nothing should happen.
 	select {
-	case whisperMock.input <- types.EnvelopeEvent{
-		Event: types.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
+	case whisperMock.input <- wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send an 'expiry' event")
 	}
@@ -362,8 +363,8 @@ func TestConnectionChangedAfterSecondExpiry(t *testing.T) {
 
 	// second expiry event
 	select {
-	case whisperMock.input <- types.EnvelopeEvent{
-		Event: types.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
+	case whisperMock.input <- wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send an 'expiry' event")
 	}

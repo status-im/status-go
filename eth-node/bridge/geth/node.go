@@ -12,8 +12,11 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	gethens "github.com/status-im/status-go/eth-node/bridge/geth/ens"
-	"github.com/status-im/status-go/eth-node/types"
+	gethnode "github.com/status-im/status-go/eth-node/node"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+
+	wakubridge "github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type gethNodeWrapper struct {
@@ -22,7 +25,7 @@ type gethNodeWrapper struct {
 	waku2 *wakuv2.Waku
 }
 
-func NewNodeBridge(stack *node.Node, waku1 *wakuv1.Waku, waku2 *wakuv2.Waku) types.Node {
+func NewNodeBridge(stack *node.Node, waku1 *wakuv1.Waku, waku2 *wakuv2.Waku) gethnode.Node {
 	return &gethNodeWrapper{stack: stack, waku1: waku1, waku2: waku2}
 }
 
@@ -42,20 +45,20 @@ func (w *gethNodeWrapper) SetWaku2(waku *wakuv2.Waku) {
 	w.waku2 = waku
 }
 
-func (w *gethNodeWrapper) GetWaku(ctx interface{}) (types.Waku, error) {
+func (w *gethNodeWrapper) GetWaku(ctx interface{}) (wakutypes.Waku, error) {
 	if w.waku1 == nil {
 		return nil, errors.New("waku service is not available")
 	}
 
-	return NewGethWakuWrapper(w.waku1), nil
+	return wakubridge.NewGethWakuWrapper(w.waku1), nil
 }
 
-func (w *gethNodeWrapper) GetWakuV2(ctx interface{}) (types.Waku, error) {
+func (w *gethNodeWrapper) GetWakuV2(ctx interface{}) (wakutypes.Waku, error) {
 	if w.waku2 == nil {
 		return nil, errors.New("waku service is not available")
 	}
 
-	return NewGethWakuV2Wrapper(w.waku2), nil
+	return wakubridge.NewGethWakuV2Wrapper(w.waku2), nil
 }
 
 func (w *gethNodeWrapper) AddPeer(url string) error {

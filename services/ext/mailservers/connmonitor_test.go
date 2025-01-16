@@ -12,6 +12,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/t/utils"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestUsedConnectionPersisted(t *testing.T) {
@@ -27,8 +28,8 @@ func TestUsedConnectionPersisted(t *testing.T) {
 
 	// Send a confirmation that we received history from one of the peers.
 	select {
-	case whisperMock.input <- types.EnvelopeEvent{
-		Event: types.EventMailServerRequestCompleted, Peer: types.EnodeID(nodes[0].ID())}:
+	case whisperMock.input <- wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventMailServerRequestCompleted, Peer: types.EnodeID(nodes[0].ID())}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send a 'completed' event")
 	}
@@ -56,8 +57,8 @@ func TestUsedConnectionPersisted(t *testing.T) {
 
 	// Use different peer, first will be marked as unused.
 	select {
-	case whisperMock.input <- types.EnvelopeEvent{
-		Event: types.EventMailServerRequestCompleted, Peer: types.EnodeID(nodes[1].ID())}:
+	case whisperMock.input <- wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventMailServerRequestCompleted, Peer: types.EnodeID(nodes[1].ID())}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send a 'completed' event")
 	}

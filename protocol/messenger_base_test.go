@@ -7,13 +7,14 @@ import (
 
 	"go.uber.org/zap"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/wakuv1"
+
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const DefaultProfileDisplayName = ""
@@ -24,7 +25,7 @@ func (s *MessengerBaseTestSuite) SetupTest() {
 	config := wakuv1.DefaultConfig
 	config.MinimumAcceptedPoW = 0
 	shh := wakuv1.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
+	s.shh = bridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
 	s.m = s.newMessenger()
@@ -51,11 +52,11 @@ type MessengerBaseTestSuite struct {
 	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single waku service should be shared.
-	shh    types.Waku
+	shh    wakutypes.Waku
 	logger *zap.Logger
 }
 
-func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, extraOptions []Option) (*Messenger, error) {
+func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, extraOptions []Option) (*Messenger, error) {
 	options := []Option{
 		WithAppSettings(settings.Settings{
 			DisplayName:               DefaultProfileDisplayName,

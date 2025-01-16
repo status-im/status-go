@@ -12,12 +12,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/appdatabase"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/waku/bridge"
 	"github.com/status-im/status-go/wakuv1"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -35,7 +35,7 @@ func TestInitProtocol(t *testing.T) {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
 
-	waku := gethbridge.NewGethWakuWrapper(wakuv1.New(nil, nil))
+	waku := bridge.NewGethWakuWrapper(wakuv1.New(nil, nil))
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 

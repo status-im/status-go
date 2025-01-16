@@ -46,6 +46,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type Publisher interface {
@@ -170,8 +172,8 @@ type HistoryArchiveDownloadTaskInfo struct {
 }
 
 type ArchiveFileService interface {
-	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*types.Message, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
-	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveTorrentFromMessages(communityID types.HexBytes, messages []*wakutypes.Message, topics []wakutypes.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
+	CreateHistoryArchiveTorrentFromDB(communityID types.HexBytes, topics []wakutypes.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) ([]string, error)
 	SaveMessageArchiveID(communityID types.HexBytes, hash string) error
 	GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error)
 	SetMessageArchiveIDImported(communityID types.HexBytes, hash string, imported bool) error
@@ -189,9 +191,9 @@ type ArchiveService interface {
 	Stop() error
 	IsReady() bool
 	GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error)
-	GetCommunityChatsTopics(communityID types.HexBytes) ([]types.TopicType, error)
+	GetCommunityChatsTopics(communityID types.HexBytes) ([]wakutypes.TopicType, error)
 	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
-	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []types.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
+	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []wakutypes.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
 	StartHistoryArchiveTasksInterval(community *Community, interval time.Duration)
 	StopHistoryArchiveTasksInterval(communityID types.HexBytes)
 	SeedHistoryArchiveTorrent(communityID types.HexBytes) error
@@ -4277,15 +4279,15 @@ func (m *Manager) GetOwnedCommunitiesChatIDs() (map[string]bool, error) {
 	return chatIDs, nil
 }
 
-func (m *Manager) StoreWakuMessage(message *types.Message) error {
+func (m *Manager) StoreWakuMessage(message *wakutypes.Message) error {
 	return m.persistence.SaveWakuMessage(message)
 }
 
-func (m *Manager) StoreWakuMessages(messages []*types.Message) error {
+func (m *Manager) StoreWakuMessages(messages []*wakutypes.Message) error {
 	return m.persistence.SaveWakuMessages(messages)
 }
 
-func (m *Manager) GetLatestWakuMessageTimestamp(topics []types.TopicType) (uint64, error) {
+func (m *Manager) GetLatestWakuMessageTimestamp(topics []wakutypes.TopicType) (uint64, error) {
 	return m.persistence.GetLatestWakuMessageTimestamp(topics)
 }
 

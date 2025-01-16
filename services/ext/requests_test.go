@@ -7,32 +7,33 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestRegisterSameRequests(t *testing.T) {
 	registry := NewRequestsRegistry(10 * time.Second)
-	topics := []types.TopicType{{1}}
+	topics := []wakutypes.TopicType{{1}}
 	require.NoError(t, registry.Register(types.Hash{1}, topics))
 	require.Error(t, registry.Register(types.Hash{2}, topics))
 }
 
 func TestRegisterSameRequestsWithoutDelay(t *testing.T) {
 	registry := NewRequestsRegistry(0)
-	topics := []types.TopicType{{1}}
+	topics := []wakutypes.TopicType{{1}}
 	require.NoError(t, registry.Register(types.Hash{1}, topics))
 	require.NoError(t, registry.Register(types.Hash{2}, topics))
 }
 
 func TestRegisterDifferentRequests(t *testing.T) {
 	registry := NewRequestsRegistry(10 * time.Second)
-	require.NoError(t, registry.Register(types.Hash{1}, []types.TopicType{{1}}))
-	require.NoError(t, registry.Register(types.Hash{2}, []types.TopicType{{2}}))
+	require.NoError(t, registry.Register(types.Hash{1}, []wakutypes.TopicType{{1}}))
+	require.NoError(t, registry.Register(types.Hash{2}, []wakutypes.TopicType{{2}}))
 }
 
 func TestUnregisterReplacedRequest(t *testing.T) {
 	registry := NewRequestsRegistry(0)
 	unreg := types.Hash{1}
-	topics := []types.TopicType{{1}}
+	topics := []wakutypes.TopicType{{1}}
 	require.NoError(t, registry.Register(unreg, topics))
 	replacement := types.Hash{2}
 	require.NoError(t, registry.Register(replacement, topics))

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerVerificationRequests(t *testing.T) { // nolint: deadcode,unused
@@ -762,7 +763,7 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 	s.Require().Equal(resp.Messages()[0].ContactVerificationState, common.ContactVerificationStateCanceled)
 }
 
-func (s *MessengerVerificationRequests) newMessenger(shh types.Waku) *Messenger {
+func (s *MessengerVerificationRequests) newMessenger(shh wakutypes.Waku) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)

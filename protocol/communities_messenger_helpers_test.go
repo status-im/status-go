@@ -31,6 +31,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type AccountManagerMock struct {
@@ -329,7 +331,7 @@ func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
 }
 
-func newTestCommunitiesMessenger(s *suite.Suite, waku types.Waku, config testCommunitiesMessengerConfig) *Messenger {
+func newTestCommunitiesMessenger(s *suite.Suite, waku wakutypes.Waku, config testCommunitiesMessengerConfig) *Messenger {
 	err := config.complete()
 	s.Require().NoError(err)
 

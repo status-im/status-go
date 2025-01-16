@@ -37,9 +37,9 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
@@ -510,7 +510,7 @@ func TestWakuV2Store(t *testing.T) {
 	w1PeersCh := make(chan peer.IDSlice, 100) // buffered not to block on the send side
 
 	// Start the first Waku node
-	w1, err := New(nil, "", config1, nil, nil, nil, nil, func(cs types.ConnStatus) {
+	w1, err := New(nil, "", config1, nil, nil, nil, nil, func(cs wakutypes.ConnStatus) {
 		w1PeersCh <- maps.Keys(cs.Peers)
 	})
 	require.NoError(t, err)
@@ -682,7 +682,7 @@ func TestLightpushRateLimit(t *testing.T) {
 	w0PeersCh := make(chan peer.IDSlice, 5) // buffered not to block on the send side
 
 	// Start the relayu node
-	w0, err := New(nil, "", config0, logger.Named("relayNode"), nil, nil, nil, func(cs types.ConnStatus) {
+	w0, err := New(nil, "", config0, logger.Named("relayNode"), nil, nil, nil, func(cs wakutypes.ConnStatus) {
 		w0PeersCh <- maps.Keys(cs.Peers)
 	})
 	require.NoError(t, err)
@@ -707,7 +707,7 @@ func TestLightpushRateLimit(t *testing.T) {
 	w1PeersCh := make(chan peer.IDSlice, 5) // buffered not to block on the send side
 
 	// Start the full node
-	w1, err := New(nil, "", config1, logger.Named("fullNode"), nil, nil, nil, func(cs types.ConnStatus) {
+	w1, err := New(nil, "", config1, logger.Named("fullNode"), nil, nil, nil, func(cs wakutypes.ConnStatus) {
 		w1PeersCh <- maps.Keys(cs.Peers)
 	})
 	require.NoError(t, err)
@@ -736,7 +736,7 @@ func TestLightpushRateLimit(t *testing.T) {
 	w2PeersCh := make(chan peer.IDSlice, 5) // buffered not to block on the send side
 
 	// Start the light node
-	w2, err := New(nil, "", config2, logger.Named("lightNode"), nil, nil, nil, func(cs types.ConnStatus) {
+	w2, err := New(nil, "", config2, logger.Named("lightNode"), nil, nil, nil, func(cs wakutypes.ConnStatus) {
 		w2PeersCh <- maps.Keys(cs.Peers)
 	})
 	require.NoError(t, err)

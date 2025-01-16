@@ -31,6 +31,8 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/server"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const (
@@ -51,7 +53,7 @@ type MessengerSuite struct {
 }
 
 type testNode struct {
-	shh types.Waku
+	shh wakutypes.Waku
 }
 
 func (n *testNode) NewENSVerifier(_ *zap.Logger) enstypes.ENSVerifier {
@@ -66,11 +68,11 @@ func (n *testNode) RemovePeer(_ string) error {
 	panic("not implemented")
 }
 
-func (n *testNode) GetWaku(_ interface{}) (types.Waku, error) {
+func (n *testNode) GetWaku(_ interface{}) (wakutypes.Waku, error) {
 	return n.shh, nil
 }
 
-func (n *testNode) GetWakuV2(_ interface{}) (types.Waku, error) {
+func (n *testNode) GetWakuV2(_ interface{}) (wakutypes.Waku, error) {
 	return nil, errors.New("No waku v2 support")
 }
 

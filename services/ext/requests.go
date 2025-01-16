@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const (
@@ -38,7 +39,7 @@ type RequestsRegistry struct {
 
 // Register request with given topics. If request with same topics was made in less then configured delay then error
 // will be returned.
-func (r *RequestsRegistry) Register(uid types.Hash, topics []types.TopicType) error {
+func (r *RequestsRegistry) Register(uid types.Hash, topics []wakutypes.TopicType) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	topicsHash := topicsToHash(topics)
@@ -89,7 +90,7 @@ func (r *RequestsRegistry) Clear() {
 }
 
 // topicsToHash returns non-cryptographic hash of the topics.
-func topicsToHash(topics []types.TopicType) types.Hash {
+func topicsToHash(topics []wakutypes.TopicType) types.Hash {
 	hash := fnv.New32()
 	for i := range topics {
 		_, _ = hash.Write(topics[i][:]) // never returns error per documentation

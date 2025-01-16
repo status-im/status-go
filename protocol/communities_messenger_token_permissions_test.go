@@ -20,7 +20,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -32,6 +31,9 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const testChainID1 = 1
@@ -139,9 +141,9 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 	bob   *Messenger
 	alice *Messenger
 
-	ownerWaku types.Waku
-	bobWaku   types.Waku
-	aliceWaku types.Waku
+	ownerWaku wakutypes.Waku
+	bobWaku   wakutypes.Waku
+	aliceWaku wakutypes.Waku
 
 	logger *zap.Logger
 
@@ -198,18 +200,18 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.bob)
 	TearDownMessenger(&s.Suite, s.alice)
 	if s.ownerWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.ownerWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.ownerWaku).Stop())
 	}
 	if s.bobWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.bobWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.bobWaku).Stop())
 	}
 	if s.aliceWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.aliceWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.aliceWaku).Stop())
 	}
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, name string, extraOptions []Option) *Messenger {
+func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku wakutypes.Waku, name string, extraOptions []Option) *Messenger {
 	communityManagerOptions := []communities.ManagerOption{
 		communities.WithAllowForcingCommunityMembersReevaluation(true),
 	}
@@ -2151,8 +2153,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	messageDate := time.UnixMilli(int64(message1.Timestamp))
 	startDate := messageDate.Add(-time.Minute)
 	endDate := messageDate.Add(time.Minute)
-	topic := types.BytesToTopic(transport.ToTopic(chat.ID))
-	topics := []types.TopicType{topic}
+	topic := wakutypes.BytesToTopic(transport.ToTopic(chat.ID))
+	topics := []wakutypes.TopicType{topic}
 
 	torrentConfig := params.TorrentConfig{
 		Enabled:    true,

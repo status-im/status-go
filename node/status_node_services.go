@@ -27,7 +27,7 @@ import (
 	"github.com/status-im/status-go/common"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
+	gethnode "github.com/status-im/status-go/eth-node/node"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -207,7 +207,7 @@ func (b *StatusNode) addPublicMethods(apis []gethrpc.API) {
 	}
 }
 
-func (b *StatusNode) nodeBridge() types.Node {
+func (b *StatusNode) nodeBridge() gethnode.Node {
 	return gethbridge.NewNodeBridge(b.gethNode, b.wakuSrvc, b.wakuV2Srvc)
 }
 

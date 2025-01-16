@@ -11,12 +11,14 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/signal"
+
+	"github.com/status-im/status-go/waku/bridge"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 func TestMessengerMessagesTrackingSuite(t *testing.T) {
@@ -77,11 +79,11 @@ func (i *EnvelopeEventsInterceptorMock) Enable() {
 type MessengerMessagesTrackingSuite struct {
 	suite.Suite
 
-	bobWaku        types.Waku
+	bobWaku        wakutypes.Waku
 	bobInterceptor *EnvelopeEventsInterceptorMock
 	bob            *Messenger
 
-	aliceWaku        types.Waku
+	aliceWaku        wakutypes.Waku
 	aliceInterceptor *EnvelopeEventsInterceptorMock
 	alice            *Messenger
 
@@ -106,20 +108,20 @@ func (s *MessengerMessagesTrackingSuite) TearDownTest() {
 
 	}
 	if s.bobWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.bobWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.bobWaku).Stop())
 	}
 
 	if s.alice != nil {
 		TearDownMessenger(&s.Suite, s.alice)
 	}
 	if s.aliceWaku != nil {
-		s.Require().NoError(gethbridge.GetGethWakuV2From(s.aliceWaku).Stop())
+		s.Require().NoError(bridge.GetGethWakuV2From(s.aliceWaku).Stop())
 	}
 
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerMessagesTrackingSuite) newMessenger(waku types.Waku, logger *zap.Logger) (*Messenger, *EnvelopeEventsInterceptorMock) {
+func (s *MessengerMessagesTrackingSuite) newMessenger(waku wakutypes.Waku, logger *zap.Logger) (*Messenger, *EnvelopeEventsInterceptorMock) {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 

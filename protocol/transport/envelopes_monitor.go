@@ -11,6 +11,8 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 // EnvelopeState in local tracker
@@ -42,14 +44,14 @@ type EnvelopeEventsHandler interface {
 }
 
 // NewEnvelopesMonitor returns a pointer to an instance of the EnvelopesMonitor.
-func NewEnvelopesMonitor(w types.Waku, config EnvelopesMonitorConfig) *EnvelopesMonitor {
+func NewEnvelopesMonitor(w wakutypes.Waku, config EnvelopesMonitorConfig) *EnvelopesMonitor {
 	logger := config.Logger
 
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
-	var api types.PublicWakuAPI
+	var api wakutypes.PublicWakuAPI
 	if w != nil {
 		api = w.PublicWakuAPI()
 	}
@@ -78,15 +80,15 @@ type monitoredEnvelope struct {
 	envelopeHashID  types.Hash
 	state           EnvelopeState
 	attempts        int
-	message         *types.NewMessage
+	message         *wakutypes.NewMessage
 	messageIDs      [][]byte
 	lastAttemptTime time.Time
 }
 
 // EnvelopesMonitor is responsible for monitoring waku envelopes state.
 type EnvelopesMonitor struct {
-	w           types.Waku
-	api         types.PublicWakuAPI
+	w           wakutypes.Waku
+	api         wakutypes.PublicWakuAPI
 	handler     EnvelopeEventsHandler
 	maxAttempts int
 
@@ -130,7 +132,7 @@ func (m *EnvelopesMonitor) Stop() {
 
 // Add hashes to a tracker.
 // Identifiers may be backed by multiple envelopes. It happens when message is split in segmentation layer.
-func (m *EnvelopesMonitor) Add(messageIDs [][]byte, envelopeHashes []types.Hash, messages []*types.NewMessage) error {
+func (m *EnvelopesMonitor) Add(messageIDs [][]byte, envelopeHashes []types.Hash, messages []*wakutypes.NewMessage) error {
 	if len(envelopeHashes) != len(messages) {
 		return errors.New("hashes don't match messages")
 	}
@@ -172,7 +174,7 @@ func (m *EnvelopesMonitor) GetState(hash types.Hash) EnvelopeState {
 
 // handleEnvelopeEvents processes waku envelope events
 func (m *EnvelopesMonitor) handleEnvelopeEvents() {
-	events := make(chan types.EnvelopeEvent, 100) // must be buffered to prevent blocking waku
+	events := make(chan wakutypes.EnvelopeEvent, 100) // must be buffered to prevent blocking waku
 	sub := m.w.SubscribeEnvelopeEvents(events)
 	defer func() {
 		sub.Unsubscribe()
@@ -189,19 +191,19 @@ func (m *EnvelopesMonitor) handleEnvelopeEvents() {
 
 // handleEvent based on type of the event either triggers
 // confirmation handler or removes hash from tracker
-func (m *EnvelopesMonitor) handleEvent(event types.EnvelopeEvent) {
-	handlers := map[types.EventType]func(types.EnvelopeEvent){
-		types.EventEnvelopeSent:      m.handleEventEnvelopeSent,
-		types.EventEnvelopeExpired:   m.handleEventEnvelopeExpired,
-		types.EventBatchAcknowledged: m.handleAcknowledgedBatch,
-		types.EventEnvelopeReceived:  m.handleEventEnvelopeReceived,
+func (m *EnvelopesMonitor) handleEvent(event wakutypes.EnvelopeEvent) {
+	handlers := map[wakutypes.EventType]func(wakutypes.EnvelopeEvent){
+		wakutypes.EventEnvelopeSent:      m.handleEventEnvelopeSent,
+		wakutypes.EventEnvelopeExpired:   m.handleEventEnvelopeExpired,
+		wakutypes.EventBatchAcknowledged: m.handleAcknowledgedBatch,
+		wakutypes.EventEnvelopeReceived:  m.handleEventEnvelopeReceived,
 	}
 	if handler, ok := handlers[event.Event]; ok {
 		handler(event)
 	}
 }
 
-func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
+func (m *EnvelopesMonitor) handleEventEnvelopeSent(event wakutypes.EnvelopeEvent) {
 	// Mailserver confirmations for WakuV2 are disabled
 	if (m.w == nil || m.w.Version() < 2) && m.awaitOnlyMailServerConfirmations {
 		if !m.isMailserver(event.Peer) {
@@ -241,7 +243,7 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 	}
 }
 
-func (m *EnvelopesMonitor) handleAcknowledgedBatch(event types.EnvelopeEvent) {
+func (m *EnvelopesMonitor) handleAcknowledgedBatch(event wakutypes.EnvelopeEvent) {
 
 	if m.awaitOnlyMailServerConfirmations && !m.isMailserver(event.Peer) {
 		return
@@ -255,7 +257,7 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event types.EnvelopeEvent) {
 		m.logger.Debug("batch is not found", zap.String("batch", event.Batch.String()))
 	}
 	m.logger.Debug("received a confirmation", zap.String("batch", event.Batch.String()), zap.String("peer", event.Peer.String()))
-	envelopeErrors, ok := event.Data.([]types.EnvelopeError)
+	envelopeErrors, ok := event.Data.([]wakutypes.EnvelopeError)
 	if event.Data != nil && !ok {
 		m.logger.Error("received unexpected data in the the confirmation event", zap.Any("data", event.Data))
 	}
@@ -267,7 +269,7 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event types.EnvelopeEvent) {
 			m.logger.Warn("envelope that was posted by us is discarded", zap.String("hash", envelopeError.Hash.String()), zap.String("peer", event.Peer.String()), zap.String("error", envelopeError.Description))
 			var err error
 			switch envelopeError.Code {
-			case types.EnvelopeTimeNotSynced:
+			case wakutypes.EnvelopeTimeNotSynced:
 				err = errors.New("envelope wasn't delivered due to time sync issues")
 			}
 			m.handleEnvelopeFailure(envelopeError.Hash, err)
@@ -289,7 +291,7 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event types.EnvelopeEvent) {
 	delete(m.batches, event.Batch)
 }
 
-func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event types.EnvelopeEvent) {
+func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event wakutypes.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.handleEnvelopeFailure(event.Hash, errors.New("envelope expired due to connectivity issues"))
@@ -382,7 +384,7 @@ func (m *EnvelopesMonitor) removeFromRetryQueue(envelopeID types.Hash) {
 	m.retryQueue = newRetryQueue
 }
 
-func (m *EnvelopesMonitor) handleEventEnvelopeReceived(event types.EnvelopeEvent) {
+func (m *EnvelopesMonitor) handleEventEnvelopeReceived(event wakutypes.EnvelopeEvent) {
 	if m.awaitOnlyMailServerConfirmations && !m.isMailserver(event.Peer) {
 		return
 	}

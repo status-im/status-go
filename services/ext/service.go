@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/db"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
+	gethnode "github.com/status-im/status-go/eth-node/node"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/version"
@@ -78,7 +79,7 @@ type Service struct {
 	identity        *ecdsa.PrivateKey
 	cancelMessenger chan struct{}
 	storage         db.TransactionalStorage
-	n               types.Node
+	n               gethnode.Node
 	rpcClient       *rpc.Client
 	config          params.NodeConfig
 	mailMonitor     *MailRequestMonitor
@@ -94,7 +95,7 @@ var _ node.Lifecycle = (*Service)(nil)
 
 func New(
 	config params.NodeConfig,
-	n types.Node,
+	n gethnode.Node,
 	rpcClient *rpc.Client,
 	ldb *leveldb.DB,
 	mailMonitor *MailRequestMonitor,

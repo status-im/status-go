@@ -19,6 +19,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/transport"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const (
@@ -59,7 +61,7 @@ type StoreNodeRequestManager struct {
 	// activeRequestsLock should be locked each time activeRequests is being accessed or changed.
 	activeRequestsLock sync.RWMutex
 
-	onPerformingBatch func(types.MailserverBatch)
+	onPerformingBatch func(wakutypes.MailserverBatch)
 }
 
 func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
@@ -313,7 +315,7 @@ type storeNodeRequest struct {
 
 	// request parameters
 	pubsubTopic      string
-	contentTopic     types.TopicType
+	contentTopic     wakutypes.TopicType
 	minimumDataClock uint64
 	config           StoreNodeRequestConfig
 
@@ -550,11 +552,11 @@ func (r *storeNodeRequest) routine() {
 	from, to := r.manager.messenger.calculateMailserverTimeBounds(oneMonthDuration)
 
 	_, err := r.manager.messenger.performStorenodeTask(func() (*MessengerResponse, error) {
-		batch := types.MailserverBatch{
+		batch := wakutypes.MailserverBatch{
 			From:        from,
 			To:          to,
 			PubsubTopic: r.pubsubTopic,
-			Topics:      []types.TopicType{r.contentTopic},
+			Topics:      []wakutypes.TopicType{r.contentTopic},
 		}
 		r.manager.logger.Info("perform store node request", zap.Any("batch", batch))
 		if r.manager.onPerformingBatch != nil {

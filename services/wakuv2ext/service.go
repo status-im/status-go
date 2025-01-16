@@ -4,18 +4,20 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/eth-node/types"
+	gethnode "github.com/status-im/status-go/eth-node/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ext"
+
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type Service struct {
 	*ext.Service
-	w types.Waku
+	w wakutypes.Waku
 }
 
-func New(config params.NodeConfig, n types.Node, rpcClient *rpc.Client, handler ext.EnvelopeEventsHandler, ldb *leveldb.DB) *Service {
+func New(config params.NodeConfig, n gethnode.Node, rpcClient *rpc.Client, handler ext.EnvelopeEventsHandler, ldb *leveldb.DB) *Service {
 	w, err := n.GetWakuV2(nil)
 	if err != nil {
 		panic(err)
@@ -32,7 +34,7 @@ func New(config params.NodeConfig, n types.Node, rpcClient *rpc.Client, handler 
 	}
 }
 
-func (s *Service) PublicWakuAPI() types.PublicWakuAPI {
+func (s *Service) PublicWakuAPI() wakutypes.PublicWakuAPI {
 	return s.w.PublicWakuAPI()
 }
 
