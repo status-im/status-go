@@ -37,17 +37,19 @@ class StatusBackend(RpcClient, SignalClient):
         else:
             self.docker_client = docker.from_env()
             retries = 5
+            ports_tried = []
             for _ in range(retries):
-                host_port = random.choice(option.status_backend_port_range)
                 try:
+                    host_port = random.choice(option.status_backend_port_range)
+                    ports_tried.append(host_port)
                     self.container = self._start_container(host_port, privileged)
                     url = f"http://127.0.0.1:{host_port}"
                     option.status_backend_port_range.remove(host_port)
                     break
                 except Exception:
-                    logging.info(f"Failed to stat container with port {host_port}")
+                    continue
             else:
-                raise RuntimeError("Failed to start container after multiple retries.")
+                raise RuntimeError(f"Failed to start container on ports: {ports_tried}")
 
         self.base_url = url
         self.api_url = f"{url}/statusgo"
