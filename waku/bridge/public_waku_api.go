@@ -7,7 +7,6 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/wakuv1"
-	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -45,20 +44,7 @@ func (w *GethPublicWakuAPIWrapper) DeleteKeyPair(ctx context.Context, key string
 // NewMessageFilter creates a new filter that can be used to poll for
 // (new) messages that satisfy the given criteria.
 func (w *GethPublicWakuAPIWrapper) NewMessageFilter(req wakutypes.Criteria) (string, error) {
-	topics := make([]wakuv1common.TopicType, len(req.Topics))
-	for index, tt := range req.Topics {
-		topics[index] = wakuv1common.TopicType(tt)
-	}
-
-	criteria := wakuv1.Criteria{
-		SymKeyID:     req.SymKeyID,
-		PrivateKeyID: req.PrivateKeyID,
-		Sig:          req.Sig,
-		MinPow:       req.MinPow,
-		Topics:       topics,
-		AllowP2P:     req.AllowP2P,
-	}
-	return w.api.NewMessageFilter(criteria)
+	return w.api.NewMessageFilter(req)
 }
 
 func (w *GethPublicWakuAPIWrapper) BloomFilter() []byte {

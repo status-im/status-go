@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/wakuv1/common"
+	"github.com/status-im/status-go/waku/types"
 )
 
 func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
@@ -41,9 +41,9 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	t1 := [4]byte{0xde, 0xea, 0xbe, 0xef}
 	t2 := [4]byte{0xca, 0xfe, 0xde, 0xca}
 
-	crit := Criteria{
+	crit := types.Criteria{
 		SymKeyID: keyID,
-		Topics:   []common.TopicType{common.TopicType(t1), common.TopicType(t2)},
+		Topics:   []types.TopicType{types.TopicType(t1), types.TopicType(t2)},
 	}
 
 	_, err = api.NewMessageFilter(crit)

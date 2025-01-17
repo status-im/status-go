@@ -309,19 +309,9 @@ func (api *PublicWakuAPI) Unsubscribe(id string) {
 	api.w.Unsubscribe(id) // nolint: errcheck
 }
 
-// Criteria holds various filter options for inbound messages.
-type Criteria struct {
-	SymKeyID     string             `json:"symKeyID"`
-	PrivateKeyID string             `json:"privateKeyID"`
-	Sig          []byte             `json:"sig"`
-	MinPow       float64            `json:"minPow"`
-	Topics       []common.TopicType `json:"topics"`
-	AllowP2P     bool               `json:"allowP2P"`
-}
-
 // Messages set up a subscription that fires events when messages arrive that match
 // the given set of criteria.
-func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Subscription, error) {
+func (api *PublicWakuAPI) Messages(ctx context.Context, crit types.Criteria) (*rpc.Subscription, error) {
 	var (
 		symKeyGiven = len(crit.SymKeyID) > 0
 		pubKeyGiven = len(crit.PrivateKeyID) > 0
@@ -500,7 +490,7 @@ func (api *PublicWakuAPI) DeleteMessageFilter(id string) (bool, error) {
 
 // NewMessageFilter creates a new filter that can be used to poll for
 // (new) messages that satisfy the given criteria.
-func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
+func (api *PublicWakuAPI) NewMessageFilter(req types.Criteria) (string, error) {
 	var (
 		src     *ecdsa.PublicKey
 		keySym  []byte

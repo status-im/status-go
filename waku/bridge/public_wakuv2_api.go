@@ -7,7 +7,6 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/wakuv2"
-	wakucommon "github.com/status-im/status-go/wakuv2/common"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -49,19 +48,7 @@ func (w *gethPublicWakuV2APIWrapper) BloomFilter() []byte {
 // NewMessageFilter creates a new filter that can be used to poll for
 // (new) messages that satisfy the given criteria.
 func (w *gethPublicWakuV2APIWrapper) NewMessageFilter(req wakutypes.Criteria) (string, error) {
-	topics := make([]wakucommon.TopicType, len(req.Topics))
-	for index, tt := range req.Topics {
-		topics[index] = wakucommon.TopicType(tt)
-	}
-
-	criteria := wakuv2.Criteria{
-		SymKeyID:      req.SymKeyID,
-		PrivateKeyID:  req.PrivateKeyID,
-		Sig:           req.Sig,
-		PubsubTopic:   req.PubsubTopic,
-		ContentTopics: topics,
-	}
-	return w.api.NewMessageFilter(criteria)
+	return w.api.NewMessageFilter(req)
 }
 
 // GetFilterMessages returns the messages that match the filter criteria and

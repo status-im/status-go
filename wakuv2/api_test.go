@@ -25,6 +25,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
@@ -46,9 +47,9 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	t1 := common.TopicType([4]byte{0xde, 0xea, 0xbe, 0xef})
 	t2 := common.TopicType([4]byte{0xca, 0xfe, 0xde, 0xca})
 
-	crit := Criteria{
-		SymKeyID:      keyID,
-		ContentTopics: []common.TopicType{t1, t2},
+	crit := types.Criteria{
+		SymKeyID: keyID,
+		Topics:   []types.TopicType{types.TopicType(t1), types.TopicType(t2)},
 	}
 
 	_, err = api.NewMessageFilter(crit)
@@ -59,7 +60,7 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	found := false
 	candidates := w.filters.GetWatchersByTopic(shard.DefaultShardPubsubTopic(), t1)
 	for _, f := range candidates {
-		if maps.Equal(f.ContentTopics, common.NewTopicSet(crit.ContentTopics)) {
+		if maps.Equal(f.ContentTopics, common.NewTopicSet([]common.TopicType{t1, t2})) {
 			found = true
 			break
 		}

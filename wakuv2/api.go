@@ -266,18 +266,9 @@ func (api *PublicWakuAPI) Unsubscribe(ctx context.Context, id string) {
 	api.w.Unsubscribe(ctx, id) // nolint: errcheck
 }
 
-// Criteria holds various filter options for inbound messages.
-type Criteria struct {
-	SymKeyID      string             `json:"symKeyID"`
-	PrivateKeyID  string             `json:"privateKeyID"`
-	Sig           []byte             `json:"sig"`
-	PubsubTopic   string             `json:"pubsubTopic"`
-	ContentTopics []common.TopicType `json:"topics"`
-}
-
 // Messages set up a subscription that fires events when messages arrive that match
 // the given set of criteria.
-func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Subscription, error) {
+func (api *PublicWakuAPI) Messages(ctx context.Context, crit types.Criteria) (*rpc.Subscription, error) {
 	var (
 		symKeyGiven = len(crit.SymKeyID) > 0
 		pubKeyGiven = len(crit.PrivateKeyID) > 0
@@ -305,8 +296,13 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 		}
 	}
 
+	contentTopics := make([]common.TopicType, len(crit.Topics))
+	for index, tt := range crit.Topics {
+		contentTopics[index] = common.TopicType(tt)
+	}
+
 	filter.PubsubTopic = crit.PubsubTopic
-	filter.ContentTopics = common.NewTopicSet(crit.ContentTopics)
+	filter.ContentTopics = common.NewTopicSet(contentTopics)
 
 	// listen for message that are encrypted with the given symmetric key
 	if symKeyGiven {
@@ -446,7 +442,7 @@ func (api *PublicWakuAPI) DeleteMessageFilter(id string) (bool, error) {
 
 // NewMessageFilter creates a new filter that can be used to poll for
 // (new) messages that satisfy the given criteria.
-func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
+func (api *PublicWakuAPI) NewMessageFilter(req types.Criteria) (string, error) {
 	var (
 		src     *ecdsa.PublicKey
 		keySym  []byte
@@ -484,12 +480,17 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 		}
 	}
 
+	topics := make([]common.TopicType, len(req.Topics))
+	for index, tt := range req.Topics {
+		topics[index] = common.TopicType(tt)
+	}
+
 	f := &common.Filter{
 		Src:           src,
 		KeySym:        keySym,
 		KeyAsym:       keyAsym,
 		PubsubTopic:   req.PubsubTopic,
-		ContentTopics: common.NewTopicSet(req.ContentTopics),
+		ContentTopics: common.NewTopicSet(topics),
 		Messages:      common.NewMemoryMessageStore(),
 	}
 
