@@ -91,17 +91,5 @@ func (w *gethPublicWakuV2APIWrapper) GetFilterMessages(id string) ([]*wakutypes.
 // Post posts a message on the network.
 // returns the hash of the message in case of success.
 func (w *gethPublicWakuV2APIWrapper) Post(ctx context.Context, req wakutypes.NewMessage) ([]byte, error) {
-	msg := wakuv2.NewMessage{
-		SymKeyID:     req.SymKeyID,
-		PublicKey:    req.PublicKey,
-		Sig:          req.SigID, // Sig is really a SigID
-		PubsubTopic:  req.PubsubTopic,
-		ContentTopic: wakucommon.TopicType(req.Topic),
-		Payload:      req.Payload,
-		Padding:      req.Padding,
-		TargetPeer:   req.TargetPeer,
-		Ephemeral:    req.Ephemeral,
-		Priority:     req.Priority,
-	}
-	return w.api.Post(ctx, msg)
+	return w.api.Post(ctx, req)
 }

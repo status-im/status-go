@@ -32,6 +32,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2/common"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -173,23 +174,9 @@ func (api *PublicWakuAPI) BloomFilter() []byte {
 	return nil
 }
 
-// NewMessage represents a new waku message that is posted through the RPC.
-type NewMessage struct {
-	SymKeyID     string           `json:"symKeyID"`
-	PublicKey    []byte           `json:"pubKey"`
-	Sig          string           `json:"sig"`
-	PubsubTopic  string           `json:"pubsubTopic"`
-	ContentTopic common.TopicType `json:"topic"`
-	Payload      []byte           `json:"payload"`
-	Padding      []byte           `json:"padding"`
-	TargetPeer   string           `json:"targetPeer"`
-	Ephemeral    bool             `json:"ephemeral"`
-	Priority     *int             `json:"priority"`
-}
-
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
-func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
+func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) (hexutil.Bytes, error) {
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
@@ -204,19 +191,21 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 	var keyInfo *payload.KeyInfo = new(payload.KeyInfo)
 
 	// Set key that is used to sign the message
-	if len(req.Sig) > 0 {
-		privKey, err := api.w.GetPrivateKey(req.Sig)
+	if len(req.SigID) > 0 {
+		privKey, err := api.w.GetPrivateKey(req.SigID)
 		if err != nil {
 			return nil, err
 		}
 		keyInfo.PrivKey = privKey
 	}
 
+	contentTopic := common.TopicType(req.Topic)
+
 	// Set symmetric key that is used to encrypt the message
 	if symKeyGiven {
 		keyInfo.Kind = payload.Symmetric
 
-		if req.ContentTopic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
+		if contentTopic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
 			return nil, ErrNoTopics
 		}
 		if keyInfo.SymKey, err = api.w.GetSymKey(req.SymKeyID); err != nil {
@@ -252,7 +241,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 	wakuMsg := &pb.WakuMessage{
 		Payload:      payload,
 		Version:      &version,
-		ContentTopic: req.ContentTopic.ContentTopic(),
+		ContentTopic: contentTopic.ContentTopic(),
 		Timestamp:    proto.Int64(api.w.timestamp()),
 		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
 		Ephemeral:    &req.Ephemeral,

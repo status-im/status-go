@@ -29,6 +29,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv1/common"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -209,24 +210,9 @@ func (api *PublicWakuAPI) CancelLightClient(ctx context.Context) bool {
 	return !api.w.LightClientMode()
 }
 
-// NewMessage represents a new waku message that is posted through the RPC.
-type NewMessage struct {
-	SymKeyID   string           `json:"symKeyID"`
-	PublicKey  []byte           `json:"pubKey"`
-	Sig        string           `json:"sig"`
-	TTL        uint32           `json:"ttl"`
-	Topic      common.TopicType `json:"topic"`
-	Payload    []byte           `json:"payload"`
-	Padding    []byte           `json:"padding"`
-	PowTime    uint32           `json:"powTime"`
-	PowTarget  float64          `json:"powTarget"`
-	TargetPeer string           `json:"targetPeer"`
-	Ephemeral  bool             `json:"ephemeral"`
-}
-
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
-func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
+func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) (hexutil.Bytes, error) {
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
@@ -244,12 +230,12 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Padding:  req.Padding,
 		WorkTime: req.PowTime,
 		PoW:      req.PowTarget,
-		Topic:    req.Topic,
+		Topic:    common.TopicType(req.Topic),
 	}
 
 	// Set key that is used to sign the message
-	if len(req.Sig) > 0 {
-		if params.Src, err = api.w.GetPrivateKey(req.Sig); err != nil {
+	if len(req.SigID) > 0 {
+		if params.Src, err = api.w.GetPrivateKey(req.SigID); err != nil {
 			return nil, err
 		}
 	}
