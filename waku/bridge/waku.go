@@ -43,7 +43,7 @@ func GetGethWakuFrom(m wakutypes.Waku) *wakuv1.Waku {
 }
 
 func (w *GethWakuWrapper) PublicWakuAPI() wakutypes.PublicWakuAPI {
-	return NewGethPublicWakuAPIWrapper(wakuv1.NewPublicWakuAPI(w.waku))
+	return wakuv1.NewPublicWakuAPI(w.waku)
 }
 
 func (w *GethWakuWrapper) Version() uint {

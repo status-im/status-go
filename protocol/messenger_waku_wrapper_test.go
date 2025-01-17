@@ -13,24 +13,24 @@ import (
 type testWakuWrapper struct {
 	*bridge.GethWakuWrapper
 
-	publicWakuAPIWrapper *testPublicWakuAPIWrapper
+	api *testPublicWakuAPI
 }
 
 func newTestWaku(w *wakuv1.Waku) wakutypes.Waku {
 	wrapper := bridge.NewGethWakuWrapper(w)
 	return &testWakuWrapper{
-		GethWakuWrapper:      wrapper.(*bridge.GethWakuWrapper),
-		publicWakuAPIWrapper: newTestPublicWakuAPI(wakuv1.NewPublicWakuAPI(w)).(*testPublicWakuAPIWrapper),
+		GethWakuWrapper: wrapper.(*bridge.GethWakuWrapper),
+		api:             newTestPublicWakuAPI(wakuv1.NewPublicWakuAPI(w)),
 	}
 }
 
 func (tw *testWakuWrapper) PublicWakuAPI() wakutypes.PublicWakuAPI {
-	return tw.publicWakuAPIWrapper
+	return tw.api
 }
 
 func (tw *testWakuWrapper) SubscribePostEvents() chan *PostMessageSubscription {
 	subscription := make(chan *PostMessageSubscription, 100)
-	tw.publicWakuAPIWrapper.postSubscriptions = append(tw.publicWakuAPIWrapper.postSubscriptions, subscription)
+	tw.api.postSubscriptions = append(tw.api.postSubscriptions, subscription)
 	return subscription
 }
 
@@ -39,21 +39,20 @@ type PostMessageSubscription struct {
 	msg *wakutypes.NewMessage
 }
 
-type testPublicWakuAPIWrapper struct {
-	*bridge.GethPublicWakuAPIWrapper
+type testPublicWakuAPI struct {
+	*wakuv1.PublicWakuAPI
 
 	postSubscriptions []chan *PostMessageSubscription
 }
 
-func newTestPublicWakuAPI(api *wakuv1.PublicWakuAPI) wakutypes.PublicWakuAPI {
-	wrapper := bridge.NewGethPublicWakuAPIWrapper(api)
-	return &testPublicWakuAPIWrapper{
-		GethPublicWakuAPIWrapper: wrapper.(*bridge.GethPublicWakuAPIWrapper),
+func newTestPublicWakuAPI(api *wakuv1.PublicWakuAPI) *testPublicWakuAPI {
+	return &testPublicWakuAPI{
+		PublicWakuAPI: api,
 	}
 }
 
-func (tp *testPublicWakuAPIWrapper) Post(ctx context.Context, req wakutypes.NewMessage) ([]byte, error) {
-	id, err := tp.GethPublicWakuAPIWrapper.Post(ctx, req)
+func (tp *testPublicWakuAPI) Post(ctx context.Context, req wakutypes.NewMessage) ([]byte, error) {
+	id, err := tp.PublicWakuAPI.Post(ctx, req)
 	if err != nil {
 		return nil, err
 	}

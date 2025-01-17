@@ -29,6 +29,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
+
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv1/common"
 
@@ -57,6 +59,8 @@ type PublicWakuAPI struct {
 	mu       sync.Mutex
 	lastUsed map[string]time.Time // keeps track when a filter was polled for the last time.
 }
+
+var _ types.PublicWakuAPI = (*PublicWakuAPI)(nil)
 
 // NewPublicWakuAPI create a new RPC waku service.
 func NewPublicWakuAPI(w *Waku) *PublicWakuAPI {
@@ -122,7 +126,7 @@ func (api *PublicWakuAPI) NewKeyPair(ctx context.Context) (string, error) {
 }
 
 // AddPrivateKey imports the given private key.
-func (api *PublicWakuAPI) AddPrivateKey(ctx context.Context, privateKey hexutil.Bytes) (string, error) {
+func (api *PublicWakuAPI) AddPrivateKey(ctx context.Context, privateKey ethtypes.HexBytes) (string, error) {
 	key, err := crypto.ToECDSA(privateKey)
 	if err != nil {
 		return "", err
@@ -212,7 +216,7 @@ func (api *PublicWakuAPI) CancelLightClient(ctx context.Context) bool {
 
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
-func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) (hexutil.Bytes, error) {
+func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
