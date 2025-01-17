@@ -54,27 +54,7 @@ func (w *GethPublicWakuAPIWrapper) BloomFilter() []byte {
 // GetFilterMessages returns the messages that match the filter criteria and
 // are received between the last poll and now.
 func (w *GethPublicWakuAPIWrapper) GetFilterMessages(id string) ([]*wakutypes.Message, error) {
-	msgs, err := w.api.GetFilterMessages(id)
-	if err != nil {
-		return nil, err
-	}
-
-	wrappedMsgs := make([]*wakutypes.Message, len(msgs))
-	for index, msg := range msgs {
-		wrappedMsgs[index] = &wakutypes.Message{
-			Sig:       msg.Sig,
-			TTL:       msg.TTL,
-			Timestamp: msg.Timestamp,
-			Topic:     wakutypes.TopicType(msg.Topic),
-			Payload:   msg.Payload,
-			Padding:   msg.Padding,
-			PoW:       msg.PoW,
-			Hash:      msg.Hash,
-			Dst:       msg.Dst,
-			P2P:       msg.P2P,
-		}
-	}
-	return wrappedMsgs, nil
+	return w.api.GetFilterMessages(id)
 }
 
 // Post posts a message on the network.

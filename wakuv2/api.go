@@ -361,27 +361,15 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types.Criteria) (*r
 	return rpcSub, nil
 }
 
-// Message is the RPC representation of a waku message.
-type Message struct {
-	Sig          []byte           `json:"sig,omitempty"`
-	Timestamp    uint32           `json:"timestamp"`
-	PubsubTopic  string           `json:"pubsubTopic"`
-	ContentTopic common.TopicType `json:"topic"`
-	Payload      []byte           `json:"payload"`
-	Padding      []byte           `json:"padding"`
-	Hash         []byte           `json:"hash"`
-	Dst          []byte           `json:"recipientPublicKey,omitempty"`
-}
-
 // ToWakuMessage converts an internal message into an API version.
-func ToWakuMessage(message *common.ReceivedMessage) *Message {
-	msg := Message{
-		Payload:      message.Data,
-		Padding:      message.Padding,
-		Timestamp:    message.Sent,
-		Hash:         message.Hash().Bytes(),
-		PubsubTopic:  message.PubsubTopic,
-		ContentTopic: message.ContentTopic,
+func ToWakuMessage(message *common.ReceivedMessage) *types.Message {
+	msg := types.Message{
+		Payload:     message.Data,
+		Padding:     message.Padding,
+		Timestamp:   message.Sent,
+		Hash:        message.Hash().Bytes(),
+		PubsubTopic: message.PubsubTopic,
+		Topic:       types.TopicType(message.ContentTopic),
 	}
 
 	if message.Dst != nil {
@@ -402,8 +390,8 @@ func ToWakuMessage(message *common.ReceivedMessage) *Message {
 }
 
 // toMessage converts a set of messages to its RPC representation.
-func toMessage(messages []*common.ReceivedMessage) []*Message {
-	msgs := make([]*Message, len(messages))
+func toMessage(messages []*common.ReceivedMessage) []*types.Message {
+	msgs := make([]*types.Message, len(messages))
 	for i, msg := range messages {
 		msgs[i] = ToWakuMessage(msg)
 	}
@@ -412,7 +400,7 @@ func toMessage(messages []*common.ReceivedMessage) []*Message {
 
 // GetFilterMessages returns the messages that match the filter criteria and
 // are received between the last poll and now.
-func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*Message, error) {
+func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*types.Message, error) {
 	api.mu.Lock()
 	f := api.w.GetFilter(id)
 	if f == nil {
@@ -423,7 +411,7 @@ func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*Message, error) {
 	api.mu.Unlock()
 
 	receivedMessages := f.Retrieve()
-	messages := make([]*Message, 0, len(receivedMessages))
+	messages := make([]*types.Message, 0, len(receivedMessages))
 	for _, msg := range receivedMessages {
 		messages = append(messages, ToWakuMessage(msg))
 	}

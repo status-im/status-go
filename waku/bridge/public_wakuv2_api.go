@@ -54,25 +54,7 @@ func (w *gethPublicWakuV2APIWrapper) NewMessageFilter(req wakutypes.Criteria) (s
 // GetFilterMessages returns the messages that match the filter criteria and
 // are received between the last poll and now.
 func (w *gethPublicWakuV2APIWrapper) GetFilterMessages(id string) ([]*wakutypes.Message, error) {
-	msgs, err := w.api.GetFilterMessages(id)
-	if err != nil {
-		return nil, err
-	}
-
-	wrappedMsgs := make([]*wakutypes.Message, len(msgs))
-	for index, msg := range msgs {
-		wrappedMsgs[index] = &wakutypes.Message{
-			Sig:         msg.Sig,
-			Timestamp:   msg.Timestamp,
-			PubsubTopic: msg.PubsubTopic,
-			Topic:       wakutypes.TopicType(msg.ContentTopic),
-			Payload:     msg.Payload,
-			Padding:     msg.Padding,
-			Hash:        msg.Hash,
-			Dst:         msg.Dst,
-		}
-	}
-	return wrappedMsgs, nil
+	return w.api.GetFilterMessages(id)
 }
 
 // Post posts a message on the network.
