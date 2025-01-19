@@ -390,10 +390,6 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 		nodeConfig.ShhextConfig.VerifyENSContractAddress = *request.VerifyENSContractAddress
 	}
 
-	if request.NetworkID != nil {
-		nodeConfig.NetworkID = *request.NetworkID
-	}
-
 	nodeConfig.TorrentConfig = params.TorrentConfig{
 		Enabled:    false,
 		Port:       0,

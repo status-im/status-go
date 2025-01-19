@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/centralizedmetrics"
 	centralizedmetricscommon "github.com/status-im/status-go/centralizedmetrics/common"
+	d_common "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -579,6 +580,100 @@ func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
 	return b.LoggedIn(request.KeyUID, err)
 }
 
+// This is a workaround to make user be able to login again, the root cause is where the node config migration
+// failed caused by adding new columns to the node config table, it's been fixed in PR: https://github.com/status-im/status-go/pull/6248.
+// Details for the issue: it prevent user from login, it happens when old mobile user ignore upgrade the app to the version which introduced the node config migration
+// and choose to upgrade a higher version instead, after upgrading, user first attempt to login will fail because the node config migration will fail.
+// and second attempt to login will cause an empty node config saved in the db.
+func (b *GethStatusBackend) workaroundToFixBadMigration(request *requests.Login) (err error) {
+	if !d_common.IsMobilePlatform() { // this issue only happens on mobile platform
+		return nil
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	var (
+		currentConf     *params.NodeConfig
+		defaultNodeConf *params.NodeConfig
+	)
+	currentConf, err = nodecfg.GetNodeConfigFromDB(b.appDB)
+	if err != nil {
+		return err
+	}
+
+	// check if we saved a empty node config because of node config migration failed
+	if currentConf.NetworkID == 0 &&
+		currentConf.KeyStoreDir == "" &&
+		currentConf.DataDir == "" &&
+		currentConf.NodeKey == "" {
+		// check if exist old node config
+		oldNodeConf := &params.NodeConfig{}
+		err = b.appDB.QueryRow("SELECT node_config FROM settings WHERE synthetic_id = 'id'").Scan(&sqlite.JSONBlob{Data: oldNodeConf})
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+		if err == sql.ErrNoRows {
+			return errors.New("failed to migrate node config as there's no data in settings")
+		}
+
+		// the createAccount contains all the fields that are needed to create the default node config
+		createAccount := b.convertLoginRequestToAccountRequest(request)
+		defaultNodeConf, err = DefaultNodeConfig(oldNodeConf.ShhextConfig.InstallationID, createAccount)
+		if err != nil {
+			return err
+		}
+
+		b.overridePartialWithOldNodeConfig(defaultNodeConf, oldNodeConf)
+		var tx *sql.Tx
+		tx, err = b.appDB.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+		err = nodecfg.SaveConfigWithTx(tx, defaultNodeConf)
+	}
+
+	return nil
+}
+
+func (b *GethStatusBackend) overridePartialWithOldNodeConfig(conf *params.NodeConfig, oldNodeConf *params.NodeConfig) {
+	// rootDataDir should be set by InitializeApplication or UpdateRootDataDir already
+	conf.RootDataDir = b.rootDataDir
+	conf.LogEnabled = oldNodeConf.LogEnabled
+	conf.LogFile = oldNodeConf.LogFile
+	conf.LogDir = oldNodeConf.LogDir
+	conf.LogLevel = oldNodeConf.LogLevel
+	conf.DataDir = oldNodeConf.DataDir
+	conf.KeyStoreDir = oldNodeConf.KeyStoreDir
+	conf.NodeKey = oldNodeConf.NodeKey
+	conf.RegisterTopics = oldNodeConf.RegisterTopics
+	conf.RequireTopics = oldNodeConf.RequireTopics
+}
+
+func (b *GethStatusBackend) convertLoginRequestToAccountRequest(loginRequest *requests.Login) *requests.CreateAccount {
+	createAccount := &requests.CreateAccount{}
+	createAccount.WalletSecretsConfig = loginRequest.WalletSecretsConfig
+	createAccount.StatusProxyEnabled = loginRequest.StatusProxyEnabled
+	createAccount.WakuV2Nameserver = &loginRequest.WakuV2Nameserver
+	createAccount.WakuV2LightClient = loginRequest.WakuV2LightClient
+	createAccount.WakuV2EnableMissingMessageVerification = loginRequest.WakuV2EnableMissingMessageVerification
+	createAccount.WakuV2EnableStoreConfirmationForMessagesSent = loginRequest.WakuV2EnableStoreConfirmationForMessagesSent
+	createAccount.TelemetryServerURL = loginRequest.TelemetryServerURL
+	createAccount.VerifyTransactionURL = loginRequest.VerifyTransactionURL
+	createAccount.VerifyENSURL = loginRequest.VerifyENSURL
+	createAccount.VerifyTransactionChainID = loginRequest.VerifyTransactionChainID
+	createAccount.VerifyENSContractAddress = loginRequest.VerifyENSContractAddress
+	return createAccount
+}
+
 func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	if err := request.Validate(); err != nil {
 		return err
@@ -619,6 +714,11 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	err := b.ensureDBsOpened(acc, request.Password)
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
+	}
+
+	//relate PR: https://github.com/status-im/status-go/pull/6248
+	if err := b.workaroundToFixBadMigration(request); err != nil {
+		return errors.Wrap(err, "failed to workaround bad migration")
 	}
 
 	defaultCfg := &params.NodeConfig{
