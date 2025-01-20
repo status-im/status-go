@@ -28,10 +28,11 @@ who wish to engage in the process.
 proposal PR.
 - For any policy PR to be eligible for merging, it:
   - MUST address all feedback provided during the review process.
-  - MUST be approved by all team leads (of Status Desktop and Mobile).
+  - MUST be approved by all team leads (of Status Desktop, Mobile and Waku Chat).
   - MUST be approved by all members of the @status-im/status-go-guild
   GitHub team.
-  - MUST receive a minimum of six approvals from CCs.
+  - MUST receive a minimum of six approvals, regardless of the number
+  of team leads or members of the @status-im/status-go-guild GitHub team.
 
 # Policy Overrides
 
@@ -45,7 +46,7 @@ referenceable form (such as a forum post, or GitHub comment or issue),
 and MUST include:
   - The specific policy being overridden,
   - The rationale for taking this action,
-  - The potential risks and impacts of the override, AND
+  - The potential risks and impacts of the **override**, AND
   - Steps taken to minimise those risks.
 - Before executing the override of any policy, the override:
   - MUST be approved in writing by at least one team lead from the
