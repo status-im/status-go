@@ -1568,6 +1568,13 @@ func (o *Community) setPrivateKey(pk *ecdsa.PrivateKey) {
 	}
 }
 
+func (o *Community) UniversalChatID() string {
+	// Using Member updates channelID as chatID to act as a universal content-topic for all chats in the community as explained here https://forum.vac.dev/t/status-communities-review-and-proposed-usage-of-waku-content-topics/335
+	// This is to match filter criteria of community with the content-topic usage.
+	// This specific topic is chosen as existing users before the change are already subscribed to this and will not get affected by it.
+	return o.MemberUpdateChannelID()
+}
+
 func (o *Community) SetResendAccountsClock(clock uint64) {
 	o.config.CommunityDescription.ResendAccountsClock = clock
 }

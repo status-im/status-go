@@ -685,7 +685,7 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 
 	hashes := make([][]byte, 0, len(newMessages))
 	for _, newMessage := range newMessages {
-		hash, err := s.transport.SendPublic(ctx, newMessage, rawMessage.LocalChatID)
+		hash, err := s.transport.SendPublic(ctx, newMessage, rawMessage.ContentTopic)
 		if err != nil {
 			return nil, nil, err
 		}

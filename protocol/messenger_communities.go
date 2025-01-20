@@ -2717,7 +2717,12 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 	publicFiltersToInit := make([]transport.FiltersToInitialize, 0, len(defaultFilters)+len(community.Chats()))
 
 	publicFiltersToInit = append(publicFiltersToInit, defaultFilters...)
-
+	for _, filter := range defaultFilters {
+		_, err := m.transport.RemoveFilterByChatID(filter.ChatID)
+		if err != nil {
+			return err
+		}
+	}
 	for chatID := range community.Chats() {
 		communityChatID := community.IDString() + chatID
 		_, err := m.transport.RemoveFilterByChatID(communityChatID)
@@ -3953,6 +3958,8 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			for _, filter := range filters {
 				topics = append(topics, filter.ContentTopic)
 			}
+
+			filters = append(filters, m.transport.FilterByChatID(c.UniversalChatID()))
 
 			// First we need to know the timestamp of the latest waku message
 			// we've received for this community, so we can request messages we've

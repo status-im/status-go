@@ -4279,6 +4279,20 @@ func (m *Manager) GetOwnedCommunitiesChatIDs() (map[string]bool, error) {
 	return chatIDs, nil
 }
 
+func (m *Manager) GetOwnedCommunitiesUniversalChatIDs() (map[string]bool, error) {
+	ownedCommunities, err := m.Controlled()
+	if err != nil {
+		return nil, err
+	}
+	chatIDs := make(map[string]bool)
+	for _, c := range ownedCommunities {
+		if c.Joined() {
+			chatIDs[c.UniversalChatID()] = true
+		}
+	}
+	return chatIDs, nil
+}
+
 func (m *Manager) StoreWakuMessage(message *wakutypes.Message) error {
 	return m.persistence.SaveWakuMessage(message)
 }

@@ -80,6 +80,7 @@ type RawMessage struct {
 	Ephemeral             bool
 	BeforeDispatch        func(*RawMessage) error
 	HashRatchetGroupID    []byte
+	ContentTopic          string
 	PubsubTopic           string
 	ResendType            ResendType
 	ResendMethod          ResendMethod
