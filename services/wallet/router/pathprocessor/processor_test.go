@@ -364,7 +364,9 @@ func TestPathProcessors(t *testing.T) {
 				assert.Equal(t, expResult.expected, result)
 
 				if tt.input.TestEstimationMap != nil {
-					estimatedGas, err := processor.EstimateGas(tt.input)
+					inputData, err := processor.PackTxInputData(tt.input)
+					assert.NoError(t, err)
+					estimatedGas, err := processor.EstimateGas(tt.input, inputData)
 					assert.NoError(t, err)
 					assert.Greater(t, estimatedGas, uint64(0))
 
@@ -372,12 +374,16 @@ func TestPathProcessors(t *testing.T) {
 					input.TestEstimationMap = map[string]requests.Estimation{
 						"randomName": {Value: 10000},
 					}
-					estimatedGas, err = processor.EstimateGas(input)
+					inputData, err = processor.PackTxInputData(tt.input)
+					assert.NoError(t, err)
+					estimatedGas, err = processor.EstimateGas(input, inputData)
 					assert.Error(t, err)
 					assert.Equal(t, ErrNoEstimationFound, err)
 					assert.Equal(t, uint64(0), estimatedGas)
 				} else {
-					estimatedGas, err := processor.EstimateGas(tt.input)
+					inputData, err := processor.PackTxInputData(tt.input)
+					assert.NoError(t, err)
+					estimatedGas, err := processor.EstimateGas(tt.input, inputData)
 					assert.Error(t, err)
 					assert.Equal(t, ErrNoEstimationFound, err)
 					assert.Equal(t, uint64(0), estimatedGas)

@@ -54,6 +54,9 @@ func (s *TransferProcessor) CalculateFees(params ProcessorInputParams) (*big.Int
 }
 
 func (s *TransferProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+	if params.TestsMode {
+		return []byte{}, nil
+	}
 	if params.FromToken.IsNative() {
 		return []byte{}, nil
 	} else {
@@ -68,7 +71,7 @@ func (s *TransferProcessor) PackTxInputData(params ProcessorInputParams) ([]byte
 	}
 }
 
-func (s *TransferProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *TransferProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
@@ -80,11 +83,6 @@ func (s *TransferProcessor) EstimateGas(params ProcessorInputParams) (uint64, er
 
 	estimation := uint64(0)
 	var err error
-
-	input, err := s.PackTxInputData(params)
-	if err != nil {
-		return 0, createTransferErrorResponse(err)
-	}
 
 	if params.FromToken.IsNative() {
 		estimation, err = s.transactor.EstimateGas(params.FromChain, params.FromAddr, params.ToAddr, params.AmountIn, input)

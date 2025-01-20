@@ -96,7 +96,7 @@ func (s *CommunityMintTokensProcessor) PackTxInputData(params ProcessorInputPara
 	}
 }
 
-func (s *CommunityMintTokensProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *CommunityMintTokensProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		return 0, ErrNoEstimationFound
 	}
@@ -104,11 +104,6 @@ func (s *CommunityMintTokensProcessor) EstimateGas(params ProcessorInputParams) 
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {
 		return 0, createENSReleaseErrorResponse(err)
-	}
-
-	input, err := s.PackTxInputData(params)
-	if err != nil {
-		return 0, createCommunityMintTokensErrorResponse(err)
 	}
 
 	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)

@@ -72,14 +72,9 @@ func (s *CommunityDeployCollectiblesProcessor) PackTxInputData(params ProcessorI
 	return append(common.FromHex(collectibles.CollectiblesBin), data...), nil
 }
 
-func (s *CommunityDeployCollectiblesProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *CommunityDeployCollectiblesProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		return 0, ErrNoEstimationFound
-	}
-
-	input, err := s.PackTxInputData(params)
-	if err != nil {
-		return 0, createCommunityDeployCollectiblesErrorResponse(err)
 	}
 
 	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)

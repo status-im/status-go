@@ -65,14 +65,9 @@ func (s *CommunityRemoteBurnProcessor) PackTxInputData(params ProcessorInputPara
 	return collectiblesABI.Pack("remoteBurn", tokenIds)
 }
 
-func (s *CommunityRemoteBurnProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *CommunityRemoteBurnProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		return 0, ErrNoEstimationFound
-	}
-
-	input, err := s.PackTxInputData(params)
-	if err != nil {
-		return 0, createCommunityRemoteBurnErrorResponse(err)
 	}
 
 	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)

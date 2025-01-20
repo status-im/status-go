@@ -63,7 +63,7 @@ func (s *ENSReleaseProcessor) PackTxInputData(params ProcessorInputParams) ([]by
 	return registrarABI.Pack("release", walletCommon.UsernameToLabel(name))
 }
 
-func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
@@ -74,11 +74,6 @@ func (s *ENSReleaseProcessor) EstimateGas(params ProcessorInputParams) (uint64, 
 	}
 
 	contractAddress, err := s.GetContractAddress(params)
-	if err != nil {
-		return 0, createENSReleaseErrorResponse(err)
-	}
-
-	input, err := s.PackTxInputData(params)
 	if err != nil {
 		return 0, createENSReleaseErrorResponse(err)
 	}

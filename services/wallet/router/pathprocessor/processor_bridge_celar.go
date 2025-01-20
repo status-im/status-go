@@ -236,7 +236,7 @@ func (c *CelerBridgeProcessor) PackTxInputData(params ProcessorInputParams) ([]b
 	}
 }
 
-func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
@@ -247,11 +247,6 @@ func (s *CelerBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 	}
 
 	value := new(big.Int)
-
-	input, err := s.PackTxInputData(params)
-	if err != nil {
-		return 0, createBridgeCellerErrorResponse(err)
-	}
 
 	contractAddress, err := s.GetContractAddress(params)
 	if err != nil {

@@ -128,17 +128,12 @@ func (s *CommunityDeployOwnerTokenProcessor) PackTxInputData(params ProcessorInp
 	return deployerABI.Pack("deploy", ownerTokenConfig, masterTokenConfig, communitySignature, common.FromHex(params.CommunityParams.SignerPubKey))
 }
 
-func (s *CommunityDeployOwnerTokenProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *CommunityDeployOwnerTokenProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		return 0, ErrNoEstimationFound
 	}
 
 	contractAddress, err := s.GetContractAddress(params)
-	if err != nil {
-		return 0, createCommunityDeployOwnerTokenErrorResponse(err)
-	}
-
-	input, err := s.PackTxInputData(params)
 	if err != nil {
 		return 0, createCommunityDeployOwnerTokenErrorResponse(err)
 	}

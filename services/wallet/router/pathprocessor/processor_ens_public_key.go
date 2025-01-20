@@ -63,7 +63,7 @@ func (s *ENSPublicKeyProcessor) PackTxInputData(params ProcessorInputParams) ([]
 	return resolverABI.Pack("setPubkey", walletCommon.NameHash(params.Username), x, y)
 }
 
-func (s *ENSPublicKeyProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *ENSPublicKeyProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
@@ -74,11 +74,6 @@ func (s *ENSPublicKeyProcessor) EstimateGas(params ProcessorInputParams) (uint64
 	}
 
 	contractAddress, err := s.GetContractAddress(params)
-	if err != nil {
-		return 0, createENSPublicKeyErrorResponse(err)
-	}
-
-	input, err := s.PackTxInputData(params)
 	if err != nil {
 		return 0, createENSPublicKeyErrorResponse(err)
 	}

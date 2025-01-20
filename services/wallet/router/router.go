@@ -887,7 +887,12 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		return nil, err
 	}
 
-	gasLimit, err := pathProcessor.EstimateGas(processorInputParams)
+	txPackedData, err := pathProcessor.PackTxInputData(processorInputParams)
+	if err != nil {
+		return nil, err
+	}
+
+	gasLimit, err := pathProcessor.EstimateGas(processorInputParams, txPackedData)
 	if err != nil {
 		return nil, err
 	}
@@ -901,12 +906,19 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		return nil, err
 	}
 
-	var approvalGasLimit uint64
+	var (
+		approvalGasLimit   uint64
+		approvalPackedData []byte
+	)
 	if approvalRequired {
 		if processorInputParams.TestsMode {
 			approvalGasLimit = processorInputParams.TestApprovalGasEstimation
 		} else {
-			approvalGasLimit, err = r.estimateGasForApproval(processorInputParams, &contractAddress)
+			approvalPackedData, err = walletCommon.PackApprovalInputData(processorInputParams.AmountIn, &contractAddress)
+			if err != nil {
+				return nil, err
+			}
+			approvalGasLimit, err = r.estimateGasForApproval(processorInputParams, approvalPackedData)
 			if err != nil {
 				return nil, err
 			}
@@ -931,6 +943,7 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 
 		// set params that we don't want to be recalculated with every new block creation
 		UsedContractAddress: &contractAddress,
+		TxPackedData:        txPackedData,
 		TxGasAmount:         gasLimit,
 		TxBonderFees:        (*hexutil.Big)(bonderFees),
 		TxTokenFees:         (*hexutil.Big)(tokenFees),
@@ -938,6 +951,7 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		ApprovalRequired:        approvalRequired,
 		ApprovalAmountRequired:  (*hexutil.Big)(approvalAmountRequired),
 		ApprovalContractAddress: &contractAddress,
+		ApprovalPackedData:      approvalPackedData,
 		ApprovalGasAmount:       approvalGasLimit,
 
 		SubtractFees: amountOption.subtractFees,

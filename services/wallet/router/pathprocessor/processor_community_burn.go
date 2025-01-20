@@ -179,14 +179,9 @@ func (s *CommunityBurnProcessor) PackTxInputData(params ProcessorInputParams) ([
 	}
 }
 
-func (s *CommunityBurnProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *CommunityBurnProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		return 0, ErrNoEstimationFound
-	}
-
-	input, err := s.PackTxInputData(params)
-	if err != nil {
-		return 0, createCommunityBurnErrorResponse(err)
 	}
 
 	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)

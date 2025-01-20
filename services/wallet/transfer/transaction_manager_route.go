@@ -76,11 +76,6 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 		lastUsedNonce = nonce
 	}
 
-	data, err := walletCommon.PackApprovalInputData(path.AmountIn.ToInt(), path.ApprovalContractAddress)
-	if err != nil {
-		return nil, err
-	}
-
 	addrTo := types.Address(path.FromToken.Address)
 	approavalSendArgs := &wallettypes.SendTxArgs{
 		Version: wallettypes.SendTxArgsVersion1,
@@ -89,7 +84,7 @@ func buildApprovalTxForPath(transactor transactions.TransactorIface, path *route
 		From:                 types.Address(addressFrom),
 		To:                   &addrTo,
 		Value:                (*hexutil.Big)(big.NewInt(0)),
-		Data:                 data,
+		Data:                 path.ApprovalPackedData,
 		Nonce:                path.ApprovalTxNonce,
 		Gas:                  (*hexutil.Uint64)(&path.ApprovalGasAmount),
 		MaxFeePerGas:         path.ApprovalMaxFeesPerGas,
@@ -124,28 +119,13 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 		lastUsedNonce = nonce
 	}
 
-	// update processor input params for the current path
-	processorInputParams.FromChain = path.FromChain
-	processorInputParams.ToChain = path.ToChain
-	processorInputParams.FromToken = path.FromToken
-	processorInputParams.ToToken = path.ToToken
-	processorInputParams.AmountIn = path.AmountIn.ToInt()
-	processorInputParams.AmountOut = path.AmountOut.ToInt()
-	// update porcessor input community related params
-	processorInputParams.CommunityParams = path.GetCommunityParams()
-
-	data, err := pathProcessors[path.ProcessorName].PackTxInputData(*processorInputParams)
-	if err != nil {
-		return nil, err
-	}
-
 	sendArgs := &wallettypes.SendTxArgs{
 		Version: wallettypes.SendTxArgsVersion1,
 
 		// tx fields
 		From:                 types.Address(processorInputParams.FromAddr),
 		Value:                path.AmountIn,
-		Data:                 data,
+		Data:                 path.TxPackedData,
 		Nonce:                path.TxNonce,
 		Gas:                  (*hexutil.Uint64)(&path.TxGasAmount),
 		MaxFeePerGas:         path.TxMaxFeesPerGas,

@@ -62,14 +62,9 @@ func (s *CommunitySetSignerPubKeyProcessor) PackTxInputData(params ProcessorInpu
 	return ownerTokenABI.Pack("setSignerPublicKey", common.FromHex(params.CommunityParams.SignerPubKey))
 }
 
-func (s *CommunitySetSignerPubKeyProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *CommunitySetSignerPubKeyProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		return 0, ErrNoEstimationFound
-	}
-
-	input, err := s.PackTxInputData(params)
-	if err != nil {
-		return 0, createCommunitySetSignerPubKeyErrorResponse(err)
 	}
 
 	ethClient, err := s.contractMaker.RPCClient.EthClient(params.FromChain.ChainID)

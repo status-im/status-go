@@ -29,6 +29,7 @@ type Path struct {
 	CurrentBaseFee                  *hexutil.Big        // Current network base fee (in ETH WEI)
 	UsedContractAddress             *common.Address     // Address of the contract that will be used for the transaction
 
+	TxPackedData    []byte          // Packed data for the transaction
 	TxNonce         *hexutil.Uint64 // Nonce for the transaction
 	TxMaxFeesPerGas *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
 	TxBaseFee       *hexutil.Big    // Base fee for the transaction (in ETH WEI)
@@ -44,6 +45,7 @@ type Path struct {
 	ApprovalRequired        bool            // Is approval required for the transaction
 	ApprovalAmountRequired  *hexutil.Big    // Amount required for the approval transaction
 	ApprovalContractAddress *common.Address // Address of the contract that will be used for the approval transaction, the same as UsedContractAddress. We can remove this field and use UsedContractAddress instead.
+	ApprovalPackedData      []byte          // Packed data for the approval transaction
 	ApprovalTxNonce         *hexutil.Uint64 // Nonce for the transaction
 	ApprovalMaxFeesPerGas   *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
 	ApprovalBaseFee         *hexutil.Big    // Base fee for the approval transaction (in ETH WEI)
@@ -149,6 +151,11 @@ func (p *Path) Copy() *Path {
 		newPath.CurrentBaseFee = (*hexutil.Big)(big.NewInt(0).Set(p.CurrentBaseFee.ToInt()))
 	}
 
+	if p.TxPackedData != nil {
+		newPath.TxPackedData = make([]byte, len(p.TxPackedData))
+		copy(newPath.TxPackedData, p.TxPackedData)
+	}
+
 	if p.TxNonce != nil {
 		txNonce := *p.TxNonce
 		newPath.TxNonce = &txNonce
@@ -194,6 +201,11 @@ func (p *Path) Copy() *Path {
 	if p.ApprovalContractAddress != nil {
 		addr := common.HexToAddress(p.ApprovalContractAddress.Hex())
 		newPath.ApprovalContractAddress = &addr
+	}
+
+	if p.ApprovalPackedData != nil {
+		newPath.ApprovalPackedData = make([]byte, len(p.ApprovalPackedData))
+		copy(newPath.ApprovalPackedData, p.ApprovalPackedData)
 	}
 
 	if p.ApprovalTxNonce != nil {

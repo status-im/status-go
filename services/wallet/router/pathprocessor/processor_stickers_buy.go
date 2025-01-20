@@ -88,7 +88,7 @@ func (s *StickersBuyProcessor) PackTxInputData(params ProcessorInputParams) ([]b
 	return sntABI.Pack("approveAndCall", stickerMarketAddress, packInfo.Price, extraData)
 }
 
-func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
@@ -99,11 +99,6 @@ func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams) (uint64,
 	}
 
 	contractAddress, err := s.GetContractAddress(params)
-	if err != nil {
-		return 0, createStickersBuyErrorResponse(err)
-	}
-
-	input, err := s.PackTxInputData(params)
 	if err != nil {
 		return 0, createStickersBuyErrorResponse(err)
 	}

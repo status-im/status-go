@@ -26,7 +26,7 @@ type PathProcessor interface {
 	// PackTxInputData packs tx for sending
 	PackTxInputData(params ProcessorInputParams) ([]byte, error)
 	// EstimateGas estimates the gas
-	EstimateGas(params ProcessorInputParams) (uint64, error)
+	EstimateGas(params ProcessorInputParams, input []byte) (uint64, error)
 	// CalculateAmountOut calculates the amount out
 	CalculateAmountOut(params ProcessorInputParams) (*big.Int, error)
 	// Send sends the tx, returns the hash and the used nonce (lastUsedNonce is -1 if it's the first tx)
