@@ -22,6 +22,7 @@ const (
 	SttSymbol  = "STT"
 	UsdcSymbol = "USDC"
 	HopSymbol  = "HOP"
+	DaiSymbol  = "DAI"
 )
 
 type ChainID uint64

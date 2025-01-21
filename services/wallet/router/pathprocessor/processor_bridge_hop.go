@@ -154,7 +154,12 @@ func (h *HopBridgeProcessor) AvailableFor(params ProcessorInputParams) (bool, er
 	if params.FromChain.ChainID == params.ToChain.ChainID {
 		return false, ErrFromAndToChainsMustBeDifferent
 	}
-	// We chcek if the contract is available on the network for the token
+	// We check if the contract is available on the receiver network for the token
+	if _, _, err := hop.GetContractAddress(params.ToChain.ChainID, params.FromToken.Symbol); err != nil {
+		return false, ErrToChainNotSupported
+	}
+
+	// We check if the contract is available on the sender network for the token
 	_, err := h.GetContractAddress(params)
 	// toToken is not nil only if the send type is Swap
 	return err == nil, err

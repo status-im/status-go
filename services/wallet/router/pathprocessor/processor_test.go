@@ -45,6 +45,22 @@ var optimism = params.Network{
 	RelatedChainID:         walletCommon.OptimismMainnet,
 }
 
+var base = params.Network{
+	ChainID:                walletCommon.BaseMainnet,
+	ChainName:              "Base",
+	BlockExplorerURL:       "https://basescan.org",
+	IconURL:                "network/Network=Base",
+	ChainColor:             "#0052FF",
+	ShortName:              "base",
+	NativeCurrencyName:     "Ether",
+	NativeCurrencySymbol:   "ETH",
+	NativeCurrencyDecimals: 18,
+	IsTest:                 false,
+	Layer:                  2,
+	Enabled:                true,
+	RelatedChainID:         walletCommon.BaseMainnet,
+}
+
 var testEstimationMap = map[string]requests.Estimation{
 	pathProcessorCommon.ProcessorTransferName:     {Value: uint64(1000)},
 	pathProcessorCommon.ProcessorBridgeHopName:    {Value: uint64(5000)},
@@ -265,6 +281,32 @@ func TestPathProcessors(t *testing.T) {
 				pathProcessorCommon.ProcessorSwapParaswapName: {
 					expected:      false,
 					expectedError: ErrFromAndToChainsMustBeSame,
+				},
+			},
+		},
+		{
+			name: "Different Chains Set - FormToken Set - No ToToken - Token Not Supported On ToChain",
+			input: ProcessorInputParams{
+				TestsMode: true,
+				FromChain: &optimism,
+				ToChain:   &base,
+				FromToken: &token.Token{
+					Symbol: walletCommon.DaiSymbol,
+				},
+				TestEstimationMap: testEstimationMap,
+			},
+			expected: map[string]expectedResult{
+				pathProcessorCommon.ProcessorTransferName: {
+					expected:      false,
+					expectedError: nil,
+				},
+				pathProcessorCommon.ProcessorBridgeHopName: {
+					expected:      false,
+					expectedError: ErrToChainNotSupported,
+				},
+				pathProcessorCommon.ProcessorSwapParaswapName: {
+					expected:      false,
+					expectedError: ErrToAndFromTokensMustBeSet,
 				},
 			},
 		},
