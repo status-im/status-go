@@ -103,3 +103,9 @@ func StringToTopic(s string) (t TopicType) {
 func TopicTypeToByteArray(t TopicType) []byte {
 	return t[:4]
 }
+
+// Converts a topic to its 23/WAKU2-TOPICS representation
+func (t TopicType) ContentTopic() string {
+	enc := hexutil.Encode(t[:])
+	return "/waku/1/" + enc + "/rfc26"
+}

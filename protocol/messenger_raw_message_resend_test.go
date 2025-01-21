@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -77,10 +76,10 @@ func (s *MessengerRawMessageResendTest) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.aliceMessenger)
 	TearDownMessenger(&s.Suite, s.bobMessenger)
 	if s.aliceWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.aliceWaku).Stop())
+		s.Require().NoError(s.aliceWaku.Stop())
 	}
 	if s.bobWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.bobWaku).Stop())
+		s.Require().NoError(s.bobWaku.Stop())
 	}
 	_ = s.logger.Sync()
 }

@@ -17,8 +17,8 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/postgres"
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/wakuv1"
 	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 )
 
@@ -126,5 +126,5 @@ func newTestEnvelope(topic []byte) (wakutypes.Envelope, error) {
 	if err != nil {
 		return nil, err
 	}
-	return bridge.NewWakuEnvelope(envelope), nil
+	return wakuv1.NewWakuEnvelope(envelope), nil
 }

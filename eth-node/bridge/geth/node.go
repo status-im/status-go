@@ -15,7 +15,6 @@ import (
 	gethnode "github.com/status-im/status-go/eth-node/node"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 
-	wakubridge "github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -50,7 +49,7 @@ func (w *gethNodeWrapper) GetWaku(ctx interface{}) (wakutypes.Waku, error) {
 		return nil, errors.New("waku service is not available")
 	}
 
-	return wakubridge.NewGethWakuWrapper(w.waku1), nil
+	return w.waku1, nil
 }
 
 func (w *gethNodeWrapper) GetWakuV2(ctx interface{}) (wakutypes.Waku, error) {
@@ -58,7 +57,7 @@ func (w *gethNodeWrapper) GetWakuV2(ctx interface{}) (wakutypes.Waku, error) {
 		return nil, errors.New("waku service is not available")
 	}
 
-	return wakubridge.NewGethWakuV2Wrapper(w.waku2), nil
+	return w.waku2, nil
 }
 
 func (w *gethNodeWrapper) AddPeer(url string) error {

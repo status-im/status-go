@@ -79,7 +79,7 @@ func (s *WakuTestSuite) TestHandleP2PMessageCode() {
 	go func() { handleError(s.T(), w2.Stop()) }()
 
 	envelopeEvents := make(chan common.EnvelopeEvent, 10)
-	sub := w1.SubscribeEnvelopeEvents(envelopeEvents)
+	sub := w1.subscribeEnvelopeEvents(envelopeEvents)
 	defer sub.Unsubscribe()
 
 	params, err := generateMessageParams()
@@ -207,7 +207,7 @@ func (s *WakuTestSuite) TestMessagesResponseWithError() {
 	}
 
 	events := make(chan common.EnvelopeEvent, 2)
-	sub := w1.SubscribeEnvelopeEvents(events)
+	sub := w1.subscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
 
 	w2.addEnvelope(&failed)
@@ -241,7 +241,7 @@ func (s *WakuTestSuite) TestEventsWithoutConfirmation() {
 	w1 := New(conf, nil)
 	w2 := New(conf, nil)
 	events := make(chan common.EnvelopeEvent, 2)
-	sub := w1.SubscribeEnvelopeEvents(events)
+	sub := w1.subscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
 
 	rw1, rw2 := p2p.MsgPipe()
@@ -390,7 +390,7 @@ func (s *WakuTestSuite) TestMailserverCompletionEvent() {
 	peer2.SetPeerTrusted(true)
 
 	events := make(chan common.EnvelopeEvent)
-	sub := w1.SubscribeEnvelopeEvents(events)
+	sub := w1.subscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
 
 	envelopes := []*common.Envelope{{Data: []byte{1}}, {Data: []byte{2}}}

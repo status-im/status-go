@@ -32,7 +32,6 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -200,13 +199,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 	TearDownMessenger(&s.Suite, s.bob)
 	TearDownMessenger(&s.Suite, s.alice)
 	if s.ownerWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.ownerWaku).Stop())
+		s.Require().NoError(s.ownerWaku.Stop())
 	}
 	if s.bobWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.bobWaku).Stop())
+		s.Require().NoError(s.bobWaku.Stop())
 	}
 	if s.aliceWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.aliceWaku).Stop())
+		s.Require().NoError(s.aliceWaku.Stop())
 	}
 	_ = s.logger.Sync()
 }
@@ -494,7 +493,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	}
 	wakuStoreNode := NewTestWakuV2(&s.Suite, cfg)
 
-	storeNodeListenAddresses := wakuStoreNode.ListenAddresses()
+	storeNodeListenAddresses, err := wakuStoreNode.ListenAddresses()
+	s.Require().NoError(err)
 	s.Require().LessOrEqual(1, len(storeNodeListenAddresses))
 
 	storeNodeAddress := storeNodeListenAddresses[0]

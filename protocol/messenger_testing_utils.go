@@ -17,8 +17,6 @@ import (
 
 	"github.com/status-im/status-go/protocol/identity"
 
-	waku2 "github.com/status-im/status-go/wakuv2"
-
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/protocol/common"
@@ -207,8 +205,9 @@ func WaitOnSignaledCommunityFound(m *Messenger, action func(), condition func(co
 	}
 }
 
-func WaitForConnectionStatus(s *suite.Suite, waku *waku2.Waku, action func() bool) {
-	subscription := waku.SubscribeToConnStatusChanges()
+func WaitForConnectionStatus(s *suite.Suite, waku wakutypes.Waku, action func() bool) {
+	subscription, err := waku.SubscribeToConnStatusChanges()
+	s.Require().NoError(err)
 	defer subscription.Unsubscribe()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -239,8 +238,9 @@ func hasAllPeers(m map[peer.ID]wakutypes.WakuV2Peer, checkSlice peer.IDSlice) bo
 	return true
 }
 
-func WaitForPeersConnected(s *suite.Suite, waku *waku2.Waku, action func() peer.IDSlice) {
-	subscription := waku.SubscribeToConnStatusChanges()
+func WaitForPeersConnected(s *suite.Suite, waku wakutypes.Waku, action func() peer.IDSlice) {
+	subscription, err := waku.SubscribeToConnStatusChanges()
+	s.Require().NoError(err)
 	defer subscription.Unsubscribe()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

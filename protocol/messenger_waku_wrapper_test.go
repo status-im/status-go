@@ -5,22 +5,20 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv1"
 )
 
 type testWakuWrapper struct {
-	*bridge.GethWakuWrapper
+	wakutypes.Waku
 
 	api *testPublicWakuAPI
 }
 
 func newTestWaku(w *wakuv1.Waku) wakutypes.Waku {
-	wrapper := bridge.NewGethWakuWrapper(w)
 	return &testWakuWrapper{
-		GethWakuWrapper: wrapper.(*bridge.GethWakuWrapper),
-		api:             newTestPublicWakuAPI(wakuv1.NewPublicWakuAPI(w)),
+		Waku: w,
+		api:  newTestPublicWakuAPI(wakuv1.NewPublicWakuAPI(w)),
 	}
 }
 

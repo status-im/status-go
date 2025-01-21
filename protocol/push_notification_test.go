@@ -21,7 +21,6 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/wakuv1"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -51,7 +50,7 @@ func (s *MessengerPushNotificationSuite) SetupTest() {
 	config := wakuv1.DefaultConfig
 	config.MinimumAcceptedPoW = 0
 	shh := wakuv1.New(&config, s.logger)
-	s.shh = bridge.NewGethWakuWrapper(shh)
+	s.shh = shh
 	s.Require().NoError(shh.Start())
 
 	s.m = s.newMessenger(s.shh)

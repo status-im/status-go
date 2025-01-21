@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -98,13 +97,13 @@ func (s *MessengerCommunitiesShardingSuite) TearDownTest() {
 		TearDownMessenger(&s.Suite, s.owner)
 	}
 	if s.ownerWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.ownerWaku).Stop())
+		s.Require().NoError(s.ownerWaku.Stop())
 	}
 	if s.alice != nil {
 		TearDownMessenger(&s.Suite, s.alice)
 	}
 	if s.aliceWaku != nil {
-		s.Require().NoError(bridge.GetGethWakuV2From(s.aliceWaku).Stop())
+		s.Require().NoError(s.aliceWaku.Stop())
 	}
 	_ = s.logger.Sync()
 }

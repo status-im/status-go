@@ -6,7 +6,6 @@ import (
 
 	transport2 "github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv1"
 
@@ -74,7 +73,7 @@ func (s *MessageSenderSuite) SetupTest() {
 	s.Require().NoError(shh.Start())
 
 	whisperTransport, err := transport2.NewTransport(
-		bridge.NewGethWakuWrapper(shh),
+		shh,
 		identity,
 		database,
 		"waku_keys",

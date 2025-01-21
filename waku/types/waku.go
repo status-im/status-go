@@ -106,6 +106,9 @@ type WakuKeyManager interface {
 type Waku interface {
 	PublicWakuAPI() PublicWakuAPI
 
+	Start() error
+	Stop() error
+
 	// Waku protocol version
 	Version() uint
 

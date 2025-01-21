@@ -37,6 +37,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
+	"google.golang.org/protobuf/proto"
 
 	"go.uber.org/zap"
 
@@ -75,6 +76,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
+	ethtypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/wakuv2/common"
@@ -199,6 +201,8 @@ type Waku struct {
 
 	defaultShardInfo protocol.RelayShards
 }
+
+var _ types.Waku = (*Waku)(nil)
 
 func (w *Waku) SetStatusTelemetryClient(client ITelemetryClient) {
 	w.statusTelemetryClient = client
@@ -371,12 +375,12 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logge
 	return waku, nil
 }
 
-func (w *Waku) SubscribeToConnStatusChanges() *types.ConnStatusSubscription {
+func (w *Waku) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription, error) {
 	w.connStatusMu.Lock()
 	defer w.connStatusMu.Unlock()
 	subscription := types.NewConnStatusSubscription()
 	w.connStatusSubscriptions[subscription.ID] = subscription
-	return subscription
+	return subscription, nil
 }
 
 func (w *Waku) GetNodeENRString() (string, error) {
@@ -743,8 +747,20 @@ func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
 
 // SubscribeEnvelopeEvents subscribes to envelopes feed.
 // In order to prevent blocking waku producers events must be amply buffered.
-func (w *Waku) SubscribeEnvelopeEvents(events chan<- common.EnvelopeEvent) event.Subscription {
+func (w *Waku) subscribeEnvelopeEvents(events chan<- common.EnvelopeEvent) event.Subscription {
 	return w.envelopeFeed.Subscribe(events)
+}
+
+func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) types.Subscription {
+	events := make(chan common.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
+	go func() {
+		defer gocommon.LogOnPanic()
+		for e := range events {
+			eventsProxy <- *NewWakuV2EnvelopeEventWrapper(&e)
+		}
+	}()
+
+	return NewGethSubscriptionWrapper(w.subscribeEnvelopeEvents(events))
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
@@ -985,7 +1001,7 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
-func (w *Waku) Subscribe(f *common.Filter) (string, error) {
+func (w *Waku) subscribe(f *common.Filter) (string, error) {
 	f.PubsubTopic = w.GetPubsubTopic(f.PubsubTopic)
 	id, err := w.filters.Install(f)
 	if err != nil {
@@ -1015,8 +1031,12 @@ func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 }
 
 // GetFilter returns the filter by id.
-func (w *Waku) GetFilter(id string) *common.Filter {
+func (w *Waku) getFilter(id string) *common.Filter {
 	return w.filters.Get(id)
+}
+
+func (w *Waku) GetFilter(id string) types.Filter {
+	return w.getFilter(id)
 }
 
 // Unsubscribe removes an installed message handler.
@@ -1577,11 +1597,11 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 
 // GetEnvelope retrieves an envelope from the message queue by its hash.
 // It returns nil if the envelope can not be found.
-func (w *Waku) GetEnvelope(hash gethcommon.Hash) *common.ReceivedMessage {
+func (w *Waku) GetEnvelope(hash ethtypes.Hash) *common.ReceivedMessage {
 	w.poolMu.RLock()
 	defer w.poolMu.RUnlock()
 
-	envelope := w.envelopeCache.Get(hash)
+	envelope := w.envelopeCache.Get(gethcommon.Hash(hash))
 	if envelope == nil {
 		return nil
 	}
@@ -1624,8 +1644,8 @@ func (w *Waku) RelayPeersByTopic(topic string) (*types.PeerList, error) {
 	}, nil
 }
 
-func (w *Waku) ListenAddresses() []multiaddr.Multiaddr {
-	return w.node.ListenAddresses()
+func (w *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
+	return w.node.ListenAddresses(), nil
 }
 
 func (w *Waku) ENR() (*enode.Node, error) {
@@ -2018,4 +2038,124 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 
 func (w *Waku) LegacyStoreNode() legacy_store.Store {
 	return w.node.LegacyStore()
+}
+
+// GetCurrentTime returns current time.
+func (w *Waku) GetCurrentTime() time.Time {
+	return w.CurrentTime()
+}
+
+func (w *Waku) GetActiveStorenode() peer.ID {
+	return w.StorenodeCycle.GetActiveStorenode()
+}
+
+func (w *Waku) OnStorenodeChanged() <-chan peer.ID {
+	return w.StorenodeCycle.StorenodeChangedEmitter.Subscribe()
+}
+
+func (w *Waku) OnStorenodeNotWorking() <-chan struct{} {
+	return w.StorenodeCycle.StorenodeNotWorkingEmitter.Subscribe()
+}
+
+func (w *Waku) OnStorenodeAvailable() <-chan peer.ID {
+	return w.StorenodeCycle.StorenodeAvailableEmitter.Subscribe()
+}
+
+func (w *Waku) WaitForAvailableStoreNode(ctx context.Context) bool {
+	return w.StorenodeCycle.WaitForAvailableStoreNode(ctx)
+}
+
+func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
+	w.StorenodeCycle.SetStorenodeConfigProvider(c)
+}
+
+func (w *Waku) ProcessMailserverBatch(
+	ctx context.Context,
+	batch types.MailserverBatch,
+	storenodeID peer.ID,
+	pageLimit uint64,
+	shouldProcessNextPage func(int) (bool, uint64),
+	processEnvelopes bool,
+) error {
+	pubsubTopic := w.GetPubsubTopic(batch.PubsubTopic)
+	contentTopics := []string{}
+	for _, topic := range batch.Topics {
+		contentTopics = append(contentTopics, common.BytesToTopic(topic.Bytes()).ContentTopic())
+	}
+
+	criteria := store.FilterCriteria{
+		TimeStart:     proto.Int64(batch.From.UnixNano()),
+		TimeEnd:       proto.Int64(batch.To.UnixNano()),
+		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
+	}
+
+	return w.HistoryRetriever.Query(ctx, criteria, storenodeID, pageLimit, shouldProcessNextPage, processEnvelopes)
+}
+
+func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
+	return w.StorenodeCycle.IsStorenodeAvailable(peerID)
+}
+
+func (w *Waku) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
+	return w.StorenodeCycle.PerformStorenodeTask(fn, opts...)
+}
+
+func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool) {
+	w.StorenodeCycle.Lock()
+	defer w.StorenodeCycle.Unlock()
+
+	w.StorenodeCycle.DisconnectActiveStorenode(backoff)
+	if shouldCycle {
+		w.StorenodeCycle.Cycle(ctx)
+	}
+}
+
+func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
+	return NewPublicWakuAPI(w)
+}
+
+func (w *Waku) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []types.TopicType) error {
+	var cTopics []string
+	for _, ct := range contentTopics {
+		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
+	}
+	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
+	w.SetTopicsToVerifyForMissingMessages(peerID, pubsubTopic, cTopics)
+
+	return nil
+}
+
+func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
+	var (
+		err     error
+		keyAsym *ecdsa.PrivateKey
+		keySym  []byte
+	)
+
+	if opts.SymKeyID != "" {
+		keySym, err = w.GetSymKey(opts.SymKeyID)
+		if err != nil {
+			return "", err
+		}
+	}
+	if opts.PrivateKeyID != "" {
+		keyAsym, err = w.GetPrivateKey(opts.PrivateKeyID)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	f := &common.Filter{
+		KeyAsym:       keyAsym,
+		KeySym:        keySym,
+		ContentTopics: common.NewTopicSetFromBytes(opts.Topics),
+		PubsubTopic:   opts.PubsubTopic,
+		Messages:      common.NewMemoryMessageStore(),
+	}
+
+	return w.subscribe(f)
+}
+
+func (w *Waku) Version() uint {
+	return 2
 }

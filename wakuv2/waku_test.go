@@ -250,7 +250,7 @@ func TestBasicWakuV2(t *testing.T) {
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
 	}
 
-	_, err = w.Subscribe(filter)
+	_, err = w.subscribe(filter)
 	require.NoError(t, err)
 
 	msgTimestamp := w.timestamp()
@@ -444,7 +444,7 @@ func TestWakuV2Filter(t *testing.T) {
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{contentTopicBytes}),
 	}
 
-	fID, err := w.Subscribe(filter)
+	fID, err := w.subscribe(filter)
 	require.NoError(t, err)
 
 	msgTimestamp := w.timestamp()
@@ -538,7 +538,7 @@ func TestWakuV2Store(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, w2.Start())
 	w2EnvelopeCh := make(chan common.EnvelopeEvent, 100)
-	w2.SubscribeEnvelopeEvents(w2EnvelopeCh)
+	w2.subscribeEnvelopeEvents(w2EnvelopeCh)
 	defer func() {
 		require.NoError(t, w2.Stop())
 		close(w2EnvelopeCh)
@@ -558,7 +558,7 @@ func TestWakuV2Store(t *testing.T) {
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
 	}
 
-	_, err = w2.Subscribe(filter)
+	_, err = w2.subscribe(filter)
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
@@ -699,7 +699,7 @@ func TestLightpushRateLimit(t *testing.T) {
 		ContentTopics: contentTopics,
 	}
 
-	_, err = w0.Subscribe(filter)
+	_, err = w0.subscribe(filter)
 	require.NoError(t, err)
 
 	config1 := &Config{}
@@ -752,7 +752,7 @@ func TestLightpushRateLimit(t *testing.T) {
 	waitForPeerConnectionWithTimeout(t, w2.node.Host().ID(), w1PeersCh, 5*time.Second)
 
 	event := make(chan common.EnvelopeEvent, 10)
-	w2.SubscribeEnvelopeEvents(event)
+	w2.subscribeEnvelopeEvents(event)
 
 	for i := range [15]int{} {
 		msgTimestamp := w2.timestamp()

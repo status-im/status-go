@@ -80,7 +80,7 @@ func TestBasic(t *testing.T) {
 		t.Fatalf("failed waku.Run.")
 	}
 
-	if w.GetFilter("non-existent") != nil {
+	if w.getFilter("non-existent") != nil {
 		t.Fatalf("failed GetFilter.")
 	}
 
@@ -626,7 +626,7 @@ func TestCustomization(t *testing.T) {
 	}
 
 	// check w.messages()
-	_, err = w.Subscribe(f)
+	_, err = w.subscribe(f)
 	if err != nil {
 		t.Fatalf("failed subscribe with seed %d: %s.", seed, err)
 	}
@@ -686,12 +686,12 @@ func TestSymmetricSendCycle(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
 
-	_, err = w.Subscribe(filter1)
+	_, err = w.subscribe(filter1)
 	if err != nil {
 		t.Fatalf("failed subscribe 1 with seed %d: %s.", seed, err)
 	}
 
-	_, err = w.Subscribe(filter2)
+	_, err = w.subscribe(filter2)
 	if err != nil {
 		t.Fatalf("failed subscribe 2 with seed %d: %s.", seed, err)
 	}
@@ -777,12 +777,12 @@ func TestSymmetricSendCycleWithTopicInterest(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
 
-	_, err = w.Subscribe(filter1)
+	_, err = w.subscribe(filter1)
 	if err != nil {
 		t.Fatalf("failed subscribe 1 with seed %d: %s.", seed, err)
 	}
 
-	_, err = w.Subscribe(filter2)
+	_, err = w.subscribe(filter2)
 	if err != nil {
 		t.Fatalf("failed subscribe 2 with seed %d: %s.", seed, err)
 	}
@@ -858,7 +858,7 @@ func TestSymmetricSendWithoutAKey(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
 
-	_, err = w.Subscribe(filter)
+	_, err = w.subscribe(filter)
 	if err != nil {
 		t.Fatalf("failed subscribe 1 with seed %d: %s.", seed, err)
 	}
@@ -926,7 +926,7 @@ func TestSymmetricSendKeyMismatch(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
 
-	_, err = w.Subscribe(filter)
+	_, err = w.subscribe(filter)
 	if err != nil {
 		t.Fatalf("failed subscribe 1 with seed %d: %s.", seed, err)
 	}
@@ -1056,7 +1056,7 @@ func TestTopicInterest(t *testing.T) {
 		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
 	}
 
-	_, err = w.Subscribe(filter1)
+	_, err = w.subscribe(filter1)
 	if err != nil {
 		t.Fatalf("failed subscribe with seed %d: %s.", seed, err)
 	}
@@ -1071,7 +1071,7 @@ func TestTopicInterest(t *testing.T) {
 		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
 	}
 
-	_, err = w.Subscribe(filter2)
+	_, err = w.subscribe(filter2)
 	if err != nil {
 		t.Fatalf("failed subscribe with seed %d: %s.", seed, err)
 	}
