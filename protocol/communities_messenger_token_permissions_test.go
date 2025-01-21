@@ -2156,7 +2156,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	topic := wakutypes.BytesToTopic(transport.ToTopic(chat.ID))
 	communityCommonTopic := wakutypes.BytesToTopic(transport.ToTopic(community.UniversalChatID()))
 	topics := []wakutypes.TopicType{topic, communityCommonTopic}
-
 	torrentConfig := params.TorrentConfig{
 		Enabled:    true,
 		DataDir:    os.TempDir() + "/archivedata",

@@ -182,12 +182,12 @@ func (m *Messenger) processSingleChat(chat *Chat, communityInfo map[string]*comm
 		filters = append(filters, transport.FiltersToInitialize{ChatID: chat.ID})
 
 	case ChatTypeCommunityChat:
-		filter, err := m.processCommunityChat(chat, communityInfo)
+		// Since universalChatID is being used, no specific filters needs to be registered for all community chats.
+		// Reasoning: https://github.com/status-im/status-go/pull/5993
+		err := m.processCommunityChat(chat, communityInfo)
 		if err != nil {
 			return nil, nil, err
 		}
-		filters = append(filters, filter)
-
 	case ChatTypeOneToOne:
 		pk, err := chat.PublicKey()
 		if err != nil {
@@ -209,13 +209,13 @@ func (m *Messenger) processSingleChat(chat *Chat, communityInfo map[string]*comm
 	return filters, publicKeys, nil
 }
 
-func (m *Messenger) processCommunityChat(chat *Chat, communityInfo map[string]*communities.Community) (transport.FiltersToInitialize, error) {
+func (m *Messenger) processCommunityChat(chat *Chat, communityInfo map[string]*communities.Community) error {
 	community, ok := communityInfo[chat.CommunityID]
 	if !ok {
 		var err error
 		community, err = m.communitiesManager.GetByIDString(chat.CommunityID)
 		if err != nil {
-			return transport.FiltersToInitialize{}, err
+			return err
 		}
 		communityInfo[chat.CommunityID] = community
 	}
@@ -229,10 +229,7 @@ func (m *Messenger) processCommunityChat(chat *Chat, communityInfo map[string]*c
 		}
 	}
 
-	return transport.FiltersToInitialize{
-		ChatID:      chat.ID,
-		PubsubTopic: community.PubsubTopic(),
-	}, nil
+	return nil
 }
 
 func (m *Messenger) processPrivateGroupChat(chat *Chat) ([]*ecdsa.PublicKey, error) {
