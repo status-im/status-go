@@ -98,6 +98,7 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 	}
 
 	return &SuggestedFees{
+		GasPrice:             big.NewInt(0),
 		BaseFee:              baseFee,
 		CurrentBaseFee:       baseFee,
 		MaxPriorityFeePerGas: maxPriorityFeePerGas,
