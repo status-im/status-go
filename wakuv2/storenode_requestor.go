@@ -15,15 +15,16 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
+	"github.com/waku-org/waku-go-bindings/waku"
 	"go.uber.org/zap"
 )
 
 type storenodeRequestor struct {
-	node   *WakuNode
+	node   *waku.WakuNode
 	logger *zap.Logger
 }
 
-func newStorenodeRequestor(node *WakuNode, logger *zap.Logger) commonapi.StorenodeRequestor {
+func newStorenodeRequestor(node *waku.WakuNode, logger *zap.Logger) commonapi.StorenodeRequestor {
 	return &storenodeRequestor{
 		node:   node,
 		logger: logger.Named("storenodeRequestor"),
