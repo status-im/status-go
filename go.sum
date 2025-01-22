@@ -2164,6 +2164,8 @@ github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 h1:
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1/go.mod h1:+LeEYoW5/uBUTVjtBGLEVCUe9mOYAlu5ZPkIxLOSr5Y=
 github.com/waku-org/waku-go-bindings v0.0.0-20250107144456-96fb32a76e3a h1:2lGVHy5s7vGAQlXM/1/hqSiAJM+ZO9JoCyBdTetizk0=
 github.com/waku-org/waku-go-bindings v0.0.0-20250107144456-96fb32a76e3a/go.mod h1:eFNpq6IGg3WsFaWdpy0O8yaIFa+ZVD5KbsOY7kxjJgQ=
+github.com/waku-org/waku-go-bindings v0.0.0-20250117132531-d517abc07be1 h1:Wlsaet+g/NyeuWkaxPS2K8ovpOIoZ9zOdKhurzomSTM=
+github.com/waku-org/waku-go-bindings v0.0.0-20250117132531-d517abc07be1/go.mod h1:eFNpq6IGg3WsFaWdpy0O8yaIFa+ZVD5KbsOY7kxjJgQ=
 github.com/wealdtech/go-ens/v3 v3.5.0 h1:Huc9GxBgiGweCOGTYomvsg07K2QggAqZpZ5SuiZdC8o=
 github.com/wealdtech/go-ens/v3 v3.5.0/go.mod h1:bVuYoWYEEeEu7Zy95rIMjPR34QFJarxt8p84ywSo0YM=
 github.com/wealdtech/go-multicodec v1.4.0 h1:iq5PgxwssxnXGGPTIK1srvt6U5bJwIp7k6kBrudIWxg=
