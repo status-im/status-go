@@ -6,7 +6,7 @@ on:
     - cron:  '0 2 * * *'
   push:
     branches:
-      - "master"
+      - "test-reactivate-reliability-workflow"
 
 env:
   FORCE_COLOR: "1"
