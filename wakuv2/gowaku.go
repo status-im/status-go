@@ -1,3 +1,6 @@
+//go:build !use_nwaku
+// +build !use_nwaku
+
 // Copyright 2019 The Waku Library Authors.
 //
 // The Waku library is free software: you can redistribute it and/or modify
@@ -118,7 +121,7 @@ type ITelemetryClient interface {
 	PushPeerCountByShard(ctx context.Context, peerCountByShard map[uint16]uint)
 	PushPeerCountByOrigin(ctx context.Context, peerCountByOrigin map[wps.Origin]uint)
 	PushDialFailure(ctx context.Context, dialFailure common.DialError)
-	PushMissedMessage(ctx context.Context, envelope *protocol.Envelope)
+	PushMissedMessage(ctx context.Context, envelope common.Envelope)
 	PushMissedRelevantMessage(ctx context.Context, message *common.ReceivedMessage)
 	PushMessageDeliveryConfirmed(ctx context.Context, messageHash string)
 	PushSentMessageTotal(ctx context.Context, messageSize uint32)
@@ -194,7 +197,7 @@ type Waku struct {
 	// discV5BootstrapNodes is the ENR to be used to fetch bootstrap nodes for discovery
 	discV5BootstrapNodes []string
 
-	onHistoricMessagesRequestFailed func([]byte, peer.ID, error)
+	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
 	onPeerStats                     func(types.ConnStatus)
 
 	statusTelemetryClient ITelemetryClient
@@ -218,7 +221,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.ID, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, _ *WakuConfig, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -1279,7 +1282,8 @@ func (w *Waku) checkForConnectionChanges() {
 func (w *Waku) reportPeerMetrics() {
 	if w.statusTelemetryClient != nil {
 		connFailures := FormatPeerConnFailures(w.node)
-		w.statusTelemetryClient.PushPeerCount(w.ctx, w.PeerCount())
+		pc, _ := w.PeerCount() // PeerCount's err will never be != nil
+		w.statusTelemetryClient.PushPeerCount(w.ctx, pc)
 		w.statusTelemetryClient.PushPeerConnFailures(w.ctx, connFailures)
 
 		peerCountByOrigin := make(map[wps.Origin]uint)
@@ -1388,11 +1392,11 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
 }
 
-func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic string, contentTopics []string) {
+func (w *Waku) SetTopicsToVerifyForMissingMessages(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []string) {
 	if !w.cfg.EnableMissingMessageVerification {
 		return
 	}
-	w.missingMsgVerifier.SetCriteriaInterest(peerID, protocol.NewContentFilter(pubsubTopic, contentTopics...))
+	w.missingMsgVerifier.SetCriteriaInterest(peerInfo, protocol.NewContentFilter(pubsubTopic, contentTopics...))
 }
 
 func (w *Waku) setupRelaySubscriptions() error {
@@ -1625,8 +1629,8 @@ func (w *Waku) ClearEnvelopesCache() {
 	w.envelopeCache = newTTLCache()
 }
 
-func (w *Waku) PeerCount() int {
-	return w.node.PeerCount()
+func (w *Waku) PeerCount() (int, error) {
+	return w.node.PeerCount(), nil
 }
 
 func (w *Waku) Peers() types.PeerStats {
@@ -1908,20 +1912,12 @@ func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
 	return w.node.SetDiscV5Bootnodes(bootnodes)
 }
 
-func (w *Waku) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, store.StoreQueryID_v300)
-	if err != nil {
-		return "", err
-	}
-	return peerID, nil
-}
-
 func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
 }
 
 func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer([]multiaddr.Multiaddr{address}, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}
@@ -1966,8 +1962,8 @@ func (w *Waku) Clean() error {
 	return nil
 }
 
-func (w *Waku) PeerID() peer.ID {
-	return w.node.Host().ID()
+func (w *Waku) PeerID() (peer.ID, error) {
+	return w.node.Host().ID(), nil
 }
 
 func (w *Waku) Peerstore() peerstore.Peerstore {
@@ -2159,3 +2155,46 @@ func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
 func (w *Waku) Version() uint {
 	return 2
 }
+func (w *Waku) ListPeersInMesh(pubsubTopic string) (int, error) {
+	listPeers := w.node.Relay().PubSub().ListPeers(pubsubTopic)
+	return len(listPeers), nil
+}
+
+// Added just for compatibility with nwaku
+
+type WakuConfig struct {
+	Host                  string           `json:"host,omitempty"`
+	NodeKey               string           `json:"nodekey,omitempty"`
+	EnableRelay           bool             `json:"relay"`
+	LogLevel              string           `json:"logLevel"`
+	DnsDiscovery          bool             `json:"dnsDiscovery,omitempty"`
+	DnsDiscoveryUrl       string           `json:"dnsDiscoveryUrl,omitempty"`
+	MaxMessageSize        string           `json:"maxMessageSize,omitempty"`
+	Staticnodes           []string         `json:"staticnodes,omitempty"`
+	Discv5BootstrapNodes  []string         `json:"discv5BootstrapNodes,omitempty"`
+	Discv5Discovery       bool             `json:"discv5Discovery,omitempty"`
+	Discv5UdpPort         int              `json:"discv5UdpPort,omitempty"`
+	ClusterID             uint16           `json:"clusterId,omitempty"`
+	Shards                []uint16         `json:"shards,omitempty"`
+	PeerExchange          bool             `json:"peerExchange,omitempty"`
+	PeerExchangeNode      string           `json:"peerExchangeNode,omitempty"`
+	Filter                bool             `json:"filter,omitempty"`
+	FilterMaxPeersToServe int              `json:"filterMaxPeersToServe,omitempty"`
+	Lightpush             bool             `json:"lightpush,omitempty"`
+	TcpPort               int              `json:"tcpPort,omitempty"`
+	RateLimits            RateLimitsConfig `json:"rateLimits,omitempty"`
+}
+
+type RateLimitsConfig struct {
+	Filter       *RateLimit `json:"-"`
+	Lightpush    *RateLimit `json:"-"`
+	PeerExchange *RateLimit `json:"-"`
+}
+
+type RateLimit struct {
+	Volume int
+	Period int
+	Unit   RateLimitUnit
+}
+
+type RateLimitUnit string

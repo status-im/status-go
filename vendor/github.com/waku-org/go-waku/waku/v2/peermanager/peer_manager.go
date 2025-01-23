@@ -678,12 +678,18 @@ func AddrInfoToPeerData(origin wps.Origin, peerID peer.ID, host host.Host, pubsu
 }
 
 // AddPeer adds peer to the peerStore and also to service slots
-func (pm *PeerManager) AddPeer(address ma.Multiaddr, origin wps.Origin, pubsubTopics []string, protocols ...protocol.ID) (*service.PeerData, error) {
+func (pm *PeerManager) AddPeer(addresses []ma.Multiaddr, origin wps.Origin, pubsubTopics []string, protocols ...protocol.ID) (*service.PeerData, error) {
 	//Assuming all addresses have peerId
-	info, err := peer.AddrInfoFromP2pAddr(address)
+	infoArr, err := peer.AddrInfosFromP2pAddrs(addresses...)
 	if err != nil {
 		return nil, err
 	}
+
+	if len(infoArr) > 1 {
+		return nil, errors.New("only a single peerID is expected in AddPeer")
+	}
+
+	info := infoArr[0]
 
 	//Add Service peers to serviceSlots.
 	for _, proto := range protocols {
@@ -697,11 +703,8 @@ func (pm *PeerManager) AddPeer(address ma.Multiaddr, origin wps.Origin, pubsubTo
 	}
 
 	pData := &service.PeerData{
-		Origin: origin,
-		AddrInfo: peer.AddrInfo{
-			ID:    info.ID,
-			Addrs: info.Addrs,
-		},
+		Origin:       origin,
+		AddrInfo:     info,
 		PubsubTopics: pubsubTopics,
 	}
 

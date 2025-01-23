@@ -456,7 +456,7 @@ func (t *Transport) WakuVersion() uint {
 	return t.waku.Version()
 }
 
-func (t *Transport) PeerCount() int {
+func (t *Transport) PeerCount() (int, error) {
 	return t.waku.PeerCount()
 }
 
@@ -516,10 +516,6 @@ func (t *Transport) RelayPeersByTopic(topic string) (*wakutypes.PeerList, error)
 
 func (t *Transport) ENR() (*enode.Node, error) {
 	return t.waku.ENR()
-}
-
-func (t *Transport) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	return t.waku.AddStorePeer(address)
 }
 
 func (t *Transport) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
@@ -600,7 +596,7 @@ func (t *Transport) ConfirmMessageDelivered(messageID string) {
 	t.waku.ConfirmMessageDelivered(commHashes)
 }
 
-func (t *Transport) SetCriteriaForMissingMessageVerification(peerID peer.ID, filters []*Filter) {
+func (t *Transport) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters []*Filter) {
 	if t.waku.Version() != 2 {
 		return
 	}
@@ -621,11 +617,11 @@ func (t *Transport) SetCriteriaForMissingMessageVerification(peerID peer.ID, fil
 
 	for pubsubTopic, contentTopics := range topicMap {
 		ctList := maps.Keys(contentTopics)
-		err := t.waku.SetCriteriaForMissingMessageVerification(peerID, pubsubTopic, ctList)
+		err := t.waku.SetCriteriaForMissingMessageVerification(peerInfo, pubsubTopic, ctList)
 		if err != nil {
 			t.logger.Error("could not check for missing messages",
 				zap.Error(err),
-				zap.Stringer("peerID", peerID),
+				zap.Stringer("peerID", peerInfo.ID),
 				zap.String("pubsubTopic", pubsubTopic),
 				zap.Stringers("contentTopics", ctList))
 			return
@@ -633,7 +629,7 @@ func (t *Transport) SetCriteriaForMissingMessageVerification(peerID peer.ID, fil
 	}
 }
 
-func (t *Transport) GetActiveStorenode() peer.ID {
+func (t *Transport) GetActiveStorenode() peer.AddrInfo {
 	return t.waku.GetActiveStorenode()
 }
 
@@ -668,12 +664,12 @@ func (t *Transport) PerformStorenodeTask(fn func() error, opts ...history.Storen
 func (t *Transport) ProcessMailserverBatch(
 	ctx context.Context,
 	batch wakutypes.MailserverBatch,
-	storenodeID peer.ID,
+	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	return t.waku.ProcessMailserverBatch(ctx, batch, storenodeID, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return t.waku.ProcessMailserverBatch(ctx, batch, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
