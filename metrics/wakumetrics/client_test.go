@@ -9,6 +9,9 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
 
+	"github.com/libp2p/go-libp2p/core/metrics"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/status-im/status-go/metrics/bandwidth"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -16,7 +19,11 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 )
 
 var (
@@ -30,6 +37,7 @@ func createTestClient(t *testing.T) *Client {
 
 	t.Cleanup(func() {
 		require.NoError(t, UnregisterMetrics())
+		require.NoError(t, bandwidth.UnregisterMetrics())
 	})
 
 	client.SetDeviceType("test-node")
@@ -178,4 +186,30 @@ func TestClient_PushErrorSendingEnvelope(t *testing.T) {
 		envelope.Message().ContentTopic,
 	)
 	require.Equal(t, float64(1), value)
+}
+
+func TestClient_PushProtocolStats(t *testing.T) {
+	client := createTestClient(t)
+
+	s := metrics.Stats{
+		TotalIn:  10,
+		TotalOut: 20,
+		RateIn:   30,
+		RateOut:  40,
+	}
+
+	m := make(map[protocol.ID]metrics.Stats)
+	m[relay.WakuRelayID_v200] = s
+	m[filter.FilterPushID_v20beta1] = s
+	m[filter.FilterSubscribeID_v20beta1] = s
+	m[legacy_store.StoreID_v20beta4] = s
+	m[lightpush.LightPushID_v20beta1] = s
+
+	client.PushProtocolStats(m, s)
+
+	// Verify metrics for each protocol
+	for protocolID, expectedStats := range m {
+		value := getGaugeVecValue(bandwidth.BandwidthIn, string(protocolID))
+		require.Equal(t, float64(expectedStats.RateIn), value)
+	}
 }

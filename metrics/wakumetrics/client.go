@@ -4,14 +4,21 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/status-im/status-go/metrics/bandwidth"
 	"github.com/status-im/status-go/protocol/transport"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
-
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	v2common "github.com/status-im/status-go/wakuv2/common"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
+
+	"github.com/libp2p/go-libp2p/core/metrics"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 )
 
 type ReceivedMessages struct {
@@ -63,8 +70,13 @@ func NewClient(opts ...TelemetryClientOption) (*Client, error) {
 // RegisterWithRegistry registers all metrics with the provided registry
 func (c *Client) RegisterWithRegistry() error {
 	if err := RegisterMetrics(); err != nil {
-		return fmt.Errorf("failed to register metrics: %v", err)
+		return fmt.Errorf("failed to register waku metrics: %v", err)
 	}
+
+	if err := bandwidth.RegisterMetrics(); err != nil {
+		return fmt.Errorf("failed to register bandwidth metrics: %v", err)
+	}
+
 	return nil
 }
 
@@ -180,4 +192,21 @@ func getOriginString(origin wps.Origin) string {
 	default:
 		return "unknown"
 	}
+}
+
+func updateProtocolMetrics(protocolID protocol.ID, stats metrics.Stats) {
+	protocolStr := string(protocolID)
+	bandwidth.BandwidthIn.WithLabelValues(protocolStr).Set(float64(stats.RateIn))
+	bandwidth.BandwidthOut.WithLabelValues(protocolStr).Set(float64(stats.RateOut))
+	bandwidth.BandwidthTotalIn.WithLabelValues(protocolStr).Set(float64(stats.TotalIn))
+	bandwidth.BandwidthTotalOut.WithLabelValues(protocolStr).Set(float64(stats.TotalOut))
+}
+
+func (c *Client) PushProtocolStats(stats map[protocol.ID]metrics.Stats, totals metrics.Stats) {
+	updateProtocolMetrics(protocol.ID("total"), totals)
+	updateProtocolMetrics(relay.WakuRelayID_v200, stats[relay.WakuRelayID_v200])
+	updateProtocolMetrics(legacy_store.StoreID_v20beta4, stats[legacy_store.StoreID_v20beta4])
+	updateProtocolMetrics(filter.FilterPushID_v20beta1, stats[filter.FilterPushID_v20beta1])
+	updateProtocolMetrics(filter.FilterSubscribeID_v20beta1, stats[filter.FilterSubscribeID_v20beta1])
+	updateProtocolMetrics(lightpush.LightPushID_v20beta1, stats[lightpush.LightPushID_v20beta1])
 }

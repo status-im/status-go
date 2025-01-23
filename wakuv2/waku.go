@@ -55,6 +55,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
+	libp2pprotocol "github.com/libp2p/go-libp2p/core/protocol"
 
 	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
@@ -121,6 +122,7 @@ type IMetricsHandler interface {
 	PushMissedRelevantMessage(message *common.ReceivedMessage)
 	PushMessageDeliveryConfirmed()
 	PushSentMessageTotal(messageSize uint32, publishMethod string)
+	PushProtocolStats(stats map[libp2pprotocol.ID]metrics.Stats, totals metrics.Stats)
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -559,31 +561,6 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	// Connection will be prunned eventually by the connection manager if needed
 	// The peer connector in go-waku uses Connect, so it will execute identify as part of its
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
-}
-
-func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
-	defer gocommon.LogOnPanic()
-	defer w.wg.Done()
-
-	if telemetryServerURL == "" {
-		return
-	}
-
-	telemetry := NewBandwidthTelemetryClient(w.logger, telemetryServerURL)
-
-	ticker := time.NewTicker(time.Second * 20)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-w.ctx.Done():
-			return
-		case <-ticker.C:
-			bandwidthPerProtocol := w.bandwidthCounter.GetBandwidthByProtocol()
-			w.bandwidthCounter.Reset()
-			go telemetry.PushProtocolStats(bandwidthPerProtocol)
-		}
-	}
 }
 
 func (w *Waku) GetStats() types.StatsSummary {
@@ -1115,6 +1092,9 @@ func (w *Waku) Start() error {
 			peerTelemetryTicker := time.NewTicker(peerTelemetryTickerInterval)
 			defer peerTelemetryTicker.Stop()
 
+			bandwidthTicker := time.NewTicker(time.Second * 20)
+			defer bandwidthTicker.Stop()
+
 			dialErrSub, err := w.node.Host().EventBus().Subscribe(new(utils.DialError))
 			if err != nil {
 				w.logger.Error("failed to subscribe to dial errors", zap.Error(err))
@@ -1139,6 +1119,11 @@ func (w *Waku) Start() error {
 					return
 				case <-peerTelemetryTicker.C:
 					w.reportPeerMetrics()
+				case <-bandwidthTicker.C:
+					bandwidthPerProtocol := w.bandwidthCounter.GetBandwidthByProtocol()
+					totals := w.bandwidthCounter.GetBandwidthTotals()
+					w.bandwidthCounter.Reset()
+					w.metricsHandler.PushProtocolStats(bandwidthPerProtocol, totals)
 				case dialErr := <-dialErrSub.Out():
 					errors := common.ParseDialErrors(dialErr.(utils.DialError).Err.Error())
 					for _, dialError := range errors {
@@ -1150,11 +1135,6 @@ func (w *Waku) Start() error {
 			}
 		}()
 	}
-
-	w.wg.Add(1)
-	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
-	//TODO: commenting for now so that only fleet nodes are used.
-	//Need to uncomment once filter peer scoring etc is implemented.
 
 	w.wg.Add(1)
 	go w.runPeerExchangeLoop()
