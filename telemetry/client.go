@@ -19,8 +19,6 @@ import (
 
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 
-	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
-
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	v2common "github.com/status-im/status-go/wakuv2/common"
 
@@ -80,7 +78,7 @@ func (c *Client) PushSentEnvelope(ctx context.Context, sentEnvelope wakuv2.SentE
 	c.processAndPushTelemetry(ctx, sentEnvelope)
 }
 
-func (c *Client) PushReceivedEnvelope(ctx context.Context, receivedEnvelope *v2protocol.Envelope) {
+func (c *Client) PushReceivedEnvelope(ctx context.Context, receivedEnvelope v2common.Envelope) {
 	c.processAndPushTelemetry(ctx, receivedEnvelope)
 }
 
@@ -137,7 +135,7 @@ func (c *Client) PushDialFailure(ctx context.Context, dialFailure v2common.DialE
 	c.processAndPushTelemetry(ctx, DialFailure{ErrorType: dialFailure.ErrType, ErrorMsg: errorMessage, Protocols: dialFailure.Protocols})
 }
 
-func (c *Client) PushMissedMessage(ctx context.Context, envelope *v2protocol.Envelope) {
+func (c *Client) PushMissedMessage(ctx context.Context, envelope v2common.Envelope) {
 	c.processAndPushTelemetry(ctx, MissedMessage{Envelope: envelope})
 }
 
@@ -193,7 +191,7 @@ type DialFailure struct {
 }
 
 type MissedMessage struct {
-	Envelope *v2protocol.Envelope
+	Envelope v2common.Envelope
 }
 
 type MissedRelevantMessage struct {

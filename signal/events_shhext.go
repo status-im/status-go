@@ -155,8 +155,8 @@ func SendHistoricMessagesRequestStarted(numBatches int) {
 	send(EventHistoryRequestStarted, HistoryMessagesSignal{NumBatches: numBatches})
 }
 
-func SendHistoricMessagesRequestFailed(requestID []byte, peerID peer.ID, err error) {
-	send(EventHistoryRequestFailed, HistoryMessagesSignal{RequestID: hex.EncodeToString(requestID), PeerID: peerID.String(), ErrorMsg: err.Error()})
+func SendHistoricMessagesRequestFailed(requestID []byte, peerInfo peer.AddrInfo, err error) {
+	send(EventHistoryRequestFailed, HistoryMessagesSignal{RequestID: hex.EncodeToString(requestID), PeerID: peerInfo.ID.String(), ErrorMsg: err.Error()})
 }
 
 func SendHistoricMessagesRequestCompleted() {

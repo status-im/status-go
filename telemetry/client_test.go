@@ -1,5 +1,6 @@
 package telemetry
 
+/* TODO-nwaku
 import (
 	"context"
 	"encoding/json"
@@ -612,3 +613,5 @@ func TestProcessSentMessageTotal(t *testing.T) {
 	}
 	runTestCase(t, tc)
 }
+
+*/

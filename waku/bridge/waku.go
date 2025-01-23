@@ -51,8 +51,8 @@ func (w *GethWakuWrapper) Version() uint {
 }
 
 // Added for compatibility with waku V2
-func (w *GethWakuWrapper) PeerCount() int {
-	return -1
+func (w *GethWakuWrapper) PeerCount() (int, error) {
+	return -1, errors.New("not available in WakuV1")
 }
 
 // Added for compatibility with waku V2
@@ -134,7 +134,7 @@ func (w *GethWakuWrapper) SubscribeToConnStatusChanges() (*types.ConnStatusSubsc
 	return nil, errors.New("not available in WakuV1")
 }
 
-func (w *GethWakuWrapper) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []wakutypes.TopicType) error {
+func (w *GethWakuWrapper) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []wakutypes.TopicType) error {
 	return errors.New("not available in WakuV1")
 }
 
@@ -314,11 +314,11 @@ func (w *wakuFilterWrapper) ID() string {
 func (w *GethWakuWrapper) ConfirmMessageDelivered(hashes []common.Hash) {
 }
 
-func (w *GethWakuWrapper) PeerID() peer.ID {
+func (w *GethWakuWrapper) PeerID() (peer.ID, error) {
 	panic("not available in WakuV1")
 }
 
-func (w *GethWakuWrapper) GetActiveStorenode() peer.ID {
+func (w *GethWakuWrapper) GetActiveStorenode() peer.AddrInfo {
 	panic("not available in WakuV1")
 }
 
@@ -345,7 +345,7 @@ func (w *GethWakuWrapper) SetStorenodeConfigProvider(c history.StorenodeConfigPr
 func (w *GethWakuWrapper) ProcessMailserverBatch(
 	ctx context.Context,
 	batch wakutypes.MailserverBatch,
-	storenodeID peer.ID,
+	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,

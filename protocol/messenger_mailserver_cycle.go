@@ -4,8 +4,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
-	"github.com/waku-org/go-waku/waku/v2/utils"
-
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/mailservers"
@@ -37,28 +35,6 @@ func (m *Messenger) AllMailservers() ([]mailservers.Mailserver, error) {
 	}
 
 	return allMailservers, nil
-}
-
-func (m *Messenger) setupStorenodes(storenodes []mailservers.Mailserver) error {
-	if m.transport.WakuVersion() != 2 {
-		return nil
-	}
-
-	for _, storenode := range storenodes {
-
-		peerInfo, err := storenode.PeerInfo()
-		if err != nil {
-			return err
-		}
-
-		for _, addr := range utils.EncapsulatePeerID(peerInfo.ID, peerInfo.Addrs...) {
-			_, err := m.transport.AddStorePeer(addr)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func (m *Messenger) getFleet() (string, error) {

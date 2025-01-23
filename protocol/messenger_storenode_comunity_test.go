@@ -10,8 +10,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/status-im/status-go/protocol/storenodes"
+	"github.com/status-im/status-go/wakuv2"
 
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/tt"
 
@@ -93,11 +93,12 @@ func (s *MessengerStoreNodeCommunitySuite) createStore(name string) (*waku2.Waku
 	cfg := testWakuV2Config{
 		logger:      s.logger.Named(name),
 		enableStore: true,
-		clusterID:   shard.MainStatusShardCluster,
+		clusterID:   wakuv2.MainStatusShardCluster,
 	}
 
 	storeNode := NewTestWakuV2(&s.Suite, cfg)
-	addresses := storeNode.ListenAddresses()
+	addresses, err := storeNode.ListenAddresses()
+	s.Require().NoError(err)
 	s.Require().GreaterOrEqual(len(addresses), 1, "no storenode listen address")
 	return storeNode, addresses[0]
 }
@@ -110,7 +111,7 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAd
 	cfg := testWakuV2Config{
 		logger:      logger,
 		enableStore: false,
-		clusterID:   shard.MainStatusShardCluster,
+		clusterID:   wakuv2.MainStatusShardCluster,
 	}
 	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 	wakuV2Wrapper := bridge.NewGethWakuV2Wrapper(wakuV2)
@@ -295,8 +296,11 @@ func (s *MessengerStoreNodeCommunitySuite) TestSetStorenodeForCommunity_fetchMes
 	err = s.bob.DialPeer(s.storeNodeAddress)
 	s.Require().NoError(err)
 
-	ownerPeerID := bridge.GetGethWakuV2From(s.ownerWaku).PeerID()
-	bobPeerID := bridge.GetGethWakuV2From(s.bobWaku).PeerID()
+	ownerPeerID, err := bridge.GetGethWakuV2From(s.ownerWaku).PeerID()
+	s.Require().NoError(err)
+
+	bobPeerID, err := bridge.GetGethWakuV2From(s.bobWaku).PeerID()
+	s.Require().NoError(err)
 
 	// 1. Owner creates a community
 	community, chat := s.createCommunityWithChat(s.owner)

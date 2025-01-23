@@ -10,11 +10,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/wakuv2"
 
 	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -109,7 +109,7 @@ func (s *MessengerCommunitiesShardingSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerCommunitiesShardingSuite) testPostToCommunityChat(shard *shard.Shard, community *communities.Community, chat *Chat) {
+func (s *MessengerCommunitiesShardingSuite) testPostToCommunityChat(shard *wakuv2.Shard, community *communities.Community, chat *Chat) {
 	_, err := s.owner.SetCommunityShard(&requests.SetCommunityShard{
 		CommunityID: community.ID(),
 		Shard:       shard,
@@ -145,8 +145,8 @@ func (s *MessengerCommunitiesShardingSuite) TestPostToCommunityChat() {
 
 	// Members should be able to receive messages in a community with sharding enabled.
 	{
-		shard := &shard.Shard{
-			Cluster: shard.MainStatusShardCluster,
+		shard := &wakuv2.Shard{
+			Cluster: wakuv2.MainStatusShardCluster,
 			Index:   128,
 		}
 		s.testPostToCommunityChat(shard, community, chat)
@@ -154,8 +154,8 @@ func (s *MessengerCommunitiesShardingSuite) TestPostToCommunityChat() {
 
 	// Members should be able to receive messages in a community where the sharding configuration has been edited.
 	{
-		shard := &shard.Shard{
-			Cluster: shard.MainStatusShardCluster,
+		shard := &wakuv2.Shard{
+			Cluster: wakuv2.MainStatusShardCluster,
 			Index:   256,
 		}
 		s.testPostToCommunityChat(shard, community, chat)
@@ -163,8 +163,8 @@ func (s *MessengerCommunitiesShardingSuite) TestPostToCommunityChat() {
 
 	// Members should continue to receive messages in a community if it is moved back to default shard.
 	{
-		shard := &shard.Shard{
-			Cluster: shard.MainStatusShardCluster,
+		shard := &wakuv2.Shard{
+			Cluster: wakuv2.MainStatusShardCluster,
 			Index:   32,
 		}
 		s.testPostToCommunityChat(shard, community, chat)
@@ -177,8 +177,8 @@ func (s *MessengerCommunitiesShardingSuite) TestIgnoreOutdatedShardKey() {
 	advertiseCommunityToUserOldWay(&s.Suite, community, s.owner, s.alice)
 	joinCommunity(&s.Suite, community.ID(), s.owner, s.alice, alicePassword, []string{aliceAddress1})
 
-	shard := &shard.Shard{
-		Cluster: shard.MainStatusShardCluster,
+	shard := &wakuv2.Shard{
+		Cluster: wakuv2.MainStatusShardCluster,
 		Index:   128,
 	}
 

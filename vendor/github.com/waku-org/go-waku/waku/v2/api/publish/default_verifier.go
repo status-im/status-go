@@ -18,10 +18,10 @@ type defaultStorenodeMessageVerifier struct {
 	store *store.WakuStore
 }
 
-func (d *defaultStorenodeMessageVerifier) MessageHashesExist(ctx context.Context, requestID []byte, peerID peer.ID, pageSize uint64, messageHashes []pb.MessageHash) ([]pb.MessageHash, error) {
+func (d *defaultStorenodeMessageVerifier) MessageHashesExist(ctx context.Context, requestID []byte, peerID peer.AddrInfo, pageSize uint64, messageHashes []pb.MessageHash) ([]pb.MessageHash, error) {
 	var opts []store.RequestOption
 	opts = append(opts, store.WithRequestID(requestID))
-	opts = append(opts, store.WithPeer(peerID))
+	opts = append(opts, store.WithPeerAddr(peerID.Addrs...))
 	opts = append(opts, store.WithPaging(false, pageSize))
 	opts = append(opts, store.IncludeData(false))
 

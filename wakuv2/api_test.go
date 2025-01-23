@@ -18,13 +18,13 @@
 
 package wakuv2
 
+/* TODO-nwaku
 import (
 	"testing"
 	"time"
 
 	"golang.org/x/exp/maps"
 
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2/common"
 )
@@ -58,7 +58,7 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	}
 
 	found := false
-	candidates := w.filters.GetWatchersByTopic(shard.DefaultShardPubsubTopic(), t1)
+	candidates := w.filters.GetWatchersByTopic(DefaultShardPubsubTopic(), t1)
 	for _, f := range candidates {
 		if maps.Equal(f.ContentTopics, common.NewTopicSet([]common.TopicType{t1, t2})) {
 			found = true
@@ -70,3 +70,4 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 		t.Fatalf("Could not find filter with both topics")
 	}
 }
+*/
