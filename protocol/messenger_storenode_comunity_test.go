@@ -10,8 +10,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/status-im/status-go/protocol/storenodes"
+	"github.com/status-im/status-go/wakuv2"
 
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/tt"
 
@@ -92,7 +92,7 @@ func (s *MessengerStoreNodeCommunitySuite) createStore(name string) (*waku2.Waku
 	cfg := testWakuV2Config{
 		logger:      s.logger.Named(name),
 		enableStore: true,
-		clusterID:   shard.MainStatusShardCluster,
+		clusterID:   wakuv2.MainStatusShardCluster,
 	}
 
 	storeNode := NewTestWakuV2(&s.Suite, cfg)
@@ -110,7 +110,7 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAd
 	cfg := testWakuV2Config{
 		logger:      logger,
 		enableStore: false,
-		clusterID:   shard.MainStatusShardCluster,
+		clusterID:   wakuv2.MainStatusShardCluster,
 	}
 	wakuV2 := NewTestWakuV2(&s.Suite, cfg)
 

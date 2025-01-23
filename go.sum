@@ -2150,8 +2150,8 @@ github.com/waku-org/go-libp2p-pubsub v0.12.0-gowaku.0.20240823143342-b0f2429ca27
 github.com/waku-org/go-libp2p-pubsub v0.12.0-gowaku.0.20240823143342-b0f2429ca27f/go.mod h1:Oi0zw9aw8/Y5GC99zt+Ef2gYAl+0nZlwdJonDyOz/sE=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0 h1:R4YYx2QamhBRl/moIxkDCNW+OP7AHbyWLBygDc/xIMo=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0/go.mod h1:EhZP9fee0DYjKH/IOQvoNSy1tSHp2iZadsHGphcAJgY=
-github.com/waku-org/go-waku v0.8.1-0.20250103101727-4ef460cb951a h1:20W3RwuJvLWEtXxXZ7RWwoVfTQJtJrjde3qQETP9QMs=
-github.com/waku-org/go-waku v0.8.1-0.20250103101727-4ef460cb951a/go.mod h1:zYhLgqwBE3sGP2vP+aNiM5moOKlf/uSoIv36puAj9WI=
+github.com/waku-org/go-waku v0.8.1-0.20250122182117-bf357f223b55 h1:bo1vIU4Kcfs9lGXO7Rt4BGKGW9vwuI9tOro3AWnPj/g=
+github.com/waku-org/go-waku v0.8.1-0.20250122182117-bf357f223b55/go.mod h1:zYhLgqwBE3sGP2vP+aNiM5moOKlf/uSoIv36puAj9WI=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 h1:jisj+OCI6QydLtFq3Pyhu49wl9ytPN7oAHjMfepHDrA=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59/go.mod h1:1PdBdPzyTaKt3VnpAHk3zj+r9dXPFOr3IHZP9nFle6E=
 github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b h1:KgZVhsLkxsj5gb/FfndSCQu6VYwALrCOgYI3poR95yE=
@@ -2160,6 +2160,16 @@ github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065 h1:Sd7
 github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065/go.mod h1:7cSGUoGVIla1IpnChrLbkVjkYgdOcr7rcifEfh4ReR4=
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 h1:4HSdWMFMufpRo3ECTX6BrvA+VzKhXZf7mS0rTa5cCWU=
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1/go.mod h1:+LeEYoW5/uBUTVjtBGLEVCUe9mOYAlu5ZPkIxLOSr5Y=
+github.com/waku-org/waku-go-bindings v0.0.0-20250212142023-46b1648912ad h1:/vYXB+trQPPxfR0/tqkSvpq9tekqWPXnreWHc3GwZaw=
+github.com/waku-org/waku-go-bindings v0.0.0-20250212142023-46b1648912ad/go.mod h1:ZumFjFmErDtVBY5t1HH7pD9cQeeepAmlLA6MD/MjHx4=
+github.com/waku-org/waku-go-bindings v0.0.0-20250214122049-77122cd5d7d0 h1:dlTEDjyeKPv2OwaYqo7qtperqCv9WV9Ype40usgpNeE=
+github.com/waku-org/waku-go-bindings v0.0.0-20250214122049-77122cd5d7d0/go.mod h1:ZumFjFmErDtVBY5t1HH7pD9cQeeepAmlLA6MD/MjHx4=
+github.com/waku-org/waku-go-bindings v0.0.0-20250214142304-7d8ea671c827 h1:+uKmky4rByMOCgg22gSpB4fM8GcIAV8s6uO+uaf8Mig=
+github.com/waku-org/waku-go-bindings v0.0.0-20250214142304-7d8ea671c827/go.mod h1:ZumFjFmErDtVBY5t1HH7pD9cQeeepAmlLA6MD/MjHx4=
+github.com/waku-org/waku-go-bindings v0.0.0-20250214150103-cd77341fb3c7 h1:6Vql94mKR5xPdeEC1chQM3LLZ8B+2uoRlBAiyDmI3Sc=
+github.com/waku-org/waku-go-bindings v0.0.0-20250214150103-cd77341fb3c7/go.mod h1:ZumFjFmErDtVBY5t1HH7pD9cQeeepAmlLA6MD/MjHx4=
+github.com/waku-org/waku-go-bindings v0.0.0-20250304153648-a0a3e952036b h1:Bt9J1tc36L++0WULYVj0wBGCFK7pu9SCcLnXKmdF/uk=
+github.com/waku-org/waku-go-bindings v0.0.0-20250304153648-a0a3e952036b/go.mod h1:ZumFjFmErDtVBY5t1HH7pD9cQeeepAmlLA6MD/MjHx4=
 github.com/wealdtech/go-ens/v3 v3.5.0 h1:Huc9GxBgiGweCOGTYomvsg07K2QggAqZpZ5SuiZdC8o=
 github.com/wealdtech/go-ens/v3 v3.5.0/go.mod h1:bVuYoWYEEeEu7Zy95rIMjPR34QFJarxt8p84ywSo0YM=
 github.com/wealdtech/go-multicodec v1.4.0 h1:iq5PgxwssxnXGGPTIK1srvt6U5bJwIp7k6kBrudIWxg=
@@ -2708,6 +2718,7 @@ golang.org/x/sys v0.0.0-20220111092808-5a964db01320/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20220317061510-51cd9980dadf/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220412211240-33da011f77ad/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.3.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=

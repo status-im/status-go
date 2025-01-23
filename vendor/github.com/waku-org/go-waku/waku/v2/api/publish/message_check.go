@@ -33,7 +33,7 @@ type ISentCheck interface {
 
 type StorenodeMessageVerifier interface {
 	// MessagesExist returns a list of the messages it found from a list of message hashes
-	MessageHashesExist(ctx context.Context, requestID []byte, peerID peer.ID, pageSize uint64, messageHashes []pb.MessageHash) ([]pb.MessageHash, error)
+	MessageHashesExist(ctx context.Context, requestID []byte, peerInfo peer.AddrInfo, pageSize uint64, messageHashes []pb.MessageHash) ([]pb.MessageHash, error)
 }
 
 // MessageSentCheck tracks the outgoing messages and check against store node
@@ -211,8 +211,8 @@ func (m *MessageSentCheck) Start() {
 }
 
 func (m *MessageSentCheck) messageHashBasedQuery(ctx context.Context, hashes []common.Hash, relayTime []uint32, pubsubTopic string) []common.Hash {
-	selectedPeer := m.storenodeCycle.GetActiveStorenode()
-	if selectedPeer == "" {
+	selectedPeer := m.storenodeCycle.GetActiveStorenodePeerInfo()
+	if selectedPeer.ID == "" {
 		m.logger.Error("no store peer id available", zap.String("pubsubTopic", pubsubTopic))
 		return []common.Hash{}
 	}
@@ -224,13 +224,13 @@ func (m *MessageSentCheck) messageHashBasedQuery(ctx context.Context, hashes []c
 		messageHashes[i] = pb.ToMessageHash(hash.Bytes())
 	}
 
-	m.logger.Debug("store.queryByHash request", zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", selectedPeer), zap.Stringers("messageHashes", messageHashes))
+	m.logger.Debug("store.queryByHash request", zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", selectedPeer.ID), zap.Stringers("messageHashes", messageHashes))
 
 	queryCtx, cancel := context.WithTimeout(ctx, m.storeQueryTimeout)
 	defer cancel()
 	result, err := m.messageVerifier.MessageHashesExist(queryCtx, requestID, selectedPeer, m.maxHashQueryLength, messageHashes)
 	if err != nil {
-		m.logger.Error("store.queryByHash failed", zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", selectedPeer), zap.Error(err))
+		m.logger.Error("store.queryByHash failed", zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", selectedPeer.ID), zap.Error(err))
 		return []common.Hash{}
 	}
 

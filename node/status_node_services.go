@@ -3,6 +3,7 @@ package node
 import (
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -62,6 +62,7 @@ import (
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/wakuv2"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
+	bindings "github.com/waku-org/waku-go-bindings/waku/common"
 )
 
 var (
@@ -244,7 +245,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			Nameserver:                             nodeConfig.WakuV2Config.Nameserver,
 			UDPPort:                                nodeConfig.WakuV2Config.UDPPort,
 			AutoUpdate:                             nodeConfig.WakuV2Config.AutoUpdate,
-			DefaultShardPubsubTopic:                shard.DefaultShardPubsubTopic(),
+			DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
 			TelemetryServerURL:                     nodeConfig.WakuV2Config.TelemetryServerURL,
 			ClusterID:                              nodeConfig.ClusterConfig.ClusterID,
 			EnableMissingMessageVerification:       nodeConfig.WakuV2Config.EnableMissingMessageVerification,
@@ -289,8 +290,16 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			}
 		}
 
-		w, err := wakuv2.New(nodeKey, nodeConfig.ClusterConfig.Fleet, cfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
+		nwakuCfg := &bindings.WakuConfig{
+			Nodekey:   hex.EncodeToString(crypto.FromECDSA(nodeKey)),
+			Host:      nodeConfig.WakuV2Config.Host,
+			TcpPort:   nodeConfig.WakuV2Config.Port,
+			LogLevel:  "DEBUG", // TODO-nwaku ?
+			ClusterID: nodeConfig.ClusterConfig.ClusterID,
+			Shards:    []uint16{wakuv2.DefaultShardIndex, wakuv2.NonProtectedShardIndex},
+		}
 
+		w, err := wakuv2.New(nodeKey, nodeConfig.ClusterConfig.Fleet, cfg, nwakuCfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
 		if err != nil {
 			return nil, err
 		}

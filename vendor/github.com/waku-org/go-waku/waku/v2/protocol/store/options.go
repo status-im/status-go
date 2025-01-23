@@ -11,7 +11,7 @@ import (
 
 type Parameters struct {
 	selectedPeer      peer.ID
-	peerAddr          multiaddr.Multiaddr
+	peerAddr          []multiaddr.Multiaddr
 	peerSelectionType peermanager.PeerSelection
 	preferredPeers    peer.IDSlice
 	requestID         []byte
@@ -33,7 +33,7 @@ type RequestOption func(*Parameters) error
 func WithPeer(p peer.ID) RequestOption {
 	return func(params *Parameters) error {
 		params.selectedPeer = p
-		if params.peerAddr != nil {
+		if len(params.peerAddr) != 0 {
 			return errors.New("WithPeer and WithPeerAddr options are mutually exclusive")
 		}
 		return nil
@@ -43,7 +43,7 @@ func WithPeer(p peer.ID) RequestOption {
 // WithPeerAddr is an option used to specify a peerAddress to request the message history.
 // This new peer will be added to peerStore.
 // Note that this option is mutually exclusive to WithPeerAddr, only one of them can be used.
-func WithPeerAddr(pAddr multiaddr.Multiaddr) RequestOption {
+func WithPeerAddr(pAddr ...multiaddr.Multiaddr) RequestOption {
 	return func(params *Parameters) error {
 		params.peerAddr = pAddr
 		if params.selectedPeer != "" {

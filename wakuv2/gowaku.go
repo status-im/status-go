@@ -1,3 +1,6 @@
+//go:build !use_nwaku
+// +build !use_nwaku
+
 // Copyright 2019 The Waku Library Authors.
 //
 // The Waku library is free software: you can redistribute it and/or modify
@@ -74,6 +77,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
+	bindings "github.com/waku-org/waku-go-bindings/waku/common"
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
@@ -195,7 +199,7 @@ type Waku struct {
 	// discV5BootstrapNodes is the ENR to be used to fetch bootstrap nodes for discovery
 	discV5BootstrapNodes []string
 
-	onHistoricMessagesRequestFailed func([]byte, peer.ID, error)
+	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
 	onPeerStats                     func(types.ConnStatus)
 
 	metricsHandler IMetricsHandler
@@ -219,7 +223,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.ID, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, _ *bindings.WakuConfig, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -1397,11 +1401,11 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
 }
 
-func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic string, contentTopics []string) {
+func (w *Waku) SetTopicsToVerifyForMissingMessages(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []string) {
 	if !w.cfg.EnableMissingMessageVerification {
 		return
 	}
-	w.missingMsgVerifier.SetCriteriaInterest(peerID, protocol.NewContentFilter(pubsubTopic, contentTopics...))
+	w.missingMsgVerifier.SetCriteriaInterest(peerInfo, protocol.NewContentFilter(pubsubTopic, contentTopics...))
 }
 
 func (w *Waku) setupRelaySubscriptions() error {
@@ -1917,20 +1921,12 @@ func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
 	return w.node.SetDiscV5Bootnodes(bootnodes)
 }
 
-func (w *Waku) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, store.StoreQueryID_v300)
-	if err != nil {
-		return "", err
-	}
-	return peerID, nil
-}
-
 func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
 }
 
 func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer([]multiaddr.Multiaddr{address}, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}
@@ -2054,8 +2050,8 @@ func (w *Waku) GetCurrentTime() time.Time {
 	return w.CurrentTime()
 }
 
-func (w *Waku) GetActiveStorenode() peer.ID {
-	return w.StorenodeCycle.GetActiveStorenode()
+func (w *Waku) GetActiveStorenode() peer.AddrInfo {
+	return w.StorenodeCycle.GetActiveStorenodePeerInfo()
 }
 
 func (w *Waku) OnStorenodeChanged() <-chan peer.ID {
@@ -2081,7 +2077,7 @@ func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 func (w *Waku) ProcessMailserverBatch(
 	ctx context.Context,
 	batch types.MailserverBatch,
-	storenodeID peer.ID,
+	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
@@ -2098,7 +2094,7 @@ func (w *Waku) ProcessMailserverBatch(
 		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
 	}
 
-	return w.HistoryRetriever.Query(ctx, criteria, storenodeID, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
@@ -2123,13 +2119,13 @@ func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
 	return NewPublicWakuAPI(w)
 }
 
-func (w *Waku) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []types.TopicType) error {
+func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
 	var cTopics []string
 	for _, ct := range contentTopics {
 		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
 	}
 	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
-	w.SetTopicsToVerifyForMissingMessages(peerID, pubsubTopic, cTopics)
+	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
 
 	return nil
 }
@@ -2168,3 +2164,46 @@ func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
 func (w *Waku) Version() uint {
 	return 2
 }
+func (w *Waku) ListPeersInMesh(pubsubTopic string) (int, error) {
+	listPeers := w.node.Relay().PubSub().ListPeers(pubsubTopic)
+	return len(listPeers), nil
+}
+
+// Added just for compatibility with nwaku
+
+type WakuConfig struct {
+	Host                  string           `json:"host,omitempty"`
+	NodeKey               string           `json:"nodekey,omitempty"`
+	EnableRelay           bool             `json:"relay"`
+	LogLevel              string           `json:"logLevel"`
+	DnsDiscovery          bool             `json:"dnsDiscovery,omitempty"`
+	DnsDiscoveryUrl       string           `json:"dnsDiscoveryUrl,omitempty"`
+	MaxMessageSize        string           `json:"maxMessageSize,omitempty"`
+	Staticnodes           []string         `json:"staticnodes,omitempty"`
+	Discv5BootstrapNodes  []string         `json:"discv5BootstrapNodes,omitempty"`
+	Discv5Discovery       bool             `json:"discv5Discovery,omitempty"`
+	Discv5UdpPort         int              `json:"discv5UdpPort,omitempty"`
+	ClusterID             uint16           `json:"clusterId,omitempty"`
+	Shards                []uint16         `json:"shards,omitempty"`
+	PeerExchange          bool             `json:"peerExchange,omitempty"`
+	PeerExchangeNode      string           `json:"peerExchangeNode,omitempty"`
+	Filter                bool             `json:"filter,omitempty"`
+	FilterMaxPeersToServe int              `json:"filterMaxPeersToServe,omitempty"`
+	Lightpush             bool             `json:"lightpush,omitempty"`
+	TcpPort               int              `json:"tcpPort,omitempty"`
+	RateLimits            RateLimitsConfig `json:"rateLimits,omitempty"`
+}
+
+type RateLimitsConfig struct {
+	Filter       *RateLimit `json:"-"`
+	Lightpush    *RateLimit `json:"-"`
+	PeerExchange *RateLimit `json:"-"`
+}
+
+type RateLimit struct {
+	Volume int
+	Period int
+	Unit   RateLimitUnit
+}
+
+type RateLimitUnit string

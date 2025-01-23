@@ -10,7 +10,7 @@ import (
 )
 
 type criteriaInterest struct {
-	peerID        peer.ID
+	peerInfo      peer.AddrInfo
 	contentFilter protocol.ContentFilter
 	lastChecked   time.Time
 
@@ -19,7 +19,7 @@ type criteriaInterest struct {
 }
 
 func (c criteriaInterest) equals(other criteriaInterest) bool {
-	if c.peerID != other.peerID {
+	if c.peerInfo.ID != other.peerInfo.ID {
 		return false
 	}
 

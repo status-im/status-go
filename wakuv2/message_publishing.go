@@ -92,6 +92,7 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 		err = w.messageSender.Send(publish.NewRequest(w.ctx, envelope))
 	}
 
+	/* TODO-nwaku
 	if w.metricsHandler != nil {
 		if err == nil {
 			w.metricsHandler.PushSentEnvelope(SentEnvelope{Envelope: envelope, PublishMethod: w.messageSender.PublishMethod()})
@@ -99,7 +100,7 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 			w.metricsHandler.PushErrorSendingEnvelope(ErrorSendingEnvelope{Error: err, SentEnvelope: SentEnvelope{Envelope: envelope, PublishMethod: w.messageSender.PublishMethod()}})
 		}
 	}
-
+	*/
 	if err != nil {
 		logger.Error("could not send message", zap.Error(err))
 		w.SendEnvelopeEvent(common.EnvelopeEvent{

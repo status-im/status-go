@@ -824,17 +824,10 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	response := &MessengerResponse{}
 
-	storenodes, err := m.AllMailservers()
+	response.Mailservers, err = m.AllMailservers()
 	if err != nil {
 		return nil, err
 	}
-
-	err = m.setupStorenodes(storenodes)
-	if err != nil {
-		return nil, err
-	}
-
-	response.Mailservers = storenodes
 
 	m.transport.SetStorenodeConfigProvider(m)
 
@@ -1017,7 +1010,8 @@ func (m *Messenger) Online() bool {
 
 	switch m.transport.WakuVersion() {
 	case 2:
-		return m.transport.PeerCount() > 0
+		pc := m.transport.PeerCount()
+		return pc > 0
 	default:
 		return m.node.PeersCount() > 0
 	}
