@@ -1,5 +1,6 @@
 .PHONY: statusgo all test clean help
 .PHONY: statusgo-android statusgo-ios
+.PHONY: build-libwaku test-libwaku clean-libwaku rebuild-libwaku
 
 # Clear any GOROOT set outside of the Nix shell
 export GOROOT=
@@ -59,6 +60,10 @@ GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
 BUILD_TAGS ?= gowaku_no_rln
+
+ifeq ($(USE_NWAKU), true)
+BUILD_TAGS += use_nwaku
+endif
 
 BUILD_FLAGS ?= -ldflags="-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)"
 BUILD_FLAGS_MOBILE ?=
@@ -207,8 +212,19 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la build/bin/libstatus.*
 
+LIBWAKU := third_party/nwaku/build/libwaku.$(GOBIN_SHARED_LIB_EXT)
+$(LIBWAKU):
+	@echo "Building libwaku"
+	$(MAKE) -C third_party/nwaku update || { echo "nwaku make update failed"; exit 1; }
+	$(MAKE) -C ./third_party/nwaku libwaku
+
+build-libwaku: $(LIBWAKU)
+
 statusgo-shared-library: generate
 statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
+ifeq ($(USE_NWAKU),true)
+	$(MAKE) $(LIBWAKU)
+endif	
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
@@ -295,6 +311,15 @@ lint-fix:
 
 docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
+
+test-libwaku: | $(LIBWAKU)
+	go test -tags '$(BUILD_TAGS) use_nwaku' -run TestBasicWakuV2 ./wakuv2/... -count 1 -v -json | jq -r '.Output'
+
+clean-libwaku:
+	@echo "Removing libwaku"
+	rm $(LIBWAKU)
+
+rebuild-libwaku: | clean-libwaku $(LIBWAKU)
 
 test: test-unit ##@tests Run basic, short tests during development
 
