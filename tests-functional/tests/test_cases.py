@@ -1,9 +1,12 @@
 from contextlib import contextmanager
 import json
 import logging
+import random
+import string
 import threading
 import time
 from collections import namedtuple
+from uuid import uuid4
 
 import pytest
 
@@ -264,3 +267,42 @@ class MessengerTestCase(NetworkConditionTestCase):
             return matched_messages
         else:
             raise ValueError(f"Failed to find a message with contentType '{content_type}' in response")
+
+    def join_private_group(self):
+        private_group_name = f"private_group_{uuid4()}"
+        response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
+        expected_group_creation_msg = f"@{self.sender.public_key} created the group {private_group_name}"
+        expected_message = self.get_message_by_content_type(
+            response, content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value, message_pattern=expected_group_creation_msg
+        )[0]
+        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"), timeout=60)
+        return response.get("result", {}).get("chats", [])[0].get("id")
+
+    def create_and_join_community(self):
+        name = f"vac_qa_community_{''.join(random.choices(string.ascii_letters, k=10))}"
+        response = self.sender.wakuext_service.create_community(name)
+
+        community_id = response.get("result", {}).get("communities", [{}])[0].get("id")
+        self.receiver.wakuext_service.fetch_community(community_id)
+
+        response_to_join = self.receiver.wakuext_service.request_to_join_community(community_id)
+        join_id = response_to_join.get("result", {}).get("requestsToJoinCommunity", [{}])[0].get("id")
+
+        # I couldn't find any signal related to the requestToJoinCommunity request in the peer node.
+        # That's why I need this retry logic for accepting the request to join the community.
+        max_retries = 40
+        retry_interval = 0.5
+        for attempt in range(max_retries):
+            try:
+                response = self.sender.wakuext_service.accept_request_to_join_community(join_id)
+                if response.get("result"):
+                    break
+            except Exception as e:
+                logging.error(f"Attempt {attempt + 1}/{max_retries}: Unexpected error: {e}")
+                time.sleep(retry_interval)
+        else:
+            raise Exception(f"Failed to accept request to join community in {max_retries * retry_interval} seconds.")
+
+        chats = response.get("result", {}).get("communities", [{}])[0].get("chats", {})
+        chat_id = list(chats.keys())[0] if chats else None
+        return community_id + chat_id
