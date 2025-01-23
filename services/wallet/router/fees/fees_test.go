@@ -156,7 +156,7 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, suggestedFees)
 
-	assert.Nil(t, suggestedFees.GasPrice)
+	assert.Equal(t, big.NewInt(0), suggestedFees.GasPrice)
 	assert.Equal(t, big.NewInt(6958609414), suggestedFees.BaseFee)
 	assert.Equal(t, big.NewInt(6958609414), suggestedFees.CurrentBaseFee)
 	assert.Equal(t, big.NewInt(7928609414), suggestedFees.MaxFeesLevels.Low.ToInt())
