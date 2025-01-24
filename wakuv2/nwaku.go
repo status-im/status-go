@@ -3,323 +3,6 @@
 
 package wakuv2
 
-/*
-	#cgo !android,!ios LDFLAGS: -L${SRCDIR}/../third_party/nwaku/build/ -lwaku
-	#cgo !android,!ios LDFLAGS: -L${SRCDIR}/../third_party/nwaku -Wl,-rpath,../third_party/nwaku/build/
-
-	#cgo amd64,android LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/android/x86_64 -lwaku
-	#cgo arm64,android LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/android/arm64-v8a -lwaku
-	#cgo arm,android LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/android/armeabi-v7a -lwaku
-	#cgo 386,android LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/android/x86 -lwaku
-
-	#cgo darwin,arm64,ios LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/ios/iphone -lwaku
-	#cgo darwin,amd64,ios LDFLAGS:-L${SRCDIR}/../third_party/nwaku/build/ios/simulator -lwaku
-
-
-	#include "../third_party/nwaku/library/libwaku.h"
-	#include <stdio.h>
-	#include <stdlib.h>
-
-	extern void globalEventCallback(int ret, char* msg, size_t len, void* userData);
-
-	typedef struct {
-		int ret;
-		char* msg;
-		size_t len;
-		void* wg;
-	} Resp;
-
-	static void* allocResp(void* wg) {
-		Resp* r = calloc(1, sizeof(Resp));
-		r->wg = wg;
-		return r;
-	}
-
-	static void freeResp(void* resp) {
-		if (resp != NULL) {
-			free(resp);
-		}
-	}
-
-	static char* getMyCharPtr(void* resp) {
-		if (resp == NULL) {
-			return NULL;
-		}
-		Resp* m = (Resp*) resp;
-		return m->msg;
-	}
-
-	static size_t getMyCharLen(void* resp) {
-		if (resp == NULL) {
-			return 0;
-		}
-		Resp* m = (Resp*) resp;
-		return m->len;
-	}
-
-	static int getRet(void* resp) {
-		if (resp == NULL) {
-			return 0;
-		}
-		Resp* m = (Resp*) resp;
-		return m->ret;
-	}
-	// resp must be set != NULL in case interest on retrieving data from the callback
-	void GoCallback(int ret, char* msg, size_t len, void* resp);
-
-	#define WAKU_CALL(call)                                                        \
-	do {                                                                           \
-		int ret = call;                                                            \
-		if (ret != 0) {                                                            \
-			printf("Failed the call to: %s. Returned code: %d\n", #call, ret);     \
-			exit(1);                                                               \
-		}                                                                          \
-	} while (0)
-
-	static void* cGoWakuNew(const char* configJson, void* resp) {
-		// We pass NULL because we are not interested in retrieving data from this callback
-		void* ret = waku_new(configJson, (WakuCallBack) GoCallback, resp);
-		return ret;
-	}
-
-	static void cGoWakuStart(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_start(wakuCtx, (WakuCallBack) GoCallback, resp));
-	}
-
-	static void cGoWakuStop(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_stop(wakuCtx, (WakuCallBack) GoCallback, resp));
-	}
-
-	static void cGoWakuDestroy(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_destroy(wakuCtx, (WakuCallBack) GoCallback, resp));
-	}
-
-	static void cGoWakuStartDiscV5(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_start_discv5(wakuCtx, (WakuCallBack) GoCallback, resp));
-	}
-
-	static void cGoWakuStopDiscV5(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_stop_discv5(wakuCtx, (WakuCallBack) GoCallback, resp));
-	}
-
-	static void cGoWakuVersion(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_version(wakuCtx, (WakuCallBack) GoCallback, resp));
-	}
-
-	static void cGoWakuSetEventCallback(void* wakuCtx) {
-		// The 'globalEventCallback' Go function is shared amongst all possible Waku instances.
-
-		// Given that the 'globalEventCallback' is shared, we pass again the
-		// wakuCtx instance but in this case is needed to pick up the correct method
-		// that will handle the event.
-
-		// In other words, for every call the libwaku makes to globalEventCallback,
-		// the 'userData' parameter will bring the context of the node that registered
-		// that globalEventCallback.
-
-		// This technique is needed because cgo only allows to export Go functions and not methods.
-
-		waku_set_event_callback(wakuCtx, (WakuCallBack) globalEventCallback, wakuCtx);
-	}
-
-	static void cGoWakuContentTopic(void* wakuCtx,
-							char* appName,
-							int appVersion,
-							char* contentTopicName,
-							char* encoding,
-							void* resp) {
-
-		WAKU_CALL( waku_content_topic(wakuCtx,
-							appName,
-							appVersion,
-							contentTopicName,
-							encoding,
-							(WakuCallBack) GoCallback,
-							resp) );
-	}
-
-	static void cGoWakuPubsubTopic(void* wakuCtx, char* topicName, void* resp) {
-		WAKU_CALL( waku_pubsub_topic(wakuCtx, topicName, (WakuCallBack) GoCallback, resp) );
-	}
-
-	static void cGoWakuDefaultPubsubTopic(void* wakuCtx, void* resp) {
-		WAKU_CALL (waku_default_pubsub_topic(wakuCtx, (WakuCallBack) GoCallback, resp));
-	}
-
-	static void cGoWakuRelayPublish(void* wakuCtx,
-                       const char* pubSubTopic,
-                       const char* jsonWakuMessage,
-                       int timeoutMs,
-					   void* resp) {
-
-		WAKU_CALL (waku_relay_publish(wakuCtx,
-                       pubSubTopic,
-                       jsonWakuMessage,
-                       timeoutMs,
-                       (WakuCallBack) GoCallback,
-                       resp));
-	}
-
-	static void cGoWakuRelaySubscribe(void* wakuCtx, char* pubSubTopic, void* resp) {
-		WAKU_CALL ( waku_relay_subscribe(wakuCtx,
-							pubSubTopic,
-							(WakuCallBack) GoCallback,
-							resp) );
-	}
-
-	static void cGoWakuRelayAddProtectedShard(void* wakuCtx, int clusterId, int shardId, char* publicKey, void* resp) {
-		WAKU_CALL ( waku_relay_add_protected_shard(wakuCtx,
-							clusterId,
-							shardId,
-							publicKey,
-							(WakuCallBack) GoCallback,
-							resp) );
-	}
-
-	static void cGoWakuRelayUnsubscribe(void* wakuCtx, char* pubSubTopic, void* resp) {
-
-		WAKU_CALL ( waku_relay_unsubscribe(wakuCtx,
-							pubSubTopic,
-							(WakuCallBack) GoCallback,
-							resp) );
-	}
-
-	static void cGoWakuConnect(void* wakuCtx, char* peerMultiAddr, int timeoutMs, void* resp) {
-		WAKU_CALL( waku_connect(wakuCtx,
-						peerMultiAddr,
-						timeoutMs,
-						(WakuCallBack) GoCallback,
-						resp) );
-	}
-
-	static void cGoWakuDialPeer(void* wakuCtx,
-									char* peerMultiAddr,
-									char* protocol,
-									int timeoutMs,
-									void* resp) {
-
-		WAKU_CALL( waku_dial_peer(wakuCtx,
-						peerMultiAddr,
-						protocol,
-						timeoutMs,
-						(WakuCallBack) GoCallback,
-						resp) );
-	}
-
-	static void cGoWakuDialPeerById(void* wakuCtx,
-									char* peerId,
-									char* protocol,
-									int timeoutMs,
-									void* resp) {
-
-		WAKU_CALL( waku_dial_peer_by_id(wakuCtx,
-						peerId,
-						protocol,
-						timeoutMs,
-						(WakuCallBack) GoCallback,
-						resp) );
-	}
-
-	static void cGoWakuDisconnectPeerById(void* wakuCtx, char* peerId, void* resp) {
-		WAKU_CALL( waku_disconnect_peer_by_id(wakuCtx,
-						peerId,
-						(WakuCallBack) GoCallback,
-						resp) );
-	}
-
-	static void cGoWakuListenAddresses(void* wakuCtx, void* resp) {
-		WAKU_CALL (waku_listen_addresses(wakuCtx, (WakuCallBack) GoCallback, resp) );
-	}
-
-	static void cGoWakuGetMyENR(void* ctx, void* resp) {
-		WAKU_CALL (waku_get_my_enr(ctx, (WakuCallBack) GoCallback, resp) );
-	}
-
-	static void cGoWakuGetMyPeerId(void* ctx, void* resp) {
-		WAKU_CALL (waku_get_my_peerid(ctx, (WakuCallBack) GoCallback, resp) );
-	}
-
-	static void cGoWakuPingPeer(void* ctx, char* peerAddr, int timeoutMs, void* resp) {
-		WAKU_CALL (waku_ping_peer(ctx, peerAddr, timeoutMs, (WakuCallBack) GoCallback, resp) );
-	}
-
-	static void cGoWakuListPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
-		WAKU_CALL (waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp) );
-	}
-
-	static void cGoWakuGetNumConnectedRelayPeers(void* ctx, char* pubSubTopic, void* resp) {
-		WAKU_CALL (waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp) );
-	}
-
-	static void cGoWakuGetConnectedPeers(void* wakuCtx, void* resp) {
-		WAKU_CALL (waku_get_connected_peers(wakuCtx, (WakuCallBack) GoCallback, resp) );
-	}
-
-	static void cGoWakuGetPeerIdsFromPeerStore(void* wakuCtx, void* resp) {
-		WAKU_CALL (waku_get_peerids_from_peerstore(wakuCtx, (WakuCallBack) GoCallback, resp) );
-	}
-
-	static void cGoWakuLightpushPublish(void* wakuCtx,
-					const char* pubSubTopic,
-					const char* jsonWakuMessage,
-					void* resp) {
-
-		WAKU_CALL (waku_lightpush_publish(wakuCtx,
-						pubSubTopic,
-						jsonWakuMessage,
-						(WakuCallBack) GoCallback,
-						resp));
-	}
-
-	static void cGoWakuStoreQuery(void* wakuCtx,
-					const char* jsonQuery,
-					const char* peerAddr,
-					int timeoutMs,
-					void* resp) {
-
-		WAKU_CALL (waku_store_query(wakuCtx,
-									jsonQuery,
-									peerAddr,
-									timeoutMs,
-									(WakuCallBack) GoCallback,
-									resp));
-	}
-
-	static void cGoWakuPeerExchangeQuery(void* wakuCtx,
-								uint64_t numPeers,
-								void* resp) {
-
-		WAKU_CALL (waku_peer_exchange_request(wakuCtx,
-									numPeers,
-									(WakuCallBack) GoCallback,
-									resp));
-	}
-
-	static void cGoWakuGetPeerIdsByProtocol(void* wakuCtx,
-									 const char* protocol,
-									 void* resp) {
-
-		WAKU_CALL (waku_get_peerids_by_protocol(wakuCtx,
-									protocol,
-									(WakuCallBack) GoCallback,
-									resp));
-	}
-
-	static void cGoWakuDnsDiscovery(void* wakuCtx,
-									 const char* entTreeUrl,
-									 const char* nameDnsServer,
-									 int timeoutMs,
-									 void* resp) {
-
-		WAKU_CALL (waku_dns_discovery(wakuCtx,
-									entTreeUrl,
-									nameDnsServer,
-									timeoutMs,
-									(WakuCallBack) GoCallback,
-									resp));
-	}
-
-*/
 import "C"
 
 import (
@@ -388,6 +71,7 @@ import (
 
 	node "github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/waku-go-bindings/waku"
 )
 
 const messageQueueLimit = 1024
@@ -424,74 +108,6 @@ type ITelemetryClient interface {
 	PushMissedRelevantMessage(ctx context.Context, message *common.ReceivedMessage)
 	PushMessageDeliveryConfirmed(ctx context.Context, messageHash string)
 	PushSentMessageTotal(ctx context.Context, messageSize uint32)
-}
-
-type WakuMessageHash = string
-type WakuPubsubTopic = string
-type WakuContentTopic = string
-
-type WakuConfig struct {
-	Host                  string           `json:"host,omitempty"`
-	NodeKey               string           `json:"nodekey,omitempty"`
-	EnableRelay           bool             `json:"relay"`
-	LogLevel              string           `json:"logLevel"`
-	DnsDiscovery          bool             `json:"dnsDiscovery,omitempty"`
-	DnsDiscoveryUrl       string           `json:"dnsDiscoveryUrl,omitempty"`
-	MaxMessageSize        string           `json:"maxMessageSize,omitempty"`
-	Staticnodes           []string         `json:"staticnodes,omitempty"`
-	Discv5BootstrapNodes  []string         `json:"discv5BootstrapNodes,omitempty"`
-	Discv5Discovery       bool             `json:"discv5Discovery,omitempty"`
-	Discv5UdpPort         int              `json:"discv5UdpPort,omitempty"`
-	ClusterID             uint16           `json:"clusterId,omitempty"`
-	Shards                []uint16         `json:"shards,omitempty"`
-	PeerExchange          bool             `json:"peerExchange,omitempty"`
-	PeerExchangeNode      string           `json:"peerExchangeNode,omitempty"`
-	Filter                bool             `json:"filter,omitempty"`
-	FilterMaxPeersToServe int              `json:"filterMaxPeersToServe,omitempty"`
-	Lightpush             bool             `json:"lightpush,omitempty"`
-	TcpPort               int              `json:"tcpPort,omitempty"`
-	RateLimits            RateLimitsConfig `json:"rateLimits,omitempty"`
-}
-
-type RateLimitsConfig struct {
-	Filter       *RateLimit `json:"-"`
-	Lightpush    *RateLimit `json:"-"`
-	PeerExchange *RateLimit `json:"-"`
-}
-
-func (rlc RateLimitsConfig) MarshalJSON() ([]byte, error) {
-	output := []string{}
-	if rlc.Filter != nil {
-		output = append(output, fmt.Sprintf("filter:%s", rlc.Filter.String()))
-	}
-	if rlc.Lightpush != nil {
-		output = append(output, fmt.Sprintf("lightpush:%s", rlc.Lightpush.String()))
-	}
-	if rlc.PeerExchange != nil {
-		output = append(output, fmt.Sprintf("px:%s", rlc.PeerExchange.String()))
-	}
-	return json.Marshal(output)
-}
-
-type RateLimitUnit string
-
-const Hour RateLimitUnit = "h"
-const Minute RateLimitUnit = "m"
-const Second RateLimitUnit = "s"
-const Millisecond RateLimitUnit = "ms"
-
-type RateLimit struct {
-	Volume int
-	Period int
-	Unit   RateLimitUnit
-}
-
-func (rl RateLimit) String() string {
-	return fmt.Sprintf("%d/%d%s", rl.Volume, rl.Period, rl.Unit)
-}
-
-func (rl RateLimit) MarshalJSON() ([]byte, error) {
-	return json.Marshal(rl.String())
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -531,7 +147,7 @@ type Waku struct {
 	wg     sync.WaitGroup
 
 	cfg     *Config
-	wakuCfg *WakuConfig
+	wakuCfg *waku.WakuConfig
 
 	options []node.WakuNodeOption
 
@@ -589,7 +205,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *WakuConfig, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *waku.WakuConfig, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	node, err := wakuNew(nodeKey,
 		fleet,
 		cfg,
@@ -2414,7 +2030,7 @@ func printStackTrace() {
 func wakuNew(nodeKey *ecdsa.PrivateKey,
 	fleet string,
 	cfg *Config, // TODO: merge Config and WakuConfig
-	nwakuCfg *WakuConfig,
+	nwakuCfg *waku.WakuConfig,
 	logger *zap.Logger,
 	appDB *sql.DB,
 	ts *timesource.NTPTimeSource,
