@@ -10,13 +10,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
+	"github.com/waku-org/waku-go-bindings/waku"
 )
 
 type pinger struct {
-	node *WakuNode
+	node *waku.WakuNode
 }
 
-func newPinger(node *WakuNode) commonapi.Pinger {
+func newPinger(node *waku.WakuNode) commonapi.Pinger {
 	return &pinger{
 		node: node,
 	}

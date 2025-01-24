@@ -20,6 +20,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	"github.com/waku-org/waku-go-bindings/waku"
 
 	"github.com/stretchr/testify/require"
 
@@ -182,10 +183,10 @@ func TestBasicWakuV2(t *testing.T) {
 		ClusterID:           16,
 	}
 
-	nwakuConfig := WakuConfig{
+	nwakuConfig := waku.WakuConfig{
 		TcpPort:         30303,
-		NodeKey:         "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
-		EnableRelay:     true,
+		Nodekey:         "11d0dcea28e86f81937a3bd1163473c7fbc0a0db54fd72914849bc47bdf78710",
+		Relay:           true,
 		LogLevel:        "DEBUG",
 		DnsDiscoveryUrl: "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im",
 		DnsDiscovery:    true,
@@ -358,8 +359,8 @@ func TestPeerExchange(t *testing.T) {
 	}
 
 	// start node that will be discovered by PeerExchange
-	discV5NodeWakuConfig := WakuConfig{
-		EnableRelay:     true,
+	discV5NodeWakuConfig := waku.WakuConfig{
+		Relay:           true,
 		LogLevel:        "DEBUG",
 		Discv5Discovery: true,
 		ClusterID:       16,
@@ -387,8 +388,8 @@ func TestPeerExchange(t *testing.T) {
 	}
 
 	// start node which serves as PeerExchange server
-	pxServerWakuConfig := WakuConfig{
-		EnableRelay:          true,
+	pxServerWakuConfig := waku.WakuConfig{
+		Relay:                true,
 		LogLevel:             "DEBUG",
 		Discv5Discovery:      true,
 		ClusterID:            16,
@@ -437,8 +438,8 @@ func TestPeerExchange(t *testing.T) {
 	}
 
 	// start light node which uses PeerExchange to discover peers
-	pxClientWakuConfig := WakuConfig{
-		EnableRelay:      false,
+	pxClientWakuConfig := waku.WakuConfig{
+		Relay:            false,
 		LogLevel:         "DEBUG",
 		Discv5Discovery:  false,
 		ClusterID:        16,
@@ -568,8 +569,8 @@ func TestDnsDiscover(t *testing.T) {
 		ClusterID:           16,
 		Nameserver:          "8.8.8.8",
 	}
-	nodeWakuConfig := WakuConfig{
-		EnableRelay:   true,
+	nodeWakuConfig := waku.WakuConfig{
+		Relay:         true,
 		LogLevel:      "DEBUG",
 		ClusterID:     16,
 		Shards:        []uint16{64},
@@ -599,8 +600,8 @@ func TestDial(t *testing.T) {
 		ClusterID:           16,
 	}
 	// start node that will initiate the dial
-	dialerNodeWakuConfig := WakuConfig{
-		EnableRelay:     true,
+	dialerNodeWakuConfig := waku.WakuConfig{
+		Relay:           true,
 		LogLevel:        "DEBUG",
 		Discv5Discovery: false,
 		ClusterID:       16,
@@ -617,8 +618,8 @@ func TestDial(t *testing.T) {
 		ClusterID:           16,
 	}
 	// start node that will receive the dial
-	receiverNodeWakuConfig := WakuConfig{
-		EnableRelay:     true,
+	receiverNodeWakuConfig := waku.WakuConfig{
+		Relay:           true,
 		LogLevel:        "DEBUG",
 		Discv5Discovery: false,
 		ClusterID:       16,

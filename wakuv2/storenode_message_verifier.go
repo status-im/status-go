@@ -15,13 +15,14 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
+	"github.com/waku-org/waku-go-bindings/waku"
 )
 
 type storenodeMessageVerifier struct {
-	node *WakuNode
+	node *waku.WakuNode
 }
 
-func newStorenodeMessageVerifier(node *WakuNode) publish.StorenodeMessageVerifier {
+func newStorenodeMessageVerifier(node *waku.WakuNode) publish.StorenodeMessageVerifier {
 	return &storenodeMessageVerifier{
 		node: node,
 	}

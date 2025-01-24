@@ -16,6 +16,7 @@ import (
 
 	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/waku-org/waku-go-bindings/waku"
 )
 
 type testWakuV2Config struct {
@@ -34,8 +35,8 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 		EnableDiscV5:             false,
 	}
 
-	nWakuConfig := &waku2.WakuConfig{
-		EnableRelay:   true,
+	nWakuConfig := &waku.WakuConfig{
+		Relay:         true,
 		LogLevel:      "DEBUG",
 		ClusterID:     cfg.clusterID,
 		Shards:        []uint16{wakuv2.DefaultShardIndex},

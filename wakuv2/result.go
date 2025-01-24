@@ -12,18 +12,19 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
+	"github.com/waku-org/waku-go-bindings/waku"
 )
 
 type storeResultImpl struct {
 	done bool
 
-	node          *WakuNode
+	node          *waku.WakuNode
 	storeRequest  *storepb.StoreQueryRequest
 	storeResponse *storepb.StoreQueryResponse
 	peerInfo      peer.AddrInfo
 }
 
-func newStoreResultImpl(node *WakuNode, peerInfo peer.AddrInfo, storeRequest *storepb.StoreQueryRequest, storeResponse *storepb.StoreQueryResponse) *storeResultImpl {
+func newStoreResultImpl(node *waku.WakuNode, peerInfo peer.AddrInfo, storeRequest *storepb.StoreQueryRequest, storeResponse *storepb.StoreQueryResponse) *storeResultImpl {
 	return &storeResultImpl{
 		node:          node,
 		storeRequest:  storeRequest,
