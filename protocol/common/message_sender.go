@@ -66,6 +66,10 @@ type MessageEvent struct {
 	RawMessage  *RawMessage
 }
 
+type MetricsHandler interface {
+	PushRawMessageByType(messageType string, messageSize uint32, pubsubTopic string, contentTopic string)
+}
+
 type MessageSender struct {
 	identity    *ecdsa.PrivateKey
 	datasync    *datasync.DataSync
@@ -90,6 +94,8 @@ type MessageSender struct {
 
 	// handleSharedSecrets is a callback that is called every time a new shared secret is negotiated
 	handleSharedSecrets func([]*sharedsecret.Secret) error
+
+	metricsHandler MetricsHandler
 }
 
 func NewMessageSender(
@@ -113,6 +119,10 @@ func NewMessageSender(
 	}
 
 	return p, nil
+}
+
+func (s *MessageSender) SetMetricsHandler(handler MetricsHandler) {
+	s.metricsHandler = handler
 }
 
 func (s *MessageSender) Stop() {
@@ -434,6 +444,8 @@ func (s *MessageSender) sendCommunity(
 		zap.String("messageType", "community"),
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
+
+	s.sendBandwidthMetrics(rawMessage)
 	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
@@ -529,6 +541,7 @@ func (s *MessageSender) sendPrivate(
 			zap.String("messageType", "private"),
 			zap.Any("contentType", rawMessage.MessageType),
 			zap.Strings("hashes", types.EncodeHexes(hashes)))
+		s.sendBandwidthMetrics(rawMessage)
 		s.transport.Track(messageID, hashes, newMessages)
 
 	} else {
@@ -549,6 +562,7 @@ func (s *MessageSender) sendPrivate(
 			zap.Any("contentType", rawMessage.MessageType),
 			zap.String("messageType", "private"),
 			zap.Strings("hashes", types.EncodeHexes(hashes)))
+		s.sendBandwidthMetrics(rawMessage)
 		s.transport.Track(messageID, hashes, newMessages)
 	}
 
@@ -580,6 +594,7 @@ func (s *MessageSender) SendPairInstallation(
 		return nil, errors.Wrap(err, "failed to send a message spec")
 	}
 
+	s.sendBandwidthMetrics(&rawMessage)
 	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
@@ -810,6 +825,7 @@ func (s *MessageSender) SendPublic(
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.String("messageType", "public"),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
+	s.sendBandwidthMetrics(&rawMessage)
 	s.transport.Track(messageID, hashes, newMessages)
 
 	return messageID, nil
@@ -1382,4 +1398,10 @@ func (s *MessageSender) CleanupHashRatchetEncryptedMessages() error {
 	}
 
 	return nil
+}
+
+func (s *MessageSender) sendBandwidthMetrics(rawMessage *RawMessage) {
+	if s.metricsHandler != nil {
+		s.metricsHandler.PushRawMessageByType(rawMessage.MessageType.String(), uint32(len(rawMessage.Payload)), rawMessage.PubsubTopic, rawMessage.ContentTopic)
+	}
 }

@@ -119,6 +119,22 @@ var (
 		},
 		[]string{"peer_id"},
 	)
+
+	RawMessagesSizeBytes = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "statusgo_waku_raw_message_size_bytes",
+			Help: "Size of each raw message in bytes sent by this node",
+		},
+		[]string{"message_type", "pubsub_topic", "content_topic"},
+	)
+
+	RawMessagesSentTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "statusgo_waku_raw_message_sent_total",
+			Help: "Total number of raw messages sent by this node",
+		},
+		[]string{"message_type", "pubsub_topic", "content_topic"},
+	)
 )
 
 // RegisterMetrics registers all metrics with the provided registry
@@ -138,6 +154,8 @@ func RegisterMetrics() error {
 		StoreQueryFailures,
 		MissedMessages,
 		PeerId,
+		RawMessagesSizeBytes,
+		RawMessagesSentTotal,
 	}
 
 	for _, collector := range collectors {
@@ -165,6 +183,8 @@ func UnregisterMetrics() error {
 		StoreQueryFailures,
 		MissedMessages,
 		PeerId,
+		RawMessagesSizeBytes,
+		RawMessagesSentTotal,
 	}
 
 	for _, collector := range collectors {

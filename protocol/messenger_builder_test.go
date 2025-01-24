@@ -53,6 +53,11 @@ func (tmc *testMessengerConfig) complete() error {
 	return nil
 }
 
+type mockMetricsHandler struct{}
+
+func (m *mockMetricsHandler) PushRawMessageByType(messageType string, messageSize uint32, pubsubTopic string, contentTopic string) {
+}
+
 func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messenger, error) {
 	err := config.complete()
 	if err != nil {
@@ -118,6 +123,8 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 	if err != nil {
 		return nil, err
 	}
+
+	m.sender.SetMetricsHandler(&mockMetricsHandler{})
 
 	return m, nil
 }

@@ -540,6 +540,7 @@ func NewMessenger(
 		if err != nil {
 			return nil, err
 		}
+		sender.SetMetricsHandler(wakuMetricsHandler)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

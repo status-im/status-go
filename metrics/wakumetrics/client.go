@@ -161,6 +161,11 @@ func (c *Client) PushSentMessageTotal(messageSize uint32, publishMethod string) 
 	MessagesSentTotal.WithLabelValues(publishMethod).Inc()
 }
 
+func (c *Client) PushRawMessageByType(messageType string, messageSize uint32, pubsubTopic string, contentTopic string) {
+	RawMessagesSizeBytes.WithLabelValues(messageType, pubsubTopic, contentTopic).Add(float64(messageSize))
+	RawMessagesSentTotal.WithLabelValues(messageType, pubsubTopic, contentTopic).Inc()
+}
+
 func getOriginString(origin wps.Origin) string {
 	switch origin {
 	case wps.Unknown:

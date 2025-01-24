@@ -39,6 +39,11 @@ type MessageSenderSuite struct {
 	logger      *zap.Logger
 }
 
+type mockMetricsHandler struct{}
+
+func (m *mockMetricsHandler) PushRawMessageByType(messageType string, messageSize uint32, pubsubTopic string, contentTopic string) {
+}
+
 func (s *MessageSenderSuite) SetupTest() {
 	s.testMessage = protobuf.ChatMessage{
 		Text:        "abc123",
@@ -94,6 +99,7 @@ func (s *MessageSenderSuite) SetupTest() {
 			Datasync: true,
 		},
 	)
+	s.sender.SetMetricsHandler(&mockMetricsHandler{})
 	s.Require().NoError(err)
 }
 
