@@ -66,6 +66,7 @@ import (
 	"github.com/status-im/status-go/timesource"
 	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 	"github.com/status-im/status-go/wakuv2"
+	"github.com/waku-org/waku-go-bindings/waku"
 )
 
 var (
@@ -382,8 +383,8 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			}
 		}
 
-		nwakuCfg := &wakuv2.WakuConfig{
-			NodeKey:   hex.EncodeToString(crypto.FromECDSA(nodeKey)),
+		nwakuCfg := &waku.WakuConfig{
+			Nodekey:   hex.EncodeToString(crypto.FromECDSA(nodeKey)),
 			Host:      nodeConfig.WakuV2Config.Host,
 			TcpPort:   nodeConfig.WakuV2Config.Port,
 			LogLevel:  "DEBUG", // TODO-nwaku ?

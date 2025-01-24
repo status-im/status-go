@@ -10,13 +10,14 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/waku-go-bindings/waku"
 )
 
 type nwakuPublisher struct {
-	node *WakuNode
+	node *waku.WakuNode
 }
 
-func newPublisher(node *WakuNode) publish.Publisher {
+func newPublisher(node *waku.WakuNode) publish.Publisher {
 	return &nwakuPublisher{
 		node: node,
 	}
