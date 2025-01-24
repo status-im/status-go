@@ -41,7 +41,7 @@ else
 endif
 
 ifeq ($(detected_OS),Darwin)
- GOBIN_SHARED_LIB_EXT := dylib
+ GOBIN_SHARED_LIB_EXT := so
  GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
@@ -212,11 +212,10 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la build/bin/libstatus.*
 
-LIBWAKU := third_party/nwaku/build/libwaku.$(GOBIN_SHARED_LIB_EXT)
+LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(GOBIN_SHARED_LIB_EXT)
 $(LIBWAKU):
 	@echo "Building libwaku"
-	$(MAKE) -C third_party/nwaku update || { echo "nwaku make update failed"; exit 1; }
-	$(MAKE) -C ./third_party/nwaku libwaku
+	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku
 
 build-libwaku: $(LIBWAKU)
 
