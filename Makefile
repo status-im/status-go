@@ -222,9 +222,7 @@ build-libwaku: $(LIBWAKU)
 
 statusgo-shared-library: generate
 statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
-ifeq ($(USE_NWAKU),true)
 	$(MAKE) $(LIBWAKU)
-endif	
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
