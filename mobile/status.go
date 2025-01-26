@@ -151,10 +151,14 @@ func initializeLogging(request *requests.InitializeApplication) error {
 		request.LogDir = request.DataDir
 	}
 
+	if request.LogLevel == "" {
+		request.LogLevel = params.DefaultPreLoginLogLevel
+	}
+
 	logSettings := logutils.LogSettings{
-		Enabled: request.LogEnabled,
+		Enabled: true, // always enable pre-login logging
 		Level:   request.LogLevel,
-		File:    path.Join(request.LogDir, api.DefaultLogFile),
+		File:    path.Join(request.LogDir, params.DefaultPreLoginLogFile),
 	}
 
 	err := os.MkdirAll(request.LogDir, 0700)
@@ -543,7 +547,7 @@ func createAccountAndLogin(requestJSON string) string {
 			return statusBackend.LoggedIn("", err)
 		}
 		logutils.ZapLogger().Debug("started a node, and created account")
-		return nil
+		return statusBackend.SetupLogSettings()
 	})
 	return makeJSONResponse(nil)
 }
@@ -580,7 +584,7 @@ func loginAccount(requestJSON string) string {
 			return err
 		}
 		logutils.ZapLogger().Debug("loginAccount started node")
-		return nil
+		return statusBackend.SetupLogSettings()
 	})
 	return makeJSONResponse(nil)
 }
@@ -615,7 +619,7 @@ func restoreAccountAndLogin(requestJSON string) string {
 			return statusBackend.LoggedIn("", err)
 		}
 		logutils.ZapLogger().Debug("started a node, and restored account")
-		return nil
+		return statusBackend.SetupLogSettings()
 	})
 
 	return makeJSONResponse(nil)
@@ -658,7 +662,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
-		return nil
+		return statusBackend.SetupLogSettings()
 	})
 	return makeJSONResponse(nil)
 }

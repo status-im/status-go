@@ -493,8 +493,12 @@ func (b *GethStatusBackend) ensureWalletDBOpened(account multiaccounts.Account, 
 	return nil
 }
 
-func (b *GethStatusBackend) setupLogSettings() error {
-	logSettings := b.config.LogSettings()
+func (b *GethStatusBackend) SetupLogSettings() error {
+	// sync pre_login.log
+	if err := logutils.ZapLogger().Sync(); err != nil {
+		return errors.Wrap(err, "failed to sync logger")
+	}
+	logSettings := b.config.DefaultLogSettings()
 	return logutils.OverrideRootLoggerWithConfig(logSettings)
 }
 
@@ -577,7 +581,12 @@ func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
 	if b.LocalPairingStateManager.IsPairing() {
 		return nil
 	}
-	return b.LoggedIn(request.KeyUID, err)
+	err = b.LoggedIn(request.KeyUID, err)
+	if err != nil {
+		return errors.Wrap(err, "failed to send LoggedIn signal")
+	}
+
+	return nil
 }
 
 // This is a workaround to make user be able to login again, the root cause is where the node config migration
@@ -754,11 +763,6 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		overrideApiConfig(b.config, request.APIConfig)
 	}
 
-	err = b.setupLogSettings()
-	if err != nil {
-		return errors.Wrap(err, "failed to setup log settings")
-	}
-
 	accountsDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return errors.Wrap(err, "failed to create accounts db")
@@ -869,11 +873,6 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	}
 
 	err = b.loadNodeConfig(inputNodeCfg)
-	if err != nil {
-		return err
-	}
-
-	err = b.setupLogSettings()
 	if err != nil {
 		return err
 	}
@@ -2681,6 +2680,10 @@ func (b *GethStatusBackend) Logout() error {
 		signal.SendNodeStopped()
 	}
 
+	if err = b.switchToPreLoginLog(); err != nil {
+		return err
+	}
+
 	// re-initialize the node, at some point we should better manage the lifecycle
 	b.initialize()
 
@@ -2690,6 +2693,14 @@ func (b *GethStatusBackend) Logout() error {
 		return err
 	}
 	return nil
+}
+
+func (b *GethStatusBackend) switchToPreLoginLog() error {
+	err := logutils.ZapLogger().Sync()
+	if err != nil {
+		return err
+	}
+	return logutils.OverrideRootLoggerWithConfig(b.config.PreLoginLogSettings())
 }
 
 // cleanupServices stops parts of services that doesn't managed by a node and removes injected data from services.

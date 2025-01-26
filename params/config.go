@@ -1157,12 +1157,28 @@ func LesTopic(netid int) string {
 	}
 }
 
-func (c *NodeConfig) LogSettings() logutils.LogSettings {
+func (c *NodeConfig) DefaultLogSettings() logutils.LogSettings {
 	return logutils.LogSettings{
 		Enabled:         c.LogEnabled,
 		Level:           c.LogLevel,
 		Namespaces:      c.LogNamespaces,
 		File:            c.LogFile,
+		MaxSize:         c.LogMaxSize,
+		MaxBackups:      c.LogMaxBackups,
+		CompressRotated: c.LogCompressRotated,
+	}
+}
+
+func (c *NodeConfig) PreLoginLogSettings() logutils.LogSettings {
+	logFile := filepath.Join(c.LogDir, DefaultPreLoginLogFile)
+	if c.LogLevel == "" {
+		c.LogLevel = DefaultPreLoginLogLevel
+	}
+	return logutils.LogSettings{
+		Enabled:         true,
+		Level:           c.LogLevel,
+		Namespaces:      c.LogNamespaces,
+		File:            logFile,
 		MaxSize:         c.LogMaxSize,
 		MaxBackups:      c.LogMaxBackups,
 		CompressRotated: c.LogCompressRotated,
