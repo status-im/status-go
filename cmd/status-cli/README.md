@@ -1,6 +1,6 @@
 # Status CLI
 
-The Status CLI is a command line interface for interacting with the Status messenging process. It is a tool for developers and QAs to test the communication workflow without running Status desktop and mobile app.
+The Status CLI is a command line interface for interacting with the Status messaging process. It is a tool for developers and QAs to test the communication workflow without running Status desktop and mobile app.
 
 ## Features
 
