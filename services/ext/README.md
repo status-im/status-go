@@ -45,7 +45,7 @@ Sends a request for historic messages to a mail server.
 
 1. `Object` - The message request object:
 
-- `mailServerPeer`:`URL` - Mail servers' enode addess
+- `mailServerPeer`:`URL` - Mail servers' enode address
 - `from`:`QUANTITY` - (optional) Lower bound of time range as unix timestamp, default is 24 hours back from now
 - `to`:`QUANTITY`- (optional) Upper bound of time range as unix timestamp, default is now
 - `topic`:`DATA`, 4 Bytes - Regular whisper topic
