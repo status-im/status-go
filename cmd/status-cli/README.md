@@ -98,7 +98,7 @@ Logs are recorded in file `*.log` and terminal.
 
 ```bash
 # notice we need both the name and the key id (not the pub key here)
-# the key id will be pressent in the logs when a new account is created, same as the public key
+# the key id will be present in the logs when a new account is created, same as the public key
 ./status-cli serve -n bobby -kid <bob_key_id>
 ```
 
