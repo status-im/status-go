@@ -4,9 +4,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron:  '0 2 * * *'
-  push:
-    branches:
-      - "test-reactivate-reliability-workflow"
 
 env:
   FORCE_COLOR: "1"
