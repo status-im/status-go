@@ -200,7 +200,6 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 statusgo-library: generate
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
-	$(MAKE) $(LIBWAKU)
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
 	@echo "Building static library..."
