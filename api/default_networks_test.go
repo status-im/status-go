@@ -27,7 +27,6 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig)
 
 	require.Len(t, actualNetworks, 8)
-
 	for _, n := range actualNetworks {
 		var err error
 		switch n.ChainID {
@@ -53,8 +52,8 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		}
 
 		// check fallback options
-		require.True(t, strings.Contains(n.RPCURL, rpcToken))
-		require.True(t, strings.Contains(n.FallbackURL, fallbackToken))
+		require.True(t, strings.Contains(n.RPCURL, infuraToken))
+		require.True(t, strings.Contains(n.FallbackURL, poktToken))
 
 		// Check proxy providers for stageName
 		for _, provider := range n.RpcProviders {

@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/status-im/status-go/rpc/network/db"
+
 	"github.com/status-im/status-go/params"
 )
 
@@ -152,6 +154,7 @@ func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[strin
 				}
 			}
 		}
+		db.FillDeprecatedURLs(network, network.RpcProviders)
 	}
 	return updatedNetworks
 }

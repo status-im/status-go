@@ -36,6 +36,14 @@ type RpcProvider struct {
 	AuthToken    string              `json:"authToken" validate:"omitempty,min=1"`                             // Token for TokenAuth (empty string if not used)
 }
 
+// GetFullURL returns the URL with auth token if TokenAuth is used
+func (p RpcProvider) GetFullURL() string {
+	if p.AuthType == TokenAuth && p.AuthToken != "" {
+		return p.URL + "/" + p.AuthToken
+	}
+	return p.URL
+}
+
 type TokenOverride struct {
 	Symbol  string         `json:"symbol"`
 	Address common.Address `json:"address"`
