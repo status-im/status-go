@@ -24,13 +24,13 @@ mkdir -p "${merged_coverage_reports_path}"
 mkdir -p "${test_results_path}"
 
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.test.status-go.yml"
-timestamp=$(python3 -c "import time; print(int(time.time() * 1000))") # Keep in sync with status_backend.py
-project_name="status-go-func-tests-${timestamp}"
+identifier=${BUILD_ID:-$(git rev-parse --short HEAD)}
+project_name="status-go-func-tests-${identifier}"
 
 export STATUS_BACKEND_URLS=$(eval echo http://${project_name}-status-backend-{1..${STATUS_BACKEND_COUNT}}:3333 | tr ' ' ,)
 
 # Remove orphans
-docker ps -a --filter "name=status-go-func-tests-*-status-backend-*" --filter "status=exited" -q | xargs -r docker rm
+docker ps -a --filter "status-go-func-tests-${identifier}" --filter "status=exited" -q | xargs -r docker rm
 
 # Run docker
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"

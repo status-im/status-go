@@ -63,9 +63,9 @@ class StatusBackend(RpcClient, SignalClient):
     def _start_container(self, host_port, privileged):
         docker_project_name = option.docker_project_name
 
-        timestamp = int(time.time() * 1000)  # Keep in sync with run_functional_tests.sh
+        identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else os.popen("git rev-parse --short HEAD").read().strip()
         image_name = f"{docker_project_name}-status-backend:latest"
-        container_name = f"{docker_project_name}-status-backend-{timestamp}"
+        container_name = f"{docker_project_name}-{identifier}-status-backend-{host_port}"
 
         coverage_path = option.codecov_dir if option.codecov_dir else os.path.abspath("./coverage/binary")
 

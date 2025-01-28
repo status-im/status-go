@@ -76,7 +76,14 @@ pipeline {
     }
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    cleanup { sh 'make git-clean' }
+      cleanup {
+        script {
+          sh '''
+            docker ps -a --filter "name=status-go-func-tests-${BUILD_ID}" -q | xargs -r docker rm
+            make git-clean
+          '''
+        }
+      }
   } // post
 } // pipeline
 
