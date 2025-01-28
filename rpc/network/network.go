@@ -14,11 +14,7 @@ import (
 	persistence "github.com/status-im/status-go/rpc/network/db"
 )
 
-type CombinedNetwork struct {
-	Prod *params.Network
-	Test *params.Network
-}
-
+//go:generate mockgen -package=mock -source=network.go -destination=mock/network.go
 type ManagerInterface interface {
 	InitEmbeddedNetworks(networks []params.Network) error
 
@@ -35,6 +31,11 @@ type ManagerInterface interface {
 
 	SetUserRpcProviders(chainID uint64, providers []params.RpcProvider) error
 	SetEnabled(chainID uint64, enabled bool) error
+}
+
+type CombinedNetwork struct {
+	Prod *params.Network
+	Test *params.Network
 }
 
 type Manager struct {
