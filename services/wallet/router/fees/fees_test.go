@@ -70,8 +70,8 @@ func TestSuggestedFeesForNotEIP1559CompatibleChains(t *testing.T) {
 	chainID := uint64(1)
 	gasPrice := big.NewInt(1)
 	feeHistory := &FeeHistory{}
-
-	state.rpcClient.EXPECT().Call(feeHistory, chainID, "eth_feeHistory", uint64(300), "latest", []int{25, 50, 75}).Times(1).Return(nil)
+	percentiles := []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3}
+	state.rpcClient.EXPECT().Call(feeHistory, chainID, "eth_feeHistory", uint64(300), "latest", percentiles).Times(1).Return(nil)
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
 	state.rpcClient.EXPECT().EthClient(chainID).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(gasPrice, nil)
@@ -88,8 +88,8 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 
 	chainID := uint64(1)
 	feeHistory := &FeeHistory{}
-
-	state.rpcClient.EXPECT().Call(feeHistory, chainID, "eth_feeHistory", uint64(300), "latest", []int{25, 50, 75}).Times(1).Return(nil).
+	percentiles := []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3}
+	state.rpcClient.EXPECT().Call(feeHistory, chainID, "eth_feeHistory", uint64(300), "latest", percentiles).Times(1).Return(nil).
 		Do(func(feeHistory, chainID, method any, args ...any) {
 			feeHistoryResponse := &FeeHistory{
 				BaseFeePerGas: []string{
@@ -156,14 +156,25 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, suggestedFees)
 
+	variadicFee1 := big.NewInt(0).Sub(suggestedFees.MaxFeesLevels.High.ToInt(), suggestedFees.MaxFeesLevels.HighPriority.ToInt())
+	variadicFee1.Sub(variadicFee1, big.NewInt(0).Mul(big.NewInt(2), suggestedFees.BaseFee))
+
+	variadicFee2 := big.NewInt(0).Sub(suggestedFees.MaxFeesLevels.Medium.ToInt(), suggestedFees.MaxFeesLevels.MediumPriority.ToInt())
+	variadicFee2.Sub(variadicFee2, suggestedFees.BaseFee)
+
+	assert.Equal(t, variadicFee1, variadicFee2)
+
 	assert.Equal(t, big.NewInt(0), suggestedFees.GasPrice)
-	assert.Equal(t, big.NewInt(6958609414), suggestedFees.BaseFee)
-	assert.Equal(t, big.NewInt(6958609414), suggestedFees.CurrentBaseFee)
-	assert.Equal(t, big.NewInt(7928609414), suggestedFees.MaxFeesLevels.Low.ToInt())
-	assert.Equal(t, big.NewInt(14887218828), suggestedFees.MaxFeesLevels.Medium.ToInt())
-	assert.Equal(t, big.NewInt(21845828242), suggestedFees.MaxFeesLevels.High.ToInt())
-	assert.Equal(t, big.NewInt(970000000), suggestedFees.MaxPriorityFeePerGas)
-	assert.Equal(t, big.NewInt(54715554), suggestedFees.MaxPriorityFeeSuggestedBounds.Lower)
-	assert.Equal(t, big.NewInt(1636040877), suggestedFees.MaxPriorityFeeSuggestedBounds.Upper)
+	assert.Equal(t, big.NewInt(5362838082), suggestedFees.BaseFee)
+	assert.Equal(t, big.NewInt(5362838082), suggestedFees.CurrentBaseFee)
+	assert.Equal(t, big.NewInt(5462838082), suggestedFees.MaxFeesLevels.Low.ToInt())
+	assert.Equal(t, big.NewInt(100000000), suggestedFees.MaxFeesLevels.LowPriority.ToInt())
+	assert.Equal(t, big.NewInt(7795989313), suggestedFees.MaxFeesLevels.Medium.ToInt())
+	assert.Equal(t, big.NewInt(970000000), suggestedFees.MaxFeesLevels.MediumPriority.ToInt())
+	assert.Equal(t, big.NewInt(14104411640), suggestedFees.MaxFeesLevels.High.ToInt())
+	assert.Equal(t, big.NewInt(1915584245), suggestedFees.MaxFeesLevels.HighPriority.ToInt())
+	assert.Equal(t, suggestedFees.MaxFeesLevels.MediumPriority.ToInt(), suggestedFees.MaxPriorityFeePerGas)
+	assert.Equal(t, big.NewInt(100000000), suggestedFees.MaxPriorityFeeSuggestedBounds.Lower)
+	assert.Equal(t, big.NewInt(1915584245), suggestedFees.MaxPriorityFeeSuggestedBounds.Upper)
 	assert.True(t, suggestedFees.EIP1559Enabled)
 }
