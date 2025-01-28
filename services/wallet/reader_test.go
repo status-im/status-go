@@ -349,7 +349,8 @@ func TestTokensToBalancesPerChain(t *testing.T) {
 		},
 	}
 
-	result := tokensToBalancesPerChain(cachedTokens)
+	result, err := tokensToBalancesPerChain(cachedTokens)
+	assert.NoError(t, err)
 
 	assert.Equal(t, expectedBalancesPerChain, result)
 }
