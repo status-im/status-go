@@ -237,8 +237,17 @@ class StatusBackend(RpcClient, SignalClient):
                 {
                     "ChainID": network_id,
                     "ChainName": "Anvil",
-                    "DefaultRPCURL": "http://anvil:8545",
-                    "RPCURL": "http://anvil:8545",
+                    "RpcProviders": [
+                        {
+                            "chainId": network_id,
+                            "name": "Anvil Direct",
+                            "url": "http://anvil:8545",
+                            "enableRpsLimiter": False,
+                            "type": "embedded-direct",
+                            "enabled": True,
+                            "authType": "no-auth",
+                        }
+                    ],
                     "ShortName": "eth",
                     "NativeCurrencyName": "Ether",
                     "NativeCurrencySymbol": "ETH",

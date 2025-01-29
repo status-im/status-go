@@ -17,16 +17,26 @@
     },
     "Networks": [
         {
-			"ChainID":                31337,
-			"ChainName":              "Anvil",
-			"RPCURL":                 "http://anvil:8545",
-			"ShortName":              "eth",
-			"NativeCurrencyName":     "Ether",
-			"NativeCurrencySymbol":   "ETH",
-			"NativeCurrencyDecimals": 18,
-			"IsTest":                 false,
-			"Layer":                  1,
-			"Enabled":                true
-		}
+            "ChainID": 31337,
+            "ChainName": "Anvil",
+            "RpcProviders": [
+                {
+                    "ChainID": 31337,
+                    "Name": "Local Anvil",
+                    "URL": "http://anvil:8545",
+                    "EnableRPSLimiter": true,
+                    "Type": "embedded-direct",
+                    "Enabled": true,
+                    "AuthType": "no-auth"
+                }
+            ],
+            "ShortName": "eth",
+            "NativeCurrencyName": "Ether",
+            "NativeCurrencySymbol": "ETH",
+            "NativeCurrencyDecimals": 18,
+            "IsTest": false,
+            "Layer": 1,
+            "Enabled": true
+        }
     ]
 }
