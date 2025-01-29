@@ -75,12 +75,14 @@ func setupTests(t *testing.T) (state testState, close func()) {
 
 	err = networkManager.InitEmbeddedNetworks([]params.Network{
 		{
-			ChainID: walletCommon.EthereumMainnet,
-			Layer:   1,
+			ChainID:   walletCommon.EthereumMainnet,
+			ChainName: "Ethereum Mainnet",
+			Layer:     1,
 		},
 		{
-			ChainID: walletCommon.OptimismMainnet,
-			Layer:   1,
+			ChainID:   walletCommon.OptimismMainnet,
+			ChainName: "Optimism Mainnet",
+			Layer:     1,
 		},
 	})
 	require.NoError(t, err)
