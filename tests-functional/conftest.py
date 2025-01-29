@@ -60,9 +60,17 @@ def pytest_configure(config):
     executor_number = int(os.getenv("EXECUTOR_NUMBER", 5))
     base_port = 7000
     range_size = 100
+    max_port = 65535
+    min_port = 1024
 
     start_port = base_port + (executor_number * range_size)
-    option.status_backend_port_range = list(range(start_port, start_port + 20000))
+    end_port = start_port + 20000
+
+    # Ensure generated ports are within the valid range
+    if start_port < min_port or end_port > max_port:
+        raise ValueError(f"Generated port range ({start_port}-{end_port}) is outside the allowed range ({min_port}-{max_port}).")
+
+    option.status_backend_port_range = list(range(start_port, end_port))
     option.status_backend_containers = []
 
     option.base_dir = os.path.dirname(os.path.abspath(__file__))
