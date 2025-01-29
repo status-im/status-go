@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron:  '0 2 * * *'
+  push:
+    branches:
+      - "test-reactivate-reliability-workflow"
 
 env:
   FORCE_COLOR: "1"
@@ -12,9 +15,15 @@ jobs:
   test-reliability:
     timeout-minutes: 90
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Restrict repository access to read-only
+      actions: read   # Only read actions, no write access
+      checks: write   # Allow posting test reports
     steps:
 
     - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
 
     - uses: actions/setup-python@v4
       with:
