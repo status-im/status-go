@@ -317,13 +317,14 @@ class StatusBackend(RpcClient, SignalClient):
 
     @retry(stop=stop_after_delay(5), wait=wait_fixed(0.1), reraise=True)
     def kill(self):
-        if self.container:
-            logging.info(f"Killing container with id {self.container.short_id}")
-            self.container.kill()
-            try:
-                self.container.remove()
-            except Exception as e:
-                logging.warning(f"Failed to remove container {self.container.short_id}: {e}")
-            finally:
-                self.container = None
-                logging.info("Container stopped.")
+        if not self.container:
+            return
+        logging.info(f"Killing container with id {self.container.short_id}")
+        self.container.kill()
+        try:
+            self.container.remove()
+        except Exception as e:
+            logging.warning(f"Failed to remove container {self.container.short_id}: {e}")
+        finally:
+            self.container = None
+            logging.info("Container stopped.")
