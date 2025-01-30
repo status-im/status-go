@@ -7,7 +7,6 @@ import tempfile
 import time
 import random
 import threading
-from uuid import uuid4
 import requests
 import docker
 import docker.errors
