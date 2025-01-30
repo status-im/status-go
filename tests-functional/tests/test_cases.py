@@ -25,6 +25,7 @@ class StatusDTestCase:
 
 class StatusBackendTestCase:
 
+    reuse_container = True  # Skip close_status_backend_containers cleanup
     await_signals = [SignalType.NODE_LOGIN.value]
 
     network_id = 31337
@@ -36,6 +37,10 @@ class StatusBackendTestCase:
         self.rpc_client.init_status_backend()
         self.rpc_client.restore_account_and_login()
         self.rpc_client.wait_for_login()
+
+    def teardown_class(self):
+        for container in option.status_backend_containers:
+            container.kill()
 
 
 class WalletTestCase(StatusBackendTestCase):

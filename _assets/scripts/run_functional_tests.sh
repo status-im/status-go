@@ -30,7 +30,7 @@ project_name="status-go-func-tests-${identifier}"
 export STATUS_BACKEND_URLS=$(eval echo http://${project_name}-status-backend-{1..${STATUS_BACKEND_COUNT}}:3333 | tr ' ' ,)
 
 # Remove orphans
-docker ps -a --filter "status-go-func-tests-${identifier}" --filter "status=exited" -q | xargs -r docker rm
+docker ps -a --filter "status-go-func-tests-${identifier}" --filter "status=exited" -q | xargs -r docker rm -f
 
 # Run docker
 echo -e "${GRN}Running tests${RST}, HEAD: $(git rev-parse HEAD)"

@@ -77,8 +77,9 @@ def pytest_configure(config):
 
 
 @pytest.fixture(scope="function", autouse=True)
-def close_status_backend_containers():
-    option.status_backend_containers = []
+def close_status_backend_containers(request):
     yield
+    if hasattr(request.node.instance, "reuse_container"):
+        return
     for container in option.status_backend_containers:
-        container.kill()
+        container.kill()  # type: ignore
