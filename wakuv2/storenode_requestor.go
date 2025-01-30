@@ -58,7 +58,13 @@ func (s *storenodeRequestor) GetMessagesByHash(ctx context.Context, peerInfo pee
 		return nil, err
 	}
 
-	storeResponse, err := s.node.StoreQuery(ctx, bindingsStoreRequest, peerInfo)
+	bindingsResponse, err := s.node.StoreQuery(ctx, bindingsStoreRequest, peerInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	storeResponse, err := BindingsToPbStoreResponse(bindingsResponse)
+
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +84,14 @@ func (s *storenodeRequestor) Query(ctx context.Context, peerInfo peer.AddrInfo, 
 		return nil, err
 	}
 
-	storeResponse, err := s.node.StoreQuery(ctx, bindingsStoreRequest, peerInfo)
+	bindingsResponse, err := s.node.StoreQuery(ctx, bindingsStoreRequest, peerInfo)
+
+	if err != nil {
+		return nil, err
+	}
+
+	storeResponse, err := BindingsToPbStoreResponse(bindingsResponse)
+
 	if err != nil {
 		return nil, err
 	}
