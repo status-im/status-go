@@ -14,8 +14,8 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/api/publish"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/waku-go-bindings/waku"
+	"github.com/waku-org/waku-go-bindings/waku/common"
 )
 
 type storenodeMessageVerifier struct {
@@ -30,9 +30,12 @@ func newStorenodeMessageVerifier(node *waku.WakuNode) publish.StorenodeMessageVe
 
 func (d *storenodeMessageVerifier) MessageHashesExist(ctx context.Context, requestID []byte, peerInfo peer.AddrInfo, pageSize uint64, messageHashes []pb.MessageHash) ([]pb.MessageHash, error) {
 	requestIDStr := hex.EncodeToString(requestID)
-	storeRequest := &storepb.StoreQueryRequest{
+
+	hexHashes := make([]common.MessageHash, len(messageHashes))
+
+	storeRequest := &common.StoreQueryRequest{
 		RequestId:         requestIDStr,
-		MessageHashes:     make([][]byte, len(messageHashes)),
+		MessageHashes:     &hexHashes,
 		IncludeData:       false,
 		PaginationCursor:  nil,
 		PaginationForward: false,
@@ -40,7 +43,7 @@ func (d *storenodeMessageVerifier) MessageHashesExist(ctx context.Context, reque
 	}
 
 	for i, mhash := range messageHashes {
-		storeRequest.MessageHashes[i] = mhash.Bytes()
+		(*storeRequest.MessageHashes)[i] = common.MessageHash(mhash.String())
 	}
 
 	response, err := d.node.StoreQuery(ctx, storeRequest, peerInfo)

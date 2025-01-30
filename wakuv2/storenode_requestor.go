@@ -52,7 +52,13 @@ func (s *storenodeRequestor) GetMessagesByHash(ctx context.Context, peerInfo pee
 		storeRequest.MessageHashes[i] = mhash.Bytes()
 	}
 
-	storeResponse, err := s.node.StoreQuery(ctx, storeRequest, peerInfo)
+	bindingsStoreRequest, err := PbToBindingsStoreRequest(storeRequest)
+
+	if err != nil {
+		return nil, err
+	}
+
+	storeResponse, err := s.node.StoreQuery(ctx, bindingsStoreRequest, peerInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +71,14 @@ func (s *storenodeRequestor) GetMessagesByHash(ctx context.Context, peerInfo pee
 }
 
 func (s *storenodeRequestor) Query(ctx context.Context, peerInfo peer.AddrInfo, storeRequest *storepb.StoreQueryRequest) (commonapi.StoreRequestResult, error) {
-	storeResponse, err := s.node.StoreQuery(ctx, storeRequest, peerInfo)
+
+	bindingsStoreRequest, err := PbToBindingsStoreRequest(storeRequest)
+
+	if err != nil {
+		return nil, err
+	}
+
+	storeResponse, err := s.node.StoreQuery(ctx, bindingsStoreRequest, peerInfo)
 	if err != nil {
 		return nil, err
 	}
