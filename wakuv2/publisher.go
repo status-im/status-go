@@ -29,20 +29,13 @@ func (p *nwakuPublisher) RelayListPeers(pubsubTopic string) ([]peer.ID, error) {
 }
 
 func (p *nwakuPublisher) RelayPublish(ctx context.Context, message *pb.WakuMessage, pubsubTopic string) (pb.MessageHash, error) {
-	// TODO-nwaku improve this quick workaround to use the pb definition of the hash
-	var pbHash pb.MessageHash
+	// TODO-nwaku improve this workaround to use the pb definition of the hash
 	hexHash, err := p.node.RelayPublish(ctx, message, pubsubTopic)
 	if err != nil {
-		return pbHash, err
+		return pb.MessageHash{}, err
 	}
 
-	bytesHash, err := hexHash.Bytes()
-	if err != nil {
-		return pbHash, err
-	}
-
-	pbHash = pb.ToMessageHash(bytesHash)
-	return pbHash, err
+	return HexToPbHash(hexHash)
 }
 
 // LightpushPublish publishes a message via WakuLightPush
