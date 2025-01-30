@@ -323,7 +323,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -331,7 +330,6 @@ import (
 	libp2pproto "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"github.com/waku-org/waku-go-bindings/waku/common"
 	"go.uber.org/zap"
@@ -347,6 +345,7 @@ type WakuConfig struct {
 	Nodekey                     string           `json:"nodekey,omitempty"`
 	Relay                       bool             `json:"relay,omitempty"`
 	Store                       bool             `json:"store,omitempty"`
+	LegacyStore                 bool             `json:"legacyStore"`
 	Storenode                   string           `json:"storenode,omitempty"`
 	StoreMessageRetentionPolicy string           `json:"storeMessageRetentionPolicy,omitempty"`
 	StoreMessageDbUrl           string           `json:"storeMessageDbUrl,omitempty"`
@@ -827,7 +826,7 @@ func (n *WakuNode) Version() (string, error) {
 	return "", errors.New(errMsg)
 }
 
-func (n *WakuNode) StoreQuery(ctx context.Context, storeRequest *storepb.StoreQueryRequest, peerInfo peer.AddrInfo) (*storepb.StoreQueryResponse, error) {
+func (n *WakuNode) StoreQuery(ctx context.Context, storeRequest *common.StoreQueryRequest, peerInfo peer.AddrInfo) (*common.StoreQueryResponse, error) {
 	timeoutMs := getContextTimeoutMilliseconds(ctx)
 
 	b, err := json.Marshal(storeRequest)
@@ -856,24 +855,24 @@ func (n *WakuNode) StoreQuery(ctx context.Context, storeRequest *storepb.StoreQu
 
 	if C.getRet(resp) == C.RET_OK {
 		jsonResponseStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		storeQueryResponse := &storepb.StoreQueryResponse{}
-		err = json.Unmarshal([]byte(jsonResponseStr), storeQueryResponse)
+		storeQueryResponse := common.StoreQueryResponse{}
+		err = json.Unmarshal([]byte(jsonResponseStr), &storeQueryResponse)
 		if err != nil {
 			return nil, err
 		}
-		return storeQueryResponse, nil
+		return &storeQueryResponse, nil
 	}
 	errMsg := "error WakuStoreQuery: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return nil, errors.New(errMsg)
 }
 
-func (n *WakuNode) RelayPublish(ctx context.Context, message *pb.WakuMessage, pubsubTopic string) (pb.MessageHash, error) {
+func (n *WakuNode) RelayPublish(ctx context.Context, message *pb.WakuMessage, pubsubTopic string) (common.MessageHash, error) {
 	timeoutMs := getContextTimeoutMilliseconds(ctx)
 
 	jsonMsg, err := json.Marshal(message)
 	if err != nil {
-		return pb.MessageHash{}, err
+		return common.MessageHash(""), err
 	}
 
 	wg := sync.WaitGroup{}
@@ -890,14 +889,14 @@ func (n *WakuNode) RelayPublish(ctx context.Context, message *pb.WakuMessage, pu
 	wg.Wait()
 	if C.getRet(resp) == C.RET_OK {
 		msgHash := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-		msgHashBytes, err := hexutil.Decode(msgHash)
+		parsedMsgHash, err := common.ToMessageHash(msgHash)
 		if err != nil {
-			return pb.MessageHash{}, err
+			return common.MessageHash(""), err
 		}
-		return pb.ToMessageHash(msgHashBytes), nil
+		return parsedMsgHash, nil
 	}
 	errMsg := "WakuRelayPublish: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return pb.MessageHash{}, errors.New(errMsg)
+	return common.MessageHash(""), errors.New(errMsg)
 }
 
 func (n *WakuNode) DnsDiscovery(ctx context.Context, enrTreeUrl string, nameDnsServer string) ([]multiaddr.Multiaddr, error) {
