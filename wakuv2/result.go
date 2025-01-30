@@ -65,12 +65,20 @@ func (r *storeResultImpl) Next(ctx context.Context, opts ...store.RequestOption)
 	r.storeRequest.RequestId = hex.EncodeToString(protocol.GenerateRequestID())
 	r.storeRequest.PaginationCursor = r.storeResponse.PaginationCursor
 
-	storeResponse, err := r.node.StoreQuery(ctx, r.storeRequest, r.peerInfo)
+	bindingsStoreRequest, err := PbToBindingsStoreRequest(r.storeRequest)
+
 	if err != nil {
 		return err
 	}
 
-	r.storeResponse = storeResponse
+	bindingsStoreResponse, err := r.node.StoreQuery(ctx, bindingsStoreRequest, r.peerInfo)
+	if err != nil {
+		return err
+	}
+
+	storeResponse := storepb.StoreQueryResponse{RequestId: bindingsStoreResponse.RequestId}
+
+	r.storeResponse = &storeResponse
 	return nil
 }
 
