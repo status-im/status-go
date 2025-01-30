@@ -56,3 +56,56 @@ func PbToBindingsStoreRequest(pbStoreRequest *storepb.StoreQueryRequest) (*commo
 	}
 	return &bindingsQueryRequest, nil
 }
+
+func BindingsToPbStoreResponse(bindingsStoreResponse *common.StoreQueryResponse) (*storepb.StoreQueryResponse, error) {
+
+	paginationCursor, err := bindingsStoreResponse.PaginationCursor.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	pbQueryResponse := storepb.StoreQueryResponse{
+		RequestId:        bindingsStoreResponse.RequestId,
+		StatusCode:       bindingsStoreResponse.StatusCode,
+		StatusDesc:       &bindingsStoreResponse.StatusDesc,
+		PaginationCursor: paginationCursor,
+	}
+
+	if bindingsStoreResponse.Messages == nil {
+		return &pbQueryResponse, nil
+	}
+
+	var messages []*storepb.WakuMessageKeyValue
+
+	for _, message := range *bindingsStoreResponse.Messages {
+
+		msgHash, err := message.MessageHash.Bytes()
+
+		if err != nil {
+			return nil, err
+		}
+
+		wakuMessage := pb.WakuMessage{
+			Payload:        message.WakuMessage.Payload,
+			ContentTopic:   message.WakuMessage.ContentTopic,
+			Version:        message.WakuMessage.Version,
+			Timestamp:      message.WakuMessage.Timestamp,
+			Meta:           message.WakuMessage.Meta,
+			Ephemeral:      message.WakuMessage.Ephemeral,
+			RateLimitProof: message.WakuMessage.RateLimitProof,
+		}
+
+		pbMessage := storepb.WakuMessageKeyValue{
+			MessageHash: msgHash,
+			PubsubTopic: &message.PubsubTopic,
+			Message:     &wakuMessage,
+		}
+
+		messages = append(messages, &pbMessage)
+	}
+
+	pbQueryResponse.Messages = messages
+
+	return &pbQueryResponse, nil
+
+}

@@ -46,7 +46,13 @@ func (d *storenodeMessageVerifier) MessageHashesExist(ctx context.Context, reque
 		(*storeRequest.MessageHashes)[i] = common.MessageHash(mhash.String())
 	}
 
-	response, err := d.node.StoreQuery(ctx, storeRequest, peerInfo)
+	bindingsResponse, err := d.node.StoreQuery(ctx, storeRequest, peerInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := BindingsToPbStoreResponse(bindingsResponse)
+
 	if err != nil {
 		return nil, err
 	}
