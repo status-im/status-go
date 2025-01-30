@@ -356,6 +356,9 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		WalletFeed:      &n.walletFeed,
 	}
 	n.rpcClient, err = rpc.NewClient(config)
+	if err != nil {
+		return
+	}
 	n.rpcClient.Start(context.Background())
 	if err != nil {
 		return
