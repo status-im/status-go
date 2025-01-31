@@ -1,7 +1,6 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
@@ -86,20 +85,14 @@ func (n *NetworksPersistence) GetNetworks(onlyEnabled bool, chainID *uint64) ([]
 	result := make([]*params.Network, 0, 10)
 	for rows.Next() {
 		network := &params.Network{}
-		var relatedChainID sql.NullInt64
 		err := rows.Scan(
 			&network.ChainID, &network.ChainName, &network.RPCURL, &network.FallbackURL,
 			&network.BlockExplorerURL, &network.IconURL, &network.NativeCurrencyName, &network.NativeCurrencySymbol,
 			&network.NativeCurrencyDecimals, &network.IsTest, &network.Layer, &network.Enabled, &network.ChainColor,
-			&network.ShortName, &relatedChainID,
+			&network.ShortName, &network.RelatedChainID,
 		)
 		if err != nil {
 			return nil, err
-		}
-
-		// Convert sql.NullInt64 to uint64 only if it's valid
-		if relatedChainID.Valid {
-			network.RelatedChainID = uint64(relatedChainID.Int64)
 		}
 
 		// Fetch RPC providers for the network
