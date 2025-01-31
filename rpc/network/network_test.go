@@ -30,7 +30,7 @@ func (s *NetworkManagerTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.db = testDb
 	s.cleanup = func() { s.Require().NoError(cleanup()) }
-	s.manager = network.NewManager(testDb)
+	s.manager = network.NewManager(testDb, nil, nil, nil)
 	persistence := db.NewNetworksPersistence(testDb)
 
 	// Use testutil to initialize networks

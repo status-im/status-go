@@ -66,7 +66,7 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 	state.db, closeDb = createDB(t)
 	state.walletDb, closeWalletDb = createWalletDB(t)
 
-	networkManager := network.NewManager(state.db)
+	networkManager := network.NewManager(state.db, nil, nil, nil)
 	require.NotNil(t, networkManager)
 
 	err := networkManager.InitEmbeddedNetworks([]params.Network{

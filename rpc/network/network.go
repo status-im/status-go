@@ -6,13 +6,18 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/event"
+
 	"github.com/status-im/status-go/errors"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/services/accounts/settingsevent"
 
 	persistence "github.com/status-im/status-go/rpc/network/db"
+	"github.com/status-im/status-go/rpc/network/networksevent"
 )
 
 //go:generate mockgen -package=mock -source=network.go -destination=mock/network.go
@@ -49,11 +54,16 @@ type Manager struct {
 	networkPersistence persistence.NetworksPersistenceInterface
 	embeddedNetworks   []params.Network
 
+	accountFeed     *event.Feed
+	settingsFeed    *event.Feed
+	networksFeed    *event.Feed
+	settingsWatcher *settingsevent.Watcher
+
 	logger *zap.Logger
 }
 
 // NewManager creates a new instance of Manager.
-func NewManager(db *sql.DB) *Manager {
+func NewManager(db *sql.DB, accountFeed *event.Feed, settingsFeed *event.Feed, networksFeed *event.Feed) *Manager {
 	accountsDB, err := accounts.NewDB(db)
 	if err != nil {
 		return nil
@@ -65,8 +75,83 @@ func NewManager(db *sql.DB) *Manager {
 		db:                 db,
 		accountsDB:         accountsDB,
 		networkPersistence: persistence.NewNetworksPersistence(db),
+		accountFeed:        accountFeed,
+		settingsFeed:       settingsFeed,
+		networksFeed:       networksFeed,
 		logger:             logger,
 	}
+}
+
+func (nm *Manager) Start() {
+	if nm.settingsWatcher == nil {
+		settingChangeCb := func(setting settings.SettingField, value interface{}) {
+			if setting.Equals(settings.TestNetworksEnabled) {
+				nm.onTestNetworksEnabledChanged()
+			}
+		}
+		nm.settingsWatcher = settingsevent.NewWatcher(nm.settingsFeed, settingChangeCb)
+		nm.settingsWatcher.Start()
+	}
+}
+
+func (nm *Manager) Stop() {
+	if nm.settingsWatcher != nil {
+		nm.settingsWatcher.Stop()
+		nm.settingsWatcher = nil
+	}
+}
+
+func (nm *Manager) onTestNetworksEnabledChanged() {
+	areTestNetworksEnabled, err := nm.GetTestNetworksEnabled()
+	if err != nil {
+		nm.logger.Error("failed to get test networks enabled", zap.Error(err))
+		return
+	}
+
+	oldActiveNetworks, err := nm.getActiveNetworksForTestMode(!areTestNetworksEnabled)
+	if err != nil {
+		nm.logger.Error("failed to get old active networks", zap.Error(err))
+		return
+	}
+
+	newActiveNetworks, err := nm.getActiveNetworksForTestMode(areTestNetworksEnabled)
+	if err != nil {
+		nm.logger.Error("failed to get new active networks", zap.Error(err))
+		return
+	}
+
+	nm.notifyActiveNetworksChange(newActiveNetworks, oldActiveNetworks)
+}
+
+func (nm *Manager) notifyActiveNetworksChange(activatedNetworks []*params.Network, deactivatedNetworks []*params.Network) {
+	if nm.networksFeed == nil {
+		return
+	}
+
+	currentActiveNetworks, err := nm.GetActiveNetworks()
+	if err != nil {
+		nm.logger.Error("failed to get active networks", zap.Error(err))
+		return
+	}
+
+	params := &networksevent.ActiveNetworksChangedParams{
+		CurrentActiveChainIDs: networksToChainIDs(currentActiveNetworks),
+		ActivatedChainIDs:     networksToChainIDs(activatedNetworks),
+		DeactivatedChainIDs:   networksToChainIDs(deactivatedNetworks),
+	}
+
+	nm.networksFeed.Send(networksevent.Event{
+		Type:                        networksevent.EventTypeActiveNetworksChanged,
+		ActiveNetworksChangedParams: params,
+	})
+}
+
+func networksToChainIDs(networks []*params.Network) []uint64 {
+	chainIDs := make([]uint64, 0, len(networks))
+	for _, network := range networks {
+		chainIDs = append(chainIDs, network.ChainID)
+	}
+	return chainIDs
 }
 
 // Init initializes the nets, merges them with existing ones, and wraps the operation in a transaction.
@@ -209,6 +294,16 @@ func (nm *Manager) SetActive(chainID uint64, active bool) error {
 	if err != nil {
 		return errors.CreateErrorResponseFromError(fmt.Errorf("failed to persist active status: %w", err))
 	}
+
+	activatedNetworks := []*params.Network{}
+	deactivatedNetworks := []*params.Network{}
+	if active {
+		activatedNetworks = append(activatedNetworks, network)
+	} else {
+		deactivatedNetworks = append(deactivatedNetworks, network)
+	}
+	nm.notifyActiveNetworksChange(activatedNetworks, deactivatedNetworks)
+
 	return nil
 }
 

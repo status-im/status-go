@@ -70,7 +70,7 @@ func setupTests(t *testing.T) (state testState, close func()) {
 	state.mockCtrl = gomock.NewController(t)
 	state.rpcClient = mock_rpcclient.NewMockClientInterface(state.mockCtrl)
 
-	networkManager := network.NewManager(state.db)
+	networkManager := network.NewManager(state.db, nil, nil, nil)
 	require.NotNil(t, networkManager)
 
 	err = networkManager.InitEmbeddedNetworks([]params.Network{

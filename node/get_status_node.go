@@ -140,6 +140,8 @@ type StatusNode struct {
 
 	accountsFeed event.Feed
 	walletFeed   event.Feed
+	networksFeed event.Feed
+	settingsFeed event.Feed
 }
 
 // New makes new instance of StatusNode.
@@ -341,7 +343,10 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		UpstreamChainID: n.config.NetworkID,
 		Networks:        n.config.Networks,
 		DB:              n.appDB,
+		AccountsFeed:    &n.accountsFeed,
 		WalletFeed:      &n.walletFeed,
+		SettingsFeed:    &n.settingsFeed,
+		NetworksFeed:    &n.networksFeed,
 	}
 	n.rpcClient, err = rpc.NewClient(config)
 	if err != nil {

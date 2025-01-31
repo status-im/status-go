@@ -77,13 +77,12 @@ var (
 )
 
 func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server.MediaServer) error {
-	settingsFeed := &event.Feed{}
 	accDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return err
 	}
 
-	setSettingsNotifier(accDB, settingsFeed)
+	setSettingsNotifier(accDB, &b.settingsFeed)
 
 	services := []common.StatusService{}
 	services = append(services, b.rpcFiltersService())
@@ -111,7 +110,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
 	// Keep this initialization before the other two
 	if config.WalletConfig.Enabled {
-		walletService := b.walletService(accDB, b.appDB, &b.accountsFeed, settingsFeed, &b.walletFeed, config.WalletConfig.StatusProxyStageName)
+		walletService := b.walletService(accDB, b.appDB, &b.accountsFeed, &b.networksFeed, &b.walletFeed, config.WalletConfig.StatusProxyStageName)
 		services = append(services, walletService)
 	}
 
@@ -589,10 +588,10 @@ func (b *StatusNode) SetWalletCommunityInfoProvider(provider thirdparty.Communit
 	}
 }
 
-func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB, accountsFeed *event.Feed, settingsFeed *event.Feed, walletFeed *event.Feed, statusProxyStageName string) *wallet.Service {
+func (b *StatusNode) walletService(accountsDB *accounts.Database, appDB *sql.DB, accountsFeed *event.Feed, networksFeed *event.Feed, walletFeed *event.Feed, statusProxyStageName string) *wallet.Service {
 	if b.walletSrvc == nil {
 		b.walletSrvc = wallet.NewService(
-			b.walletDB, accountsDB, appDB, b.rpcClient, accountsFeed, settingsFeed, b.gethAccountManager, b.transactor, b.config,
+			b.walletDB, accountsDB, appDB, b.rpcClient, accountsFeed, networksFeed, b.gethAccountManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()).API().EnsResolver(),
 			b.pendingTracker,
 			walletFeed,

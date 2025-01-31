@@ -55,7 +55,7 @@ func NewService(
 	appDB *sql.DB,
 	rpcClient *rpc.Client,
 	accountFeed *event.Feed,
-	settingsFeed *event.Feed,
+	networksFeed *event.Feed,
 	gethManager *account.GethManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
