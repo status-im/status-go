@@ -54,8 +54,8 @@ func (n *NetworksPersistence) GetRpcPersistence() RpcProvidersPersistenceInterfa
 	return n.rpcPersistence
 }
 
-// GetNetworks returns networks based on filters.
-func (n *NetworksPersistence) GetNetworks(onlyEnabled bool, chainID *uint64) ([]*params.Network, error) {
+// getNetworksWithoutProviders returns networks based on filters without populating providers.
+func (n *NetworksPersistence) getNetworksWithoutProviders(onlyEnabled bool, chainID *uint64) ([]*params.Network, error) {
 	q := sq.Select(
 		"chain_id", "chain_name", "rpc_url", "fallback_url",
 		"block_explorer_url", "icon_url", "native_currency_name", "native_currency_symbol", "native_currency_decimals",
@@ -80,7 +80,6 @@ func (n *NetworksPersistence) GetNetworks(onlyEnabled bool, chainID *uint64) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	result := make([]*params.Network, 0, 10)
 	for rows.Next() {
@@ -94,25 +93,42 @@ func (n *NetworksPersistence) GetNetworks(onlyEnabled bool, chainID *uint64) ([]
 		if err != nil {
 			return nil, err
 		}
-
-		// Fetch RPC providers for the network
-		providers, err := n.rpcPersistence.GetRpcProviders(network.ChainID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch RPC providers for chain_id %d: %w", network.ChainID, err)
-		}
-		network.RpcProviders = providers
-
-		// Fill deprecated URLs if necessary (assuming this is a function you have)
-		FillDeprecatedURLs(network, providers)
-
 		result = append(result, network)
 	}
 
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
+	rows.Close()
 
 	return result, nil
+}
+
+// populateNetworkProviders populates RPC providers for the given networks.
+func (n *NetworksPersistence) populateNetworkProviders(networks []*params.Network) error {
+	for i := range networks {
+		providers, err := n.rpcPersistence.GetRpcProviders(networks[i].ChainID)
+		if err != nil {
+			return fmt.Errorf("failed to fetch RPC providers for chain_id %d: %w", networks[i].ChainID, err)
+		}
+		networks[i].RpcProviders = providers
+		FillDeprecatedURLs(networks[i], providers)
+	}
+	return nil
+}
+
+// GetNetworks returns networks based on filters.
+func (n *NetworksPersistence) GetNetworks(onlyEnabled bool, chainID *uint64) ([]*params.Network, error) {
+	networks, err := n.getNetworksWithoutProviders(onlyEnabled, chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := n.populateNetworkProviders(networks); err != nil {
+		return nil, err
+	}
+
+	return networks, nil
 }
 
 // GetAllNetworks returns all networks.
