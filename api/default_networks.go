@@ -92,6 +92,8 @@ func mainnet(proxyHost, stageName string) params.Network {
 		Layer:                  1,
 		Enabled:                true,
 		RelatedChainID:         SepoliaChainID,
+		IsActive:               true,
+		IsDeactivatable:        false,
 	}
 }
 
@@ -114,10 +116,10 @@ func sepolia(proxyHost, stageName string) params.Network {
 
 	return params.Network{
 		ChainID:                chainID,
-		ChainName:              "Mainnet",
+		ChainName:              "Sepolia",
 		RpcProviders:           rpcProviders,
 		BlockExplorerURL:       "https://sepolia.etherscan.io/",
-		IconURL:                "network/Network=Ethereum",
+		IconURL:                "network/Network=Ethereum-test",
 		ChainColor:             "#627EEA",
 		ShortName:              "eth",
 		NativeCurrencyName:     "Ether",
@@ -127,6 +129,8 @@ func sepolia(proxyHost, stageName string) params.Network {
 		Layer:                  1,
 		Enabled:                true,
 		RelatedChainID:         MainnetChainID,
+		IsActive:               true,
+		IsDeactivatable:        false,
 	}
 }
 
@@ -162,6 +166,8 @@ func optimism(proxyHost, stageName string) params.Network {
 		Layer:                  2,
 		Enabled:                true,
 		RelatedChainID:         OptimismSepoliaChainID,
+		IsActive:               true,
+		IsDeactivatable:        true,
 	}
 }
 
@@ -184,10 +190,10 @@ func optimismSepolia(proxyHost, stageName string) params.Network {
 
 	return params.Network{
 		ChainID:                chainID,
-		ChainName:              "Optimism",
+		ChainName:              "Optimism Sepolia",
 		RpcProviders:           rpcProviders,
 		BlockExplorerURL:       "https://sepolia-optimism.etherscan.io/",
-		IconURL:                "network/Network=Optimism",
+		IconURL:                "network/Network=Optimism-test",
 		ChainColor:             "#E90101",
 		ShortName:              "oeth",
 		NativeCurrencyName:     "Ether",
@@ -197,6 +203,8 @@ func optimismSepolia(proxyHost, stageName string) params.Network {
 		Layer:                  2,
 		Enabled:                false,
 		RelatedChainID:         OptimismChainID,
+		IsActive:               true,
+		IsDeactivatable:        true,
 	}
 }
 
@@ -232,6 +240,8 @@ func arbitrum(proxyHost, stageName string) params.Network {
 		Layer:                  2,
 		Enabled:                true,
 		RelatedChainID:         ArbitrumSepoliaChainID,
+		IsActive:               true,
+		IsDeactivatable:        true,
 	}
 }
 
@@ -254,10 +264,10 @@ func arbitrumSepolia(proxyHost, stageName string) params.Network {
 
 	return params.Network{
 		ChainID:                chainID,
-		ChainName:              "Arbitrum",
+		ChainName:              "Arbitrum Sepolia",
 		RpcProviders:           rpcProviders,
 		BlockExplorerURL:       "https://sepolia-explorer.arbitrum.io/",
-		IconURL:                "network/Network=Arbitrum",
+		IconURL:                "network/Network=Arbitrum-test",
 		ChainColor:             "#51D0F0",
 		ShortName:              "arb1",
 		NativeCurrencyName:     "Ether",
@@ -267,6 +277,8 @@ func arbitrumSepolia(proxyHost, stageName string) params.Network {
 		Layer:                  2,
 		Enabled:                false,
 		RelatedChainID:         ArbitrumChainID,
+		IsActive:               true,
+		IsDeactivatable:        true,
 	}
 }
 
@@ -302,6 +314,8 @@ func base(proxyHost, stageName string) params.Network {
 		Layer:                  2,
 		Enabled:                true,
 		RelatedChainID:         BaseSepoliaChainID,
+		IsActive:               true,
+		IsDeactivatable:        true,
 	}
 }
 
@@ -324,10 +338,10 @@ func baseSepolia(proxyHost, stageName string) params.Network {
 
 	return params.Network{
 		ChainID:                chainID,
-		ChainName:              "Base",
+		ChainName:              "Base Sepolia",
 		RpcProviders:           rpcProviders,
 		BlockExplorerURL:       "https://sepolia.basescan.org/",
-		IconURL:                "network/Network=Base",
+		IconURL:                "network/Network=Base-test",
 		ChainColor:             "#0052FF",
 		ShortName:              "base",
 		NativeCurrencyName:     "Ether",
@@ -337,6 +351,8 @@ func baseSepolia(proxyHost, stageName string) params.Network {
 		Layer:                  2,
 		Enabled:                false,
 		RelatedChainID:         BaseChainID,
+		IsActive:               true,
+		IsDeactivatable:        true,
 	}
 }
 

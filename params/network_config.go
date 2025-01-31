@@ -81,6 +81,8 @@ type Network struct {
 	ShortName              string          `json:"shortName" validate:"omitempty,min=1"`
 	TokenOverrides         []TokenOverride `json:"tokenOverrides" validate:"omitempty,dive"`
 	RelatedChainID         uint64          `json:"relatedChainId" validate:"omitempty"`
+	IsActive               bool            `json:"isActive"`
+	IsDeactivatable        bool            `json:"isDeactivatable"`
 }
 
 func (n *Network) DeepCopy() Network {

@@ -40,6 +40,8 @@ func CreateNetwork(chainID uint64, chainName string, providers []params.RpcProvi
 		ShortName:              "eth",
 		RelatedChainID:         api.OptimismSepoliaChainID,
 		RpcProviders:           providers,
+		IsActive:               true,
+		IsDeactivatable:        true,
 	}
 }
 
@@ -71,6 +73,8 @@ func CompareNetworks(t require.TestingT, expected, actual *params.Network) {
 	require.Equal(t, expected.ChainColor, actual.ChainColor)
 	require.Equal(t, expected.ShortName, actual.ShortName)
 	require.Equal(t, expected.RelatedChainID, actual.RelatedChainID)
+	require.Equal(t, expected.IsActive, actual.IsActive)
+	require.Equal(t, expected.IsDeactivatable, actual.IsDeactivatable)
 }
 
 // Helper function to compare lists of providers

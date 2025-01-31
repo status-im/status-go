@@ -1,0 +1,1 @@
+ALTER TABLE networks ADD COLUMN is_active BOOLEAN DEFAULT true;

@@ -44,7 +44,22 @@ func (s *NetworkManagerTestSuite) SetupTest() {
 		*testutil.CreateNetwork(api.OptimismChainID, "Optimistic Ethereum", []params.RpcProvider{
 			testutil.CreateProvider(api.OptimismChainID, "Infura Optimism", params.UserProviderType, true, "https://optimism.infura.io"),
 		}),
+		*testutil.CreateNetwork(api.OptimismSepoliaChainID, "Optimistic Sepolia", []params.RpcProvider{
+			testutil.CreateProvider(api.OptimismSepoliaChainID, "Infura Optimism Sepolia", params.UserProviderType, true, "https://optimism-sepolia.infura.io"),
+		}),
+		*testutil.CreateNetwork(api.BaseChainID, "Base", []params.RpcProvider{
+			testutil.CreateProvider(api.BaseChainID, "Infura Base", params.UserProviderType, true, "https://base.infura.io"),
+		}),
+		*testutil.CreateNetwork(api.BaseSepoliaChainID, "Base Sepolia", []params.RpcProvider{
+			testutil.CreateProvider(api.BaseSepoliaChainID, "Infura Base Sepolia", params.UserProviderType, true, "https://base-sepolia.infura.io"),
+		}),
 	}
+	// Make "Ethereum Mainnet" network not deactivatable
+	initNetworks[0].IsDeactivatable = false
+
+	// Make "Optimistic Ethereum" network inactive by default
+	initNetworks[2].IsActive = false
+
 	err = persistence.SetNetworks(initNetworks)
 	s.Require().NoError(err)
 	s.assertDbNetworks(initNetworks)
@@ -259,10 +274,15 @@ func (s *NetworkManagerTestSuite) TestLegacyFieldPopulationWithoutUserProviders(
 }
 
 func (s *NetworkManagerTestSuite) TestUpsertNetwork() {
+	chainID := uint64(999)
+
 	// Create a new network
-	newNetwork := testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
-		testutil.CreateProvider(api.MainnetChainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
+	newNetwork := testutil.CreateNetwork(chainID, "Ethereum Mainnet", []params.RpcProvider{
+		testutil.CreateProvider(chainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
 	})
+	// Check that these values are overriden for upserted networks
+	newNetwork.IsActive = true
+	newNetwork.IsDeactivatable = false
 
 	// Upsert the network
 	err := s.manager.Upsert(newNetwork)
@@ -270,9 +290,76 @@ func (s *NetworkManagerTestSuite) TestUpsertNetwork() {
 
 	// Verify the network was upserted without embedded providers
 	persistence := db.NewNetworksPersistence(s.db)
-	chainID := api.MainnetChainID
 	networks, err := persistence.GetNetworks(false, &chainID)
 	s.Require().NoError(err)
 	s.Require().Len(networks, 1)
 	s.Require().Len(networkhelper.GetEmbeddedProviders(networks[0].RpcProviders), 0)
+	s.Require().False(networks[0].IsActive)
+	s.Require().True(networks[0].IsDeactivatable)
+}
+
+func (s *NetworkManagerTestSuite) TestSetActive() {
+	var err error
+	var n *params.Network
+
+	// Check that the  "Base" network is active by default
+	n = s.manager.Find(api.BaseChainID)
+	s.Require().NotNil(n)
+	s.True(n.IsActive)
+
+	// Set the "Base" network to inactive
+	err = s.manager.SetActive(api.BaseChainID, false)
+	s.Require().NoError(err)
+
+	// Verify the network was set to inactive
+	n = s.manager.Find(api.BaseChainID)
+	s.Require().NotNil(n)
+	s.False(n.IsActive)
+
+	// Set the "Base" network to active
+	err = s.manager.SetActive(api.BaseChainID, true)
+	s.Require().NoError(err)
+
+	// Verify the network was set to active
+	n = s.manager.Find(api.BaseChainID)
+	s.Require().NotNil(n)
+	s.True(n.IsActive)
+}
+
+func (s *NetworkManagerTestSuite) TestSetActiveNotDeactivatable() {
+	var err error
+	var n *params.Network
+
+	// Try to set Ethereum Mainnet to inactive (should fail)
+	err = s.manager.SetActive(api.MainnetChainID, false)
+	s.Require().Error(err)
+
+	// Verify the network was not set to inactive
+	n = s.manager.Find(api.MainnetChainID)
+	s.Require().NotNil(n)
+	s.True(n.IsActive)
+}
+
+func (s *NetworkManagerTestSuite) TestSetActiveMaxNumberOfActiveNetworks() {
+	var err error
+	var n *params.Network
+
+	// Check that we're at the limit of active networks
+	activeNetworks, err := s.manager.GetActiveNetworks()
+	s.Require().NoError(err)
+	s.Require().Len(activeNetworks, network.MaxActiveNetworks)
+
+	// Check that the "Optimistic Ethereum" network is inactive by default
+	n = s.manager.Find(api.OptimismChainID)
+	s.Require().NotNil(n)
+	s.False(n.IsActive)
+
+	// Try to set the "Optimistic Ethereum" network to active (should fail due to number networks active)
+	err = s.manager.SetActive(api.OptimismChainID, true)
+	s.Require().Error(err)
+
+	// Verify the network was not set to active
+	n = s.manager.Find(api.OptimismChainID)
+	s.Require().NotNil(n)
+	s.False(n.IsActive)
 }
