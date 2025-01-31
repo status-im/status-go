@@ -806,7 +806,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 
 	err = b.StartNode(b.config)
 	if err != nil {
-		b.logger.Info("failed to start node")
+		b.logger.Info("failed to start node", zap.Error(err))
 		return err
 	}
 
