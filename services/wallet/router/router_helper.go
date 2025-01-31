@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/contracts"
-	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
+	gaspriceproxy "github.com/status-im/status-go/contracts/gas-price-proxy"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/chain"
@@ -94,19 +94,19 @@ func (r *Router) calculateL1Fee(chainID uint64, data []byte) (*big.Int, error) {
 }
 
 func CalculateL1Fee(chainID uint64, data []byte, ethClient chain.ClientInterface) (*big.Int, error) {
-	oracleContractAddress, err := gaspriceoracle.ContractAddress(chainID)
+	oracleContractAddress, err := gaspriceproxy.ContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}
 
-	oracleContract, err := gaspriceoracle.NewGaspriceoracleCaller(oracleContractAddress, ethClient)
+	proxyContract, err := gaspriceproxy.NewGaspriceproxy(oracleContractAddress, ethClient)
 	if err != nil {
 		return nil, err
 	}
 
 	callOpt := &bind.CallOpts{}
 
-	return oracleContract.GetL1Fee(callOpt, data)
+	return proxyContract.GetL1Fee(callOpt, data)
 }
 
 func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
@@ -256,9 +256,8 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	l1TxFeeWei := big.NewInt(0)
 	l1ApprovalFeeWei := big.NewInt(0)
 
-	needL1Fee := path.FromChain.ChainID != walletCommon.EthereumMainnet &&
-		path.FromChain.ChainID != walletCommon.EthereumSepolia &&
-		path.FromChain.ChainID != walletCommon.AnvilMainnet
+	needL1Fee := path.FromChain.ChainID == walletCommon.OptimismMainnet ||
+		path.FromChain.ChainID == walletCommon.OptimismSepolia
 
 	if testsMode {
 		usedNonces[path.FromChain.ChainID] = usedNonces[path.FromChain.ChainID] + 1

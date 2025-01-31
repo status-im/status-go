@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
+	gaspriceproxy "github.com/status-im/status-go/contracts/gas-price-proxy"
 	"github.com/status-im/status-go/services/wallet/common"
 )
 
@@ -50,12 +50,12 @@ func (f *FeeManager) GetL1Fee(ctx context.Context, chainID uint64, input []byte)
 		return 0, err
 	}
 
-	contractAddress, err := gaspriceoracle.ContractAddress(chainID)
+	contractAddress, err := gaspriceproxy.ContractAddress(chainID)
 	if err != nil {
 		return 0, err
 	}
 
-	contract, err := gaspriceoracle.NewGaspriceoracleCaller(contractAddress, ethClient)
+	contract, err := gaspriceproxy.NewGaspriceproxy(contractAddress, ethClient)
 	if err != nil {
 		return 0, err
 	}
