@@ -3,13 +3,33 @@
 
 package wakuv2
 
+// TODO-nwaku remove this entire file once go-waku is removed from status-go
 import (
+	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
-	"github.com/waku-org/waku-go-bindings/waku/common"
+	bindings "github.com/waku-org/waku-go-bindings/waku/common"
 )
 
-func HexToPbHash(hexHash common.MessageHash) (pb.MessageHash, error) {
+type envelopeImpl struct {
+	msg   *pb.WakuMessage
+	topic string
+	hash  pb.MessageHash
+}
+
+func (e *envelopeImpl) Message() *pb.WakuMessage {
+	return e.msg
+}
+
+func (e *envelopeImpl) PubsubTopic() string {
+	return e.topic
+}
+
+func (e *envelopeImpl) Hash() pb.MessageHash {
+	return e.hash
+}
+
+func HexToPbHash(hexHash bindings.MessageHash) (pb.MessageHash, error) {
 	bytesHash, err := hexHash.Bytes()
 	if err != nil {
 		return pb.MessageHash{}, err
@@ -19,14 +39,14 @@ func HexToPbHash(hexHash common.MessageHash) (pb.MessageHash, error) {
 	return pbHash, nil
 }
 
-func PbToHexHash(pbHash pb.MessageHash) (common.MessageHash, error) {
-	return common.ToMessageHash(pbHash.String())
+func PbToHexHash(pbHash pb.MessageHash) (bindings.MessageHash, error) {
+	return bindings.ToMessageHash(pbHash.String())
 }
 
-func PbToBindingsStoreRequest(pbStoreRequest *storepb.StoreQueryRequest) (*common.StoreQueryRequest, error) {
+func PbToBindingsStoreRequest(pbStoreRequest *storepb.StoreQueryRequest) (*bindings.StoreQueryRequest, error) {
 
-	var messageHashes []common.MessageHash
-	var paginationCursor common.MessageHash
+	var messageHashes []bindings.MessageHash
+	var paginationCursor bindings.MessageHash
 
 	for _, hash := range pbStoreRequest.MessageHashes {
 		hexHash, err := PbToHexHash(pb.ToMessageHash(hash))
@@ -42,7 +62,7 @@ func PbToBindingsStoreRequest(pbStoreRequest *storepb.StoreQueryRequest) (*commo
 		return nil, err
 	}
 
-	bindingsQueryRequest := common.StoreQueryRequest{
+	bindingsQueryRequest := bindings.StoreQueryRequest{
 		RequestId:         pbStoreRequest.RequestId,
 		IncludeData:       pbStoreRequest.IncludeData,
 		PubsubTopic:       *pbStoreRequest.PubsubTopic,
@@ -57,7 +77,7 @@ func PbToBindingsStoreRequest(pbStoreRequest *storepb.StoreQueryRequest) (*commo
 	return &bindingsQueryRequest, nil
 }
 
-func BindingsToPbStoreResponse(bindingsStoreResponse *common.StoreQueryResponse) (*storepb.StoreQueryResponse, error) {
+func BindingsToPbStoreResponse(bindingsStoreResponse *bindings.StoreQueryResponse) (*storepb.StoreQueryResponse, error) {
 
 	paginationCursor, err := bindingsStoreResponse.PaginationCursor.Bytes()
 	if err != nil {
@@ -108,4 +128,17 @@ func BindingsToPbStoreResponse(bindingsStoreResponse *common.StoreQueryResponse)
 
 	return &pbQueryResponse, nil
 
+}
+
+func BindingsToCommonEnvelope(bindingsEnv bindings.Envelope) (common.Envelope, error) {
+
+	hash, err := HexToPbHash(bindingsEnv.Hash())
+
+	if err != nil {
+		return nil, err
+	}
+
+	env := envelopeImpl{topic: bindingsEnv.PubsubTopic(), msg: bindingsEnv.Message(), hash: hash}
+
+	return &env, nil
 }
