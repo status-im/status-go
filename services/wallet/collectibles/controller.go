@@ -13,10 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/rpc/network/networksevent"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
-	"github.com/status-im/status-go/services/accounts/settingsevent"
 	"github.com/status-im/status-go/services/wallet/async"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -39,17 +38,17 @@ type Controller struct {
 	walletFeed   *event.Feed
 	accountsDB   *accounts.Database
 	accountsFeed *event.Feed
-	settingsFeed *event.Feed
+	networksFeed *event.Feed
 
 	networkManager *network.Manager
 	cancelFn       context.CancelFunc
 
-	commands            commandPerAddressAndChainID
-	timers              timerPerAddressAndChainID
-	group               *async.Group
-	accountsWatcher     *accountsevent.Watcher
-	walletEventsWatcher *walletevent.Watcher
-	settingsWatcher     *settingsevent.Watcher
+	commands             commandPerAddressAndChainID
+	timers               timerPerAddressAndChainID
+	group                *async.Group
+	accountsWatcher      *accountsevent.Watcher
+	walletEventsWatcher  *walletevent.Watcher
+	networkEventsWatcher *networksevent.Watcher
 
 	ownedCollectiblesChangeCb OwnedCollectiblesChangeCb
 	collectiblesTransferCb    TransferCb
@@ -62,7 +61,7 @@ func NewController(
 	walletFeed *event.Feed,
 	accountsDB *accounts.Database,
 	accountsFeed *event.Feed,
-	settingsFeed *event.Feed,
+	networksFeed *event.Feed,
 	networkManager *network.Manager,
 	manager *Manager) *Controller {
 	return &Controller{
@@ -71,7 +70,7 @@ func NewController(
 		walletFeed:     walletFeed,
 		accountsDB:     accountsDB,
 		accountsFeed:   accountsFeed,
-		settingsFeed:   settingsFeed,
+		networksFeed:   networksFeed,
 		networkManager: networkManager,
 		commands:       make(commandPerAddressAndChainID),
 		timers:         make(timerPerAddressAndChainID),
@@ -96,12 +95,12 @@ func (c *Controller) Start() {
 	// Setup collectibles fetch when relevant activity is detected
 	c.startWalletEventsWatcher()
 
-	// Setup collectibles fetch when chain-related settings change
-	c.startSettingsWatcher()
+	// Setup collectibles fetch when active networks change
+	c.startNetworkEventsWatcher()
 }
 
 func (c *Controller) Stop() {
-	c.stopSettingsWatcher()
+	c.stopNetworkEventsWatcher()
 
 	c.stopWalletEventsWatcher()
 
@@ -186,20 +185,12 @@ func (c *Controller) stopPeriodicalOwnershipFetch() {
 func (c *Controller) startPeriodicalOwnershipFetchForAccount(address common.Address) error {
 	logutils.ZapLogger().Debug("wallet.api.collectibles.Controller Start periodical fetching", zap.Stringer("address", address))
 
-	networks, err := c.networkManager.Get(false)
-	if err != nil {
-		return err
-	}
-
-	areTestNetworksEnabled, err := c.accountsDB.GetTestNetworksEnabled()
+	networks, err := c.networkManager.GetActiveNetworks()
 	if err != nil {
 		return err
 	}
 
 	for _, network := range networks {
-		if network.IsTest != areTestNetworksEnabled {
-			continue
-		}
 		chainID := walletCommon.ChainID(network.ChainID)
 
 		err := c.startPeriodicalOwnershipFetchForAccountAndChainID(address, chainID, false)
@@ -369,13 +360,15 @@ func (c *Controller) stopWalletEventsWatcher() {
 	}
 }
 
-func (c *Controller) startSettingsWatcher() {
-	if c.settingsWatcher != nil {
+func (c *Controller) startNetworkEventsWatcher() {
+	if c.networkEventsWatcher != nil {
 		return
 	}
 
-	settingChangeCb := func(setting settings.SettingField, value interface{}) {
-		if setting.Equals(settings.TestNetworksEnabled) {
+	activeNetworksChangeCb := func(params *networksevent.ActiveNetworksChangedParams) {
+		// Lazy logic for now, just restart everything if there's any network change.
+		// TODO #17183: Per-network logic
+		if len(params.ActivatedChainIDs) > 0 || len(params.DeactivatedChainIDs) > 0 {
 			c.stopPeriodicalOwnershipFetch()
 			err := c.startPeriodicalOwnershipFetch()
 			if err != nil {
@@ -384,15 +377,19 @@ func (c *Controller) startSettingsWatcher() {
 		}
 	}
 
-	c.settingsWatcher = settingsevent.NewWatcher(c.settingsFeed, settingChangeCb)
+	networkEventsWatcherCallbacks := networksevent.EventCallbacks{
+		ActiveNetworksChangeCb: activeNetworksChangeCb,
+	}
 
-	c.settingsWatcher.Start()
+	c.networkEventsWatcher = networksevent.NewWatcher(c.networksFeed, networkEventsWatcherCallbacks)
+
+	c.networkEventsWatcher.Start()
 }
 
-func (c *Controller) stopSettingsWatcher() {
-	if c.settingsWatcher != nil {
-		c.settingsWatcher.Stop()
-		c.settingsWatcher = nil
+func (c *Controller) stopNetworkEventsWatcher() {
+	if c.networkEventsWatcher != nil {
+		c.networkEventsWatcher.Stop()
+		c.networkEventsWatcher = nil
 	}
 }
 

@@ -193,7 +193,7 @@ func NewService(
 		mediaServer,
 		feed,
 	)
-	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, settingsFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
+	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, networksFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed, pendingTxManager)
 
