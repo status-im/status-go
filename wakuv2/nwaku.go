@@ -676,8 +676,14 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 				}
 				return
 
-			case env := <-w.node.MsgChan:
-				err := w.OnNewEnvelopes(env, common.RelayedMessageType, false)
+			case bindingsEnv := <-w.node.MsgChan:
+				env, err := BindingsToCommonEnvelope(bindingsEnv)
+				if err != nil {
+					w.logger.Error("BindingsToCommonEnvelope error", zap.Error(err))
+					return
+				}
+
+				err = w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 				if err != nil {
 					w.logger.Error("OnNewEnvelopes error", zap.Error(err))
 				}
