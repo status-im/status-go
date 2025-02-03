@@ -1,11 +1,5 @@
 import random
-import time
-from dataclasses import dataclass
-from typing import Optional
-
 import pytest
-
-from conftest import option
 from test_cases import StatusBackendTestCase, MessengerTestCase
 
 
@@ -29,11 +23,37 @@ class TestRpc(StatusBackendTestCase):
 
 
 @pytest.mark.rpc
-class TestRpcMessaging(MessengerTestCase):
+@pytest.mark.usefixtures("setup_two_nodes")
+class TestDefaultMessaging(MessengerTestCase):
 
-    @pytest.mark.usefixtures("setup_two_nodes")
-    def test_one_to_one_message(self):
+    @pytest.fixture(scope="function", autouse=False)
+    def setup_two_nodes(self, request):
+        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False)
+        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False)
+
+    def test_one_to_one_messages(self):
         self.one_to_one_message(5)
 
     def test_add_contact(self):
         self.add_contact(execution_number=1, network_condition=None)
+
+    def test_crate_private_group(self):
+        self.make_contacts()
+        self.create_private_group(1)
+
+    def test_private_group_messages(self):
+        self.make_contacts()
+        self.private_group_id = self.join_private_group()
+        self.private_group_message(5)
+
+
+@pytest.mark.rpc
+@pytest.mark.usefixtures("setup_two_nodes")
+class TestLightClientMessaging(TestDefaultMessaging):
+
+    @pytest.fixture(scope="function", autouse=False)
+    def setup_two_nodes(self, request):
+        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False)
+        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False)
+        for user in self.sender, self.receiver:
+            user.wakuext_service.set_light_client(True)

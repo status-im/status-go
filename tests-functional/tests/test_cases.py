@@ -210,11 +210,11 @@ class MessengerTestCase(NetworkConditionTestCase):
 
     @pytest.fixture(scope="function", autouse=False)
     def setup_two_nodes(self, request):
-        request.cls.sender = self.sender = self.initialize_backend(await_signals=self.await_signals)
-        request.cls.receiver = self.receiver = self.initialize_backend(await_signals=self.await_signals)
+        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, True)
+        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, True)
 
-    def initialize_backend(self, await_signals):
-        backend = StatusBackend(await_signals=await_signals, privileged=True)
+    def initialize_backend(self, await_signals, privileged=True):
+        backend = StatusBackend(await_signals, privileged)
         backend.init_status_backend()
         backend.create_account_and_login()
         backend.find_public_key()
@@ -389,3 +389,48 @@ class MessengerTestCase(NetworkConditionTestCase):
             fields_to_validate={"text": "text"},
             expected_message=expected_message,
         )
+
+    def create_private_group(self, private_groups_count):
+        private_groups = []
+        for i in range(private_groups_count):
+            private_group_name = f"private_group_{i+1}_{uuid4()}"
+            response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
+
+            expected_group_creation_msg = f"@{self.sender.public_key} created the group {private_group_name}"
+            expected_message = self.get_message_by_content_type(
+                response, content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value, message_pattern=expected_group_creation_msg
+            )[0]
+
+            private_groups.append(expected_message)
+            time.sleep(0.01)
+
+        for i, expected_message in enumerate(private_groups):
+            messages_new_event = self.receiver.find_signal_containing_pattern(
+                SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"), timeout=60
+            )
+            self.validate_signal_event_against_response(
+                signal_event=messages_new_event,
+                expected_message=expected_message,
+                fields_to_validate={"text": "text"},
+            )
+
+    def private_group_message(self, message_count):
+        sent_messages = []
+        for i in range(message_count):
+            message_text = f"test_message_{i+1}_{uuid4()}"
+            response = self.sender.wakuext_service.send_group_chat_message(self.private_group_id, message_text)
+            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+            sent_messages.append(expected_message)
+            time.sleep(0.01)
+
+        for _, expected_message in enumerate(sent_messages):
+            messages_new_event = self.receiver.find_signal_containing_pattern(
+                SignalType.MESSAGES_NEW.value,
+                event_pattern=expected_message.get("id"),
+                timeout=60,
+            )
+            self.validate_signal_event_against_response(
+                signal_event=messages_new_event,
+                fields_to_validate={"text": "text"},
+                expected_message=expected_message,
+            )
