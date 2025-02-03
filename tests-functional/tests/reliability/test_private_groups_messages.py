@@ -3,7 +3,6 @@ from uuid import uuid4
 import pytest
 from tests.test_cases import MessengerTestCase
 from clients.signals import SignalType
-from resources.enums import MessageContentType
 
 
 @pytest.mark.usefixtures("setup_two_nodes")
@@ -13,7 +12,7 @@ class TestPrivateGroupMessages(MessengerTestCase):
     def test_private_group_messages_baseline(self, message_count=1):
         self.make_contacts()
         self.private_group_id = self.join_private_group()
-        self.private_group_message(message_count)
+        self.private_group_message(message_count, self.private_group_id)
 
     def test_multiple_group_chat_messages(self):
         self.test_private_group_messages_baseline(message_count=50)

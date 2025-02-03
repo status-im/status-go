@@ -44,7 +44,7 @@ class TestDefaultMessaging(MessengerTestCase):
     def test_private_group_messages(self):
         self.make_contacts()
         self.private_group_id = self.join_private_group()
-        self.private_group_message(5)
+        self.private_group_message(5, self.private_group_id)
 
 
 @pytest.mark.rpc

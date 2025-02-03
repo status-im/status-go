@@ -3,7 +3,6 @@ from uuid import uuid4
 import pytest
 from tests.test_cases import MessengerTestCase
 from clients.signals import SignalType
-from resources.enums import MessageContentType
 
 
 @pytest.mark.usefixtures("setup_two_nodes")
