@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS good_two(
+    timestamp UNSIGNED BIGINT NOT NULL
+);
