@@ -36,6 +36,14 @@ type RpcProvider struct {
 	AuthToken    string              `json:"authToken" validate:"omitempty,min=1"`                             // Token for TokenAuth (empty string if not used)
 }
 
+// GetFullURL returns the URL with auth token if TokenAuth is used
+func (p RpcProvider) GetFullURL() string {
+	if p.AuthType == TokenAuth && p.AuthToken != "" {
+		return p.URL + "/" + p.AuthToken
+	}
+	return p.URL
+}
+
 type TokenOverride struct {
 	Symbol  string         `json:"symbol"`
 	Address common.Address `json:"address"`
@@ -68,6 +76,15 @@ type Network struct {
 	ShortName              string          `json:"shortName" validate:"omitempty,min=1"`
 	TokenOverrides         []TokenOverride `json:"tokenOverrides" validate:"omitempty,dive"`
 	RelatedChainID         uint64          `json:"relatedChainId" validate:"omitempty"`
+}
+
+func (n *Network) DeepCopy() Network {
+	updatedNetwork := *n
+	updatedNetwork.RpcProviders = make([]RpcProvider, len(n.RpcProviders))
+	copy(updatedNetwork.RpcProviders, n.RpcProviders)
+	updatedNetwork.TokenOverrides = make([]TokenOverride, len(n.TokenOverrides))
+	copy(updatedNetwork.TokenOverrides, n.TokenOverrides)
+	return updatedNetwork
 }
 
 func newRpcProvider(chainID uint64, name, url string, enableRpsLimiter bool, providerType RpcProviderType) *RpcProvider {

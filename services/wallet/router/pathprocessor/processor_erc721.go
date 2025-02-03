@@ -111,7 +111,7 @@ func (s *ERC721Processor) PackTxInputData(params ProcessorInputParams) ([]byte, 
 	return s.packTxInputDataInternally(params, functionNameTransferFrom)
 }
 
-func (s *ERC721Processor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *ERC721Processor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {
@@ -127,11 +127,6 @@ func (s *ERC721Processor) EstimateGas(params ProcessorInputParams) (uint64, erro
 	}
 
 	value := new(big.Int)
-
-	input, err := s.PackTxInputData(params)
-	if err != nil {
-		return 0, createERC721ErrorResponse(err)
-	}
 
 	msg := ethereum.CallMsg{
 		From:  params.FromAddr,

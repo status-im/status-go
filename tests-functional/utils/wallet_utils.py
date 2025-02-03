@@ -93,7 +93,7 @@ def check_tx_details(rpc_client, tx_hash, network_id, address_to, expected_amoun
     assert tx_details["to"].upper() == address_to.upper()
 
 
-def check_fees(fee_mode, base_fee, max_priority_fee_per_gas, max_fee_per_gas):
+def check_fees(fee_mode, base_fee, max_priority_fee_per_gas, max_fee_per_gas, suggested_fee_levels):
     assert base_fee.startswith("0x")
     assert max_priority_fee_per_gas.startswith("0x")
     assert max_fee_per_gas.startswith("0x")
@@ -102,12 +102,31 @@ def check_fees(fee_mode, base_fee, max_priority_fee_per_gas, max_fee_per_gas):
     max_priority_fee_per_gas_int = int(max_priority_fee_per_gas, 16)
     max_fee_per_gas_int = int(max_fee_per_gas, 16)
 
+    low_max_fee_per_gas = int(suggested_fee_levels["low"], 16)
+    low_priority_max_fee_per_gas = int(suggested_fee_levels["lowPriority"], 16)
+    medium_max_fee_per_gas = int(suggested_fee_levels["medium"], 16)
+    medium_priority_max_fee_per_gas = int(suggested_fee_levels["mediumPriority"], 16)
+    high_max_fee_per_gas = int(suggested_fee_levels["high"], 16)
+    high_priority_max_fee_per_gas = int(suggested_fee_levels["highPriority"], 16)
+
     if fee_mode == constants.gas_fee_mode_low:
+        assert max_fee_per_gas_int == low_max_fee_per_gas
+        assert max_priority_fee_per_gas_int == low_priority_max_fee_per_gas
         assert base_fee_int + max_priority_fee_per_gas_int == max_fee_per_gas_int
     elif fee_mode == constants.gas_fee_mode_medium:
-        assert (2 * base_fee_int + max_priority_fee_per_gas_int) == max_fee_per_gas_int
+        # calculate variadic fees from high max fees per gas
+        variadic_fee = high_max_fee_per_gas - high_priority_max_fee_per_gas - 2 * base_fee_int
+
+        assert max_fee_per_gas_int == medium_max_fee_per_gas
+        assert max_priority_fee_per_gas_int == medium_priority_max_fee_per_gas
+        assert base_fee_int + variadic_fee + max_priority_fee_per_gas_int == max_fee_per_gas_int
     elif fee_mode == constants.gas_fee_mode_high:
-        assert 3 * base_fee_int + max_priority_fee_per_gas_int == max_fee_per_gas_int
+        # calculate variadic fees from medium max fees per gas
+        variadic_fee = medium_max_fee_per_gas - medium_priority_max_fee_per_gas - base_fee_int
+
+        assert max_fee_per_gas_int == high_max_fee_per_gas
+        assert max_priority_fee_per_gas_int == high_priority_max_fee_per_gas
+        assert 2 * base_fee_int + variadic_fee + max_priority_fee_per_gas_int == max_fee_per_gas_int
     elif fee_mode == constants.gas_fee_mode_custom:
         assert base_fee_int + max_priority_fee_per_gas_int == max_fee_per_gas_int
     else:
@@ -120,9 +139,17 @@ def check_fees_for_path(path_name, gas_fee_mode, check_approval, route):
             continue
         if check_approval:
             assert path_tx["ApprovalRequired"]
-            check_fees(gas_fee_mode, path_tx["ApprovalBaseFee"], path_tx["ApprovalPriorityFee"], path_tx["ApprovalMaxFeesPerGas"])
+            check_fees(
+                gas_fee_mode,
+                path_tx["ApprovalBaseFee"],
+                path_tx["ApprovalPriorityFee"],
+                path_tx["ApprovalMaxFeesPerGas"],
+                path_tx["SuggestedLevelsForMaxFeesPerGas"],
+            )
             return
-        check_fees(gas_fee_mode, path_tx["TxBaseFee"], path_tx["TxPriorityFee"], path_tx["TxMaxFeesPerGas"])
+        check_fees(
+            gas_fee_mode, path_tx["TxBaseFee"], path_tx["TxPriorityFee"], path_tx["TxMaxFeesPerGas"], path_tx["SuggestedLevelsForMaxFeesPerGas"]
+        )
 
 
 def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):

@@ -49,7 +49,7 @@ func getTokenSymbols(t *testing.T) []string {
 	networkManager := mock_network.NewMockManagerInterface(ctrl)
 	networkManager.EXPECT().Get(gomock.Any()).Return(ptrNetworkList, nil).AnyTimes()
 	networkManager.EXPECT().GetAll().Return(ptrNetworkList, nil).AnyTimes()
-	networkManager.EXPECT().GetConfiguredNetworks().Return(networksList).AnyTimes()
+	networkManager.EXPECT().GetEmbeddedNetworks().Return(networksList).AnyTimes()
 
 	// Skeleton token store to get full list of tokens
 	tm := token.NewTokenManager(walletDB, nil, nil, networkManager, appDB, nil, nil, nil, nil, nil)

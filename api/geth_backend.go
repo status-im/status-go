@@ -806,7 +806,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 
 	err = b.StartNode(b.config)
 	if err != nil {
-		b.logger.Info("failed to start node")
+		b.logger.Info("failed to start node", zap.Error(err))
 		return err
 	}
 
@@ -2692,7 +2692,10 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w wakutypes.WakuKeyMan
 	}
 
 	if st != nil {
-		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.walletDB, b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, b.statusNode.RPCClient(), b.statusNode.WalletService(), b.statusNode.CommunityTokensService(), b.statusNode.WakuV2Service(), logutils.ZapLogger(), b.statusNode.AccountsFeed()); err != nil {
+		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.walletDB,
+			b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, b.statusNode.RPCClient(),
+			b.statusNode.WalletService(), b.statusNode.CommunityTokensService(), b.statusNode.WakuV2Service(),
+			logutils.ZapLogger(), b.statusNode.AccountsFeed()); err != nil {
 			return err
 		}
 		// Set initial connection state

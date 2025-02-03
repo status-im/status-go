@@ -192,13 +192,22 @@ func (t *Transactor) SendRawTransaction(chainID uint64, rawTx string) error {
 }
 
 func createPendingTransaction(from common.Address, symbol string, chainID uint64, multiTransactionID wallet_common.MultiTransactionIDType, tx *gethtypes.Transaction) (pTx *PendingTransaction) {
+	var toAddress common.Address
+	if tx.To() != nil {
+		toAddress = *tx.To()
+	} else {
+		// when deploying a new contract we don't know the address beforehand,
+		// so we create it from the address the contract was deployed from and the nonce
+		toAddr := crypto.CreateAddress(types.Address(from), tx.Nonce())
+		toAddress = common.Address(toAddr)
+	}
 
 	pTx = &PendingTransaction{
 		Hash:               tx.Hash(),
 		Timestamp:          uint64(time.Now().Unix()),
 		Value:              bigint.BigInt{Int: tx.Value()},
 		From:               from,
-		To:                 *tx.To(),
+		To:                 toAddress,
 		Nonce:              tx.Nonce(),
 		Data:               string(tx.Data()),
 		Type:               WalletTransfer,
@@ -408,8 +417,6 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args wa
 	if args.Gas != nil {
 		gas = uint64(*args.Gas)
 	} else {
-		ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
-		defer cancel()
 
 		var (
 			gethTo    common.Address

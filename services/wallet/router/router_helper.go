@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/contracts"
-	gaspriceoracle "github.com/status-im/status-go/contracts/gas-price-oracle"
+	gaspriceproxy "github.com/status-im/status-go/contracts/gas-price-proxy"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/chain"
@@ -70,12 +70,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 	return true, params.AmountIn, nil
 }
 
-func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParams, approvalContractAddress *common.Address) (uint64, error) {
-	data, err := walletCommon.PackApprovalInputData(params.AmountIn, approvalContractAddress)
-	if err != nil {
-		return 0, err
-	}
-
+func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParams, input []byte) (uint64, error) {
 	ethClient, err := r.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
 		return 0, err
@@ -85,43 +80,33 @@ func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParam
 		From:  params.FromAddr,
 		To:    &params.FromToken.Address,
 		Value: walletCommon.ZeroBigIntValue(),
-		Data:  data,
+		Data:  input,
 	})
 }
 
-func (r *Router) calculateApprovalL1Fee(amountIn *big.Int, chainID uint64, approvalContractAddress *common.Address) (uint64, error) {
+func (r *Router) calculateL1Fee(chainID uint64, data []byte) (*big.Int, error) {
 	ethClient, err := r.rpcClient.EthClient(chainID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return CalculateApprovalL1Fee(amountIn, chainID, approvalContractAddress, ethClient)
+	return CalculateL1Fee(chainID, data, ethClient)
 }
 
-func CalculateApprovalL1Fee(amountIn *big.Int, chainID uint64, approvalContractAddress *common.Address, ethClient chain.ClientInterface) (uint64, error) {
-	data, err := walletCommon.PackApprovalInputData(amountIn, approvalContractAddress)
+func CalculateL1Fee(chainID uint64, data []byte, ethClient chain.ClientInterface) (*big.Int, error) {
+	oracleContractAddress, err := gaspriceproxy.ContractAddress(chainID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	var l1Fee uint64
-	oracleContractAddress, err := gaspriceoracle.ContractAddress(chainID)
-	if err == nil {
-		oracleContract, err := gaspriceoracle.NewGaspriceoracleCaller(oracleContractAddress, ethClient)
-		if err != nil {
-			return 0, err
-		}
-
-		callOpt := &bind.CallOpts{}
-
-		l1FeeResult, err := oracleContract.GetL1Fee(callOpt, data)
-		if err == nil {
-			l1Fee = l1FeeResult.Uint64()
-		}
+	proxyContract, err := gaspriceproxy.NewGaspriceproxy(oracleContractAddress, ethClient)
+	if err != nil {
+		return nil, err
 	}
 
-	// return 0 if we failed to get the fee
-	return l1Fee, nil
+	callOpt := &bind.CallOpts{}
+
+	return proxyContract.GetL1Fee(callOpt, data)
 }
 
 func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
@@ -207,31 +192,31 @@ func (r *Router) applyCustomFields(ctx context.Context, path *routes.Path, fetch
 
 	if r.lastInputParams.PathTxCustomParams == nil || len(r.lastInputParams.PathTxCustomParams) == 0 {
 		// if no custom params are provided, use the initial fee mode
-		maxFeesPerGas, err := fetchedFees.FeeFor(r.lastInputParams.GasFeeMode)
+		maxFeesPerGas, priorityFee, err := fetchedFees.FeeFor(r.lastInputParams.GasFeeMode)
 		if err != nil {
 			return err
 		}
 		if path.ApprovalRequired {
 			path.ApprovalMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
 			path.ApprovalBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
-			path.ApprovalPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas)
+			path.ApprovalPriorityFee = (*hexutil.Big)(priorityFee)
 		}
 
 		path.TxMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
 		path.TxBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
-		path.TxPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas)
+		path.TxPriorityFee = (*hexutil.Big)(priorityFee)
 	} else {
 		if path.ApprovalRequired {
 			approvalTxIdentityKey := path.TxIdentityKey(true)
 			if approvalTxCustomParams, ok := r.lastInputParams.PathTxCustomParams[approvalTxIdentityKey]; ok {
 				if approvalTxCustomParams.GasFeeMode != fees.GasFeeCustom {
-					maxFeesPerGas, err := fetchedFees.FeeFor(approvalTxCustomParams.GasFeeMode)
+					maxFeesPerGas, priorityFee, err := fetchedFees.FeeFor(approvalTxCustomParams.GasFeeMode)
 					if err != nil {
 						return err
 					}
 					path.ApprovalMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
 					path.ApprovalBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
-					path.ApprovalPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas)
+					path.ApprovalPriorityFee = (*hexutil.Big)(priorityFee)
 				} else {
 					path.ApprovalTxNonce = (*hexutil.Uint64)(&approvalTxCustomParams.Nonce)
 					path.ApprovalGasAmount = approvalTxCustomParams.GasAmount
@@ -245,13 +230,13 @@ func (r *Router) applyCustomFields(ctx context.Context, path *routes.Path, fetch
 		txIdentityKey := path.TxIdentityKey(false)
 		if txCustomParams, ok := r.lastInputParams.PathTxCustomParams[txIdentityKey]; ok {
 			if txCustomParams.GasFeeMode != fees.GasFeeCustom {
-				maxFeesPerGas, err := fetchedFees.FeeFor(txCustomParams.GasFeeMode)
+				maxFeesPerGas, priorityFee, err := fetchedFees.FeeFor(txCustomParams.GasFeeMode)
 				if err != nil {
 					return err
 				}
 				path.TxMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
 				path.TxBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
-				path.TxPriorityFee = (*hexutil.Big)(fetchedFees.MaxPriorityFeePerGas)
+				path.TxPriorityFee = (*hexutil.Big)(priorityFee)
 			} else {
 				path.TxNonce = (*hexutil.Uint64)(&txCustomParams.Nonce)
 				path.TxGasAmount = txCustomParams.GasAmount
@@ -268,17 +253,21 @@ func (r *Router) applyCustomFields(ctx context.Context, path *routes.Path, fetch
 func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.Path, fetchedFees *fees.SuggestedFees,
 	usedNonces map[uint64]uint64, testsMode bool, testApprovalL1Fee uint64) (err error) {
 
-	var (
-		l1ApprovalFee uint64
-	)
+	l1TxFeeWei := big.NewInt(0)
+	l1ApprovalFeeWei := big.NewInt(0)
+
+	needL1Fee := path.FromChain.ChainID == walletCommon.OptimismMainnet ||
+		path.FromChain.ChainID == walletCommon.OptimismSepolia
+
 	if testsMode {
 		usedNonces[path.FromChain.ChainID] = usedNonces[path.FromChain.ChainID] + 1
 	}
-	if path.ApprovalRequired {
+
+	if path.ApprovalRequired && needL1Fee {
 		if testsMode {
-			l1ApprovalFee = testApprovalL1Fee
+			l1ApprovalFeeWei = big.NewInt(int64(testApprovalL1Fee))
 		} else {
-			l1ApprovalFee, err = r.calculateApprovalL1Fee(path.AmountIn.ToInt(), path.FromChain.ChainID, path.ApprovalContractAddress)
+			l1ApprovalFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.ApprovalPackedData)
 			if err != nil {
 				return err
 			}
@@ -290,38 +279,26 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 		return
 	}
 
-	// TODO: keep l1 fees at 0 until we have the correct algorithm, as we do base fee x 2 that should cover the l1 fees
-	var l1FeeWei uint64 = 0
-	// if input.SendType.needL1Fee() {
-	// 	txInputData, err := pProcessor.PackTxInputData(processorInputParams)
-	// 	if err != nil {
-	// 		continue
-	// 	}
-
-	// 	l1FeeWei, _ = r.feesManager.GetL1Fee(ctx, network.ChainID, txInputData)
-	// }
+	if needL1Fee {
+		if !testsMode {
+			l1TxFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.TxPackedData)
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	// calculate ETH fees
 	ethTotalFees := big.NewInt(0)
 	txFeeInWei := new(big.Int).Mul(path.TxMaxFeesPerGas.ToInt(), big.NewInt(int64(path.TxGasAmount)))
 	ethTotalFees.Add(ethTotalFees, txFeeInWei)
-
-	txL1FeeInWei := big.NewInt(0)
-	if l1FeeWei > 0 {
-		txL1FeeInWei = big.NewInt(int64(l1FeeWei))
-		ethTotalFees.Add(ethTotalFees, txL1FeeInWei)
-	}
+	ethTotalFees.Add(ethTotalFees, l1TxFeeWei)
 
 	approvalFeeInWei := big.NewInt(0)
-	approvalL1FeeInWei := big.NewInt(0)
 	if path.ApprovalRequired {
 		approvalFeeInWei.Mul(path.ApprovalMaxFeesPerGas.ToInt(), big.NewInt(int64(path.ApprovalGasAmount)))
 		ethTotalFees.Add(ethTotalFees, approvalFeeInWei)
-
-		if l1ApprovalFee > 0 {
-			approvalL1FeeInWei = big.NewInt(int64(l1ApprovalFee))
-			ethTotalFees.Add(ethTotalFees, approvalL1FeeInWei)
-		}
+		ethTotalFees.Add(ethTotalFees, l1ApprovalFeeWei)
 	}
 
 	// calculate required balances (bonder and token fees are already included in the amountIn by Hop bridge (once we include Celar we need to check how they handle the fees))
@@ -342,10 +319,10 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	path.SuggestedLevelsForMaxFeesPerGas = fetchedFees.MaxFeesLevels
 
 	path.TxFee = (*hexutil.Big)(txFeeInWei)
-	path.TxL1Fee = (*hexutil.Big)(txL1FeeInWei)
+	path.TxL1Fee = (*hexutil.Big)(l1TxFeeWei)
 
 	path.ApprovalFee = (*hexutil.Big)(approvalFeeInWei)
-	path.ApprovalL1Fee = (*hexutil.Big)(approvalL1FeeInWei)
+	path.ApprovalL1Fee = (*hexutil.Big)(l1ApprovalFeeWei)
 
 	path.TxTotalFee = (*hexutil.Big)(ethTotalFees)
 
@@ -379,6 +356,11 @@ func ParseCollectibleID(ID string) (contractAddress common.Address, tokenID *big
 func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *token.Token {
 	if !sendType.IsCollectiblesTransfer() {
 		return tokenManager.FindToken(network, tokenID)
+	}
+
+	if sendType.IsCommunityRelatedTransfer() {
+		// TODO: optimize tokens to handle community tokens
+		return nil
 	}
 
 	contractAddress, collectibleTokenID, success := ParseCollectibleID(tokenID)

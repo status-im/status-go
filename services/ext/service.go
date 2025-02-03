@@ -127,7 +127,11 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service, communityTokensService *communitytokens.Service, wakuService *wakuv2.Waku, logger *zap.Logger, accountsFeed *event.Feed) error {
+func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB,
+	httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account,
+	accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service,
+	communityTokensService *communitytokens.Service, wakuService *wakuv2.Waku, logger *zap.Logger,
+	accountsFeed *event.Feed) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil

@@ -173,7 +173,7 @@ func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams) ([]
 	return []byte{}, nil
 }
 
-func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[s.Name()]; ok {

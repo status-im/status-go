@@ -293,21 +293,6 @@ func NewLimits(min, max int) Limits {
 	}
 }
 
-type ProviderConfig struct {
-	// Enabled flag specifies whether feature is enabled
-	Enabled bool `validate:"required"`
-
-	// To identify provider
-	Name string `validate:"required"`
-
-	// URL sets the rpc upstream host address for communication with
-	// a non-local infura endpoint.
-	User         string `json:",omitempty"`
-	Password     string `json:",omitempty"`
-	APIKey       string `json:"APIKey,omitempty"`
-	APIKeySecret string `json:"APIKeySecret,omitempty"`
-}
-
 // ----------
 // NodeConfig
 // ----------

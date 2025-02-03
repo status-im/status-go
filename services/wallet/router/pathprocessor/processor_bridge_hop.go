@@ -154,7 +154,12 @@ func (h *HopBridgeProcessor) AvailableFor(params ProcessorInputParams) (bool, er
 	if params.FromChain.ChainID == params.ToChain.ChainID {
 		return false, ErrFromAndToChainsMustBeDifferent
 	}
-	// We chcek if the contract is available on the network for the token
+	// We check if the contract is available on the receiver network for the token
+	if _, _, err := hop.GetContractAddress(params.ToChain.ChainID, params.FromToken.Symbol); err != nil {
+		return false, ErrToChainNotSupported
+	}
+
+	// We check if the contract is available on the sender network for the token
 	_, err := h.GetContractAddress(params)
 	// toToken is not nil only if the send type is Swap
 	return err == nil, err
@@ -195,6 +200,9 @@ func (c *HopBridgeProcessor) getAppropriateABI(contractType string, chainID uint
 }
 
 func (h *HopBridgeProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+	if params.TestsMode {
+		return []byte{}, nil
+	}
 	_, contractType, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
 	if err != nil {
 		return []byte{}, createBridgeHopErrorResponse(err)
@@ -232,7 +240,7 @@ func (h *HopBridgeProcessor) packTxInputDataInternally(params ProcessorInputPara
 	return []byte{}, ErrContractTypeNotSupported
 }
 
-func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, error) {
+func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	if params.TestsMode {
 		if params.TestEstimationMap != nil {
 			if val, ok := params.TestEstimationMap[h.Name()]; ok {
@@ -247,12 +255,7 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams) (uint64, e
 		value = params.AmountIn
 	}
 
-	contractAddress, contractType, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
-	if err != nil {
-		return 0, createBridgeHopErrorResponse(err)
-	}
-
-	input, err := h.packTxInputDataInternally(params, contractType)
+	contractAddress, _, err := hop.GetContractAddress(params.FromChain.ChainID, params.FromToken.Symbol)
 	if err != nil {
 		return 0, createBridgeHopErrorResponse(err)
 	}

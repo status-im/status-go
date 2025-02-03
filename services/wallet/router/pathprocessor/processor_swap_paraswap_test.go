@@ -17,6 +17,7 @@ import (
 	mock_paraswap "github.com/status-im/status-go/services/wallet/thirdparty/paraswap/mock"
 	"github.com/status-im/status-go/services/wallet/token"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -136,7 +137,9 @@ func TestParaswapErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		expectClientFetchPriceRoute(client, paraswap.Route{}, errors.New(tc.clientError))
-		_, err := processor.EstimateGas(testInputParams)
+		inputData, err := processor.PackTxInputData(testInputParams)
+		assert.NoError(t, err)
+		_, err = processor.EstimateGas(testInputParams, inputData)
 		require.Equal(t, tc.processorError.Error(), err.Error())
 	}
 }

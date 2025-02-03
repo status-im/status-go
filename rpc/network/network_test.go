@@ -1,142 +1,278 @@
-package network
+package network_test
 
 import (
 	"database/sql"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/status-im/status-go/api"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/rpc/network/db"
+	"github.com/status-im/status-go/rpc/network/testutil"
 	"github.com/status-im/status-go/t/helpers"
+
+	"github.com/stretchr/testify/suite"
 )
 
-var initNetworks = []params.Network{
-	{
-		ChainID:                1,
-		ChainName:              "Ethereum Mainnet",
-		RPCURL:                 "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ",
-		BlockExplorerURL:       "https://etherscan.io/",
-		IconURL:                "",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 false,
-		Layer:                  1,
-		Enabled:                true,
-		RelatedChainID:         11155111,
-	},
-	{
-		ChainID:                11155111,
-		ChainName:              "Sepolia",
-		RPCURL:                 "https://sepolia.infura.io/v3/",
-		BlockExplorerURL:       "https://sepolia.etherscan.io/",
-		IconURL:                "",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 true,
-		Layer:                  1,
-		Enabled:                false,
-		RelatedChainID:         1,
-	},
-	{
-		ChainID:                10,
-		ChainName:              "Optimistic Ethereum",
-		RPCURL:                 "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ",
-		BlockExplorerURL:       "https://optimistic.etherscan.io",
-		IconURL:                "",
-		NativeCurrencyName:     "Ether",
-		NativeCurrencySymbol:   "ETH",
-		NativeCurrencyDecimals: 18,
-		IsTest:                 false,
-		Layer:                  2,
-		Enabled:                true,
-		RelatedChainID:         11155420,
-	},
+type NetworkManagerTestSuite struct {
+	suite.Suite
+	db      *sql.DB
+	cleanup func()
+	manager *network.Manager
 }
 
-func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "wallet-network-tests")
-	require.NoError(t, err)
-	return db, func() { require.NoError(t, cleanup()) }
+func (s *NetworkManagerTestSuite) SetupTest() {
+
+	testDb, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "wallet-network-tests")
+	s.Require().NoError(err)
+	s.db = testDb
+	s.cleanup = func() { s.Require().NoError(cleanup()) }
+	s.manager = network.NewManager(testDb)
+	persistence := db.NewNetworksPersistence(testDb)
+
+	// Use testutil to initialize networks
+	initNetworks := []params.Network{
+		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+			testutil.CreateProvider(api.MainnetChainID, "Infura Mainnet", params.UserProviderType, true, "https://mainnet.infura.io"),
+		}),
+		*testutil.CreateNetwork(api.SepoliaChainID, "Sepolia Testnet", []params.RpcProvider{
+			testutil.CreateProvider(api.SepoliaChainID, "Infura Sepolia", params.UserProviderType, true, "https://sepolia.infura.io"),
+		}),
+		*testutil.CreateNetwork(api.OptimismChainID, "Optimistic Ethereum", []params.RpcProvider{
+			testutil.CreateProvider(api.OptimismChainID, "Infura Optimism", params.UserProviderType, true, "https://optimism.infura.io"),
+		}),
+	}
+	err = persistence.SetNetworks(initNetworks)
+	s.Require().NoError(err)
+	s.assertDbNetworks(initNetworks)
 }
 
-func TestInitNetwork(t *testing.T) {
-	db, stop := setupTestNetworkDB(t)
-	defer stop()
-
-	nm := NewManager(db)
-	err := nm.Init(initNetworks)
-	require.NoError(t, err)
-
-	network := nm.Find(1)
-	require.NotNil(t, network)
-	require.Equal(t, (uint64)(1), network.ChainID)
+func (s *NetworkManagerTestSuite) TearDownTest() {
+	if s.cleanup != nil {
+		s.cleanup()
+	}
 }
 
-func TestGet(t *testing.T) {
-	db, stop := setupTestNetworkDB(t)
-	defer stop()
-
-	nm := NewManager(db)
-	err := nm.Init(initNetworks)
-	require.NoError(t, err)
-
-	networks, err := nm.Get(true)
-	require.Nil(t, err)
-	require.Equal(t, 2, len(networks))
+func TestNetworkManagerTestSuite(t *testing.T) {
+	suite.Run(t, new(NetworkManagerTestSuite))
 }
 
-func TestGetCombinedNetworks(t *testing.T) {
-	db, stop := setupTestNetworkDB(t)
-	defer stop()
+// Helper functions
 
-	nm := NewManager(db)
-	err := nm.Init(initNetworks)
-	require.NoError(t, err)
+func (s *NetworkManagerTestSuite) assertDbNetworks(expectedNetworks []params.Network) {
+	// Convert []model.Network to []*model.Network
+	expectedNetworksPtr := testutil.ConvertNetworksToPointers(expectedNetworks)
 
-	combinedNetworks, err := nm.GetCombinedNetworks()
-	require.Nil(t, err)
-	require.Equal(t, 2, len(combinedNetworks))
-	require.Equal(t, uint64(1), combinedNetworks[0].Prod.ChainID)
-	require.Equal(t, uint64(11155111), combinedNetworks[0].Test.ChainID)
-	require.Equal(t, uint64(10), combinedNetworks[1].Prod.ChainID)
-	require.Nil(t, combinedNetworks[1].Test)
+	// Fetch saved networks
+	savedNetworks, err := s.manager.GetAll()
+	s.Require().NoError(err)
+
+	// Compare the lists
+	testutil.CompareNetworksList(s.T(), expectedNetworksPtr, savedNetworks)
 }
 
-func TestDelete(t *testing.T) {
-	db, stop := setupTestNetworkDB(t)
-	defer stop()
+func (s *NetworkManagerTestSuite) TestUserAddsCustomProviders() {
+	// Adding custom providers
+	customProviders := []params.RpcProvider{
+		testutil.CreateProvider(api.MainnetChainID, "CustomProvider1", params.UserProviderType, true, "https://custom1.example.com"),
+		testutil.CreateProvider(api.MainnetChainID, "CustomProvider2", params.UserProviderType, false, "https://custom2.example.com"),
+	}
+	err := s.manager.SetUserRpcProviders(api.MainnetChainID, customProviders)
+	s.Require().NoError(err)
 
-	nm := NewManager(db)
-	err := nm.Init(initNetworks)
-	require.NoError(t, err)
-
-	err = nm.Delete(1)
-	require.NoError(t, err)
-	networks, err := nm.Get(true)
-	require.Nil(t, err)
-	require.Equal(t, 1, len(networks))
+	// Assert providers
+	foundNetwork := s.manager.Find(api.MainnetChainID)
+	s.Require().NotNil(foundNetwork)
+	expectedProviders := append(customProviders, networkhelper.GetEmbeddedProviders(foundNetwork.RpcProviders)...)
+	testutil.CompareProvidersList(s.T(), expectedProviders, foundNetwork.RpcProviders)
 }
 
-func TestUpsert(t *testing.T) {
-	db, stop := setupTestNetworkDB(t)
-	defer stop()
+func (s *NetworkManagerTestSuite) TestInitNetworksKeepsUserProviders() {
+	// Add custom providers
+	customProviders := []params.RpcProvider{
+		testutil.CreateProvider(api.MainnetChainID, "CustomProvider1", params.UserProviderType, true, "https://custom1.example.com"),
+		testutil.CreateProvider(api.MainnetChainID, "CustomProvider2", params.UserProviderType, false, "https://custom2.example.com"),
+	}
+	err := s.manager.SetUserRpcProviders(api.MainnetChainID, customProviders)
+	s.Require().NoError(err)
 
-	nm := NewManager(db)
-	err := nm.Init(initNetworks)
-	require.NoError(t, err)
+	// Re-initialize networks
+	initNetworks := []params.Network{
+		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+			testutil.CreateProvider(api.MainnetChainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
+		}),
+	}
+	err = s.manager.InitEmbeddedNetworks(initNetworks)
+	s.Require().NoError(err)
 
-	network := nm.Find(1)
-	require.NotNil(t, network)
+	// Check that custom providers are retained
+	foundNetwork := s.manager.Find(api.MainnetChainID)
+	s.Require().NotNil(foundNetwork)
+	expectedProviders := append(customProviders, networkhelper.GetEmbeddedProviders(initNetworks[0].RpcProviders)...)
+	testutil.CompareProvidersList(s.T(), expectedProviders, foundNetwork.RpcProviders)
+}
 
-	newName := "New Chain Name"
-	network.ChainName = newName
-	err = nm.Upsert(network)
-	require.Nil(t, err)
+func (s *NetworkManagerTestSuite) TestInitNetworksDoesNotSaveEmbeddedProviders() {
+	persistence := db.NewNetworksPersistence(s.db)
+	s.Require().NoError(persistence.DeleteAllNetworks())
 
-	network = nm.Find(1)
-	require.NotNil(t, network)
-	require.Equal(t, newName, network.ChainName)
+	// Re-initialize networks
+	initNetworks := []params.Network{
+		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+			testutil.CreateProvider(api.MainnetChainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
+		}),
+	}
+	err := s.manager.InitEmbeddedNetworks(initNetworks)
+	s.Require().NoError(err)
+
+	// Check that embedded providers are not saved using persistence
+	networks, err := persistence.GetNetworks(false, nil)
+	s.Require().NoError(err)
+	s.Require().Len(networks, 1)
+	s.Require().Len(networks[0].RpcProviders, 0)
+}
+
+func (s *NetworkManagerTestSuite) TestInitEmbeddedNetworks() {
+	// Re-initialize networks
+	initNetworks := []params.Network{
+		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+			testutil.CreateProvider(api.MainnetChainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
+		}),
+	}
+	expectedProviders := networkhelper.GetEmbeddedProviders(initNetworks[0].RpcProviders)
+	err := s.manager.InitEmbeddedNetworks(initNetworks)
+	s.Require().NoError(err)
+
+	// functor tests if embedded providers are present in the networks
+	expectEmbeddedProviders := func(networks []*params.Network) {
+		for _, network := range networks {
+			if network.ChainID == api.MainnetChainID {
+				storedEmbeddedProviders := networkhelper.GetEmbeddedProviders(network.RpcProviders)
+				testutil.CompareProvidersList(s.T(), expectedProviders, storedEmbeddedProviders)
+			}
+		}
+	}
+
+	// GetAll
+	networks, err := s.manager.GetAll()
+	s.Require().NoError(err)
+	expectEmbeddedProviders(networks)
+
+	// Get
+	networks, err = s.manager.Get(false)
+	s.Require().NoError(err)
+	expectEmbeddedProviders(networks)
+
+	// GetActiveNetworks
+	networks, err = s.manager.GetActiveNetworks()
+	s.Require().NoError(err)
+	expectEmbeddedProviders(networks)
+
+	// GetCombinedNetworks
+	combinedNetworks, err := s.manager.GetCombinedNetworks()
+	s.Require().NoError(err)
+	for _, combinedNetwork := range combinedNetworks {
+		if combinedNetwork.Test != nil && combinedNetwork.Test.ChainID == api.MainnetChainID {
+			storedEmbeddedProviders := networkhelper.GetEmbeddedProviders(combinedNetwork.Test.RpcProviders)
+			testutil.CompareProvidersList(s.T(), expectedProviders, storedEmbeddedProviders)
+		}
+		if combinedNetwork.Prod != nil && combinedNetwork.Prod.ChainID == api.MainnetChainID {
+			storedEmbeddedProviders := networkhelper.GetEmbeddedProviders(combinedNetwork.Prod.RpcProviders)
+			testutil.CompareProvidersList(s.T(), expectedProviders, storedEmbeddedProviders)
+		}
+	}
+
+	// GetEmbeddedNetworks
+	embeddedNetworks := s.manager.GetEmbeddedNetworks()
+	expectEmbeddedProviders(testutil.ConvertNetworksToPointers(embeddedNetworks))
+}
+
+func (s *NetworkManagerTestSuite) TestLegacyFieldPopulation() {
+	// Create initial test networks with various providers
+	initNetworks := []params.Network{
+		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+			testutil.CreateProvider(api.MainnetChainID, "DirectProvider1", params.EmbeddedDirectProviderType, true, "https://direct1.ethereum.io"),
+			testutil.CreateProvider(api.MainnetChainID, "DirectProvider2", params.EmbeddedDirectProviderType, true, "https://direct2.ethereum.io"),
+			testutil.CreateProvider(api.MainnetChainID, "ProxyProvider1", params.EmbeddedProxyProviderType, true, "https://proxy1.ethereum.io"),
+			testutil.CreateProvider(api.MainnetChainID, "ProxyProvider2", params.EmbeddedProxyProviderType, true, "https://proxy2.ethereum.io"),
+			testutil.CreateProvider(api.MainnetChainID, "ProxyProvider3", params.EmbeddedProxyProviderType, true, "https://proxy3.ethereum.io"),
+			testutil.CreateProvider(api.MainnetChainID, "UserProvider1", params.UserProviderType, true, "https://user1.ethereum.io"),
+			testutil.CreateProvider(api.MainnetChainID, "UserProvider2", params.UserProviderType, true, "https://user2.ethereum.io"),
+		}),
+	}
+
+	// Add the network to the database
+	persistence := db.NewNetworksPersistence(s.db)
+	err := persistence.SetNetworks(initNetworks)
+	s.Require().NoError(err)
+
+	// Fetch networks and verify legacy field population
+	networks, err := persistence.GetNetworks(false, nil)
+	s.Require().NoError(err)
+	s.Require().Len(networks, 1)
+
+	network := networks[0]
+
+	// Check legacy fields
+	s.Equal("https://direct1.ethereum.io", network.OriginalRPCURL)
+	s.Equal("https://direct2.ethereum.io", network.OriginalFallbackURL)
+	s.Equal("https://user1.ethereum.io", network.RPCURL)
+	s.Equal("https://user2.ethereum.io", network.FallbackURL)
+	s.Equal("https://proxy1.ethereum.io", network.DefaultRPCURL)
+	s.Equal("https://proxy2.ethereum.io", network.DefaultFallbackURL)
+	s.Equal("https://proxy3.ethereum.io", network.DefaultFallbackURL2)
+}
+
+func (s *NetworkManagerTestSuite) TestLegacyFieldPopulationWithoutUserProviders() {
+	// Create a test network with only EmbeddedDirect and EmbeddedProxy providers
+	initNetworks := []params.Network{
+		*testutil.CreateNetwork(api.SepoliaChainID, "Sepolia Testnet", []params.RpcProvider{
+			testutil.CreateProvider(api.SepoliaChainID, "DirectProvider1", params.EmbeddedDirectProviderType, true, "https://direct1.sepolia.io"),
+			testutil.CreateProvider(api.SepoliaChainID, "ProxyProvider1", params.EmbeddedProxyProviderType, true, "https://proxy1.sepolia.io"),
+			testutil.CreateProvider(api.SepoliaChainID, "ProxyProvider2", params.EmbeddedProxyProviderType, true, "https://proxy2.sepolia.io"),
+		}),
+	}
+
+	// Add the network to the database
+	persistence := db.NewNetworksPersistence(s.db)
+	err := persistence.SetNetworks(initNetworks)
+	s.Require().NoError(err)
+
+	// Fetch networks and verify legacy field population
+	networks, err := persistence.GetNetworks(false, nil)
+	s.Require().NoError(err)
+	s.Require().Len(networks, 1)
+
+	network := networks[0]
+
+	// Check legacy fields
+	s.Equal("https://direct1.sepolia.io", network.OriginalRPCURL)
+	s.Empty(network.OriginalFallbackURL)                  // No second EmbeddedDirect provider
+	s.Equal("https://direct1.sepolia.io", network.RPCURL) // Defaults to OriginalRPCURL
+	s.Empty(network.FallbackURL)                          // Defaults to OriginalFallbackURL, which is empty
+	s.Equal("https://proxy1.sepolia.io", network.DefaultRPCURL)
+	s.Equal("https://proxy2.sepolia.io", network.DefaultFallbackURL)
+	s.Empty(network.DefaultFallbackURL2) // No third Proxy provider
+}
+
+func (s *NetworkManagerTestSuite) TestUpsertNetwork() {
+	// Create a new network
+	newNetwork := testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+		testutil.CreateProvider(api.MainnetChainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
+	})
+
+	// Upsert the network
+	err := s.manager.Upsert(newNetwork)
+	s.Require().NoError(err)
+
+	// Verify the network was upserted without embedded providers
+	persistence := db.NewNetworksPersistence(s.db)
+	chainID := api.MainnetChainID
+	networks, err := persistence.GetNetworks(false, &chainID)
+	s.Require().NoError(err)
+	s.Require().Len(networks, 1)
+	s.Require().Len(networkhelper.GetEmbeddedProviders(networks[0].RpcProviders), 0)
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 )
@@ -26,7 +27,9 @@ type Path struct {
 	SuggestedMinPriorityFee         *hexutil.Big        // Suggested min priority fee by the network (in ETH WEI)
 	SuggestedMaxPriorityFee         *hexutil.Big        // Suggested max priority fee by the network (in ETH WEI)
 	CurrentBaseFee                  *hexutil.Big        // Current network base fee (in ETH WEI)
+	UsedContractAddress             *common.Address     // Address of the contract that will be used for the transaction
 
+	TxPackedData    []byte          // Packed data for the transaction
 	TxNonce         *hexutil.Uint64 // Nonce for the transaction
 	TxMaxFeesPerGas *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
 	TxBaseFee       *hexutil.Big    // Base fee for the transaction (in ETH WEI)
@@ -41,7 +44,8 @@ type Path struct {
 
 	ApprovalRequired        bool            // Is approval required for the transaction
 	ApprovalAmountRequired  *hexutil.Big    // Amount required for the approval transaction
-	ApprovalContractAddress *common.Address // Address of the contract that needs to be approved
+	ApprovalContractAddress *common.Address // Address of the contract that will be used for the approval transaction, the same as UsedContractAddress. We can remove this field and use UsedContractAddress instead.
+	ApprovalPackedData      []byte          // Packed data for the approval transaction
 	ApprovalTxNonce         *hexutil.Uint64 // Nonce for the transaction
 	ApprovalMaxFeesPerGas   *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
 	ApprovalBaseFee         *hexutil.Big    // Base fee for the approval transaction (in ETH WEI)
@@ -57,10 +61,17 @@ type Path struct {
 	RequiredTokenBalance  *big.Int // (in selected token)
 	RequiredNativeBalance *big.Int // (in ETH WEI)
 	SubtractFees          bool
+
+	// used internally
+	communityParams *requests.CommunityRouteInputParams
 }
 
 func (p *Path) PathIdentity() string {
-	return fmt.Sprintf("%s-%s-%d", p.RouterInputParamsUuid, p.ProcessorName, p.FromChain.ChainID)
+	var communityID string
+	if p.communityParams != nil {
+		communityID = p.communityParams.ID()
+	}
+	return fmt.Sprintf("%s-%s-%d-%s", p.RouterInputParamsUuid, p.ProcessorName, p.FromChain.ChainID, communityID)
 }
 
 func (p *Path) TxIdentityKey(approval bool) string {
@@ -69,6 +80,14 @@ func (p *Path) TxIdentityKey(approval bool) string {
 
 func (p *Path) Equal(o *Path) bool {
 	return p.FromChain.ChainID == o.FromChain.ChainID && p.ToChain.ChainID == o.ToChain.ChainID
+}
+
+func (p *Path) SetCommunityParams(params *requests.CommunityRouteInputParams) {
+	p.communityParams = params
+}
+
+func (p *Path) GetCommunityParams() *requests.CommunityRouteInputParams {
+	return p.communityParams
 }
 
 func (p *Path) Copy() *Path {
@@ -132,6 +151,11 @@ func (p *Path) Copy() *Path {
 		newPath.CurrentBaseFee = (*hexutil.Big)(big.NewInt(0).Set(p.CurrentBaseFee.ToInt()))
 	}
 
+	if p.TxPackedData != nil {
+		newPath.TxPackedData = make([]byte, len(p.TxPackedData))
+		copy(newPath.TxPackedData, p.TxPackedData)
+	}
+
 	if p.TxNonce != nil {
 		txNonce := *p.TxNonce
 		newPath.TxNonce = &txNonce
@@ -139,6 +163,11 @@ func (p *Path) Copy() *Path {
 
 	if p.TxMaxFeesPerGas != nil {
 		newPath.TxMaxFeesPerGas = (*hexutil.Big)(big.NewInt(0).Set(p.TxMaxFeesPerGas.ToInt()))
+	}
+
+	if p.UsedContractAddress != nil {
+		addr := common.HexToAddress(p.UsedContractAddress.Hex())
+		newPath.UsedContractAddress = &addr
 	}
 
 	if p.TxBaseFee != nil {
@@ -172,6 +201,11 @@ func (p *Path) Copy() *Path {
 	if p.ApprovalContractAddress != nil {
 		addr := common.HexToAddress(p.ApprovalContractAddress.Hex())
 		newPath.ApprovalContractAddress = &addr
+	}
+
+	if p.ApprovalPackedData != nil {
+		newPath.ApprovalPackedData = make([]byte, len(p.ApprovalPackedData))
+		copy(newPath.ApprovalPackedData, p.ApprovalPackedData)
 	}
 
 	if p.ApprovalTxNonce != nil {
@@ -209,6 +243,10 @@ func (p *Path) Copy() *Path {
 
 	if p.RequiredNativeBalance != nil {
 		newPath.RequiredNativeBalance = big.NewInt(0).Set(p.RequiredNativeBalance)
+	}
+
+	if p.communityParams != nil {
+		newPath.communityParams = p.communityParams.Copy()
 	}
 
 	return newPath

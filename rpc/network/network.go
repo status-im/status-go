@@ -1,318 +1,231 @@
 package network
 
-//go:generate mockgen -package=mock_network  -source=network.go -destination=mock/network.go
-
 import (
-	"bytes"
 	"database/sql"
 	"fmt"
 
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/params/networkhelper"
+
+	persistence "github.com/status-im/status-go/rpc/network/db"
 )
 
-var SepoliaChainIDs = []uint64{11155111, 421614, 11155420, 84532}
+//go:generate mockgen -package=mock -source=network.go -destination=mock/network.go
+type ManagerInterface interface {
+	InitEmbeddedNetworks(networks []params.Network) error
+
+	Upsert(network *params.Network) error
+	Delete(chainID uint64) error
+	Find(chainID uint64) *params.Network
+
+	Get(onlyEnabled bool) ([]*params.Network, error)
+	GetAll() ([]*params.Network, error)
+	GetActiveNetworks() ([]*params.Network, error)
+	GetCombinedNetworks() ([]*CombinedNetwork, error)
+	GetEmbeddedNetworks() []params.Network // Networks that are embedded in the app binary code
+	GetTestNetworksEnabled() (bool, error)
+
+	SetUserRpcProviders(chainID uint64, providers []params.RpcProvider) error
+	SetEnabled(chainID uint64, enabled bool) error
+}
 
 type CombinedNetwork struct {
 	Prod *params.Network
 	Test *params.Network
 }
 
-const baseQuery = "SELECT chain_id, chain_name, rpc_url, original_rpc_url, fallback_url, original_fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name, related_chain_id FROM networks"
-
-func newNetworksQuery() *networksQuery {
-	buf := bytes.NewBuffer(nil)
-	buf.WriteString(baseQuery)
-	return &networksQuery{buf: buf}
-}
-
-type networksQuery struct {
-	buf   *bytes.Buffer
-	args  []interface{}
-	added bool
-}
-
-func (nq *networksQuery) andOrWhere() {
-	if nq.added {
-		nq.buf.WriteString(" AND")
-	} else {
-		nq.buf.WriteString(" WHERE")
-	}
-}
-
-func (nq *networksQuery) filterEnabled(enabled bool) *networksQuery {
-	nq.andOrWhere()
-	nq.added = true
-	nq.buf.WriteString(" enabled = ?")
-	nq.args = append(nq.args, enabled)
-	return nq
-}
-
-func (nq *networksQuery) filterChainID(chainID uint64) *networksQuery {
-	nq.andOrWhere()
-	nq.added = true
-	nq.buf.WriteString(" chain_id = ?")
-	nq.args = append(nq.args, chainID)
-	return nq
-}
-
-func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
-	rows, err := db.Query(nq.buf.String(), nq.args...)
-	if err != nil {
-		return nil, err
-	}
-	var res []*params.Network
-	defer rows.Close()
-	for rows.Next() {
-		network := params.Network{}
-		err := rows.Scan(
-			&network.ChainID, &network.ChainName, &network.RPCURL, &network.OriginalRPCURL, &network.FallbackURL, &network.OriginalFallbackURL,
-			&network.BlockExplorerURL, &network.IconURL, &network.NativeCurrencyName, &network.NativeCurrencySymbol,
-			&network.NativeCurrencyDecimals, &network.IsTest, &network.Layer, &network.Enabled, &network.ChainColor, &network.ShortName,
-			&network.RelatedChainID,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		res = append(res, &network)
-	}
-
-	return res, err
-}
-
-type ManagerInterface interface {
-	Get(onlyEnabled bool) ([]*params.Network, error)
-	GetAll() ([]*params.Network, error)
-	Find(chainID uint64) *params.Network
-	GetConfiguredNetworks() []params.Network
-	GetTestNetworksEnabled() (bool, error)
-}
-
 type Manager struct {
 	db                 *sql.DB
-	configuredNetworks []params.Network
 	accountsDB         *accounts.Database
+	networkPersistence persistence.NetworksPersistenceInterface
+	embeddedNetworks   []params.Network
+
+	logger *zap.Logger
 }
 
+// NewManager creates a new instance of Manager.
 func NewManager(db *sql.DB) *Manager {
 	accountsDB, err := accounts.NewDB(db)
 	if err != nil {
 		return nil
 	}
+
+	logger := logutils.ZapLogger().Named("NetworkManager")
+
 	return &Manager{
-		db:         db,
-		accountsDB: accountsDB,
+		db:                 db,
+		accountsDB:         accountsDB,
+		networkPersistence: persistence.NewNetworksPersistence(db),
+		logger:             logger,
 	}
 }
 
-func find(chainID uint64, networks []params.Network) int {
-	for i := range networks {
-		if networks[i].ChainID == chainID {
-			return i
-		}
-	}
-	return -1
-}
-
-func (nm *Manager) Init(networks []params.Network) error {
-	if networks == nil {
+// Init initializes the nets, merges them with existing ones, and wraps the operation in a transaction.
+// We should store the following information in the DB:
+// - User's RPC providers
+// - Enabled state of the network
+// Embedded RPC providers should only be stored in memory
+func (nm *Manager) InitEmbeddedNetworks(embeddedNetworks []params.Network) error {
+	if embeddedNetworks == nil {
 		return nil
 	}
-	nm.configuredNetworks = networks
 
-	var errors string
-	currentNetworks, _ := nm.Get(false)
+	// Update embedded networks
+	nm.embeddedNetworks = embeddedNetworks
 
-	// Delete networks which are not supported any more
-	for i := range currentNetworks {
-		if find(currentNetworks[i].ChainID, networks) == -1 {
-			err := nm.Delete(currentNetworks[i].ChainID)
-			if err != nil {
-				errors += fmt.Sprintf("error deleting network with ChainID: %d, %s", currentNetworks[i].ChainID, err.Error())
-			}
-		}
-	}
+	// Begin a transaction
+	return persistence.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
+		// Create temporary persistence instances with the transaction
+		txNetworksPersistence := persistence.NewNetworksPersistence(tx)
 
-	// Add new networks and update related chain id for the old ones
-	for i := range networks {
-		found := false
-		networks[i].OriginalRPCURL = networks[i].RPCURL
-		networks[i].OriginalFallbackURL = networks[i].FallbackURL
-
-		for j := range currentNetworks {
-			if currentNetworks[j].ChainID == networks[i].ChainID {
-				found = true
-				if currentNetworks[j].RelatedChainID != networks[i].RelatedChainID {
-					// Update fallback_url if it's different
-					err := nm.UpdateRelatedChainID(currentNetworks[j].ChainID, networks[i].RelatedChainID)
-					if err != nil {
-						errors += fmt.Sprintf("error updating network fallback_url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
-					}
-				}
-
-				if networks[i].OriginalRPCURL != currentNetworks[j].OriginalRPCURL && currentNetworks[j].RPCURL == currentNetworks[j].OriginalRPCURL {
-					err := nm.updateRPCURL(networks[i].ChainID, networks[i].OriginalRPCURL)
-					if err != nil {
-						errors += fmt.Sprintf("error updating rpc url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
-					}
-				}
-
-				if networks[i].OriginalFallbackURL != currentNetworks[j].OriginalFallbackURL && currentNetworks[j].FallbackURL == currentNetworks[j].OriginalFallbackURL {
-					err := nm.updateFallbackURL(networks[i].ChainID, networks[i].OriginalFallbackURL)
-					if err != nil {
-						errors += fmt.Sprintf("error updating rpc url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
-					}
-				}
-
-				err := nm.updateOriginalURLs(networks[i].ChainID, networks[i].OriginalRPCURL, networks[i].OriginalFallbackURL)
-				if err != nil {
-					errors += fmt.Sprintf("error updating network original url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
-				}
-
-				break
-			}
+		currentNetworks, err := txNetworksPersistence.GetAllNetworks()
+		if err != nil {
+			return fmt.Errorf("error fetching current networks: %w", err)
 		}
 
-		if !found {
-			// Insert new network
-			err := nm.Upsert(&networks[i])
-			if err != nil {
-				errors += fmt.Sprintf("error inserting network with ChainID: %d, %s", networks[i].ChainID, err.Error())
+		// Create a map for quick access to current networks
+		currentNetworskMap := make(map[uint64]params.Network)
+		for _, currentNetwork := range currentNetworks {
+			currentNetworskMap[currentNetwork.ChainID] = *currentNetwork
+		}
+
+		// Keep user's rpc providers and enabled state
+		var updatedNetworks []params.Network
+		for _, newNetwork := range embeddedNetworks {
+			if existingNetwork, exists := currentNetworskMap[newNetwork.ChainID]; exists {
+				newNetwork.RpcProviders = networkhelper.GetUserProviders(existingNetwork.RpcProviders)
+				newNetwork.Enabled = existingNetwork.Enabled
+			} else {
+				newNetwork.RpcProviders = networkhelper.GetUserProviders(newNetwork.RpcProviders)
 			}
+			updatedNetworks = append(updatedNetworks, newNetwork)
+		}
+
+		// Use SetNetworks to replace all networks in the database without embedded RPC providers
+		err = txNetworksPersistence.SetNetworks(updatedNetworks)
+		if err != nil {
+			return fmt.Errorf("error setting networks: %w", err)
+		}
+
+		return nil
+	})
+}
+
+// GetEmbeddedProviders returns embedded providers for a given chainID.
+func (nm *Manager) getEmbeddedProviders(chainID uint64) []params.RpcProvider {
+	for _, network := range nm.embeddedNetworks {
+		if network.ChainID == chainID {
+			return networkhelper.GetEmbeddedProviders(network.RpcProviders)
 		}
 	}
-
-	if len(errors) > 0 {
-		return fmt.Errorf(errors)
-	}
-
 	return nil
 }
 
+// setEmbeddedProviders adds embedded providers to a network.
+func (nm *Manager) setNetworkEmbeddedProviders(network *params.Network) {
+	network.RpcProviders = networkhelper.ReplaceEmbeddedProviders(
+		network.RpcProviders, nm.getEmbeddedProviders(network.ChainID))
+}
+
+func (nm *Manager) setEmbeddedProviders(networks []*params.Network) {
+	for _, network := range networks {
+		nm.setNetworkEmbeddedProviders(network)
+	}
+}
+
+// networkWithoutEmbeddedProviders returns a copy of the given network without embedded RPC providers.
+func (nm *Manager) networkWithoutEmbeddedProviders(network *params.Network) *params.Network {
+	networkCopy := network.DeepCopy()
+	networkCopy.RpcProviders = networkhelper.GetUserProviders(network.RpcProviders)
+	return &networkCopy
+}
+
+// Upsert adds or updates a network, synchronizing RPC providers, wrapped in a transaction.
 func (nm *Manager) Upsert(network *params.Network) error {
-	_, err := nm.db.Exec(
-		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, original_rpc_url, fallback_url, original_fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name, related_chain_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		network.ChainID, network.ChainName, network.RPCURL, network.OriginalRPCURL, network.FallbackURL, network.OriginalFallbackURL, network.BlockExplorerURL, network.IconURL,
-		network.NativeCurrencyName, network.NativeCurrencySymbol, network.NativeCurrencyDecimals,
-		network.IsTest, network.Layer, network.Enabled, network.ChainColor, network.ShortName,
-		network.RelatedChainID,
-	)
-	return err
+	return persistence.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
+		txNetworksPersistence := persistence.NewNetworksPersistence(tx)
+		err := txNetworksPersistence.UpsertNetwork(nm.networkWithoutEmbeddedProviders(network))
+		if err != nil {
+			return fmt.Errorf("failed to upsert network: %w", err)
+		}
+		return nil
+	})
 }
 
+// Delete removes a network by ChainID, wrapped in a transaction.
 func (nm *Manager) Delete(chainID uint64) error {
-	_, err := nm.db.Exec("DELETE FROM networks WHERE chain_id = ?", chainID)
-	return err
+	return persistence.ExecuteWithinTransaction(nm.db, func(tx *sql.Tx) error {
+		txNetworksPersistence := persistence.NewNetworksPersistence(tx)
+		err := txNetworksPersistence.DeleteNetwork(chainID)
+		if err != nil {
+			return fmt.Errorf("failed to delete network: %w", err)
+		}
+		return nil
+	})
 }
 
-func (nm *Manager) UpdateRelatedChainID(chainID uint64, relatedChainID uint64) error {
-	_, err := nm.db.Exec(`UPDATE networks SET related_chain_id = ? WHERE chain_id = ?`, relatedChainID, chainID)
-	return err
+// SetUserRpcProviders updates user RPC providers, wrapped in a transaction.
+func (nm *Manager) SetUserRpcProviders(chainID uint64, userProviders []params.RpcProvider) error {
+	rpcPersistence := nm.networkPersistence.GetRpcPersistence()
+	return rpcPersistence.SetRpcProviders(chainID, networkhelper.GetUserProviders(userProviders))
 }
 
-func (nm *Manager) updateRPCURL(chainID uint64, rpcURL string) error {
-	_, err := nm.db.Exec(`UPDATE networks SET rpc_url = ? WHERE chain_id = ?`, rpcURL, chainID)
-	return err
+// SetEnabled updates the enabled status of a network
+func (nm *Manager) SetEnabled(chainID uint64, enabled bool) error {
+	err := nm.networkPersistence.SetEnabled(chainID, enabled)
+	if err != nil {
+		return fmt.Errorf("failed to set enabled status: %w", err)
+	}
+	return nil
 }
 
-func (nm *Manager) updateFallbackURL(chainID uint64, fallbackURL string) error {
-	_, err := nm.db.Exec(`UPDATE networks SET fallback_url = ? WHERE chain_id = ?`, fallbackURL, chainID)
-	return err
-}
-
-func (nm *Manager) updateOriginalURLs(chainID uint64, originalRPCURL, OriginalFallbackURL string) error {
-	_, err := nm.db.Exec(`UPDATE networks SET original_rpc_url = ?, original_fallback_url = ?  WHERE chain_id = ?`, originalRPCURL, OriginalFallbackURL, chainID)
-	return err
-}
-
+// Find locates a network by ChainID.
 func (nm *Manager) Find(chainID uint64) *params.Network {
-	networks, err := newNetworksQuery().filterChainID(chainID).exec(nm.db)
+	networks, err := nm.networkPersistence.GetNetworkByChainID(chainID)
 	if len(networks) != 1 || err != nil {
+		nm.logger.Warn("Failed to find network", zap.Uint64("chainID", chainID), zap.Error(err))
 		return nil
 	}
-	setDefaultRPCURL(networks, nm.configuredNetworks)
-	return networks[0]
+	result := networks[0]
+	nm.setNetworkEmbeddedProviders(result)
+	return result
 }
 
+// GetAll returns all networks.
 func (nm *Manager) GetAll() ([]*params.Network, error) {
-	query := newNetworksQuery()
-	networks, err := query.exec(nm.db)
-	setDefaultRPCURL(networks, nm.configuredNetworks)
-	return networks, err
+	networks, err := nm.networkPersistence.GetAllNetworks()
+	if err != nil {
+		return nil, err
+	}
+	nm.setEmbeddedProviders(networks)
+	return networks, nil
 }
 
+// Get returns networks filtered by the enabled status.
 func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
-	query := newNetworksQuery()
-	if onlyEnabled {
-		query.filterEnabled(true)
-	}
-
-	networks, err := query.exec(nm.db)
+	networks, err := nm.networkPersistence.GetNetworks(onlyEnabled, nil)
 	if err != nil {
 		return nil, err
 	}
-
-	var results []*params.Network
-	for _, network := range networks {
-
-		configuredNetwork, err := findNetwork(nm.configuredNetworks, network.ChainID)
-		if err != nil {
-			addDefaultRPCURL(network, configuredNetwork)
-		}
-
-		results = append(results, network)
-	}
-
-	return results, nil
+	nm.setEmbeddedProviders(networks)
+	return networks, nil
 }
 
-func (nm *Manager) GetCombinedNetworks() ([]*CombinedNetwork, error) {
-	networks, err := nm.Get(false)
-	if err != nil {
-		return nil, err
-	}
-	var combinedNetworks []*CombinedNetwork
-	for _, network := range networks {
-		found := false
-		for _, n := range combinedNetworks {
-			if (n.Test != nil && (network.ChainID == n.Test.RelatedChainID || n.Test.ChainID == network.RelatedChainID)) || (n.Prod != nil && (network.ChainID == n.Prod.RelatedChainID || n.Prod.ChainID == network.RelatedChainID)) {
-				found = true
-				if network.IsTest {
-					n.Test = network
-					break
-				} else {
-					n.Prod = network
-					break
-				}
-			}
-		}
-
-		if found {
-			continue
-		}
-
-		newCombined := &CombinedNetwork{}
-		if network.IsTest {
-			newCombined.Test = network
-		} else {
-			newCombined.Prod = network
-		}
-		combinedNetworks = append(combinedNetworks, newCombined)
-	}
-
-	return combinedNetworks, nil
+// GetConfiguredNetworks returns the configured networks.
+func (nm *Manager) GetEmbeddedNetworks() []params.Network {
+	return nm.embeddedNetworks
 }
 
-func (nm *Manager) GetConfiguredNetworks() []params.Network {
-	return nm.configuredNetworks
-}
-
+// GetTestNetworksEnabled checks if test networks are enabled.
 func (nm *Manager) GetTestNetworksEnabled() (result bool, err error) {
 	return nm.accountsDB.GetTestNetworksEnabled()
 }
 
-// Returns all networks for active mode (test/prod)
+// GetActiveNetworks returns active networks based on the current mode (test/prod).
 func (nm *Manager) GetActiveNetworks() ([]*params.Network, error) {
 	areTestNetworksEnabled, err := nm.GetTestNetworksEnabled()
 	if err != nil {
@@ -323,39 +236,41 @@ func (nm *Manager) GetActiveNetworks() ([]*params.Network, error) {
 	if err != nil {
 		return nil, err
 	}
-	availableNetworks := make([]*params.Network, 0)
+
+	var availableNetworks []*params.Network
 	for _, network := range networks {
-		if network.IsTest != areTestNetworksEnabled {
-			continue
+		if network.IsTest == areTestNetworksEnabled {
+			availableNetworks = append(availableNetworks, network)
 		}
-		availableNetworks = append(availableNetworks, network)
 	}
 
 	return availableNetworks, nil
 }
 
-func findNetwork(networks []params.Network, chainID uint64) (params.Network, error) {
+func (nm *Manager) GetCombinedNetworks() ([]*CombinedNetwork, error) {
+	networks, err := nm.Get(false)
+	if err != nil {
+		return nil, err
+	}
+
+	combinedNetworksMap := make(map[uint64]*CombinedNetwork)
+	combinedNetworksSlice := make([]*CombinedNetwork, 0)
+
 	for _, network := range networks {
-		if network.ChainID == chainID {
-			return network, nil
+		combinedNetwork, exists := combinedNetworksMap[network.RelatedChainID]
+
+		if !exists {
+			combinedNetwork = &CombinedNetwork{}
+			combinedNetworksMap[network.ChainID] = combinedNetwork
+			combinedNetworksSlice = append(combinedNetworksSlice, combinedNetwork)
+		}
+
+		if network.IsTest {
+			combinedNetwork.Test = network
+		} else {
+			combinedNetwork.Prod = network
 		}
 	}
-	return params.Network{}, fmt.Errorf("network not found")
-}
 
-func addDefaultRPCURL(target *params.Network, source params.Network) {
-	target.DefaultRPCURL = source.DefaultRPCURL
-	target.DefaultFallbackURL = source.DefaultFallbackURL
-	target.DefaultFallbackURL2 = source.DefaultFallbackURL2
-}
-
-func setDefaultRPCURL(target []*params.Network, source []params.Network) {
-	for i := range target {
-		for j := range source {
-			if target[i].ChainID == source[j].ChainID {
-				addDefaultRPCURL(target[i], source[j])
-				break
-			}
-		}
-	}
+	return combinedNetworksSlice, nil
 }

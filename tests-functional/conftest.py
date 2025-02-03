@@ -1,8 +1,7 @@
 import os
-import docker
-
 from dataclasses import dataclass, field
 from typing import List
+import pytest
 
 
 def pytest_addoption(parser):
@@ -61,21 +60,26 @@ def pytest_configure(config):
     executor_number = int(os.getenv("EXECUTOR_NUMBER", 5))
     base_port = 7000
     range_size = 100
+    max_port = 65535
+    min_port = 1024
 
     start_port = base_port + (executor_number * range_size)
+    end_port = start_port + 20000
 
-    option.status_backend_port_range = list(range(start_port, start_port + range_size - 1))
+    # Ensure generated ports are within the valid range
+    if start_port < min_port or end_port > max_port:
+        raise ValueError(f"Generated port range ({start_port}-{end_port}) is outside the allowed range ({min_port}-{max_port}).")
+
+    option.status_backend_port_range = list(range(start_port, end_port))
     option.status_backend_containers = []
 
     option.base_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-def pytest_unconfigure():
-    docker_client = docker.from_env()
-    for container_id in option.status_backend_containers:
-        try:
-            container = docker_client.containers.get(container_id)
-            container.stop(timeout=30)
-            container.remove()
-        except Exception as e:
-            print(e)
+@pytest.fixture(scope="function", autouse=True)
+def close_status_backend_containers(request):
+    yield
+    if hasattr(request.node.instance, "reuse_container"):
+        return
+    for container in option.status_backend_containers:
+        container.kill()  # type: ignore

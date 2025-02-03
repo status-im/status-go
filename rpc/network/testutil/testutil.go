@@ -102,3 +102,14 @@ func CompareNetworksList(t require.TestingT, expectedNetworks, actualNetworks []
 		CompareNetworks(t, expectedNetwork, network)
 	}
 }
+
+func ConvertNetworksToPointers(networks []params.Network) []*params.Network {
+	result := make([]*params.Network, len(networks))
+	for i := range networks {
+		// Create a copy of the current network
+		network := networks[i]
+		// Store a pointer to the copy
+		result[i] = &network
+	}
+	return result
+}

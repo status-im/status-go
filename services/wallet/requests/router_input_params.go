@@ -2,6 +2,8 @@ package requests
 
 import (
 	"math/big"
+	"reflect"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -32,6 +34,10 @@ var (
 	ErrENSSetPubKeyInvalidUsername               = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-017"), Details: "a valid username, ending in '.eth', is required for ENSSetPubKey"}
 	ErrLockedAmountExcludesAllSupported          = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-018"), Details: "all supported chains are excluded, routing impossible"}
 	ErrCannotCheckLockedAmounts                  = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-019"), Details: "cannot check locked amounts"}
+	ErrNoCommunityParametersProvided             = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-020"), Details: "no community parameters provided"}
+	ErrNoFromChainProvided                       = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-021"), Details: "from chain not provided"}
+	ErrNoToChainProvided                         = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-022"), Details: "to chain not provided"}
+	ErrFromAndToChainMustBeTheSame               = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-023"), Details: "from and to chain IDs must be the same"}
 )
 
 type RouteInputParams struct {
@@ -58,6 +64,9 @@ type RouteInputParams struct {
 	// Used internally
 	PathTxCustomParams map[string]*PathTxCustomParams `json:"-"`
 
+	// Community related params
+	CommunityRouteInputParams *CommunityRouteInputParams `json:"communityRouteInputParams"`
+
 	// TODO: Remove two fields below once we implement a better solution for tests
 	// Currently used for tests only
 	TestsMode  bool
@@ -79,6 +88,29 @@ type RouterTestParams struct {
 type Estimation struct {
 	Value uint64
 	Err   error
+}
+
+func slicesEqual(a, b []uint64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	aCopy := make([]uint64, len(a))
+	bCopy := make([]uint64, len(b))
+	copy(aCopy, a)
+	copy(bCopy, b)
+
+	sort.Slice(aCopy, func(i, j int) bool { return aCopy[i] < aCopy[j] })
+	sort.Slice(bCopy, func(i, j int) bool { return bCopy[i] < bCopy[j] })
+
+	return reflect.DeepEqual(aCopy, bCopy)
+}
+
+func (i *RouteInputParams) UseCommunityTransferDetails() bool {
+	if !i.SendType.IsCommunityRelatedTransfer() || i.CommunityRouteInputParams == nil {
+		return false
+	}
+	return i.CommunityRouteInputParams.UseTransferDetails()
 }
 
 func (i *RouteInputParams) Validate() error {
@@ -142,6 +174,23 @@ func (i *RouteInputParams) Validate() error {
 		if i.AmountOut != nil && i.AmountOut.ToInt().Sign() < 0 {
 			return ErrSwapAmountOutMustBePositive
 		}
+	}
+
+	if i.SendType.IsCommunityRelatedTransfer() {
+		if i.DisabledFromChainIDs == nil || len(i.DisabledFromChainIDs) == 0 {
+			return ErrNoFromChainProvided
+		}
+		if i.DisabledToChainIDs == nil || len(i.DisabledToChainIDs) == 0 {
+			return ErrNoToChainProvided
+		}
+		if !slicesEqual(i.DisabledFromChainIDs, i.DisabledToChainIDs) {
+			return ErrFromAndToChainMustBeTheSame
+		}
+
+		if i.CommunityRouteInputParams == nil {
+			return ErrNoCommunityParametersProvided
+		}
+		return i.CommunityRouteInputParams.validateCommunityRelatedInputs(i.SendType)
 	}
 
 	return i.validateFromLockedAmount()

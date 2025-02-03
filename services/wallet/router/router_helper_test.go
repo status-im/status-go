@@ -37,8 +37,7 @@ func (s *CalculateFeesTestSuite) TearDownTest() {
 
 func (s *CalculateFeesTestSuite) TestCalculateApprovalL1Fee_Success() {
 	// Test inputs
-	amountIn := big.NewInt(1000)
-	approvalContractAddress := common.HexToAddress("0xApprovalAddress")
+	approvalTxInputData := []byte("0x123456")
 	expectedFee := big.NewInt(500)
 
 	// Prepare mock return data
@@ -56,17 +55,16 @@ func (s *CalculateFeesTestSuite) TestCalculateApprovalL1Fee_Success() {
 		})
 
 	// Call the function
-	fee, err := router.CalculateApprovalL1Fee(amountIn, s.chainID, &approvalContractAddress, s.ethClient)
+	fee, err := router.CalculateL1Fee(s.chainID, approvalTxInputData, s.ethClient)
 
 	// Assertions
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), expectedFee.Uint64(), fee)
+	require.Equal(s.T(), expectedFee, fee)
 }
 
 func (s *CalculateFeesTestSuite) TestCalculateApprovalL1Fee_ZeroFeeOnContractCallError() {
 	// Test inputs
-	amountIn := big.NewInt(1000)
-	approvalContractAddress := common.HexToAddress("0xApprovalAddress")
+	approvalTxInputData := []byte("0x123456")
 
 	// Mock CallContract to return an error
 	s.ethClient.EXPECT().
@@ -74,11 +72,11 @@ func (s *CalculateFeesTestSuite) TestCalculateApprovalL1Fee_ZeroFeeOnContractCal
 		Return(nil, errors.New("contract call failed"))
 
 	// Call the function
-	fee, err := router.CalculateApprovalL1Fee(amountIn, s.chainID, &approvalContractAddress, s.ethClient)
+	fee, err := router.CalculateL1Fee(s.chainID, approvalTxInputData, s.ethClient)
 
 	// Assertions
-	require.Nil(s.T(), err)
-	require.Equal(s.T(), uint64(0), fee)
+	require.NotNil(s.T(), err)
+	require.Nil(s.T(), fee)
 }
 
 func TestCalculateFeesTestSuite(t *testing.T) {

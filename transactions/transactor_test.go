@@ -69,7 +69,6 @@ func (s *TransactorSuite) SetupTest() {
 		Networks:        nil,
 		DB:              db,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	rpcClient, _ := statusRpc.NewClient(config)
 

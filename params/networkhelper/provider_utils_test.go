@@ -87,6 +87,7 @@ func TestUpdateEmbeddedProxyProviders(t *testing.T) {
 				assert.True(t, provider.Enabled, "Provider Enabled state should be overridden")
 				assert.Equal(t, user, provider.AuthLogin, "Provider AuthLogin should be overridden")
 				assert.Equal(t, password, provider.AuthPassword, "Provider AuthPassword should be overridden")
+				assert.Equal(t, params.BasicAuth, provider.AuthType, "Provider AuthType should be set to BasicAuth")
 			} else {
 				assert.Equal(t, expectedProvider.Enabled, provider.Enabled, "Provider Enabled state should remain unchanged")
 				assert.Equal(t, expectedProvider.AuthLogin, provider.AuthLogin, "Provider AuthLogin should remain unchanged")
@@ -143,29 +144,23 @@ func TestOverrideDirectProvidersAuth(t *testing.T) {
 	}
 }
 
-func TestOverrideGanacheTokenOverrides(t *testing.T) {
-	// Create a sample list of networks with various ChainIDs
-	networks := []params.Network{
-		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", nil),
-		*testutil.CreateNetwork(api.OptimismChainID, "Optimism", nil),
-		*testutil.CreateNetwork(api.MainnetChainID, "Mainnet Duplicate", nil),
+func TestDeepCopyNetwork(t *testing.T) {
+	originalNetwork := testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+		*params.NewUserProvider(api.MainnetChainID, "Provider1", "https://userprovider.example.com", true),
+		*params.NewDirectProvider(api.MainnetChainID, "Provider2", "https://mainnet.infura.io/v3/", true),
+	})
+
+	originalNetwork.TokenOverrides = []params.TokenOverride{
+		{Symbol: "token1", Address: common.HexToAddress("0x123")},
 	}
 
-	ganacheTokenOverride := params.TokenOverride{
-		Symbol:  "SNT",
-		Address: common.HexToAddress("0x8571Ddc46b10d31EF963aF49b6C7799Ea7eff818"),
-	}
+	copiedNetwork := originalNetwork.DeepCopy()
 
-	// Call OverrideGanacheTokenOverrides
-	updatedNetworks := networkhelper.OverrideGanacheToken(networks, "url", api.MainnetChainID, ganacheTokenOverride)
+	assert.True(t, reflect.DeepEqual(originalNetwork, &copiedNetwork), "Copied network should be deeply equal to the original")
 
-	// Verify that only networks with the specified ChainID have the token override applied
-	for _, network := range updatedNetworks {
-		if network.ChainID == api.MainnetChainID {
-			require.NotNil(t, network.TokenOverrides, "TokenOverrides should not be nil for ChainID %d", network.ChainID)
-			assert.Contains(t, network.TokenOverrides, ganacheTokenOverride, "TokenOverrides should contain the ganache token")
-		} else {
-			assert.Nil(t, network.TokenOverrides, "TokenOverrides should be nil for ChainID %d", network.ChainID)
-		}
-	}
+	// Modify the copied network and verify that the original network remains unchanged
+	copiedNetwork.RpcProviders[0].Enabled = false
+	copiedNetwork.TokenOverrides[0].Symbol = "modifiedSymbol"
+	assert.NotEqual(t, originalNetwork.RpcProviders[0].Enabled, copiedNetwork.RpcProviders[0].Enabled, "Original network should remain unchanged")
+	assert.NotEqual(t, originalNetwork.TokenOverrides[0].Symbol, copiedNetwork.TokenOverrides[0].Symbol, "Original network should remain unchanged")
 }

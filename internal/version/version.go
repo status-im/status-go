@@ -8,7 +8,7 @@ import (
 // Use go:generate script to get the version and git commit.
 // VERSION and GIT_COMMIT files are used in further `go:embed` commands to load values to the variables.
 // Suppress errors, assuming files have already been properly generated. Required for Docker builds.
-//go:generate sh -c "../../_assets/scripts/version.sh > VERSION || true"
+//go:generate sh -c "git describe --tags --dirty='-dirty' > VERSION || true"
 //go:generate sh -c "git rev-parse --short HEAD > GIT_COMMIT || true"
 
 var (

@@ -1,0 +1,51 @@
+name: Test Reliability
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron:  '0 2 * * *'
+
+env:
+  FORCE_COLOR: "1"
+
+jobs:
+  test-reliability:
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Restrict repository access to read-only
+      actions: read   # Only read actions, no write access
+      checks: write   # Allow posting test reports
+    steps:
+
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Set up virtual environment in /tests-functional/
+      run: |
+        python -m venv tests-functional/.venv
+        echo "tests-functional/.venv/bin" >> $GITHUB_PATH  # Add virtualenv to PATH for subsequent steps
+
+    - name: Install dependencies based on requirements.txt
+      run: pip install -r tests-functional/requirements.txt
+
+    - name: Build status-backend
+      run: cd tests-functional; docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f docker-compose.status-go.local.yml up --build --remove-orphans -d
+
+    - name: Run tests
+      run: pytest -n auto -m "reliability" -c tests-functional/pytest.ini --junit-xml=pytest_results.xml --tb=short
+
+    - name: Test Report
+      if: always()
+      uses: dorny/test-reporter@95058abb17504553158e70e2c058fe1fda4392c2
+      with:
+        name: Pytest JUnit Test Report
+        path: pytest_results.xml
+        reporter: java-junit
+        use-actions-summary: 'true'

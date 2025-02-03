@@ -48,6 +48,13 @@ const (
 	testApprovalL1Fee         = 100000000000
 
 	stageName = "test"
+
+	// Provider types
+	proxyNodefleet = "proxy-nodefleet"
+	proxyInfura    = "proxy-infura"
+	proxyGrove     = "proxy-grove"
+	directInfura   = "direct-infura"
+	directGrove    = "direct-grove"
 )
 
 var (
@@ -91,13 +98,15 @@ var (
 )
 
 var mainnet = params.Network{
-	ChainID:                walletCommon.EthereumMainnet,
-	ChainName:              "Mainnet",
-	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/ethereum/mainnet/", stageName),
-	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/ethereum/mainnet/", stageName),
-	DefaultFallbackURL2:    "https://mainnet.infura.io/v3/",
-	RPCURL:                 fmt.Sprintf("https://%s.api.status.im/grove/ethereum/mainnet/", stageName),
-	FallbackURL:            "https://eth-archival.rpc.grove.city/v1/",
+	ChainID:   walletCommon.EthereumMainnet,
+	ChainName: "Mainnet",
+	RpcProviders: []params.RpcProvider{
+		*params.NewProxyProvider(walletCommon.EthereumMainnet, proxyNodefleet, fmt.Sprintf("https://%s.api.status.im/nodefleet/ethereum/mainnet/", stageName), false),
+		*params.NewProxyProvider(walletCommon.EthereumMainnet, proxyInfura, fmt.Sprintf("https://%s.api.status.im/infura/ethereum/mainnet/", stageName), false),
+		*params.NewDirectProvider(walletCommon.EthereumMainnet, directInfura, "https://mainnet.infura.io/v3/", true),
+		*params.NewProxyProvider(walletCommon.EthereumMainnet, proxyGrove, fmt.Sprintf("https://%s.api.status.im/grove/ethereum/mainnet/", stageName), false),
+		*params.NewDirectProvider(walletCommon.EthereumMainnet, directGrove, "https://eth-archival.rpc.grove.city/v1/", false),
+	},
 	BlockExplorerURL:       "https://etherscan.io/",
 	IconURL:                "network/Network=Ethereum",
 	ChainColor:             "#627EEA",
@@ -112,13 +121,15 @@ var mainnet = params.Network{
 }
 
 var optimism = params.Network{
-	ChainID:                walletCommon.OptimismMainnet,
-	ChainName:              "Optimism",
-	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/optimism/mainnet/", stageName),
-	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/optimism/mainnet/", stageName),
-	DefaultFallbackURL2:    "https://optimism-mainnet.infura.io/v3/",
-	RPCURL:                 fmt.Sprintf("https://%s.api.status.im/grove/optimism/mainnet/", stageName),
-	FallbackURL:            "https://optimism-archival.rpc.grove.city/v1/",
+	ChainID:   walletCommon.OptimismMainnet,
+	ChainName: "Optimism",
+	RpcProviders: []params.RpcProvider{
+		*params.NewProxyProvider(walletCommon.OptimismMainnet, proxyNodefleet, fmt.Sprintf("https://%s.api.status.im/nodefleet/optimism/mainnet/", stageName), false),
+		*params.NewProxyProvider(walletCommon.OptimismMainnet, proxyInfura, fmt.Sprintf("https://%s.api.status.im/infura/optimism/mainnet/", stageName), false),
+		*params.NewDirectProvider(walletCommon.OptimismMainnet, directInfura, "https://optimism-mainnet.infura.io/v3/", true),
+		*params.NewProxyProvider(walletCommon.OptimismMainnet, proxyGrove, fmt.Sprintf("https://%s.api.status.im/grove/optimism/mainnet/", stageName), true),
+		*params.NewDirectProvider(walletCommon.OptimismMainnet, directGrove, "https://optimism.rpc.grove.city/v1/", false),
+	},
 	BlockExplorerURL:       "https://optimistic.etherscan.io",
 	IconURL:                "network/Network=Optimism",
 	ChainColor:             "#E90101",
@@ -133,13 +144,16 @@ var optimism = params.Network{
 }
 
 var arbitrum = params.Network{
-	ChainID:                walletCommon.ArbitrumMainnet,
-	ChainName:              "Arbitrum",
-	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/arbitrum/mainnet/", stageName),
-	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/arbitrum/mainnet/", stageName),
-	DefaultFallbackURL2:    "https://arbitrum-mainnet.infura.io/v3/",
-	RPCURL:                 fmt.Sprintf("https://%s.api.status.im/grove/arbitrum/mainnet/", stageName),
-	FallbackURL:            "https://arbitrum-one.rpc.grove.city/v1/",
+	ChainID:   walletCommon.ArbitrumMainnet,
+	ChainName: "Arbitrum",
+	RpcProviders: []params.RpcProvider{
+		*params.NewProxyProvider(walletCommon.ArbitrumMainnet, proxyNodefleet, fmt.Sprintf("https://%s.api.status.im/nodefleet/arbitrum/mainnet/", stageName), false),
+		*params.NewProxyProvider(walletCommon.ArbitrumMainnet, proxyInfura, fmt.Sprintf("https://%s.api.status.im/infura/arbitrum/mainnet/", stageName), false),
+		*params.NewDirectProvider(walletCommon.ArbitrumMainnet, directInfura, "https://arbitrum-mainnet.infura.io/v3/", true),
+		*params.NewProxyProvider(walletCommon.ArbitrumMainnet, proxyGrove, fmt.Sprintf("https://%s.api.status.im/grove/arbitrum/mainnet/", stageName), true),
+		*params.NewDirectProvider(walletCommon.ArbitrumMainnet, directGrove, "https://arbitrum-one.rpc.grove.city/v1/", false),
+	},
+	BlockExplorerURL:       "https://arbiscan.io/",
 	IconURL:                "network/Network=Arbitrum",
 	ChainColor:             "#51D0F0",
 	ShortName:              "arb1",
@@ -153,13 +167,16 @@ var arbitrum = params.Network{
 }
 
 var base = params.Network{
-	ChainID:                walletCommon.BaseMainnet,
-	ChainName:              "Base",
-	DefaultRPCURL:          fmt.Sprintf("https://%s.api.status.im/nodefleet/base/mainnet/", stageName),
-	DefaultFallbackURL:     fmt.Sprintf("https://%s.api.status.im/infura/base/mainnet/", stageName),
-	DefaultFallbackURL2:    "https://base-mainnet.infura.io/v3/",
-	RPCURL:                 fmt.Sprintf("https://%s.api.status.im/grove/base/mainnet/", stageName),
-	FallbackURL:            "https://base.rpc.grove.city/v1/",
+	ChainID:   walletCommon.BaseMainnet,
+	ChainName: "Base",
+	RpcProviders: []params.RpcProvider{
+		*params.NewProxyProvider(walletCommon.BaseMainnet, proxyNodefleet, fmt.Sprintf("https://%s.api.status.im/nodefleet/base/mainnet/", stageName), false),
+		*params.NewProxyProvider(walletCommon.BaseMainnet, proxyInfura, fmt.Sprintf("https://%s.api.status.im/infura/base/mainnet/", stageName), false),
+		*params.NewDirectProvider(walletCommon.BaseMainnet, directInfura, "https://base-mainnet.infura.io/v3/", true),
+		*params.NewProxyProvider(walletCommon.BaseMainnet, proxyGrove, fmt.Sprintf("https://%s.api.status.im/grove/base/mainnet/", stageName), true),
+		*params.NewDirectProvider(walletCommon.BaseMainnet, directGrove, "https://base.rpc.grove.city/v1/", false),
+	},
+	BlockExplorerURL:       "https://basescan.org",
 	IconURL:                "network/Network=Base",
 	ChainColor:             "#0052FF",
 	ShortName:              "base",

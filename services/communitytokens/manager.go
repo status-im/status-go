@@ -8,74 +8,60 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	communitytokens "github.com/status-im/status-go/contracts/community-tokens"
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
+	"github.com/status-im/status-go/contracts/community-tokens/ownertoken"
+	communityownertokenregistry "github.com/status-im/status-go/contracts/community-tokens/registry"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/requests"
 )
 
 type Manager struct {
-	rpcClient *rpc.Client
+	contractMaker *communitytokens.CommunityTokensContractMaker
 }
 
 func NewManager(rpcClient *rpc.Client) *Manager {
 	return &Manager{
-		rpcClient: rpcClient,
+		contractMaker: &communitytokens.CommunityTokensContractMaker{
+			RPCClient: rpcClient,
+		},
 	}
 }
 
-func (m *Manager) NewCollectiblesInstance(chainID uint64, contractAddress string) (*collectibles.Collectibles, error) {
-	backend, err := m.rpcClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return collectibles.NewCollectibles(common.HexToAddress(contractAddress), backend)
+func (m *Manager) NewCollectiblesInstance(chainID uint64, contractAddress common.Address) (*collectibles.Collectibles, error) {
+	return m.contractMaker.NewCollectiblesInstance(chainID, contractAddress)
 }
 
 func (m *Manager) NewCommunityTokenDeployerInstance(chainID uint64) (*communitytokendeployer.CommunityTokenDeployer, error) {
-	backend, err := m.rpcClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
 	deployerAddr, err := communitytokendeployer.ContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}
-	return communitytokendeployer.NewCommunityTokenDeployer(deployerAddr, backend)
+	return m.contractMaker.NewCommunityTokenDeployerInstance(chainID, deployerAddr)
 }
 
-func (m *Manager) GetCollectiblesContractInstance(chainID uint64, contractAddress string) (*collectibles.Collectibles, error) {
-	contractInst, err := m.NewCollectiblesInstance(chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-	return contractInst, nil
+func (m *Manager) NewAssetsInstance(chainID uint64, contractAddress common.Address) (*assets.Assets, error) {
+	return m.contractMaker.NewAssetsInstance(chainID, contractAddress)
 }
 
-func (m *Manager) NewAssetsInstance(chainID uint64, contractAddress string) (*assets.Assets, error) {
-	backend, err := m.rpcClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return assets.NewAssets(common.HexToAddress(contractAddress), backend)
+func (m *Manager) NewCommunityOwnerTokenRegistryInstance(chainID uint64, contractAddress common.Address) (*communityownertokenregistry.CommunityOwnerTokenRegistry, error) {
+	return m.contractMaker.NewCommunityOwnerTokenRegistryInstance(chainID, contractAddress)
 }
 
-func (m *Manager) GetAssetContractInstance(chainID uint64, contractAddress string) (*assets.Assets, error) {
-	contractInst, err := m.NewAssetsInstance(chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-	return contractInst, nil
+func (m *Manager) NewOwnerTokenInstance(chainID uint64, contractAddress common.Address) (*ownertoken.OwnerToken, error) {
+	return m.contractMaker.NewOwnerTokenInstance(chainID, contractAddress)
 }
 
 func (m *Manager) GetCollectibleContractData(chainID uint64, contractAddress string) (*communities.CollectibleContractData, error) {
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
 
-	contract, err := m.GetCollectiblesContractInstance(chainID, contractAddress)
+	contract, err := m.NewCollectiblesInstance(chainID, common.HexToAddress(contractAddress))
 	if err != nil {
 		return nil, err
 	}
@@ -96,13 +82,13 @@ func (m *Manager) GetCollectibleContractData(chainID uint64, contractAddress str
 		TotalSupply:    &bigint.BigInt{Int: totalSupply},
 		Transferable:   transferable,
 		RemoteBurnable: remoteBurnable,
-		InfiniteSupply: GetInfiniteSupply().Cmp(totalSupply) == 0,
+		InfiniteSupply: requests.GetInfiniteSupply().Cmp(totalSupply) == 0,
 	}, nil
 }
 
 func (m *Manager) GetAssetContractData(chainID uint64, contractAddress string) (*communities.AssetContractData, error) {
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
-	contract, err := m.GetAssetContractInstance(chainID, contractAddress)
+	contract, err := m.NewAssetsInstance(chainID, common.HexToAddress(contractAddress))
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +99,7 @@ func (m *Manager) GetAssetContractData(chainID uint64, contractAddress string) (
 
 	return &communities.AssetContractData{
 		TotalSupply:    &bigint.BigInt{Int: totalSupply},
-		InfiniteSupply: GetInfiniteSupply().Cmp(totalSupply) == 0,
+		InfiniteSupply: requests.GetInfiniteSupply().Cmp(totalSupply) == 0,
 	}, nil
 }
 

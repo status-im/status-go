@@ -1,7 +1,7 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from test_cases import MessengerTestCase
+from tests.test_cases import MessengerTestCase
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 
@@ -10,8 +10,6 @@ from resources.enums import MessageContentType
 @pytest.mark.reliability
 class TestCreatePrivateGroups(MessengerTestCase):
 
-    @pytest.mark.rpc  # until we have dedicated functional tests for this we can still run this test as part of the functional tests suite
-    @pytest.mark.dependency(name="test_create_private_group_baseline")
     def test_create_private_group_baseline(self, private_groups_count=1):
         self.make_contacts()
 
@@ -38,35 +36,9 @@ class TestCreatePrivateGroups(MessengerTestCase):
                 fields_to_validate={"text": "text"},
             )
 
-    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
     def test_multiple_one_create_private_groups(self):
         self.test_create_private_group_baseline(private_groups_count=50)
 
-    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
-    @pytest.mark.skip(reason="Skipping until add_latency is implemented")
-    def test_create_private_groups_with_latency(self):
-        # with self.add_latency():
-        #     self.test_create_private_group_baseline()
-        # to be done in the next PR
-        pass
-
-    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
-    @pytest.mark.skip(reason="Skipping until add_packet_loss is implemented")
-    def test_create_private_groups_with_packet_loss(self):
-        # with self.add_packet_loss():
-        #     self.test_create_private_group_baseline()
-        # to be done in the next PR
-        pass
-
-    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
-    @pytest.mark.skip(reason="Skipping until add_low_bandwith is implemented")
-    def test_create_private_groups_with_low_bandwidth(self):
-        # with self.add_low_bandwith():
-        #     self.test_create_private_group_baseline()
-        # to be done in the next PR
-        pass
-
-    @pytest.mark.dependency(depends=["test_create_private_group_baseline"])
     def test_create_private_groups_with_node_pause_30_seconds(self):
         self.make_contacts()
 

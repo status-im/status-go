@@ -1,7 +1,7 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from test_cases import MessengerTestCase
+from tests.test_cases import MessengerTestCase
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 
@@ -10,8 +10,6 @@ from resources.enums import MessageContentType
 @pytest.mark.reliability
 class TestOneToOneMessages(MessengerTestCase):
 
-    @pytest.mark.rpc  # until we have dedicated functional tests for this we can still run this test as part of the functional tests suite
-    @pytest.mark.dependency(name="test_one_to_one_message_baseline")
     def test_one_to_one_message_baseline(self, message_count=1):
         sent_messages = []
         for i in range(message_count):
@@ -33,35 +31,21 @@ class TestOneToOneMessages(MessengerTestCase):
                 expected_message=expected_message,
             )
 
-    @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
     def test_multiple_one_to_one_messages(self):
         self.test_one_to_one_message_baseline(message_count=50)
 
-    @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
-    @pytest.mark.skip(reason="Skipping until add_latency is implemented")
     def test_one_to_one_message_with_latency(self):
-        # with self.add_latency():
-        #     self.test_one_to_one_message_baseline()
-        # to be done in the next PR
-        pass
+        with self.add_latency(self.receiver):
+            self.test_one_to_one_message_baseline(message_count=50)
 
-    @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
-    @pytest.mark.skip(reason="Skipping until add_packet_loss is implemented")
     def test_one_to_one_message_with_packet_loss(self):
-        # with self.add_packet_loss():
-        #     self.test_one_to_one_message_baseline()
-        # to be done in the next PR
-        pass
+        with self.add_packet_loss(self.receiver):
+            self.test_one_to_one_message_baseline(message_count=50)
 
-    @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
-    @pytest.mark.skip(reason="Skipping until add_low_bandwith is implemented")
     def test_one_to_one_message_with_low_bandwidth(self):
-        # with self.add_low_bandwith():
-        #     self.test_one_to_one_message_baseline()
-        # to be done in the next PR
-        pass
+        with self.add_low_bandwith(self.receiver):
+            self.test_one_to_one_message_baseline(message_count=50)
 
-    @pytest.mark.dependency(depends=["test_one_to_one_message_baseline"])
     def test_one_to_one_message_with_node_pause_30_seconds(self):
         with self.node_pause(self.receiver):
             message_text = f"test_message_{uuid4()}"

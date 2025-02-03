@@ -1084,11 +1084,11 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		DB:              appdb,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
-	client, _ := statusRpc.NewClient(config)
+	client, err := statusRpc.NewClient(config)
+	require.NoError(t, err)
 
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
@@ -1355,9 +1355,8 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		DB:              appdb,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1487,9 +1486,8 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 			Client:          nil,
 			UpstreamChainID: 1,
 			Networks:        []params.Network{},
-			DB:              db,
+			DB:              appdb,
 			WalletFeed:      nil,
-			ProviderConfigs: nil,
 		}
 		client, _ := statusRpc.NewClient(config)
 
@@ -1576,9 +1574,8 @@ func TestFetchNewBlocksCommand_nonceDetection(t *testing.T) {
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		DB:              appdb,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1699,9 +1696,8 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		DB:              appdb,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 
@@ -1847,9 +1843,8 @@ func TestLoadBlocksAndTransfersCommand_FiniteFinishedInfiniteRunning(t *testing.
 		Client:          nil,
 		UpstreamChainID: 1,
 		Networks:        []params.Network{},
-		DB:              db,
+		DB:              appdb,
 		WalletFeed:      nil,
-		ProviderConfigs: nil,
 	}
 	client, _ := statusRpc.NewClient(config)
 

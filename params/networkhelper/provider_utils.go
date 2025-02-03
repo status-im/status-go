@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/status-im/status-go/rpc/network/db"
+
 	"github.com/status-im/status-go/params"
 )
 
@@ -51,7 +53,7 @@ func ToggleUserProviders(providers []params.RpcProvider, enabled bool) []params.
 
 // GetEmbeddedProviders returns the embedded providers from the list.
 func GetEmbeddedProviders(providers []params.RpcProvider) []params.RpcProvider {
-	var embeddedProviders []params.RpcProvider
+	embeddedProviders := make([]params.RpcProvider, 0, len(providers))
 	for _, provider := range providers {
 		if provider.Type != params.UserProviderType {
 			embeddedProviders = append(embeddedProviders, provider)
@@ -62,7 +64,7 @@ func GetEmbeddedProviders(providers []params.RpcProvider) []params.RpcProvider {
 
 // GetUserProviders returns the user-defined providers from the list.
 func GetUserProviders(providers []params.RpcProvider) []params.RpcProvider {
-	var userProviders []params.RpcProvider
+	userProviders := make([]params.RpcProvider, 0, len(providers))
 	for _, provider := range providers {
 		if provider.Type == params.UserProviderType {
 			userProviders = append(userProviders, provider)
@@ -104,6 +106,7 @@ func OverrideEmbeddedProxyProviders(networks []params.Network, enabled bool, use
 		for j, provider := range network.RpcProviders {
 			if provider.Type == params.EmbeddedProxyProviderType {
 				provider.Enabled = enabled
+				provider.AuthType = params.BasicAuth
 				provider.AuthLogin = user
 				provider.AuthPassword = password
 			}
@@ -117,19 +120,16 @@ func OverrideEmbeddedProxyProviders(networks []params.Network, enabled bool, use
 	return updatedNetworks
 }
 
-func deepCopyNetworks(networks []params.Network) []params.Network {
+func DeepCopyNetworks(networks []params.Network) []params.Network {
 	updatedNetworks := make([]params.Network, len(networks))
 	for i, network := range networks {
-		updatedNetwork := network
-		updatedNetwork.RpcProviders = make([]params.RpcProvider, len(network.RpcProviders))
-		copy(updatedNetwork.RpcProviders, network.RpcProviders)
-		updatedNetworks[i] = updatedNetwork
+		updatedNetworks[i] = network.DeepCopy()
 	}
 	return updatedNetworks
 }
 
 func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[string]string) []params.Network {
-	updatedNetworks := deepCopyNetworks(networks)
+	updatedNetworks := DeepCopyNetworks(networks)
 
 	for i := range updatedNetworks {
 		network := &updatedNetworks[i]
@@ -154,25 +154,7 @@ func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[strin
 				}
 			}
 		}
-	}
-	return updatedNetworks
-}
-
-func OverrideGanacheToken(networks []params.Network, ganacheURL string, chainID uint64, tokenOverride params.TokenOverride) []params.Network {
-	updatedNetworks := deepCopyNetworks(networks)
-
-	for i := range updatedNetworks {
-		network := &updatedNetworks[i]
-
-		if network.ChainID != chainID {
-			continue
-		}
-		for j := range network.RpcProviders {
-			if ganacheURL != "" {
-				network.RpcProviders[j].URL = ganacheURL
-			}
-		}
-		network.TokenOverrides = []params.TokenOverride{tokenOverride}
+		db.FillDeprecatedURLs(network, network.RpcProviders)
 	}
 	return updatedNetworks
 }

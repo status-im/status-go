@@ -45,6 +45,22 @@ var optimism = params.Network{
 	RelatedChainID:         walletCommon.OptimismMainnet,
 }
 
+var base = params.Network{
+	ChainID:                walletCommon.BaseMainnet,
+	ChainName:              "Base",
+	BlockExplorerURL:       "https://basescan.org",
+	IconURL:                "network/Network=Base",
+	ChainColor:             "#0052FF",
+	ShortName:              "base",
+	NativeCurrencyName:     "Ether",
+	NativeCurrencySymbol:   "ETH",
+	NativeCurrencyDecimals: 18,
+	IsTest:                 false,
+	Layer:                  2,
+	Enabled:                true,
+	RelatedChainID:         walletCommon.BaseMainnet,
+}
+
 var testEstimationMap = map[string]requests.Estimation{
 	pathProcessorCommon.ProcessorTransferName:     {Value: uint64(1000)},
 	pathProcessorCommon.ProcessorBridgeHopName:    {Value: uint64(5000)},
@@ -269,6 +285,32 @@ func TestPathProcessors(t *testing.T) {
 			},
 		},
 		{
+			name: "Different Chains Set - FormToken Set - No ToToken - Token Not Supported On ToChain",
+			input: ProcessorInputParams{
+				TestsMode: true,
+				FromChain: &optimism,
+				ToChain:   &base,
+				FromToken: &token.Token{
+					Symbol: walletCommon.DaiSymbol,
+				},
+				TestEstimationMap: testEstimationMap,
+			},
+			expected: map[string]expectedResult{
+				pathProcessorCommon.ProcessorTransferName: {
+					expected:      false,
+					expectedError: nil,
+				},
+				pathProcessorCommon.ProcessorBridgeHopName: {
+					expected:      false,
+					expectedError: ErrToChainNotSupported,
+				},
+				pathProcessorCommon.ProcessorSwapParaswapName: {
+					expected:      false,
+					expectedError: ErrToAndFromTokensMustBeSet,
+				},
+			},
+		},
+		{
 			name: "Different Chains Set - FormToken Set - ToToken Set - Different Tokens",
 			input: ProcessorInputParams{
 				TestsMode: true,
@@ -322,7 +364,9 @@ func TestPathProcessors(t *testing.T) {
 				assert.Equal(t, expResult.expected, result)
 
 				if tt.input.TestEstimationMap != nil {
-					estimatedGas, err := processor.EstimateGas(tt.input)
+					inputData, err := processor.PackTxInputData(tt.input)
+					assert.NoError(t, err)
+					estimatedGas, err := processor.EstimateGas(tt.input, inputData)
 					assert.NoError(t, err)
 					assert.Greater(t, estimatedGas, uint64(0))
 
@@ -330,12 +374,16 @@ func TestPathProcessors(t *testing.T) {
 					input.TestEstimationMap = map[string]requests.Estimation{
 						"randomName": {Value: 10000},
 					}
-					estimatedGas, err = processor.EstimateGas(input)
+					inputData, err = processor.PackTxInputData(tt.input)
+					assert.NoError(t, err)
+					estimatedGas, err = processor.EstimateGas(input, inputData)
 					assert.Error(t, err)
 					assert.Equal(t, ErrNoEstimationFound, err)
 					assert.Equal(t, uint64(0), estimatedGas)
 				} else {
-					estimatedGas, err := processor.EstimateGas(tt.input)
+					inputData, err := processor.PackTxInputData(tt.input)
+					assert.NoError(t, err)
+					estimatedGas, err := processor.EstimateGas(tt.input, inputData)
 					assert.Error(t, err)
 					assert.Equal(t, ErrNoEstimationFound, err)
 					assert.Equal(t, uint64(0), estimatedGas)

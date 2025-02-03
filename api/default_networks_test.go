@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/status-im/status-go/params"
+
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
@@ -11,12 +13,13 @@ import (
 )
 
 func TestBuildDefaultNetworks(t *testing.T) {
-	rpcToken := "infura-token"
-	fallbackToken := ""
+	infuraToken := "infura-token"
+	poktToken := "pokt-token"
 	stageName := "fast-n-bulbous"
 	request := &requests.CreateAccount{
 		WalletSecretsConfig: requests.WalletSecretsConfig{
-			InfuraToken:          rpcToken,
+			InfuraToken:          infuraToken,
+			PoktToken:            poktToken,
 			StatusProxyStageName: stageName,
 		},
 	}
@@ -24,7 +27,6 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig)
 
 	require.Len(t, actualNetworks, 8)
-
 	for _, n := range actualNetworks {
 		var err error
 		switch n.ChainID {
@@ -50,32 +52,26 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		}
 
 		// check fallback options
-		require.True(t, strings.Contains(n.RPCURL, rpcToken))
-		require.True(t, strings.Contains(n.FallbackURL, fallbackToken))
+		require.True(t, strings.Contains(n.RPCURL, infuraToken))
+		require.True(t, strings.Contains(n.FallbackURL, poktToken))
+
+		// Check proxy providers for stageName
+		for _, provider := range n.RpcProviders {
+			if provider.Type == params.EmbeddedProxyProviderType {
+				require.Contains(t, provider.URL, stageName, "Proxy provider URL should contain stageName")
+			}
+		}
+
+		// Check direct providers for tokens
+		for _, provider := range n.RpcProviders {
+			if provider.Type != params.EmbeddedDirectProviderType {
+				continue
+			}
+			if strings.Contains(provider.URL, "infura.io") {
+				require.Equal(t, provider.AuthToken, infuraToken, "Direct provider URL should have infuraToken")
+			} else if strings.Contains(provider.URL, "grove.city") {
+				require.Equal(t, provider.AuthToken, poktToken, "Direct provider URL should have poktToken")
+			}
+		}
 	}
-}
-
-func TestBuildDefaultNetworksGanache(t *testing.T) {
-	ganacheURL := "ganacheurl"
-	request := &requests.CreateAccount{
-		WalletSecretsConfig: requests.WalletSecretsConfig{
-			GanacheURL: ganacheURL,
-		},
-	}
-
-	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig)
-
-	require.Len(t, actualNetworks, 8)
-
-	for _, n := range actualNetworks {
-		require.True(t, strings.Contains(n.RPCURL, ganacheURL))
-		require.True(t, strings.Contains(n.FallbackURL, ganacheURL))
-	}
-
-	require.Equal(t, MainnetChainID, actualNetworks[0].ChainID)
-
-	require.NotNil(t, actualNetworks[0].TokenOverrides)
-	require.Len(t, actualNetworks[0].TokenOverrides, 1)
-	require.Equal(t, sntSymbol, actualNetworks[0].TokenOverrides[0].Symbol)
-	require.Equal(t, ganacheTokenAddress, actualNetworks[0].TokenOverrides[0].Address)
 }

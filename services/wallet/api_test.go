@@ -9,9 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/params/networkhelper"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 
 	gomock "go.uber.org/mock/gomock"
@@ -125,14 +128,6 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	chainID := uint64(1)
 	address := "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-	providerConfig := params.ProviderConfig{
-		Enabled:  true,
-		Name:     rpc.ProviderStatusProxy,
-		User:     "user1",
-		Password: "pass1",
-	}
-	providerConfigs := []params.ProviderConfig{providerConfig}
-
 	// Create a new server that delays the response by 1 second
 	serverWith1SecDelay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(1 * time.Second)
@@ -142,17 +137,30 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 
 	networks := []params.Network{
 		{
-			ChainID:       chainID,
-			DefaultRPCURL: serverWith1SecDelay.URL + "/nodefleet/",
+			ChainID:   chainID,
+			ChainName: "Ethereum Mainnet",
+			RpcProviders: []params.RpcProvider{
+				{
+					ChainID:  chainID,
+					Name:     "Test Provider",
+					URL:      serverWith1SecDelay.URL + "/nodefleet/",
+					Type:     params.EmbeddedProxyProviderType,
+					Enabled:  true,
+					AuthType: params.NoAuth,
+				},
+			},
 		},
 	}
+
+	networks = networkhelper.OverrideEmbeddedProxyProviders(networks, true, gofakeit.Username(), gofakeit.LetterN(5))
+	require.NotEmpty(t, networks)
+
 	config := rpc.ClientConfig{
 		Client:          nil,
 		UpstreamChainID: chainID,
 		Networks:        networks,
 		DB:              appDB,
 		WalletFeed:      nil,
-		ProviderConfigs: providerConfigs,
 	}
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)
@@ -215,13 +223,6 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	mockReader := mock_reader.NewMockReaderInterface(mockCtrl)
-	providerConfig := params.ProviderConfig{
-		Enabled:  true,
-		Name:     rpc.ProviderStatusProxy,
-		User:     "user1",
-		Password: "pass1",
-	}
-	providerConfigs := []params.ProviderConfig{providerConfig}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{"result": "0x10"}`)
@@ -232,8 +233,20 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 
 	networks := []params.Network{
 		{
-			ChainID:       chainID,
-			DefaultRPCURL: server.URL + "/nodefleet/",
+			ChainID:   chainID,
+			ChainName: "Ethereum Mainnet",
+			RpcProviders: []params.RpcProvider{
+				{
+					ChainID:      chainID,
+					Name:         "Test Provider",
+					URL:          server.URL + "/nodefleet/",
+					Type:         params.EmbeddedProxyProviderType,
+					Enabled:      true,
+					AuthType:     params.BasicAuth,
+					AuthLogin:    "user1",
+					AuthPassword: "pass1",
+				},
+			},
 		},
 	}
 	config := rpc.ClientConfig{
@@ -242,7 +255,6 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 		Networks:        networks,
 		DB:              appDB,
 		WalletFeed:      nil,
-		ProviderConfigs: providerConfigs,
 	}
 	c, err := rpc.NewClient(config)
 	require.NoError(t, err)
