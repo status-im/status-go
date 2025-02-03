@@ -354,10 +354,10 @@ class MessengerTestCase(NetworkConditionTestCase):
                 expected_message=expected_message,
             )
 
-    def add_contact(self, execution_number, network_condition):
+    def add_contact(self, execution_number, network_condition, privileged=True):
         message_text = f"test_contact_request_{execution_number}_{uuid4()}"
-        sender = self.initialize_backend(await_signals=self.await_signals)
-        receiver = self.initialize_backend(await_signals=self.await_signals)
+        sender = self.initialize_backend(await_signals=self.await_signals, privileged=privileged)
+        receiver = self.initialize_backend(await_signals=self.await_signals, privileged=privileged)
 
         existing_contacts = receiver.wakuext_service.get_contacts()
 
