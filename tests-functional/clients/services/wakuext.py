@@ -1,5 +1,6 @@
 from clients.rpc import RpcClient
 from clients.services.service import Service
+from resources.enums import MessageContentType
 
 
 class WakuextService(Service):
@@ -64,7 +65,7 @@ class WakuextService(Service):
         response = self.rpc_request("acceptRequestToJoinCommunity", params)
         return response.json()
 
-    def send_community_chat_message(self, chat_id, message, content_type="1"):
+    def send_community_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value):
         params = [{"chatId": chat_id, "text": message, "contentType": content_type}]
         response = self.rpc_request("sendChatMessage", params)
         return response.json()
