@@ -45,35 +45,40 @@ func PbToHexHash(pbHash pb.MessageHash) (bindings.MessageHash, error) {
 
 func PbToBindingsStoreRequest(pbStoreRequest *storepb.StoreQueryRequest) (*bindings.StoreQueryRequest, error) {
 
-	var messageHashes []bindings.MessageHash
-	var paginationCursor bindings.MessageHash
-
-	for _, hash := range pbStoreRequest.MessageHashes {
-		hexHash, err := PbToHexHash(pb.ToMessageHash(hash))
-		if err != nil {
-			return nil, err
-		}
-		messageHashes = append(messageHashes, hexHash)
-	}
-
-	paginationCursor, err := PbToHexHash(pb.ToMessageHash(pbStoreRequest.PaginationCursor))
-
-	if err != nil {
-		return nil, err
-	}
-
 	bindingsQueryRequest := bindings.StoreQueryRequest{
 		RequestId:         pbStoreRequest.RequestId,
 		IncludeData:       pbStoreRequest.IncludeData,
 		PubsubTopic:       *pbStoreRequest.PubsubTopic,
 		ContentTopics:     &pbStoreRequest.ContentTopics,
 		TimeStart:         pbStoreRequest.TimeStart,
-		MessageHashes:     &messageHashes,
+		MessageHashes:     nil,
 		TimeEnd:           pbStoreRequest.TimeEnd,
-		PaginationCursor:  &paginationCursor,
+		PaginationCursor:  nil,
 		PaginationForward: pbStoreRequest.PaginationForward,
 		PaginationLimit:   pbStoreRequest.PaginationLimit,
 	}
+
+	if len(pbStoreRequest.MessageHashes) > 0 {
+		var messageHashes []bindings.MessageHash
+		for _, hash := range pbStoreRequest.MessageHashes {
+			hexHash, err := PbToHexHash(pb.ToMessageHash(hash))
+			if err != nil {
+				return nil, err
+			}
+			messageHashes = append(messageHashes, hexHash)
+		}
+
+		bindingsQueryRequest.MessageHashes = &messageHashes
+	}
+
+	if pbStoreRequest.PaginationCursor != nil {
+		paginationCursor, err := PbToHexHash(pb.ToMessageHash(pbStoreRequest.PaginationCursor))
+		if err != nil {
+			return nil, err
+		}
+		bindingsQueryRequest.PaginationCursor = &paginationCursor
+	}
+
 	return &bindingsQueryRequest, nil
 }
 
