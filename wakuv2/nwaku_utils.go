@@ -71,7 +71,7 @@ func PbToBindingsStoreRequest(pbStoreRequest *storepb.StoreQueryRequest) (*bindi
 		bindingsQueryRequest.MessageHashes = &messageHashes
 	}
 
-	if pbStoreRequest.PaginationCursor != nil {
+	if len(pbStoreRequest.PaginationCursor) > 0 {
 		paginationCursor, err := PbToHexHash(pb.ToMessageHash(pbStoreRequest.PaginationCursor))
 		if err != nil {
 			return nil, err
