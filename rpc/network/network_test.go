@@ -280,7 +280,7 @@ func (s *NetworkManagerTestSuite) TestUpsertNetwork() {
 	newNetwork := testutil.CreateNetwork(chainID, "Ethereum Mainnet", []params.RpcProvider{
 		testutil.CreateProvider(chainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
 	})
-	// Check that these values are overriden for upserted networks
+	// Check that these values are overiden for upserted networks
 	newNetwork.IsActive = true
 	newNetwork.IsDeactivatable = false
 
