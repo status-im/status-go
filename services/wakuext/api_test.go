@@ -10,6 +10,8 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -17,7 +19,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/wakuv1"
+	"github.com/status-im/status-go/wakuv2"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -34,7 +36,18 @@ func TestInitProtocol(t *testing.T) {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
 
-	waku := wakuv1.New(nil, nil)
+	waku, err := wakuv2.New(
+		nil,
+		"",
+		&wakuv2.DefaultConfig,
+		nil,
+		nil,
+		nil,
+		func([]byte, peer.ID, error) {},
+		nil,
+	)
+	require.NoError(t, err)
+
 	privateKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 

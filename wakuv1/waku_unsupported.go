@@ -12,8 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/status-im/status-go/waku/types"
 	"github.com/waku-org/go-waku/waku/v2/api/history"
+
+	"github.com/status-im/status-go/waku/types"
 )
 
 var notAvailableStr = "not available in WakuV1"

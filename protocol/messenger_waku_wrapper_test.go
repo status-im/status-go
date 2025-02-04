@@ -6,7 +6,7 @@ import (
 	"go.uber.org/zap"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv1"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 type testWakuWrapper struct {
@@ -15,10 +15,10 @@ type testWakuWrapper struct {
 	api *testPublicWakuAPI
 }
 
-func newTestWaku(w *wakuv1.Waku) wakutypes.Waku {
+func newTestWaku(w *wakuv2.Waku) wakutypes.Waku {
 	return &testWakuWrapper{
 		Waku: w,
-		api:  newTestPublicWakuAPI(wakuv1.NewPublicWakuAPI(w)),
+		api:  newTestPublicWakuAPI(wakuv2.NewPublicWakuAPI(w)),
 	}
 }
 
@@ -38,12 +38,12 @@ type PostMessageSubscription struct {
 }
 
 type testPublicWakuAPI struct {
-	*wakuv1.PublicWakuAPI
+	*wakuv2.PublicWakuAPI
 
 	postSubscriptions []chan *PostMessageSubscription
 }
 
-func newTestPublicWakuAPI(api *wakuv1.PublicWakuAPI) *testPublicWakuAPI {
+func newTestPublicWakuAPI(api *wakuv2.PublicWakuAPI) *testPublicWakuAPI {
 	return &testPublicWakuAPI{
 		PublicWakuAPI: api,
 	}
@@ -64,10 +64,10 @@ func (tp *testPublicWakuAPI) Post(ctx context.Context, req wakutypes.NewMessage)
 	return id, err
 }
 
-func newTestWakuWrapper(config *wakuv1.Config, logger *zap.Logger) (*testWakuWrapper, error) {
-	if config == nil {
-		config = &wakuv1.DefaultConfig
+func newTestWakuWrapper(logger *zap.Logger) (*testWakuWrapper, error) {
+	w, err := newTestWakuNode(logger)
+	if err != nil {
+		return nil, err
 	}
-	w := wakuv1.New(config, logger)
-	return newTestWaku(w).(*testWakuWrapper), w.Start()
+	return newTestWaku(w.(*wakuv2.Waku)).(*testWakuWrapper), w.Start()
 }

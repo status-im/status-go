@@ -19,7 +19,6 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -47,11 +46,10 @@ type MessengerPushNotificationSuite struct {
 func (s *MessengerPushNotificationSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = shh
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity

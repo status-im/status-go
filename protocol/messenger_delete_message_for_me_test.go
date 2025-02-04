@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -59,11 +58,10 @@ func (s *MessengerDeleteMessageForMeSuite) otherNewMessenger() *Messenger {
 func (s *MessengerDeleteMessageForMeSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = shh
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 
 	s.alice1 = s.newMessenger()
 	s.alice2 = s.newMessenger()
@@ -115,6 +113,8 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Require().NoError(err)
 
 	otherMessenger := s.otherNewMessenger()
+	defer TearDownMessenger(&s.Suite, otherMessenger)
+
 	_, err = otherMessenger.createPublicChat(chatID, &MessengerResponse{})
 	s.Require().NoError(err)
 

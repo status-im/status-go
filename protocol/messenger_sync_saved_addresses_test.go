@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/wakuv1"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -41,16 +40,14 @@ type MessengerSyncSavedAddressesSuite struct {
 func (s *MessengerSyncSavedAddressesSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = shh
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 
 	s.main = s.newMessenger(s.logger.Named("main"))
 	s.privateKey = s.main.identity
 
-	var err error
 	// Create new device and add main account to
 	s.other, err = newMessengerWithKey(s.shh, s.main.identity, s.logger.Named("other"), nil)
 	s.Require().NoError(err)

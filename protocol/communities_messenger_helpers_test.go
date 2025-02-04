@@ -320,7 +320,7 @@ func defaultTestCommunitiesMessengerSettings() *settings.Settings {
 		SendPushNotifications:     true,
 		ProfilePicturesVisibility: 1,
 		DefaultSyncPeriod:         777600,
-		UseMailservers:            true,
+		UseMailservers:            false,
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}

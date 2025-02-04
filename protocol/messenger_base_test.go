@@ -3,6 +3,7 @@ package protocol
 import (
 	"crypto/ecdsa"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/suite"
 
 	"go.uber.org/zap"
@@ -11,7 +12,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
+	"github.com/status-im/status-go/wakuv2"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -20,12 +21,10 @@ const DefaultProfileDisplayName = ""
 
 func (s *MessengerBaseTestSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
-
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = shh
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 
 	s.m = s.newMessenger()
 	s.privateKey = s.m.identity
@@ -83,4 +82,17 @@ func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logge
 	}
 
 	return m, nil
+}
+
+func newTestWakuNode(logger *zap.Logger) (wakutypes.Waku, error) {
+	return wakuv2.New(
+		nil,
+		"",
+		&wakuv2.DefaultConfig,
+		logger,
+		nil,
+		nil,
+		func([]byte, peer.ID, error) {},
+		nil,
+	)
 }

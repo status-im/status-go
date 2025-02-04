@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -37,16 +36,14 @@ type MessengerSyncKeycardsStateSuite struct {
 func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = shh
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 
 	s.main = s.newMessenger(s.shh)
 	s.privateKey = s.main.identity
 
-	var err error
 	// Create new device and add main account to
 	s.other, err = newMessengerWithKey(s.shh, s.main.identity, s.logger, nil)
 	s.Require().NoError(err)

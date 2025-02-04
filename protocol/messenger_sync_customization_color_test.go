@@ -8,7 +8,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/wakuv1"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -34,11 +33,10 @@ type MessengerSyncAccountCustomizationColorSuite struct {
 func (s *MessengerSyncAccountCustomizationColorSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = shh
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 
 	pk, err := crypto.GenerateKey()
 	s.Require().NoError(err)

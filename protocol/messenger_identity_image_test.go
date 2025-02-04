@@ -21,7 +21,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -44,13 +43,10 @@ type MessengerProfilePictureHandlerSuite struct {
 func (s *MessengerProfilePictureHandlerSuite) SetupSuite() {
 	s.logger = tt.MustCreateTestLogger()
 
-	// Setup Waku things
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	wakuLogger := s.logger.Named("Waku")
-	shh := wakuv1.New(&config, wakuLogger)
-	s.shh = shh
+	shh, err := newTestWakuNode(s.logger.Named("Waku"))
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 }
 
 func (s *MessengerProfilePictureHandlerSuite) TearDownSuite() {
@@ -299,8 +295,6 @@ func (s *MessengerProfilePictureHandlerSuite) TestE2eSendingReceivingProfilePict
 			}
 		}
 	}
-
-	s.SetupTest()
 }
 
 func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePicture(args *e2eArgs) {

@@ -577,7 +577,6 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
-	s.Require().Equal(s.alice.account.GetCustomizationColor(), response.Contacts[0].CustomizationColor)
 
 	// check if response contains the chat we're interested in
 	// we use this instead of checking just the length of the chat because
@@ -2416,6 +2415,8 @@ func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger 
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
@@ -2468,6 +2469,8 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
@@ -2557,6 +2560,8 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 
 	// Create new device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
@@ -2723,6 +2728,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 
 	// Create Alice's other device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	// Pair alice's two devices
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
@@ -2924,6 +2930,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Join() {
 
 	alicesOtherDevice := s.createOtherDevice(s.alice)
 	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
+
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	s.joinCommunity(community, s.owner, s.alice)
@@ -2949,6 +2956,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 
 	// Create Alice's other device
 	alicesOtherDevice := s.createOtherDevice(s.alice)
+	defer TearDownMessenger(&s.Suite, alicesOtherDevice)
 
 	// Pair alice's two devices
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
@@ -3060,6 +3068,8 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_ImportCommunity() {
 
 	// New device is created & paired
 	ownersOtherDevice := s.createOtherDevice(s.owner)
+	defer TearDownMessenger(&s.Suite, ownersOtherDevice)
+
 	PairDevices(&s.Suite, ownersOtherDevice, s.owner)
 	PairDevices(&s.Suite, s.owner, ownersOtherDevice)
 

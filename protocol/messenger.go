@@ -1027,6 +1027,10 @@ func (m *Messenger) handleConnectionChange(online bool) {
 }
 
 func (m *Messenger) Online() bool {
+	if m.config.onlineChecker != nil {
+		return m.config.onlineChecker()
+	}
+
 	switch m.transport.WakuVersion() {
 	case 2:
 		return m.transport.PeerCount() > 0

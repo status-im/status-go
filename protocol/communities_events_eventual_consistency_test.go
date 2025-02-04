@@ -10,7 +10,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
 )
 
 func TestCommunityEventsEventualConsistencySuite(t *testing.T) {
@@ -30,12 +29,8 @@ func (s *CommunityEventsEventualConsistencySuite) SetupTest() {
 	s.accountsPasswords = make(map[string]string)
 	s.mockedBalances = createMockedWalletBalance(&s.Suite)
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	wakuWrapper, err := newTestWakuWrapper(&config, s.logger)
+	wakuWrapper, err := newTestWakuWrapper(s.logger)
 	s.Require().NoError(err)
-	s.Require().NoError(shh.Start())
 	s.shh = wakuWrapper
 
 	s.messagesOrderController = NewMessagesOrderController(messagesOrderRandom)

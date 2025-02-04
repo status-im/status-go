@@ -409,6 +409,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 func (s *MessengerInstallationSuite) TestInitInstallations() {
 	m, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
 	s.Require().NoError(err)
+	defer TearDownMessenger(&s.Suite, m)
 
 	// m.InitInstallations is already called when we set-up the messenger for
 	// testing, thus this test has no act phase.

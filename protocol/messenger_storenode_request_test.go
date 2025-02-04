@@ -170,8 +170,8 @@ func (s *MessengerStoreNodeRequestSuite) createStore() {
 }
 
 func (s *MessengerStoreNodeRequestSuite) tearDownOwner() {
-	_ = s.ownerWaku.Stop()
 	TearDownMessenger(&s.Suite, s.owner)
+	_ = s.ownerWaku.Stop()
 }
 
 func (s *MessengerStoreNodeRequestSuite) createOwner() {
@@ -208,8 +208,8 @@ func (s *MessengerStoreNodeRequestSuite) createBob() {
 }
 
 func (s *MessengerStoreNodeRequestSuite) tearDownBob() {
-	_ = s.bobWaku.Stop()
 	TearDownMessenger(&s.Suite, s.bob)
+	_ = s.bobWaku.Stop()
 }
 
 func (s *MessengerStoreNodeRequestSuite) newMessenger(shh wakutypes.Waku, logger *zap.Logger, mailserverAddress *multiaddr.Multiaddr) *Messenger {

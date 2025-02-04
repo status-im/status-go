@@ -7,7 +7,9 @@ import (
 	transport2 "github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/t/helpers"
 	wakutypes "github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv1"
+	"github.com/status-im/status-go/wakuv2"
+
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/golang/protobuf/proto"
 
@@ -67,9 +69,18 @@ func (s *MessageSenderSuite) SetupTest() {
 		s.logger,
 	)
 
-	wakuConfig := wakuv1.DefaultConfig
-	wakuConfig.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&wakuConfig, s.logger)
+	wakuConfig := wakuv2.DefaultConfig
+	shh, err := wakuv2.New(
+		nil,
+		"",
+		&wakuConfig,
+		s.logger,
+		database,
+		nil,
+		func([]byte, peer.ID, error) {},
+		nil,
+	)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
 
 	whisperTransport, err := transport2.NewTransport(

@@ -85,6 +85,7 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 		WithToplevelDatabaseMigrations(),
 		WithBrowserDatabase(nil),
 		WithCuratedCommunitiesUpdateLoop(false),
+		WithStubOnlineChecker(),
 	}
 	options = append(options, config.extraOptions...)
 
@@ -107,6 +108,11 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 
 	if config.messagesOrderController != nil {
 		m.retrievedMessagesIteratorFactory = config.messagesOrderController.newMessagesIterator
+	}
+
+	err = m.settings.SetUseMailservers(false)
+	if err != nil {
+		return nil, err
 	}
 
 	err = m.InitInstallations()

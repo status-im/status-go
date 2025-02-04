@@ -124,6 +124,8 @@ type config struct {
 	communityManagerOptions []communities.ManagerOption
 
 	accountsFeed *event.Feed
+
+	onlineChecker func() bool
 }
 
 func messengerDefaultConfig() config {

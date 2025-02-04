@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/protocol/peersyncing"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv1"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -42,11 +41,10 @@ func (s *MessengerPeersyncingSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 	peerSyncingLoopInterval = 500 * time.Millisecond
 
-	config := wakuv1.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := wakuv1.New(&config, s.logger)
-	s.shh = shh
+	shh, err := newTestWakuNode(s.logger)
+	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
+	s.shh = shh
 
 	s.owner = s.newMessenger()
 	s.bob = s.newMessenger()
@@ -66,7 +64,7 @@ func (s *MessengerPeersyncingSuite) SetupTest() {
 	s.accountsPasswords[common.PubkeyToHex(&s.bob.identity.PublicKey)] = bobPassword
 	s.accountsPasswords[common.PubkeyToHex(&s.alice.identity.PublicKey)] = aliceAddress1
 
-	_, err := s.owner.Start()
+	_, err = s.owner.Start()
 	s.Require().NoError(err)
 	_, err = s.bob.Start()
 	s.Require().NoError(err)

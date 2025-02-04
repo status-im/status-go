@@ -196,13 +196,15 @@ func (m *Messenger) broadcastLatestUserStatus() {
 	ctx := context.Background()
 	go func() {
 		defer gocommon.LogOnPanic()
-		// Ensure that we are connected before sending a message
-		time.Sleep(5 * time.Second)
-		m.sendCurrentUserStatus(ctx)
-	}()
 
-	go func() {
-		defer gocommon.LogOnPanic()
+		select {
+		// Ensure that we are connected before sending a message
+		case <-time.After(5 * time.Second):
+			m.sendCurrentUserStatus(ctx)
+		case <-m.quit:
+			return
+		}
+
 		for {
 			select {
 			case <-time.After(5 * time.Minute):
