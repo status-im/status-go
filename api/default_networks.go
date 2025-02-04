@@ -26,18 +26,13 @@ type ProviderID = string
 
 // Provider IDs
 const (
-	ProxyNodefleet = "proxy-nodefleet"
-	ProxyInfura    = "proxy-infura"
-	ProxyGrove     = "proxy-grove"
-	Nodefleet      = "nodefleet"
-	Infura         = "infura"
-	Grove          = "grove"
-	DirectInfura   = "direct-infura"
-	DirectGrove    = "direct-grove"
+	StatusSmartProxy = "status-smart-proxy"
+	DirectInfura     = "direct-infura"
+	DirectGrove      = "direct-grove"
 )
 
-func proxyUrl(stageName, provider, chainName, networkName string) string {
-	return fmt.Sprintf("https://%s.api.status.im/%s/%s/%s/", stageName, provider, chainName, networkName)
+func smartProxyUrl(chainName, networkName string) string {
+	return fmt.Sprintf("https://test.eth-rpc.status.im/%s/%s/", chainName, networkName)
 }
 
 func mainnet(stageName string) params.Network {
@@ -46,10 +41,8 @@ func mainnet(stageName string) params.Network {
 	const networkName = "mainnet"
 
 	rpcProviders := []params.RpcProvider{
-		// Proxy providers
-		*params.NewProxyProvider(chainID, ProxyNodefleet, proxyUrl(stageName, Nodefleet, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyInfura, proxyUrl(stageName, Infura, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyGrove, proxyUrl(stageName, Grove, chainName, networkName), false),
+		// Smart proxy provider
+		*params.NewProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(chainName, networkName), false),
 		// Direct providers
 		*params.NewDirectProvider(chainID, DirectInfura, "https://mainnet.infura.io/v3/", true),
 		*params.NewDirectProvider(chainID, DirectGrove, "https://eth.rpc.grove.city/v1/", false),
@@ -79,10 +72,8 @@ func sepolia(stageName string) params.Network {
 	const networkName = "sepolia"
 
 	rpcProviders := []params.RpcProvider{
-		// Proxy providers
-		*params.NewProxyProvider(chainID, ProxyNodefleet, proxyUrl(stageName, Nodefleet, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyInfura, proxyUrl(stageName, Infura, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyGrove, proxyUrl(stageName, Grove, chainName, networkName), true),
+		// Smart proxy provider
+		*params.NewProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(chainName, networkName), false),
 		// Direct providers
 		*params.NewDirectProvider(chainID, DirectInfura, "https://sepolia.infura.io/v3/", true),
 		*params.NewDirectProvider(chainID, DirectGrove, "https://eth-sepolia-testnet.rpc.grove.city/v1/", false),
@@ -112,10 +103,8 @@ func optimism(stageName string) params.Network {
 	const networkName = "mainnet"
 
 	rpcProviders := []params.RpcProvider{
-		// Proxy providers
-		*params.NewProxyProvider(chainID, ProxyNodefleet, proxyUrl(stageName, Nodefleet, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyInfura, proxyUrl(stageName, Infura, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyGrove, proxyUrl(stageName, Grove, chainName, networkName), true),
+		// Smart proxy provider
+		*params.NewProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(chainName, networkName), false),
 		// Direct providers
 		*params.NewDirectProvider(chainID, DirectInfura, "https://optimism-mainnet.infura.io/v3/", true),
 		*params.NewDirectProvider(chainID, DirectGrove, "https://optimism.rpc.grove.city/v1/", false),
@@ -145,10 +134,8 @@ func optimismSepolia(stageName string) params.Network {
 	const networkName = "sepolia"
 
 	rpcProviders := []params.RpcProvider{
-		// Proxy providers
-		*params.NewProxyProvider(chainID, ProxyNodefleet, proxyUrl(stageName, Nodefleet, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyInfura, proxyUrl(stageName, Infura, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyGrove, proxyUrl(stageName, Grove, chainName, networkName), true),
+		// Smart proxy provider
+		*params.NewProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(chainName, networkName), false),
 		// Direct providers
 		*params.NewDirectProvider(chainID, DirectInfura, "https://optimism-sepolia.infura.io/v3/", true),
 		*params.NewDirectProvider(chainID, DirectGrove, "https://optimism-sepolia-testnet.rpc.grove.city/v1/", false),
@@ -178,10 +165,8 @@ func arbitrum(stageName string) params.Network {
 	const networkName = "mainnet"
 
 	rpcProviders := []params.RpcProvider{
-		// Proxy providers
-		*params.NewProxyProvider(chainID, ProxyNodefleet, proxyUrl(stageName, Nodefleet, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyInfura, proxyUrl(stageName, Infura, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyGrove, proxyUrl(stageName, Grove, chainName, networkName), true),
+		// Smart proxy provider
+		*params.NewProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(chainName, networkName), false),
 		// Direct providers
 		*params.NewDirectProvider(chainID, DirectInfura, "https://arbitrum-mainnet.infura.io/v3/", true),
 		*params.NewDirectProvider(chainID, DirectGrove, "https://arbitrum-one.rpc.grove.city/v1/", false),
@@ -211,10 +196,8 @@ func arbitrumSepolia(stageName string) params.Network {
 	const networkName = "sepolia"
 
 	rpcProviders := []params.RpcProvider{
-		// Proxy providers
-		*params.NewProxyProvider(chainID, ProxyNodefleet, proxyUrl(stageName, Nodefleet, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyInfura, proxyUrl(stageName, Infura, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyGrove, proxyUrl(stageName, Grove, chainName, networkName), true),
+		// Smart proxy provider
+		*params.NewProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(chainName, networkName), false),
 		// Direct providers
 		*params.NewDirectProvider(chainID, DirectInfura, "https://arbitrum-sepolia.infura.io/v3/", true),
 		*params.NewDirectProvider(chainID, DirectGrove, "https://arbitrum-sepolia-testnet.rpc.grove.city/v1/", false),
@@ -244,10 +227,8 @@ func base(stageName string) params.Network {
 	const networkName = "mainnet"
 
 	rpcProviders := []params.RpcProvider{
-		// Proxy providers
-		*params.NewProxyProvider(chainID, ProxyNodefleet, proxyUrl(stageName, Nodefleet, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyInfura, proxyUrl(stageName, Infura, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyGrove, proxyUrl(stageName, Grove, chainName, networkName), true),
+		// Smart proxy provider
+		*params.NewProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(chainName, networkName), false),
 		// Direct providers
 		*params.NewDirectProvider(chainID, DirectInfura, "https://base-mainnet.infura.io/v3/", true),
 		*params.NewDirectProvider(chainID, DirectGrove, "https://base.rpc.grove.city/v1/", false),
@@ -270,16 +251,15 @@ func base(stageName string) params.Network {
 		RelatedChainID:         BaseSepoliaChainID,
 	}
 }
+
 func baseSepolia(stageName string) params.Network {
 	const chainID = BaseSepoliaChainID
 	const chainName = "base"
 	const networkName = "sepolia"
 
 	rpcProviders := []params.RpcProvider{
-		// Proxy providers
-		*params.NewProxyProvider(chainID, ProxyNodefleet, proxyUrl(stageName, Nodefleet, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyInfura, proxyUrl(stageName, Infura, chainName, networkName), false),
-		*params.NewProxyProvider(chainID, ProxyGrove, proxyUrl(stageName, Grove, chainName, networkName), true),
+		// Smart proxy provider
+		*params.NewProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(chainName, networkName), false),
 		// Direct providers
 		*params.NewDirectProvider(chainID, DirectInfura, "https://base-sepolia.infura.io/v3/", true),
 		*params.NewDirectProvider(chainID, DirectGrove, "https://base-testnet.rpc.grove.city/v1/", false),
