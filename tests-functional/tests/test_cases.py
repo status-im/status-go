@@ -311,3 +311,24 @@ class MessengerTestCase(NetworkConditionTestCase):
         chats = response.get("result", {}).get("communities", [{}])[0].get("chats", {})
         chat_id = list(chats.keys())[0] if chats else None
         return community_id + chat_id
+
+    def community_messages(self, message_chat_id, message_count):
+        sent_messages = []
+        for i in range(message_count):
+            message_text = f"test_message_{i+1}_{uuid4()}"
+            response = self.sender.wakuext_service.send_community_chat_message(message_chat_id, message_text)
+            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+            sent_messages.append(expected_message)
+            time.sleep(0.01)
+
+        for i, expected_message in enumerate(sent_messages):
+            messages_new_event = self.receiver.find_signal_containing_pattern(
+                SignalType.MESSAGES_NEW.value,
+                event_pattern=expected_message.get("id"),
+                timeout=60,
+            )
+            self.validate_signal_event_against_response(
+                signal_event=messages_new_event,
+                fields_to_validate={"text": "text"},
+                expected_message=expected_message,
+            )
