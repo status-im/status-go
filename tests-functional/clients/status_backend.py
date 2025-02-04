@@ -200,25 +200,23 @@ class StatusBackend(RpcClient, SignalClient):
 
         return temp_dir
 
-    def create_account_and_login(
-        self,
-        data_dir=USER_DIR,
-        display_name=None,
-        password=user_1.password,
-    ):
-        self.display_name = (
-            display_name if display_name else f"DISP_NAME_{''.join(random.choices(string.ascii_letters + string.digits + '_-', k=10))}"
+    def create_account_and_login(self, data_dir=USER_DIR, **kwargs):
+        self.display_name = kwargs.get(
+            "display_name",
+            f"DISP_NAME_{''.join(random.choices(string.ascii_letters + string.digits + '_-', k=10))}",
         )
         method = "CreateAccountAndLogin"
         data = {
             "rootDataDir": data_dir,
             "kdfIterations": 256000,
             "displayName": self.display_name,
-            "password": password,
+            "password": kwargs.get("password", user_1.password),
             "customizationColor": "primary",
             "logEnabled": True,
             "logLevel": "DEBUG",
+            "wakuV2LightClient": kwargs.get("wakuV2LightClient", False),
         }
+
         data = self._set_proxy_credentials(data)
         resp = self.api_valid_request(method, data)
         self.node_login_event = self.find_signal_containing_pattern(SignalType.NODE_LOGIN.value, event_pattern=self.display_name)
