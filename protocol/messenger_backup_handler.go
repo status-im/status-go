@@ -208,39 +208,48 @@ func (m *Messenger) startBackupFetchingTracking(response *MessengerResponse) err
 	}
 
 	// Add a timeout to mark the backup syncing as failed after 1 minute and 30 seconds
-	time.AfterFunc(1*time.Minute+30*time.Second, func() {
-		m.backedUpFetchingStatus.fetchingCompletedMutex.Lock()
-		defer m.backedUpFetchingStatus.fetchingCompletedMutex.Unlock()
-
-		if m.backedUpFetchingStatus.fetchingCompleted {
-			// Nothing to do, the fetching has completed successfully
-			return
-		}
-		// Update the AC notification to the failure state
-		notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(backupSyncingNotificationID))
-		if err != nil {
-			m.logger.Error("failed to get activity center notification", zap.Error(err))
-		} else if notification != nil {
-			notification.UpdatedAt = m.GetCurrentTimeInMillis()
-			if m.backedUpFetchingStatus.dataProgress == nil || len(m.backedUpFetchingStatus.dataProgress) == 0 {
-				notification.Type = ActivityCenterNotificationTypeBackupSyncingFailure
-			} else {
-				notification.Type = ActivityCenterNotificationTypeBackupSyncingPartialFailure
-			}
-			_, err = m.persistence.SaveActivityCenterNotification(notification, true)
-			if err != nil {
-				m.logger.Error("failed to save activity center notification", zap.Error(err))
-			} else {
-				if m.config.messengerSignalsHandler != nil {
-					resp := &MessengerResponse{}
-					resp.AddActivityCenterNotification(notification)
-					m.config.messengerSignalsHandler.MessengerResponse(resp)
-				}
-			}
-		}
-	})
+	time.AfterFunc(90*time.Second, m.backupFetchingTimeout)
 
 	return nil
+}
+
+func (m *Messenger) backupFetchingTimeout() {
+	m.backedUpFetchingStatus.fetchingCompletedMutex.Lock()
+	defer m.backedUpFetchingStatus.fetchingCompletedMutex.Unlock()
+
+	if m.backedUpFetchingStatus.fetchingCompleted {
+		// Nothing to do, the fetching has completed successfully
+		return
+	}
+	// Update the AC notification to the failure state
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(backupSyncingNotificationID))
+	if err != nil {
+		m.logger.Error("failed to get activity center notification", zap.Error(err))
+		return
+	}
+	if notification == nil {
+		return
+	}
+
+	notification.UpdatedAt = m.GetCurrentTimeInMillis()
+	if m.backedUpFetchingStatus.dataProgress == nil || len(m.backedUpFetchingStatus.dataProgress) == 0 {
+		notification.Type = ActivityCenterNotificationTypeBackupSyncingFailure
+	} else {
+		notification.Type = ActivityCenterNotificationTypeBackupSyncingPartialFailure
+	}
+	_, err = m.persistence.SaveActivityCenterNotification(notification, true)
+	if err != nil {
+		m.logger.Error("failed to save activity center notification", zap.Error(err))
+		return
+	}
+
+	if m.config.messengerSignalsHandler == nil {
+		return
+	}
+
+	resp := &MessengerResponse{}
+	resp.AddActivityCenterNotification(notification)
+	m.config.messengerSignalsHandler.MessengerResponse(resp)
 }
 
 func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, backupTime uint64) error {

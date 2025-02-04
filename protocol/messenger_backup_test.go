@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
+
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
@@ -262,7 +263,9 @@ func (s *MessengerBackupSuite) TestBackupProfileWithInvalidDisplayName() {
 
 func (s *MessengerBackupSuite) TestFetchingDuringBackup() {
 	bob1 := s.m
-	bob1.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{}
+	bob1.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{
+		wakuBackedUpDataResponseChan: make(chan *wakusync.WakuBackedUpDataResponse, 1000),
+	}
 
 	state := ReceivedMessageState{
 		Response: &MessengerResponse{},

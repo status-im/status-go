@@ -61,10 +61,7 @@ type MessengerSignalsHandlerMock struct {
 }
 
 func (m *MessengerSignalsHandlerMock) SendWakuFetchingBackupProgress(response *wakusync.WakuBackedUpDataResponse) {
-	select {
-	case m.wakuBackedUpDataResponseChan <- response:
-	default:
-	}
+	m.wakuBackedUpDataResponseChan <- response
 }
 func (m *MessengerSignalsHandlerMock) SendWakuBackedUpProfile(*wakusync.WakuBackedUpDataResponse)  {}
 func (m *MessengerSignalsHandlerMock) SendWakuBackedUpSettings(*wakusync.WakuBackedUpDataResponse) {}
