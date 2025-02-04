@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/api"
+	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network/db"
@@ -41,23 +41,23 @@ func TestRpcProviderPersistenceTestSuite(t *testing.T) {
 // Test cases
 
 func (s *RpcProviderPersistenceTestSuite) TestAddAndGetRpcProvider() {
-	provider := testutil.CreateProvider(api.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com")
+	provider := testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com")
 
 	err := s.rpcPersistence.AddRpcProvider(provider)
 	s.Require().NoError(err)
 
 	// Verify the added provider
-	providers, err := s.rpcPersistence.GetRpcProviders(api.MainnetChainID)
+	providers, err := s.rpcPersistence.GetRpcProviders(api_common.MainnetChainID)
 	s.Require().NoError(err)
 	testutil.CompareProvidersList(s.T(), []params.RpcProvider{provider}, providers)
 }
 
 func (s *RpcProviderPersistenceTestSuite) TestGetRpcProvidersByType() {
 	providers := []params.RpcProvider{
-		testutil.CreateProvider(api.MainnetChainID, "UserProvider1", params.UserProviderType, true, "https://provider1.example.com"),
-		testutil.CreateProvider(api.MainnetChainID, "EmbeddedDirect1", params.EmbeddedDirectProviderType, false, "https://provider2.example.com"),
-		testutil.CreateProvider(api.MainnetChainID, "UserProvider2", params.UserProviderType, false, "https://provider3.example.com"),
-		testutil.CreateProvider(api.MainnetChainID, "EmbeddedProxy1", params.EmbeddedProxyProviderType, true, "https://provider4.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "UserProvider1", params.UserProviderType, true, "https://provider1.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "EmbeddedDirect1", params.EmbeddedDirectProviderType, false, "https://provider2.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "UserProvider2", params.UserProviderType, false, "https://provider3.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "EmbeddedProxy1", params.EmbeddedProxyProviderType, true, "https://provider4.example.com"),
 	}
 
 	for _, provider := range providers {
@@ -66,42 +66,42 @@ func (s *RpcProviderPersistenceTestSuite) TestGetRpcProvidersByType() {
 	}
 
 	// Verify by type
-	userProviders, err := s.rpcPersistence.GetRpcProvidersByType(api.MainnetChainID, params.UserProviderType)
+	userProviders, err := s.rpcPersistence.GetRpcProvidersByType(api_common.MainnetChainID, params.UserProviderType)
 	s.Require().NoError(err)
 	testutil.CompareProvidersList(s.T(), []params.RpcProvider{providers[0], providers[2]}, userProviders)
 
-	embeddedDirectProviders, err := s.rpcPersistence.GetRpcProvidersByType(api.MainnetChainID, params.EmbeddedDirectProviderType)
+	embeddedDirectProviders, err := s.rpcPersistence.GetRpcProvidersByType(api_common.MainnetChainID, params.EmbeddedDirectProviderType)
 	s.Require().NoError(err)
 	testutil.CompareProvidersList(s.T(), []params.RpcProvider{providers[1]}, embeddedDirectProviders)
 
-	embeddedProxyProviders, err := s.rpcPersistence.GetRpcProvidersByType(api.MainnetChainID, params.EmbeddedProxyProviderType)
+	embeddedProxyProviders, err := s.rpcPersistence.GetRpcProvidersByType(api_common.MainnetChainID, params.EmbeddedProxyProviderType)
 	s.Require().NoError(err)
 	testutil.CompareProvidersList(s.T(), []params.RpcProvider{providers[3]}, embeddedProxyProviders)
 }
 
 func (s *RpcProviderPersistenceTestSuite) TestDeleteRpcProviders() {
-	provider := testutil.CreateProvider(api.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com")
+	provider := testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com")
 
 	err := s.rpcPersistence.AddRpcProvider(provider)
 	s.Require().NoError(err)
 
-	err = s.rpcPersistence.DeleteRpcProviders(api.MainnetChainID)
+	err = s.rpcPersistence.DeleteRpcProviders(api_common.MainnetChainID)
 	s.Require().NoError(err)
 
 	// Verify deletion
-	providers, err := s.rpcPersistence.GetRpcProviders(api.MainnetChainID)
+	providers, err := s.rpcPersistence.GetRpcProviders(api_common.MainnetChainID)
 	s.Require().NoError(err)
 	s.Require().Empty(providers)
 }
 
 func (s *RpcProviderPersistenceTestSuite) TestUpdateRpcProvider() {
-	provider := testutil.CreateProvider(api.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com")
+	provider := testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com")
 
 	err := s.rpcPersistence.AddRpcProvider(provider)
 	s.Require().NoError(err)
 
 	// Retrieve provider to get the ID
-	providers, err := s.rpcPersistence.GetRpcProviders(api.MainnetChainID)
+	providers, err := s.rpcPersistence.GetRpcProviders(api_common.MainnetChainID)
 	s.Require().NoError(err)
 	s.Require().Len(providers, 1)
 
@@ -113,15 +113,15 @@ func (s *RpcProviderPersistenceTestSuite) TestUpdateRpcProvider() {
 	s.Require().NoError(err)
 
 	// Verify update
-	updatedProviders, err := s.rpcPersistence.GetRpcProviders(api.MainnetChainID)
+	updatedProviders, err := s.rpcPersistence.GetRpcProviders(api_common.MainnetChainID)
 	s.Require().NoError(err)
 	testutil.CompareProvidersList(s.T(), []params.RpcProvider{provider}, updatedProviders)
 }
 
 func (s *RpcProviderPersistenceTestSuite) TestSetRpcProviders() {
 	initialProviders := []params.RpcProvider{
-		testutil.CreateProvider(api.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com"),
-		testutil.CreateProvider(api.MainnetChainID, "Provider2", params.EmbeddedDirectProviderType, false, "https://provider2.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "Provider1", params.UserProviderType, true, "https://provider1.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "Provider2", params.EmbeddedDirectProviderType, false, "https://provider2.example.com"),
 	}
 
 	for _, provider := range initialProviders {
@@ -130,15 +130,15 @@ func (s *RpcProviderPersistenceTestSuite) TestSetRpcProviders() {
 	}
 
 	newProviders := []params.RpcProvider{
-		testutil.CreateProvider(api.MainnetChainID, "NewProvider1", params.UserProviderType, true, "https://newprovider1.example.com"),
-		testutil.CreateProvider(api.MainnetChainID, "NewProvider2", params.EmbeddedProxyProviderType, true, "https://newprovider2.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "NewProvider1", params.UserProviderType, true, "https://newprovider1.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "NewProvider2", params.EmbeddedProxyProviderType, true, "https://newprovider2.example.com"),
 	}
 
-	err := s.rpcPersistence.SetRpcProviders(api.MainnetChainID, newProviders)
+	err := s.rpcPersistence.SetRpcProviders(api_common.MainnetChainID, newProviders)
 	s.Require().NoError(err)
 
 	// Verify replacement
-	providers, err := s.rpcPersistence.GetRpcProviders(api.MainnetChainID)
+	providers, err := s.rpcPersistence.GetRpcProviders(api_common.MainnetChainID)
 	s.Require().NoError(err)
 	testutil.CompareProvidersList(s.T(), newProviders, providers)
 }

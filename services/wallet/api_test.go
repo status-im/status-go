@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/rpc/network/testutil"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -136,20 +137,10 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 	defer serverWith1SecDelay.Close()
 
 	networks := []params.Network{
-		{
-			ChainID:   chainID,
-			ChainName: "Ethereum Mainnet",
-			RpcProviders: []params.RpcProvider{
-				{
-					ChainID:  chainID,
-					Name:     "Test Provider",
-					URL:      serverWith1SecDelay.URL + "/nodefleet/",
-					Type:     params.EmbeddedProxyProviderType,
-					Enabled:  true,
-					AuthType: params.NoAuth,
-				},
-			},
+		*testutil.CreateNetwork(chainID, "Ethereum Mainnet", []params.RpcProvider{
+			*params.NewProxyProvider(chainID, "Test Provider", serverWith1SecDelay.URL+"/nodefleet/", false),
 		},
+		),
 	}
 
 	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, gofakeit.Username(), gofakeit.LetterN(5))

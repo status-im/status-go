@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/params"
 	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
 	"github.com/status-im/status-go/rpc/network"
+	network_testutil "github.com/status-im/status-go/rpc/network/testutil"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
@@ -73,18 +74,15 @@ func setupTests(t *testing.T) (state testState, close func()) {
 	networkManager := network.NewManager(state.db, nil, nil, nil)
 	require.NotNil(t, networkManager)
 
-	err = networkManager.InitEmbeddedNetworks([]params.Network{
-		{
-			ChainID:   walletCommon.EthereumMainnet,
-			ChainName: "Ethereum Mainnet",
-			Layer:     1,
-		},
-		{
-			ChainID:   walletCommon.OptimismMainnet,
-			ChainName: "Optimism Mainnet",
-			Layer:     1,
-		},
-	})
+	initNetworks := []params.Network{
+		*network_testutil.CreateNetwork(walletCommon.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
+			network_testutil.CreateProvider(walletCommon.EthereumMainnet, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
+		}),
+		*network_testutil.CreateNetwork(walletCommon.OptimismMainnet, "Optimism Mainnet", []params.RpcProvider{
+			network_testutil.CreateProvider(walletCommon.OptimismMainnet, "Optimism Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.optimism.io"),
+		}),
+	}
+	err = networkManager.InitEmbeddedNetworks(initNetworks)
 	require.NoError(t, err)
 
 	state.rpcClient.EXPECT().GetNetworkManager().AnyTimes().Return(networkManager)

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -199,28 +200,28 @@ func buildWalletConfig(request *requests.WalletSecretsConfig, statusProxyEnabled
 	}
 
 	if request.AlchemyEthereumMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[MainnetChainID] = request.AlchemyEthereumMainnetToken
+		walletConfig.AlchemyAPIKeys[common.MainnetChainID] = request.AlchemyEthereumMainnetToken
 	}
 	if request.AlchemyEthereumSepoliaToken != "" {
-		walletConfig.AlchemyAPIKeys[SepoliaChainID] = request.AlchemyEthereumSepoliaToken
+		walletConfig.AlchemyAPIKeys[common.SepoliaChainID] = request.AlchemyEthereumSepoliaToken
 	}
 	if request.AlchemyArbitrumMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[ArbitrumChainID] = request.AlchemyArbitrumMainnetToken
+		walletConfig.AlchemyAPIKeys[common.ArbitrumChainID] = request.AlchemyArbitrumMainnetToken
 	}
 	if request.AlchemyArbitrumSepoliaToken != "" {
-		walletConfig.AlchemyAPIKeys[ArbitrumSepoliaChainID] = request.AlchemyArbitrumSepoliaToken
+		walletConfig.AlchemyAPIKeys[common.ArbitrumSepoliaChainID] = request.AlchemyArbitrumSepoliaToken
 	}
 	if request.AlchemyOptimismMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[OptimismChainID] = request.AlchemyOptimismMainnetToken
+		walletConfig.AlchemyAPIKeys[common.OptimismChainID] = request.AlchemyOptimismMainnetToken
 	}
 	if request.AlchemyOptimismSepoliaToken != "" {
-		walletConfig.AlchemyAPIKeys[OptimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
+		walletConfig.AlchemyAPIKeys[common.OptimismSepoliaChainID] = request.AlchemyOptimismSepoliaToken
 	}
 	if request.AlchemyBaseMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[BaseChainID] = request.AlchemyBaseMainnetToken
+		walletConfig.AlchemyAPIKeys[common.BaseChainID] = request.AlchemyBaseMainnetToken
 	}
 	if request.AlchemyBaseSepoliaToken != "" {
-		walletConfig.AlchemyAPIKeys[BaseSepoliaChainID] = request.AlchemyBaseSepoliaToken
+		walletConfig.AlchemyAPIKeys[common.BaseSepoliaChainID] = request.AlchemyBaseSepoliaToken
 	}
 	if request.StatusProxyMarketUser != "" {
 		walletConfig.StatusProxyMarketUser = request.StatusProxyMarketUser

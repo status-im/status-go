@@ -4,8 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/status-im/status-go/api"
-
+	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
@@ -35,23 +34,23 @@ func (s *NetworkManagerTestSuite) SetupTest() {
 
 	// Use testutil to initialize networks
 	initNetworks := []params.Network{
-		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
-			testutil.CreateProvider(api.MainnetChainID, "Infura Mainnet", params.UserProviderType, true, "https://mainnet.infura.io"),
+		*testutil.CreateNetwork(api_common.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+			testutil.CreateProvider(api_common.MainnetChainID, "Infura Mainnet", params.UserProviderType, true, "https://mainnet.infura.io"),
 		}),
-		*testutil.CreateNetwork(api.SepoliaChainID, "Sepolia Testnet", []params.RpcProvider{
-			testutil.CreateProvider(api.SepoliaChainID, "Infura Sepolia", params.UserProviderType, true, "https://sepolia.infura.io"),
+		*testutil.CreateNetwork(api_common.SepoliaChainID, "Sepolia Testnet", []params.RpcProvider{
+			testutil.CreateProvider(api_common.SepoliaChainID, "Infura Sepolia", params.UserProviderType, true, "https://sepolia.infura.io"),
 		}),
-		*testutil.CreateNetwork(api.OptimismChainID, "Optimistic Ethereum", []params.RpcProvider{
-			testutil.CreateProvider(api.OptimismChainID, "Infura Optimism", params.UserProviderType, true, "https://optimism.infura.io"),
+		*testutil.CreateNetwork(api_common.OptimismChainID, "Optimistic Ethereum", []params.RpcProvider{
+			testutil.CreateProvider(api_common.OptimismChainID, "Infura Optimism", params.UserProviderType, true, "https://optimism.infura.io"),
 		}),
-		*testutil.CreateNetwork(api.OptimismSepoliaChainID, "Optimistic Sepolia", []params.RpcProvider{
-			testutil.CreateProvider(api.OptimismSepoliaChainID, "Infura Optimism Sepolia", params.UserProviderType, true, "https://optimism-sepolia.infura.io"),
+		*testutil.CreateNetwork(api_common.OptimismSepoliaChainID, "Optimistic Sepolia", []params.RpcProvider{
+			testutil.CreateProvider(api_common.OptimismSepoliaChainID, "Infura Optimism Sepolia", params.UserProviderType, true, "https://optimism-sepolia.infura.io"),
 		}),
-		*testutil.CreateNetwork(api.BaseChainID, "Base", []params.RpcProvider{
-			testutil.CreateProvider(api.BaseChainID, "Infura Base", params.UserProviderType, true, "https://base.infura.io"),
+		*testutil.CreateNetwork(api_common.BaseChainID, "Base", []params.RpcProvider{
+			testutil.CreateProvider(api_common.BaseChainID, "Infura Base", params.UserProviderType, true, "https://base.infura.io"),
 		}),
-		*testutil.CreateNetwork(api.BaseSepoliaChainID, "Base Sepolia", []params.RpcProvider{
-			testutil.CreateProvider(api.BaseSepoliaChainID, "Infura Base Sepolia", params.UserProviderType, true, "https://base-sepolia.infura.io"),
+		*testutil.CreateNetwork(api_common.BaseSepoliaChainID, "Base Sepolia", []params.RpcProvider{
+			testutil.CreateProvider(api_common.BaseSepoliaChainID, "Infura Base Sepolia", params.UserProviderType, true, "https://base-sepolia.infura.io"),
 		}),
 	}
 	// Make "Ethereum Mainnet" network not deactivatable
@@ -92,14 +91,14 @@ func (s *NetworkManagerTestSuite) assertDbNetworks(expectedNetworks []params.Net
 func (s *NetworkManagerTestSuite) TestUserAddsCustomProviders() {
 	// Adding custom providers
 	customProviders := []params.RpcProvider{
-		testutil.CreateProvider(api.MainnetChainID, "CustomProvider1", params.UserProviderType, true, "https://custom1.example.com"),
-		testutil.CreateProvider(api.MainnetChainID, "CustomProvider2", params.UserProviderType, false, "https://custom2.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "CustomProvider1", params.UserProviderType, true, "https://custom1.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "CustomProvider2", params.UserProviderType, false, "https://custom2.example.com"),
 	}
-	err := s.manager.SetUserRpcProviders(api.MainnetChainID, customProviders)
+	err := s.manager.SetUserRpcProviders(api_common.MainnetChainID, customProviders)
 	s.Require().NoError(err)
 
 	// Assert providers
-	foundNetwork := s.manager.Find(api.MainnetChainID)
+	foundNetwork := s.manager.Find(api_common.MainnetChainID)
 	s.Require().NotNil(foundNetwork)
 	expectedProviders := append(customProviders, networkhelper.GetEmbeddedProviders(foundNetwork.RpcProviders)...)
 	testutil.CompareProvidersList(s.T(), expectedProviders, foundNetwork.RpcProviders)
@@ -108,23 +107,23 @@ func (s *NetworkManagerTestSuite) TestUserAddsCustomProviders() {
 func (s *NetworkManagerTestSuite) TestInitNetworksKeepsUserProviders() {
 	// Add custom providers
 	customProviders := []params.RpcProvider{
-		testutil.CreateProvider(api.MainnetChainID, "CustomProvider1", params.UserProviderType, true, "https://custom1.example.com"),
-		testutil.CreateProvider(api.MainnetChainID, "CustomProvider2", params.UserProviderType, false, "https://custom2.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "CustomProvider1", params.UserProviderType, true, "https://custom1.example.com"),
+		testutil.CreateProvider(api_common.MainnetChainID, "CustomProvider2", params.UserProviderType, false, "https://custom2.example.com"),
 	}
-	err := s.manager.SetUserRpcProviders(api.MainnetChainID, customProviders)
+	err := s.manager.SetUserRpcProviders(api_common.MainnetChainID, customProviders)
 	s.Require().NoError(err)
 
 	// Re-initialize networks
 	initNetworks := []params.Network{
-		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
-			testutil.CreateProvider(api.MainnetChainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
+		*testutil.CreateNetwork(api_common.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+			testutil.CreateProvider(api_common.MainnetChainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
 		}),
 	}
 	err = s.manager.InitEmbeddedNetworks(initNetworks)
 	s.Require().NoError(err)
 
 	// Check that custom providers are retained
-	foundNetwork := s.manager.Find(api.MainnetChainID)
+	foundNetwork := s.manager.Find(api_common.MainnetChainID)
 	s.Require().NotNil(foundNetwork)
 	expectedProviders := append(customProviders, networkhelper.GetEmbeddedProviders(initNetworks[0].RpcProviders)...)
 	testutil.CompareProvidersList(s.T(), expectedProviders, foundNetwork.RpcProviders)
@@ -136,8 +135,8 @@ func (s *NetworkManagerTestSuite) TestInitNetworksDoesNotSaveEmbeddedProviders()
 
 	// Re-initialize networks
 	initNetworks := []params.Network{
-		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
-			testutil.CreateProvider(api.MainnetChainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
+		*testutil.CreateNetwork(api_common.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+			testutil.CreateProvider(api_common.MainnetChainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
 		}),
 	}
 	err := s.manager.InitEmbeddedNetworks(initNetworks)
@@ -153,8 +152,8 @@ func (s *NetworkManagerTestSuite) TestInitNetworksDoesNotSaveEmbeddedProviders()
 func (s *NetworkManagerTestSuite) TestInitEmbeddedNetworks() {
 	// Re-initialize networks
 	initNetworks := []params.Network{
-		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
-			testutil.CreateProvider(api.MainnetChainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
+		*testutil.CreateNetwork(api_common.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+			testutil.CreateProvider(api_common.MainnetChainID, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
 		}),
 	}
 	expectedProviders := networkhelper.GetEmbeddedProviders(initNetworks[0].RpcProviders)
@@ -164,7 +163,7 @@ func (s *NetworkManagerTestSuite) TestInitEmbeddedNetworks() {
 	// functor tests if embedded providers are present in the networks
 	expectEmbeddedProviders := func(networks []*params.Network) {
 		for _, network := range networks {
-			if network.ChainID == api.MainnetChainID {
+			if network.ChainID == api_common.MainnetChainID {
 				storedEmbeddedProviders := networkhelper.GetEmbeddedProviders(network.RpcProviders)
 				testutil.CompareProvidersList(s.T(), expectedProviders, storedEmbeddedProviders)
 			}
@@ -190,11 +189,11 @@ func (s *NetworkManagerTestSuite) TestInitEmbeddedNetworks() {
 	combinedNetworks, err := s.manager.GetCombinedNetworks()
 	s.Require().NoError(err)
 	for _, combinedNetwork := range combinedNetworks {
-		if combinedNetwork.Test != nil && combinedNetwork.Test.ChainID == api.MainnetChainID {
+		if combinedNetwork.Test != nil && combinedNetwork.Test.ChainID == api_common.MainnetChainID {
 			storedEmbeddedProviders := networkhelper.GetEmbeddedProviders(combinedNetwork.Test.RpcProviders)
 			testutil.CompareProvidersList(s.T(), expectedProviders, storedEmbeddedProviders)
 		}
-		if combinedNetwork.Prod != nil && combinedNetwork.Prod.ChainID == api.MainnetChainID {
+		if combinedNetwork.Prod != nil && combinedNetwork.Prod.ChainID == api_common.MainnetChainID {
 			storedEmbeddedProviders := networkhelper.GetEmbeddedProviders(combinedNetwork.Prod.RpcProviders)
 			testutil.CompareProvidersList(s.T(), expectedProviders, storedEmbeddedProviders)
 		}
@@ -208,14 +207,14 @@ func (s *NetworkManagerTestSuite) TestInitEmbeddedNetworks() {
 func (s *NetworkManagerTestSuite) TestLegacyFieldPopulation() {
 	// Create initial test networks with various providers
 	initNetworks := []params.Network{
-		*testutil.CreateNetwork(api.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
-			testutil.CreateProvider(api.MainnetChainID, "DirectProvider1", params.EmbeddedDirectProviderType, true, "https://direct1.ethereum.io"),
-			testutil.CreateProvider(api.MainnetChainID, "DirectProvider2", params.EmbeddedDirectProviderType, true, "https://direct2.ethereum.io"),
-			testutil.CreateProvider(api.MainnetChainID, "ProxyProvider1", params.EmbeddedProxyProviderType, true, "https://proxy1.ethereum.io"),
-			testutil.CreateProvider(api.MainnetChainID, "ProxyProvider2", params.EmbeddedProxyProviderType, true, "https://proxy2.ethereum.io"),
-			testutil.CreateProvider(api.MainnetChainID, "ProxyProvider3", params.EmbeddedProxyProviderType, true, "https://proxy3.ethereum.io"),
-			testutil.CreateProvider(api.MainnetChainID, "UserProvider1", params.UserProviderType, true, "https://user1.ethereum.io"),
-			testutil.CreateProvider(api.MainnetChainID, "UserProvider2", params.UserProviderType, true, "https://user2.ethereum.io"),
+		*testutil.CreateNetwork(api_common.MainnetChainID, "Ethereum Mainnet", []params.RpcProvider{
+			testutil.CreateProvider(api_common.MainnetChainID, "DirectProvider1", params.EmbeddedDirectProviderType, true, "https://direct1.ethereum.io"),
+			testutil.CreateProvider(api_common.MainnetChainID, "DirectProvider2", params.EmbeddedDirectProviderType, true, "https://direct2.ethereum.io"),
+			testutil.CreateProvider(api_common.MainnetChainID, "ProxyProvider1", params.EmbeddedProxyProviderType, true, "https://proxy1.ethereum.io"),
+			testutil.CreateProvider(api_common.MainnetChainID, "ProxyProvider2", params.EmbeddedProxyProviderType, true, "https://proxy2.ethereum.io"),
+			testutil.CreateProvider(api_common.MainnetChainID, "ProxyProvider3", params.EmbeddedProxyProviderType, true, "https://proxy3.ethereum.io"),
+			testutil.CreateProvider(api_common.MainnetChainID, "UserProvider1", params.UserProviderType, true, "https://user1.ethereum.io"),
+			testutil.CreateProvider(api_common.MainnetChainID, "UserProvider2", params.UserProviderType, true, "https://user2.ethereum.io"),
 		}),
 	}
 
@@ -244,10 +243,10 @@ func (s *NetworkManagerTestSuite) TestLegacyFieldPopulation() {
 func (s *NetworkManagerTestSuite) TestLegacyFieldPopulationWithoutUserProviders() {
 	// Create a test network with only EmbeddedDirect and EmbeddedProxy providers
 	initNetworks := []params.Network{
-		*testutil.CreateNetwork(api.SepoliaChainID, "Sepolia Testnet", []params.RpcProvider{
-			testutil.CreateProvider(api.SepoliaChainID, "DirectProvider1", params.EmbeddedDirectProviderType, true, "https://direct1.sepolia.io"),
-			testutil.CreateProvider(api.SepoliaChainID, "ProxyProvider1", params.EmbeddedProxyProviderType, true, "https://proxy1.sepolia.io"),
-			testutil.CreateProvider(api.SepoliaChainID, "ProxyProvider2", params.EmbeddedProxyProviderType, true, "https://proxy2.sepolia.io"),
+		*testutil.CreateNetwork(api_common.SepoliaChainID, "Sepolia Testnet", []params.RpcProvider{
+			testutil.CreateProvider(api_common.SepoliaChainID, "DirectProvider1", params.EmbeddedDirectProviderType, true, "https://direct1.sepolia.io"),
+			testutil.CreateProvider(api_common.SepoliaChainID, "ProxyProvider1", params.EmbeddedProxyProviderType, true, "https://proxy1.sepolia.io"),
+			testutil.CreateProvider(api_common.SepoliaChainID, "ProxyProvider2", params.EmbeddedProxyProviderType, true, "https://proxy2.sepolia.io"),
 		}),
 	}
 
@@ -303,25 +302,25 @@ func (s *NetworkManagerTestSuite) TestSetActive() {
 	var n *params.Network
 
 	// Check that the  "Base" network is active by default
-	n = s.manager.Find(api.BaseChainID)
+	n = s.manager.Find(api_common.BaseChainID)
 	s.Require().NotNil(n)
 	s.True(n.IsActive)
 
 	// Set the "Base" network to inactive
-	err = s.manager.SetActive(api.BaseChainID, false)
+	err = s.manager.SetActive(api_common.BaseChainID, false)
 	s.Require().NoError(err)
 
 	// Verify the network was set to inactive
-	n = s.manager.Find(api.BaseChainID)
+	n = s.manager.Find(api_common.BaseChainID)
 	s.Require().NotNil(n)
 	s.False(n.IsActive)
 
 	// Set the "Base" network to active
-	err = s.manager.SetActive(api.BaseChainID, true)
+	err = s.manager.SetActive(api_common.BaseChainID, true)
 	s.Require().NoError(err)
 
 	// Verify the network was set to active
-	n = s.manager.Find(api.BaseChainID)
+	n = s.manager.Find(api_common.BaseChainID)
 	s.Require().NotNil(n)
 	s.True(n.IsActive)
 }
@@ -331,11 +330,11 @@ func (s *NetworkManagerTestSuite) TestSetActiveNotDeactivatable() {
 	var n *params.Network
 
 	// Try to set Ethereum Mainnet to inactive (should fail)
-	err = s.manager.SetActive(api.MainnetChainID, false)
+	err = s.manager.SetActive(api_common.MainnetChainID, false)
 	s.Require().Error(err)
 
 	// Verify the network was not set to inactive
-	n = s.manager.Find(api.MainnetChainID)
+	n = s.manager.Find(api_common.MainnetChainID)
 	s.Require().NotNil(n)
 	s.True(n.IsActive)
 }
@@ -350,16 +349,16 @@ func (s *NetworkManagerTestSuite) TestSetActiveMaxNumberOfActiveNetworks() {
 	s.Require().Len(activeNetworks, network.MaxActiveNetworks)
 
 	// Check that the "Optimistic Ethereum" network is inactive by default
-	n = s.manager.Find(api.OptimismChainID)
+	n = s.manager.Find(api_common.OptimismChainID)
 	s.Require().NotNil(n)
 	s.False(n.IsActive)
 
 	// Try to set the "Optimistic Ethereum" network to active (should fail due to number networks active)
-	err = s.manager.SetActive(api.OptimismChainID, true)
+	err = s.manager.SetActive(api_common.OptimismChainID, true)
 	s.Require().Error(err)
 
 	// Verify the network was not set to active
-	n = s.manager.Find(api.OptimismChainID)
+	n = s.manager.Find(api_common.OptimismChainID)
 	s.Require().NotNil(n)
 	s.False(n.IsActive)
 }

@@ -4,23 +4,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/protocol/requests"
 )
 
 const (
-	MainnetChainID         uint64 = 1
-	SepoliaChainID         uint64 = 11155111
-	OptimismChainID        uint64 = 10
-	OptimismSepoliaChainID uint64 = 11155420
-	ArbitrumChainID        uint64 = 42161
-	ArbitrumSepoliaChainID uint64 = 421614
-	BaseChainID            uint64 = 8453
-	BaseSepoliaChainID     uint64 = 84532
-	sntSymbol                     = "SNT"
-	sttSymbol                     = "STT"
-
 	// Host suffixes for providers
 	SmartProxyHostSuffix = "eth-rpc.status.im"
 	ProxyHostSuffix      = "api.status.im"
@@ -61,7 +51,7 @@ func smartProxyUrl(proxyHost, chainName, networkName string) string {
 }
 
 func mainnet(proxyHost, stageName string) params.Network {
-	const chainID = MainnetChainID
+	const chainID = common.MainnetChainID
 	const chainName = "ethereum"
 	const networkName = "mainnet"
 
@@ -91,14 +81,14 @@ func mainnet(proxyHost, stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  1,
 		Enabled:                true,
-		RelatedChainID:         SepoliaChainID,
+		RelatedChainID:         common.SepoliaChainID,
 		IsActive:               true,
 		IsDeactivatable:        false,
 	}
 }
 
 func sepolia(proxyHost, stageName string) params.Network {
-	const chainID = SepoliaChainID
+	const chainID = common.SepoliaChainID
 	const chainName = "ethereum"
 	const networkName = "sepolia"
 
@@ -128,14 +118,14 @@ func sepolia(proxyHost, stageName string) params.Network {
 		IsTest:                 true,
 		Layer:                  1,
 		Enabled:                true,
-		RelatedChainID:         MainnetChainID,
+		RelatedChainID:         common.MainnetChainID,
 		IsActive:               true,
 		IsDeactivatable:        false,
 	}
 }
 
 func optimism(proxyHost, stageName string) params.Network {
-	const chainID = OptimismChainID
+	const chainID = common.OptimismChainID
 	const chainName = "optimism"
 	const networkName = "mainnet"
 
@@ -165,14 +155,14 @@ func optimism(proxyHost, stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  2,
 		Enabled:                true,
-		RelatedChainID:         OptimismSepoliaChainID,
+		RelatedChainID:         common.OptimismSepoliaChainID,
 		IsActive:               true,
 		IsDeactivatable:        true,
 	}
 }
 
 func optimismSepolia(proxyHost, stageName string) params.Network {
-	const chainID = OptimismSepoliaChainID
+	const chainID = common.OptimismSepoliaChainID
 	const chainName = "optimism"
 	const networkName = "sepolia"
 
@@ -202,14 +192,14 @@ func optimismSepolia(proxyHost, stageName string) params.Network {
 		IsTest:                 true,
 		Layer:                  2,
 		Enabled:                false,
-		RelatedChainID:         OptimismChainID,
+		RelatedChainID:         common.OptimismChainID,
 		IsActive:               true,
 		IsDeactivatable:        true,
 	}
 }
 
 func arbitrum(proxyHost, stageName string) params.Network {
-	const chainID = ArbitrumChainID
+	const chainID = common.ArbitrumChainID
 	const chainName = "arbitrum"
 	const networkName = "mainnet"
 
@@ -239,14 +229,14 @@ func arbitrum(proxyHost, stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  2,
 		Enabled:                true,
-		RelatedChainID:         ArbitrumSepoliaChainID,
+		RelatedChainID:         common.ArbitrumSepoliaChainID,
 		IsActive:               true,
 		IsDeactivatable:        true,
 	}
 }
 
 func arbitrumSepolia(proxyHost, stageName string) params.Network {
-	const chainID = ArbitrumSepoliaChainID
+	const chainID = common.ArbitrumSepoliaChainID
 	const chainName = "arbitrum"
 	const networkName = "sepolia"
 
@@ -276,14 +266,14 @@ func arbitrumSepolia(proxyHost, stageName string) params.Network {
 		IsTest:                 true,
 		Layer:                  2,
 		Enabled:                false,
-		RelatedChainID:         ArbitrumChainID,
+		RelatedChainID:         common.ArbitrumChainID,
 		IsActive:               true,
 		IsDeactivatable:        true,
 	}
 }
 
 func base(proxyHost, stageName string) params.Network {
-	const chainID = BaseChainID
+	const chainID = common.BaseChainID
 	const chainName = "base"
 	const networkName = "mainnet"
 
@@ -313,14 +303,14 @@ func base(proxyHost, stageName string) params.Network {
 		IsTest:                 false,
 		Layer:                  2,
 		Enabled:                true,
-		RelatedChainID:         BaseSepoliaChainID,
+		RelatedChainID:         common.BaseSepoliaChainID,
 		IsActive:               true,
 		IsDeactivatable:        true,
 	}
 }
 
 func baseSepolia(proxyHost, stageName string) params.Network {
-	const chainID = BaseSepoliaChainID
+	const chainID = common.BaseSepoliaChainID
 	const chainName = "base"
 	const networkName = "sepolia"
 
@@ -350,7 +340,7 @@ func baseSepolia(proxyHost, stageName string) params.Network {
 		IsTest:                 true,
 		Layer:                  2,
 		Enabled:                false,
-		RelatedChainID:         BaseChainID,
+		RelatedChainID:         common.BaseChainID,
 		IsActive:               true,
 		IsDeactivatable:        true,
 	}

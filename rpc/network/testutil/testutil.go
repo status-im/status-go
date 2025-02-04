@@ -3,7 +3,7 @@ package testutil
 import (
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/api"
+	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/params"
 )
 
@@ -38,7 +38,7 @@ func CreateNetwork(chainID uint64, chainName string, providers []params.RpcProvi
 		Enabled:                true,
 		ChainColor:             "#E90101",
 		ShortName:              "eth",
-		RelatedChainID:         api.OptimismSepoliaChainID,
+		RelatedChainID:         api_common.OptimismSepoliaChainID,
 		RpcProviders:           providers,
 		IsActive:               true,
 		IsDeactivatable:        true,
