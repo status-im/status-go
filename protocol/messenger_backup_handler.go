@@ -208,12 +208,30 @@ func (m *Messenger) startBackupFetchingTracking(response *MessengerResponse) err
 	}
 
 	// Add a timeout to mark the backup syncing as failed after 1 minute and 30 seconds
-	time.AfterFunc(90*time.Second, m.backupFetchingTimeout)
+	m.shutdownWaitGroup.Add(1)
+	go func() {
+		defer utils.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
+		m.watchBackupFetching()
+	}()
 
 	return nil
 }
 
+func (m *Messenger) watchBackupFetching() {
+	select {
+	case <-m.ctx.Done():
+		return
+	case <-time.After(90 * time.Second):
+		m.backupFetchingTimeout()
+	}
+}
+
 func (m *Messenger) backupFetchingTimeout() {
+	if m.backedUpFetchingStatus == nil {
+		return
+	}
+
 	m.backedUpFetchingStatus.fetchingCompletedMutex.Lock()
 	defer m.backedUpFetchingStatus.fetchingCompletedMutex.Unlock()
 
