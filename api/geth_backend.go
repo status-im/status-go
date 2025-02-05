@@ -2695,6 +2695,10 @@ func (b *GethStatusBackend) Logout() error {
 	return nil
 }
 
+// switchToPreLoginLog switches to global pre-login logging settings.
+// This log is profile-independent and should be enabled by default,
+// including in release builds, to help diagnose login issues.
+// related issue: https://github.com/status-im/status-mobile/issues/21501
 func (b *GethStatusBackend) switchToPreLoginLog() error {
 	err := logutils.ZapLogger().Sync()
 	if err != nil {
