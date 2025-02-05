@@ -563,11 +563,16 @@ func (w *Waku) StopDiscV5() error {
 }
 
 func (w *Waku) GetStats() types.StatsSummary {
+	return types.StatsSummary{
+		UploadRate:   uint64(1),
+		DownloadRate: uint64(1),
+	}
+	/* TODO-nwaku
 	stats := w.bandwidthCounter.GetBandwidthTotals()
 	return types.StatsSummary{
 		UploadRate:   uint64(stats.RateOut),
 		DownloadRate: uint64(stats.RateIn),
-	}
+	} */
 }
 
 /* TODO-nwaku
