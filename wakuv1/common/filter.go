@@ -273,3 +273,7 @@ func (f *Filter) MatchMessage(msg *ReceivedMessage) bool {
 func (f *Filter) MatchEnvelope(envelope *Envelope) bool {
 	return f.PoW <= 0 || envelope.pow >= f.PoW
 }
+
+func (f *Filter) ID() string {
+	return f.id
+}

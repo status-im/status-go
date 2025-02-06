@@ -305,12 +305,12 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byt
 
 // UninstallFilter is alias for Unsubscribe
 func (api *PublicWakuAPI) UninstallFilter(id string) {
-	api.w.Unsubscribe(id) // nolint: errcheck
+	api.w.Unsubscribe(context.TODO(), id) // nolint: errcheck
 }
 
 // Unsubscribe disables and removes an existing filter.
 func (api *PublicWakuAPI) Unsubscribe(id string) {
-	api.w.Unsubscribe(id) // nolint: errcheck
+	api.w.Unsubscribe(context.TODO(), id) // nolint: errcheck
 }
 
 // Messages set up a subscription that fires events when messages arrive that match
@@ -373,7 +373,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types.Criteria) (*r
 		}
 	}
 
-	id, err := api.w.Subscribe(&filter)
+	id, err := api.w.subscribe(&filter)
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +389,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types.Criteria) (*r
 		for {
 			select {
 			case <-ticker.C:
-				if filter := api.w.GetFilter(id); filter != nil {
+				if filter := api.w.getFilter(id); filter != nil {
 					for _, rpcMessage := range toMessage(filter.Retrieve()) {
 						if err := notifier.Notify(rpcSub.ID, rpcMessage); err != nil {
 							logutils.ZapLogger().Error("Failed to send notification", zap.Error(err))
@@ -397,7 +397,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit types.Criteria) (*r
 					}
 				}
 			case <-rpcSub.Err():
-				_ = api.w.Unsubscribe(id)
+				_ = api.w.Unsubscribe(context.TODO(), id)
 				return
 			}
 		}
@@ -450,7 +450,7 @@ func toMessage(messages []*common.ReceivedMessage) []*types.Message {
 func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*types.Message, error) {
 	logger := api.w.logger.With(zap.String("site", "getFilterMessages"), zap.String("filterId", id))
 	api.mu.Lock()
-	f := api.w.GetFilter(id)
+	f := api.w.getFilter(id)
 	if f == nil {
 		api.mu.Unlock()
 		return nil, fmt.Errorf("filter not found")
@@ -475,7 +475,7 @@ func (api *PublicWakuAPI) DeleteMessageFilter(id string) (bool, error) {
 	defer api.mu.Unlock()
 
 	delete(api.lastUsed, id)
-	return true, api.w.Unsubscribe(id)
+	return true, api.w.Unsubscribe(context.TODO(), id)
 }
 
 // NewMessageFilter creates a new filter that can be used to poll for
@@ -537,7 +537,7 @@ func (api *PublicWakuAPI) NewMessageFilter(req types.Criteria) (string, error) {
 		Messages: common.NewMemoryMessageStore(),
 	}
 
-	id, err := api.w.Subscribe(f)
+	id, err := api.w.subscribe(f)
 	if err != nil {
 		return "", err
 	}

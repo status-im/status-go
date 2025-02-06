@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 	waku2 "github.com/status-im/status-go/wakuv2"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -72,8 +71,7 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 }
 
 func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []string) []wakutypes.Waku {
-	nodes := make([]*waku2.Waku, len(nodeNames))
-	wrappers := make([]wakutypes.Waku, len(nodes))
+	nodes := make([]wakutypes.Waku, len(nodeNames))
 
 	for i, name := range nodeNames {
 		nodes[i] = NewTestWakuV2(s, testWakuV2Config{
@@ -90,16 +88,15 @@ func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []s
 				continue
 			}
 
-			addrs := nodes[j].ListenAddresses()
+			addrs, err := nodes[j].ListenAddresses()
+			s.Require().NoError(err)
 			s.Require().Greater(len(addrs), 0)
-			_, err := nodes[i].AddRelayPeer(addrs[0])
+			_, err = nodes[i].AddRelayPeer(addrs[0])
 			s.Require().NoError(err)
 			err = nodes[i].DialPeer(addrs[0])
 			s.Require().NoError(err)
 		}
 	}
-	for i, n := range nodes {
-		wrappers[i] = bridge.NewGethWakuV2Wrapper(n)
-	}
-	return wrappers
+
+	return nodes
 }

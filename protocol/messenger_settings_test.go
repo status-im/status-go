@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/status-im/status-go/waku/bridge"
 	"github.com/status-im/status-go/wakuv1"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -31,7 +30,7 @@ func (s *MessengerSettingsSuite) SetupTest() {
 	config := wakuv1.DefaultConfig
 	config.MinimumAcceptedPoW = 0
 	shh := wakuv1.New(&config, s.logger)
-	s.shh = bridge.NewGethWakuWrapper(shh)
+	s.shh = shh
 	s.Require().NoError(shh.Start())
 
 	pk, err := crypto.GenerateKey()

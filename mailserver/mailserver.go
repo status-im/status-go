@@ -35,7 +35,6 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv1"
 	wakuv1common "github.com/status-im/status-go/wakuv1/common"
@@ -126,7 +125,7 @@ func (s *WakuMailServer) Close() {
 }
 
 func (s *WakuMailServer) Archive(env *wakuv1common.Envelope) {
-	s.ms.Archive(bridge.NewWakuEnvelope(env))
+	s.ms.Archive(wakuv1.NewWakuEnvelope(env))
 }
 
 func (s *WakuMailServer) Deliver(peerID []byte, req wakuv1common.MessagesRequest) {

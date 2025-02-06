@@ -23,7 +23,6 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/wakuv1"
 
-	"github.com/status-im/status-go/waku/bridge"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -50,12 +49,12 @@ func (s *MessengerProfilePictureHandlerSuite) SetupSuite() {
 	config.MinimumAcceptedPoW = 0
 	wakuLogger := s.logger.Named("Waku")
 	shh := wakuv1.New(&config, wakuLogger)
-	s.shh = bridge.NewGethWakuWrapper(shh)
+	s.shh = shh
 	s.Require().NoError(shh.Start())
 }
 
 func (s *MessengerProfilePictureHandlerSuite) TearDownSuite() {
-	_ = bridge.GetGethWakuFrom(s.shh).Stop()
+	_ = s.shh.Stop()
 	_ = s.logger.Sync()
 }
 

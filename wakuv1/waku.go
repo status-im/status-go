@@ -20,6 +20,7 @@ package wakuv1
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"errors"
@@ -27,8 +28,6 @@ import (
 	"runtime"
 	"sync"
 	"time"
-
-	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -45,6 +44,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/connection"
 
 	"github.com/status-im/status-go/eth-node/types"
 
@@ -121,6 +121,8 @@ type Waku struct {
 
 	logger *zap.Logger
 }
+
+var _ wakutypes.Waku = (*Waku)(nil)
 
 // New creates a Waku client ready to communicate through the Ethereum P2P network.
 func New(cfg *Config, logger *zap.Logger) *Waku {
@@ -553,8 +555,20 @@ func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
 
 // SubscribeEnvelopeEvents subscribes to envelopes feed.
 // In order to prevent blocking waku producers events must be amply buffered.
-func (w *Waku) SubscribeEnvelopeEvents(events chan<- common.EnvelopeEvent) event.Subscription {
+func (w *Waku) subscribeEnvelopeEvents(events chan<- common.EnvelopeEvent) event.Subscription {
 	return w.envelopeFeed.Subscribe(events)
+}
+
+func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- wakutypes.EnvelopeEvent) wakutypes.Subscription {
+	events := make(chan common.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
+	go func() {
+		defer gocommon.LogOnPanic()
+		for e := range events {
+			eventsProxy <- *NewWakuEnvelopeEventWrapper(&e)
+		}
+	}()
+
+	return NewGethSubscriptionWrapper(w.subscribeEnvelopeEvents(events))
 }
 
 func (w *Waku) notifyPeersAboutPowRequirementChange(pow float64) {
@@ -915,7 +929,7 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
-func (w *Waku) Subscribe(f *common.Filter) (string, error) {
+func (w *Waku) subscribe(f *common.Filter) (string, error) {
 	s, err := w.filters.Install(f)
 	if err != nil {
 		return s, err
@@ -966,15 +980,15 @@ func (w *Waku) updateBloomFilter(f *common.Filter) error {
 	return nil
 }
 
-// GetFilter returns the filter by id.
-func (w *Waku) GetFilter(id string) *common.Filter {
+// getFilter returns the filter by id.
+func (w *Waku) getFilter(id string) *common.Filter {
 	return w.filters.Get(id)
 }
 
 // Unsubscribe removes an installed message handler.
 // TODO: This does not update the bloom filter, but does update
 // the topic interest map
-func (w *Waku) Unsubscribe(id string) error {
+func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 	ok := w.filters.Uninstall(id)
 	if !ok {
 		return fmt.Errorf("failed to unsubscribe: invalid ID '%s'", id)
@@ -1543,10 +1557,6 @@ func (w *Waku) Clean() error {
 	return nil
 }
 
-func (w *Waku) PeerID() peer.ID {
-	panic("not implemented")
-}
-
 // validatePrivateKey checks the format of the given private key.
 func validatePrivateKey(k *ecdsa.PrivateKey) bool {
 	if k == nil || k.D == nil || k.D.Sign() == 0 {
@@ -1588,4 +1598,50 @@ func addBloom(a, b []byte) []byte {
 		c[i] = a[i] | b[i]
 	}
 	return c
+}
+
+func (w *Waku) ConnectionChanged(_ connection.State) {}
+
+func (w *Waku) GetCurrentTime() time.Time {
+	return w.CurrentTime()
+}
+
+func (w *Waku) GetFilter(id string) wakutypes.Filter {
+	return w.getFilter(id)
+}
+
+func (w *Waku) PublicWakuAPI() wakutypes.PublicWakuAPI {
+	return NewPublicWakuAPI(w)
+}
+
+func (w *Waku) Subscribe(opts *wakutypes.SubscriptionOptions) (string, error) {
+	var (
+		err     error
+		keyAsym *ecdsa.PrivateKey
+		keySym  []byte
+	)
+
+	if opts.SymKeyID != "" {
+		keySym, err = w.GetSymKey(opts.SymKeyID)
+		if err != nil {
+			return "", err
+		}
+	}
+	if opts.PrivateKeyID != "" {
+		keyAsym, err = w.GetPrivateKey(opts.PrivateKeyID)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	f := &common.Filter{
+		KeyAsym:  keyAsym,
+		KeySym:   keySym,
+		PoW:      opts.PoW,
+		AllowP2P: true,
+		Topics:   opts.Topics,
+		Messages: common.NewMemoryMessageStore(),
+	}
+
+	return w.subscribe(f)
 }

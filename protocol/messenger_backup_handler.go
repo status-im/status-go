@@ -2,12 +2,15 @@ package protocol
 
 import (
 	"database/sql"
+	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/golang/protobuf/proto"
 
 	utils "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -27,6 +30,20 @@ const (
 	SyncWakuSectionKeyKeypairs          = "keypairs"
 	SyncWakuSectionKeyWatchOnlyAccounts = "watchOnlyAccounts"
 )
+
+const backupSyncingNotificationID = "BACKUP_SYNCING"
+
+type FetchingBackedUpDataTracking struct {
+	LoadedItems map[uint32]bool
+	TotalNumber uint32
+}
+
+type BackupFetchingStatus struct {
+	dataProgress           map[string]FetchingBackedUpDataTracking
+	lastKnownMsgClock      uint64
+	fetchingCompleted      bool
+	fetchingCompletedMutex sync.Mutex
+}
 
 func (m *Messenger) HandleBackup(state *ReceivedMessageState, message *protobuf.Backup, statusMessage *v1protocol.StatusMessage) error {
 	if !m.processBackedupMessages {
@@ -96,12 +113,161 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyKeypairs, message.KeypairDetails)
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyWatchOnlyAccounts, message.WatchOnlyAccountDetails)
 
+		err = m.updateBackupFetchProgress(message, &response, state)
+		if err != nil {
+			errors = append(errors, err)
+		}
+
 		m.config.messengerSignalsHandler.SendWakuFetchingBackupProgress(&response)
 	}
 
 	state.Response.BackupHandled = true
 
 	return errors
+}
+
+func (m *Messenger) updateBackupFetchProgress(message *protobuf.Backup, response *wakusync.WakuBackedUpDataResponse, state *ReceivedMessageState) error {
+	m.backedUpFetchingStatus.fetchingCompletedMutex.Lock()
+	defer m.backedUpFetchingStatus.fetchingCompletedMutex.Unlock()
+
+	if m.backedUpFetchingStatus.fetchingCompleted {
+		return nil
+	}
+
+	if m.backedUpFetchingStatus.lastKnownMsgClock > message.Clock {
+		return nil
+	}
+
+	if m.backedUpFetchingStatus.lastKnownMsgClock < message.Clock {
+		// Reset the progress tracker because we have access to a more recent copy of the backup
+		m.backedUpFetchingStatus.lastKnownMsgClock = message.Clock
+		m.backedUpFetchingStatus.dataProgress = make(map[string]FetchingBackedUpDataTracking)
+		for backupName, details := range response.FetchingBackedUpDataDetails() {
+			m.backedUpFetchingStatus.dataProgress[backupName] = FetchingBackedUpDataTracking{
+				LoadedItems: make(map[uint32]bool),
+				TotalNumber: details.TotalNumber,
+			}
+		}
+
+		if len(m.backedUpFetchingStatus.dataProgress) == 0 {
+			return nil
+		}
+	}
+
+	// Evaluate the progress of the backup
+
+	// Set the new items before evaluating
+	for backupName, details := range response.FetchingBackedUpDataDetails() {
+		m.backedUpFetchingStatus.dataProgress[backupName].LoadedItems[details.DataNumber] = true
+	}
+
+	for _, tracker := range m.backedUpFetchingStatus.dataProgress {
+		if len(tracker.LoadedItems)-1 < int(tracker.TotalNumber) {
+			// have not received everything yet
+			return nil
+		}
+	}
+
+	m.backedUpFetchingStatus.fetchingCompleted = true
+
+	// Update the AC notification and add it to the response
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(backupSyncingNotificationID))
+	if err != nil {
+		return err
+	}
+
+	if notification == nil {
+		return nil
+	}
+
+	notification.UpdatedAt = m.GetCurrentTimeInMillis()
+	notification.Type = ActivityCenterNotificationTypeBackupSyncingSuccess
+	_, err = m.persistence.SaveActivityCenterNotification(notification, true)
+	if err != nil {
+		return err
+	}
+
+	state.Response.AddActivityCenterNotification(notification)
+	return nil
+}
+
+func (m *Messenger) startBackupFetchingTracking(response *MessengerResponse) error {
+	// Add an acivity center notification to show that we are fetching back up messages
+	notification := &ActivityCenterNotification{
+		ID:        types.FromHex(backupSyncingNotificationID),
+		Type:      ActivityCenterNotificationTypeBackupSyncingFetching,
+		Timestamp: m.getTimesource().GetCurrentTime(),
+		Read:      false,
+		Deleted:   false,
+		UpdatedAt: m.GetCurrentTimeInMillis(),
+	}
+	err := m.addActivityCenterNotification(response, notification, nil)
+
+	if err != nil {
+		return err
+	}
+
+	// Add a timeout to mark the backup syncing as failed after 1 minute and 30 seconds
+	m.shutdownWaitGroup.Add(1)
+	go func() {
+		defer utils.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
+		m.watchBackupFetching()
+	}()
+
+	return nil
+}
+
+func (m *Messenger) watchBackupFetching() {
+	select {
+	case <-m.ctx.Done():
+		return
+	case <-time.After(90 * time.Second):
+		m.backupFetchingTimeout()
+	}
+}
+
+func (m *Messenger) backupFetchingTimeout() {
+	if m.backedUpFetchingStatus == nil {
+		return
+	}
+
+	m.backedUpFetchingStatus.fetchingCompletedMutex.Lock()
+	defer m.backedUpFetchingStatus.fetchingCompletedMutex.Unlock()
+
+	if m.backedUpFetchingStatus.fetchingCompleted {
+		// Nothing to do, the fetching has completed successfully
+		return
+	}
+	// Update the AC notification to the failure state
+	notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(backupSyncingNotificationID))
+	if err != nil {
+		m.logger.Error("failed to get activity center notification", zap.Error(err))
+		return
+	}
+	if notification == nil {
+		return
+	}
+
+	notification.UpdatedAt = m.GetCurrentTimeInMillis()
+	if m.backedUpFetchingStatus.dataProgress == nil || len(m.backedUpFetchingStatus.dataProgress) == 0 {
+		notification.Type = ActivityCenterNotificationTypeBackupSyncingFailure
+	} else {
+		notification.Type = ActivityCenterNotificationTypeBackupSyncingPartialFailure
+	}
+	_, err = m.persistence.SaveActivityCenterNotification(notification, true)
+	if err != nil {
+		m.logger.Error("failed to save activity center notification", zap.Error(err))
+		return
+	}
+
+	if m.config.messengerSignalsHandler == nil {
+		return
+	}
+
+	resp := &MessengerResponse{}
+	resp.AddActivityCenterNotification(notification)
+	m.config.messengerSignalsHandler.MessengerResponse(resp)
 }
 
 func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, backupTime uint64) error {

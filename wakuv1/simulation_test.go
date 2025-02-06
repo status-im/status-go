@@ -20,6 +20,7 @@ package wakuv1
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	mrand "math/rand"
 	"net"
@@ -197,7 +198,7 @@ func initializeBloomFilterMode(t *testing.T) {
 		topics = append(topics, sharedTopic)
 		f := common.Filter{KeySym: sharedKey, Messages: common.NewMemoryMessageStore()}
 		f.Topics = [][]byte{topics[0][:]}
-		node.filerID, err = node.waku.Subscribe(&f)
+		node.filerID, err = node.waku.subscribe(&f)
 		if err != nil {
 			t.Fatalf("failed to install the filter: %s.", err)
 		}
@@ -248,7 +249,7 @@ func stopServers() {
 	for i := 0; i < NumNodes; i++ {
 		n := nodes[i]
 		if n != nil {
-			_ = n.waku.Unsubscribe(n.filerID)
+			_ = n.waku.Unsubscribe(context.Background(), n.filerID)
 			_ = n.waku.Stop()
 			n.server.Stop()
 		}
@@ -271,7 +272,7 @@ func checkPropagation(t *testing.T, includingNodeZero bool) {
 
 	for j := 0; j < iterations; j++ {
 		for i := first; i < NumNodes; i++ {
-			f := nodes[i].waku.GetFilter(nodes[i].filerID)
+			f := nodes[i].waku.getFilter(nodes[i].filerID)
 			if f == nil {
 				t.Fatalf("failed to get filterId %s from node %d, round %d.", nodes[i].filerID, i, round)
 			}

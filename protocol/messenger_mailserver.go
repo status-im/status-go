@@ -322,7 +322,13 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 		return nil, nil
 	}
 
+	allResponses := &MessengerResponse{}
 	if forceFetchingBackup || !backupFetched {
+		err = m.startBackupFetchingTracking(allResponses)
+		if err != nil {
+			return nil, err
+		}
+
 		m.logger.Info("fetching backup")
 		err := m.syncBackup()
 		if err != nil {
@@ -336,7 +342,6 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 	defer m.resetFiltersPriority(filters)
 
 	filtersByMs := m.SplitFiltersByStoreNode(filters)
-	allResponses := &MessengerResponse{}
 	for communityID, filtersForMs := range filtersByMs {
 		peerID := m.getCommunityStorenode(communityID)
 		if withRetries {
