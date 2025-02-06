@@ -500,21 +500,26 @@ type NodeConfig struct {
 
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
-	Enabled                       bool
-	OpenseaAPIKey                 string            `json:"OpenseaAPIKey"`
-	RaribleMainnetAPIKey          string            `json:"RaribleMainnetAPIKey"`
-	RaribleTestnetAPIKey          string            `json:"RaribleTestnetAPIKey"`
-	AlchemyAPIKeys                map[uint64]string `json:"AlchemyAPIKeys"`
-	InfuraAPIKey                  string            `json:"InfuraAPIKey"`
-	InfuraAPIKeySecret            string            `json:"InfuraAPIKeySecret"`
-	StatusProxyMarketUser         string            `json:"StatusProxyMarketUser"`
-	StatusProxyMarketPassword     string            `json:"StatusProxyMarketPassword"`
-	StatusProxyBlockchainUser     string            `json:"StatusProxyBlockchainUser"`
-	StatusProxyBlockchainPassword string            `json:"StatusProxyBlockchainPassword"`
-	StatusProxyEnabled            bool              `json:"StatusProxyEnabled"`
-	StatusProxyStageName          string            `json:"StatusProxyStageName"`
-	EnableCelerBridge             bool              `json:"EnableCelerBridge"`
-	EnableMercuryoProvider        bool              `json:"EnableMercuryoProvider"`
+	Enabled                   bool
+	OpenseaAPIKey             string            `json:"OpenseaAPIKey"`
+	RaribleMainnetAPIKey      string            `json:"RaribleMainnetAPIKey"`
+	RaribleTestnetAPIKey      string            `json:"RaribleTestnetAPIKey"`
+	AlchemyAPIKeys            map[uint64]string `json:"AlchemyAPIKeys"`
+	InfuraAPIKey              string            `json:"InfuraAPIKey"`
+	InfuraAPIKeySecret        string            `json:"InfuraAPIKeySecret"`
+	StatusProxyMarketUser     string            `json:"StatusProxyMarketUser"`
+	StatusProxyMarketPassword string            `json:"StatusProxyMarketPassword"`
+	// FIXME: remove when EthRpcProxy* is integrated
+	StatusProxyBlockchainUser     string `json:"StatusProxyBlockchainUser"`
+	StatusProxyBlockchainPassword string `json:"StatusProxyBlockchainPassword"`
+
+	StatusProxyEnabled     bool   `json:"StatusProxyEnabled"`
+	StatusProxyStageName   string `json:"StatusProxyStageName"`
+	EnableCelerBridge      bool   `json:"EnableCelerBridge"`
+	EnableMercuryoProvider bool   `json:"EnableMercuryoProvider"`
+	EthRpcProxyUrl         string `json:"EthRpcProxyUrl"`
+	EthRpcProxyUser        string `json:"EthRpcProxyUser"`
+	EthRpcProxyPassword    string `json:"EthRpcProxyPassword"`
 }
 
 // MarshalJSON custom marshalling to avoid exposing sensitive data in log,

@@ -345,8 +345,8 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	networks := networkhelper.OverrideEmbeddedProxyProviders(
 		n.config.Networks,
 		n.config.WalletConfig.StatusProxyEnabled,
-		n.config.WalletConfig.StatusProxyBlockchainUser,
-		n.config.WalletConfig.StatusProxyBlockchainPassword)
+		n.config.WalletConfig.EthRpcProxyUser,
+		n.config.WalletConfig.EthRpcProxyPassword)
 
 	config := rpc.ClientConfig{
 		Client:          gethNodeClient,
@@ -360,9 +360,6 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		return
 	}
 	n.rpcClient.Start(context.Background())
-	if err != nil {
-		return
-	}
 	return
 }
 

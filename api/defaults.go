@@ -228,11 +228,23 @@ func buildWalletConfig(request *requests.WalletSecretsConfig, statusProxyEnabled
 	if request.StatusProxyMarketPassword != "" {
 		walletConfig.StatusProxyMarketPassword = request.StatusProxyMarketPassword
 	}
+
+	// FIXME: remove when EthRpcProxy* is integrated
 	if request.StatusProxyBlockchainUser != "" {
 		walletConfig.StatusProxyBlockchainUser = request.StatusProxyBlockchainUser
 	}
 	if request.StatusProxyBlockchainPassword != "" {
 		walletConfig.StatusProxyBlockchainPassword = request.StatusProxyBlockchainPassword
+	}
+
+	if request.EthRpcProxyUrl != "" {
+		walletConfig.EthRpcProxyUrl = request.EthRpcProxyUrl
+	}
+	if request.EthRpcProxyUser != "" {
+		walletConfig.EthRpcProxyUser = request.EthRpcProxyUser
+	}
+	if request.EthRpcProxyPassword != "" {
+		walletConfig.EthRpcProxyPassword = request.EthRpcProxyPassword
 	}
 
 	walletConfig.StatusProxyEnabled = statusProxyEnabled

@@ -105,11 +105,16 @@ type WalletSecretsConfig struct {
 	AlchemyBaseMainnetToken     string `json:"alchemyBaseMainnetToken"`
 	AlchemyBaseSepoliaToken     string `json:"alchemyBaseSepoliaToken"`
 
-	StatusProxyStageName          string `json:"statusProxyStageName"`
-	StatusProxyMarketUser         string `json:"statusProxyMarketUser"`
-	StatusProxyMarketPassword     string `json:"statusProxyMarketPassword"`
+	StatusProxyStageName      string `json:"statusProxyStageName"`
+	StatusProxyMarketUser     string `json:"statusProxyMarketUser"`
+	StatusProxyMarketPassword string `json:"statusProxyMarketPassword"`
+	// FIXME: remove when EthRpcProxy* is integrated
 	StatusProxyBlockchainUser     string `json:"statusProxyBlockchainUser"`
 	StatusProxyBlockchainPassword string `json:"statusProxyBlockchainPassword"`
+
+	EthRpcProxyUrl      string `json:"ethRpcProxyUrl"`
+	EthRpcProxyUser     string `json:"ethRpcProxyUser"`
+	EthRpcProxyPassword string `json:"ethRpcProxyPassword"`
 }
 
 func (c *CreateAccount) Validate(validation *CreateAccountValidation) error {
