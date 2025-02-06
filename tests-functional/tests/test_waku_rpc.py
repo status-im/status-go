@@ -56,4 +56,7 @@ class TestLightClientMessaging(TestDefaultMessaging):
         request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False)
         request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False)
         for user in self.sender, self.receiver:
+            key_uid = user.node_login_event["event"]["account"]["key-uid"]
             user.wakuext_service.set_light_client(True)
+            user.logout()
+            user.login(key_uid)
