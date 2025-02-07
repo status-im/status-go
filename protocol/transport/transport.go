@@ -456,7 +456,7 @@ func (t *Transport) WakuVersion() uint {
 	return t.waku.Version()
 }
 
-func (t *Transport) PeerCount() (int, error) {
+func (t *Transport) PeerCount() int {
 	return t.waku.PeerCount()
 }
 

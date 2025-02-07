@@ -1010,12 +1010,11 @@ func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
 	}
 
 	f := &common.Filter{
-		KeyAsym:  keyAsym,
-		KeySym:   keySym,
-		PoW:      opts.PoW,
-		AllowP2P: true,
-		Topics:   opts.Topics,
-		Messages: common.NewMemoryMessageStore(),
+		KeyAsym:       keyAsym,
+		KeySym:        keySym,
+		ContentTopics: common.NewTopicSetFromBytes(opts.Topics),
+		PubsubTopic:   opts.PubsubTopic,
+		Messages:      common.NewMemoryMessageStore(),
 	}
 
 	return w.subscribe(f)
@@ -1654,7 +1653,7 @@ func (w *Waku) ClearEnvelopesCache() {
 	w.envelopeCache = newTTLCache()
 }
 
-func (w *Waku) PeerCount() (int, error) {
+func (w *Waku) PeerCount() int {
 	return w.node.GetNumConnectedPeers()
 }
 
@@ -1984,7 +1983,7 @@ func (w *Waku) Clean() error {
 	return nil
 }
 
-func (w *Waku) PeerID() (peer.ID, error) {
+func (w *Waku) PeerID() peer.ID {
 	return w.node.PeerID()
 }
 

@@ -1630,7 +1630,7 @@ func (w *Waku) ClearEnvelopesCache() {
 	w.envelopeCache = newTTLCache()
 }
 
-func (w *Waku) PeerCount() (int, error) {
+func (w *Waku) PeerCount() int {
 	return w.node.PeerCount(), nil
 }
 
@@ -1963,8 +1963,8 @@ func (w *Waku) Clean() error {
 	return nil
 }
 
-func (w *Waku) PeerID() (peer.ID, error) {
-	return w.node.Host().ID(), nil
+func (w *Waku) PeerID() peer.ID {
+	return w.node.Host().ID()
 }
 
 func (w *Waku) Peerstore() peerstore.Peerstore {
