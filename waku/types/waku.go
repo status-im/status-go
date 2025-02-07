@@ -201,7 +201,7 @@ type Waku interface {
 	PeerID() (peer.ID, error)
 
 	// GetActiveStorenode returns the AddrInfo of the currently active storenode. It will be empty if no storenode is active
-	GetActiveStorenode() peer.AddrInfo
+	GetActiveStorenode() peer.ID
 
 	// OnStorenodeChanged is triggered when a new storenode is promoted to become the active storenode or when the active storenode is removed
 	OnStorenodeChanged() <-chan peer.ID
