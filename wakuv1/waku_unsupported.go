@@ -134,7 +134,7 @@ func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 func (w *Waku) ProcessMailserverBatch(
 	ctx context.Context,
 	batch types.MailserverBatch,
-	storenodeID peer.ID,
+	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,

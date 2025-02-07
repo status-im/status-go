@@ -23,6 +23,7 @@ import (
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"google.golang.org/protobuf/proto"
 
 	"go.uber.org/zap"
 
@@ -327,12 +328,12 @@ func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *waku.Wa
 		return waku, nil*/
 }
 
-func (w *Waku) SubscribeToConnStatusChanges() *types.ConnStatusSubscription {
+func (w *Waku) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription, error) {
 	w.connStatusMu.Lock()
 	defer w.connStatusMu.Unlock()
 	subscription := types.NewConnStatusSubscription()
 	w.connStatusSubscriptions[subscription.ID] = subscription
-	return subscription
+	return subscription, nil
 }
 
 /* TODO-nwaku
@@ -732,7 +733,7 @@ func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
 
 // SubscribeEnvelopeEvents subscribes to envelopes feed.
 // In order to prevent blocking waku producers events must be amply buffered.
-func (w *Waku) SubscribeEnvelopeEvents(events chan<- common.EnvelopeEvent) event.Subscription {
+func (w *Waku) SubscribeEnvelopeEvents(events chan<- types.EnvelopeEvent) types.Subscription {
 	return w.envelopeFeed.Subscribe(events)
 }
 
@@ -1737,6 +1738,91 @@ func (w *Waku) RemovePubsubTopicKey(topic string) error {
 
 func (w *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
 	return w.node.ListenAddresses()
+}
+
+func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool) {
+	// TODO-nwaku
+	return
+}
+
+func (w *Waku) GetActiveStorenode() peer.AddrInfo {
+	// TODO-nwaku
+	return peer.AddrInfo{}
+}
+
+// GetCurrentTime returns current time.
+func (w *Waku) GetCurrentTime() time.Time {
+	return w.CurrentTime()
+}
+
+func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
+	return w.StorenodeCycle.IsStorenodeAvailable(peerID)
+}
+
+func (w *Waku) OnStorenodeAvailable() <-chan peer.ID {
+	return w.StorenodeCycle.StorenodeAvailableEmitter.Subscribe()
+}
+
+func (w *Waku) OnStorenodeChanged() <-chan peer.ID {
+	return w.StorenodeCycle.StorenodeChangedEmitter.Subscribe()
+}
+
+func (w *Waku) OnStorenodeNotWorking() <-chan struct{} {
+	return w.StorenodeCycle.StorenodeNotWorkingEmitter.Subscribe()
+}
+
+func (w *Waku) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
+	return w.StorenodeCycle.PerformStorenodeTask(fn, opts...)
+}
+
+func (w *Waku) ProcessMailserverBatch(
+	ctx context.Context,
+	batch types.MailserverBatch,
+	storenode peer.AddrInfo,
+	pageLimit uint64,
+	shouldProcessNextPage func(int) (bool, uint64),
+	processEnvelopes bool,
+) error {
+	pubsubTopic := w.GetPubsubTopic(batch.PubsubTopic)
+	contentTopics := []string{}
+	for _, topic := range batch.Topics {
+		contentTopics = append(contentTopics, common.BytesToTopic(topic.Bytes()).ContentTopic())
+	}
+
+	criteria := store.FilterCriteria{
+		TimeStart:     proto.Int64(batch.From.UnixNano()),
+		TimeEnd:       proto.Int64(batch.To.UnixNano()),
+		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
+	}
+
+	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+}
+
+func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
+	return NewPublicWakuAPI(w)
+}
+
+func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
+	var cTopics []string
+	for _, ct := range contentTopics {
+		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
+	}
+	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
+	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
+
+	return nil
+}
+
+func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
+	w.StorenodeCycle.SetStorenodeConfigProvider(c)
+}
+
+func (w *Waku) Version() uint {
+	return 2
+}
+
+func (w *Waku) WaitForAvailableStoreNode(ctx context.Context) bool {
+	return w.StorenodeCycle.WaitForAvailableStoreNode(ctx)
 }
 
 func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
