@@ -974,7 +974,7 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
-func (w *Waku) Subscribe(f *common.Filter) (string, error) {
+func (w *Waku) subscribe(f *common.Filter) (string, error) {
 	f.PubsubTopic = w.GetPubsubTopic(f.PubsubTopic)
 	id, err := w.filters.Install(f)
 	if err != nil {
@@ -987,6 +987,38 @@ func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 	}
 
 	return id, nil
+}
+
+func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
+	var (
+		err     error
+		keyAsym *ecdsa.PrivateKey
+		keySym  []byte
+	)
+
+	if opts.SymKeyID != "" {
+		keySym, err = w.GetSymKey(opts.SymKeyID)
+		if err != nil {
+			return "", err
+		}
+	}
+	if opts.PrivateKeyID != "" {
+		keyAsym, err = w.GetPrivateKey(opts.PrivateKeyID)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	f := &common.Filter{
+		KeyAsym:  keyAsym,
+		KeySym:   keySym,
+		PoW:      opts.PoW,
+		AllowP2P: true,
+		Topics:   opts.Topics,
+		Messages: common.NewMemoryMessageStore(),
+	}
+
+	return w.subscribe(f)
 }
 
 // Unsubscribe removes an installed message handler.
@@ -1004,8 +1036,12 @@ func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 }
 
 // GetFilter returns the filter by id.
-func (w *Waku) GetFilter(id string) *common.Filter {
+func (w *Waku) getFilter(id string) *common.Filter {
 	return w.filters.Get(id)
+}
+
+func (w *Waku) GetFilter(id string) types.Filter {
+	return w.getFilter(id)
 }
 
 // Unsubscribe removes an installed message handler.

@@ -45,7 +45,7 @@ func (m *Messenger) shouldSync() (bool, error) {
 	}
 
 	// TODO (pablo) support community store node as well
-	if m.transport.GetActiveStorenode().ID == "" || !m.Online() {
+	if m.transport.GetActiveStorenode() == "" || !m.Online() {
 		return false, nil
 	}
 
