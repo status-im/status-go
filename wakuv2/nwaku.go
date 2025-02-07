@@ -733,8 +733,21 @@ func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
 
 // SubscribeEnvelopeEvents subscribes to envelopes feed.
 // In order to prevent blocking waku producers events must be amply buffered.
-func (w *Waku) SubscribeEnvelopeEvents(events chan<- types.EnvelopeEvent) types.Subscription {
+
+func (w *Waku) subscribeEnvelopeEvents(events chan<- common.EnvelopeEvent) event.Subscription {
 	return w.envelopeFeed.Subscribe(events)
+}
+
+func (w *Waku) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) types.Subscription {
+	events := make(chan common.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
+	go func() {
+		defer gocommon.LogOnPanic()
+		for e := range events {
+			eventsProxy <- *NewWakuV2EnvelopeEventWrapper(&e)
+		}
+	}()
+
+	return NewGethSubscriptionWrapper(w.subscribeEnvelopeEvents(events))
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
