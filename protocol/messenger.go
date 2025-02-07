@@ -356,10 +356,8 @@ func NewMessenger(
 		if err != nil || wakuV2 == nil {
 			return nil, errors.Wrap(err, "failed to find Whisper and Waku V1/V2 services")
 		}
-		peerId, err = wakuV2.PeerID()
-		if err != nil {
-			return nil, err
-		}
+		peerId = wakuV2.PeerID()
+
 		transp, err = transport.NewTransport(
 			wakuV2,
 			identity,
@@ -1020,11 +1018,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 func (m *Messenger) Online() bool {
 	switch m.transport.WakuVersion() {
 	case 2:
-		pc, err := m.transport.PeerCount()
-		if err != nil {
-			m.logger.Error("could not obtain number of peers", zap.Error(err))
-			return false
-		}
+		pc := m.transport.PeerCount()
 		return pc > 0
 	default:
 		return m.node.PeersCount() > 0
