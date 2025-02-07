@@ -2042,7 +2042,7 @@ func (w *Waku) GetCurrentTime() time.Time {
 	return w.CurrentTime()
 }
 
-func (w *Waku) GetActiveStorenode() peer.ID {
+func (w *Waku) GetActiveStorenode() peer.AddrInfo {
 	return w.StorenodeCycle.GetActiveStorenode()
 }
 
@@ -2069,7 +2069,7 @@ func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 func (w *Waku) ProcessMailserverBatch(
 	ctx context.Context,
 	batch types.MailserverBatch,
-	storenodeID peer.ID,
+	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
@@ -2086,7 +2086,7 @@ func (w *Waku) ProcessMailserverBatch(
 		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
 	}
 
-	return w.HistoryRetriever.Query(ctx, criteria, storenodeID, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {

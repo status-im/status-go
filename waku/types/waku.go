@@ -222,7 +222,7 @@ type Waku interface {
 	ProcessMailserverBatch(
 		ctx context.Context,
 		batch MailserverBatch,
-		storenode peer.ID,
+		storenode peer.AddrInfo,
 		pageLimit uint64,
 		shouldProcessNextPage func(int) (bool, uint64),
 		processEnvelopes bool,
