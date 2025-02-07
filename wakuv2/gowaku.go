@@ -1283,7 +1283,7 @@ func (w *Waku) checkForConnectionChanges() {
 func (w *Waku) reportPeerMetrics() {
 	if w.statusTelemetryClient != nil {
 		connFailures := FormatPeerConnFailures(w.node)
-		pc, _ := w.PeerCount() // PeerCount's err will never be != nil
+		pc := w.PeerCount() // PeerCount's err will never be != nil
 		w.statusTelemetryClient.PushPeerCount(w.ctx, pc)
 		w.statusTelemetryClient.PushPeerConnFailures(w.ctx, connFailures)
 
@@ -1631,7 +1631,7 @@ func (w *Waku) ClearEnvelopesCache() {
 }
 
 func (w *Waku) PeerCount() int {
-	return w.node.PeerCount(), nil
+	return w.node.PeerCount()
 }
 
 func (w *Waku) Peers() types.PeerStats {
