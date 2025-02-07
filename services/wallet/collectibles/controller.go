@@ -11,6 +11,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
+
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/network"
@@ -153,7 +155,8 @@ func (c *Controller) startPeriodicalOwnershipFetch() error {
 	for _, addr := range addresses {
 		err := c.startPeriodicalOwnershipFetchForAccount(common.Address(addr))
 		if err != nil {
-			logutils.ZapLogger().Error("Error starting periodical collectibles fetch for accpunt", zap.Stringer("address", addr), zap.Error(err))
+			as := addr.String()
+			logutils.ZapLogger().Error("Error starting periodical collectibles fetch for accpunt", zap.String("address", gocommon.TruncateWithDot(as)), zap.Error(err))
 			return err
 		}
 	}
@@ -300,14 +303,16 @@ func (c *Controller) startAccountsWatcher() {
 			for _, address := range changedAddresses {
 				err := c.startPeriodicalOwnershipFetchForAccount(address)
 				if err != nil {
-					logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Stringer("address", address), zap.Error(err))
+					as := address.String()
+					logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.String("address", gocommon.TruncateWithDot(as)), zap.Error(err))
 				}
 			}
 		} else if eventType == accountsevent.EventTypeRemoved {
 			for _, address := range changedAddresses {
 				err := c.stopPeriodicalOwnershipFetchForAccount(address)
 				if err != nil {
-					logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Stringer("address", address), zap.Error(err))
+					as := address.String()
+					logutils.ZapLogger().Error("Error stopping periodical collectibles fetch", zap.String("address", gocommon.TruncateWithDot(as)), zap.Error(err))
 				}
 			}
 		}
@@ -416,7 +421,8 @@ func (c *Controller) refetchOwnershipIfRecentTransfer(account common.Address, ch
 		err := c.startPeriodicalOwnershipFetchForAccountAndChainID(account, chainID, true)
 		c.commandsLock.Unlock()
 		if err != nil {
-			logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Stringer("address", account), zap.Error(err))
+			as := account.String()
+			logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.String("address", gocommon.TruncateWithDot(as)), zap.Error(err))
 		}
 	}
 }

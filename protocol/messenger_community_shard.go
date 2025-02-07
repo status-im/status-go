@@ -9,6 +9,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -80,7 +81,7 @@ func (m *Messenger) HandleCommunityPublicShardInfo(state *ReceivedMessageState, 
 	}
 
 	logError := func(err error) {
-		m.logger.Error("HandleCommunityPublicShardInfo failed: ", zap.Error(err), zap.String("communityID", types.EncodeHex(publicShardInfo.CommunityId)))
+		m.logger.Error("HandleCommunityPublicShardInfo failed: ", zap.Error(err), zap.String("communityID", gocommon.TruncateWithDot(types.EncodeHex(publicShardInfo.CommunityId))))
 	}
 
 	err = m.verifyCommunitySignature(a.Payload, a.Signature, publicShardInfo.CommunityId, publicShardInfo.ChainId)

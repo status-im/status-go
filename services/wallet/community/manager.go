@@ -74,7 +74,7 @@ func (cm *Manager) fetchCommunityInfo(communityID string, fetcher func() (*third
 	if err != nil {
 		dbErr := cm.setCommunityInfo(communityID, nil)
 		if dbErr != nil {
-			logutils.ZapLogger().Error("SetCommunityInfo failed", zap.String("communityID", communityID), zap.Error(dbErr))
+			logutils.ZapLogger().Error("SetCommunityInfo failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(dbErr))
 		}
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (cm *Manager) FetchCommunityMetadataAsync(communityID string) {
 		defer gocommon.LogOnPanic()
 		communityInfo, err := cm.FetchCommunityMetadata(communityID)
 		if err != nil {
-			logutils.ZapLogger().Error("FetchCommunityInfo failed", zap.String("communityID", communityID), zap.Error(err))
+			logutils.ZapLogger().Error("FetchCommunityInfo failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 		}
 		cm.signalUpdatedCommunityMetadata(communityID, communityInfo)
 	}()

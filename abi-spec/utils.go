@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
 )
@@ -48,7 +49,7 @@ func Sha3(str string) string {
 	if hexStrictPattern.MatchString(str) {
 		bytes, err = hex.DecodeString(str[2:])
 		if err != nil {
-			logutils.ZapLogger().Error("failed to decode hex string when sha3", zap.String("hex", str), zap.Error(err))
+			logutils.ZapLogger().Error("failed to decode hex string when sha3", zap.Error(err))
 			return ""
 		}
 	} else {
@@ -183,7 +184,7 @@ func ToChecksumAddress(address string) (string, error) {
 		return "", nil
 	}
 	if !addressBasicPattern.MatchString(address) {
-		return "", fmt.Errorf("given address '%s' is not a valid Ethereum address", address)
+		return "", fmt.Errorf("given address '%s' is not a valid Ethereum address", gocommon.TruncateWithDot(address))
 	}
 
 	address = strings.ToLower(address)

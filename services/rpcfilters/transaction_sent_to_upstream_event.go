@@ -73,7 +73,7 @@ func (e *transactionSentToUpstreamEvent) processTransactionSentToUpstream(transa
 		select {
 		case channel <- transactionInfo:
 		default:
-			logutils.ZapLogger().Error("dropping messages because the channel is full", zap.Any("transactionInfo", transactionInfo), zap.Int("id", id))
+			logutils.ZapLogger().Error("dropping messages because the channel is full", zap.Int("id", id))
 		}
 	}
 }

@@ -154,11 +154,11 @@ func ParseNetIps(in []byte) ([]net.IP, error) {
 func (cp *ConnectionParams) FromString(s string) error {
 
 	if len(s) < 2 {
-		return fmt.Errorf("connection string is too short: '%s'", s)
+		return fmt.Errorf("connection string is too short")
 	}
 
 	if s[:2] != connectionStringID {
-		return fmt.Errorf("connection string doesn't begin with identifier '%s'", connectionStringID)
+		return fmt.Errorf("connection string doesn't begin with identifier")
 	}
 
 	requiredParams := 5
@@ -166,7 +166,7 @@ func (cp *ConnectionParams) FromString(s string) error {
 	sData := strings.Split(s[2:], ":")
 	// NOTE: always allow extra parameters for forward compatibility, error on not enough required parameters or failing to parse
 	if len(sData) < requiredParams {
-		return fmt.Errorf("expected data '%s' to have length of '%d', received '%d'", s, requiredParams, len(sData))
+		return fmt.Errorf("expected connection string to have length of '%d', received '%d'", requiredParams, len(sData))
 	}
 
 	netIpsBytes := base58.Decode(sData[1])

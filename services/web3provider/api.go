@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/status-im/status-go/account"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/typeddata"
@@ -253,7 +254,7 @@ func (api *API) getVerifiedWalletAccount(address, password string) (*account.Sel
 
 	key, err := api.s.accountsManager.VerifyAccountPassword(api.s.config.KeyStoreDir, address, password)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to verify account", zap.String("account", address), zap.Error(err))
+		logutils.ZapLogger().Error("failed to verify account", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
 		return nil, err
 	}
 

@@ -128,7 +128,7 @@ func FixMissingKeyUIDForAccounts(sqlTx *sql.Tx) error {
 		}
 		pk, err := crypto.UnmarshalPubkey(pubkey)
 		if err != nil {
-			logutils.ZapLogger().Error("Migrating accounts: failed to unmarshal pubkey", zap.String("pubkey", string(pubkey)), zap.Error(err))
+			logutils.ZapLogger().Error("Migrating accounts: failed to unmarshal pubkey", zap.String("pubkey", d_common.TruncateWithDot(string(pubkey))), zap.Error(err))
 			return err
 		}
 		pkBytes := sha256.Sum256(crypto.FromECDSAPub(pk))
@@ -250,7 +250,7 @@ func migrateEnsUsernames(sqlTx *sql.Tx) error {
 
 		_, err = sqlTx.Exec(`INSERT INTO ens_usernames (username, chain_id) VALUES (?, ?)`, username, defaultChainID)
 		if err != nil {
-			logutils.ZapLogger().Error("Migrating ens usernames: failed to insert username into new database", zap.String("ensUsername", username), zap.Error(err))
+			logutils.ZapLogger().Error("Migrating ens usernames: failed to insert username into new database", zap.Error(err))
 		}
 	}
 

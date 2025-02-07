@@ -149,7 +149,7 @@ func (m *StoreNodeRequestManager) FetchCommunities(ctx context.Context, communit
 	for _, community := range communities {
 		_, _, err := m.FetchCommunity(ctx, community, opts)
 		if err != nil {
-			outErr = fmt.Errorf("%sfailed to create a request for community %s: %w", outErr, community.CommunityID, err)
+			outErr = fmt.Errorf("%sfailed to create a request for community %s: %w", outErr, gocommon.TruncateWithDot(community.CommunityID), err)
 		}
 	}
 

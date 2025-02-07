@@ -72,18 +72,16 @@ func findServerCert(c *ConnectionParams, reachableIPs []net.IP) (*url.URL, *x509
 
 	// Keep track of error counts
 	errorCount := 0
-	var combinedErrors string
 	for {
 		select {
 		case success := <-successCh:
 			baseAddress = success.u
 			serverCert = success.cert
 			return baseAddress, serverCert, nil
-		case ipErr := <-errCh:
+		case <-errCh:
 			errorCount++
-			combinedErrors += fmt.Sprintf("IP %s: %s; ", ipErr.ip, ipErr.err)
 			if errorCount == len(reachableIPs) {
-				return nil, nil, fmt.Errorf(combinedErrors)
+				return nil, nil, fmt.Errorf("failed to connect to any of given ip addresses.")
 			}
 		}
 	}
@@ -97,7 +95,7 @@ func NewBaseClient(c *ConnectionParams, logger *zap.Logger) (*BaseClient, error)
 
 	netIPs, err := server.FindReachableAddressesForPairingClient(c.netIPs)
 	if err != nil {
-		logger.Error("[local pair client] failed to find reachable addresses", zap.Error(err), zap.Any("netIPs", netIPs))
+		logger.Error("[local pair client] failed to find reachable addresses", zap.Error(err))
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: err.Error(), Action: ActionConnect})
 		return nil, err
 	}

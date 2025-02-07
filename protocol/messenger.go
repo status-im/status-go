@@ -2038,7 +2038,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 				zap.String("chatName", chat.Name),
 				zap.Any("messageType", rawMessage.MessageType),
 			)
-			return rawMessage, fmt.Errorf("can't post message type '%d' on chat '%s'", rawMessage.MessageType, chat.ID)
+			return rawMessage, fmt.Errorf("can't post message type '%d' on chat '%s'", rawMessage.MessageType, gocommon.TruncateWithDot(chat.ID))
 		}
 
 		logger.Debug("sending community chat message", zap.String("chatName", chat.Name))
@@ -2184,7 +2184,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	if err == nil {
 		message.Text = replacedText
 	} else {
-		m.logger.Error("failed to replace text with public key", zap.String("chatID", message.ChatId), zap.String("text", message.Text))
+		m.logger.Error("failed to replace text with public key", zap.String("chatID", gocommon.TruncateWithDot(message.ChatId)), zap.Error(err))
 	}
 
 	if len(message.ImagePath) != 0 {
@@ -3023,12 +3023,12 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 
 	chat, ok := r.AllChats.Load(m.LocalChatID)
 	if !ok {
-		return fmt.Errorf("chat ID '%s' not present", m.LocalChatID)
+		return fmt.Errorf("chat ID '%s' not present", gocommon.TruncateWithDot(m.LocalChatID))
 	}
 
 	contact, ok := r.AllContacts.Load(contactID)
 	if !ok {
-		return fmt.Errorf("contact ID '%s' not present", contactID)
+		return fmt.Errorf("contact ID '%s' not present", gocommon.TruncateWithDot(contactID))
 	}
 
 	if !chat.Muted {
@@ -3098,7 +3098,7 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 
 	chat, ok := r.AllChats.Load(message.LocalChatID)
 	if !ok {
-		return fmt.Errorf("chat ID '%s' not present", message.LocalChatID)
+		return fmt.Errorf("chat ID '%s' not present", gocommon.TruncateWithDot(message.LocalChatID))
 	}
 
 	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
@@ -4283,7 +4283,7 @@ func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID stri
 			m.allChats.Store(chat.ID, chat)
 			response.AddChat(chat)
 		} else {
-			err = fmt.Errorf("chat with chatID %s not found", chatID)
+			err = fmt.Errorf("chat with chatID %s not found", gocommon.TruncateWithDot(chatID))
 		}
 	}
 	return response, err

@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
@@ -85,7 +86,7 @@ func addSignaturesToTransactions(transactions map[common.Hash]*TransactionDescri
 	for hash, desc := range transactions {
 		sigDetails, ok := signatures[hash.String()]
 		if !ok {
-			return fmt.Errorf("missing signature for transaction %s", hash)
+			return fmt.Errorf("missing signature for transaction %s", gocommon.TruncateWithDot(hash.String()))
 		}
 
 		rBytes, _ := hex.DecodeString(sigDetails.R)
