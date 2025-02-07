@@ -92,7 +92,7 @@ func (w *Waku) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription, er
 	return nil, notAvailableError
 }
 
-func (w *Waku) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []types.TopicType) error {
+func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
 	return notAvailableError
 }
 
@@ -107,7 +107,7 @@ func (w *Waku) PeerID() peer.ID {
 	panic(notAvailableStr)
 }
 
-func (w *Waku) GetActiveStorenode() peer.ID {
+func (w *Waku) GetActiveStorenode() peer.AddrInfo {
 	panic(notAvailableStr)
 }
 
