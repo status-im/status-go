@@ -105,7 +105,7 @@ __pycache__/
 .pytest_cache/
 .envrc
 report/results.xml
-tests-functional/coverage
+tests-functional/**/coverage
 tests-functional/reports
 tests-functional/signals
 tests-functional/*.log
