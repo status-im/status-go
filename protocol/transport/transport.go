@@ -629,7 +629,7 @@ func (t *Transport) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrI
 	}
 }
 
-func (t *Transport) GetActiveStorenode() peer.ID {
+func (t *Transport) GetActiveStorenode() peer.AddrInfo {
 	return t.waku.GetActiveStorenode()
 }
 

@@ -201,7 +201,7 @@ type Waku interface {
 	PeerID() peer.ID
 
 	// GetActiveStorenode returns the AddrInfo of the currently active storenode. It will be empty if no storenode is active
-	GetActiveStorenode() peer.ID
+	GetActiveStorenode() peer.AddrInfo
 
 	// OnStorenodeChanged is triggered when a new storenode is promoted to become the active storenode or when the active storenode is removed
 	OnStorenodeChanged() <-chan peer.ID
@@ -222,7 +222,7 @@ type Waku interface {
 	ProcessMailserverBatch(
 		ctx context.Context,
 		batch MailserverBatch,
-		storenode peer.AddrInfo,
+		storenode peer.ID,
 		pageLimit uint64,
 		shouldProcessNextPage func(int) (bool, uint64),
 		processEnvelopes bool,

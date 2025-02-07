@@ -1654,7 +1654,11 @@ func (w *Waku) ClearEnvelopesCache() {
 }
 
 func (w *Waku) PeerCount() int {
-	return w.node.GetNumConnectedPeers()
+	numPeers, err := w.node.GetNumConnectedPeers()
+	if err != nil {
+		panic(err)
+	}
+	return numPeers
 }
 
 // TODO-nwaku
@@ -1984,7 +1988,11 @@ func (w *Waku) Clean() error {
 }
 
 func (w *Waku) PeerID() peer.ID {
-	return w.node.PeerID()
+	peerId, err := w.node.PeerID()
+	if err != nil {
+		panic(err)
+	}
+	return peerId
 }
 
 // validatePrivateKey checks the format of the given private key.

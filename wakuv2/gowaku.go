@@ -2111,13 +2111,13 @@ func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
 	return NewPublicWakuAPI(w)
 }
 
-func (w *Waku) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []types.TopicType) error {
+func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
 	var cTopics []string
 	for _, ct := range contentTopics {
 		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
 	}
 	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
-	w.SetTopicsToVerifyForMissingMessages(peerID, pubsubTopic, cTopics)
+	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
 
 	return nil
 }
