@@ -36,4 +36,5 @@ class TestLightClientRateLimiting(MessengerTestCase):
             )
         elapsed_time = time() - start_time
 
-        assert elapsed_time <= 45, f"Message sending took too long: {elapsed_time:.2f} seconds"
+        assert elapsed_time >= 30, f"Message sending was too fast: {elapsed_time:.2f} seconds. Rate limiting is not applied"
+        assert elapsed_time <= 60, f"Message sending took too long: {elapsed_time:.2f} seconds. Rate limiting is too high"
