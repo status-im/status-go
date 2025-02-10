@@ -4,6 +4,8 @@ import logging
 from test_cases import StatusBackendTestCase
 
 
+@pytest.mark.rpc
+@pytest.mark.wallet
 class TestSavedAddresses(StatusBackendTestCase):
 
     @pytest.mark.parametrize(
@@ -137,11 +139,3 @@ class TestSavedAddresses(StatusBackendTestCase):
         response = self.rpc_client.rpc_request("wakuext_remainingCapacityForSavedAddresses", [is_test])
         self.rpc_client.verify_is_json_rpc_error(response)
         assert response.json()["error"]["message"] == "no more save addresses can be added"
-
-        # Uncomment when answer is ready: testing adding beyond capacity
-        # logging.info("Step: Attempting to add one more address beyond capacity")
-        # not_added_address = "0x6621930f8c6c992ef708b2d097cc9df860dede0d"
-        # self.rpc_client.rpc_valid_request("wakuext_upsertSavedAddress", [{"address": not_added_address, "name": "a1", "isTest": is_test}])
-        # response = self.rpc_client.rpc_valid_request("wakuext_getSavedAddressesPerMode", [is_test])
-        # assert all(entry["address"] != not_added_address for entry in response.json()["result"])
-        # assert len(response.json()["result"]) == 20
