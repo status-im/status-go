@@ -206,6 +206,7 @@ class MessengerTestCase(NetworkConditionTestCase):
         SignalType.MESSAGES_NEW.value,
         SignalType.MESSAGE_DELIVERED.value,
         SignalType.NODE_LOGIN.value,
+        SignalType.NODE_LOGOUT.value
     ]
 
     @pytest.fixture(scope="function", autouse=False)

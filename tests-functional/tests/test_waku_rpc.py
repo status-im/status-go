@@ -59,4 +59,7 @@ class TestLightClientMessaging(TestDefaultMessaging):
             key_uid = user.node_login_event["event"]["account"]["key-uid"]
             user.wakuext_service.set_light_client(True)
             user.logout()
+            user.wait_for_logout()
             user.login(key_uid)
+            user.prepare_wait_for_signal("node.login", 1)
+            user.wait_for_login()
