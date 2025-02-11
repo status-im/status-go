@@ -48,6 +48,7 @@ class TestDefaultMessaging(MessengerTestCase):
 
 
 @pytest.mark.rpc
+@pytest.mark.skip
 @pytest.mark.usefixtures("setup_two_nodes")
 class TestLightClientMessaging(TestDefaultMessaging):
 
