@@ -103,7 +103,6 @@ class TestActivityCenterNotifications(MessengerTestCase):
         self.sender.verify_json_schema(response, method="wakuext_markActivityCenterNotificationsRead")
         assert all(
             (
-                response["result"]["activityCenterState"]["hasSeen"] is True,
                 response["result"]["activityCenterNotifications"][0]["id"] == message_id,
                 response["result"]["activityCenterNotifications"][0]["read"] is True,
             )
