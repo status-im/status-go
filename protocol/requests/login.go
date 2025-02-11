@@ -31,6 +31,7 @@ type Login struct {
 	// When non-empty, mnemonic is used to generate required keypairs and:
 	// - Password is ignored and replaced with encryption public key
 	// - KeycardWhisperPrivateKey is ignored and replaced with chat private key
+	// - KeyUID is ignored and replaced with hash of the master public key
 	Mnemonic string `json:"mnemonic"`
 
 	WalletSecretsConfig
