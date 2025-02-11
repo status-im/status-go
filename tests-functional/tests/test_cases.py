@@ -227,18 +227,27 @@ class MessengerTestCase(NetworkConditionTestCase):
         backend.wakuext_service.start_messenger()
         return backend
 
+    def send_contact_request_and_wait_for_signal_to_be_received(self):
+        response = self.sender.wakuext_service.send_contact_request(self.receiver.public_key, "contact_request")
+        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
+        message_id = expected_message.get("id")
+        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id)
+        return message_id
+
+    def accept_contact_request_and_wait_for_signal_to_be_received(self, message_id):
+        self.receiver.wakuext_service.accept_contact_request(message_id)
+        accepted_signal = f"@{self.receiver.public_key} accepted your contact request"
+        self.sender.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=accepted_signal)
+
     def make_contacts(self):
         existing_contacts = self.receiver.wakuext_service.get_contacts()
 
         if self.sender.public_key in str(existing_contacts):
             return
 
-        response = self.sender.wakuext_service.send_contact_request(self.receiver.public_key, "contact_request")
-        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
-        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"))
-        self.receiver.wakuext_service.accept_contact_request(expected_message.get("id"))
-        accepted_signal = f"@{self.receiver.public_key} accepted your contact request"
-        self.sender.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=accepted_signal)
+        message_id = self.send_contact_request_and_wait_for_signal_to_be_received()
+        self.accept_contact_request_and_wait_for_signal_to_be_received(message_id)
+        return message_id
 
     def validate_signal_event_against_response(self, signal_event, fields_to_validate, expected_message):
         expected_message_id = expected_message.get("id")

@@ -9,10 +9,7 @@
         },
         "result": {
             "properties": {
-                "cursor": {
-                    "type": "string"
-                },
-                "notifications": {
+                "activityCenterNotifications": {
                     "items": {
                         "properties": {
                             "accepted": {
@@ -157,6 +154,7 @@
                                     "chatId",
                                     "clock",
                                     "compressedKey",
+                                    "contactRequestState",
                                     "contentType",
                                     "displayName",
                                     "emojiHash",
@@ -167,6 +165,8 @@
                                     "lineCount",
                                     "localChatId",
                                     "messageType",
+                                    "new",
+                                    "parsedText",
                                     "quotedMessage",
                                     "replace",
                                     "responseTo",
@@ -360,10 +360,33 @@
                         "type": "object"
                     },
                     "type": "array"
+                },
+                "activityCenterState": {
+                    "properties": {
+                        "hasSeen": {
+                            "type": "boolean"
+                        },
+                        "updatedAt": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "hasSeen",
+                        "updatedAt"
+                    ],
+                    "type": "object"
+                },
+                "discordOldestMessageTimestamp": {
+                    "type": "integer"
+                },
+                "notifications": {
+                    "type": "null"
                 }
             },
             "required": [
-                "cursor",
+                "activityCenterNotifications",
+                "activityCenterState",
+                "discordOldestMessageTimestamp",
                 "notifications"
             ],
             "type": "object"

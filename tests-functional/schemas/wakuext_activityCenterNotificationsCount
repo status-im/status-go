@@ -1,0 +1,68 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "properties": {
+                "1": {
+                    "type": "integer"
+                },
+                "10": {
+                    "type": "integer"
+                },
+                "2": {
+                    "type": "integer"
+                },
+                "23": {
+                    "type": "integer"
+                },
+                "24": {
+                    "type": "integer"
+                },
+                "3": {
+                    "type": "integer"
+                },
+                "4": {
+                    "type": "integer"
+                },
+                "5": {
+                    "type": "integer"
+                },
+                "7": {
+                    "type": "integer"
+                },
+                "8": {
+                    "type": "integer"
+                },
+                "9": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "1",
+                "10",
+                "2",
+                "23",
+                "24",
+                "3",
+                "4",
+                "5",
+                "7",
+                "8",
+                "9"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}
