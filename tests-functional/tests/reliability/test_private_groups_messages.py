@@ -5,7 +5,7 @@ from tests.test_cases import MessengerTestCase
 from clients.signals import SignalType
 
 
-@pytest.mark.usefixtures("setup_two_nodes")
+@pytest.mark.usefixtures("setup_two_privileged_nodes")
 @pytest.mark.reliability
 class TestPrivateGroupMessages(MessengerTestCase):
 

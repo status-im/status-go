@@ -7,7 +7,7 @@ from resources.enums import MessageContentType
 from tests.test_cases import MessengerTestCase
 
 
-@pytest.mark.usefixtures("setup_two_nodes")
+@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc
 class TestMessageReactions(MessengerTestCase):
     def test_one_to_one_message_reactions(self):

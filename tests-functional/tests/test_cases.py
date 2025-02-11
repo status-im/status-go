@@ -210,9 +210,14 @@ class MessengerTestCase(NetworkConditionTestCase):
     ]
 
     @pytest.fixture(scope="function", autouse=False)
-    def setup_two_nodes(self, request):
+    def setup_two_privileged_nodes(self, request):
         request.cls.sender = self.sender = self.initialize_backend(self.await_signals, True)
         request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, True)
+
+    @pytest.fixture(scope="function", autouse=False)
+    def setup_two_unprivileged_nodes(self, request):
+        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False)
+        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False)
 
     def initialize_backend(self, await_signals, privileged=True):
         backend = StatusBackend(await_signals, privileged)

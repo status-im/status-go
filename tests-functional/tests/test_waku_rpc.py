@@ -23,13 +23,8 @@ class TestRpc(StatusBackendTestCase):
 
 
 @pytest.mark.rpc
-@pytest.mark.usefixtures("setup_two_nodes")
+@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 class TestDefaultMessaging(MessengerTestCase):
-
-    @pytest.fixture(scope="function", autouse=False)
-    def setup_two_nodes(self, request):
-        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False)
-        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False)
 
     def test_one_to_one_messages(self):
         self.one_to_one_message(5)
@@ -49,11 +44,11 @@ class TestDefaultMessaging(MessengerTestCase):
 
 @pytest.mark.rpc
 @pytest.mark.skip
-@pytest.mark.usefixtures("setup_two_nodes")
+@pytest.mark.usefixtures("setup_two_privileged_nodes")
 class TestLightClientMessaging(TestDefaultMessaging):
 
     @pytest.fixture(scope="function", autouse=False)
-    def setup_two_nodes(self, request):
+    def setup_two_unprivileged_nodes(self, request):
         request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False)
         request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False)
         for user in self.sender, self.receiver:
