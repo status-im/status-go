@@ -64,9 +64,7 @@ class WalletTestCase(StatusBackendTestCase):
             if key in transfer_tx_data:
                 transfer_tx_data[key] = new_value
             else:
-                logging.info(
-                    f"Warning: The key '{key}' does not exist in the transferTx parameters and will be ignored."
-                )
+                logging.info(f"Warning: The key '{key}' does not exist in the transferTx parameters and will be ignored.")
         params = [
             {
                 "fromAddress": user_1.address,
@@ -141,9 +139,7 @@ class EthRpcTestCase(WalletTestCase):
         while response.json()["result"]["isPending"] is True:
             time_passed = time.time() - start_time
             if time_passed >= timeout:
-                raise TimeoutError(
-                    f"Tx {tx_hash} is still pending after {timeout} seconds"
-                )
+                raise TimeoutError(f"Tx {tx_hash} is still pending after {timeout} seconds")
             time.sleep(0.5)
             response = self.rpc_client.rpc_valid_request(method, params)
         return response.json()["result"]["tx"]
@@ -166,9 +162,7 @@ class NetworkConditionTestCase:
     @contextmanager
     def add_latency(self, node, latency=300, jitter=50):
         logging.info("Entering context manager: add_latency")
-        node.container_exec(
-            f"apk add iproute2 && tc qdisc add dev eth0 root netem delay {latency}ms {jitter}ms distribution normal"
-        )
+        node.container_exec(f"apk add iproute2 && tc qdisc add dev eth0 root netem delay {latency}ms {jitter}ms distribution normal")
         try:
             yield
         finally:
@@ -178,9 +172,7 @@ class NetworkConditionTestCase:
     @contextmanager
     def add_packet_loss(self, node, packet_loss=2):
         logging.info("Entering context manager: add_packet_loss")
-        node.container_exec(
-            f"apk add iproute2 && tc qdisc add dev eth0 root netem loss {packet_loss}%"
-        )
+        node.container_exec(f"apk add iproute2 && tc qdisc add dev eth0 root netem loss {packet_loss}%")
         try:
             yield
         finally:
@@ -190,9 +182,7 @@ class NetworkConditionTestCase:
     @contextmanager
     def add_low_bandwith(self, node, rate="1mbit", burst="32kbit", limit="12500"):
         logging.info("Entering context manager: add_low_bandwith")
-        node.container_exec(
-            f"apk add iproute2 && tc qdisc add dev eth0 root tbf rate {rate} burst {burst} limit {limit}"
-        )
+        node.container_exec(f"apk add iproute2 && tc qdisc add dev eth0 root tbf rate {rate} burst {burst} limit {limit}")
         try:
             yield
         finally:
@@ -221,12 +211,8 @@ class MessengerTestCase(NetworkConditionTestCase):
 
     @pytest.fixture(scope="function", autouse=False)
     def setup_two_nodes(self, request):
-        request.cls.sender = self.sender = self.initialize_backend(
-            self.await_signals, True
-        )
-        request.cls.receiver = self.receiver = self.initialize_backend(
-            self.await_signals, True
-        )
+        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, True)
+        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, True)
 
     def initialize_backend(self, await_signals, privileged=True):
         backend = StatusBackend(await_signals, privileged)
@@ -242,48 +228,30 @@ class MessengerTestCase(NetworkConditionTestCase):
         if self.sender.public_key in str(existing_contacts):
             return
 
-        response = self.sender.wakuext_service.send_contact_request(
-            self.receiver.public_key, "contact_request"
-        )
-        expected_message = self.get_message_by_content_type(
-            response, content_type=MessageContentType.CONTACT_REQUEST.value
-        )[0]
-        self.receiver.find_signal_containing_pattern(
-            SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id")
-        )
+        response = self.sender.wakuext_service.send_contact_request(self.receiver.public_key, "contact_request")
+        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
+        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"))
         self.receiver.wakuext_service.accept_contact_request(expected_message.get("id"))
         accepted_signal = f"@{self.receiver.public_key} accepted your contact request"
-        self.sender.find_signal_containing_pattern(
-            SignalType.MESSAGES_NEW.value, event_pattern=accepted_signal
-        )
+        self.sender.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=accepted_signal)
 
-    def validate_signal_event_against_response(
-        self, signal_event, fields_to_validate, expected_message
-    ):
+    def validate_signal_event_against_response(self, signal_event, fields_to_validate, expected_message):
         expected_message_id = expected_message.get("id")
         signal_event_messages = signal_event.get("event", {}).get("messages")
         assert len(signal_event_messages) > 0, "No messages found in the signal event"
 
         message = next(
-            (
-                message
-                for message in signal_event_messages
-                if message.get("id") == expected_message_id
-            ),
+            (message for message in signal_event_messages if message.get("id") == expected_message_id),
             None,
         )
-        assert (
-            message
-        ), f"Message with ID {expected_message_id} not found in the signal event"
+        assert message, f"Message with ID {expected_message_id} not found in the signal event"
 
         message_mismatch = []
         for response_field, event_field in fields_to_validate.items():
             response_value = expected_message[response_field]
             event_value = message[event_field]
             if response_value != event_value:
-                message_mismatch.append(
-                    f"Field '{response_field}': Expected '{response_value}', Found '{event_value}'"
-                )
+                message_mismatch.append(f"Field '{response_field}': Expected '{response_value}', Found '{event_value}'")
 
         if not message_mismatch:
             return
@@ -304,18 +272,12 @@ class MessengerTestCase(NetworkConditionTestCase):
         if matched_messages:
             return matched_messages
         else:
-            raise ValueError(
-                f"Failed to find a message with contentType '{content_type}' in response"
-            )
+            raise ValueError(f"Failed to find a message with contentType '{content_type}' in response")
 
     def join_private_group(self):
         private_group_name = f"private_group_{uuid4()}"
-        response = self.sender.wakuext_service.create_group_chat_with_members(
-            [self.receiver.public_key], private_group_name
-        )
-        expected_group_creation_msg = (
-            f"@{self.sender.public_key} created the group {private_group_name}"
-        )
+        response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
+        expected_group_creation_msg = f"@{self.sender.public_key} created the group {private_group_name}"
         expected_message = self.get_message_by_content_type(
             response,
             content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
@@ -335,14 +297,8 @@ class MessengerTestCase(NetworkConditionTestCase):
         community_id = response.get("result", {}).get("communities", [{}])[0].get("id")
         self.receiver.wakuext_service.fetch_community(community_id)
 
-        response_to_join = self.receiver.wakuext_service.request_to_join_community(
-            community_id
-        )
-        join_id = (
-            response_to_join.get("result", {})
-            .get("requestsToJoinCommunity", [{}])[0]
-            .get("id")
-        )
+        response_to_join = self.receiver.wakuext_service.request_to_join_community(community_id)
+        join_id = response_to_join.get("result", {}).get("requestsToJoinCommunity", [{}])[0].get("id")
 
         # I couldn't find any signal related to the requestToJoinCommunity request in the peer node.
         # That's why I need this retry logic for accepting the request to join the community.
@@ -350,20 +306,14 @@ class MessengerTestCase(NetworkConditionTestCase):
         retry_interval = 0.5
         for attempt in range(max_retries):
             try:
-                response = self.sender.wakuext_service.accept_request_to_join_community(
-                    join_id
-                )
+                response = self.sender.wakuext_service.accept_request_to_join_community(join_id)
                 if response.get("result"):
                     break
             except Exception as e:
-                logging.error(
-                    f"Attempt {attempt + 1}/{max_retries}: Unexpected error: {e}"
-                )
+                logging.error(f"Attempt {attempt + 1}/{max_retries}: Unexpected error: {e}")
                 time.sleep(retry_interval)
         else:
-            raise Exception(
-                f"Failed to accept request to join community in {max_retries * retry_interval} seconds."
-            )
+            raise Exception(f"Failed to accept request to join community in {max_retries * retry_interval} seconds.")
 
         chats = response.get("result", {}).get("communities", [{}])[0].get("chats", {})
         chat_id = list(chats.keys())[0] if chats else None
@@ -373,12 +323,8 @@ class MessengerTestCase(NetworkConditionTestCase):
         sent_messages = []
         for i in range(message_count):
             message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.send_community_chat_message(
-                message_chat_id, message_text
-            )
-            expected_message = self.get_message_by_content_type(
-                response, content_type=MessageContentType.TEXT_PLAIN.value
-            )[0]
+            response = self.sender.wakuext_service.send_community_chat_message(message_chat_id, message_text)
+            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
             sent_messages.append(expected_message)
             time.sleep(0.01)
 
@@ -398,12 +344,8 @@ class MessengerTestCase(NetworkConditionTestCase):
         sent_messages = []
         for i in range(message_count):
             message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.send_message(
-                self.receiver.public_key, message_text
-            )
-            expected_message = self.get_message_by_content_type(
-                response, content_type=MessageContentType.TEXT_PLAIN.value
-            )[0]
+            response = self.sender.wakuext_service.send_message(self.receiver.public_key, message_text)
+            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
             sent_messages.append(expected_message)
             time.sleep(0.01)
 
@@ -421,29 +363,19 @@ class MessengerTestCase(NetworkConditionTestCase):
 
     def add_contact(self, execution_number, network_condition=None, privileged=True):
         message_text = f"test_contact_request_{execution_number}_{uuid4()}"
-        sender = self.initialize_backend(
-            await_signals=self.await_signals, privileged=privileged
-        )
-        receiver = self.initialize_backend(
-            await_signals=self.await_signals, privileged=privileged
-        )
+        sender = self.initialize_backend(await_signals=self.await_signals, privileged=privileged)
+        receiver = self.initialize_backend(await_signals=self.await_signals, privileged=privileged)
 
         existing_contacts = receiver.wakuext_service.get_contacts()
 
         if sender.public_key in str(existing_contacts):
-            pytest.skip(
-                "Contact request was already sent for this sender<->receiver. Skipping test!!"
-            )
+            pytest.skip("Contact request was already sent for this sender<->receiver. Skipping test!!")
 
         if network_condition:
             network_condition(receiver)
 
-        response = sender.wakuext_service.send_contact_request(
-            receiver.public_key, message_text
-        )
-        expected_message = self.get_message_by_content_type(
-            response, content_type=MessageContentType.CONTACT_REQUEST.value
-        )[0]
+        response = sender.wakuext_service.send_contact_request(receiver.public_key, message_text)
+        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
 
         messages_new_event = receiver.find_signal_containing_pattern(
             SignalType.MESSAGES_NEW.value,
@@ -453,11 +385,7 @@ class MessengerTestCase(NetworkConditionTestCase):
 
         signal_messages_texts = []
         if "messages" in messages_new_event.get("event", {}):
-            signal_messages_texts.extend(
-                message["text"]
-                for message in messages_new_event["event"]["messages"]
-                if "text" in message
-            )
+            signal_messages_texts.extend(message["text"] for message in messages_new_event["event"]["messages"] if "text" in message)
 
         assert (
             f"@{sender.public_key} sent you a contact request" in signal_messages_texts
@@ -473,13 +401,9 @@ class MessengerTestCase(NetworkConditionTestCase):
         private_groups = []
         for i in range(private_groups_count):
             private_group_name = f"private_group_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.create_group_chat_with_members(
-                [self.receiver.public_key], private_group_name
-            )
+            response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
 
-            expected_group_creation_msg = (
-                f"@{self.sender.public_key} created the group {private_group_name}"
-            )
+            expected_group_creation_msg = f"@{self.sender.public_key} created the group {private_group_name}"
             expected_message = self.get_message_by_content_type(
                 response,
                 content_type=MessageContentType.SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP.value,
@@ -505,12 +429,8 @@ class MessengerTestCase(NetworkConditionTestCase):
         sent_messages = []
         for i in range(message_count):
             message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.send_group_chat_message(
-                private_group_id, message_text
-            )
-            expected_message = self.get_message_by_content_type(
-                response, content_type=MessageContentType.TEXT_PLAIN.value
-            )[0]
+            response = self.sender.wakuext_service.send_group_chat_message(private_group_id, message_text)
+            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
             sent_messages.append(expected_message)
             time.sleep(0.01)
 
