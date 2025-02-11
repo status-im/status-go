@@ -311,7 +311,7 @@ func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConf
 	}
 	networks = networkhelper.OverrideDirectProvidersAuth(networks, authTokens)
 
-	return networkhelper.OverrideEmbeddedProxyProviders(
+	networks = networkhelper.OverrideEmbeddedProxyProviders(
 		networks,
 		true,
 		walletConfig.EthRpcProxyUser,
