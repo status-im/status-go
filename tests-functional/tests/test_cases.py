@@ -419,7 +419,7 @@ class MessengerTestCase(NetworkConditionTestCase):
                 expected_message=expected_message,
             )
 
-    def add_contact(self, execution_number, network_condition, privileged=True):
+    def add_contact(self, execution_number, network_condition=None, privileged=True):
         message_text = f"test_contact_request_{execution_number}_{uuid4()}"
         sender = self.initialize_backend(
             await_signals=self.await_signals, privileged=privileged

@@ -37,7 +37,7 @@ class TestDefaultMessaging(MessengerTestCase):
     def test_add_contact(self):
         self.add_contact(execution_number=1, network_condition=None, privileged=False)
 
-    def test_crate_private_group(self):
+    def test_create_private_group(self):
         self.make_contacts()
         self.create_private_group(1)
 
