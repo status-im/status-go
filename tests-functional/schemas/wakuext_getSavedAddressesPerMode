@@ -1,0 +1,63 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "items": {
+                "properties": {
+                    "address": {
+                        "type": "string"
+                    },
+                    "chainShortNames": {
+                        "type": "string"
+                    },
+                    "colorId": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "integer"
+                    },
+                    "ens": {
+                        "type": "string"
+                    },
+                    "isTest": {
+                        "type": "boolean"
+                    },
+                    "mixedcaseAddress": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "removed": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "address",
+                    "chainShortNames",
+                    "colorId",
+                    "createdAt",
+                    "ens",
+                    "isTest",
+                    "mixedcaseAddress",
+                    "name",
+                    "removed"
+                ],
+                "type": "object"
+            },
+            "type": "array"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

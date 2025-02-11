@@ -16,6 +16,7 @@ class SignalType(Enum):
     NODE_READY = "node.ready"
     NODE_STARTED = "node.started"
     NODE_LOGIN = "node.login"
+    NODE_LOGOUT = "node.stopped"
     MEDIASERVER_STARTED = "mediaserver.started"
     WALLET_SUGGESTED_ROUTES = "wallet.suggested.routes"
     WALLET_ROUTER_SIGN_TRANSACTIONS = "wallet.router.sign-transactions"
@@ -96,6 +97,10 @@ class SignalClient:
         signal = self.wait_for_signal(SignalType.NODE_LOGIN.value)
         if "error" in signal["event"]:
             assert not signal["event"]["error"]
+        return signal
+
+    def wait_for_logout(self):
+        signal = self.wait_for_signal(SignalType.NODE_LOGOUT.value)
         return signal
 
     def find_signal_containing_pattern(self, signal_type, event_pattern, timeout=20):

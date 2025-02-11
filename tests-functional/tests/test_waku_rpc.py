@@ -1,12 +1,6 @@
 import random
-import time
-from dataclasses import dataclass
-from typing import Optional
-
 import pytest
-
-from conftest import option
-from test_cases import StatusBackendTestCase
+from test_cases import StatusBackendTestCase, MessengerTestCase
 
 
 class TestRpc(StatusBackendTestCase):
@@ -28,73 +22,45 @@ class TestRpc(StatusBackendTestCase):
         self.rpc_client.verify_json_schema(response.json(), method)
 
 
-@pytest.mark.skip("to be reworked via status-backend")
-class TestRpcMessaging(StatusBackendTestCase):
-    @dataclass
-    class User:
-        rpc_url: str
-        chat_public_key: Optional[str] = None
-        chat_id: Optional[str] = None
+@pytest.mark.rpc
+@pytest.mark.usefixtures("setup_two_nodes")
+class TestDefaultMessaging(MessengerTestCase):
+
+    @pytest.fixture(scope="function", autouse=False)
+    def setup_two_nodes(self, request):
+        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False)
+        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False)
+
+    def test_one_to_one_messages(self):
+        self.one_to_one_message(5)
 
     def test_add_contact(self):
-        _id = str(random.randint(1, 8888))
+        self.add_contact(execution_number=1, network_condition=None, privileged=False)
 
-        self.user_1 = self.User(rpc_url=option.rpc_url)
-        self.user_2 = self.User(rpc_url=option.rpc_url_2)
+    def test_create_private_group(self):
+        self.make_contacts()
+        self.create_private_group(1)
 
-        # get chat public key
-        for user in self.user_1, self.user_2:
-            response = self.rpc_client.rpc_request("accounts_getAccounts", [], _id, url=user.rpc_url)
-            self.rpc_client.verify_is_valid_json_rpc_response(response)
+    def test_private_group_messages(self):
+        self.make_contacts()
+        self.private_group_id = self.join_private_group()
+        self.private_group_message(5, self.private_group_id)
 
-            user.chat_public_key = next(
-                (item["public-key"] for item in response.json()["result"] if item["chat"]),
-                None,
-            )
 
-        # send contact requests
-        for sender in self.user_1, self.user_2:
-            for receiver in self.user_1, self.user_2:
-                if sender != receiver:
-                    response = self.rpc_client.rpc_request(
-                        method="wakuext_sendContactRequest",
-                        params=[
-                            {
-                                "id": receiver.chat_public_key,
-                                "message": f"contact request from {sender.chat_public_key}: sent at {time.time()}",
-                            }
-                        ],
-                        request_id=99,
-                        url=sender.rpc_url,
-                    )
+@pytest.mark.rpc
+@pytest.mark.skip
+@pytest.mark.usefixtures("setup_two_nodes")
+class TestLightClientMessaging(TestDefaultMessaging):
 
-                    self.rpc_client.verify_is_valid_json_rpc_response(response)
-                    sender.chat_id = response.json()["result"]["chats"][0]["lastMessage"]["id"]
-
-        # accept contact requests
-        for user in self.user_1, self.user_2:
-            response = self.rpc_client.rpc_request(
-                method="wakuext_acceptContactRequest",
-                params=[
-                    {
-                        "id": user.chat_id,
-                    }
-                ],
-                request_id=99,
-                url=user.rpc_url,
-            )
-            self.rpc_client.verify_is_valid_json_rpc_response(response)
-
-        # verify contacts
-        for user in (self.user_1, self.user_2), (self.user_2, self.user_1):
-            response = self.rpc_client.rpc_request(
-                method="wakuext_contacts",
-                params=[],
-                request_id=99,
-                url=user[0].rpc_url,
-            )
-            self.rpc_client.verify_is_valid_json_rpc_response(response)
-
-            response = response.json()
-            assert response["result"][0]["added"] is True
-            assert response["result"][0]["id"] == user[1].chat_public_key
+    @pytest.fixture(scope="function", autouse=False)
+    def setup_two_nodes(self, request):
+        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False)
+        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False)
+        for user in self.sender, self.receiver:
+            key_uid = user.node_login_event["event"]["account"]["key-uid"]
+            user.wakuext_service.set_light_client(True)
+            user.logout()
+            user.wait_for_logout()
+            user.login(key_uid)
+            user.prepare_wait_for_signal("node.login", 1)
+            user.wait_for_login()

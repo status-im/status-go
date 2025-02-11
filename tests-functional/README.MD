@@ -41,6 +41,23 @@ Functional tests for status-go
 * In `./tests-functional/tests` directory run `pytest -m rpc`
 * To run tests against binary run `pytest -m <your mark> --url=http:<binary_url>:<binary_port> --user_dir=/<path>`
 
+### Prerequisites for Mac OSx users
+If you see errors at attempt to run tests, try to run in terminal:
+```shell
+sock.connect(self.unix_socket)
+```
+If you see
+```
+PermissionError: [Errno 13] Permission denied
+```
+
+Please follow this fix: https://github.com/docker/compose/issues/10299#issuecomment-1438247730
+
+If you're on MacOS and `/var/run/docker.sock` doesn't exist, you need to create a symlink to the docker socket:
+```shell
+sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
+```
+
 ## Implementation details
 
 - Functional tests are implemented in `./tests-functional/tests` based on [pytest](https://docs.pytest.org/en/8.2.x/)
@@ -51,17 +68,9 @@ Functional tests for status-go
 
 # Known issues
 
-## Docker permission denied
+## Import issues
 
-When running tests with auto-creating status-backend containers, you might face this:
-```shell
-sock.connect(self.unix_socket)
-PermissionError: [Errno 13] Permission denied
-```
+If you see some import issues, make sure that you have all requirements installed from `requirements.txt` 
 
-Please follow this fix: https://github.com/docker/compose/issues/10299#issuecomment-1438247730
-
-If you're on MacOS and `/var/run/docker.sock` doesn't exist, you need to create a symlink to the docker socket:
-```shell
-sudo ln -s $HOME/.docker/run/docker.sock /var/run/docker.sock
-```
+### For PyCharm users
+Make sure that you made `test-functional` source folder (Right click > Mark directory as > Source folder)

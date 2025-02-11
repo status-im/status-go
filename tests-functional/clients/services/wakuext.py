@@ -69,3 +69,8 @@ class WakuextService(Service):
         params = [{"chatId": chat_id, "text": message, "contentType": content_type}]
         response = self.rpc_request("sendChatMessage", params)
         return response.json()
+
+    def set_light_client(self, enabled=True):
+        params = [{"enabled": enabled}]
+        response = self.rpc_request("setLightClient", params)
+        return response.json()
