@@ -316,6 +316,8 @@ func setRPCs(networks []params.Network, walletConfig *requests.WalletSecretsConf
 		true,
 		walletConfig.EthRpcProxyUser,
 		walletConfig.EthRpcProxyPassword)
+
+	return networks
 }
 
 func BuildDefaultNetworks(walletSecretsConfig *requests.WalletSecretsConfig) []params.Network {
