@@ -609,7 +609,11 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	}
 
 	if acc.KDFIterations == 0 {
-		acc.KDFIterations = dbsetup.ReducedKDFIterationsNumber
+		var err error
+		acc.KDFIterations, err = b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
+		if err != nil {
+			return errors.Wrap(err, "failed to get account kdf iterations number")
+		}
 	}
 
 	err := b.ensureDBsOpened(acc, request.Password)
