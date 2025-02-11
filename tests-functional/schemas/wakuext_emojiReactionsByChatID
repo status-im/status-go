@@ -1,0 +1,66 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "items": {
+                "properties": {
+                    "chatId": {
+                        "type": "string"
+                    },
+                    "clock": {
+                        "type": "integer"
+                    },
+                    "compressedKey": {
+                        "type": "string"
+                    },
+                    "emojiHash": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "emojiId": {
+                        "type": "integer"
+                    },
+                    "from": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "localChatId": {
+                        "type": "string"
+                    },
+                    "messageId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "chatId",
+                    "clock",
+                    "compressedKey",
+                    "emojiHash",
+                    "emojiId",
+                    "from",
+                    "id",
+                    "localChatId",
+                    "messageId"
+                ],
+                "type": "object"
+            },
+            "type": "array"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}
