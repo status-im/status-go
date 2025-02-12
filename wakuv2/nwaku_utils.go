@@ -110,20 +110,30 @@ func BindingsToPbStoreResponse(bindingsStoreResponse *bindings.StoreQueryRespons
 			return nil, err
 		}
 
-		wakuMessage := pb.WakuMessage{
-			Payload:        message.WakuMessage.Payload,
-			ContentTopic:   message.WakuMessage.ContentTopic,
-			Version:        message.WakuMessage.Version,
-			Timestamp:      message.WakuMessage.Timestamp,
-			Meta:           message.WakuMessage.Meta,
-			Ephemeral:      message.WakuMessage.Ephemeral,
-			RateLimitProof: message.WakuMessage.RateLimitProof,
-		}
+		var pbMessage storepb.WakuMessageKeyValue
+		if message.WakuMessage == nil {
+			pbMessage = storepb.WakuMessageKeyValue{
+				MessageHash: msgHash,
+				PubsubTopic: &message.PubsubTopic,
+				Message:     nil,
+			}
+		} else {
+			wakuMessage := pb.WakuMessage{
+				Payload:        message.WakuMessage.Payload,
+				ContentTopic:   message.WakuMessage.ContentTopic,
+				Version:        message.WakuMessage.Version,
+				Timestamp:      message.WakuMessage.Timestamp,
+				Meta:           message.WakuMessage.Meta,
+				Ephemeral:      message.WakuMessage.Ephemeral,
+				RateLimitProof: message.WakuMessage.RateLimitProof,
+			}
 
-		pbMessage := storepb.WakuMessageKeyValue{
-			MessageHash: msgHash,
-			PubsubTopic: &message.PubsubTopic,
-			Message:     &wakuMessage,
+			pbMessage = storepb.WakuMessageKeyValue{
+				MessageHash: msgHash,
+				PubsubTopic: &message.PubsubTopic,
+				Message:     &wakuMessage,
+			}
+
 		}
 
 		messages = append(messages, &pbMessage)
