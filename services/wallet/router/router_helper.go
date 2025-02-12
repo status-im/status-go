@@ -157,10 +157,13 @@ func (r *Router) resolveNonceForPath(ctx context.Context, path *routes.Path, add
 	usedNonces[path.FromChain.ChainID] = nextNonce
 	if !path.ApprovalRequired {
 		path.TxNonce = (*hexutil.Uint64)(&nextNonce)
+		path.SuggestedTxNonce = (*hexutil.Uint64)(&nextNonce)
 	} else {
 		path.ApprovalTxNonce = (*hexutil.Uint64)(&nextNonce)
+		path.SuggestedApprovalTxNonce = (*hexutil.Uint64)(&nextNonce)
 		txNonce := nextNonce + 1
 		path.TxNonce = (*hexutil.Uint64)(&txNonce)
+		path.SuggestedTxNonce = (*hexutil.Uint64)(&txNonce)
 
 		usedNonces[path.FromChain.ChainID] = txNonce
 	}
@@ -197,11 +200,13 @@ func (r *Router) applyCustomFields(ctx context.Context, path *routes.Path, fetch
 			return err
 		}
 		if path.ApprovalRequired {
+			path.ApprovalGasFeeMode = r.lastInputParams.GasFeeMode
 			path.ApprovalMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
 			path.ApprovalBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
 			path.ApprovalPriorityFee = (*hexutil.Big)(priorityFee)
 		}
 
+		path.TxGasFeeMode = r.lastInputParams.GasFeeMode
 		path.TxMaxFeesPerGas = (*hexutil.Big)(maxFeesPerGas)
 		path.TxBaseFee = (*hexutil.Big)(fetchedFees.BaseFee)
 		path.TxPriorityFee = (*hexutil.Big)(priorityFee)
@@ -209,6 +214,7 @@ func (r *Router) applyCustomFields(ctx context.Context, path *routes.Path, fetch
 		if path.ApprovalRequired {
 			approvalTxIdentityKey := path.TxIdentityKey(true)
 			if approvalTxCustomParams, ok := r.lastInputParams.PathTxCustomParams[approvalTxIdentityKey]; ok {
+				path.ApprovalGasFeeMode = approvalTxCustomParams.GasFeeMode
 				if approvalTxCustomParams.GasFeeMode != fees.GasFeeCustom {
 					maxFeesPerGas, priorityFee, err := fetchedFees.FeeFor(approvalTxCustomParams.GasFeeMode)
 					if err != nil {
@@ -229,6 +235,7 @@ func (r *Router) applyCustomFields(ctx context.Context, path *routes.Path, fetch
 
 		txIdentityKey := path.TxIdentityKey(false)
 		if txCustomParams, ok := r.lastInputParams.PathTxCustomParams[txIdentityKey]; ok {
+			path.TxGasFeeMode = txCustomParams.GasFeeMode
 			if txCustomParams.GasFeeMode != fees.GasFeeCustom {
 				maxFeesPerGas, priorityFee, err := fetchedFees.FeeFor(txCustomParams.GasFeeMode)
 				if err != nil {

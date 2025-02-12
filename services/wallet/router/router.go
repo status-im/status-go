@@ -942,6 +942,9 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		AmountOut:             (*hexutil.Big)(amountOut),
 
 		// set params that we don't want to be recalculated with every new block creation
+		SuggestedTxGasAmount:       gasLimit,
+		SuggestedApprovalGasAmount: approvalGasLimit,
+
 		UsedContractAddress: &contractAddress,
 		TxPackedData:        txPackedData,
 		TxGasAmount:         gasLimit,

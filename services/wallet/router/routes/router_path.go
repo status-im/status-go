@@ -26,11 +26,16 @@ type Path struct {
 	SuggestedLevelsForMaxFeesPerGas *fees.MaxFeesLevels // Suggested max fees by the network (in ETH WEI)
 	SuggestedMinPriorityFee         *hexutil.Big        // Suggested min priority fee by the network (in ETH WEI)
 	SuggestedMaxPriorityFee         *hexutil.Big        // Suggested max priority fee by the network (in ETH WEI)
+	SuggestedTxNonce                *hexutil.Uint64     // Suggested nonce for the transaction
+	SuggestedTxGasAmount            uint64              // Suggested gas amount for the transaction
+	SuggestedApprovalTxNonce        *hexutil.Uint64     // Suggested nonce for the approval transaction
+	SuggestedApprovalGasAmount      uint64              // Suggested gas amount for the approval transaction
 	CurrentBaseFee                  *hexutil.Big        // Current network base fee (in ETH WEI)
 	UsedContractAddress             *common.Address     // Address of the contract that will be used for the transaction
 
 	TxPackedData    []byte          // Packed data for the transaction
 	TxNonce         *hexutil.Uint64 // Nonce for the transaction
+	TxGasFeeMode    fees.GasFeeMode // Gas fee mode for the transaction
 	TxMaxFeesPerGas *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
 	TxBaseFee       *hexutil.Big    // Base fee for the transaction (in ETH WEI)
 	TxPriorityFee   *hexutil.Big    // Priority fee for the transaction (in ETH WEI)
@@ -47,6 +52,7 @@ type Path struct {
 	ApprovalContractAddress *common.Address // Address of the contract that will be used for the approval transaction, the same as UsedContractAddress. We can remove this field and use UsedContractAddress instead.
 	ApprovalPackedData      []byte          // Packed data for the approval transaction
 	ApprovalTxNonce         *hexutil.Uint64 // Nonce for the transaction
+	ApprovalGasFeeMode      fees.GasFeeMode // Gas fee mode for the approval transaction
 	ApprovalMaxFeesPerGas   *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
 	ApprovalBaseFee         *hexutil.Big    // Base fee for the approval transaction (in ETH WEI)
 	ApprovalPriorityFee     *hexutil.Big    // Priority fee for the approval transaction (in ETH WEI)
@@ -92,15 +98,19 @@ func (p *Path) GetCommunityParams() *requests.CommunityRouteInputParams {
 
 func (p *Path) Copy() *Path {
 	newPath := &Path{
-		RouterInputParamsUuid: p.RouterInputParamsUuid,
-		ProcessorName:         p.ProcessorName,
-		AmountInLocked:        p.AmountInLocked,
-		TxGasAmount:           p.TxGasAmount,
-		TxEstimatedTime:       p.TxEstimatedTime,
-		ApprovalRequired:      p.ApprovalRequired,
-		ApprovalGasAmount:     p.ApprovalGasAmount,
-		ApprovalEstimatedTime: p.ApprovalEstimatedTime,
-		SubtractFees:          p.SubtractFees,
+		RouterInputParamsUuid:      p.RouterInputParamsUuid,
+		ProcessorName:              p.ProcessorName,
+		AmountInLocked:             p.AmountInLocked,
+		SuggestedTxGasAmount:       p.SuggestedTxGasAmount,
+		SuggestedApprovalGasAmount: p.SuggestedApprovalGasAmount,
+		TxGasFeeMode:               p.TxGasFeeMode,
+		TxGasAmount:                p.TxGasAmount,
+		TxEstimatedTime:            p.TxEstimatedTime,
+		ApprovalRequired:           p.ApprovalRequired,
+		ApprovalGasFeeMode:         p.ApprovalGasFeeMode,
+		ApprovalGasAmount:          p.ApprovalGasAmount,
+		ApprovalEstimatedTime:      p.ApprovalEstimatedTime,
+		SubtractFees:               p.SubtractFees,
 	}
 
 	if p.FromChain != nil {
@@ -145,6 +155,16 @@ func (p *Path) Copy() *Path {
 
 	if p.SuggestedMaxPriorityFee != nil {
 		newPath.SuggestedMaxPriorityFee = (*hexutil.Big)(big.NewInt(0).Set(p.SuggestedMaxPriorityFee.ToInt()))
+	}
+
+	if p.SuggestedTxNonce != nil {
+		SuggestedTxNonce := *p.SuggestedTxNonce
+		newPath.SuggestedTxNonce = &SuggestedTxNonce
+	}
+
+	if p.SuggestedApprovalTxNonce != nil {
+		SuggestedApprovalTxNonce := *p.SuggestedApprovalTxNonce
+		newPath.SuggestedApprovalTxNonce = &SuggestedApprovalTxNonce
 	}
 
 	if p.CurrentBaseFee != nil {
