@@ -1,6 +1,18 @@
+from typing import Union
+
 import pytest
 
+from clients.status_backend import StatusBackend
 from tests.test_cases import MessengerTestCase
+
+
+def _get_activity_center_notifications(
+    backend_instance: StatusBackend, activity_types: list = [1, 2, 3, 4, 5, 7, 8, 9, 10, 23, 24], read_type: Union[int, None] = None
+):
+    params = {"cursor": "", "limit": 20, "activityTypes": activity_types}
+    if read_type:
+        params["readType"] = read_type
+    return backend_instance.wakuext_service.rpc_request(method="activityCenterNotifications", params=[params]).json()
 
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
@@ -9,37 +21,33 @@ class TestActivityCenterNotifications(MessengerTestCase):
 
     def test_activity_center_notifications(self):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received()
-        response = self.receiver.wakuext_service.rpc_request(
-            method="activityCenterNotifications", params=[{"cursor": "", "limit": 20, "activityTypes": [5], "readType": 2}]
-        ).json()
+        response = _get_activity_center_notifications(backend_instance=self.receiver, activity_types=[5], read_type=2)
         self.receiver.verify_json_schema(response, method="wakuext_activityCenterNotifications")
-        result = response["result"]
+        notification = response["result"]["notifications"][0]
         assert all(
             (
-                result["notifications"][0]["accepted"] is False,
-                result["notifications"][0]["author"] == self.sender.public_key,
-                result["notifications"][0]["chatId"] == self.sender.public_key,
-                result["notifications"][0]["id"] == message_id,
-                result["notifications"][0]["read"] is False,
-                result["notifications"][0]["lastMessage"]["contactRequestState"] == 1,
+                notification["accepted"] is False,
+                notification["author"] == self.sender.public_key,
+                notification["chatId"] == self.sender.public_key,
+                notification["id"] == message_id,
+                notification["read"] is False,
+                notification["lastMessage"]["contactRequestState"] == 1,
             )
         )
 
         self.accept_contact_request_and_wait_for_signal_to_be_received(message_id)
-        response = self.sender.wakuext_service.rpc_request(
-            method="activityCenterNotifications", params=[{"cursor": "", "limit": 20, "activityTypes": [1, 2, 3, 4, 5, 7, 8, 9, 10, 23, 24]}]
-        ).json()
+        response = _get_activity_center_notifications(backend_instance=self.sender)
         self.sender.verify_json_schema(response, method="wakuext_activityCenterNotifications")
-        result = response["result"]
+        notification = response["result"]["notifications"][0]
         assert all(
             (
-                result["notifications"][0]["accepted"] is True,
-                result["notifications"][0]["author"] == self.sender.public_key,
-                result["notifications"][0]["chatId"] == self.receiver.public_key,
-                result["notifications"][0]["id"] == message_id,
-                result["notifications"][0]["read"] is True,
-                result["notifications"][0]["message"]["contactRequestState"] == 2,
-                result["notifications"][0]["lastMessage"]["text"] == f"@{self.receiver.public_key} accepted your contact request",
+                notification["accepted"] is True,
+                notification["author"] == self.sender.public_key,
+                notification["chatId"] == self.receiver.public_key,
+                notification["id"] == message_id,
+                notification["read"] is True,
+                notification["message"]["contactRequestState"] == 2,
+                notification["lastMessage"]["text"] == f"@{self.receiver.public_key} accepted your contact request",
             )
         )
 
@@ -108,9 +116,7 @@ class TestActivityCenterNotifications(MessengerTestCase):
             )
         )
 
-        result = self.sender.wakuext_service.rpc_request(
-            method="activityCenterNotifications", params=[{"cursor": "", "limit": 20, "activityTypes": [5]}]
-        ).json()["result"]
+        result = _get_activity_center_notifications(backend_instance=self.sender, activity_types=[5])["result"]
         assert result["notifications"][0]["read"] is True
 
         response = self.sender.wakuext_service.rpc_request(
@@ -130,9 +136,7 @@ class TestActivityCenterNotifications(MessengerTestCase):
             )
         )
 
-        result = self.sender.wakuext_service.rpc_request(
-            method="activityCenterNotifications", params=[{"cursor": "", "limit": 20, "activityTypes": [5]}]
-        ).json()["result"]
+        result = _get_activity_center_notifications(backend_instance=self.sender, activity_types=[5])["result"]
         assert result["notifications"][0]["read"] is False
 
     def test_accept_activity_center_notifications(self):
@@ -147,9 +151,7 @@ class TestActivityCenterNotifications(MessengerTestCase):
         ).json()
         self.receiver.verify_json_schema(response, method="wakuext_acceptActivityCenterNotifications")
 
-        result = self.receiver.wakuext_service.rpc_request(
-            method="activityCenterNotifications", params=[{"cursor": "", "limit": 20, "activityTypes": [1, 2, 3, 4, 5, 7, 8, 9, 10, 23, 24]}]
-        ).json()["result"]
+        result = _get_activity_center_notifications(backend_instance=self.receiver)["result"]
         assert all((result["notifications"][0]["accepted"] is True, result["notifications"][0]["id"] == message_id))
 
     def test_dismiss_activity_center_notifications(self):
@@ -164,16 +166,12 @@ class TestActivityCenterNotifications(MessengerTestCase):
         ).json()
         self.receiver.verify_json_schema(response, method="wakuext_dismissActivityCenterNotifications")
 
-        result = self.receiver.wakuext_service.rpc_request(
-            method="activityCenterNotifications", params=[{"cursor": "", "limit": 20, "activityTypes": [1, 2, 3, 4, 5, 7, 8, 9, 10, 23, 24]}]
-        ).json()["result"]
+        result = _get_activity_center_notifications(backend_instance=self.receiver)["result"]
         assert all((result["notifications"][0]["dismissed"] is True, result["notifications"][0]["id"] == message_id))
 
     def test_delete_activity_center_notifications(self):
         message_id = self.make_contacts()
-        result = self.sender.wakuext_service.rpc_request(
-            method="activityCenterNotifications", params=[{"cursor": "", "limit": 20, "activityTypes": [1, 2, 3, 4, 5, 7, 8, 9, 10, 23, 24]}]
-        ).json()["result"]
+        result = _get_activity_center_notifications(backend_instance=self.sender)["result"]
         assert len(result["notifications"]) == 1
         response = self.sender.wakuext_service.rpc_request(
             method="deleteActivityCenterNotifications",
@@ -184,7 +182,5 @@ class TestActivityCenterNotifications(MessengerTestCase):
             ],
         ).json()
         self.sender.verify_json_schema(response, method="wakuext_deleteActivityCenterNotifications")
-        result = self.sender.wakuext_service.rpc_request(
-            method="activityCenterNotifications", params=[{"cursor": "", "limit": 20, "activityTypes": [1, 2, 3, 4, 5, 7, 8, 9, 10, 23, 24]}]
-        ).json()["result"]
+        result = _get_activity_center_notifications(backend_instance=self.sender)["result"]
         assert not result["notifications"]
