@@ -169,6 +169,26 @@ func (r *Router) setCustomTxDetails(pathTxIdentity *requests.PathTxIdentity, pat
 			continue
 		}
 
+		if pathTxIdentity.IsApprovalTx {
+			path.ApprovalGasFeeMode = pathTxCustomParams.GasFeeMode
+			if pathTxCustomParams.GasFeeMode == fees.GasFeeCustom {
+				path.ApprovalTxNonce = (*hexutil.Uint64)(&pathTxCustomParams.Nonce)
+				path.ApprovalGasAmount = pathTxCustomParams.GasAmount
+				path.ApprovalMaxFeesPerGas = pathTxCustomParams.MaxFeesPerGas
+				path.ApprovalBaseFee = (*hexutil.Big)(new(big.Int).Sub(pathTxCustomParams.MaxFeesPerGas.ToInt(), pathTxCustomParams.PriorityFee.ToInt()))
+				path.ApprovalPriorityFee = pathTxCustomParams.PriorityFee
+			}
+		} else {
+			path.TxGasFeeMode = pathTxCustomParams.GasFeeMode
+			if pathTxCustomParams.GasFeeMode == fees.GasFeeCustom {
+				path.TxNonce = (*hexutil.Uint64)(&pathTxCustomParams.Nonce)
+				path.TxGasAmount = pathTxCustomParams.GasAmount
+				path.TxMaxFeesPerGas = pathTxCustomParams.MaxFeesPerGas
+				path.TxBaseFee = (*hexutil.Big)(new(big.Int).Sub(pathTxCustomParams.MaxFeesPerGas.ToInt(), pathTxCustomParams.PriorityFee.ToInt()))
+				path.TxPriorityFee = pathTxCustomParams.PriorityFee
+			}
+		}
+
 		r.lastInputParamsMutex.Lock()
 		if r.lastInputParams.PathTxCustomParams == nil {
 			r.lastInputParams.PathTxCustomParams = make(map[string]*requests.PathTxCustomParams)
