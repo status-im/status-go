@@ -2162,10 +2162,8 @@ github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065 h1:Sd7
 github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065/go.mod h1:7cSGUoGVIla1IpnChrLbkVjkYgdOcr7rcifEfh4ReR4=
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 h1:4HSdWMFMufpRo3ECTX6BrvA+VzKhXZf7mS0rTa5cCWU=
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1/go.mod h1:+LeEYoW5/uBUTVjtBGLEVCUe9mOYAlu5ZPkIxLOSr5Y=
-github.com/waku-org/waku-go-bindings v0.0.0-20250122175840-9c78421cd09f h1:apETMA44/ezqVy6j5/L5mtu4boPxBEMWIt/AkDQ05yM=
-github.com/waku-org/waku-go-bindings v0.0.0-20250122175840-9c78421cd09f/go.mod h1:eFNpq6IGg3WsFaWdpy0O8yaIFa+ZVD5KbsOY7kxjJgQ=
-github.com/waku-org/waku-go-bindings v0.0.0-20250130081538-a4db2843d020 h1:7B975cTxZ5yxsqIYXE/6YZUs2u8bAeNcNv1sjAFgono=
-github.com/waku-org/waku-go-bindings v0.0.0-20250130081538-a4db2843d020/go.mod h1:eFNpq6IGg3WsFaWdpy0O8yaIFa+ZVD5KbsOY7kxjJgQ=
+github.com/waku-org/waku-go-bindings v0.0.0-20250212142023-46b1648912ad h1:/vYXB+trQPPxfR0/tqkSvpq9tekqWPXnreWHc3GwZaw=
+github.com/waku-org/waku-go-bindings v0.0.0-20250212142023-46b1648912ad/go.mod h1:ZumFjFmErDtVBY5t1HH7pD9cQeeepAmlLA6MD/MjHx4=
 github.com/wealdtech/go-ens/v3 v3.5.0 h1:Huc9GxBgiGweCOGTYomvsg07K2QggAqZpZ5SuiZdC8o=
 github.com/wealdtech/go-ens/v3 v3.5.0/go.mod h1:bVuYoWYEEeEu7Zy95rIMjPR34QFJarxt8p84ywSo0YM=
 github.com/wealdtech/go-multicodec v1.4.0 h1:iq5PgxwssxnXGGPTIK1srvt6U5bJwIp7k6kBrudIWxg=
@@ -2714,6 +2712,7 @@ golang.org/x/sys v0.0.0-20220111092808-5a964db01320/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20220317061510-51cd9980dadf/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220412211240-33da011f77ad/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.3.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
