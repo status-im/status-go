@@ -3,6 +3,9 @@ package pairing
 import (
 	"encoding/json"
 	"errors"
+	"strings"
+
+	"github.com/status-im/status-go/common"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -78,6 +81,18 @@ func (ppm *AccountPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 	ppm.accountKeysFromProtobuf(pb.Keys)
 	if pb.Multiaccount != nil {
 		ppm.multiaccountFromProtobuf(pb.Multiaccount)
+	}
+
+	// historically it so happened that on a mobile device a password without 0x is used, and on a desktop with it,
+	// so with local pairing we have a conflict that needs to be resolved
+	if ppm.multiaccount != nil && ppm.multiaccount.KeycardPairing != "" {
+		if common.IsMobilePlatform() {
+			pb.Password = strings.TrimPrefix(pb.Password, "0x")
+		} else {
+			if !strings.HasPrefix(pb.Password, "0x") {
+				pb.Password = "0x" + pb.Password
+			}
+		}
 	}
 	ppm.password = pb.Password
 	ppm.chatKey = pb.ChatKey

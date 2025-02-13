@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
@@ -340,4 +341,83 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LockPayload() {
 
 	toSend3 := pm.ToSend()
 	pms.Nil(toSend3)
+}
+
+func (pms *PayloadMarshallerSuite) TestKeycardPairingPasswordAdjustments_Unmarshal_OldProto() {
+
+	// 1) KeycardPairing == "" => do nothing
+	pms.T().Run("KeycardPairing is empty => do nothing", func(t *testing.T) {
+		ap := &AccountPayload{
+			password:     "0xABC",
+			multiaccount: &multiaccounts.Account{},
+			keys:         make(map[string][]byte),
+		}
+		ppm := NewPairingPayloadMarshaller(ap, pms.Logger)
+		pb, err := ppm.MarshalProtobuf()
+		require.NoError(t, err)
+		ppm.password = ""
+		err = ppm.UnmarshalProtobuf(pb)
+		require.NoError(t, err)
+
+		require.Equal(t, "0xABC", ppm.password)
+	})
+
+	// 2) KeycardPairing != "", IsMobilePlatform() == true => TrimPrefix("0x")
+	pms.T().Run("IsMobilePlatform => trim prefix 0x", func(t *testing.T) {
+		ap := &AccountPayload{
+			password:     "0xDEF",
+			multiaccount: &multiaccounts.Account{},
+			keys:         make(map[string][]byte),
+		}
+		ppm := NewPairingPayloadMarshaller(ap, pms.Logger)
+		ppm.multiaccount.KeycardPairing = "ABCDF"
+		pb, err := ppm.MarshalProtobuf()
+		require.NoError(t, err)
+		ppm.password = ""
+		common.IsMobilePlatform = func() bool { return true }
+
+		err = ppm.UnmarshalProtobuf(pb)
+		require.NoError(t, err)
+
+		require.Equal(t, "DEF", ppm.password)
+	})
+
+	// 3) KeycardPairing != "", IsMobilePlatform() == false, without "0x" => add "0x"
+	pms.T().Run("No prefix => add 0x", func(t *testing.T) {
+		ap := &AccountPayload{
+			password:     "1234",
+			multiaccount: &multiaccounts.Account{},
+			keys:         make(map[string][]byte),
+		}
+		ppm := NewPairingPayloadMarshaller(ap, pms.Logger)
+		common.IsMobilePlatform = func() bool { return false }
+		ppm.multiaccount.KeycardPairing = "ABCDF"
+		pb, err := ppm.MarshalProtobuf()
+		require.NoError(t, err)
+		ppm.password = ""
+		err = ppm.UnmarshalProtobuf(pb)
+		require.NoError(t, err)
+
+		require.Equal(t, "0x1234", ppm.password)
+	})
+
+	// 4) KeycardPairing != "", IsMobilePlatform() == false, contains "0x" => do nothing
+	pms.T().Run("Already has prefix => do nothing", func(t *testing.T) {
+		ap := &AccountPayload{
+			password:     "0x9999",
+			multiaccount: &multiaccounts.Account{},
+			keys:         make(map[string][]byte),
+		}
+		ppm := NewPairingPayloadMarshaller(ap, pms.Logger)
+		ppm.multiaccount.KeycardPairing = "ABCDF"
+		pb, err := ppm.MarshalProtobuf()
+		require.NoError(t, err)
+		ppm.password = ""
+		common.IsMobilePlatform = func() bool { return false }
+
+		err = ppm.UnmarshalProtobuf(pb)
+		require.NoError(t, err)
+
+		require.Equal(t, "0x9999", ppm.password)
+	})
 }
