@@ -2232,7 +2232,7 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 		nwakuCfg.RateLimits.PeerExchange = &waku.RateLimit{Volume: 5, Period: 1, TimeUnit: waku.Second}
 	}
 
-	wakunode, err := waku.NewWakuNode(nwakuCfg, logger)
+	wakunode, err := waku.NewWakuNode(nwakuCfg, "nwaku")
 	if err != nil {
 		cancel()
 		return nil, err
