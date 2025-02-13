@@ -2,11 +2,10 @@ package alias
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"fmt"
 	"strings"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/api/multiformat"
 )
 
 const poly uint64 = 0xB8
@@ -29,19 +28,27 @@ func GenerateFromPublicKey(publicKey *ecdsa.PublicKey) string {
 	return generate(uint64(publicKey.X.Int64()))
 }
 
-// GenerateFromPublicKeyString returns the 3 words name given a public key
-// prefixed with 0x
+// GenerateFromPublicKeyString calculates the compressed key for the given publicKeyString
+// and returns its first 8 chars followed by an ellipsis char and its last 5 chars.
 func GenerateFromPublicKeyString(publicKeyString string) (string, error) {
-	pk := strings.TrimPrefix(publicKeyString, "0x")
-	publicKeyBytes, err := hex.DecodeString(pk)
+	//  Ensure there's `0x` prefix
+	if !strings.HasPrefix(publicKeyString, "0x") {
+		publicKeyString = "0x" + publicKeyString
+	}
+
+	compressedKey, err := multiformat.SerializeLegacyKey(publicKeyString)
 	if err != nil {
 		return "", err
 	}
 
-	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
-	if err != nil {
-		return "", err
-	}
+	return ShortenedCompressedKey(compressedKey), nil
+}
 
-	return GenerateFromPublicKey(publicKey), nil
+func ShortenedCompressedKey(compressedKey string) string {
+	if len(compressedKey) <= 12 {
+		return ""
+	}
+	prefix := compressedKey[0:8]
+	suffix := compressedKey[len(compressedKey)-5:]
+	return prefix + "…" + suffix
 }

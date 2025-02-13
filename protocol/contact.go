@@ -15,6 +15,7 @@ import (
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/verification"
 )
@@ -363,18 +364,6 @@ func BuildContactFromPublicKey(publicKey *ecdsa.PublicKey) (*Contact, error) {
 	return buildContact(id, publicKey)
 }
 
-func getShortenedCompressedKey(publicKey string) string {
-	if len(publicKey) > 9 {
-		firstPart := publicKey[0:3]
-		ellipsis := "..."
-		publicKeySize := len(publicKey)
-		lastPart := publicKey[publicKeySize-6 : publicKeySize]
-		abbreviatedKey := fmt.Sprintf("%s%s%s", firstPart, ellipsis, lastPart)
-		return abbreviatedKey
-	}
-	return ""
-}
-
 func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact, error) {
 	compressedKey, err := multiformat.SerializeLegacyKey(common.PubkeyToHex(publicKey))
 	if err != nil {
@@ -385,7 +374,7 @@ func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact,
 
 	contact := &Contact{
 		ID:                 publicKeyString,
-		Alias:              getShortenedCompressedKey(compressedKey),
+		Alias:              alias.ShortenedCompressedKey(compressedKey),
 		Address:            types.EncodeHex(address[:]),
 		CustomizationColor: multiaccountscommon.CustomizationColorBlue,
 	}

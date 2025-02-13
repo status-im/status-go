@@ -24,13 +24,13 @@ func TestGenerateFromPublicKeyString(t *testing.T) {
 		{
 			name:          "valid public key - start with 0x",
 			publicKey:     "0x04eedbaafd6adf4a9233a13e7b1c3c14461fffeba2e9054b8d456ce5f6ebeafadcbf3dce3716253fbc391277fa5a086b60b283daf61fb5b1f26895f456c2f31ae3",
-			alias:         "Darkorange Blue Bubblefish",
+			alias:         "zQ3shviW…k2bWB",
 			errorExpected: false,
 		},
 		{
 			name:          "valid public key - without 0x",
 			publicKey:     "04eedbaafd6adf4a9233a13e7b1c3c14461fffeba2e9054b8d456ce5f6ebeafadcbf3dce3716253fbc391277fa5a086b60b283daf61fb5b1f26895f456c2f31ae3",
-			alias:         "Darkorange Blue Bubblefish",
+			alias:         "zQ3shviW…k2bWB",
 			errorExpected: false,
 		},
 		{
@@ -42,6 +42,24 @@ func TestGenerateFromPublicKeyString(t *testing.T) {
 		{
 			name:          "empty public key",
 			publicKey:     "",
+			alias:         "",
+			errorExpected: true,
+		},
+		{
+			name:          "invalid public key length - 2 chars",
+			publicKey:     "0X",
+			alias:         "",
+			errorExpected: true,
+		},
+		{
+			name:          "invalid public key length - public key length minus 1 char",
+			publicKey:     "0x04eedbaafd6adf4a9233a13e7b1c3c14461fffeba2e9054b8d456ce5f6ebeafadcbf3dce3716253fbc391277fa5a086b60b283daf61fb5b1f26895f456c2f31ae",
+			alias:         "",
+			errorExpected: true,
+		},
+		{
+			name:          "invalid public key length - more chars than the public key",
+			publicKey:     "0x04eedbaafd6adf4a9233a13e7b1c3c14461fffeba2e9054b8d456ce5f6ebeafadcbf3dce3716253fbc391277fa5a086b60b283daf61fb5b1f26895f456c2f31ae304eedbaafd6adf4a9233a13e7b1c3c14461fffeba2e9054b8d456ce5f6ebeafadcbf3dce3716253fbc391277fa5a086b60b283daf61fb5b1f26895f456c2f31ae3",
 			alias:         "",
 			errorExpected: true,
 		},
