@@ -14,7 +14,7 @@ type EventCallbacks struct {
 	ActiveNetworksChangeCb ActiveNetworksChangeCb
 }
 
-type ActiveNetworksChangeCb func(params *ActiveNetworksChangedParams)
+type ActiveNetworksChangeCb func()
 
 // Watcher executes a given callback whenever a network event is emitted
 type Watcher struct {
@@ -49,17 +49,12 @@ func (w *Watcher) Stop() {
 	}
 }
 
-func onActiveNetworksChange(callback ActiveNetworksChangeCb, params *ActiveNetworksChangedParams) {
+func onActiveNetworksChange(callback ActiveNetworksChangeCb) {
 	if callback == nil {
 		return
 	}
 
-	if params == nil {
-		logutils.ZapLogger().Error("no params in event EventTypeActiveNetworksChanged")
-		return
-	}
-
-	callback(params)
+	callback()
 }
 
 func watch(ctx context.Context, accountFeed *event.Feed, callbacks EventCallbacks) error {
@@ -78,7 +73,7 @@ func watch(ctx context.Context, accountFeed *event.Feed, callbacks EventCallback
 		case ev := <-ch:
 			switch ev.Type {
 			case EventTypeActiveNetworksChanged:
-				onActiveNetworksChange(callbacks.ActiveNetworksChangeCb, ev.ActiveNetworksChangedParams)
+				onActiveNetworksChange(callbacks.ActiveNetworksChangeCb)
 			}
 		}
 	}

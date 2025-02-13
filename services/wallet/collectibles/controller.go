@@ -365,15 +365,13 @@ func (c *Controller) startNetworkEventsWatcher() {
 		return
 	}
 
-	activeNetworksChangeCb := func(params *networksevent.ActiveNetworksChangedParams) {
+	activeNetworksChangeCb := func() {
 		// Lazy logic for now, just restart everything if there's any network change.
 		// TODO #17183: Per-network logic
-		if len(params.ActivatedChainIDs) > 0 || len(params.DeactivatedChainIDs) > 0 {
-			c.stopPeriodicalOwnershipFetch()
-			err := c.startPeriodicalOwnershipFetch()
-			if err != nil {
-				logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Error(err))
-			}
+		c.stopPeriodicalOwnershipFetch()
+		err := c.startPeriodicalOwnershipFetch()
+		if err != nil {
+			logutils.ZapLogger().Error("Error starting periodical collectibles fetch", zap.Error(err))
 		}
 	}
 
