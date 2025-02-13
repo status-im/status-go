@@ -9,10 +9,7 @@
         },
         "result": {
             "properties": {
-                "cursor": {
-                    "type": "string"
-                },
-                "notifications": {
+                "activityCenterNotifications": {
                     "items": {
                         "properties": {
                             "accepted": {
@@ -59,9 +56,6 @@
                                     "compressedKey": {
                                         "type": "string"
                                     },
-                                    "contactRequestState": {
-                                        "type": "integer"
-                                    },
                                     "contentType": {
                                         "type": "integer"
                                     },
@@ -94,38 +88,6 @@
                                     },
                                     "messageType": {
                                         "type": "integer"
-                                    },
-                                    "new": {
-                                        "type": "boolean"
-                                    },
-                                    "parsedText": {
-                                        "items": {
-                                            "properties": {
-                                                "children": {
-                                                    "items": {
-                                                        "properties": {
-                                                            "literal": {
-                                                                "type": "string"
-                                                            }
-                                                        },
-                                                        "required": [
-                                                            "literal"
-                                                        ],
-                                                        "type": "object"
-                                                    },
-                                                    "type": "array"
-                                                },
-                                                "type": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "required": [
-                                                "children",
-                                                "type"
-                                            ],
-                                            "type": "object"
-                                        },
-                                        "type": "array"
                                     },
                                     "quotedMessage": {
                                         "type": "null"
@@ -216,6 +178,9 @@
                                     "from": {
                                         "type": "string"
                                     },
+                                    "gapParameters": {
+                                        "type": "object"
+                                    },
                                     "id": {
                                         "type": "string"
                                     },
@@ -230,6 +195,9 @@
                                     },
                                     "messageType": {
                                         "type": "integer"
+                                    },
+                                    "outgoingStatus": {
+                                        "type": "string"
                                     },
                                     "parsedText": {
                                         "items": {
@@ -296,11 +264,13 @@
                                     "emojiHash",
                                     "ensName",
                                     "from",
+                                    "gapParameters",
                                     "id",
                                     "identicon",
                                     "lineCount",
                                     "localChatId",
                                     "messageType",
+                                    "outgoingStatus",
                                     "parsedText",
                                     "quotedMessage",
                                     "replace",
@@ -360,10 +330,33 @@
                         "type": "object"
                     },
                     "type": "array"
+                },
+                "activityCenterState": {
+                    "properties": {
+                        "hasSeen": {
+                            "type": "boolean"
+                        },
+                        "updatedAt": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "hasSeen",
+                        "updatedAt"
+                    ],
+                    "type": "object"
+                },
+                "discordOldestMessageTimestamp": {
+                    "type": "integer"
+                },
+                "notifications": {
+                    "type": "null"
                 }
             },
             "required": [
-                "cursor",
+                "activityCenterNotifications",
+                "activityCenterState",
+                "discordOldestMessageTimestamp",
                 "notifications"
             ],
             "type": "object"

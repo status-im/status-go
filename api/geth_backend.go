@@ -590,6 +590,10 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 			return errors.Wrap(err, "failed to generate account info")
 		}
 
+		if info.KeyUID != request.KeyUID {
+			return errors.New("mnemonic does not match this account")
+		}
+
 		derivedAddresses, err := b.getDerivedAddresses(info.ID)
 		if err != nil {
 			return errors.Wrap(err, "failed to get derived addresses")
@@ -605,7 +609,11 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	}
 
 	if acc.KDFIterations == 0 {
-		acc.KDFIterations = dbsetup.ReducedKDFIterationsNumber
+		var err error
+		acc.KDFIterations, err = b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
+		if err != nil {
+			return errors.Wrap(err, "failed to get account kdf iterations number")
+		}
 	}
 
 	err := b.ensureDBsOpened(acc, request.Password)
