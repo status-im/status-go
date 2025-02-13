@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 )
 
@@ -12,13 +13,13 @@ import (
 type Envelope interface {
 	Message() *pb.WakuMessage
 	PubsubTopic() string
-	Hash() MessageHash
+	Hash() pb.MessageHash
 }
 
 type envelopeImpl struct {
 	msg   *pb.WakuMessage
 	topic string
-	hash  MessageHash
+	hash  pb.MessageHash
 }
 
 type tmpWakuMessageJson struct {
@@ -34,7 +35,7 @@ type tmpWakuMessageJson struct {
 type tmpEnvelopeStruct struct {
 	WakuMessage tmpWakuMessageJson `json:"wakuMessage"`
 	PubsubTopic string             `json:"pubsubTopic"`
-	MessageHash MessageHash        `json:"messageHash"`
+	MessageHash string             `json:"messageHash"`
 }
 
 // NewEnvelope creates a new Envelope from a json string generated in nwaku
@@ -45,6 +46,7 @@ func NewEnvelope(jsonEventStr string) (Envelope, error) {
 		return nil, err
 	}
 
+	hash, err := hexutil.Decode(tmpEnvelopeStruct.MessageHash)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +62,7 @@ func NewEnvelope(jsonEventStr string) (Envelope, error) {
 			RateLimitProof: tmpEnvelopeStruct.WakuMessage.RateLimitProof,
 		},
 		topic: tmpEnvelopeStruct.PubsubTopic,
-		hash:  tmpEnvelopeStruct.MessageHash,
+		hash:  pb.ToMessageHash(hash),
 	}, nil
 }
 
@@ -72,6 +74,6 @@ func (e *envelopeImpl) PubsubTopic() string {
 	return e.topic
 }
 
-func (e *envelopeImpl) Hash() MessageHash {
+func (e *envelopeImpl) Hash() pb.MessageHash {
 	return e.hash
 }
