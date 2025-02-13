@@ -317,6 +317,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -336,14 +337,14 @@ import (
 )
 
 const requestTimeout = 30 * time.Second
-const MsgChanBufferSize = 100
-const TopicHealthChanBufferSize = 100
-const ConnectionChangeChanBufferSize = 100
+const MsgChanBufferSize = 1024
+const TopicHealthChanBufferSize = 1024
+const ConnectionChangeChanBufferSize = 1024
 
 type WakuConfig struct {
 	Host                        string           `json:"host,omitempty"`
 	Nodekey                     string           `json:"nodekey,omitempty"`
-	Relay                       bool             `json:"relay,omitempty"`
+	Relay                       bool             `json:"relay"`
 	Store                       bool             `json:"store,omitempty"`
 	LegacyStore                 bool             `json:"legacyStore"`
 	Storenode                   string           `json:"storenode,omitempty"`
@@ -432,17 +433,17 @@ func GoCallback(ret C.int, msg *C.char, len C.size_t, resp unsafe.Pointer) {
 type WakuNode struct {
 	wakuCtx              unsafe.Pointer
 	config               *WakuConfig
-	logger               *zap.Logger
 	MsgChan              chan common.Envelope
 	TopicHealthChan      chan topicHealth
 	ConnectionChangeChan chan connectionChange
+	nodeName             string
 }
 
-func NewWakuNode(config *WakuConfig, logger *zap.Logger) (*WakuNode, error) {
-
+func NewWakuNode(config *WakuConfig, nodeName string) (*WakuNode, error) {
+	Debug("Creating new WakuNode: %v", nodeName)
 	n := &WakuNode{
-		config: config,
-		logger: logger,
+		config:   config,
+		nodeName: nodeName,
 	}
 
 	wg := sync.WaitGroup{}
@@ -453,14 +454,14 @@ func NewWakuNode(config *WakuConfig, logger *zap.Logger) (*WakuNode, error) {
 	}
 
 	var cJsonConfig = C.CString(string(jsonConfig))
-
 	var resp = C.allocResp(unsafe.Pointer(&wg))
 
 	defer C.free(unsafe.Pointer(cJsonConfig))
 	defer C.freeResp(resp)
 
 	if C.getRet(resp) != C.RET_OK {
-		errMsg := "error wakuNew: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		Error("error wakuNew for %s: %v", nodeName, errMsg)
 		return nil, errors.New(errMsg)
 	}
 
@@ -472,10 +473,10 @@ func NewWakuNode(config *WakuConfig, logger *zap.Logger) (*WakuNode, error) {
 	n.TopicHealthChan = make(chan topicHealth, TopicHealthChanBufferSize)
 	n.ConnectionChangeChan = make(chan connectionChange, ConnectionChangeChanBufferSize)
 
-	// Notice that the events for self node are handled by the 'MyEventCallback' method
 	C.cGoWakuSetEventCallback(n.wakuCtx)
 	registerNode(n)
 
+	Debug("Successfully created WakuNode: %s", nodeName)
 	return n, nil
 }
 
@@ -537,7 +538,8 @@ func (n *WakuNode) OnEvent(eventStr string) {
 	jsonEvent := jsonEvent{}
 	err := json.Unmarshal([]byte(eventStr), &jsonEvent)
 	if err != nil {
-		n.logger.Error("could not unmarshal nwaku event string", zap.Error(err))
+		Error("could not unmarshal nwaku event string: %v", err)
+
 		return
 	}
 
@@ -554,7 +556,7 @@ func (n *WakuNode) OnEvent(eventStr string) {
 func (n *WakuNode) parseMessageEvent(eventStr string) {
 	envelope, err := common.NewEnvelope(eventStr)
 	if err != nil {
-		n.logger.Error("could not parse message", zap.Error(err))
+		Error("could not parse message %v", err)
 	}
 	n.MsgChan <- envelope
 }
@@ -564,7 +566,7 @@ func (n *WakuNode) parseTopicHealthChangeEvent(eventStr string) {
 	topicHealth := topicHealth{}
 	err := json.Unmarshal([]byte(eventStr), &topicHealth)
 	if err != nil {
-		n.logger.Error("could not parse topic health change", zap.Error(err))
+		Error("could not parse topic health change %v", err)
 	}
 	n.TopicHealthChan <- topicHealth
 }
@@ -574,40 +576,44 @@ func (n *WakuNode) parseConnectionChangeEvent(eventStr string) {
 	connectionChange := connectionChange{}
 	err := json.Unmarshal([]byte(eventStr), &connectionChange)
 	if err != nil {
-		n.logger.Error("could not parse connection change", zap.Error(err))
+		Error("could not parse connection change %v", err)
 	}
 	n.ConnectionChangeChan <- connectionChange
 }
 
 func (n *WakuNode) GetNumConnectedRelayPeers(optPubsubTopic ...string) (int, error) {
-	var pubsubTopic string
-	if len(optPubsubTopic) == 0 {
-		pubsubTopic = ""
-	} else {
+
+	Debug("Fetching number of connected relay peers for %s", n.nodeName)
+	pubsubTopic := ""
+	if len(optPubsubTopic) > 0 {
 		pubsubTopic = optPubsubTopic[0]
 	}
 
 	wg := sync.WaitGroup{}
-
 	var resp = C.allocResp(unsafe.Pointer(&wg))
 	defer C.freeResp(resp)
 
 	var cPubsubTopic = C.CString(pubsubTopic)
 	defer C.free(unsafe.Pointer(cPubsubTopic))
 
+	wg.Add(1)
 	C.cGoWakuGetNumConnectedRelayPeers(n.wakuCtx, cPubsubTopic, resp)
+	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
 		numPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		numPeers, err := strconv.Atoi(numPeersStr)
 		if err != nil {
-			errMsg := "GetNumConnectedRelayPeers - error converting string to int: " + err.Error()
-			return 0, errors.New(errMsg)
+			Error("Failed to convert relay peer count for %s: %v", n.nodeName, err)
+			return 0, err
 		}
+		Debug("Successfully fetched number of connected relay peers for %s: %d", n.nodeName, numPeers)
 		return numPeers, nil
 	}
-	errMsg := "error GetNumConnectedRelayPeers: " +
-		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+
+	errMsg := "error GetNumConnectedRelayPeers: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to get number of connected relay peers for %s: %s", n.nodeName, errMsg)
+
 	return 0, errors.New(errMsg)
 }
 
@@ -631,8 +637,15 @@ func (n *WakuNode) DisconnectPeerByID(peerID peer.ID) error {
 }
 
 func (n *WakuNode) GetConnectedPeers() (peer.IDSlice, error) {
-	wg := sync.WaitGroup{}
+	if n == nil {
+		err := errors.New("waku node is nil")
+		Error("Failed to get connected peers %v", err)
+		return nil, err
+	}
 
+	Debug("Fetching connected peers for %v", n.nodeName)
+
+	wg := sync.WaitGroup{}
 	var resp = C.allocResp(unsafe.Pointer(&wg))
 	defer C.freeResp(resp)
 
@@ -643,23 +656,29 @@ func (n *WakuNode) GetConnectedPeers() (peer.IDSlice, error) {
 	if C.getRet(resp) == C.RET_OK {
 		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		if peersStr == "" {
+			Debug("No connected peers found for " + n.nodeName)
 			return nil, nil
 		}
-		// peersStr contains a comma-separated list of peer ids
-		itemsPeerIds := strings.Split(peersStr, ",")
+
+		peerIDs := strings.Split(peersStr, ",")
 		var peers peer.IDSlice
-		for _, peerId := range itemsPeerIds {
-			id, err := peer.Decode(peerId)
+		for _, peerID := range peerIDs {
+			id, err := peer.Decode(peerID)
 			if err != nil {
-				return nil, fmt.Errorf("GetConnectedPeers - decoding peerId: %w", err)
+				Error("Failed to decode peer ID for "+n.nodeName, zap.Error(err))
+				return nil, err
 			}
 			peers = append(peers, id)
 		}
+
+		Debug("Successfully fetched connected peers for "+n.nodeName, zap.Int("count", len(peers)))
 		return peers, nil
 	}
-	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return nil, fmt.Errorf("GetConnectedPeers: %s", errMsg)
 
+	errMsg := "error GetConnectedPeers: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to get connected peers for "+n.nodeName, zap.String("error", errMsg))
+
+	return nil, errors.New(errMsg)
 }
 
 func (n *WakuNode) RelaySubscribe(pubsubTopic string) error {
@@ -962,54 +981,74 @@ func (n *WakuNode) PingPeer(ctx context.Context, peerInfo peer.AddrInfo) (time.D
 }
 
 func (n *WakuNode) Start() error {
-	wg := sync.WaitGroup{}
+	Debug("Starting %s", n.nodeName)
 
+	wg := sync.WaitGroup{}
 	var resp = C.allocResp(unsafe.Pointer(&wg))
 	defer C.freeResp(resp)
 
 	wg.Add(1)
 	C.cGoWakuStart(n.wakuCtx, resp)
 	wg.Wait()
+
 	if C.getRet(resp) == C.RET_OK {
+		Debug("Successfully started %s", n.nodeName)
 		return nil
 	}
 
 	errMsg := "error WakuStart: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to start %s: %s", n.nodeName, errMsg)
+
 	return errors.New(errMsg)
 }
 
 func (n *WakuNode) Stop() error {
-	wg := sync.WaitGroup{}
 
+	Debug("Stopping %s", n.nodeName)
+	wg := sync.WaitGroup{}
 	var resp = C.allocResp(unsafe.Pointer(&wg))
 	defer C.freeResp(resp)
 
 	wg.Add(1)
 	C.cGoWakuStop(n.wakuCtx, resp)
 	wg.Wait()
+
 	if C.getRet(resp) == C.RET_OK {
-		unregisterNode(n)
+		Debug("Successfully stopped %s", n.nodeName)
 		return nil
 	}
 
 	errMsg := "error WakuStop: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to stop %s: %s", n.nodeName, errMsg)
+
 	return errors.New(errMsg)
 }
 
 func (n *WakuNode) Destroy() error {
-	wg := sync.WaitGroup{}
+	if n == nil {
+		err := errors.New("waku node is nil")
+		Error("Failed to destroy %v", err)
+		return err
+	}
 
+	Debug("Destroying %v", n.nodeName)
+
+	wg := sync.WaitGroup{}
 	var resp = C.allocResp(unsafe.Pointer(&wg))
 	defer C.freeResp(resp)
 
 	wg.Add(1)
 	C.cGoWakuDestroy(n.wakuCtx, resp)
 	wg.Wait()
+
 	if C.getRet(resp) == C.RET_OK {
+		Debug("Successfully destroyed " + n.nodeName)
 		return nil
 	}
 
 	errMsg := "error WakuDestroy: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to destroy "+n.nodeName, zap.String("error", errMsg))
+
 	return errors.New(errMsg)
 }
 
@@ -1237,11 +1276,24 @@ func (n *WakuNode) DialPeer(ctx context.Context, peerAddr multiaddr.Multiaddr, p
 }
 
 func (n *WakuNode) GetNumConnectedPeers() (int, error) {
-	peers, err := n.GetConnectedPeers()
-	if err != nil {
+	if n == nil {
+		err := errors.New("waku node is nil")
+		Error("Failed to get number of connected peers %v", err)
 		return 0, err
 	}
-	return len(peers), nil
+
+	Debug("Fetching number of connected peers for %v", n.nodeName)
+
+	peers, err := n.GetConnectedPeers()
+	if err != nil {
+		Error("Failed to fetch connected peers for %v %v ", n.nodeName, err)
+		return 0, err
+	}
+
+	numPeers := len(peers)
+	Debug("Successfully fetched number of connected peers for "+n.nodeName, zap.Int("count", numPeers))
+
+	return numPeers, nil
 }
 
 func getContextTimeoutMilliseconds(ctx context.Context) int {
@@ -1254,4 +1306,160 @@ func getContextTimeoutMilliseconds(ctx context.Context) int {
 
 func FormatWakuRelayTopic(clusterId uint16, shard uint16) string {
 	return fmt.Sprintf("/waku/2/rs/%d/%d", clusterId, shard)
+}
+
+func GetFreePortIfNeeded(tcpPort int, discV5UDPPort int) (int, int, error) {
+	if tcpPort == 0 {
+		for i := 0; i < 10; i++ {
+			tcpAddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("localhost", "0"))
+			if err != nil {
+				Warn("unable to resolve tcp addr: %v", zap.Error(err))
+				continue
+			}
+			tcpListener, err := net.ListenTCP("tcp", tcpAddr)
+			if err != nil {
+				Warn("unable to listen on addr: addr=%v, error=%v", tcpAddr, err)
+
+				continue
+			}
+			tcpPort = tcpListener.Addr().(*net.TCPAddr).Port
+			tcpListener.Close()
+			break
+		}
+		if tcpPort == 0 {
+			return -1, -1, errors.New("could not obtain a free TCP port")
+		}
+	}
+
+	if discV5UDPPort == 0 {
+		for i := 0; i < 10; i++ {
+			udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("localhost", "0"))
+			if err != nil {
+				Warn("unable to resolve udp addr: %v", err)
+				continue
+			}
+
+			udpListener, err := net.ListenUDP("udp", udpAddr)
+			if err != nil {
+				Warn("unable to listen on addr: addr=%v, error=%v", udpAddr, err)
+
+				continue
+			}
+
+			discV5UDPPort = udpListener.LocalAddr().(*net.UDPAddr).Port
+			udpListener.Close()
+			break
+		}
+		if discV5UDPPort == 0 {
+			return -1, -1, errors.New("could not obtain a free UDP port")
+		}
+	}
+
+	return tcpPort, discV5UDPPort, nil
+}
+
+// Create & start node
+func StartWakuNode(nodeName string, customCfg *WakuConfig) (*WakuNode, error) {
+
+	Debug("Initializing %s", nodeName)
+
+	var nodeCfg WakuConfig
+	if customCfg == nil {
+		nodeCfg = DefaultWakuConfig
+	} else {
+		nodeCfg = *customCfg
+	}
+
+	Debug("Creating %s", nodeName)
+	node, err := NewWakuNode(&nodeCfg, nodeName)
+	if err != nil {
+		Error("Failed to create %s: %v", nodeName, err)
+		return nil, err
+	}
+
+	Debug("Starting %s", nodeName)
+	if err := node.Start(); err != nil {
+		Error("Failed to start %s: %v", nodeName, err)
+		return nil, err
+	}
+
+	Debug("Successfully started %s", nodeName)
+	return node, nil
+}
+
+func (n *WakuNode) StopAndDestroy() error {
+	if n == nil {
+		err := errors.New("waku node is nil")
+		Error("Failed to stop and destroy: %v", err)
+		return err
+	}
+
+	Debug("Stopping %s", n.nodeName)
+
+	err := n.Stop()
+	if err != nil {
+		Error("Failed to stop %s: %v", n.nodeName, err)
+		return err
+	}
+
+	Debug("Destroying %s", n.nodeName)
+
+	err = n.Destroy()
+	if err != nil {
+		Error("Failed to destroy %s: %v", n.nodeName, err)
+		return err
+	}
+
+	Debug("Successfully stopped and destroyed %s", n.nodeName)
+	return nil
+}
+
+func (n *WakuNode) ConnectPeer(targetNode *WakuNode) error {
+
+	Debug("Connecting %s to %s", n.nodeName, targetNode.nodeName)
+
+	targetPeerID, err := targetNode.PeerID()
+	if err != nil {
+		Error("Failed to get PeerID of target node %s: %v", targetNode.nodeName, err)
+		return err
+	}
+
+	targetAddr, err := targetNode.ListenAddresses()
+	if err != nil || len(targetAddr) == 0 {
+		Error("Failed to get listen addresses for target node %s: %v", targetNode.nodeName, err)
+		return errors.New("target node has no listen addresses")
+	}
+
+	Debug("Attempting connection to peer %s", targetPeerID.String())
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	err = n.Connect(ctx, targetAddr[0])
+	if err != nil {
+		Error("Failed to connect to peer %s: %v", targetPeerID.String(), err)
+		return err
+	}
+
+	Debug("Successfully connected %s to %s", n.nodeName, targetNode.nodeName)
+	return nil
+}
+
+func (n *WakuNode) DisconnectPeer(target *WakuNode) error {
+	Debug("Disconnecting %s from %s", n.nodeName, target.nodeName)
+
+	targetPeerID, err := target.PeerID()
+	if err != nil {
+		Error("Failed to get PeerID of target node %s: %v", target.nodeName, err)
+		return err
+	}
+
+	err = n.DisconnectPeerByID(targetPeerID)
+	if err != nil {
+		Error("Failed to disconnect peer %s: %v", targetPeerID.String(), err)
+		return err
+	}
+
+	Debug("Successfully disconnected %s from %s", n.nodeName, target.nodeName)
+	return nil
 }

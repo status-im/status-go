@@ -35,5 +35,10 @@ func (h MessageHash) String() string {
 }
 
 func (h MessageHash) Bytes() ([]byte, error) {
-	return hex.DecodeString(string(h))
+	s := string(h)
+	// Remove 0x prefix if present
+	if len(s) >= 2 && s[:2] == "0x" {
+		s = s[2:]
+	}
+	return hex.DecodeString(s)
 }
