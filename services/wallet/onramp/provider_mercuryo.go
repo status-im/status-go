@@ -17,7 +17,7 @@ import (
 )
 
 const mercuryoID = "mercuryo"
-const mercuryioNoFeesBaseURL = "https://exchange.mercuryo.io/?type=buy&networks=ETHEREUM,ARBITRUM,OPTIMISM&currency=ETH"
+const mercuryioNoFeesBaseURL = "https://exchange.mercuryo.io/?type=buy&networks=ETHEREUM,ARBITRUM,OPTIMISM,BASE&currency=ETH"
 const supportedAssetsUpdateInterval = 24 * time.Hour
 
 type MercuryoProvider struct {
