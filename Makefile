@@ -146,6 +146,16 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	echo "Compilation done." ;\
 	echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
+LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(GOBIN_SHARED_LIB_EXT)
+$(LIBWAKU):
+ifeq ($(USE_NWAKU),true)
+	@echo "Building libwaku"
+	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku
+else
+	@echo "Cloning nwaku"
+	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku prepare
+endif
+
 statusgo: ##@build Build status-go as statusd server
 statusgo: build/bin/statusd
 statusd: statusgo
@@ -198,8 +208,7 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
 statusgo-library: generate
-statusgo-library: ##@cross-compile Build status-go as static library for current platform
-	$(MAKE) $(LIBWAKU)
+statusgo-library: $(LIBWAKU) ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
@@ -213,16 +222,11 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Static library built:"
 	@ls -la build/bin/libstatus.*
 
-LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(GOBIN_SHARED_LIB_EXT)
-$(LIBWAKU):
-	@echo "Building libwaku"
-	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku
 
 build-libwaku: $(LIBWAKU)
 
 statusgo-shared-library: generate
-statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
-	$(MAKE) $(LIBWAKU)
+statusgo-shared-library: $(LIBWAKU) ##@cross-compile Build status-go as shared library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
