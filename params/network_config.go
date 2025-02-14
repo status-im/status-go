@@ -1,6 +1,10 @@
 package params
 
-import "github.com/ethereum/go-ethereum/common"
+import (
+	"strings"
+
+	"github.com/ethereum/go-ethereum/common"
+)
 
 // RpcProviderAuthType defines the different types of authentication for RPC providers
 type RpcProviderAuthType string
@@ -39,7 +43,7 @@ type RpcProvider struct {
 // GetFullURL returns the URL with auth token if TokenAuth is used
 func (p RpcProvider) GetFullURL() string {
 	if p.AuthType == TokenAuth && p.AuthToken != "" {
-		return p.URL + "/" + p.AuthToken
+		return strings.TrimRight(p.URL, "/") + "/" + p.AuthToken
 	}
 	return p.URL
 }

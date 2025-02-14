@@ -266,6 +266,22 @@ func overrideApiConfigProd(nodeConfig *params.NodeConfig, config *requests.APICo
 	nodeConfig.WSPort = config.WSPort
 }
 
+// getMainnetRPCURL retuevrns URL of the first provider with TokenAuth from mainnet network
+func getMainnetRPCURL(networks []params.Network) string {
+	for _, network := range networks {
+		if network.ChainID != MainnetChainID {
+			continue
+		}
+		for _, provider := range network.RpcProviders {
+			if provider.AuthType == params.TokenAuth && provider.Enabled {
+				return provider.GetFullURL()
+			}
+		}
+		break
+	}
+	return ""
+}
+
 func DefaultNodeConfig(installationID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
@@ -356,13 +372,13 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	if request.VerifyTransactionURL != nil {
 		nodeConfig.ShhextConfig.VerifyTransactionURL = *request.VerifyTransactionURL
 	} else {
-		nodeConfig.ShhextConfig.VerifyTransactionURL = mainnet(request.WalletSecretsConfig.StatusProxyStageName).FallbackURL
+		nodeConfig.ShhextConfig.VerifyTransactionURL = getMainnetRPCURL(nodeConfig.Networks)
 	}
 
 	if request.VerifyENSURL != nil {
 		nodeConfig.ShhextConfig.VerifyENSURL = *request.VerifyENSURL
 	} else {
-		nodeConfig.ShhextConfig.VerifyENSURL = mainnet(request.WalletSecretsConfig.StatusProxyStageName).FallbackURL
+		nodeConfig.ShhextConfig.VerifyENSURL = getMainnetRPCURL(nodeConfig.Networks)
 	}
 
 	if request.VerifyTransactionChainID != nil {
