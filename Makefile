@@ -151,9 +151,6 @@ $(LIBWAKU):
 ifeq ($(USE_NWAKU),true)
 	@echo "Building libwaku"
 	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku
-else
-	@echo "Cloning nwaku"
-	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku prepare
 endif
 
 statusgo: ##@build Build status-go as statusd server

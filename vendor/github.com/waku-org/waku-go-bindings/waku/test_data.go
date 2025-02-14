@@ -2,9 +2,11 @@ package waku
 
 import (
 	"time"
+
+	"github.com/waku-org/waku-go-bindings/waku/common"
 )
 
-var DefaultWakuConfig WakuConfig
+var DefaultWakuConfig common.WakuConfig
 
 func init() {
 
@@ -15,7 +17,7 @@ func init() {
 		Error("Failed to get free ports %v %v", err1, err2)
 	}
 
-	DefaultWakuConfig = WakuConfig{
+	DefaultWakuConfig = common.WakuConfig{
 		Relay:           false,
 		LogLevel:        "DEBUG",
 		Discv5Discovery: true,
