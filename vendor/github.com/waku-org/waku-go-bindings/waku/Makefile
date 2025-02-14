@@ -5,7 +5,7 @@ THIRD_PARTY_DIR := ../third_party
 NWAKU_REPO := https://github.com/waku-org/nwaku
 NWAKU_DIR := $(THIRD_PARTY_DIR)/nwaku
 
-.PHONY: all clean prepare build
+.PHONY: all clean prepare build-libwaku build
 
 # Default target
 all: build
@@ -22,12 +22,14 @@ prepare:
 	else \
 		echo "nwaku repository already exists."; \
 	fi
-	
+
+# Build libwaku
+build-libwaku: prepare
 	@echo "Building libwaku..."
 	@cd $(NWAKU_DIR) && make libwaku
 
 # Build Waku Go Bindings
-build: prepare
+build: build-libwaku
 	@echo "Building Waku Go Bindings..."
 	go build ./...
 
