@@ -66,6 +66,7 @@ import (
 	node "github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/waku-go-bindings/waku"
+	bindingscommon "github.com/waku-org/waku-go-bindings/waku/common"
 )
 
 const messageQueueLimit = 1024
@@ -141,7 +142,7 @@ type Waku struct {
 	wg     sync.WaitGroup
 
 	cfg     *Config
-	wakuCfg *waku.WakuConfig
+	wakuCfg *bindingscommon.WakuConfig
 
 	options []node.WakuNodeOption
 
@@ -199,7 +200,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *waku.WakuConfig, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, nwakuCfg *bindingscommon.WakuConfig, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	node, err := wakuNew(nodeKey,
 		fleet,
 		cfg,
@@ -2176,7 +2177,7 @@ func printStackTrace() {
 func wakuNew(nodeKey *ecdsa.PrivateKey,
 	fleet string,
 	cfg *Config, // TODO: merge Config and WakuConfig
-	nwakuCfg *waku.WakuConfig,
+	nwakuCfg *bindingscommon.WakuConfig,
 	logger *zap.Logger,
 	appDB *sql.DB,
 	ts *timesource.NTPTimeSource,
@@ -2223,13 +2224,13 @@ func wakuNew(nodeKey *ecdsa.PrivateKey,
 		nwakuCfg.Filter = true
 		nwakuCfg.FilterMaxPeersToServe = 20
 		nwakuCfg.Lightpush = true
-		nwakuCfg.RateLimits.Filter = &waku.RateLimit{Volume: 100, Period: 1, TimeUnit: waku.Second}
-		nwakuCfg.RateLimits.Lightpush = &waku.RateLimit{Volume: 5, Period: 1, TimeUnit: waku.Second}
+		nwakuCfg.RateLimits.Filter = &bindingscommon.RateLimit{Volume: 100, Period: 1, TimeUnit: bindingscommon.Second}
+		nwakuCfg.RateLimits.Lightpush = &bindingscommon.RateLimit{Volume: 5, Period: 1, TimeUnit: bindingscommon.Second}
 	}
 
 	if cfg.EnablePeerExchangeServer {
 		nwakuCfg.PeerExchange = true
-		nwakuCfg.RateLimits.PeerExchange = &waku.RateLimit{Volume: 5, Period: 1, TimeUnit: waku.Second}
+		nwakuCfg.RateLimits.PeerExchange = &bindingscommon.RateLimit{Volume: 5, Period: 1, TimeUnit: bindingscommon.Second}
 	}
 
 	wakunode, err := waku.NewWakuNode(nwakuCfg, "nwaku")
