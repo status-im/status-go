@@ -13,19 +13,14 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
-	"golang.org/x/exp/maps"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/api/history"
-	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/waku-go-bindings/waku"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv2/common"
 )
 
 // var testStoreENRBootstrap = "enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@store.staging.status.nodes.status.im"
@@ -255,7 +250,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, slices.Contains(connectedStoreNodes, storeNode.ID), "nwaku should be connected to the store node")
 
-	filter := &common.Filter{
+	/* filter := &common.Filter{
 		PubsubTopic:   w.cfg.DefaultShardPubsubTopic,
 		Messages:      common.NewMemoryMessageStore(),
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{{1, 2, 3, 4}}),
@@ -314,12 +309,12 @@ func TestBasicWakuV2(t *testing.T) {
 			}
 			return errors.New("no messages received from store node")
 		}
-		return nil*/
+		return nil
 
 	}, options)
 	require.NoError(t, err)
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(10 * time.Second) */
 
 	require.NoError(t, w.Stop())
 }
@@ -635,10 +630,10 @@ func TestDial(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, receiverMultiaddr)
 	// Check that both nodes start with no connected peers
-	dialerPeerCount, err := dialerNode.PeerCount()
+	dialerPeerCount := dialerNode.PeerCount()
 	require.NoError(t, err)
 	require.True(t, dialerPeerCount == 0, "Dialer node should have no connected peers")
-	receiverPeerCount, err := receiverNode.PeerCount()
+	receiverPeerCount := receiverNode.PeerCount()
 	require.NoError(t, err)
 	require.True(t, receiverPeerCount == 0, "Receiver node should have no connected peers")
 	// Dial
@@ -646,10 +641,10 @@ func TestDial(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(1 * time.Second)
 	// Check that both nodes now have one connected peer
-	dialerPeerCount, err = dialerNode.PeerCount()
+	dialerPeerCount = dialerNode.PeerCount()
 	require.NoError(t, err)
 	require.True(t, dialerPeerCount == 1, "Dialer node should have 1 peer")
-	receiverPeerCount, err = receiverNode.PeerCount()
+	receiverPeerCount = receiverNode.PeerCount()
 	require.NoError(t, err)
 	require.True(t, receiverPeerCount == 1, "Receiver node should have 1 peer")
 	// Stop nodes

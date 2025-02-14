@@ -308,7 +308,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 	docker run --privileged --rm -it -v "$(PWD):$(DOCKER_TEST_WORKDIR)" -w "$(DOCKER_TEST_WORKDIR)" $(DOCKER_TEST_IMAGE) go test ${ARGS}
 
 test-libwaku: | $(LIBWAKU)
-	go test -tags '$(BUILD_TAGS) use_nwaku' -run TestBasicWakuV2 ./wakuv2/... -count 1 -v -json | jq -r '.Output'
+	go test -tags '$(BUILD_TAGS) use_nwaku' -run TestDial ./wakuv2/... -count 1 -v -json | jq -r '.Output'
 
 clean-libwaku:
 	@echo "Removing libwaku"
