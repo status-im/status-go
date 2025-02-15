@@ -37,3 +37,13 @@ class TestContactRequests(MessengerTestCase):
             sleep(30)
         receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"))
         sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
+
+    def test_contact_request_with_ip_change(self):
+        sender = self.initialize_backend(await_signals=self.await_signals, privileged=True)
+        receiver = self.initialize_backend(await_signals=self.await_signals, privileged=True)
+        receiver.change_container_ip()
+
+        message_text = f"test_contact_request_{uuid4()}"
+        response = sender.wakuext_service.send_contact_request(receiver.public_key, message_text)
+        expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)[0]
+        receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"))

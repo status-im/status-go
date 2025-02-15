@@ -1,7 +1,9 @@
 FROM ghcr.io/foundry-rs/foundry:stable
 
-RUN apk update && \
-    apk add git bash
+USER root
+
+RUN apt-get update && \
+    apt-get install -y git bash
 
 WORKDIR /app
 

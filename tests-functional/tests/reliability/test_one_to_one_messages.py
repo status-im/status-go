@@ -34,3 +34,8 @@ class TestOneToOneMessages(MessengerTestCase):
             sleep(30)
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
         self.sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
+
+    def test_one_to_one_messages_with_ip_change(self):
+        self.test_one_to_one_message_baseline()
+        self.receiver.change_container_ip()
+        self.test_one_to_one_message_baseline()

@@ -17,15 +17,15 @@ class TestPrivateGroupMessages(MessengerTestCase):
     def test_multiple_group_chat_messages(self):
         self.test_private_group_messages_baseline(message_count=50)
 
-    def test_multiple_group_chat_messages_with_latency(self):
+    def test_private_group_chat_messages_with_latency(self):
         with self.add_latency(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
 
-    def test_multiple_group_chat_messages_with_packet_loss(self):
+    def test_private_group_chat_messages_with_packet_loss(self):
         with self.add_packet_loss(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
 
-    def test_multiple_group_chat_messages_with_low_bandwidth(self):
+    def test_private_group_chat_messages_with_low_bandwidth(self):
         with self.add_low_bandwith(self.receiver):
             self.test_private_group_messages_baseline(message_count=50)
 
@@ -39,3 +39,10 @@ class TestPrivateGroupMessages(MessengerTestCase):
             sleep(30)
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
         self.sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
+
+    def test_private_group_messages_with_ip_change(self):
+        self.make_contacts()
+        self.private_group_id = self.join_private_group()
+        self.private_group_message(1, self.private_group_id)
+        self.receiver.change_container_ip()
+        self.private_group_message(1, self.private_group_id)

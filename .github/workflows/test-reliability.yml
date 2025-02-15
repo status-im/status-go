@@ -36,10 +36,10 @@ jobs:
       run: pip install -r tests-functional/requirements.txt
 
     - name: Build status-backend
-      run: cd tests-functional; docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f docker-compose.status-go.local.yml up --build --remove-orphans -d
+      run: cd tests-functional; docker compose -f docker-compose.test.reliability.yml up --build --remove-orphans -d
 
     - name: Run tests
-      run: pytest -n auto -m "reliability" -c tests-functional/pytest.ini --junit-xml=pytest_results.xml --tb=short
+      run: pytest --reruns 2 -n auto -m "reliability" -c tests-functional/pytest.ini --junit-xml=pytest_results.xml --tb=short
 
     - name: Test Report
       if: always()

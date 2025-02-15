@@ -35,3 +35,10 @@ class TestCommunityMessages(MessengerTestCase):
             self.sender.wakuext_service.send_community_chat_message(message_chat_id, message_text)
             sleep(30)
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
+
+    def test_community_messages_with_ip_change(self):
+        message_chat_id = self.create_and_join_community()
+
+        self.community_messages(message_chat_id, 1)
+        self.receiver.change_container_ip()
+        self.community_messages(message_chat_id, 1)

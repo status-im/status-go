@@ -45,8 +45,8 @@ class StatusBackend(RpcClient, SignalClient):
                     url = f"http://127.0.0.1:{host_port}"
                     option.status_backend_port_range.remove(host_port)
                     break
-                except Exception:
-                    continue
+                except Exception as ex:
+                    logging.error(f"Error in starting the container: {str(ex)}")
             else:
                 raise RuntimeError(f"Failed to start container on ports: {ports_tried}")
 
@@ -334,3 +334,20 @@ class StatusBackend(RpcClient, SignalClient):
         finally:
             self.container = None
             logging.info("Container stopped.")
+
+    @retry(stop=stop_after_delay(10), wait=wait_fixed(0.1), reraise=True)
+    def change_container_ip(self, new_ip=None):
+        if not self.container:
+            raise RuntimeError("Container is not initialized.")
+        logging.info(f"Trying to change container {self.container.name} IP")
+        if not new_ip:
+            new_ip = f"172.11.0.{random.randint(2, 254)}"
+        docker_project_name = option.docker_project_name
+        network_name = f"{docker_project_name}_default"
+        try:
+            network = self.docker_client.networks.get(network_name)
+            network.disconnect(self.container)
+            network.connect(self.container, ipv4_address=new_ip)
+            logging.info(f"Changed container {self.container.name} IP to {new_ip}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to change container IP: {e}")
