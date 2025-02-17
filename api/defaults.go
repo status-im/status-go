@@ -270,7 +270,7 @@ func overrideApiConfigProd(nodeConfig *params.NodeConfig, config *requests.APICo
 // getMainnetRPCURL retuevrns URL of the first provider with TokenAuth from mainnet network
 func getMainnetRPCURL(networks []params.Network) string {
 	for _, network := range networks {
-		if network.ChainID != MainnetChainID {
+		if network.ChainID != common.MainnetChainID {
 			continue
 		}
 		for _, provider := range network.RpcProviders {
