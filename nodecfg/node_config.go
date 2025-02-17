@@ -828,6 +828,11 @@ func SetLogNamespaces(db *sql.DB, logNamespaces string) error {
 	return err
 }
 
+func SetLogEnabled(db *sql.DB, enabled bool) error {
+	_, err := db.Exec(`UPDATE log_config SET enabled = ?`, enabled)
+	return err
+}
+
 func SetMaxLogBackups(db *sql.DB, maxLogBackups uint) error {
 	_, err := db.Exec(`UPDATE log_config SET max_backups = ?`, maxLogBackups)
 	return err
