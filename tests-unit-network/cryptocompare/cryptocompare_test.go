@@ -7,7 +7,7 @@ import (
 	"github.com/status-im/status-go/params"
 	mock_network "github.com/status-im/status-go/rpc/network/mock"
 	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
+	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
