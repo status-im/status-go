@@ -1,4 +1,4 @@
-FROM ghcr.io/foundry-rs/foundry:stable
+FROM ghcr.io/foundry-rs/foundry:v0.3.0
 
 RUN apk update && \
     apk add git bash
