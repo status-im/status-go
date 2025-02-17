@@ -152,7 +152,7 @@ func TestAPI_GetAddressDetails(t *testing.T) {
 		},
 	}
 
-	networks = networkhelper.OverrideEmbeddedProxyProviders(networks, true, gofakeit.Username(), gofakeit.LetterN(5))
+	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, gofakeit.Username(), gofakeit.LetterN(5))
 	require.NotEmpty(t, networks)
 
 	config := rpc.ClientConfig{

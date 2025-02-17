@@ -158,7 +158,7 @@ func TestGetClientsUsingCache(t *testing.T) {
 				Type:         params.EmbeddedProxyProviderType,
 				AuthType:     params.BasicAuth,
 				AuthLogin:    "incorrectUser",
-				AuthPassword: "incorrectPwd", // will be replaced by correct values by OverrideEmbeddedProxyProviders
+				AuthPassword: "incorrectPwd", // will be replaced by correct values by OverrideBasicAuth
 				Enabled:      true,
 			})
 		}
@@ -173,7 +173,7 @@ func TestGetClientsUsingCache(t *testing.T) {
 		},
 	}
 
-	networks = networkhelper.OverrideEmbeddedProxyProviders(networks, true, user, password)
+	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, user, password)
 
 	config := ClientConfig{
 		Client:          nil,

@@ -93,28 +93,22 @@ func ReplaceEmbeddedProviders(currentProviders, newEmbeddedProviders []params.Rp
 	return append(userProviders, embeddedProviders...)
 }
 
-// OverrideEmbeddedProxyProviders updates all embedded-proxy providers in the given networks.
-// It sets the `Enabled` flag and configures the `AuthLogin` and `AuthPassword` for each provider.
-func OverrideEmbeddedProxyProviders(networks []params.Network, enabled bool, user, password string) []params.Network {
-	updatedNetworks := make([]params.Network, len(networks))
-	for i, network := range networks {
-		// Deep copy the network to avoid mutating the input slice
-		updatedNetwork := network
-		updatedProviders := make([]params.RpcProvider, len(network.RpcProviders))
+// OverrideBasicAuth updates providers of the specified type in the given networks.
+// It sets the `Enabled` flag and configures the `AuthLogin` and `AuthPassword` for each matching provider.
+func OverrideBasicAuth(networks []params.Network, providerType params.RpcProviderType, enabled bool, user, password string) []params.Network {
+	updatedNetworks := DeepCopyNetworks(networks)
 
-		// Update the embedded-proxy providers
-		for j, provider := range network.RpcProviders {
-			if provider.Type == params.EmbeddedProxyProviderType {
+	for i := range updatedNetworks {
+		network := &updatedNetworks[i]
+		for j := range network.RpcProviders {
+			provider := &network.RpcProviders[j]
+			if provider.Type == providerType {
 				provider.Enabled = enabled
 				provider.AuthType = params.BasicAuth
 				provider.AuthLogin = user
 				provider.AuthPassword = password
 			}
-			updatedProviders[j] = provider
 		}
-
-		updatedNetwork.RpcProviders = updatedProviders
-		updatedNetworks[i] = updatedNetwork
 	}
 
 	return updatedNetworks

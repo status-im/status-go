@@ -19,9 +19,10 @@ const (
 type RpcProviderType string
 
 const (
-	EmbeddedProxyProviderType  RpcProviderType = "embedded-proxy"  // Proxy-based RPC provider
-	EmbeddedDirectProviderType RpcProviderType = "embedded-direct" // Direct RPC provider
-	UserProviderType           RpcProviderType = "user"            // User-defined RPC provider
+	EmbeddedProxyProviderType       RpcProviderType = "embedded-proxy"         // Proxy-based RPC provider
+	EmbeddedEthRpcProxyProviderType RpcProviderType = "embedded-eth-rpc-proxy" // EthRpcProxy-based RPC provider (smart proxy)
+	EmbeddedDirectProviderType      RpcProviderType = "embedded-direct"        // Direct RPC provider
+	UserProviderType                RpcProviderType = "user"                   // User-defined RPC provider
 )
 
 // RpcProvider represents an RPC provider configuration with various options
@@ -109,6 +110,10 @@ func NewUserProvider(chainID uint64, name, url string, enableRpsLimiter bool) *R
 
 func NewProxyProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedProxyProviderType)
+}
+
+func NewEthRpcProxyProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
+	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedEthRpcProxyProviderType)
 }
 
 func NewDirectProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
