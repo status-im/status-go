@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 	"reflect"
+	"time"
 
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/params"
@@ -74,4 +75,12 @@ func WeiToGwei(val *big.Int) *big.Float {
 	unit.SetInt64(gethParams.GWei)
 
 	return result.Quo(result, new(big.Float).SetInt(unit))
+}
+
+func GetBlockCreationTimeForChain(chainID uint64) time.Duration {
+	blockDuration, found := AverageBlockDurationForChain[ChainID(chainID)]
+	if !found {
+		blockDuration = AverageBlockDurationForChain[ChainID(UnknownChainID)]
+	}
+	return blockDuration
 }

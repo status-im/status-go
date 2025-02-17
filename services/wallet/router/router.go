@@ -142,7 +142,7 @@ func (r *Router) SetTestBalanceMap(balanceMap map[string]*big.Int) {
 	}
 }
 
-func (r *Router) setCustomTxDetails(pathTxIdentity *requests.PathTxIdentity, pathTxCustomParams *requests.PathTxCustomParams) error {
+func (r *Router) setCustomTxDetails(ctx context.Context, pathTxIdentity *requests.PathTxIdentity, pathTxCustomParams *requests.PathTxCustomParams) error {
 	if pathTxIdentity == nil {
 		return ErrTxIdentityNotProvided
 	}
@@ -164,37 +164,32 @@ func (r *Router) setCustomTxDetails(pathTxIdentity *requests.PathTxIdentity, pat
 		return ErrCannotCustomizeIfNoRoute
 	}
 
+	fetchedFees, err := r.feesManager.SuggestedFees(ctx, pathTxIdentity.ChainID)
+	if err != nil {
+		return err
+	}
+
 	for _, path := range r.activeRoutes.Best {
 		if path.PathIdentity() != pathTxIdentity.PathIdentity() {
 			continue
 		}
 
-		if pathTxIdentity.IsApprovalTx {
-			path.ApprovalGasFeeMode = pathTxCustomParams.GasFeeMode
-			if pathTxCustomParams.GasFeeMode == fees.GasFeeCustom {
-				path.ApprovalTxNonce = (*hexutil.Uint64)(&pathTxCustomParams.Nonce)
-				path.ApprovalGasAmount = pathTxCustomParams.GasAmount
-				path.ApprovalMaxFeesPerGas = pathTxCustomParams.MaxFeesPerGas
-				path.ApprovalBaseFee = (*hexutil.Big)(new(big.Int).Sub(pathTxCustomParams.MaxFeesPerGas.ToInt(), pathTxCustomParams.PriorityFee.ToInt()))
-				path.ApprovalPriorityFee = pathTxCustomParams.PriorityFee
-			}
-		} else {
-			path.TxGasFeeMode = pathTxCustomParams.GasFeeMode
-			if pathTxCustomParams.GasFeeMode == fees.GasFeeCustom {
-				path.TxNonce = (*hexutil.Uint64)(&pathTxCustomParams.Nonce)
-				path.TxGasAmount = pathTxCustomParams.GasAmount
-				path.TxMaxFeesPerGas = pathTxCustomParams.MaxFeesPerGas
-				path.TxBaseFee = (*hexutil.Big)(new(big.Int).Sub(pathTxCustomParams.MaxFeesPerGas.ToInt(), pathTxCustomParams.PriorityFee.ToInt()))
-				path.TxPriorityFee = pathTxCustomParams.PriorityFee
-			}
-		}
-
+		// update the custom params
 		r.lastInputParamsMutex.Lock()
 		if r.lastInputParams.PathTxCustomParams == nil {
 			r.lastInputParams.PathTxCustomParams = make(map[string]*requests.PathTxCustomParams)
 		}
 		r.lastInputParams.PathTxCustomParams[pathTxIdentity.TxIdentityKey()] = pathTxCustomParams
 		r.lastInputParamsMutex.Unlock()
+
+		// update the path details
+		usedNonces := make(map[uint64]uint64)
+		err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, false, 0)
+		if err != nil {
+			return err
+		}
+		// inform the client about the changes
+		sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, nil)
 
 		return nil
 	}
@@ -207,14 +202,14 @@ func (r *Router) SetFeeMode(ctx context.Context, pathTxIdentity *requests.PathTx
 		return ErrCustomFeeModeCannotBeSetThisWay
 	}
 
-	return r.setCustomTxDetails(pathTxIdentity, &requests.PathTxCustomParams{GasFeeMode: feeMode})
+	return r.setCustomTxDetails(ctx, pathTxIdentity, &requests.PathTxCustomParams{GasFeeMode: feeMode})
 }
 
 func (r *Router) SetCustomTxDetails(ctx context.Context, pathTxIdentity *requests.PathTxIdentity, pathTxCustomParams *requests.PathTxCustomParams) error {
 	if pathTxCustomParams != nil && pathTxCustomParams.GasFeeMode != fees.GasFeeCustom {
 		return ErrOnlyCustomFeeModeCanBeSetThisWay
 	}
-	return r.setCustomTxDetails(pathTxIdentity, pathTxCustomParams)
+	return r.setCustomTxDetails(ctx, pathTxIdentity, pathTxCustomParams)
 }
 
 func newSuggestedRoutes(

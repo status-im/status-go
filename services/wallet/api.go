@@ -481,6 +481,11 @@ func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64,
 	return api.s.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, gweiToWei(maxFeePerGas)), nil
 }
 
+func (api *API) GetTransactionEstimatedTimeV2(ctx context.Context, chainID uint64, maxFeePerGas *hexutil.Big, maxPriorityFeePerGas *hexutil.Big) (uint, error) {
+	logutils.ZapLogger().Debug("call to getTransactionEstimatedTimeV2")
+	return api.s.router.GetFeesManager().TransactionEstimatedTimeV2(ctx, chainID, maxFeePerGas.ToInt(), maxPriorityFeePerGas.ToInt()), nil
+}
+
 func gweiToWei(val *big.Float) *big.Int {
 	res, _ := new(big.Float).Mul(val, big.NewFloat(1000000000)).Int(nil)
 	return res

@@ -97,7 +97,7 @@ func (c *SendTransactionCommand) Execute(ctx context.Context, request RPCRequest
 		if !fetchedFees.EIP1559Enabled {
 			params.GasPrice = (*hexutil.Big)(fetchedFees.GasPrice)
 		} else {
-			maxFees, priorityFee, err := fetchedFees.FeeFor(fees.GasFeeMedium)
+			maxFees, priorityFee, _, err := fetchedFees.FeeFor(fees.GasFeeMedium)
 			if err != nil {
 				return "", err
 			}
