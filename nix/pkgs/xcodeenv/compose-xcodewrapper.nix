@@ -1,9 +1,14 @@
-{ stdenv, lib, writeShellScriptBin }:
-{ versions ? [ "14.3" "15.1" "15.2" "15.3" ]
-, xcodeBaseDir ? "/Applications/Xcode.app" }:
+{
+  lib,
+  stdenv,
+  writeShellScriptBin,
+}:
+{
+  versions ? [ ],
+  xcodeBaseDir ? "/Applications/Xcode.app",
+}:
 
-assert stdenv.isDarwin;
-
+assert stdenv.hostPlatform.isDarwin;
 let
   xcodebuildPath = "${xcodeBaseDir}/Contents/Developer/usr/bin/xcodebuild";
 
@@ -25,14 +30,22 @@ let
   '';
 in
 stdenv.mkDerivation {
-  pname = "xcode-wrapper-plus";
-  version = lib.concatStringsSep "," versions;
+  name = "xcode-wrapper-impure";
   # Fails in sandbox. Use `--option sandbox relaxed` or `--option sandbox false`.
   __noChroot = true;
   buildCommand = ''
     mkdir -p $out/bin
     cd $out/bin
-    ln -s "${xcodebuildWrapper}/bin/xcode-select"
+    ${
+      if versions == [ ] then
+        ''
+          ln -s "${xcodebuildPath}"
+        ''
+      else
+        ''
+          ln -s "${xcodebuildWrapper}/bin/xcode-select"
+        ''
+    }
     ln -s /usr/bin/security
     ln -s /usr/bin/codesign
     ln -s /usr/bin/xcrun
@@ -41,7 +54,6 @@ stdenv.mkDerivation {
     ln -s /usr/bin/lipo
     ln -s /usr/bin/file
     ln -s /usr/bin/rev
-    ln -s "${xcodebuildWrapper}/bin/xcodebuild"
     ln -s "${xcodeBaseDir}/Contents/Developer/Applications/Simulator.app/Contents/MacOS/Simulator"
 
     cd ..

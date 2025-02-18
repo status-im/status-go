@@ -1,8 +1,6 @@
 module github.com/status-im/status-go
 
-go 1.21
-
-toolchain go1.21.8
+go 1.22
 
 replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.18
 

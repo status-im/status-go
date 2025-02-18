@@ -40,6 +40,16 @@ type Login struct {
 
 	APIConfig          *APIConfig `json:"apiConfig"`
 	StatusProxyEnabled bool       `json:"statusProxyEnabled"`
+
+	// Following fields are used for migration from old node config to new one
+	WakuV2LightClient                            bool    `json:"wakuV2LightClient"`
+	WakuV2EnableStoreConfirmationForMessagesSent bool    `json:"wakuV2EnableStoreConfirmationForMessagesSent"`
+	WakuV2EnableMissingMessageVerification       bool    `json:"wakuV2EnableMissingMessageVerification"`
+	TelemetryServerURL                           string  `json:"telemetryServerURL"`
+	VerifyTransactionURL                         *string `json:"verifyTransactionURL"`
+	VerifyENSURL                                 *string `json:"verifyENSURL"`
+	VerifyENSContractAddress                     *string `json:"verifyENSContractAddress"`
+	VerifyTransactionChainID                     *int64  `json:"verifyTransactionChainID"`
 }
 
 func (c *Login) Validate() error {

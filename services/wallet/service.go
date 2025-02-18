@@ -55,7 +55,7 @@ func NewService(
 	appDB *sql.DB,
 	rpcClient *rpc.Client,
 	accountFeed *event.Feed,
-	settingsFeed *event.Feed,
+	networksFeed *event.Feed,
 	gethManager *account.GethManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
@@ -193,7 +193,7 @@ func NewService(
 		mediaServer,
 		feed,
 	)
-	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, settingsFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
+	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, networksFeed, communityManager, rpcClient.NetworkManager, collectiblesManager)
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed, pendingTxManager)
 

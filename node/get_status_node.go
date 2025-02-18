@@ -11,8 +11,6 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/status-im/status-go/params/networkhelper"
-
 	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap"
 
@@ -142,6 +140,8 @@ type StatusNode struct {
 
 	accountsFeed event.Feed
 	walletFeed   event.Feed
+	networksFeed event.Feed
+	settingsFeed event.Feed
 }
 
 // New makes new instance of StatusNode.
@@ -338,31 +338,21 @@ func (n *StatusNode) setupRPCClient() (err error) {
 		return
 	}
 
-	// Proxy AuthConfigs should be passed not in wallet secrets config on login
-	// but some other way, as it's not wallet specific and should not be passed with login request
-	// but currently there is no other way to pass it
-	// (maybe move to default_networks.go)
-	networks := networkhelper.OverrideEmbeddedProxyProviders(
-		n.config.Networks,
-		n.config.WalletConfig.StatusProxyEnabled,
-		n.config.WalletConfig.StatusProxyBlockchainUser,
-		n.config.WalletConfig.StatusProxyBlockchainPassword)
-
 	config := rpc.ClientConfig{
 		Client:          gethNodeClient,
 		UpstreamChainID: n.config.NetworkID,
-		Networks:        networks,
+		Networks:        n.config.Networks,
 		DB:              n.appDB,
+		AccountsFeed:    &n.accountsFeed,
 		WalletFeed:      &n.walletFeed,
+		SettingsFeed:    &n.settingsFeed,
+		NetworksFeed:    &n.networksFeed,
 	}
 	n.rpcClient, err = rpc.NewClient(config)
 	if err != nil {
 		return
 	}
 	n.rpcClient.Start(context.Background())
-	if err != nil {
-		return
-	}
 	return
 }
 

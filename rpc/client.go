@@ -105,7 +105,10 @@ type Client struct {
 
 	healthMgr          *healthmanager.BlockchainHealthManager
 	stopMonitoringFunc context.CancelFunc
+	accountsFeed       *event.Feed
 	walletFeed         *event.Feed
+	settingsFeed       *event.Feed
+	networksFeed       *event.Feed
 
 	handlersMx sync.RWMutex       // mx guards handlers
 	handlers   map[string]Handler // locally registered handlers
@@ -123,7 +126,10 @@ type ClientConfig struct {
 	UpstreamChainID uint64
 	Networks        []params.Network
 	DB              *sql.DB
+	AccountsFeed    *event.Feed
 	WalletFeed      *event.Feed
+	SettingsFeed    *event.Feed
+	NetworksFeed    *event.Feed
 }
 
 // NewClient initializes Client
@@ -132,7 +138,7 @@ type ClientConfig struct {
 // reconnect to the server if connection is lost.
 func NewClient(config ClientConfig) (*Client, error) {
 	logger := logutils.ZapLogger().Named("rpcClient")
-	networkManager := network.NewManager(config.DB)
+	networkManager := network.NewManager(config.DB, config.AccountsFeed, config.SettingsFeed, config.NetworksFeed)
 	if networkManager == nil {
 		return nil, errors.New("failed to create network manager")
 	}
@@ -151,7 +157,10 @@ func NewClient(config ClientConfig) (*Client, error) {
 		limiterPerProvider: make(map[string]*rpclimiter.RPCRpsLimiter),
 		logger:             logger,
 		healthMgr:          healthmanager.NewBlockchainHealthManager(),
+		accountsFeed:       config.AccountsFeed,
 		walletFeed:         config.WalletFeed,
+		settingsFeed:       config.SettingsFeed,
+		networksFeed:       config.NetworksFeed,
 	}
 
 	c.UpstreamChainID = config.UpstreamChainID
@@ -165,6 +174,8 @@ func NewClient(config ClientConfig) (*Client, error) {
 }
 
 func (c *Client) Start(ctx context.Context) {
+	c.NetworkManager.Start()
+
 	if c.stopMonitoringFunc != nil {
 		c.logger.Warn("Blockchain health manager already started")
 		return
@@ -177,6 +188,8 @@ func (c *Client) Start(ctx context.Context) {
 }
 
 func (c *Client) Stop() {
+	c.NetworkManager.Stop()
+
 	c.healthMgr.Stop()
 	if c.stopMonitoringFunc == nil {
 		return

@@ -342,7 +342,7 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	rpcClient, _ := rpc.NewClient(config)
 
 	rpcClient.UpstreamChainID = chainID
-	nm := network.NewManager(appDB)
+	nm := network.NewManager(appDB, nil, nil, nil)
 	mediaServer, err := mediaserver.NewMediaServer(appDB, nil, nil, walletDB)
 	require.NoError(t, err)
 
@@ -406,7 +406,7 @@ func Test_tokensListsValidity(t *testing.T) {
 	accountsDB, err := accounts.NewDB(appDB)
 	require.NoError(t, err)
 
-	nm := network.NewManager(appDB)
+	nm := network.NewManager(appDB, nil, nil, nil)
 
 	manager := NewTokenManager(walletDB, nil, nil, nm, appDB, nil, nil, nil, accountsDB, NewPersistence(walletDB))
 	require.NotNil(t, manager)

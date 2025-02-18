@@ -225,7 +225,7 @@ func TestGetCachedBalancesByChain(t *testing.T) {
 
 	require.NoError(t, persistence.SaveTokens(tokens))
 
-	tokenManager := NewTokenManager(db, nil, community.NewManager(db, nil, nil), network.NewManager(db), db, nil, nil, nil, nil, persistence)
+	tokenManager := NewTokenManager(db, nil, community.NewManager(db, nil, nil), network.NewManager(db, nil, nil, nil), db, nil, nil, nil, nil, persistence)
 
 	// Verify that the token balance was inserted correctly
 	var count int

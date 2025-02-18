@@ -22,6 +22,7 @@ import (
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -1583,14 +1584,14 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	}
 
 	require.Equal(t, b.config.WalletConfig.InfuraAPIKey, infuraToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[MainnetChainID], alchemyEthereumMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[SepoliaChainID], alchemyEthereumSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[ArbitrumChainID], alchemyArbitrumMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[ArbitrumSepoliaChainID], alchemyArbitrumSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[OptimismChainID], alchemyOptimismMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[OptimismSepoliaChainID], alchemyOptimismSepoliaToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[BaseChainID], alchemyBaseMainnetToken)
-	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[BaseSepoliaChainID], alchemyBaseSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.MainnetChainID], alchemyEthereumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.SepoliaChainID], alchemyEthereumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.ArbitrumChainID], alchemyArbitrumMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.ArbitrumSepoliaChainID], alchemyArbitrumSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.OptimismChainID], alchemyOptimismMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.OptimismSepoliaChainID], alchemyOptimismSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.BaseChainID], alchemyBaseMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.BaseSepoliaChainID], alchemyBaseSepoliaToken)
 	require.Equal(t, b.config.WalletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
 	require.Equal(t, b.config.WalletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
 

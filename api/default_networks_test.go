@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/params"
 
 	"github.com/pkg/errors"
@@ -30,14 +31,14 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	for _, n := range actualNetworks {
 		var err error
 		switch n.ChainID {
-		case MainnetChainID:
-		case SepoliaChainID:
-		case OptimismChainID:
-		case OptimismSepoliaChainID:
-		case ArbitrumChainID:
-		case ArbitrumSepoliaChainID:
-		case BaseChainID:
-		case BaseSepoliaChainID:
+		case common.MainnetChainID:
+		case common.SepoliaChainID:
+		case common.OptimismChainID:
+		case common.OptimismSepoliaChainID:
+		case common.ArbitrumChainID:
+		case common.ArbitrumSepoliaChainID:
+		case common.BaseChainID:
+		case common.BaseSepoliaChainID:
 		default:
 			err = errors.Errorf("unexpected chain id: %d", n.ChainID)
 		}

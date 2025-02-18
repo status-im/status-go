@@ -3,7 +3,7 @@ package testutil
 import (
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/api"
+	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/params"
 )
 
@@ -38,8 +38,10 @@ func CreateNetwork(chainID uint64, chainName string, providers []params.RpcProvi
 		Enabled:                true,
 		ChainColor:             "#E90101",
 		ShortName:              "eth",
-		RelatedChainID:         api.OptimismSepoliaChainID,
+		RelatedChainID:         api_common.OptimismSepoliaChainID,
 		RpcProviders:           providers,
+		IsActive:               true,
+		IsDeactivatable:        true,
 	}
 }
 
@@ -71,6 +73,8 @@ func CompareNetworks(t require.TestingT, expected, actual *params.Network) {
 	require.Equal(t, expected.ChainColor, actual.ChainColor)
 	require.Equal(t, expected.ShortName, actual.ShortName)
 	require.Equal(t, expected.RelatedChainID, actual.RelatedChainID)
+	require.Equal(t, expected.IsActive, actual.IsActive)
+	require.Equal(t, expected.IsDeactivatable, actual.IsDeactivatable)
 }
 
 // Helper function to compare lists of providers

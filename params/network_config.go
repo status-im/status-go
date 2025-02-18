@@ -1,6 +1,10 @@
 package params
 
-import "github.com/ethereum/go-ethereum/common"
+import (
+	"strings"
+
+	"github.com/ethereum/go-ethereum/common"
+)
 
 // RpcProviderAuthType defines the different types of authentication for RPC providers
 type RpcProviderAuthType string
@@ -15,9 +19,10 @@ const (
 type RpcProviderType string
 
 const (
-	EmbeddedProxyProviderType  RpcProviderType = "embedded-proxy"  // Proxy-based RPC provider
-	EmbeddedDirectProviderType RpcProviderType = "embedded-direct" // Direct RPC provider
-	UserProviderType           RpcProviderType = "user"            // User-defined RPC provider
+	EmbeddedProxyProviderType       RpcProviderType = "embedded-proxy"         // Proxy-based RPC provider
+	EmbeddedEthRpcProxyProviderType RpcProviderType = "embedded-eth-rpc-proxy" // EthRpcProxy-based RPC provider (smart proxy)
+	EmbeddedDirectProviderType      RpcProviderType = "embedded-direct"        // Direct RPC provider
+	UserProviderType                RpcProviderType = "user"                   // User-defined RPC provider
 )
 
 // RpcProvider represents an RPC provider configuration with various options
@@ -39,7 +44,7 @@ type RpcProvider struct {
 // GetFullURL returns the URL with auth token if TokenAuth is used
 func (p RpcProvider) GetFullURL() string {
 	if p.AuthType == TokenAuth && p.AuthToken != "" {
-		return p.URL + "/" + p.AuthToken
+		return strings.TrimRight(p.URL, "/") + "/" + p.AuthToken
 	}
 	return p.URL
 }
@@ -76,6 +81,8 @@ type Network struct {
 	ShortName              string          `json:"shortName" validate:"omitempty,min=1"`
 	TokenOverrides         []TokenOverride `json:"tokenOverrides" validate:"omitempty,dive"`
 	RelatedChainID         uint64          `json:"relatedChainId" validate:"omitempty"`
+	IsActive               bool            `json:"isActive"`
+	IsDeactivatable        bool            `json:"isDeactivatable"`
 }
 
 func (n *Network) DeepCopy() Network {
@@ -105,6 +112,10 @@ func NewUserProvider(chainID uint64, name, url string, enableRpsLimiter bool) *R
 
 func NewProxyProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedProxyProviderType)
+}
+
+func NewEthRpcProxyProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
+	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedEthRpcProxyProviderType)
 }
 
 func NewDirectProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
