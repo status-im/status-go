@@ -98,7 +98,7 @@ func TestClient_PushReceivedMessages(t *testing.T) {
 	client.PushReceivedMessages(receivedMessages)
 
 	// Verify MessagesReceivedTotal metric
-	value := getCounterValue(messagesReceivedTotal,
+	value := getCounterValue(metrics.MessagesReceivedTotal,
 		filter.PubsubTopic,
 		filter.ContentTopic.String(),
 		filter.ChatID,
@@ -110,7 +110,7 @@ func TestClient_PushPeerCount(t *testing.T) {
 	client := createTestClient(t)
 
 	client.PushPeerCount(5)
-	value := getGaugeValue(connectedPeers)
+	value := getGaugeValue(metrics.ConnectedPeers)
 	require.Equal(t, float64(5), value)
 }
 
@@ -131,7 +131,7 @@ func TestClient_PushPeerCountByOrigin(t *testing.T) {
 
 	// Verify metrics for each origin
 	for origin, expectedCount := range peerCountByOrigin {
-		value := getGaugeVecValue(peersByOrigin, getOriginString(origin))
+		value := getGaugeVecValue(metrics.PeersByOrigin, getOriginString(origin))
 		require.Equal(t, float64(expectedCount), value)
 	}
 }
@@ -149,7 +149,7 @@ func TestClient_PushPeerCountByShard(t *testing.T) {
 
 	// Verify metrics for each shard
 	for shard, expectedCount := range peerCountByShard {
-		value := getGaugeVecValue(peersByShard, strconv.FormatUint(uint64(shard), 10))
+		value := getGaugeVecValue(metrics.PeersByShard, strconv.FormatUint(uint64(shard), 10))
 		require.Equal(t, float64(expectedCount), value)
 	}
 }
@@ -173,7 +173,7 @@ func TestClient_PushErrorSendingEnvelope(t *testing.T) {
 
 	client.PushErrorSendingEnvelope(errorSendingEnvelope)
 
-	value := getCounterValue(envelopeSentErrors,
+	value := getCounterValue(metrics.EnvelopeSentErrors,
 		envelope.PubsubTopic(),
 		envelope.Message().ContentTopic,
 	)
