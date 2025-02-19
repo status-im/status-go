@@ -355,10 +355,13 @@ class MessengerTestCase(NetworkConditionTestCase):
             )
 
     def one_to_one_message(self, message_count):
+        responses = []
         sent_messages = []
+
         for i in range(message_count):
             message_text = f"test_message_{i+1}_{uuid4()}"
             response = self.sender.wakuext_service.send_message(self.receiver.public_key, message_text)
+            responses.append(response)
             expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
             sent_messages.append(expected_message)
             time.sleep(0.01)
@@ -374,6 +377,8 @@ class MessengerTestCase(NetworkConditionTestCase):
                 fields_to_validate={"text": "text"},
                 expected_message=expected_message,
             )
+
+        return responses
 
     def add_contact(self, execution_number, network_condition=None, privileged=True):
         message_text = f"test_contact_request_{execution_number}_{uuid4()}"
