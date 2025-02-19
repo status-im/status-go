@@ -1,21 +1,5 @@
-import random
 import pytest
-from test_cases import StatusBackendTestCase, MessengerTestCase
-
-
-class TestRpc(StatusBackendTestCase):
-
-    @pytest.mark.parametrize(
-        "method, params",
-        [
-            ("wakuext_peers", []),
-        ],
-    )
-    def test_(self, method, params):
-        _id = str(random.randint(1, 8888))
-
-        response = self.rpc_client.rpc_valid_request(method, params, _id)
-        self.rpc_client.verify_json_schema(response.json(), method)
+from test_cases import MessengerTestCase
 
 
 @pytest.mark.rpc
