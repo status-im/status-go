@@ -8,7 +8,13 @@ class TestDefaultMessaging(MessengerTestCase):
 
     def test_one_to_one_messages(self):
         responses = self.one_to_one_message(5)
-        self.receiver.verify_json_schema(responses[0], method="wakuext_sendOneToOneMessage")
+
+        first_response, *rest = responses
+        self.receiver.verify_json_schema(first_response, method="wakuext_sendOneToOneMessage")
+
+        chat = first_response["result"]["chats"][0]
+        assert chat["id"] == self.receiver.public_key
+        assert chat["lastMessage"]["displayName"] == self.sender.display_name
 
     def test_add_contact(self):
         self.add_contact(execution_number=1, network_condition=None, privileged=False)
