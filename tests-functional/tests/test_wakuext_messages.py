@@ -1,6 +1,5 @@
-from uuid import uuid4
-
 import pytest
+from uuid import uuid4
 
 from tests.test_cases import MessengerTestCase
 
@@ -15,6 +14,8 @@ class TestMessages(MessengerTestCase):
 
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.get_chat_messages(sender_chat_id)
+
+        self.sender.verify_json_schema(response, method="wakuext_chatMessages")
 
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == 1
