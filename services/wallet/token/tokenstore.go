@@ -15,7 +15,7 @@ type store interface {
 var tokenPeg = map[string]string{
 	"aUSDC": "USD",
 	"DAI":   "USD",
-	"EUROC": "EUR",
+	"EURC":  "EUR",
 	"SAI":   "USD",
 	"sUSD":  "USD",
 	"PAXG":  "XAU",
@@ -805,7 +805,7 @@ func newDefaultStore() *DefaultStore {
 			&Token{
 				Address:     common.HexToAddress("0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c"),
 				Name:        "Euro Coin",
-				Symbol:      "EUROC",
+				Symbol:      "EURC",
 				Decimals:    6,
 				ChainID:     1,
 				TokenListID: "status",
@@ -1837,9 +1837,17 @@ func newDefaultStore() *DefaultStore {
 			&Token{
 				Address:     common.HexToAddress("0x08210F9170F89Ab7658F0B5E3fF39b0E03C594D4"),
 				Name:        "Euro Coin",
-				Symbol:      "EUROC",
+				Symbol:      "EURC",
 				Decimals:    6,
 				ChainID:     11155111,
+				TokenListID: "status",
+			},
+			&Token{
+				Address:     common.HexToAddress("0x808456652fdb597867f38412077A9182bf77359F"),
+				Name:        "Euro Coin",
+				Symbol:      "EURC",
+				Decimals:    6,
+				ChainID:     84532,
 				TokenListID: "status",
 			},
 			&Token{
@@ -1864,6 +1872,14 @@ func newDefaultStore() *DefaultStore {
 				Symbol:      "USDC",
 				Decimals:    6,
 				ChainID:     11155420,
+				TokenListID: "status",
+			},
+			&Token{
+				Address:     common.HexToAddress("0x036CbD53842c5426634e7929541eC2318f3dCF7e"),
+				Name:        "USD Coin",
+				Symbol:      "USDC",
+				Decimals:    6,
+				ChainID:     84532,
 				TokenListID: "status",
 			},
 		},
