@@ -1,4 +1,5 @@
 import pytest
+from uuid import uuid4
 
 from tests.test_cases import MessengerTestCase
 
@@ -15,6 +16,8 @@ class TestChatMessages(MessengerTestCase):
 
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.chat_messages(sender_chat_id)
+
+        self.sender.verify_json_schema(response, method="wakuext_chatMessages")
 
         self.sender.verify_json_schema(response, method="wakuext_chatMessages")
 
