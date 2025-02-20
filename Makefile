@@ -264,6 +264,8 @@ generate-contracts:
 	go generate ./contracts
 download-uniswap-tokens:
 	go run ./services/wallet/token/downloader/main.go
+analyze-token-stores:
+	go run ./services/wallet/token/analyzer/main.go
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)

@@ -3,7 +3,7 @@ package token
 type uniswapStore struct {
 }
 
-func newUniswapStore() *uniswapStore {
+func NewUniswapStore() *uniswapStore {
 	return &uniswapStore{}
 }
 

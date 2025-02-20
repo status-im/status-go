@@ -4,7 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-type store interface {
+type Store interface {
 	GetTokens() []*Token
 	GetVersion() string
 	GetSource() string
@@ -55,7 +55,7 @@ func (s *DefaultStore) GetSource() string {
 	return "https://github.com/status-im/status-go/blob/develop/services/wallet/token/tokenstore.go"
 }
 
-func newDefaultStore() *DefaultStore {
+func NewDefaultStore() *DefaultStore {
 	return &DefaultStore{
 		TokenListID: []*Token{
 			&Token{
