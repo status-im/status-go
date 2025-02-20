@@ -26,3 +26,10 @@ type ChainProvider interface {
 	Provider
 	IsChainSupported(chainID w_common.ChainID) bool
 }
+
+type ItemsContainer[T any] struct {
+	Items          []T
+	NextCursor     string
+	PreviousCursor string
+	Provider       string
+}
