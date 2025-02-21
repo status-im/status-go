@@ -19,8 +19,6 @@ class TestChatMessages(MessengerTestCase):
 
         self.sender.verify_json_schema(response, method="wakuext_chatMessages")
 
-        self.sender.verify_json_schema(response, method="wakuext_chatMessages")
-
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == 1
         actual_text = messages[0].get("text", "")
