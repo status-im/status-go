@@ -75,8 +75,8 @@ class WakuextService(Service):
         response = self.rpc_request("setLightClient", params)
         return response.json()
 
-    def get_chat_messages(self, chat_id: str):
-        params = [chat_id, "", 10]
+    def get_chat_messages(self, chat_id: str, cursor="", limit=10):
+        params = [chat_id, cursor, limit]
         response = self.rpc_request("chatMessages", params)
         return response.json()
 
