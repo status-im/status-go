@@ -284,7 +284,7 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams, input []by
 		}
 	}
 
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
 	return uint64(increasedEstimation), nil
 }
 

@@ -1,8 +1,9 @@
 package common
 
 const (
-	IncreaseEstimatedGasFactor = 1.05
-	SevenDaysInSeconds         = 60 * 60 * 24 * 7
+	IncreaseEstimatedGasFactor          = 1.05
+	IncreaseEstimatedGasFactorForBridge = 1.2
+	SevenDaysInSeconds                  = 60 * 60 * 24 * 7
 
 	CommunityDeploymentTokenDecimals = uint8(18)
 
