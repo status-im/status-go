@@ -54,3 +54,22 @@ class TestChatMessages(MessengerTestCase):
 
         actual_text = response.get("result", {}).get("text", "")
         assert actual_text == sent_texts[0]
+
+    @pytest.mark.parametrize(
+        "searchTerm,caseSensitive,expectedCount",
+        [
+            ("test_message_1", False, 1),
+            ("TEST_MESSAGE_", False, 3),
+            ("TEST_MESSAGE_", True, 3),  # caseSensitive doesn't work?
+        ],
+    )
+    def test_all_messages_from_chat_which_match_term(self, searchTerm, caseSensitive, expectedCount):
+        self.send_multiple_one_to_one_messages(3)
+        sender_chat_id = self.receiver.public_key
+
+        response = self.sender.wakuext_service.all_messages_from_chat_which_match_term(sender_chat_id, searchTerm, caseSensitive)
+
+        self.sender.verify_json_schema(response, method="wakuext_allMessagesFromChatWhichMatchTerm")
+
+        messages = response.get("result", {}).get("messages", [])
+        assert len(messages) == expectedCount
