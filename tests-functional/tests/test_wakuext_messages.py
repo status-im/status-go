@@ -1,5 +1,4 @@
 import pytest
-from uuid import uuid4
 
 from tests.test_cases import MessengerTestCase
 
