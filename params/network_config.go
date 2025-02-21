@@ -1,6 +1,8 @@
 package params
 
 import (
+	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -47,6 +49,20 @@ func (p RpcProvider) GetFullURL() string {
 		return strings.TrimRight(p.URL, "/") + "/" + p.AuthToken
 	}
 	return p.URL
+}
+
+// GetHost returns the host from the provider's URL
+func (p RpcProvider) GetHost() string {
+	u, err := url.Parse(p.URL)
+	if err != nil {
+		return ""
+	}
+	return u.Host
+}
+
+// NameAndChain returns a string in the format 'Name:ChainID'
+func (p RpcProvider) GetNameAndChainID() string {
+	return p.Name + ":" + strconv.FormatUint(p.ChainID, 10)
 }
 
 type TokenOverride struct {

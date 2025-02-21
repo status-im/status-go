@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"reflect"
 	"sync"
 	"time"
@@ -275,13 +274,8 @@ func (c *Client) getProviderRPCLimiter(provider params.RpcProvider) (*rpclimiter
 	if !provider.EnableRPSLimiter {
 		return nil, "", nil
 	}
-
-	// Generate a unique key for the provider based on its URL or host
-	limiterKey := provider.URL
-	parsedURL, err := url.Parse(provider.URL)
-	if err == nil {
-		limiterKey = parsedURL.Host
-	}
+	// Generate a unique key for the provider based on its host
+	limiterKey := provider.GetHost()
 
 	// Check if the limiter already exists
 	if limiter, ok := c.limiterPerProvider[limiterKey]; ok {
