@@ -162,12 +162,6 @@ func isVMError(err error) bool {
 	return false
 }
 
-func isRPSLimitError(err error) bool {
-	return strings.Contains(err.Error(), "backoff_seconds") ||
-		strings.Contains(err.Error(), "has exceeded its throughput limit") ||
-		strings.Contains(err.Error(), "request rate exceeded")
-}
-
 func (c *ClientWithFallback) SetIsConnected(value bool) {
 	c.LastCheckedAt = time.Now().Unix()
 	if !value {
@@ -206,41 +200,17 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, ethClients []ethclien
 	c.LastCheckedAt = time.Now().Unix()
 
 	cmd := circuitbreaker.NewCommand(ctx, nil)
-	for _, provider := range ethClients {
-		provider := provider
+	// Try making requests with each RPC provider.
+	// Cancel the command if we get a VM error or a context cancellation.
+	for _, ethProviderClient := range ethClients {
+		ethProviderClient := ethProviderClient
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
-			limiter := provider.GetLimiter()
-			if limiter != nil {
-				err := provider.GetLimiter().WaitForRequestsAvailability(1)
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			res, err := f(provider)
-			if err != nil {
-				if limiter != nil && isRPSLimitError(err) {
-					provider.GetLimiter().ReduceLimit()
-
-					err = provider.GetLimiter().WaitForRequestsAvailability(1)
-					if err != nil {
-						return nil, err
-					}
-
-					res, err = f(provider)
-					if err == nil {
-						return []interface{}{res}, err
-					}
-				}
-
-				if isVMError(err) || errors.Is(err, context.Canceled) {
-					cmd.Cancel()
-				}
-
-				return nil, err
+			res, err := ethProviderClient.ExecuteWithRPSLimit(f)
+			if err != nil && (isVMError(err) || errors.Is(err, context.Canceled)) {
+				cmd.Cancel()
 			}
 			return []interface{}{res}, err
-		}, provider.GetName()))
+		}, ethProviderClient.GetName()))
 	}
 
 	result := c.circuitbreaker.Execute(cmd)
