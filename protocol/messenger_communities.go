@@ -1914,6 +1914,10 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 		}
 
 		for _, privilegedMember := range privMembersArray {
+			// Reset rawMessage.Sender to nil on each iteration so that SendPrivate can
+			// assign the correct sender. This prevents any modifications from previous
+			// SendPrivate calls from affecting subsequent ones.
+			rawMessage.Sender = nil
 			_, err := m.sender.SendPrivate(context.Background(), privilegedMember, &rawMessage)
 			if err != nil {
 				return nil, err
