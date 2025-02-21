@@ -383,14 +383,14 @@ class MessengerTestCase(NetworkConditionTestCase):
         return responses
 
     def send_multiple_one_to_one_messages(self, message_count=1) -> tuple[list[str], list[dict]]:
-        sent_texts = []  # ordered from latest to earliest
-        messages = []  # ordered from latest to earliest
+        sent_texts = []
+        messages = []
 
         for i in range(message_count):
             message_text = f"test_message_{i}_{uuid4()}"
-            sent_texts.insert(0, message_text)
+            sent_texts.append(message_text)
             response = self.sender.wakuext_service.send_message(self.receiver.public_key, message_text)
-            messages.insert(0, response.get("result", {}).get("messages", [])[0])
+            messages.append(response.get("result", {}).get("messages", [])[0])
 
         return sent_texts, messages
 

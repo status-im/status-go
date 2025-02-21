@@ -30,8 +30,8 @@ class TestChatMessages(MessengerTestCase):
         cursor1 = chat_messages_res1.get("result", {}).get("cursor", "")
         messages_page1 = chat_messages_res1.get("result", {}).get("messages", [])
         assert len(messages_page1) == 3
-        assert messages_page1[0].get("text", "") == sent_texts[0]
-        assert messages_page1[1].get("text", "") == sent_texts[1]
+        assert messages_page1[0].get("text", "") == sent_texts[4]
+        assert messages_page1[1].get("text", "") == sent_texts[3]
         assert messages_page1[2].get("text", "") == sent_texts[2]
 
         # Page 2
@@ -40,8 +40,8 @@ class TestChatMessages(MessengerTestCase):
         cursor2 = chat_messages_res2.get("result", {}).get("cursor", "")
         messages_page2 = chat_messages_res2.get("result", {}).get("messages", [])
         assert len(messages_page2) == 2
-        assert messages_page2[0].get("text", "") == sent_texts[3]
-        assert messages_page2[1].get("text", "") == sent_texts[4]
+        assert messages_page2[0].get("text", "") == sent_texts[1]
+        assert messages_page2[1].get("text", "") == sent_texts[0]
         assert cursor2 == ""
 
     def test_message_by_message_id(self):
