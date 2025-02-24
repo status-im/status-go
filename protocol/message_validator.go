@@ -18,7 +18,7 @@ const maxStatusMessageText = 128
 // from whisperTimestamp
 const maxWhisperFutureDriftMs uint64 = 120000
 
-func validateClockValue(clock uint64, whisperTimestamp uint64) error {
+func ValidateClockValue(clock uint64, whisperTimestamp uint64) error {
 	if clock == 0 {
 		return errors.New("clock can't be 0")
 	}
@@ -33,7 +33,7 @@ func validateClockValue(clock uint64, whisperTimestamp uint64) error {
 func ValidateMembershipUpdateMessage(message *protocol.MembershipUpdateMessage, timeNowMs uint64) error {
 
 	for _, e := range message.Events {
-		if err := validateClockValue(e.ClockValue, timeNowMs); err != nil {
+		if err := ValidateClockValue(e.ClockValue, timeNowMs); err != nil {
 			return err
 		}
 
@@ -114,7 +114,7 @@ func ValidateDeleteForMeMessage(message *protobuf.SyncDeleteForMeMessage) error 
 }
 
 func ValidateReceivedPairInstallation(message *protobuf.SyncPairInstallation, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+	if err := ValidateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err
 	}
 
@@ -134,7 +134,7 @@ func ValidateReceivedPairInstallation(message *protobuf.SyncPairInstallation, wh
 }
 
 func ValidateReceivedSendTransaction(message *protobuf.SendTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+	if err := ValidateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err
 	}
 
@@ -150,7 +150,7 @@ func ValidateReceivedSendTransaction(message *protobuf.SendTransaction, whisperT
 }
 
 func ValidateReceivedRequestAddressForTransaction(message *protobuf.RequestAddressForTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+	if err := ValidateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err
 	}
 
@@ -167,7 +167,7 @@ func ValidateReceivedRequestAddressForTransaction(message *protobuf.RequestAddre
 }
 
 func ValidateReceivedRequestTransaction(message *protobuf.RequestTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+	if err := ValidateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err
 	}
 
@@ -188,7 +188,7 @@ func ValidateReceivedRequestTransaction(message *protobuf.RequestTransaction, wh
 }
 
 func ValidateReceivedAcceptRequestAddressForTransaction(message *protobuf.AcceptRequestAddressForTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+	if err := ValidateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err
 	}
 
@@ -204,7 +204,7 @@ func ValidateReceivedAcceptRequestAddressForTransaction(message *protobuf.Accept
 }
 
 func ValidateReceivedDeclineRequestAddressForTransaction(message *protobuf.DeclineRequestAddressForTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+	if err := ValidateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err
 	}
 
@@ -216,7 +216,7 @@ func ValidateReceivedDeclineRequestAddressForTransaction(message *protobuf.Decli
 }
 
 func ValidateReceivedDeclineRequestTransaction(message *protobuf.DeclineRequestTransaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+	if err := ValidateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err
 	}
 
@@ -240,7 +240,7 @@ func ValidateText(text string) error {
 }
 
 func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp uint64) error {
-	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+	if err := ValidateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err
 	}
 
@@ -352,7 +352,7 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 }
 
 func ValidateReceivedEmojiReaction(emoji *protobuf.EmojiReaction, whisperTimestamp uint64) error {
-	if err := validateClockValue(emoji.Clock, whisperTimestamp); err != nil {
+	if err := ValidateClockValue(emoji.Clock, whisperTimestamp); err != nil {
 		return err
 	}
 

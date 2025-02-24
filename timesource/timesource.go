@@ -159,7 +159,7 @@ func (s *NTPTimeSource) Now() time.Time {
 	return n.Add(s.latestOffset)
 }
 
-func (s *NTPTimeSource) updateOffset() error {
+func (s *NTPTimeSource) UpdateOffset() error {
 	offset, err := computeOffset(s.timeQuery, s.servers, s.allowedFailures)
 	if err != nil {
 		logutils.ZapLogger().Error("failed to compute offset", zap.Error(err))
@@ -210,14 +210,14 @@ func (s *NTPTimeSource) Start() {
 	}
 
 	// Attempt to update the offset synchronously so that user can have reliable messages right away
-	err := s.updateOffset()
+	err := s.UpdateOffset()
 	if err != nil {
 		// Failure to update can occur if the node is offline.
 		// Instead of returning an error, continue with the process as the update will be retried periodically.
 		logutils.ZapLogger().Error("failed to update offset", zap.Error(err))
 	}
 
-	s.runPeriodically(s.updateOffset, err == nil)
+	s.runPeriodically(s.UpdateOffset, err == nil)
 
 	s.started = true
 }
