@@ -94,7 +94,7 @@ func (s *MessengerRemoveMessageSuite) TestDeleteMessagePreviousLastMessage() {
 
 	response, err := WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.messages) > 1 },
 		"no messages",
 	)
 	s.Require().NoError(err)
