@@ -312,7 +312,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 		}
 
 		// Create ethclient with RPS limiter
-		ethClient := ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, limiterKey)
+		ethClient := ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, limiterKey, provider.Name)
 		ethClients = append(ethClients, ethClient)
 	}
 
