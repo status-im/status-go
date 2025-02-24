@@ -215,7 +215,7 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, ethClients []ethclien
 
 	result := c.circuitbreaker.Execute(cmd)
 	if c.providersHealthManager != nil {
-		rpcCallStatuses := convertFunctorCallStatuses(result.FunctorCallStatuses())
+		rpcCallStatuses := convertFunctorCallStatuses(result.FunctorCallStatuses(), c.ChainID)
 		c.providersHealthManager.Update(ctx, rpcCallStatuses)
 	}
 	if result.Error() != nil {
@@ -823,9 +823,13 @@ func (c *ClientWithFallback) SetCircuitBreaker(cb *circuitbreaker.CircuitBreaker
 	c.circuitbreaker = cb
 }
 
-func convertFunctorCallStatuses(statuses []circuitbreaker.FunctorCallStatus) (result []rpcstatus.RpcProviderCallStatus) {
+func convertFunctorCallStatuses(statuses []circuitbreaker.FunctorCallStatus, chainID uint64) (result []rpcstatus.RpcProviderCallStatus) {
 	for _, f := range statuses {
-		result = append(result, rpcstatus.RpcProviderCallStatus{Name: f.Name, Timestamp: f.Timestamp, Err: f.Err})
+		result = append(result, rpcstatus.RpcProviderCallStatus{
+			Name:      f.Name,
+			ChainID:   chainID,
+			Timestamp: f.Timestamp,
+			Err:       f.Err})
 	}
 	return
 }
