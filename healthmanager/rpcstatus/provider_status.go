@@ -1,6 +1,7 @@
 package rpcstatus
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/status-im/status-go/healthmanager/provider_errors"
@@ -21,8 +22,27 @@ type ProviderStatus struct {
 	ChainID       uint64     `json:"chain_id"`
 	LastSuccessAt time.Time  `json:"last_success_at"`
 	LastErrorAt   time.Time  `json:"last_error_at"`
-	LastError     error      `json:"last_error"`
+	LastError     error      `json:"-"` // ignore this field during standard marshaling
 	Status        StatusType `json:"status"`
+}
+
+// MarshalJSON implements custom JSON marshaling for ProviderStatus
+func (ps ProviderStatus) MarshalJSON() ([]byte, error) {
+	type Alias ProviderStatus // prevent recursive MarshalJSON calls
+
+	// Create a new struct for JSON marshaling
+	return json.Marshal(&struct {
+		Alias
+		LastError string `json:"last_error,omitempty"`
+	}{
+		Alias: Alias(ps),
+		LastError: func() string {
+			if ps.LastError != nil {
+				return ps.LastError.Error()
+			}
+			return ""
+		}(),
+	})
 }
 
 // RpcProviderCallStatus represents the result of an RPC provider call.
