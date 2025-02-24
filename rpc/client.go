@@ -5,11 +5,9 @@ package rpc
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"reflect"
 	"sync"
 	"time"
@@ -298,30 +296,12 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 			continue
 		}
 
-		// Create RPC client options
-		var opts []gethrpc.ClientOption
-		headers := http.Header{}
-		headers.Set("User-Agent", rpcUserAgentName)
-
-		// Set up authentication if needed
-		switch provider.AuthType {
-		case params.BasicAuth:
-			authEncoded := base64.StdEncoding.EncodeToString([]byte(provider.AuthLogin + ":" + provider.AuthPassword))
-			headers.Set("Authorization", "Basic "+authEncoded)
-		case params.TokenAuth:
-			provider.URL = provider.URL + provider.AuthToken
-		case params.NoAuth:
-			// no-op
-		default:
-			c.logger.Error("unknown auth type", zap.String("auth_type", string(provider.AuthType)))
-		}
-
-		opts = append(opts, gethrpc.WithHeaders(headers))
-
-		// Dial the RPC client
-		rpcClient, err := gethrpc.DialOptions(context.Background(), provider.URL, opts...)
+		rpcClient, err := chain.CreateEthClientFromProvider(provider, rpcUserAgentName)
 		if err != nil {
-			c.logger.Error("dial server failed", zap.String("provider", provider.Name), zap.Error(err))
+			c.logger.Error("create eth client failed", zap.String("provider", provider.Name), zap.Error(err))
+			continue
+		}
+		if rpcClient == nil {
 			continue
 		}
 
