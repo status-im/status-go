@@ -45,9 +45,9 @@ class TestChatMessages(MessengerTestCase):
         assert cursor2 == ""
 
     def test_message_by_message_id(self):
-        sent_texts, messages = self.send_multiple_one_to_one_messages(1)
+        sent_texts, responses = self.send_multiple_one_to_one_messages(1)
 
-        messageId = messages[0].get("id", "")
+        messageId = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
         response = self.sender.wakuext_service.message_by_message_id(messageId)
 
         self.sender.verify_json_schema(response, method="wakuext_messageByMessageID")
