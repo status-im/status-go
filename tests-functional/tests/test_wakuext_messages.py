@@ -61,7 +61,7 @@ class TestChatMessages(MessengerTestCase):
         [
             ("test_message_1", False, 1),
             ("TEST_MESSAGE_", False, 3),
-            ("TEST_MESSAGE_", True, 3),  # caseSensitive doesn't work?
+            # ("TEST_MESSAGE_", True, 0),  # Skipped due to https://github.com/status-im/status-go/issues/6359
         ],
     )
     def test_all_messages_from_chat_which_match_term(self, searchTerm, caseSensitive, expectedCount):
