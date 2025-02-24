@@ -28,7 +28,7 @@ func TestCircuitBreaker_ExecuteSuccessSingle(t *testing.T) {
 	cmd := NewCommand(context.TODO(), []*Functor{
 		NewFunctor(func() ([]interface{}, error) {
 			return []any{expectedResult}, nil
-		}, circuitName)},
+		}, circuitName, "")},
 	)
 
 	result := cb.Execute(cmd)
@@ -53,13 +53,13 @@ func TestCircuitBreaker_ExecuteMultipleFallbacksFail(t *testing.T) {
 		NewFunctor(func() ([]interface{}, error) {
 			time.Sleep(100 * time.Millisecond) // will cause hystrix: timeout
 			return []any{success}, nil
-		}, circuitName+"1"),
+		}, circuitName+"1", ""),
 		NewFunctor(func() ([]interface{}, error) {
 			return nil, errSecProvFailed
-		}, circuitName+"2"),
+		}, circuitName+"2", ""),
 		NewFunctor(func() ([]interface{}, error) {
 			return nil, errThirdProvFailed
-		}, circuitName+"3"),
+		}, circuitName+"3", ""),
 	})
 
 	result := cb.Execute(cmd)
@@ -87,13 +87,13 @@ func TestCircuitBreaker_ExecuteMultipleFallbacksFailButLastSuccessStress(t *test
 		cmd := NewCommand(context.TODO(), []*Functor{
 			NewFunctor(func() ([]interface{}, error) {
 				return nil, errors.New("provider 1 failed")
-			}, circuitName+"1"),
+			}, circuitName+"1", ""),
 			NewFunctor(func() ([]interface{}, error) {
 				return nil, errors.New("provider 2 failed")
-			}, circuitName+"2"),
+			}, circuitName+"2", ""),
 			NewFunctor(func() ([]interface{}, error) {
 				return []any{expectedResult}, nil
-			}, circuitName+"3"),
+			}, circuitName+"3", ""),
 		},
 		)
 
@@ -120,15 +120,15 @@ func TestCircuitBreaker_ExecuteSwitchToWorkingProviderOnVolumeThresholdReached(t
 			NewFunctor(func() ([]interface{}, error) {
 				prov1Called++
 				return nil, errors.New("provider 1 failed")
-			}, circuitName+"1"),
+			}, circuitName+"1", ""),
 			NewFunctor(func() ([]interface{}, error) {
 				prov2Called++
 				return nil, errors.New("provider 2 failed")
-			}, circuitName+"2"),
+			}, circuitName+"2", ""),
 			NewFunctor(func() ([]interface{}, error) {
 				prov3Called++
 				return []any{expectedResult}, nil
-			}, circuitName+"3"),
+			}, circuitName+"3", ""),
 		})
 
 		result := cb.Execute(cmd)
@@ -160,11 +160,11 @@ func TestCircuitBreaker_ExecuteHealthCheckOnWindowTimeout(t *testing.T) {
 			NewFunctor(func() ([]interface{}, error) {
 				prov1Called++
 				return nil, errors.New("provider 1 failed")
-			}, circuitName+"1"),
+			}, circuitName+"1", ""),
 			NewFunctor(func() ([]interface{}, error) {
 				prov2Called++
 				return []any{expectedResult}, nil
-			}, circuitName+"2"),
+			}, circuitName+"2", ""),
 		})
 
 		result := cb.Execute(cmd)
@@ -183,11 +183,11 @@ func TestCircuitBreaker_ExecuteHealthCheckOnWindowTimeout(t *testing.T) {
 		NewFunctor(func() ([]interface{}, error) {
 			prov1Called++
 			return []any{expectedResult}, nil // Now it is working
-		}, circuitName+"1"),
+		}, circuitName+"1", ""),
 		NewFunctor(func() ([]interface{}, error) {
 			prov2Called++
 			return []any{expectedResult}, nil
-		}, circuitName+"2"),
+		}, circuitName+"2", ""),
 	})
 	result := cb.Execute(cmd)
 	require.NoError(t, result.Error())
@@ -212,11 +212,11 @@ func TestCircuitBreaker_CommandCancel(t *testing.T) {
 		prov1Called++
 		cmd.Cancel()
 		return nil, expectedErr
-	}, circuitName+"1"))
+	}, circuitName+"1", ""))
 	cmd.Add(NewFunctor(func() ([]interface{}, error) {
 		prov2Called++
 		return nil, errors.New("provider 2 failed")
-	}, circuitName+"2"))
+	}, circuitName+"2", ""))
 
 	result := cb.Execute(cmd)
 	require.True(t, errors.Is(result.Error(), expectedErr))
@@ -224,7 +224,6 @@ func TestCircuitBreaker_CommandCancel(t *testing.T) {
 
 	assert.Equal(t, 1, prov1Called)
 	assert.Equal(t, 0, prov2Called)
-
 }
 
 func TestCircuitBreaker_EmptyOrNilCommand(t *testing.T) {
@@ -247,11 +246,11 @@ func TestCircuitBreaker_CircuitExistsAndClosed(t *testing.T) {
 	// We add it twice as otherwise it's only used for the fallback
 	cmd.Add(NewFunctor(func() ([]interface{}, error) {
 		return nil, nil
-	}, existCircuit))
+	}, existCircuit, ""))
 
 	cmd.Add(NewFunctor(func() ([]interface{}, error) {
 		return nil, nil
-	}, existCircuit))
+	}, existCircuit, ""))
 	_ = cb.Execute(cmd)
 	require.True(t, CircuitExists(existCircuit))
 	require.False(t, IsCircuitOpen(existCircuit))
@@ -276,10 +275,10 @@ func TestCircuitBreaker_Fallback(t *testing.T) {
 		cmd := NewCommand(ctx, nil)
 		cmd.Add(NewFunctor(func() ([]interface{}, error) {
 			return nil, expectedErr
-		}, circuitName+"1"))
+		}, circuitName+"1", ""))
 		cmd.Add(NewFunctor(func() ([]interface{}, error) {
 			return nil, errors.New("provider 2 failed")
-		}, circuitName+"2"))
+		}, circuitName+"2", ""))
 
 		result := cb.Execute(cmd)
 		require.NotNil(t, result.Error())
@@ -297,7 +296,7 @@ func TestCircuitBreaker_Fallback(t *testing.T) {
 	cmd.Add(NewFunctor(func() ([]interface{}, error) {
 		prov1Called++
 		return nil, expectedErr
-	}, circuitName+"1"))
+	}, circuitName+"1", ""))
 
 	result := cb.Execute(cmd)
 	require.True(t, errors.Is(result.Error(), expectedErr))
@@ -310,7 +309,7 @@ func TestCircuitBreaker_SuccessCallStatus(t *testing.T) {
 
 	functor := NewFunctor(func() ([]any, error) {
 		return []any{"success"}, nil
-	}, "successCircuit")
+	}, "successCircuit", "")
 
 	cmd := NewCommand(context.Background(), []*Functor{functor})
 
@@ -337,7 +336,7 @@ func TestCircuitBreaker_ErrorCallStatus(t *testing.T) {
 	expectedError := errors.New("functor error")
 	functor := NewFunctor(func() ([]any, error) {
 		return nil, expectedError
-	}, "errorCircuit")
+	}, "errorCircuit", "")
 
 	cmd := NewCommand(context.Background(), []*Functor{functor})
 
@@ -364,7 +363,7 @@ func TestCircuitBreaker_CancelledResult(t *testing.T) {
 	functor := NewFunctor(func() ([]any, error) {
 		time.Sleep(500 * time.Millisecond)
 		return []any{"should not be returned"}, nil
-	}, "cancelCircuit")
+	}, "cancelCircuit", "")
 
 	cmd := NewCommand(context.Background(), []*Functor{functor})
 	cmd.Cancel()
@@ -388,11 +387,11 @@ func TestCircuitBreaker_MultipleFunctorsResult(t *testing.T) {
 
 	functor1 := NewFunctor(func() ([]any, error) {
 		return nil, errors.New("functor1 error")
-	}, "circuit1")
+	}, "circuit1", "")
 
 	functor2 := NewFunctor(func() ([]any, error) {
 		return []any{"success from functor2"}, nil
-	}, "circuit2")
+	}, "circuit2", "")
 
 	cmd := NewCommand(context.Background(), []*Functor{functor1, functor2})
 
@@ -424,11 +423,11 @@ func TestCircuitBreaker_LastFunctorDirectExecution(t *testing.T) {
 	failingFunctor := NewFunctor(func() ([]any, error) {
 		time.Sleep(20 * time.Millisecond)
 		return nil, errors.New("should time out")
-	}, "circuitName")
+	}, "circuitName", "")
 
 	successFunctor := NewFunctor(func() ([]any, error) {
 		return []any{"success without circuit"}, nil
-	}, "circuitName")
+	}, "circuitName", "")
 
 	cmd := NewCommand(context.Background(), []*Functor{failingFunctor, successFunctor})
 

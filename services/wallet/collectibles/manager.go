@@ -241,8 +241,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 						zap.Error(err))
 				}
 				return []interface{}{assetContainer}, err
-			}, getCircuitName(provider, chainID),
-		)
+			}, getCircuitName(provider, chainID), provider.ID())
 		cmd.Add(f)
 	}
 
@@ -292,8 +291,7 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 					)
 				}
 				return []interface{}{assetContainer}, err
-			}, getCircuitName(provider, chainID),
-		)
+			}, getCircuitName(provider, chainID), provider.ID())
 		cmd.Add(f)
 	}
 
@@ -501,7 +499,7 @@ func (o *Manager) fetchMissingAssetsForChainByCollectibleUniqueID(ctx context.Co
 			}
 
 			return []any{fetchedAssets}, err
-		}, getCircuitName(provider, chainID)))
+		}, getCircuitName(provider, chainID), provider.ID()))
 	}
 
 	if cmd.IsEmpty() {
@@ -543,7 +541,7 @@ func (o *Manager) FetchCollectionsDataByContractID(ctx context.Context, ids []th
 				cmd.Add(circuitbreaker.NewFunctor(func() ([]any, error) {
 					fetchedCollections, err := provider.FetchCollectionsDataByContractID(ctx, idsToFetch)
 					return []any{fetchedCollections}, err
-				}, getCircuitName(provider, chainID)))
+				}, getCircuitName(provider, chainID), provider.ID()))
 			}
 
 			if cmd.IsEmpty() {
@@ -607,7 +605,7 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(ctx context.Context, c
 				)
 			}
 			return []any{res}, err
-		}, getCircuitName(provider, chainID)))
+		}, getCircuitName(provider, chainID), provider.ID()))
 	}
 
 	if cmd.IsEmpty() {
@@ -1183,7 +1181,7 @@ func (o *Manager) fetchSocialsForCollection(ctx context.Context, contractID thir
 				)
 			}
 			return []interface{}{socials}, err
-		}, getCircuitName(provider, contractID.ChainID)))
+		}, getCircuitName(provider, contractID.ChainID), provider.ID()))
 	}
 
 	if cmd.IsEmpty() {

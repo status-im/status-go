@@ -96,7 +96,7 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
 			result, err := f(provider)
 			return []interface{}{result}, err
-		}, provider.ID()))
+		}, provider.ID(), provider.ID()))
 	}
 
 	result := pm.circuitbreaker.Execute(cmd)

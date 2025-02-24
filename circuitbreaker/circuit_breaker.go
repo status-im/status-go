@@ -26,24 +26,25 @@ type FunctorCallStatus struct {
 	Err       error
 }
 
-func (cr CommandResult) Result() []any {
+func (cr *CommandResult) Result() []any {
 	return cr.res
 }
 
-func (cr CommandResult) Error() error {
+func (cr *CommandResult) Error() error {
 	return cr.err
 }
-func (cr CommandResult) Cancelled() bool {
+
+func (cr *CommandResult) Cancelled() bool {
 	return cr.cancelled
 }
 
-func (cr CommandResult) FunctorCallStatuses() []FunctorCallStatus {
+func (cr *CommandResult) FunctorCallStatuses() []FunctorCallStatus {
 	return cr.functorCallStatuses
 }
 
-func (cr *CommandResult) addCallStatus(circuitName string, err error) {
+func (cr *CommandResult) addCallStatus(providerName string, err error) {
 	cr.functorCallStatuses = append(cr.functorCallStatuses, FunctorCallStatus{
-		Name:      circuitName,
+		Name:      providerName,
 		Timestamp: time.Now(),
 		Err:       err,
 	})
@@ -62,8 +63,8 @@ func NewCommand(ctx context.Context, functors []*Functor) *Command {
 	}
 }
 
-func (cmd *Command) Add(ftor *Functor) {
-	cmd.functors = append(cmd.functors, ftor)
+func (cmd *Command) Add(functor *Functor) {
+	cmd.functors = append(cmd.functors, functor)
 }
 
 func (cmd *Command) IsEmpty() bool {
@@ -94,14 +95,19 @@ func NewCircuitBreaker(config Config) *CircuitBreaker {
 }
 
 type Functor struct {
-	exec        FallbackFunc
-	circuitName string
+	exec         FallbackFunc
+	circuitName  string
+	providerName string
 }
 
-func NewFunctor(exec FallbackFunc, circuitName string) *Functor {
+// NewFunctor creates a new Functor with the provided FallbackFunc, circuitName and providerName.
+// The circuitName is the name of the circuit to be used by the Functor. If the circuitName is empty,
+// or there is only one Functor in the Command, the command will be executed without a circuit.
+func NewFunctor(exec FallbackFunc, circuitName, providerName string) *Functor {
 	return &Functor{
-		exec:        exec,
-		circuitName: circuitName,
+		exec:         exec,
+		circuitName:  circuitName,
+		providerName: providerName,
 	}
 }
 
@@ -115,7 +121,7 @@ func accumulateCommandError(result CommandResult, circuitName string, err error)
 	return result
 }
 
-// Executes the command in its circuit if set.
+// Execute the command in its circuit if set.
 // If the command's circuit is not configured, the circuit of the CircuitBreaker is used.
 // This is a blocking function.
 func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
@@ -137,19 +143,20 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 
 		var err error
 		circuitName := f.circuitName
+		providerName := f.providerName
 		if cb.circuitNameHandler != nil {
 			circuitName = cb.circuitNameHandler(circuitName)
 		}
 
 		// if last command, execute without circuit
-		if i == len(cmd.functors)-1 {
+		if i == len(cmd.functors)-1 || circuitName == "" {
 			res, execErr := f.exec()
 			err = execErr
 			if err == nil {
 				result.res = res
 				result.err = nil
 			}
-			result.addCallStatus(circuitName, err)
+			result.addCallStatus(f.providerName, err)
 		} else {
 			if hystrix.GetCircuitSettings()[circuitName] == nil {
 				hystrix.ConfigureCommand(circuitName, hystrix.CommandConfig{
@@ -168,10 +175,10 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 					result.res = res
 					result.err = nil
 				}
-				result.addCallStatus(circuitName, err)
+				result.addCallStatus(f.providerName, err)
 
 				// If the command has been cancelled, we don't count
-				// the error towars breaking the circuit, and then we break
+				// the error towards breaking the circuit, and then we break
 				if cmd.cancel {
 					result = accumulateCommandError(result, circuitName, err)
 					result.cancelled = true
@@ -187,25 +194,24 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 			break
 		}
 
-		result = accumulateCommandError(result, circuitName, err)
-
-		// Lets abuse every provider with the same amount of MaxConcurrentRequests,
+		result = accumulateCommandError(result, providerName, err)
+		// Let's abuse every provider with the same amount of MaxConcurrentRequests,
 		// keep iterating even in case of ErrMaxConcurrency error
 	}
 	return result
 }
 
-func (c *CircuitBreaker) SetOverrideCircuitNameHandler(f func(string) string) {
-	c.circuitNameHandler = f
+func (cb *CircuitBreaker) SetOverrideCircuitNameHandler(f func(string) string) {
+	cb.circuitNameHandler = f
 }
 
-// Expects a circuit to exist because a new circuit is always closed.
-// Call CircuitExists to check if a circuit exists.
+// IsCircuitOpen Expects a circuit to exist because a new circuit is always closed.
 func IsCircuitOpen(circuitName string) bool {
 	circuit, wasCreated, _ := hystrix.GetCircuit(circuitName)
 	return !wasCreated && circuit.IsOpen()
 }
 
+// CircuitExists checks if a circuit exists.
 func CircuitExists(circuitName string) bool {
 	_, wasCreated, _ := hystrix.GetCircuit(circuitName)
 	return !wasCreated
