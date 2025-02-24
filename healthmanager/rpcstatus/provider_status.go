@@ -25,13 +25,6 @@ type ProviderStatus struct {
 	Status        StatusType `json:"status"`
 }
 
-// ProviderCallStatus represents the result of an arbitrary provider call.
-type ProviderCallStatus struct {
-	Name      string
-	Timestamp time.Time
-	Err       error
-}
-
 // RpcProviderCallStatus represents the result of an RPC provider call.
 type RpcProviderCallStatus struct {
 	Name      string
@@ -50,25 +43,6 @@ func NewRpcProviderStatus(res RpcProviderCallStatus) ProviderStatus {
 
 	// Determine if the error is critical
 	if res.Err == nil || provider_errors.IsNonCriticalRpcError(res.Err) || provider_errors.IsNonCriticalProviderError(res.Err) {
-		status.LastSuccessAt = res.Timestamp
-		status.Status = StatusUp
-	} else {
-		status.LastErrorAt = res.Timestamp
-		status.LastError = res.Err
-		status.Status = StatusDown
-	}
-
-	return status
-}
-
-// NewProviderStatus processes ProviderCallStatus and returns a new ProviderStatus.
-func NewProviderStatus(res ProviderCallStatus) ProviderStatus {
-	status := ProviderStatus{
-		Name: res.Name,
-	}
-
-	// Determine if the error is critical
-	if res.Err == nil || provider_errors.IsNonCriticalProviderError(res.Err) {
 		status.LastSuccessAt = res.Timestamp
 		status.Status = StatusUp
 	} else {
