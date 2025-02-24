@@ -37,6 +37,7 @@ type RpcProviderCallStatus struct {
 	Name      string
 	ChainID   uint64
 	Timestamp time.Time
+	Method    string
 	Err       error
 }
 

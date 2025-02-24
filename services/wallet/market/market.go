@@ -93,10 +93,12 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 	cmd := circuitbreaker.NewCommand(context.Background(), nil)
 	for _, provider := range providers {
 		provider := provider
+		// FIXME: we might want a different circuitName. See other uses of NewFunctor
+		circuitName := provider.ID()
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
 			result, err := f(provider)
 			return []interface{}{result}, err
-		}, provider.ID(), provider.ID()))
+		}, circuitName, provider.ID()))
 	}
 
 	result := pm.circuitbreaker.Execute(cmd)

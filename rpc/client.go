@@ -302,6 +302,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 			continue
 		}
 		if rpcClient == nil {
+			// Provider is disabled
 			continue
 		}
 
@@ -311,7 +312,7 @@ func (c *Client) getEthClients(network *params.Network) []ethclient.RPSLimitedEt
 			continue
 		}
 
-		// Create ethclient with RPS limiter
+		// Create ethclient with RPS limiter. If limiter is not enabled, it will be nil
 		ethClient := ethclient.NewRPSLimitedEthClient(rpcClient, rpcLimiter, limiterKey, provider.Name)
 		ethClients = append(ethClients, ethClient)
 	}
