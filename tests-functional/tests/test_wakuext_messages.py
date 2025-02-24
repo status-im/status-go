@@ -33,6 +33,7 @@ class TestChatMessages(MessengerTestCase):
         assert messages_page1[0].get("text", "") == sent_texts[4]
         assert messages_page1[1].get("text", "") == sent_texts[3]
         assert messages_page1[2].get("text", "") == sent_texts[2]
+        assert cursor1 != ""
 
         # Page 2
         chat_messages_res2 = self.sender.wakuext_service.chat_messages(sender_chat_id, cursor=cursor1, limit=3)
