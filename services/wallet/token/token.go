@@ -175,7 +175,7 @@ func NewTokenManager(
 	tokenBalancesStorage TokenBalancesStorage,
 ) *Manager {
 	maker, _ := contracts.NewContractMaker(RPCClient)
-	stores := []Store{NewUniswapStore(), NewDefaultStore()}
+	stores := []Store{NewUniswapStore(), NewDefaultStore(), NewAaveStore()}
 	tokens := prepareTokens(networkManager, stores)
 
 	return &Manager{

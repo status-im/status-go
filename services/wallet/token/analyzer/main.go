@@ -8,7 +8,7 @@ import (
 
 func main() {
 	statusStore := token.NewDefaultStore()
-	otherStores := []token.Store{token.NewUniswapStore()}
+	otherStores := []token.Store{token.NewUniswapStore(), token.NewAaveStore()}
 	allStores := append([]token.Store{statusStore}, otherStores...)
 
 	storePerName := map[string]token.Store{}

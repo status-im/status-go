@@ -419,7 +419,7 @@ func Test_tokensListsValidity(t *testing.T) {
 	tmpMap := make(map[string][]*Token)
 	for _, list := range allLists {
 		for _, token := range list.Tokens {
-			key := fmt.Sprintf("%d-%s", token.ChainID, token.Symbol)
+			key := fmt.Sprintf("%d-%s", token.ChainID, token.Address)
 			if added, ok := tmpMap[key]; ok {
 				found := false
 				for _, a := range added {

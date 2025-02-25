@@ -262,7 +262,7 @@ generate:  ##@ Run generate for all given packages using go-generate-fast, fallb
 
 generate-contracts:
 	go generate ./contracts
-download-uniswap-tokens:
+download-tokens:
 	go run ./services/wallet/token/downloader/main.go
 analyze-token-stores:
 	go run ./services/wallet/token/analyzer/main.go
