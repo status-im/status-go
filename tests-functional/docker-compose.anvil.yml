@@ -5,7 +5,7 @@ services:
     command:
       - anvil --host 0.0.0.0 --block-time 2
     networks:
-      - network
+      - network_ipv6
 
   deploy-sntv2:
     platform: linux/amd64
@@ -24,7 +24,7 @@ services:
             --fork-url=http://anvil:8545
             --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
     networks:
-      - network
+      - network_ipv6
 
   deploy-communities-contracts:
     platform: linux/amd64
@@ -47,10 +47,10 @@ services:
             --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
             --sender=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
     networks:
-      - network
+      - network_ipv6
 
 networks:
-  network:
+  network_ipv6:
     driver: bridge
     enable_ipv6: true
     ipam:

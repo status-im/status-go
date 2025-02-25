@@ -23,4 +23,4 @@ services:
       - ./coverage/binary:/coverage/binary
     stop_signal: SIGINT
     networks:
-      - network
+      - network_ipv6

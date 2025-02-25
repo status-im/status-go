@@ -80,6 +80,9 @@ class StatusBackend(RpcClient, SignalClient):
 
         coverage_path = option.codecov_dir if option.codecov_dir else os.path.abspath("./coverage/binary")
 
+        existing_networks = [net.name for net in self.docker_client.networks.list()]
+        network = [n for n in existing_networks if "network_ipv6" in n]  # type: ignore
+
         container_args = {
             "image": image_name,
             "detach": True,
@@ -101,7 +104,7 @@ class StatusBackend(RpcClient, SignalClient):
                     "mode": "rw",
                 }
             },
-            "network": "tests-functional_network",
+            "network": network[0],
         }
         if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
             container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
