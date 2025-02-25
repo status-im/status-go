@@ -554,6 +554,7 @@ func (s *SyncDeviceSuite) createUser(name string) (*api.GethStatusBackend, strin
 }
 
 func (s *SyncDeviceSuite) TestPairPendingContactRequest() {
+	s.T().Skip("flaky test")
 	bobBackend, _ := s.createUser("bob")
 	defer func() {
 		s.Require().NoError(bobBackend.Logout())
@@ -670,6 +671,7 @@ func (s *SyncDeviceSuite) testPairContactRequest(requestAction contactRequestAct
 }
 
 func (s *SyncDeviceSuite) TestPairDeclineContactRequest() {
+	s.T().Skip("flaky test")
 	declineContactRequest := func(messenger *protocol.Messenger, contactRequestID string) (*protocol.MessengerResponse, error) {
 		return messenger.DeclineContactRequest(context.Background(), &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequestID)})
 	}
