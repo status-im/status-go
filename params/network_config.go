@@ -2,7 +2,6 @@ package params
 
 import (
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -58,11 +57,6 @@ func (p RpcProvider) GetHost() string {
 		return ""
 	}
 	return u.Host
-}
-
-// NameAndChain returns a string in the format 'Name:ChainID'
-func (p RpcProvider) GetNameAndChainID() string {
-	return p.Name + ":" + strconv.FormatUint(p.ChainID, 10)
 }
 
 type TokenOverride struct {
