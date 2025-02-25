@@ -4,6 +4,8 @@ services:
     platform: linux/amd64
     command:
       - anvil --host 0.0.0.0 --block-time 2
+    networks:
+      - network
 
   deploy-sntv2:
     platform: linux/amd64
@@ -21,19 +23,20 @@ services:
             --broadcast
             --fork-url=http://anvil:8545
             --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+    networks:
+      - network
 
   deploy-communities-contracts:
     platform: linux/amd64
     environment:
-    # API_KEY_* env vars are required, but values aren't used
       - API_KEY_ETHERSCAN=""
       - API_KEY_ARBISCAN=""
       - API_KEY_OPTIMISTIC_ETHERSCAN=""
       - GITHUB_ORG=status-im
       - GITHUB_REPO=communities-contracts
     depends_on:
-     deploy-sntv2:
-      condition: service_completed_successfully
+      deploy-sntv2:
+        condition: service_completed_successfully
     build:
       context: .
       dockerfile: Dockerfile
@@ -43,3 +46,19 @@ services:
             --fork-url=http://anvil:8545
             --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
             --sender=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+    networks:
+      - network
+
+networks:
+  network:
+    enable_ipv6: true
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "true"
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.100.0/24  # IPv4 Subnet
+          gateway: 192.168.100.1
+        - subnet: fd00:0:0:1::/64  # IPv6 Subnet
+          gateway: fd00:0:0:1::1

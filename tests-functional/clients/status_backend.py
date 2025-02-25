@@ -22,7 +22,6 @@ from clients.rpc import RpcClient
 from conftest import option
 from resources.constants import user_1, DEFAULT_DISPLAY_NAME, USER_DIR
 from docker.errors import APIError
-from docker.types import IPAMConfig, IPAMPool
 
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
@@ -44,7 +43,7 @@ class StatusBackend(RpcClient, SignalClient):
                     host_port = random.choice(option.status_backend_port_range)
                     ports_tried.append(host_port)
                     self.container = self._start_container(host_port, privileged)
-                    url = f"http://[::1]:{host_port}"
+                    url = f"http://127.0.0.1:{host_port}"
                     option.status_backend_port_range.remove(host_port)
                     break
                 except Exception as ex:
@@ -81,15 +80,6 @@ class StatusBackend(RpcClient, SignalClient):
 
         coverage_path = option.codecov_dir if option.codecov_dir else os.path.abspath("./coverage/binary")
 
-        # Created a IPv6-only network
-        network_name = f"{docker_project_name}_ipv6"
-        subnet = "2001:db8:1::/64"
-
-        existing_networks = [net.name for net in self.docker_client.networks.list()]
-        if network_name not in existing_networks:
-            ipam_config = IPAMConfig(driver="default", pool_configs=[IPAMPool(subnet=subnet)])
-            self.docker_client.networks.create(name=network_name, driver="bridge", enable_ipv6=True, ipam=ipam_config)
-
         container_args = {
             "image": image_name,
             "detach": True,
@@ -97,7 +87,12 @@ class StatusBackend(RpcClient, SignalClient):
             "name": container_name,
             "labels": {"com.docker.compose.project": docker_project_name},
             "entrypoint": ["status-backend", "--address", f"[::]:{host_port}"],
-            "ports": {f"{host_port}/tcp": [{"HostIp": "::", "HostPort": str(host_port)}]},
+            "ports": {
+                f"{host_port}/tcp": [
+                    # {"HostIp": "::", "HostPort": str(host_port)},
+                    {"HostIp": "0.0.0.0", "HostPort": str(host_port)},
+                ]
+            },
             "environment": {
                 "GOCOVERDIR": "/coverage/binary",
             },
@@ -107,14 +102,21 @@ class StatusBackend(RpcClient, SignalClient):
                     "mode": "rw",
                 }
             },
+            "network": "tests-functional_network",
         }
         if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
             container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
 
         container = self.docker_client.containers.run(**container_args)
 
-        network = self.docker_client.networks.get(network_name)
-        network.connect(container, ipv6_address="2001:db8:1::2")  # Assign an IPv6 address
+        # subnet = ipaddress.IPv6Network("fd00:0:0:1::/64")
+        # random_host = random.randint(5, subnet.num_addresses - 2)  # Avoid 0 to 4
+        # random_ipv6 = str(subnet.network_address + random_host)
+
+        # a = self.docker_client.networks
+
+        # network = self.docker_client.networks.get("tests-functional_network")
+        # network.connect(container, ipv6_address=random_ipv6)  # Assign an IPv6 address
 
         option.status_backend_containers.append(self)
         return container

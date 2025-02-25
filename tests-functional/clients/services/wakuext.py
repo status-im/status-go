@@ -74,3 +74,8 @@ class WakuextService(Service):
         params = [{"enabled": enabled}]
         response = self.rpc_request("setLightClient", params)
         return response.json()
+
+    def peers(self):
+        params = []
+        response = self.rpc_request("peers", params)
+        return response.json()
