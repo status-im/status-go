@@ -2,9 +2,7 @@ package coingecko
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/url"
 	"strings"
 	"sync"
 
@@ -13,6 +11,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
 )
+
+const baseURL = "https://api.coingecko.com/api/v3"
 
 var coinGeckoMapping = map[string]string{
 	"STT":   "status",
@@ -56,30 +56,6 @@ var coinGeckoMapping = map[string]string{
 	"OP":    "optimism",
 }
 
-const baseURL = "https://api.coingecko.com/api/v3"
-
-type HistoricalPriceContainer struct {
-	Prices [][]float64 `json:"prices"`
-}
-type GeckoMarketValues struct {
-	ID                                string  `json:"id"`
-	Symbol                            string  `json:"symbol"`
-	Name                              string  `json:"name"`
-	MarketCap                         float64 `json:"market_cap"`
-	High24h                           float64 `json:"high_24h"`
-	Low24h                            float64 `json:"low_24h"`
-	PriceChange24h                    float64 `json:"price_change_24h"`
-	PriceChangePercentage24h          float64 `json:"price_change_percentage_24h"`
-	PriceChangePercentage1hInCurrency float64 `json:"price_change_percentage_1h_in_currency"`
-}
-
-type GeckoToken struct {
-	ID          string `json:"id"`
-	Symbol      string `json:"symbol"`
-	Name        string `json:"name"`
-	EthPlatform bool
-}
-
 type Client struct {
 	httpClient       *thirdparty.HTTPClient
 	tokens           map[string][]GeckoToken
@@ -95,35 +71,8 @@ func NewClient() *Client {
 	}
 }
 
-func (gt *GeckoToken) UnmarshalJSON(data []byte) error {
-	// Define an auxiliary struct to hold the JSON data
-	var aux struct {
-		ID        string `json:"id"`
-		Symbol    string `json:"symbol"`
-		Name      string `json:"name"`
-		Platforms struct {
-			Ethereum string `json:"ethereum"`
-			// Other platforms can be added here if needed
-		} `json:"platforms"`
-	}
-
-	// Unmarshal the JSON data into the auxiliary struct
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-
-	// Set the fields of GeckoToken from the auxiliary struct
-	gt.ID = aux.ID
-	gt.Symbol = aux.Symbol
-	gt.Name = aux.Name
-
-	// Check if "ethereum" key exists in the platforms map
-	if aux.Platforms.Ethereum != "" {
-		gt.EthPlatform = true
-	} else {
-		gt.EthPlatform = false
-	}
-	return nil
+func (c *Client) ID() string {
+	return "coingecko"
 }
 
 func mapTokensToSymbols(tokens []GeckoToken, tokenMap map[string][]GeckoToken) {
@@ -167,17 +116,7 @@ func (c *Client) getTokens() (map[string][]GeckoToken, error) {
 		return c.tokens, nil
 	}
 
-	params := url.Values{}
-	params.Add("include_platform", "true")
-
-	url := fmt.Sprintf("%s/coins/list", c.baseURL)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var tokens []GeckoToken
-	err = json.Unmarshal(response, &tokens)
+	tokens, err := c.FetchTokens(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -208,27 +147,16 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 		return nil, err
 	}
 
-	params := url.Values{}
-	params.Add("ids", strings.Join(maps.Values(ids), ","))
-	params.Add("vs_currencies", strings.Join(currencies, ","))
-
-	url := fmt.Sprintf("%s/simple/price", c.baseURL)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
+	simplePrices, err := c.FetchSimplePrice(context.Background(), maps.Values(ids), currencies)
 	if err != nil {
 		return nil, err
-	}
-
-	prices := make(map[string]map[string]float64)
-	err = json.Unmarshal(response, &prices)
-	if err != nil {
-		return nil, fmt.Errorf("%s - %s", err, string(response))
 	}
 
 	result := make(map[string]map[string]float64)
 	for symbol, id := range ids {
 		result[symbol] = map[string]float64{}
 		for _, currency := range currencies {
-			result[symbol][currency] = prices[id][strings.ToLower(currency)]
+			result[symbol][currency] = simplePrices[id][strings.ToLower(currency)]
 		}
 	}
 
@@ -260,25 +188,9 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		return nil, err
 	}
 
-	params := url.Values{}
-	params.Add("ids", strings.Join(maps.Values(ids), ","))
-	params.Add("vs_currency", currency)
-	params.Add("order", "market_cap_desc")
-	params.Add("per_page", "250")
-	params.Add("page", "1")
-	params.Add("sparkline", "false")
-	params.Add("price_change_percentage", "1h,24h")
-
-	url := fmt.Sprintf("%s/coins/markets", c.baseURL)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
+	marketValues, err := c.FetchCoinsMarkets(context.Background(), maps.Values(ids), currency)
 	if err != nil {
 		return nil, err
-	}
-
-	var marketValues []GeckoMarketValues
-	err = json.Unmarshal(response, &marketValues)
-	if err != nil {
-		return nil, fmt.Errorf("%s - %s", err, string(response))
 	}
 
 	result := make(map[string]thirdparty.TokenMarketValues)
@@ -318,18 +230,7 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 		return nil, err
 	}
 
-	params := url.Values{}
-	params.Add("vs_currency", currency)
-	params.Add("days", "30")
-
-	url := fmt.Sprintf("%s/coins/%s/market_chart", c.baseURL, id)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var container HistoricalPriceContainer
-	err = json.Unmarshal(response, &container)
+	container, err := c.FetchHistoryMarketData(context.Background(), id, currency)
 	if err != nil {
 		return nil, err
 	}
@@ -343,8 +244,4 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 	}
 
 	return result, nil
-}
-
-func (c *Client) ID() string {
-	return "coingecko"
 }
