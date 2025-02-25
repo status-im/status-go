@@ -27,8 +27,8 @@ type BlockchainHealthManager struct {
 	aggregator          *aggregator.Aggregator
 	subscriptionManager *SubscriptionManager
 
-	providers   map[uint64]*ProvidersHealthManager
-	cancelFuncs map[uint64]context.CancelFunc // Map chainID to cancel functions
+	providers   map[uint64]*ProvidersHealthManager // ChainID to its providers health manager
+	cancelFuncs map[uint64]context.CancelFunc      // Map chainID to cancel functions
 	lastStatus  *BlockchainStatus
 	wg          sync.WaitGroup
 }

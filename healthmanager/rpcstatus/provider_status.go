@@ -2,6 +2,7 @@ package rpcstatus
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/status-im/status-go/healthmanager/provider_errors"
@@ -67,7 +68,7 @@ func NewRpcProviderStatus(res RpcProviderCallStatus) ProviderStatus {
 		status.Status = StatusUp
 	} else {
 		status.LastErrorAt = res.Timestamp
-		status.LastError = res.Err
+		status.LastError = fmt.Errorf("method: %s, error: %w", res.Method, res.Err)
 		status.Status = StatusDown
 	}
 
