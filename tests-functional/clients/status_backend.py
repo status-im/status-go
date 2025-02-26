@@ -326,7 +326,11 @@ class StatusBackend(RpcClient, SignalClient):
         if not self.container:
             return
         logging.info(f"Killing container with id {self.container.short_id}")
-        self.container.kill()
+        try:
+            self.container.stop(timeout=30)
+            self.container.remove()
+        except Exception as e:
+            print(e)
         try:
             self.container.remove()
         except Exception as e:

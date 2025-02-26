@@ -42,7 +42,11 @@ class StatusBackendTestCase:
 
     def teardown_class(self):
         for container in option.status_backend_containers:
-            container.kill()
+            try:
+                container.stop(timeout=30)
+                container.remove()
+            except Exception as e:
+                print(e)
 
 
 class WalletTestCase(StatusBackendTestCase):

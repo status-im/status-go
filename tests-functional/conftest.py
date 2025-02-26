@@ -82,4 +82,8 @@ def close_status_backend_containers(request):
     if hasattr(request.node.instance, "reuse_container"):
         return
     for container in option.status_backend_containers:
-        container.kill()  # type: ignore
+        try:
+            container.stop(timeout=30)
+            container.remove()
+        except Exception as e:
+            print(e)
