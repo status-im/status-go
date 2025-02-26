@@ -32,6 +32,8 @@ class StatusBackend(RpcClient, SignalClient):
 
     def __init__(self, await_signals=[], privileged=False, ipv6=False):
         self.ipv6 = ipv6
+        self.docker_project_name = option.docker_project_name
+        self.network_name = f"{self.docker_project_name}_default"
         if option.status_backend_url:
             url = option.status_backend_url
         else:
@@ -72,11 +74,9 @@ class StatusBackend(RpcClient, SignalClient):
         self.settings_service = SettingsService(self)
 
     def _start_container(self, host_port, privileged):
-        docker_project_name = option.docker_project_name
-
         identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else os.popen("git rev-parse --short HEAD").read().strip()
-        image_name = f"{docker_project_name}-status-backend:latest"
-        container_name = f"{docker_project_name}-{identifier}-status-backend-{host_port}"
+        image_name = f"{self.docker_project_name}-status-backend:latest"
+        container_name = f"{self.docker_project_name}-{identifier}-status-backend-{host_port}"
 
         coverage_path = option.codecov_dir if option.codecov_dir else os.path.abspath("./coverage/binary")
 
@@ -85,7 +85,7 @@ class StatusBackend(RpcClient, SignalClient):
             "detach": True,
             "privileged": privileged,
             "name": container_name,
-            "labels": {"com.docker.compose.project": docker_project_name},
+            "labels": {"com.docker.compose.project": self.docker_project_name},
             "entrypoint": ["status-backend", "--address", "0.0.0.0:3333"],
             "ports": {"3333/tcp": host_port},
             "environment": {
@@ -119,7 +119,7 @@ class StatusBackend(RpcClient, SignalClient):
 
         container = self.docker_client.containers.run(**container_args)
 
-        network = self.docker_client.networks.get(f"{docker_project_name}_default")
+        network = self.docker_client.networks.get(self.network_name)
         network.connect(container)
 
         option.status_backend_containers.append(self)
@@ -356,10 +356,8 @@ class StatusBackend(RpcClient, SignalClient):
         logging.info(f"Trying to change container {self.container.name} IP")
         if not new_ip:
             new_ip = f"172.11.0.{random.randint(2, 254)}"
-        docker_project_name = option.docker_project_name
-        network_name = f"{docker_project_name}_default"
         try:
-            network = self.docker_client.networks.get(network_name)
+            network = self.docker_client.networks.get(self.network_name)
             network.disconnect(self.container)
             network.connect(self.container, ipv4_address=new_ip)
             logging.info(f"Changed container {self.container.name} IP to {new_ip}")
