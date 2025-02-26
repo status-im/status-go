@@ -36,7 +36,7 @@ jobs:
       run: pip install -r tests-functional/requirements.txt
 
     - name: Build status-backend
-      run: cd tests-functional; docker compose -f docker-compose.test.reliability.yml up --build --remove-orphans -d
+      run: cd tests-functional; docker compose -f docker-compose.test.reliability.ipv6.yml up --build --remove-orphans -d
 
     - name: Run tests
       run: pytest --reruns 2 -n auto -m "reliability" -c tests-functional/pytest.ini --junit-xml=pytest_results.xml --tb=short

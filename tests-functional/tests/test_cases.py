@@ -211,16 +211,16 @@ class MessengerTestCase(NetworkConditionTestCase):
 
     @pytest.fixture(scope="function", autouse=False)
     def setup_two_privileged_nodes(self, request):
-        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, True)
-        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, True)
+        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, True, True)
+        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, True, True)
 
     @pytest.fixture(scope="function", autouse=False)
     def setup_two_unprivileged_nodes(self, request):
         request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False)
         request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False)
 
-    def initialize_backend(self, await_signals, privileged=True, **kwargs):
-        backend = StatusBackend(await_signals, privileged)
+    def initialize_backend(self, await_signals, privileged=True, ipv6=False, **kwargs):
+        backend = StatusBackend(await_signals, privileged=privileged, ipv6=ipv6)
         backend.init_status_backend()
         backend.create_account_and_login(**kwargs)
         backend.find_public_key()

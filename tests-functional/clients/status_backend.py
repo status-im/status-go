@@ -33,7 +33,7 @@ class StatusBackend(RpcClient, SignalClient):
     def __init__(self, await_signals=[], privileged=False, ipv6=False):
         self.ipv6 = ipv6
         self.docker_project_name = option.docker_project_name
-        self.network_name = f"{self.docker_project_name}_default"
+        self.network_name = f"{self.docker_project_name}_network_ipv6" if ipv6 else f"{self.docker_project_name}_default"
         if option.status_backend_url:
             url = option.status_backend_url
         else:
@@ -41,15 +41,12 @@ class StatusBackend(RpcClient, SignalClient):
             retries = 5
             ports_tried = []
             for _ in range(retries):
-                try:
-                    host_port = random.choice(option.status_backend_port_range)
-                    ports_tried.append(host_port)
-                    self.container = self._start_container(host_port, privileged)
-                    url = f"http://{'[::1]' if self.ipv6 else '127.0.0.1'}:{host_port}"
-                    option.status_backend_port_range.remove(host_port)
-                    break
-                except Exception as ex:
-                    logging.error(f"Error in starting the container: {str(ex)}")
+                host_port = random.choice(option.status_backend_port_range)
+                ports_tried.append(host_port)
+                self.container = self._start_container(host_port, privileged)
+                url = f"http://{'[::1]' if self.ipv6 else '127.0.0.1'}:{host_port}"
+                option.status_backend_port_range.remove(host_port)
+                break
             else:
                 raise RuntimeError(f"Failed to start container on ports: {ports_tried}")
 
@@ -119,8 +116,8 @@ class StatusBackend(RpcClient, SignalClient):
 
         container = self.docker_client.containers.run(**container_args)
 
-        network = self.docker_client.networks.get(self.network_name)
-        network.connect(container)
+        # network = self.docker_client.networks.get(self.network_name)
+        # network.connect(container)
 
         option.status_backend_containers.append(self)
         return container
