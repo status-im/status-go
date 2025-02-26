@@ -2,6 +2,8 @@ import pytest
 
 from tests.test_cases import MessengerTestCase
 
+from clients.services.wakuext import SendPinMessagePayload
+
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc
@@ -74,3 +76,59 @@ class TestChatMessages(MessengerTestCase):
 
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == expectedCount
+
+    def test_pinned_messages(self):
+        sent_texts, responses = self.send_multiple_one_to_one_messages(1)
+
+        message = responses[0].get("result", {}).get("messages", [])[0]
+        pin_message_payload: SendPinMessagePayload = {
+            "chat_id": message.get("chatId", ""),
+            "message_id": message.get("id", ""),
+            "pinned": True,
+        }
+
+        response = self.sender.wakuext_service.send_pin_message(pin_message_payload)
+        self.sender.verify_json_schema(response, method="wakuext_sendPinMessage")
+
+        sender_chat_id = self.receiver.public_key
+        response = self.sender.wakuext_service.chat_pinned_messages(sender_chat_id)
+        self.sender.verify_json_schema(response, method="wakuext_schatPinnedMessages")
+
+        pinned_messages = response.get("result", {}).get("pinnedMessages", [])
+        assert len(pinned_messages) == 1
+        actual_text = pinned_messages[0].get("message", {}).get("text", "")
+        assert actual_text == sent_texts[0]
+
+    def test_pinned_messages_with_pagination(self):
+        sent_texts, responses = self.send_multiple_one_to_one_messages(5)
+        sender_chat_id = self.receiver.public_key
+
+        for response in responses:
+            message = response.get("result", {}).get("messages", [])[0]
+            pin_message_payload: SendPinMessagePayload = {
+                "chat_id": message.get("chatId", ""),
+                "message_id": message.get("id", ""),
+                "pinned": True,
+            }
+            self.sender.wakuext_service.send_pin_message(pin_message_payload)
+
+        # Page 1
+        pinned_messages_res1 = self.sender.wakuext_service.chat_pinned_messages(sender_chat_id, cursor="", limit=3)
+
+        cursor1 = pinned_messages_res1.get("result", {}).get("cursor", "")
+        pinned_messages_page1 = pinned_messages_res1.get("result", {}).get("pinnedMessages", [])
+        assert len(pinned_messages_page1) == 3
+        assert pinned_messages_page1[0].get("message", {}).get("text", "") == sent_texts[4]
+        assert pinned_messages_page1[1].get("message", {}).get("text", "") == sent_texts[3]
+        assert pinned_messages_page1[2].get("message", {}).get("text", "") == sent_texts[2]
+        assert cursor1 != ""
+
+        # Page 2
+        pinned_messages_res2 = self.sender.wakuext_service.chat_pinned_messages(sender_chat_id, cursor=cursor1, limit=3)
+
+        cursor2 = pinned_messages_res2.get("result", {}).get("cursor", "")
+        pinned_messages_page2 = pinned_messages_res2.get("result", {}).get("pinnedMessages", [])
+        assert len(pinned_messages_page2) == 2
+        assert pinned_messages_page2[0].get("message", {}).get("text", "") == sent_texts[1]
+        assert pinned_messages_page2[1].get("message", {}).get("text", "") == sent_texts[0]
+        assert cursor2 == ""

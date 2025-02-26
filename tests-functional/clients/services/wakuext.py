@@ -1,6 +1,13 @@
+from typing import TypedDict
 from clients.rpc import RpcClient
 from clients.services.service import Service
 from resources.enums import MessageContentType
+
+
+class SendPinMessagePayload(TypedDict):
+    chat_id: str
+    message_id: str
+    pinned: bool
 
 
 class WakuextService(Service):
@@ -98,4 +105,14 @@ class WakuextService(Service):
     def all_messages_from_chat_which_match_term(self, chat_id: str, searchTerm: str, caseSensitive: bool):
         params = [chat_id, searchTerm, caseSensitive]
         response = self.rpc_request("allMessagesFromChatWhichMatchTerm", params)
+        return response.json()
+
+    def send_pin_message(self, message: SendPinMessagePayload):
+        params = [message]
+        response = self.rpc_request("sendPinMessage", params)
+        return response.json()
+
+    def chat_pinned_messages(self, chat_id: str, cursor="", limit=10):
+        params = [chat_id, cursor, limit]
+        response = self.rpc_request("chatPinnedMessages", params)
         return response.json()
