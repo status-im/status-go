@@ -32,6 +32,11 @@ func (w *Watcher) Start() {
 		return
 	}
 
+	if w.feed == nil {
+		logutils.ZapLogger().Error("nil feed")
+		return
+	}
+
 	w.group = async.NewGroup(context.Background())
 	w.group.Add(func(ctx context.Context) error {
 		return watch(ctx, w.feed, w.callback)
