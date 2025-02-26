@@ -360,10 +360,7 @@ class StatusBackend(RpcClient, SignalClient):
             if not ipam_config:
                 raise RuntimeError("Network does not have a user-defined subnet, cannot assign a custom IP.")
 
-            # Refresh container attributes
             self.container.reload()
-
-            # Get existing IPs
             container_info = self.container.attrs["NetworkSettings"]["Networks"].get(self.network_name, {})
             current_ipv4 = container_info.get("IPAddress", "Unknown")
             current_ipv6 = container_info.get("GlobalIPv6Address", "Unknown")
@@ -390,11 +387,15 @@ class StatusBackend(RpcClient, SignalClient):
             else:
                 network.connect(self.container, ipv4_address=new_ipv4)
 
-            # Reload to confirm changes
             self.container.reload()
             updated_info = self.container.attrs["NetworkSettings"]["Networks"].get(self.network_name, {})
             updated_ipv4 = updated_info.get("IPAddress", "Unknown")
             updated_ipv6 = updated_info.get("GlobalIPv6Address", "Unknown")
+
+            if self.ipv6 and current_ipv6 == updated_ipv6:
+                raise RuntimeError("IPV6 is the same after network reconnect")
+            if not self.ipv6 and current_ipv4 == updated_ipv4:
+                raise RuntimeError("IPV4 is the same after network reconnect")
 
             logging.info(f"Changed container {self.container.name} IPs - New IPv4: {updated_ipv4}, New IPv6: {updated_ipv6}")
 

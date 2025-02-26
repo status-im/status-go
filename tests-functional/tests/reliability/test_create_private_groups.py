@@ -3,6 +3,7 @@ from uuid import uuid4
 import pytest
 from tests.test_cases import MessengerTestCase
 from clients.signals import SignalType
+from resources.constants import USE_IPV6
 
 
 @pytest.mark.usefixtures("setup_two_privileged_nodes")
@@ -25,6 +26,7 @@ class TestCreatePrivateGroups(MessengerTestCase):
             sleep(30)
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=private_group_name)
 
+    @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
     def test_create_private_groups_with_ip_change(self):
         self.make_contacts()
         self.receiver.change_container_ip()

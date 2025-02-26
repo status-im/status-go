@@ -4,6 +4,7 @@ import pytest
 from tests.test_cases import MessengerTestCase
 from clients.signals import SignalType
 from resources.enums import MessageContentType
+from resources.constants import USE_IPV6
 
 
 @pytest.mark.reliability
@@ -38,6 +39,7 @@ class TestContactRequests(MessengerTestCase):
         receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=expected_message.get("id"))
         sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
 
+    @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
     def test_contact_request_with_ip_change(self):
         sender = self.initialize_backend(await_signals=self.await_signals, privileged=True)
         receiver = self.initialize_backend(await_signals=self.await_signals, privileged=True)

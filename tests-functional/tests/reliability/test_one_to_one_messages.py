@@ -3,6 +3,7 @@ from uuid import uuid4
 import pytest
 from tests.test_cases import MessengerTestCase
 from clients.signals import SignalType
+from resources.constants import USE_IPV6
 
 
 @pytest.mark.usefixtures("setup_two_privileged_nodes")
@@ -35,6 +36,7 @@ class TestOneToOneMessages(MessengerTestCase):
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
         self.sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)
 
+    @pytest.mark.skipif(USE_IPV6 == "Yes", reason="Test works only with IPV4")
     def test_one_to_one_messages_with_ip_change(self):
         self.test_one_to_one_message_baseline()
         self.receiver.change_container_ip()
