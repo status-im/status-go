@@ -44,7 +44,6 @@ func (a *Aggregator) Update(providerStatus rpcstatus.ProviderStatus) {
 	// Update existing provider status or add a new provider.
 	if ps, exists := a.providerStatuses[providerStatus.Name]; exists {
 		ps.Status = providerStatus.Status
-		ps.ChainID = providerStatus.ChainID
 		if providerStatus.Status == rpcstatus.StatusUp {
 			ps.LastSuccessAt = providerStatus.LastSuccessAt
 		} else if providerStatus.Status == rpcstatus.StatusDown {
@@ -54,7 +53,6 @@ func (a *Aggregator) Update(providerStatus rpcstatus.ProviderStatus) {
 	} else {
 		a.providerStatuses[providerStatus.Name] = &rpcstatus.ProviderStatus{
 			Name:          providerStatus.Name,
-			ChainID:       providerStatus.ChainID,
 			LastSuccessAt: providerStatus.LastSuccessAt,
 			LastErrorAt:   providerStatus.LastErrorAt,
 			LastError:     providerStatus.LastError,
@@ -83,8 +81,6 @@ func (a *Aggregator) ComputeAggregatedStatus() rpcstatus.ProviderStatus {
 	var lastError error
 	anyUp := false
 	anyUnknown := false
-	// chainid
-	var chainID uint64 = 0
 
 	for _, ps := range a.providerStatuses {
 		switch ps.Status {
@@ -101,12 +97,10 @@ func (a *Aggregator) ComputeAggregatedStatus() rpcstatus.ProviderStatus {
 				lastError = ps.LastError
 			}
 		}
-		chainID = ps.ChainID
 	}
 
 	aggregatedStatus := rpcstatus.ProviderStatus{
 		Name:          a.name,
-		ChainID:       chainID,
 		LastSuccessAt: lastSuccessAt,
 		LastErrorAt:   lastErrorAt,
 		LastError:     lastError,

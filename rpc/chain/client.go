@@ -215,7 +215,7 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (i
 
 	result := c.circuitbreaker.Execute(cmd)
 	if c.providersHealthManager != nil {
-		rpcCallStatuses := convertFunctorCallStatuses(result.FunctorCallStatuses(), c.ChainID, f.MethodName)
+		rpcCallStatuses := convertFunctorCallStatuses(result.FunctorCallStatuses(), f.MethodName)
 		c.providersHealthManager.Update(ctx, rpcCallStatuses)
 	}
 	if result.Error() != nil {
@@ -740,7 +740,7 @@ func (c *ClientWithFallback) SetWalletNotifier(notifier func(chainId uint64, mes
 func (c *ClientWithFallback) toggleConnectionState(err error) {
 	connected := true
 	if err != nil {
-		if !isNotFoundError(err) && !isVMError(err) && !errors.Is(err, rpclimiter.ErrRequestsOverLimit) && !errors.Is(err, context.Canceled) {
+		if !isNotFoundError(err) && !isVMError(err) && !errors.Is(err, rpclimiter.ErrRequestsOverLimit) && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 			logutils.ZapLogger().Warn("Error not in chain call", zap.Uint64("chain", c.ChainID), zap.Error(err))
 			connected = false
 		} else {
@@ -787,11 +787,10 @@ func (c *ClientWithFallback) SetCircuitBreaker(cb *circuitbreaker.CircuitBreaker
 	c.circuitbreaker = cb
 }
 
-func convertFunctorCallStatuses(statuses []circuitbreaker.FunctorCallStatus, chainID uint64, methodName string) (result []rpcstatus.RpcProviderCallStatus) {
+func convertFunctorCallStatuses(statuses []circuitbreaker.FunctorCallStatus, methodName string) (result []rpcstatus.RpcProviderCallStatus) {
 	for _, f := range statuses {
 		result = append(result, rpcstatus.RpcProviderCallStatus{
 			Name:      f.Name,
-			ChainID:   chainID,
 			Method:    methodName,
 			Timestamp: f.Timestamp,
 			Err:       f.Err})

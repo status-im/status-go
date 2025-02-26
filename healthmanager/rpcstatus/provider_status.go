@@ -20,7 +20,6 @@ const (
 // ProviderStatus holds the status information for a single provider.
 type ProviderStatus struct {
 	Name          string     `json:"name"`
-	ChainID       uint64     `json:"chain_id"`
 	LastSuccessAt time.Time  `json:"last_success_at"`
 	LastErrorAt   time.Time  `json:"last_error_at"`
 	LastError     error      `json:"-"` // ignore this field during standard marshaling
@@ -49,7 +48,6 @@ func (ps ProviderStatus) MarshalJSON() ([]byte, error) {
 // RpcProviderCallStatus represents the result of an RPC provider call.
 type RpcProviderCallStatus struct {
 	Name      string
-	ChainID   uint64
 	Timestamp time.Time
 	Method    string
 	Err       error
@@ -58,8 +56,7 @@ type RpcProviderCallStatus struct {
 // NewRpcProviderStatus processes RpcProviderCallStatus and returns a new ProviderStatus.
 func NewRpcProviderStatus(res RpcProviderCallStatus) ProviderStatus {
 	status := ProviderStatus{
-		Name:    res.Name,
-		ChainID: res.ChainID,
+		Name: res.Name,
 	}
 
 	// Determine if the error is critical
