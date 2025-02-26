@@ -335,7 +335,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 			for pkString := range encryptionKeyActions.CommunityKeyAction.RemovedMembers {
 				pk, err := common.HexToPubkey(pkString)
 				if err != nil {
-					m.logger.Error("failed to decode public key", zap.Error(err), zap.String("pk", pkString))
+					m.logger.Error("failed to decode public key", zap.Error(err), zap.String("pk", gocommon.TruncateWithDot(pkString)))
 				}
 				payload, err := proto.Marshal(userKicked)
 				if err != nil {
@@ -649,7 +649,7 @@ func (m *Messenger) handleCommunityEncryptionKeysRequest(community *communities.
 
 	err := m.communitiesKeyDistributor.Distribute(community, keyActions)
 	if err != nil {
-		m.logger.Error("failed to send community keys", zap.Error(err), zap.String("community ID", community.IDString()))
+		m.logger.Error("failed to send community keys", zap.String("community ID", gocommon.TruncateWithDot(community.IDString())), zap.Error(err))
 	}
 
 	return nil
@@ -4749,7 +4749,7 @@ func (m *Messenger) rekeyCommunities(logger *zap.Logger) {
 
 		err = m.communitiesKeyDistributor.Distribute(c, keyActions)
 		if err != nil {
-			logger.Error("failed to rekey community", zap.Error(err), zap.String("community ID", c.IDString()))
+			logger.Error("failed to rekey community", zap.String("community ID", gocommon.TruncateWithDot(c.IDString())), zap.Error(err))
 			continue
 		}
 	}
@@ -5079,18 +5079,18 @@ func (m *Messenger) HandleDeleteCommunityMemberMessages(state *ReceivedMessageSt
 func (m *Messenger) leaveCommunityOnSoftKick(community *communities.Community, messengerResponse *MessengerResponse) {
 	response, err := m.kickedOutOfCommunity(community.ID(), true)
 	if err != nil {
-		m.logger.Error("member soft kick error", zap.String("communityID", types.EncodeHex(community.ID())), zap.Error(err))
+		m.logger.Error("member soft kick error", zap.String("communityID", gocommon.TruncateWithDot(types.EncodeHex(community.ID()))), zap.Error(err))
 	}
 
 	if err := messengerResponse.Merge(response); err != nil {
-		m.logger.Error("cannot merge leaveCommunityOnSoftKick response", zap.String("communityID", types.EncodeHex(community.ID())), zap.Error(err))
+		m.logger.Error("cannot merge leaveCommunityOnSoftKick response", zap.String("communityID", gocommon.TruncateWithDot(types.EncodeHex(community.ID()))), zap.Error(err))
 	}
 }
 
 func (m *Messenger) shareRevealedAccountsOnSoftKick(community *communities.Community, messengerResponse *MessengerResponse) {
 	requestToJoin, err := m.sendSharedAddressToControlNode(community.ControlNode(), community)
 	if err != nil {
-		m.logger.Error("share address to control node failed", zap.String("id", types.EncodeHex(community.ID())), zap.Error(err))
+		m.logger.Error("share address to control node failed", zap.String("id", gocommon.TruncateWithDot(types.EncodeHex(community.ID()))), zap.Error(err))
 
 		if err == communities.ErrRevealedAccountsAbsent || err == communities.ErrNoRevealedAccountsSignature {
 			m.AddActivityCenterNotificationToResponse(community.IDString(), ActivityCenterNotificationTypeShareAccounts, messengerResponse)
@@ -5181,7 +5181,7 @@ func (m *Messenger) getCommunityStorenode(communityID ...string) peer.ID {
 	ms, err := m.communityStorenodes.GetStorenodeByCommunityID(communityID[0])
 	if err != nil {
 		if !errors.Is(err, storenodes.ErrNotFound) {
-			m.logger.Error("getting storenode for community, using global", zap.String("communityID", communityID[0]), zap.Error(err))
+			m.logger.Error("getting storenode for community, using global", zap.String("communityID", gocommon.TruncateWithDot(communityID[0])), zap.Error(err))
 		}
 		// if we don't find a specific mailserver for the community, we just use the regular mailserverCycle's one
 		return m.transport.GetActiveStorenode()
@@ -5189,7 +5189,7 @@ func (m *Messenger) getCommunityStorenode(communityID ...string) peer.ID {
 
 	peerID, err := ms.PeerID()
 	if err != nil {
-		m.logger.Error("getting storenode for community, using global", zap.String("communityID", communityID[0]), zap.Error(err))
+		m.logger.Error("getting storenode for community, using global", zap.String("communityID", gocommon.TruncateWithDot(communityID[0])), zap.Error(err))
 		return m.transport.GetActiveStorenode()
 	}
 

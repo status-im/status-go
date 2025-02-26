@@ -58,7 +58,7 @@ func (d *Database) syncSave(communityID types.HexBytes, snode []Storenode, clock
 	for _, n := range snode {
 		// defensively validate the communityID
 		if len(n.CommunityID) == 0 || !bytes.Equal(communityID, n.CommunityID) {
-			err = fmt.Errorf("communityID mismatch %v != %v", communityID, n.CommunityID)
+			err = fmt.Errorf("communityID mismatch")
 			return err
 		}
 		dbN := find(n, dbNodes)

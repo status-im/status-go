@@ -676,7 +676,7 @@ func (m *Manager) runOwnerVerificationLoop() {
 func (m *Manager) ValidateCommunityByID(communityID types.HexBytes) (*CommunityResponse, error) {
 	communitiesToValidate, err := m.persistence.getCommunityToValidateByID(communityID)
 	if err != nil {
-		m.logger.Error("failed to validate community by ID", zap.String("id", communityID.String()), zap.Error(err))
+		m.logger.Error("failed to validate community by ID", zap.String("id", utils.TruncateWithDot(communityID.String())), zap.Error(err))
 		return nil, err
 	}
 	return m.validateCommunity(communitiesToValidate)

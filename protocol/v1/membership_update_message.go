@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -309,17 +310,17 @@ func (g *Group) init() error {
 		}
 		valid := g.validateEvent(event)
 		if !valid {
-			return fmt.Errorf("invalid event %#+v from %s", event, event.From)
+			return fmt.Errorf("invalid event, type: %s, from: %s, chatID: %s, name: %s", event.Type, gocommon.TruncateWithDot(event.From), gocommon.TruncateWithDot(event.ChatID), event.Name)
 		}
 		g.processEvent(event)
 	}
 
 	valid := g.validateChatID(g.chatID)
 	if !valid {
-		return fmt.Errorf("invalid chat ID: %s", g.chatID)
+		return fmt.Errorf("invalid chat ID: %s", gocommon.TruncateWithDot(g.chatID))
 	}
 	if chatID != g.chatID {
-		return fmt.Errorf("expected chat ID equal %s, got %s", g.chatID, chatID)
+		return fmt.Errorf("expected chat ID equal %s, got %s", gocommon.TruncateWithDot(g.chatID), gocommon.TruncateWithDot(chatID))
 	}
 
 	return nil
@@ -484,7 +485,7 @@ func (g *Group) ProcessEvents(events []MembershipUpdateEvent) error {
 
 func (g *Group) ProcessEvent(event MembershipUpdateEvent) error {
 	if !g.validateEvent(event) {
-		return fmt.Errorf("invalid event %#+v", event)
+		return fmt.Errorf("invalid event when processing, type: %s, from: %s, chatID: %s, name: %s", event.Type, gocommon.TruncateWithDot(event.From), gocommon.TruncateWithDot(event.ChatID), event.Name)
 	}
 	// Check if exists
 	g.events = append(g.events, event)

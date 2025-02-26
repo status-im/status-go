@@ -540,7 +540,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(state *ReceivedMessag
 	_, err = m.SendMessageToControlNode(community, rawMessage)
 
 	if err != nil {
-		m.logger.Error("failed to request shared addresses", zap.String("communityId", community.IDString()), zap.Error(err))
+		m.logger.Error("failed to request shared addresses", zap.String("communityId", utils.TruncateWithDot(community.IDString())), zap.Error(err))
 		return err
 	}
 
@@ -561,7 +561,7 @@ func (m *Messenger) requestCommunityKeysAndSharedAddresses(state *ReceivedMessag
 	if isEncrypted {
 		err = m.requestCommunityEncryptionKeys(community, nil)
 		if err != nil {
-			m.logger.Error("failed to request community encryption keys", zap.String("communityId", community.IDString()), zap.Error(err))
+			m.logger.Error("failed to request community encryption keys", zap.String("communityId", utils.TruncateWithDot(community.IDString())), zap.Error(err))
 			return err
 		}
 	}

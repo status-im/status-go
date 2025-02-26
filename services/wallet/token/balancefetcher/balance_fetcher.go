@@ -13,6 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
@@ -169,7 +171,8 @@ func (bf *DefaultBalanceFetcher) FetchTokenBalancesWithScanContract(ctx context.
 		BlockNumber: atBlock,
 	}, account, chunk)
 	if err != nil {
-		logutils.ZapLogger().Error("can't fetch erc20 token balance 6", zap.Stringer("account", account), zap.Error(err))
+		as := account.String()
+		logutils.ZapLogger().Error("can't fetch erc20 token balance 6", zap.String("account", gocommon.TruncateWithDot(as)), zap.Error(err))
 		return nil, err
 	}
 

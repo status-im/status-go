@@ -12,6 +12,7 @@ import (
 	"github.com/andybalholm/brotli"
 
 	"github.com/status-im/status-go/api/multiformat"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -224,7 +225,7 @@ func (m *Messenger) ShareCommunityChannelURLWithChatKey(request *requests.Commun
 	}
 
 	if !valid {
-		return "", fmt.Errorf("channelID should be UUID, got %s", request.ChannelID)
+		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(request.ChannelID))
 	}
 
 	return fmt.Sprintf("%s/cc/%s#%s", baseShareURL, request.ChannelID, shortKey), nil
@@ -237,7 +238,7 @@ func parseCommunityChannelURLWithChatKey(channelID string, publicKey string) (*U
 	}
 
 	if !valid {
-		return nil, fmt.Errorf("channelID should be UUID, got %s", channelID)
+		return nil, fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(channelID))
 	}
 
 	communityID, err := decodeCommunityID(publicKey)
@@ -313,7 +314,7 @@ func (m *Messenger) ShareCommunityChannelURLWithData(request *requests.Community
 	}
 
 	if !valid {
-		return "nil", fmt.Errorf("channelID should be UUID, got %s", request.ChannelID)
+		return "", fmt.Errorf("channelID should be UUID, got %s", gocommon.TruncateWithDot(request.ChannelID))
 	}
 
 	community, err := m.GetCommunityByID(request.CommunityID)
@@ -323,7 +324,7 @@ func (m *Messenger) ShareCommunityChannelURLWithData(request *requests.Community
 
 	channel := community.Chats()[request.ChannelID]
 	if channel == nil {
-		return "", fmt.Errorf("channel with channelID %s not found", request.ChannelID)
+		return "", fmt.Errorf("channel with channelID %s not found", gocommon.TruncateWithDot(request.ChannelID))
 	}
 
 	data, shortKey, err := m.prepareEncodedCommunityChannelData(community, channel, request.ChannelID)

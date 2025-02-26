@@ -68,7 +68,7 @@ func NewChallengeGiver(e *PayloadEncryptor, logger *zap.Logger) (*ChallengeGiver
 func (cg *ChallengeGiver) getIP(r *http.Request) (net.IP, error) {
 	h, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		cg.logger.Error("getIP: h, _, err := net.SplitHostPort(r.RemoteAddr)", zap.Error(err), zap.String("r.RemoteAddr", r.RemoteAddr))
+		cg.logger.Error("getIP: h, _, err := net.SplitHostPort(r.RemoteAddr)", zap.Error(err))
 		return nil, &ChallengeError{"error", http.StatusInternalServerError}
 	}
 	return net.ParseIP(h), nil
@@ -112,7 +112,7 @@ func (cg *ChallengeGiver) validateClientIP(r *http.Request) error {
 func (cg *ChallengeGiver) getSession(r *http.Request) (*sessions.Session, error) {
 	s, err := cg.cookieStore.Get(r, sessionChallenge)
 	if err != nil {
-		cg.logger.Error("checkChallengeResponse: cg.cookieStore.Get(r, sessionChallenge)", zap.Error(err), zap.String("sessionChallenge", sessionChallenge))
+		cg.logger.Error("checkChallengeResponse: cg.cookieStore.Get(r, sessionChallenge)", zap.Error(err))
 		return nil, &ChallengeError{"error", http.StatusInternalServerError}
 	}
 	return s, nil
@@ -171,7 +171,7 @@ func (cg *ChallengeGiver) checkChallengeResponse(w http.ResponseWriter, r *http.
 
 	dcr, err := cg.encryptor.decryptPlain(base58.Decode(clientChallengeResp))
 	if err != nil {
-		cg.logger.Error("checkChallengeResponse: cg.encryptor.decryptPlain(base58.Decode(clientChallengeResp))", zap.Error(err), zap.String("clientChallengeResp", clientChallengeResp))
+		cg.logger.Error("checkChallengeResponse: cg.encryptor.decryptPlain(base58.Decode(clientChallengeResp))", zap.Error(err))
 		return &ChallengeError{"error", http.StatusInternalServerError}
 	}
 

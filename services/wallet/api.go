@@ -19,6 +19,7 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/account"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
@@ -949,7 +950,7 @@ func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int
 func (api *API) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
 	exists, err := api.s.accountsDB.AddressExists(types.HexToAddress(address))
 	if err != nil {
-		logutils.ZapLogger().Error("failed to query db for a given address", zap.String("address", address), zap.Error(err))
+		logutils.ZapLogger().Error("failed to query db for a given address", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
 		return nil, err
 	}
 
@@ -961,7 +962,7 @@ func (api *API) getVerifiedWalletAccount(address, password string) (*account.Sel
 	keyStoreDir := api.s.Config().KeyStoreDir
 	key, err := api.s.gethManager.VerifyAccountPassword(keyStoreDir, address, password)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to verify account", zap.String("account", address), zap.Error(err))
+		logutils.ZapLogger().Error("failed to verify account", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
 		return nil, err
 	}
 

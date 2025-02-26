@@ -14,23 +14,27 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/common/dbsetup"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/common/shard"
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/tt"
 	accservice "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 const (
@@ -61,12 +65,39 @@ type SyncDeviceSuite struct {
 	logger   *zap.Logger
 	password string
 	tmpdir   string
+
+	// add pxBootNode to ensure alice and bob can find each other.
+	// If relying on in the fleet, the test will likely be flaky
+	pxBootNode      *wakuv2.Waku
+	pxServerNodeENR string
+	pxAddress       multiaddr.Multiaddr
 }
 
 func (s *SyncDeviceSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 	s.password = "password"
 	s.tmpdir = s.T().TempDir()
+
+	exchangeNodeConfig := &wakuv2.Config{
+		Port:                                   0,
+		EnableDiscV5:                           true,
+		EnablePeerExchangeServer:               true,
+		ClusterID:                              16,
+		DefaultShardPubsubTopic:                shard.DefaultShardPubsubTopic(),
+		EnableStoreConfirmationForMessagesSent: false,
+	}
+	var err error
+	s.pxBootNode, err = wakuv2.New(nil, "", exchangeNodeConfig, s.logger.Named("pxServerNode"), nil, nil, nil, nil)
+	s.Require().NoError(err)
+	s.Require().NoError(s.pxBootNode.Start())
+
+	s.pxServerNodeENR, err = s.pxBootNode.GetNodeENRString()
+	s.Require().NoError(err)
+
+	addrs, err := s.pxBootNode.ListenAddresses()
+	s.Require().NoError(err)
+	s.Require().Greater(len(addrs), 0)
+	s.pxAddress = addrs[0]
 }
 
 func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *api.GethStatusBackend {
@@ -87,16 +118,25 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *ap
 		CustomizationColor: "primary",
 	}
 
+	opts := []params.Option{
+		params.WithDiscV5BootstrapNodes([]string{s.pxServerNodeENR}),
+		// override fleet nodes
+		params.WithWakuNodes([]string{})}
 	if mnemonic == "" {
-		_, err = backend.CreateAccountAndLogin(&createAccount)
+		_, err = backend.CreateAccountAndLogin(&createAccount, opts...)
 	} else {
 		_, err = backend.RestoreAccountAndLogin(&requests.RestoreAccount{
 			Mnemonic:      mnemonic,
 			FetchBackup:   false,
 			CreateAccount: createAccount,
-		})
+		}, opts...)
 	}
+	s.Require().NoError(err)
 
+	waku := backend.StatusNode().WakuV2Service()
+	_, err = waku.AddRelayPeer(s.pxAddress)
+	s.Require().NoError(err)
+	err = waku.DialPeer(s.pxAddress)
 	s.Require().NoError(err)
 
 	accs, err := backend.GetAccounts()

@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/centralizedmetrics"
 	"github.com/status-im/status-go/centralizedmetrics/providers"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
@@ -478,13 +479,13 @@ func login(accountData, password, configJSON string) error {
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.UpdateNodeConfigFleet(account, password, &conf)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to update node config fleet", zap.String("key-uid", account.KeyUID), zap.Error(err))
+			logutils.ZapLogger().Error("failed to update node config fleet", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return statusBackend.LoggedIn(account.KeyUID, err)
 		}
 
 		err = statusBackend.StartNodeWithAccount(account, password, &conf, nil)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", account.KeyUID), zap.Error(err))
+			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
@@ -658,7 +659,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 		logutils.ZapLogger().Debug("starting a node, and saving account with configuration", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs, nil)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", account.KeyUID), zap.Error(err))
+			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
@@ -767,7 +768,7 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 		logutils.ZapLogger().Debug("starting a node, and saving account with configuration", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.SaveAccountAndStartNodeWithKey(account, password, settings, &conf, subaccs, keyHex)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", account.KeyUID), zap.Error(err))
+			logutils.ZapLogger().Error("failed to start node and save account", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node, and saved account", zap.String("key-uid", account.KeyUID))
@@ -794,7 +795,7 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.StartNodeWithKey(account, password, keyHex, &conf)
 		if err != nil {
-			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", account.KeyUID), zap.Error(err))
+			logutils.ZapLogger().Error("failed to start a node", zap.String("key-uid", gocommon.TruncateWithDot(account.KeyUID)), zap.Error(err))
 			return err
 		}
 		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
@@ -2066,7 +2067,7 @@ func EncodeTransfer(to string, value string) string {
 func encodeTransfer(to string, value string) string {
 	result, err := abi_spec.EncodeTransfer(to, value)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to encode transfer", zap.String("to", to), zap.String("value", value), zap.Error(err))
+		logutils.ZapLogger().Error("failed to encode transfer", zap.String("to", gocommon.TruncateWithDot(to)), zap.String("value", gocommon.TruncateWithDot(value)), zap.Error(err))
 		return ""
 	}
 	return result
@@ -2099,6 +2100,7 @@ func encodeFunctionCall(method string, paramsJSON string) string {
 	return result
 }
 
+// Deprecated: no usage in mobile, we might implemented it within other functions
 func EncodeFunctionCallV2(requestJSON string) string {
 	return callWithResponse(encodeFunctionCallV2, requestJSON)
 }
@@ -2112,6 +2114,7 @@ func encodeFunctionCallV2(requestJSON string) string {
 	return encodeFunctionCall(request.Method, request.ParamsJSON)
 }
 
+// Deprecated: no usage in mobile
 func DecodeParameters(decodeParamJSON string) string {
 	return decodeParameters(decodeParamJSON)
 }
@@ -2159,6 +2162,7 @@ func Sha3(str string) string {
 	return "0x" + abi_spec.Sha3(str)
 }
 
+// Deprecated: no usage in mobile
 func Utf8ToHex(str string) string {
 	return callWithResponse(utf8ToHex, str)
 }
@@ -2178,7 +2182,7 @@ func HexToUtf8(hexString string) string {
 func hexToUtf8(hexString string) string {
 	str, err := abi_spec.HexToUtf8(hexString)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to convert hex to utf8", zap.String("hexString", hexString), zap.Error(err))
+		logutils.ZapLogger().Error("failed to convert hex to utf8", zap.String("hexString", gocommon.TruncateWithDot(hexString)), zap.Error(err))
 	}
 	return str
 }
@@ -2190,7 +2194,7 @@ func CheckAddressChecksum(address string) string {
 func checkAddressChecksum(address string) string {
 	valid, err := abi_spec.CheckAddressChecksum(address)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to invoke check address checksum", zap.String("address", address), zap.Error(err))
+		logutils.ZapLogger().Error("failed to invoke check address checksum", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
 	}
 	result, _ := json.Marshal(valid)
 	return string(result)
@@ -2203,7 +2207,7 @@ func IsAddress(address string) string {
 func isAddress(address string) string {
 	valid, err := abi_spec.IsAddress(address)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to invoke IsAddress", zap.String("address", address), zap.Error(err))
+		logutils.ZapLogger().Error("failed to invoke IsAddress", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
 	}
 	result, _ := json.Marshal(valid)
 	return string(result)
@@ -2216,7 +2220,7 @@ func ToChecksumAddress(address string) string {
 func toChecksumAddress(address string) string {
 	address, err := abi_spec.ToChecksumAddress(address)
 	if err != nil {
-		logutils.ZapLogger().Error("failed to convert to checksum address", zap.String("address", address), zap.Error(err))
+		logutils.ZapLogger().Error("failed to convert to checksum address", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
 	}
 	return address
 }
