@@ -39,6 +39,8 @@ jobs:
       run: cd tests-functional; docker compose -f docker-compose.test.reliability.ipv6.yml up --build --remove-orphans -d
 
     - name: Run tests
+      env:
+        USE_IPV6: "Yes"
       run: pytest --reruns 2 -n auto -m "reliability" -c tests-functional/pytest.ini --junit-xml=pytest_results.xml --tb=short
 
     - name: Test Report

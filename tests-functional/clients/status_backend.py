@@ -20,7 +20,7 @@ from clients.services.settings import SettingsService
 from clients.signals import SignalClient, SignalType
 from clients.rpc import RpcClient
 from conftest import option
-from resources.constants import user_1, DEFAULT_DISPLAY_NAME, USER_DIR
+from resources.constants import USE_IPV6, user_1, DEFAULT_DISPLAY_NAME, USER_DIR
 from docker.errors import APIError
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
@@ -30,10 +30,11 @@ class StatusBackend(RpcClient, SignalClient):
 
     container = None
 
-    def __init__(self, await_signals=[], privileged=False, ipv6=False):
-        self.ipv6 = ipv6
+    def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6):
+        self.ipv6 = True if ipv6 == "Yes" else False
+        logging.info(f"Flag USE_IPV6 is: {self.ipv6}")
         self.docker_project_name = option.docker_project_name
-        self.network_name = f"{self.docker_project_name}_network_ipv6" if ipv6 else f"{self.docker_project_name}_default"
+        self.network_name = f"{self.docker_project_name}_default"
         if option.status_backend_url:
             url = option.status_backend_url
         else:
@@ -97,8 +98,6 @@ class StatusBackend(RpcClient, SignalClient):
         }
 
         if self.ipv6:
-            existing_networks = [net.name for net in self.docker_client.networks.list()]
-            network = [n for n in existing_networks if "network_ipv6" in n]  # type: ignore
             container_args.update(
                 {
                     "entrypoint": ["status-backend", "--address", f"[::]:{host_port}"],
@@ -107,7 +106,6 @@ class StatusBackend(RpcClient, SignalClient):
                             {"HostIp": "::", "HostPort": str(host_port)},
                         ]
                     },
-                    "network": network[0] if network else None,
                 }
             )
 
@@ -116,8 +114,8 @@ class StatusBackend(RpcClient, SignalClient):
 
         container = self.docker_client.containers.run(**container_args)
 
-        # network = self.docker_client.networks.get(self.network_name)
-        # network.connect(container)
+        network = self.docker_client.networks.get(self.network_name)
+        network.connect(container)
 
         option.status_backend_containers.append(self)
         return container
@@ -347,16 +345,58 @@ class StatusBackend(RpcClient, SignalClient):
             logging.info("Container stopped.")
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.1), reraise=True)
-    def change_container_ip(self, new_ip=None):
+    def change_container_ip(self, new_ipv4=None, new_ipv6=None):
         if not self.container:
             raise RuntimeError("Container is not initialized.")
-        logging.info(f"Trying to change container {self.container.name} IP")
-        if not new_ip:
-            new_ip = f"172.11.0.{random.randint(2, 254)}"
+
+        logging.info(f"Trying to change container {self.container.name} IPs (IPv6 Mode: {self.ipv6})")
+
         try:
+            # Get the network details
             network = self.docker_client.networks.get(self.network_name)
+
+            # Ensure network has explicitly configured subnets
+            ipam_config = network.attrs.get("IPAM", {}).get("Config", [])
+            if not ipam_config:
+                raise RuntimeError("Network does not have a user-defined subnet, cannot assign a custom IP.")
+
+            # Refresh container attributes
+            self.container.reload()
+
+            # Get existing IPs
+            container_info = self.container.attrs["NetworkSettings"]["Networks"].get(self.network_name, {})
+            current_ipv4 = container_info.get("IPAddress", "Unknown")
+            current_ipv6 = container_info.get("GlobalIPv6Address", "Unknown")
+
+            logging.info(f"Current IPs for {self.container.name} - IPv4: {current_ipv4}, IPv6: {current_ipv6}")
+
+            # Generate new IPs based on mode
+            for config in ipam_config:
+                subnet = config.get("Subnet")
+
+                if self.ipv6 and ":" in subnet and not new_ipv6:  # IPv6 Subnet
+                    base_ipv6 = subnet.rstrip("::/64")
+                    new_ipv6 = f"{base_ipv6}::{random.randint(1, 9999):x}:{random.randint(1, 9999):x}"
+                    logging.info(f"Generated new IPv6: {new_ipv6}")
+
+                elif not self.ipv6 and "." in subnet and not new_ipv4:  # IPv4 Subnet
+                    new_ipv4 = subnet.rsplit(".", 1)[0] + f".{random.randint(2, 254)}"
+                    logging.info(f"Generated new IPv4: {new_ipv4}")
+
+            # Disconnect and reconnect with only the needed IP type
             network.disconnect(self.container)
-            network.connect(self.container, ipv4_address=new_ip)
-            logging.info(f"Changed container {self.container.name} IP to {new_ip}")
+            if self.ipv6:
+                network.connect(self.container, ipv6_address=new_ipv6)
+            else:
+                network.connect(self.container, ipv4_address=new_ipv4)
+
+            # Reload to confirm changes
+            self.container.reload()
+            updated_info = self.container.attrs["NetworkSettings"]["Networks"].get(self.network_name, {})
+            updated_ipv4 = updated_info.get("IPAddress", "Unknown")
+            updated_ipv6 = updated_info.get("GlobalIPv6Address", "Unknown")
+
+            logging.info(f"Changed container {self.container.name} IPs - New IPv4: {updated_ipv4}, New IPv6: {updated_ipv6}")
+
         except Exception as e:
             raise RuntimeError(f"Failed to change container IP: {e}")

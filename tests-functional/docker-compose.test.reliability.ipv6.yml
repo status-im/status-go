@@ -1,7 +1,7 @@
 version: "3.9"
 
 networks:
-  network_ipv6:
+  default:
     driver: bridge
     enable_ipv6: true
     ipam:
@@ -19,7 +19,7 @@ services:
     ports:
       - 8545:8545
     networks:
-      - network_ipv6
+      - default
 
   deploy-sntv2:
     platform: linux/amd64
@@ -38,7 +38,7 @@ services:
             --fork-url=http://anvil:8545
             --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
     networks:
-      - network_ipv6
+      - default
 
   deploy-communities-contracts:
     platform: linux/amd64
@@ -61,7 +61,7 @@ services:
             --private-key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
             --sender=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
     networks:
-      - network_ipv6
+      - default
 
   status-backend:
     user: ${INTEGRATION_TESTS_DOCKER_UID}
@@ -89,4 +89,4 @@ services:
       - 3314-3324:3333
     stop_signal: SIGINT
     networks:
-      - network_ipv6
+      - default
