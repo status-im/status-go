@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass, field
 from typing import List
-import pytest
+import docker
 
 
 def pytest_addoption(parser):
@@ -76,10 +76,12 @@ def pytest_configure(config):
     option.base_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-@pytest.fixture(scope="function", autouse=True)
-def close_status_backend_containers(request):
-    yield
-    if hasattr(request.node.instance, "reuse_container"):
-        return
-    for container in option.status_backend_containers:
-        container.kill()  # type: ignore
+def pytest_unconfigure():
+    docker_client = docker.from_env()
+    for container_id in option.status_backend_containers:
+        try:
+            container = docker_client.containers.get(container_id)
+            container.stop(timeout=30)
+            container.remove()
+        except Exception as e:
+            print(e)
