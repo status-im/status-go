@@ -31,7 +31,8 @@ class StatusBackend(RpcClient, SignalClient):
 
     container = None
 
-    def __init__(self, await_signals=[], privileged=False):
+    def __init__(self, await_signals=[], privileged=False, ipv6=False):
+        self.ipv6 = ipv6
         if option.status_backend_url:
             url = option.status_backend_url
         else:
@@ -43,7 +44,7 @@ class StatusBackend(RpcClient, SignalClient):
                     host_port = random.choice(option.status_backend_port_range)
                     ports_tried.append(host_port)
                     self.container = self._start_container(host_port, privileged)
-                    url = f"http://[::1]:{host_port}"
+                    url = f"http://{'[::1]' if self.ipv6 else '127.0.0.1'}:{host_port}"
                     option.status_backend_port_range.remove(host_port)
                     break
                 except Exception as ex:
@@ -80,21 +81,14 @@ class StatusBackend(RpcClient, SignalClient):
 
         coverage_path = option.codecov_dir if option.codecov_dir else os.path.abspath("./coverage/binary")
 
-        existing_networks = [net.name for net in self.docker_client.networks.list()]
-        network = [n for n in existing_networks if "network_ipv6" in n]  # type: ignore
-
         container_args = {
             "image": image_name,
             "detach": True,
             "privileged": privileged,
             "name": container_name,
             "labels": {"com.docker.compose.project": docker_project_name},
-            "entrypoint": ["status-backend", "--address", f"[::]:{host_port}"],
-            "ports": {
-                f"{host_port}/tcp": [
-                    {"HostIp": "::", "HostPort": str(host_port)},
-                ]
-            },
+            "entrypoint": ["status-backend", "--address", "0.0.0.0:3333"],
+            "ports": {"3333/tcp": host_port},
             "environment": {
                 "GOCOVERDIR": "/coverage/binary",
             },
@@ -104,8 +98,23 @@ class StatusBackend(RpcClient, SignalClient):
                     "mode": "rw",
                 }
             },
-            "network": network[0],
         }
+
+        if self.ipv6:
+            existing_networks = [net.name for net in self.docker_client.networks.list()]
+            network = [n for n in existing_networks if "network_ipv6" in n]  # type: ignore
+            container_args.update(
+                {
+                    "entrypoint": ["status-backend", "--address", f"[::]:{host_port}"],
+                    "ports": {
+                        f"{host_port}/tcp": [
+                            {"HostIp": "::", "HostPort": str(host_port)},
+                        ]
+                    },
+                    "network": network[0] if network else None,
+                }
+            )
+
         if "FUNCTIONAL_TESTS_DOCKER_UID" in os.environ:
             container_args["user"] = os.environ["FUNCTIONAL_TESTS_DOCKER_UID"]
 

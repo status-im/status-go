@@ -1,4 +1,3 @@
-import json
 from time import sleep
 from uuid import uuid4
 import pytest
@@ -12,10 +11,6 @@ class TestOneToOneMessages(MessengerTestCase):
 
     def test_one_to_one_message_baseline(self, message_count=1):
         self.one_to_one_message(message_count)
-
-        res = self.sender.wakuext_service.peers()
-
-        print(json.dumps(res))
 
     def test_multiple_one_to_one_messages(self):
         self.test_one_to_one_message_baseline(message_count=50)

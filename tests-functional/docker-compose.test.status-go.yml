@@ -10,10 +10,10 @@ services:
         build_flags: -cover
     entrypoint: [
       "status-backend",
-      "--address", "[::]:3333"
+      "--address", "0.0.0.0:3333",
     ]
     healthcheck:
-      test: ["CMD-SHELL", "curl -X POST --data '{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":1}' -H 'Content-Type: application/json' http://[::1]:3333 || exit 1"]
+      test: ["CMD-SHELL", "curl -X POST --data '{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":1}' -H 'Content-Type: application/json' http://0.0.0.0:3333 || exit 1"]
       interval: 5s
       timeout: 2s
       retries: 120
@@ -22,5 +22,3 @@ services:
     volumes:
       - ./coverage/binary:/coverage/binary
     stop_signal: SIGINT
-    networks:
-      - network_ipv6
