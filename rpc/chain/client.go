@@ -37,6 +37,7 @@ type ClientInterface interface {
 	GetConnectionStatus() rpcstatus.StatusType
 	GetLimiter() rpclimiter.RequestLimiter
 	SetLimiter(rpclimiter.RequestLimiter)
+	GetProviderClient(provider string) ethclient.EthClientInterface
 }
 
 type HealthMonitor interface {
@@ -810,4 +811,14 @@ func convertFunctorCallStatuses(statuses []circuitbreaker.FunctorCallStatus, met
 		})
 	}
 	return
+}
+
+// Returns provider instance with a specific provider name
+func (c *ClientWithFallback) GetProviderClient(provider string) ethclient.EthClientInterface {
+	for _, client := range c.ethClients {
+		if client.GetProviderName() == provider {
+			return client
+		}
+	}
+	return nil
 }
