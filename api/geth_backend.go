@@ -1431,13 +1431,13 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	return nil
 }
 
-func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAccount) (*multiaccounts.Account, error) {
+func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAccount, opts ...params.Option) (*multiaccounts.Account, error) {
 
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
 
-	response, err := b.generateOrImportAccount(request.Mnemonic, 0, request.FetchBackup, &request.CreateAccount)
+	response, err := b.generateOrImportAccount(request.Mnemonic, 0, request.FetchBackup, &request.CreateAccount, opts...)
 	if err != nil {
 		return nil, err
 	}
