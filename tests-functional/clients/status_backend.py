@@ -119,6 +119,9 @@ class StatusBackend(RpcClient, SignalClient):
 
         container = self.docker_client.containers.run(**container_args)
 
+        network = self.docker_client.networks.get(f"{docker_project_name}_default")
+        network.connect(container)
+
         option.status_backend_containers.append(self)
         return container
 
