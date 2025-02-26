@@ -23,7 +23,6 @@ from conftest import option
 from resources.constants import user_1, DEFAULT_DISPLAY_NAME, USER_DIR
 from docker.errors import APIError
 
-
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
 
