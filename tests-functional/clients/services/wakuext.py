@@ -126,3 +126,13 @@ class WakuextService(Service):
         params = []
         response = self.rpc_request("statusUpdates", params)
         return response.json()
+
+    def delete_message(self, message_id: str):
+        params = [message_id]
+        response = self.rpc_request("deleteMessage", params)
+        return response.json()
+
+    def delete_messages_by_chat_id(self, chat_id: str):
+        params = [chat_id]
+        response = self.rpc_request("deleteMessagesByChatID", params)
+        return response.json()

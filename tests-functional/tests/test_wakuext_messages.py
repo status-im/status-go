@@ -134,6 +134,37 @@ class TestChatMessages(MessengerTestCase):
         assert pinned_messages_page2[1].get("message", {}).get("text", "") == sent_texts[0]
         assert cursor2 == ""
 
+    def test_delete_message(self):
+        _, responses = self.send_multiple_one_to_one_messages(1)
+
+        messageId = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+        response = self.sender.wakuext_service.message_by_message_id(messageId)
+        assert response.get("result", {}) != {}
+
+        response = self.sender.wakuext_service.delete_message(messageId)
+        self.sender.verify_json_schema(response, method="wakuext_deleteMessage")
+
+        response = self.sender.rpc_request("wakuext_messageByMessageID", [messageId])
+        error_code = response.json().get("error", {}).get("code", 0)
+        error_message = response.json().get("error", {}).get("message", "")
+        assert error_code == -32000
+        assert error_message == "record not found"
+
+    def test_delete_messages_by_chat_id(self):
+        _, _ = self.send_multiple_one_to_one_messages(3)
+        sender_chat_id = self.receiver.public_key
+
+        response = self.sender.wakuext_service.chat_messages(sender_chat_id)
+        messages = response.get("result", {}).get("messages", [])
+        assert len(messages) == 3
+
+        response = self.sender.wakuext_service.delete_messages_by_chat_id(sender_chat_id)
+        self.sender.verify_json_schema(response, method="wakuext_deleteMessagesByChatID")
+
+        response = self.sender.wakuext_service.chat_messages(sender_chat_id)
+        messages = response.get("result", {}).get("messages", [])
+        assert messages is None
+
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc
