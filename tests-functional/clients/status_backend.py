@@ -42,12 +42,15 @@ class StatusBackend(RpcClient, SignalClient):
             retries = 5
             ports_tried = []
             for _ in range(retries):
-                host_port = random.choice(option.status_backend_port_range)
-                ports_tried.append(host_port)
-                self.container = self._start_container(host_port, privileged)
-                url = f"http://{'[::1]' if self.ipv6 else '127.0.0.1'}:{host_port}"
-                option.status_backend_port_range.remove(host_port)
-                break
+                try:
+                    host_port = random.choice(option.status_backend_port_range)
+                    ports_tried.append(host_port)
+                    self.container = self._start_container(host_port, privileged)
+                    url = f"http://127.0.0.1:{host_port}"
+                    option.status_backend_port_range.remove(host_port)
+                    break
+                except Exception as ex:
+                    logging.error(f"Error in starting the container: {str(ex)}")
             else:
                 raise RuntimeError(f"Failed to start container on ports: {ports_tried}")
 
