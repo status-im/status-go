@@ -47,7 +47,6 @@ class StatusBackendTestCase:
             status_backend.container.remove()
 
 
-
 class WalletTestCase(StatusBackendTestCase):
 
     def wallet_create_multi_transaction(self, **kwargs):
