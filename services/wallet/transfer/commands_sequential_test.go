@@ -740,6 +740,10 @@ func (tc *TestClient) Close() {
 	}
 }
 
+func (tc *TestClient) GetProviderClient(provider string) ethclient.EthClientInterface {
+	return tc
+}
+
 type testERC20Transfer struct {
 	block     *big.Int
 	address   common.Address
