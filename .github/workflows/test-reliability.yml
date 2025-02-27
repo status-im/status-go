@@ -9,13 +9,23 @@ env:
   FORCE_COLOR: "1"
 
 jobs:
-  test-reliability-ipv4:
+  test-reliability:
     timeout-minutes: 90
     runs-on: ubuntu-latest
     permissions:
-      contents: read  # Restrict repository access to read-only
-      actions: read   # Only read actions, no write access
-      checks: write   # Allow posting test reports
+      contents: read
+      actions: read
+      checks: write
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: ipv4
+            docker_compose_file: docker-compose.test.reliability.yml
+            use_ipv6: "No"
+          - name: ipv6
+            docker_compose_file: docker-compose.test.reliability.ipv6.yml
+            use_ipv6: "Yes"
     steps:
 
     - uses: actions/checkout@v4
@@ -36,59 +46,18 @@ jobs:
       run: pip install -r tests-functional/requirements.txt
 
     - name: Build status-backend
-      run: cd tests-functional; docker compose -f docker-compose.test.reliability.yml up --build --remove-orphans -d
-
-    - name: Run tests
-      run: pytest --reruns 2 -n auto -m "reliability" -c tests-functional/pytest.ini --junit-xml=pytest_results.xml --tb=short
-
-    - name: Test Report
-      if: always()
-      uses: dorny/test-reporter@95058abb17504553158e70e2c058fe1fda4392c2
-      with:
-        name: Pytest JUnit Test Report
-        path: pytest_results.xml
-        reporter: java-junit
-        use-actions-summary: 'true'
-
-  test-reliability-ipv6:
-    timeout-minutes: 90
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read  # Restrict repository access to read-only
-      actions: read   # Only read actions, no write access
-      checks: write   # Allow posting test reports
-    steps:
-
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-
-    - uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-        cache: 'pip'
-
-    - name: Set up virtual environment in /tests-functional/
-      run: |
-        python -m venv tests-functional/.venv
-        echo "tests-functional/.venv/bin" >> $GITHUB_PATH  # Add virtualenv to PATH for subsequent steps
-
-    - name: Install dependencies based on requirements.txt
-      run: pip install -r tests-functional/requirements.txt
-
-    - name: Build status-backend
-      run: cd tests-functional; docker compose -f docker-compose.test.reliability.ipv6.yml up --build --remove-orphans -d
+      run: cd tests-functional; docker compose -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
 
     - name: Run tests
       env:
-        USE_IPV6: "Yes"
+        USE_IPV6: ${{ matrix.config.use_ipv6 }}
       run: pytest --reruns 2 -n auto -m "reliability" -c tests-functional/pytest.ini --junit-xml=pytest_results.xml --tb=short
 
     - name: Test Report
       if: always()
       uses: dorny/test-reporter@95058abb17504553158e70e2c058fe1fda4392c2
       with:
-        name: Pytest JUnit Test Report
+        name: Pytest JUnit Test Report (${{ matrix.config.name }})
         path: pytest_results.xml
         reporter: java-junit
         use-actions-summary: 'true'
