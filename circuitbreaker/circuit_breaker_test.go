@@ -309,7 +309,7 @@ func TestCircuitBreaker_SuccessCallStatus(t *testing.T) {
 
 	functor := NewFunctor(func() ([]any, error) {
 		return []any{"success"}, nil
-	}, "successCircuit", "")
+	}, "successCircuit", "successProvider")
 
 	cmd := NewCommand(context.Background(), []*Functor{functor})
 
@@ -322,8 +322,8 @@ func TestCircuitBreaker_SuccessCallStatus(t *testing.T) {
 	assert.Len(t, result.FunctorCallStatuses(), 1)
 
 	status := result.FunctorCallStatuses()[0]
-	if status.Name != "successCircuit" {
-		t.Errorf("Expected functor name to be 'successCircuit', got %s", status.Name)
+	if status.Name != "successProvider" {
+		t.Errorf("Expected functor name to be 'successProvider', got %s", status.Name)
 	}
 	if status.Err != nil {
 		t.Errorf("Expected no error in functor status, got %v", status.Err)
@@ -336,7 +336,7 @@ func TestCircuitBreaker_ErrorCallStatus(t *testing.T) {
 	expectedError := errors.New("functor error")
 	functor := NewFunctor(func() ([]any, error) {
 		return nil, expectedError
-	}, "errorCircuit", "")
+	}, "errorCircuit", "errorProvider")
 
 	cmd := NewCommand(context.Background(), []*Functor{functor})
 
@@ -349,8 +349,8 @@ func TestCircuitBreaker_ErrorCallStatus(t *testing.T) {
 	assert.Len(t, result.FunctorCallStatuses(), 1)
 
 	status := result.FunctorCallStatuses()[0]
-	if status.Name != "errorCircuit" {
-		t.Errorf("Expected functor name to be 'errorCircuit', got %s", status.Name)
+	if status.Name != "errorProvider" {
+		t.Errorf("Expected functor name to be 'errorProvider', got %s", status.Name)
 	}
 	if !errors.Is(status.Err, expectedError) {
 		t.Errorf("Expected functor error to be '%v', got '%v'", expectedError, status.Err)
@@ -387,11 +387,11 @@ func TestCircuitBreaker_MultipleFunctorsResult(t *testing.T) {
 
 	functor1 := NewFunctor(func() ([]any, error) {
 		return nil, errors.New("functor1 error")
-	}, "circuit1", "")
+	}, "circuit1", "provider1")
 
 	functor2 := NewFunctor(func() ([]any, error) {
 		return []any{"success from functor2"}, nil
-	}, "circuit2", "")
+	}, "circuit2", "provider2")
 
 	cmd := NewCommand(context.Background(), []*Functor{functor1, functor2})
 
@@ -404,10 +404,10 @@ func TestCircuitBreaker_MultipleFunctorsResult(t *testing.T) {
 	statuses := result.FunctorCallStatuses()
 	require.Len(t, statuses, 2)
 
-	require.Equal(t, statuses[0].Name, "circuit1")
+	require.Equal(t, statuses[0].Name, "provider1")
 	require.NotNil(t, statuses[0].Err)
 
-	require.Equal(t, statuses[1].Name, "circuit2")
+	require.Equal(t, statuses[1].Name, "provider2")
 	require.Nil(t, statuses[1].Err)
 }
 
@@ -423,11 +423,11 @@ func TestCircuitBreaker_LastFunctorDirectExecution(t *testing.T) {
 	failingFunctor := NewFunctor(func() ([]any, error) {
 		time.Sleep(20 * time.Millisecond)
 		return nil, errors.New("should time out")
-	}, "circuitName", "")
+	}, "circuitName", "providerName")
 
 	successFunctor := NewFunctor(func() ([]any, error) {
 		return []any{"success without circuit"}, nil
-	}, "circuitName", "")
+	}, "circuitName", "providerName")
 
 	cmd := NewCommand(context.Background(), []*Functor{failingFunctor, successFunctor})
 
@@ -443,9 +443,9 @@ func TestCircuitBreaker_LastFunctorDirectExecution(t *testing.T) {
 	statuses := result.FunctorCallStatuses()
 	require.Len(t, statuses, 2)
 
-	require.Equal(t, statuses[0].Name, "circuitName")
+	require.Equal(t, statuses[0].Name, "providerName")
 	require.NotNil(t, statuses[0].Err)
 
-	require.Equal(t, statuses[1].Name, "circuitName")
+	require.Equal(t, statuses[1].Name, "providerName")
 	require.Nil(t, statuses[1].Err)
 }

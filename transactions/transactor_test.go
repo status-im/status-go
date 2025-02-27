@@ -75,7 +75,7 @@ func (s *TransactorSuite) SetupTest() {
 	rpcClient.UpstreamChainID = chainID
 
 	ethClients := []ethclient.RPSLimitedEthClientInterface{
-		ethclient.NewRPSLimitedEthClient(s.client, rpclimiter.NewRPCRpsLimiter(), "local-1-chain-id-1"),
+		ethclient.NewRPSLimitedEthClient(s.client, rpclimiter.NewRPCRpsLimiter(), "local-1-chain-id-1-circuit", "local-1-chain-id-1-provider"),
 	}
 	localClient := chain.NewClient(ethClients, chainID, nil)
 	rpcClient.SetClient(chainID, localClient)

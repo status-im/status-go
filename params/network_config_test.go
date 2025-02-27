@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/params"
+
 	"github.com/stretchr/testify/assert"
 )
 

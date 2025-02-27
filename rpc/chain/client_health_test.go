@@ -44,8 +44,12 @@ func (s *ClientWithFallbackSuite) setupClients(numClients int) {
 
 	for i := 0; i < numClients; i++ {
 		ethClient := mockEthclient.NewMockRPSLimitedEthClientInterface(s.mockCtrl)
-		ethClient.EXPECT().GetName().AnyTimes().Return("test" + strconv.Itoa(i))
+		ethClient.EXPECT().GetProviderName().AnyTimes().Return("test" + strconv.Itoa(i) + "_provider")
+		ethClient.EXPECT().GetCircuitName().AnyTimes().Return("test" + strconv.Itoa(i) + "_circuit")
 		ethClient.EXPECT().GetLimiter().AnyTimes().Return(nil)
+		ethClient.EXPECT().ExecuteWithRPSLimit(gomock.Any()).DoAndReturn(func(f func(client ethclient.EthClientInterface) (interface{}, error)) (interface{}, error) {
+			return f(ethClient)
+		}).AnyTimes()
 
 		s.mockEthClients = append(s.mockEthClients, ethClient)
 		ethClients = append(ethClients, ethClient)
@@ -74,7 +78,7 @@ func (s *ClientWithFallbackSuite) TestSingleClientSuccess() {
 	require.Equal(s.T(), rpcstatus.StatusUp, chainStatus.Status)
 	providerStatuses := s.providersHealthManager.GetStatuses()
 	require.Len(s.T(), providerStatuses, 1)
-	require.Equal(s.T(), providerStatuses["test0"].Status, rpcstatus.StatusUp)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusUp)
 }
 
 func (s *ClientWithFallbackSuite) TestSingleClientConnectionError() {
@@ -94,7 +98,7 @@ func (s *ClientWithFallbackSuite) TestSingleClientConnectionError() {
 	require.Equal(s.T(), rpcstatus.StatusDown, chainStatus.Status)
 	providerStatuses := s.providersHealthManager.GetStatuses()
 	require.Len(s.T(), providerStatuses, 1)
-	require.Equal(s.T(), providerStatuses["test0"].Status, rpcstatus.StatusDown)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusDown)
 }
 
 func (s *ClientWithFallbackSuite) TestRPSLimitErrorDoesNotMarkChainDown() {
@@ -115,9 +119,9 @@ func (s *ClientWithFallbackSuite) TestRPSLimitErrorDoesNotMarkChainDown() {
 	require.Equal(s.T(), rpcstatus.StatusUp, chainStatus.Status)
 	providerStatuses := s.providersHealthManager.GetStatuses()
 	require.Len(s.T(), providerStatuses, 1)
-	require.Equal(s.T(), providerStatuses["test0"].Status, rpcstatus.StatusUp)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusUp)
 
-	status := providerStatuses["test0"]
+	status := providerStatuses["test0_provider"]
 	require.Equal(s.T(), status.Status, rpcstatus.StatusUp, "provider shouldn't be DOWN on RPS limit")
 }
 
@@ -139,7 +143,7 @@ func (s *ClientWithFallbackSuite) TestContextCanceledDoesNotMarkChainDown() {
 	require.Equal(s.T(), rpcstatus.StatusUp, chainStatus.Status)
 	providerStatuses := s.providersHealthManager.GetStatuses()
 	require.Len(s.T(), providerStatuses, 1)
-	require.Equal(s.T(), providerStatuses["test0"].Status, rpcstatus.StatusUp)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusUp)
 }
 
 func (s *ClientWithFallbackSuite) TestVMErrorDoesNotMarkChainDown() {
@@ -161,7 +165,7 @@ func (s *ClientWithFallbackSuite) TestVMErrorDoesNotMarkChainDown() {
 	require.Equal(s.T(), rpcstatus.StatusUp, chainStatus.Status)
 	providerStatuses := s.providersHealthManager.GetStatuses()
 	require.Len(s.T(), providerStatuses, 1)
-	require.Equal(s.T(), providerStatuses["test0"].Status, rpcstatus.StatusUp)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusUp)
 }
 
 func (s *ClientWithFallbackSuite) TestNoClientsChainDown() {
@@ -200,9 +204,9 @@ func (s *ClientWithFallbackSuite) TestAllClientsDifferentErrors() {
 	providerStatuses := s.providersHealthManager.GetStatuses()
 	require.Len(s.T(), providerStatuses, 3)
 
-	require.Equal(s.T(), providerStatuses["test0"].Status, rpcstatus.StatusDown, "provider test0 should be DOWN due to a connection error")
-	require.Equal(s.T(), providerStatuses["test1"].Status, rpcstatus.StatusUp, "provider test1 should not be marked DOWN due to RPS limit error")
-	require.Equal(s.T(), providerStatuses["test2"].Status, rpcstatus.StatusUp, "provider test2 should not be labelled DOWN due to a VM error")
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusDown, "provider test0 should be DOWN due to a connection error")
+	require.Equal(s.T(), providerStatuses["test1_provider"].Status, rpcstatus.StatusUp, "provider test1 should not be marked DOWN due to RPS limit error")
+	require.Equal(s.T(), providerStatuses["test2_provider"].Status, rpcstatus.StatusUp, "provider test2 should not be labelled DOWN due to a VM error")
 }
 
 func (s *ClientWithFallbackSuite) TestAllClientsNetworkErrors() {
@@ -225,9 +229,9 @@ func (s *ClientWithFallbackSuite) TestAllClientsNetworkErrors() {
 
 	providerStatuses := s.providersHealthManager.GetStatuses()
 	require.Len(s.T(), providerStatuses, 3)
-	require.Equal(s.T(), providerStatuses["test0"].Status, rpcstatus.StatusDown)
-	require.Equal(s.T(), providerStatuses["test1"].Status, rpcstatus.StatusDown)
-	require.Equal(s.T(), providerStatuses["test2"].Status, rpcstatus.StatusDown)
+	require.Equal(s.T(), providerStatuses["test0_provider"].Status, rpcstatus.StatusDown)
+	require.Equal(s.T(), providerStatuses["test1_provider"].Status, rpcstatus.StatusDown)
+	require.Equal(s.T(), providerStatuses["test2_provider"].Status, rpcstatus.StatusDown)
 }
 
 func (s *ClientWithFallbackSuite) TestChainStatusDownWhenInitial() {
