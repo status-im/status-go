@@ -30,7 +30,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/centralizedmetrics"
 	centralizedmetricscommon "github.com/status-im/status-go/centralizedmetrics/common"
-	d_common "github.com/status-im/status-go/common"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -283,7 +283,7 @@ func (b *GethStatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Ac
 			return &acc, nil
 		}
 	}
-	return nil, fmt.Errorf("account with keyUID %s not found", keyUID)
+	return nil, fmt.Errorf("account with keyUID %s not found", gocommon.TruncateWithDot(keyUID))
 }
 
 func (b *GethStatusBackend) SaveAccount(account multiaccounts.Account) error {
@@ -359,7 +359,7 @@ func (b *GethStatusBackend) DeleteImportedKey(address, password, keyStoreDir str
 		if strings.Contains(fileInfo.Name(), address) {
 			_, err := b.accountManager.VerifyAccountPassword(keyStoreDir, "0x"+address, password)
 			if err != nil {
-				b.logger.Error("failed to verify account", zap.String("account", address), zap.Error(err))
+				b.logger.Error("failed to verify account", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
 				return err
 			}
 
@@ -595,7 +595,7 @@ func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
 // and choose to upgrade a higher version instead, after upgrading, user first attempt to login will fail because the node config migration will fail.
 // and second attempt to login will cause an empty node config saved in the db.
 func (b *GethStatusBackend) workaroundToFixBadMigration(request *requests.Login) (err error) {
-	if !d_common.IsMobilePlatform() { // this issue only happens on mobile platform
+	if !gocommon.IsMobilePlatform() { // this issue only happens on mobile platform
 		return nil
 	}
 
@@ -1431,13 +1431,13 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	return nil
 }
 
-func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAccount) (*multiaccounts.Account, error) {
+func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAccount, opts ...params.Option) (*multiaccounts.Account, error) {
 
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
 
-	response, err := b.generateOrImportAccount(request.Mnemonic, 0, request.FetchBackup, &request.CreateAccount)
+	response, err := b.generateOrImportAccount(request.Mnemonic, 0, request.FetchBackup, &request.CreateAccount, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2475,7 +2475,7 @@ func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (
 	}
 	exists, err := db.AddressExists(types.HexToAddress(address))
 	if err != nil {
-		b.logger.Error("failed to query db for a given address", zap.String("address", address), zap.Error(err))
+		b.logger.Error("failed to query db for a given address", zap.String("address", gocommon.TruncateWithDot(address)), zap.Error(err))
 		return nil, err
 	}
 
@@ -2493,7 +2493,7 @@ func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (
 	}
 
 	if err != nil {
-		b.logger.Error("failed to verify account", zap.String("account", address), zap.Error(err))
+		b.logger.Error("failed to verify account", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
 		return nil, err
 	}
 
@@ -2507,7 +2507,7 @@ func (b *GethStatusBackend) generatePartialAccountKey(db *accounts.Database, add
 	dbPath, err := db.GetPath(types.HexToAddress(address))
 	path := "m/" + dbPath[strings.LastIndex(dbPath, "/")+1:]
 	if err != nil {
-		b.logger.Error("failed to get path for given account address", zap.String("account", address), zap.Error(err))
+		b.logger.Error("failed to get path for given account address", zap.String("account", gocommon.TruncateWithDot(address)), zap.Error(err))
 		return nil, err
 	}
 

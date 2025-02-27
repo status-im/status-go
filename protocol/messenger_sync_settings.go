@@ -35,7 +35,7 @@ func (m *Messenger) prepareSyncSettingsMessages(currentClock uint64, prepareForB
 			// Pull clock from the db
 			clock, err := m.settings.GetSettingLastSynced(sf)
 			if err != nil {
-				logger.Error("m.settings.GetSettingLastSynced", zap.Error(err), zap.Any("SettingField", sf))
+				logger.Error("m.settings.GetSettingLastSynced", zap.Error(err), zap.String("SettingField", sf.GetDBName()))
 				errors = append(errors, err)
 				return
 			}
@@ -143,7 +143,7 @@ func (m *Messenger) startSyncSettingsLoop() {
 					}
 					rm, _, err := s.SyncProtobufFactory().FromInterface()(s.Value, clock, chat.ID)
 					if err != nil {
-						logger.Error("SyncProtobufFactory().FromInterface", zap.Error(err), zap.Any("SyncSettingField", s))
+						logger.Error("SyncProtobufFactory().FromInterface", zap.Error(err), zap.String("SyncSettingField", s.GetDBName()))
 						break
 					}
 

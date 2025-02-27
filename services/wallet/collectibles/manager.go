@@ -720,7 +720,7 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 		} else {
 			err := o.fetchCommunityAssets(communityID, communityAssets)
 			if err != nil {
-				logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", communityID), zap.Error(err))
+				logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 				continue
 			}
 			for _, asset := range communityAssets {
@@ -808,7 +808,7 @@ func (o *Manager) fillCommunityID(asset *thirdparty.FullCollectibleData) error {
 func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*thirdparty.FullCollectibleData) error {
 	communityFound, err := o.communityManager.FillCollectiblesMetadata(communityID, communityAssets)
 	if err != nil {
-		logutils.ZapLogger().Error("FillCollectiblesMetadata failed", zap.String("communityID", communityID), zap.Error(err))
+		logutils.ZapLogger().Error("FillCollectiblesMetadata failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 	} else if !communityFound {
 		logutils.ZapLogger().Warn("fetchCommunityAssets community not found", zap.String("communityID", communityID))
 	}
@@ -829,13 +829,13 @@ func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*th
 
 	err = o.collectiblesDataDB.SetData(collectiblesData, allowUpdate)
 	if err != nil {
-		logutils.ZapLogger().Error("collectiblesDataDB SetData failed", zap.String("communityID", communityID), zap.Error(err))
+		logutils.ZapLogger().Error("collectiblesDataDB SetData failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 		return err
 	}
 
 	err = o.collectionsDataDB.SetData(collectionsData, allowUpdate)
 	if err != nil {
-		logutils.ZapLogger().Error("collectionsDataDB SetData failed", zap.String("communityID", communityID), zap.Error(err))
+		logutils.ZapLogger().Error("collectionsDataDB SetData failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 		return err
 	}
 
@@ -843,7 +843,7 @@ func (o *Manager) fetchCommunityAssets(communityID string, communityAssets []*th
 		if asset.CollectibleCommunityInfo != nil {
 			err = o.collectiblesDataDB.SetCommunityInfo(asset.CollectibleData.ID, *asset.CollectibleCommunityInfo)
 			if err != nil {
-				logutils.ZapLogger().Error("collectiblesDataDB SetCommunityInfo failed", zap.String("communityID", communityID), zap.Error(err))
+				logutils.ZapLogger().Error("collectiblesDataDB SetCommunityInfo failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 				return err
 			}
 		}
@@ -861,7 +861,7 @@ func (o *Manager) fetchCommunityAssetsAsync(_ context.Context, communityID strin
 		defer gocommon.LogOnPanic()
 		err := o.fetchCommunityAssets(communityID, communityAssets)
 		if err != nil {
-			logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", communityID), zap.Error(err))
+			logutils.ZapLogger().Error("fetchCommunityAssets failed", zap.String("communityID", gocommon.TruncateWithDot(communityID)), zap.Error(err))
 			return
 		}
 

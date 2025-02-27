@@ -68,13 +68,13 @@ func (m *Verifier) verifyENSName(ensInfo enstypes.ENSDetails, ethclient *ethclie
 	// Resolve ensName
 	resolver, err := ens.NewResolver(ethclient, ensName)
 	if err != nil {
-		m.logger.Error("error while creating ENS name resolver", zap.String("ensName", ensName), zap.Error(err))
+		m.logger.Error("error while creating ENS name resolver", zap.Error(err))
 		response.Error = err
 		return response
 	}
 	x, y, err := resolver.PubKey()
 	if err != nil {
-		m.logger.Error("error while resolving public key from ENS name", zap.String("ensName", ensName), zap.Error(err))
+		m.logger.Error("error while resolving public key from ENS name", zap.Error(err))
 		response.Error = err
 		return response
 	}

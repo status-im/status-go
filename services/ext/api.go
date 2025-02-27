@@ -1807,6 +1807,10 @@ func (api *PublicAPI) SetLogNamespaces(request *requests.SetLogNamespaces) error
 	return api.service.messenger.SetLogNamespaces(request)
 }
 
+func (api *PublicAPI) SetLogEnabled(enabled bool) error {
+	return api.service.messenger.SetLogEnabled(enabled)
+}
+
 func (api *PublicAPI) SetMaxLogBackups(request *requests.SetMaxLogBackups) error {
 	return api.service.messenger.SetMaxLogBackups(request)
 }

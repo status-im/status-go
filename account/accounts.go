@@ -20,6 +20,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account/generator"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
@@ -230,7 +231,7 @@ func (m *DefaultManager) VerifyAccountPassword(keyStoreDir, address, password st
 
 	// avoid swap attack
 	if key.Address != addressObj {
-		return nil, fmt.Errorf("account mismatch: have %s, want %s", key.Address.Hex(), addressObj.Hex())
+		return nil, fmt.Errorf("account mismatch: have %s, want %s", gocommon.TruncateWithDot(key.Address.Hex()), gocommon.TruncateWithDot(addressObj.Hex()))
 	}
 
 	return key, nil

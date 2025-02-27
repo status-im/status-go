@@ -486,7 +486,7 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 	}
 
 	if chat == nil {
-		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", contact.ID)
+		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", gocommon.TruncateWithDot(contact.ID))
 	}
 
 	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(contact.ID)

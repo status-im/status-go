@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/account"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
@@ -147,7 +148,7 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 func (s *Service) handleAirdropCommunityToken(status string, toAddress common.Address, chainID walletCommon.ChainID) (*token.CommunityToken, error) {
 	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(chainID), toAddress.String())
 	if communityToken == nil {
-		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, toAddress.String())
+		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, gocommon.TruncateWithDot(toAddress.String()))
 	} else {
 		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
 			communityToken.Address, protobuf.CommunityTokenAction_AIRDROP)
@@ -161,7 +162,7 @@ func (s *Service) handleAirdropCommunityToken(status string, toAddress common.Ad
 func (s *Service) handleRemoteDestructCollectible(status string, toAddress common.Address, chainID walletCommon.ChainID) (*token.CommunityToken, error) {
 	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(chainID), toAddress.String())
 	if communityToken == nil {
-		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, toAddress.String())
+		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, gocommon.TruncateWithDot(toAddress.String()))
 	} else {
 		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
 			communityToken.Address, protobuf.CommunityTokenAction_REMOTE_DESTRUCT)
@@ -188,7 +189,7 @@ func (s *Service) handleBurnCommunityToken(status string, toAddress common.Addre
 	communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(chainID), toAddress.String())
 
 	if communityToken == nil {
-		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, toAddress.String())
+		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, gocommon.TruncateWithDot(toAddress.String()))
 	} else {
 		publishErr := s.publishTokenActionToPrivilegedMembers(communityToken.CommunityID, uint64(communityToken.ChainID),
 			communityToken.Address, protobuf.CommunityTokenAction_BURN)
@@ -237,7 +238,7 @@ func (s *Service) updateStateAndAddTokenToCommunityDescription(status string, ch
 		return nil, err
 	}
 	if tokenToUpdate == nil {
-		return nil, fmt.Errorf("token does not exist in database: chainID=%v, address=%v", chainID, address)
+		return nil, fmt.Errorf("token does not exist in database: chainID=%v, address=%v", chainID, gocommon.TruncateWithDot(address))
 	}
 
 	if status == transactions.Success {
@@ -269,7 +270,7 @@ func (s *Service) handleSetSignerPubKey(status string, toAddress common.Address,
 		return nil, err
 	}
 	if communityToken == nil {
-		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, toAddress.String())
+		return nil, fmt.Errorf("token does not exist in database: chainId=%v, address=%v", chainID, gocommon.TruncateWithDot(toAddress.String()))
 	}
 
 	if status == transactions.Success {
@@ -550,7 +551,7 @@ func (s *Service) GetMasterTokenContractAddressFromHash(ctx context.Context, cha
 			return event.Arg0.Hex(), nil
 		}
 	}
-	return "", fmt.Errorf("can't find master token address in transaction: %v", txHash)
+	return "", fmt.Errorf("can't find master token address in transaction: %s", gocommon.TruncateWithDot(txHash))
 }
 
 func (s *Service) GetOwnerTokenContractAddressFromHash(ctx context.Context, chainID uint64, txHash string) (string, error) {
@@ -581,7 +582,7 @@ func (s *Service) GetOwnerTokenContractAddressFromHash(ctx context.Context, chai
 			return event.Arg0.Hex(), nil
 		}
 	}
-	return "", fmt.Errorf("can't find owner token address in transaction: %v", txHash)
+	return "", fmt.Errorf("can't find owner token address in transaction: %s", gocommon.TruncateWithDot(txHash))
 }
 
 func (s *Service) publishTokenActionToPrivilegedMembers(communityID string, chainID uint64, contractAddress string, actionType protobuf.CommunityTokenAction_ActionType) error {

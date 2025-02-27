@@ -38,7 +38,7 @@ func handleReceiveAccount(logger *zap.Logger, pr PayloadReceiver) http.HandlerFu
 		err = pr.Receive(payload)
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionPairingAccount})
-			logger.Error("handleReceiveAccount pr.Receive(payload)", zap.Error(err), zap.Binary("payload", payload))
+			logger.Error("handleReceiveAccount pr.Receive(payload)", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -89,7 +89,7 @@ func handleParingSyncDeviceReceive(logger *zap.Logger, pr PayloadReceiver) http.
 		err = pr.Receive(payload)
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionSyncDevice})
-			logger.Error("handleParingSyncDeviceReceive pr.Receive(payload)", zap.Error(err), zap.Binary("payload", payload))
+			logger.Error("handleParingSyncDeviceReceive pr.Receive(payload)", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
@@ -142,7 +142,7 @@ func handleReceiveInstallation(logger *zap.Logger, pmr PayloadMounterReceiver) h
 		err = pmr.Receive(payload)
 		if err != nil {
 			signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionPairingInstallation})
-			logger.Error("handleReceiveInstallation pmr.Receive(payload)", zap.Error(err), zap.Binary("payload", payload))
+			logger.Error("handleReceiveInstallation pmr.Receive(payload)", zap.Error(err))
 			http.Error(w, "error", http.StatusInternalServerError)
 			return
 		}
