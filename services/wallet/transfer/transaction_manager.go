@@ -120,16 +120,6 @@ type MultiTransactionCommandResult struct {
 	Hashes map[uint64][]types.Hash `json:"hashes"`
 }
 
-type TransactionIdentity struct {
-	ChainID wallet_common.ChainID `json:"chainId"`
-	Hash    common.Hash           `json:"hash"`
-	Address common.Address        `json:"address"`
-}
-
-func (tid *TransactionIdentity) Key() string {
-	return fmt.Sprintf("%d-%s-%s", tid.ChainID, tid.Hash.Hex(), tid.Address.Hex())
-}
-
 type TxResponse struct {
 	KeyUID        string                 `json:"keyUid,omitempty"`
 	Address       types.Address          `json:"address,omitempty"`

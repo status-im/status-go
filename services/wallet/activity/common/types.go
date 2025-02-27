@@ -1,13 +1,13 @@
 package common
 
 import (
+	"fmt"
 	"math"
 
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
 type PayloadType = int
@@ -69,8 +69,17 @@ const (
 	Erc1155
 )
 
-// Token supports all tokens. Some fields might be optional, depending on the TokenType
+type TransactionIdentity struct {
+	ChainID common.ChainID `json:"chainId"`
+	Hash    eth.Hash       `json:"hash"`
+	Address eth.Address    `json:"address"`
+}
 
+func (tid *TransactionIdentity) Key() string {
+	return fmt.Sprintf("%d-%s-%s", tid.ChainID, tid.Hash.Hex(), tid.Address.Hex())
+}
+
+// Token supports all tokens. Some fields might be optional, depending on the TokenType
 type Token struct {
 	TokenType TokenType `json:"tokenType"`
 	// ChainID is used for TokenType.Native only to lookup the symbol, all chains will be included in the token filter
@@ -80,29 +89,29 @@ type Token struct {
 }
 
 type EntryData struct {
-	PayloadType               PayloadType                     `json:"payloadType"`
-	Key                       string                          `json:"key"`
-	Transaction               *transfer.TransactionIdentity   `json:"transaction,omitempty"`
-	ID                        *common.MultiTransactionIDType  `json:"id,omitempty"`
-	Transactions              []*transfer.TransactionIdentity `json:"transactions,omitempty"`
-	Timestamp                 *int64                          `json:"timestamp,omitempty"`
-	ActivityType              *Type                           `json:"activityType,omitempty"`
-	ActivityStatus            *Status                         `json:"activityStatus,omitempty"`
-	AmountOut                 *hexutil.Big                    `json:"amountOut,omitempty"`
-	AmountIn                  *hexutil.Big                    `json:"amountIn,omitempty"`
-	TokenOut                  *Token                          `json:"tokenOut,omitempty"`
-	TokenIn                   *Token                          `json:"tokenIn,omitempty"`
-	SymbolOut                 *string                         `json:"symbolOut,omitempty"`
-	SymbolIn                  *string                         `json:"symbolIn,omitempty"`
-	Sender                    *eth.Address                    `json:"sender,omitempty"`
-	Recipient                 *eth.Address                    `json:"recipient,omitempty"`
-	ChainIDOut                *common.ChainID                 `json:"chainIdOut,omitempty"`
-	ChainIDIn                 *common.ChainID                 `json:"chainIdIn,omitempty"`
-	TransferType              *TransferType                   `json:"transferType,omitempty"`
-	ContractAddress           *eth.Address                    `json:"contractAddress,omitempty"`
-	CommunityID               *string                         `json:"communityId,omitempty"`
-	InteractedContractAddress *eth.Address                    `json:"interactedContractAddress,omitempty"`
-	ApprovalSpender           *eth.Address                    `json:"approvalSpender,omitempty"`
+	PayloadType               PayloadType                    `json:"payloadType"`
+	Key                       string                         `json:"key"`
+	Transaction               *TransactionIdentity           `json:"transaction,omitempty"`
+	ID                        *common.MultiTransactionIDType `json:"id,omitempty"`
+	Transactions              []*TransactionIdentity         `json:"transactions,omitempty"`
+	Timestamp                 *int64                         `json:"timestamp,omitempty"`
+	ActivityType              *Type                          `json:"activityType,omitempty"`
+	ActivityStatus            *Status                        `json:"activityStatus,omitempty"`
+	AmountOut                 *hexutil.Big                   `json:"amountOut,omitempty"`
+	AmountIn                  *hexutil.Big                   `json:"amountIn,omitempty"`
+	TokenOut                  *Token                         `json:"tokenOut,omitempty"`
+	TokenIn                   *Token                         `json:"tokenIn,omitempty"`
+	SymbolOut                 *string                        `json:"symbolOut,omitempty"`
+	SymbolIn                  *string                        `json:"symbolIn,omitempty"`
+	Sender                    *eth.Address                   `json:"sender,omitempty"`
+	Recipient                 *eth.Address                   `json:"recipient,omitempty"`
+	ChainIDOut                *common.ChainID                `json:"chainIdOut,omitempty"`
+	ChainIDIn                 *common.ChainID                `json:"chainIdIn,omitempty"`
+	TransferType              *TransferType                  `json:"transferType,omitempty"`
+	ContractAddress           *eth.Address                   `json:"contractAddress,omitempty"`
+	CommunityID               *string                        `json:"communityId,omitempty"`
+	InteractedContractAddress *eth.Address                   `json:"interactedContractAddress,omitempty"`
+	ApprovalSpender           *eth.Address                   `json:"approvalSpender,omitempty"`
 
 	IsNew *bool `json:"isNew,omitempty"`
 

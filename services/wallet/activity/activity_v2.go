@@ -20,7 +20,6 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
@@ -192,7 +191,7 @@ func dataToEntriesV2(deps FilterDependencies, data []*entryDataV2) ([]Entry, err
 		entry := Entry{
 			payloadType: ac.MultiTransactionPT, // Temporary, to keep compatibility with clients
 			id:          d.TxArgs.MultiTransactionID,
-			transactions: []*transfer.TransactionIdentity{
+			transactions: []*ac.TransactionIdentity{
 				{
 					ChainID: chainID,
 					Hash:    d.Tx.Hash(),

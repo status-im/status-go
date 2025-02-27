@@ -7,13 +7,12 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 
 	ac "github.com/status-im/status-go/services/wallet/activity/common"
-	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
 // TODO #12120: cover missing cases
 func TestFindUpdates(t *testing.T) {
-	txIds := []transfer.TransactionIdentity{
-		transfer.TransactionIdentity{
+	txIds := []ac.TransactionIdentity{
+		ac.TransactionIdentity{
 			ChainID: 1,
 			Hash:    eth.HexToHash("0x1234"),
 			Address: eth.HexToAddress("0x1234"),

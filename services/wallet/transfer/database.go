@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/logutils"
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -187,7 +188,7 @@ func (db *Database) GetTransfers(chainID uint64, start, end *big.Int) (rst []Tra
 	return query.TransferScan(rows)
 }
 
-func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []TransactionIdentity) (rst []Transfer, err error) {
+func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []ac.TransactionIdentity) (rst []Transfer, err error) {
 	query := newTransfersQuery()
 	for _, identity := range identities {
 		subQuery := newSubQuery()

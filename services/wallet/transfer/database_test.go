@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	ac "github.com/status-im/status-go/services/wallet/activity/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -130,9 +131,17 @@ func TestGetTransfersForIdentities(t *testing.T) {
 		InsertTestTransfer(t, db.client, trs[i].To, &trs[i])
 	}
 
-	entries, err := db.GetTransfersForIdentities(context.Background(), []TransactionIdentity{
-		TransactionIdentity{trs[1].ChainID, trs[1].Hash, trs[1].To},
-		TransactionIdentity{trs[3].ChainID, trs[3].Hash, trs[3].To}})
+	entries, err := db.GetTransfersForIdentities(context.Background(), []ac.TransactionIdentity{
+		{
+			ChainID: trs[1].ChainID,
+			Hash:    trs[1].Hash,
+			Address: trs[1].To,
+		},
+		{
+			ChainID: trs[3].ChainID,
+			Hash:    trs[3].Hash,
+			Address: trs[3].To,
+		}})
 	require.NoError(t, err)
 	require.Equal(t, 2, len(entries))
 	require.Equal(t, trs[1].Hash, entries[0].ID)

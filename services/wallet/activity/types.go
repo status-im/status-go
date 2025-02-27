@@ -15,14 +15,13 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
 type Entry struct {
 	payloadType               ac.PayloadType
-	transaction               *transfer.TransactionIdentity   // ID for SimpleTransactionPT and PendingTransactionPT.	Origin transaction for MultiTransactionPT
-	id                        common.MultiTransactionIDType   // ID for MultiTransactionPT
-	transactions              []*transfer.TransactionIdentity // List of transactions for MultiTransactionPT
+	transaction               *ac.TransactionIdentity       // ID for SimpleTransactionPT and PendingTransactionPT.	Origin transaction for MultiTransactionPT
+	id                        common.MultiTransactionIDType // ID for MultiTransactionPT
+	transactions              []*ac.TransactionIdentity     // List of transactions for MultiTransactionPT
 	timestamp                 int64
 	activityType              ac.Type
 	activityStatus            ac.Status
