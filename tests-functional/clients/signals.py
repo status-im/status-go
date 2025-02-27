@@ -112,7 +112,7 @@ class SignalClient:
                 time.sleep(0.2)
                 continue
             for event in self.received_signals[signal_type]["received"]:
-                if event_pattern in str(event):
+                if event_pattern in json.dumps(event):
                     logging.info(f"Signal {signal_type} containing {event_pattern} is received in {round(time.time() - start_time)} seconds")
                     return event
             time.sleep(0.2)

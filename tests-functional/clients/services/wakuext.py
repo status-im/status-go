@@ -116,3 +116,13 @@ class WakuextService(Service):
         params = [chat_id, cursor, limit]
         response = self.rpc_request("chatPinnedMessages", params)
         return response.json()
+
+    def set_user_status(self, new_status: int, custom_text=""):
+        params = [new_status, custom_text]
+        response = self.rpc_request("setUserStatus", params)
+        return response.json()
+
+    def status_updates(self):
+        params = []
+        response = self.rpc_request("statusUpdates", params)
+        return response.json()

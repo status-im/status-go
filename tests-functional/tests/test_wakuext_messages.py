@@ -3,6 +3,7 @@ import pytest
 from tests.test_cases import MessengerTestCase
 
 from clients.services.wakuext import SendPinMessagePayload
+from clients.signals import SignalType
 
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
@@ -132,3 +133,30 @@ class TestChatMessages(MessengerTestCase):
         assert pinned_messages_page2[0].get("message", {}).get("text", "") == sent_texts[1]
         assert pinned_messages_page2[1].get("message", {}).get("text", "") == sent_texts[0]
         assert cursor2 == ""
+
+
+@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
+@pytest.mark.rpc
+class TestUserStatus(MessengerTestCase):
+
+    def test_status_updates(self):
+        self.make_contacts()
+
+        statuses = [[1, "text_1"], [2, "text_2"], [3, "text_3"], [4, "text_4"]]
+
+        for new_status, custom_text in statuses:
+            response = self.sender.wakuext_service.set_user_status(new_status, custom_text)
+            self.sender.verify_json_schema(response, method="wakuext_setUserStatus")
+
+            self.receiver.find_signal_containing_pattern(
+                SignalType.MESSAGES_NEW.value,
+                event_pattern=custom_text,
+                timeout=10,
+            )
+
+            response = self.receiver.wakuext_service.status_updates()
+            self.sender.verify_json_schema(response, method="wakuext_statusUpdates")
+
+            statusUpdate = response.get("result", {}).get("statusUpdates", [])[0]
+            assert statusUpdate.get("statusType", -1) == new_status
+            assert statusUpdate.get("text", "") == custom_text
