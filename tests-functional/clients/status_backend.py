@@ -35,7 +35,7 @@ class StatusBackend(RpcClient, SignalClient):
             url = option.status_backend_url
         else:
             self.docker_client = docker.from_env()
-            retries = 5
+            retries = 2
             ports_tried = []
             for _ in range(retries):
                 try:
@@ -320,24 +320,6 @@ class StatusBackend(RpcClient, SignalClient):
 
     def find_public_key(self):
         self.public_key = self.node_login_event.get("event", {}).get("settings", {}).get("public-key")
-
-    @retry(stop=stop_after_delay(5), wait=wait_fixed(0.1), reraise=True)
-    def kill(self):
-        if not self.container:
-            return
-        logging.info(f"Killing container with id {self.container.short_id}")
-        try:
-            self.container.stop(timeout=30)
-            self.container.remove()
-        except Exception as e:
-            print(e)
-        try:
-            self.container.remove()
-        except Exception as e:
-            logging.warning(f"Failed to remove container {self.container.short_id}: {e}")
-        finally:
-            self.container = None
-            logging.info("Container stopped.")
 
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.1), reraise=True)
     def change_container_ip(self, new_ip=None):

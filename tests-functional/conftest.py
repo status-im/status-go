@@ -81,9 +81,7 @@ def close_status_backend_containers(request):
     yield
     if hasattr(request.node.instance, "reuse_container"):
         return
-    for container in option.status_backend_containers:
-        try:
-            container.stop(timeout=30)
-            container.remove()
-        except Exception as e:
-            print(e)
+    for status_backend in option.status_backend_containers:
+        status_backend.container.stop(timeout=10)
+        option.status_backend_containers.remove(status_backend)
+        status_backend.container.remove()
