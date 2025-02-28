@@ -21,7 +21,7 @@ jobs:
       matrix:
         config:
           - name: ipv4
-            docker_compose_file: docker-compose.test.reliability.yml
+            docker_compose_file: docker-compose.test.reliability.ipv4.yml
             use_ipv6: "No"
           - name: ipv6
             docker_compose_file: docker-compose.test.reliability.ipv6.yml
@@ -46,7 +46,7 @@ jobs:
       run: pip install -r tests-functional/requirements.txt
 
     - name: Build status-backend
-      run: cd tests-functional; docker compose -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
+      run: cd tests-functional; docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f ${{ matrix.config.docker_compose_file }} up --build --remove-orphans -d
 
     - name: Run tests
       env:

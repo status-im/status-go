@@ -3,12 +3,9 @@ version: "3.9"
 networks:
   default:
     driver: bridge
-    enable_ipv6: true
     ipam:
-      driver: default
       config:
-        - subnet: "fd00:0:0:1::/64"
-          gateway: "fd00:0:0:1::1"
+        - subnet: 172.11.0.0/24
 
 services:
   anvil:
@@ -26,9 +23,9 @@ services:
   status-backend:
     entrypoint: [
       "status-backend",
-      "--address", "[::]:3333"
+      "--address", "0.0.0.0:3333"
     ]
     healthcheck:
-      test: ["CMD-SHELL", "curl -X POST --data '{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":1}' -H 'Content-Type: application/json' http://[::1]:3333 || exit 1"]
+      test: ["CMD-SHELL", "curl -X POST --data '{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":1}' -H 'Content-Type: application/json' http://0.0.0.0:3333 || exit 1"]
     networks:
       - default
