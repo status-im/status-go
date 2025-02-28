@@ -147,6 +147,11 @@ class WakuextService(Service):
         response = self.rpc_request("deleteMessageAndSend", params)
         return response.json()
 
+    def delete_message_for_me_and_sync(self, localChatID: str, message_id: str):
+        params = [localChatID, message_id]
+        response = self.rpc_request("deleteMessageForMeAndSync", params)
+        return response.json()
+
     def mark_message_as_unread(self, chat_id: str, message_id: str):
         params = [chat_id, message_id]
         response = self.rpc_request("markMessageAsUnread", params)

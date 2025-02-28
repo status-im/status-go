@@ -208,6 +208,24 @@ class TestChatMessages(MessengerTestCase):
         messages = response.get("result", {}).get("messages", [])
         assert messages is None
 
+    def test_delete_message_for_me_and_sync(self):
+        _, responses = self.send_multiple_one_to_one_messages(1)
+
+        message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+        local_chat_id = responses[0].get("result", {}).get("messages", [])[0].get("localChatId", "")
+        response = self.sender.wakuext_service.message_by_message_id(message_id)
+        assert response.get("result", {}) != {}
+
+        response = self.sender.wakuext_service.delete_message_for_me_and_sync(local_chat_id, message_id)
+        self.sender.verify_json_schema(response, method="wakuext_deleteMessageForMeAndSync")
+
+        response = self.sender.wakuext_service.message_by_message_id(message_id)
+        message = response.get("result", {})
+        assert message.get("id", "") == message_id
+        assert message.get("deletedForMe", None) is True
+
+        # TODO: assert sync action
+
     def test_first_unseen_message(self):
         _, responses = self.send_multiple_one_to_one_messages(1)
         sender_chat_id = self.receiver.public_key
