@@ -9,7 +9,7 @@ from collections import namedtuple
 from uuid import uuid4
 
 import pytest
-
+from tenacity import retry, stop_after_delay, wait_fixed
 from clients.services.wallet import WalletService
 from clients.signals import SignalClient, SignalType
 from clients.status_backend import RpcClient, StatusBackend
@@ -304,14 +304,20 @@ class MessengerTestCase(NetworkConditionTestCase):
         )
         return response.get("result", {}).get("chats", [])[0].get("id")
 
-    def create_and_join_community(self):
+    def create_community(self, node):
         name = f"vac_qa_community_{''.join(random.choices(string.ascii_letters, k=10))}"
-        response = self.sender.wakuext_service.create_community(name)
+        response = node.wakuext_service.create_community(name)
+        self.community_id = response.get("result", {}).get("communities", [{}])[0].get("id")
+        return self.community_id
 
-        community_id = response.get("result", {}).get("communities", [{}])[0].get("id")
-        self.receiver.wakuext_service.fetch_community(community_id)
+    def fetch_community(self, node, community_id=None):
+        if not community_id:
+            community_id = self.community_id
+        return node.wakuext_service.fetch_community(community_id)
 
-        response_to_join = self.receiver.wakuext_service.request_to_join_community(community_id)
+    def join_community(self, node):
+        self.fetch_community(node)
+        response_to_join = node.wakuext_service.request_to_join_community(self.community_id)
         join_id = response_to_join.get("result", {}).get("requestsToJoinCommunity", [{}])[0].get("id")
 
         # I couldn't find any signal related to the requestToJoinCommunity request in the peer node.
@@ -331,7 +337,24 @@ class MessengerTestCase(NetworkConditionTestCase):
 
         chats = response.get("result", {}).get("communities", [{}])[0].get("chats", {})
         chat_id = list(chats.keys())[0] if chats else None
-        return community_id + chat_id
+        return self.community_id + chat_id
+
+    @retry(stop=stop_after_delay(20), wait=wait_fixed(0.5), reraise=True)
+    def leave_the_community(self, node, community_id=None):
+        if not community_id:
+            community_id = self.community_id
+        response = node.wakuext_service.leave_community(community_id)
+        target_community = [
+            existing_community for existing_community in response.get("result", {}).get("communities") if existing_community.get("id") == community_id
+        ][0]
+        assert target_community.get("joined") is False
+
+    @retry(stop=stop_after_delay(20), wait=wait_fixed(2), reraise=True)
+    def check_node_joined_community(self, node, joined, community_id=None):
+        if not community_id:
+            community_id = self.community_id
+        response = self.fetch_community(node, community_id)
+        assert response.get("result", {}).get("joined") is joined
 
     def community_messages(self, message_chat_id, message_count):
         sent_messages = []

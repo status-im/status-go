@@ -70,6 +70,11 @@ class WakuextService(Service):
         response = self.rpc_request("sendChatMessage", params)
         return response.json()
 
+    def leave_community(self, community_id):
+        params = [community_id]
+        response = self.rpc_request("leaveCommunity", params)
+        return response.json()
+
     def set_light_client(self, enabled=True):
         params = [{"enabled": enabled}]
         response = self.rpc_request("setLightClient", params)
