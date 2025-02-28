@@ -81,6 +81,7 @@ class TestChatMessages(MessengerTestCase):
     def test_pinned_messages(self):
         sent_texts, responses = self.send_multiple_one_to_one_messages(1)
 
+        # pin
         message = responses[0].get("result", {}).get("messages", [])[0]
         pin_message_payload: SendPinMessagePayload = {
             "chat_id": message.get("chatId", ""),
@@ -99,6 +100,14 @@ class TestChatMessages(MessengerTestCase):
         assert len(pinned_messages) == 1
         actual_text = pinned_messages[0].get("message", {}).get("text", "")
         assert actual_text == sent_texts[0]
+
+        # unpin
+        pin_message_payload["pinned"] = False
+        self.sender.wakuext_service.send_pin_message(pin_message_payload)
+        response = self.sender.wakuext_service.chat_pinned_messages(sender_chat_id)
+
+        pinned_messages = response.get("result", {}).get("pinnedMessages", [])
+        assert pinned_messages is None
 
     def test_pinned_messages_with_pagination(self):
         sent_texts, responses = self.send_multiple_one_to_one_messages(5)
