@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/contracts"
 	gaspriceproxy "github.com/status-im/status-go/contracts/gas-price-proxy"
+	"github.com/status-im/status-go/contracts/hop"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/chain"
@@ -408,4 +409,18 @@ func fetchPrices(sendType sendtype.SendType, marketManager *market.Manager, toke
 		}
 	}
 	return prices, nil
+}
+
+func (r *Router) GetTokensAvailableForBridgeOnChain(chainID uint64) []*token.Token {
+	symbols := hop.GetSymbolsAvailableOnChain(chainID)
+
+	tokens := make([]*token.Token, 0)
+	for _, symbol := range symbols {
+		t, _ := r.tokenManager.LookupToken(&chainID, symbol)
+		if t == nil {
+			continue
+		}
+		tokens = append(tokens, t)
+	}
+	return tokens
 }

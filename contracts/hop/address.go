@@ -398,3 +398,12 @@ func GetContractAddress(chainID uint64, symbol string) (addr common.Address, con
 	}
 	return
 }
+
+func GetSymbolsAvailableOnChain(chainID uint64) (symbols []string) {
+	for symbol, chainchainID := range hopBridgeContractAddresses {
+		if _, ok := chainchainID[chainID]; ok {
+			symbols = append(symbols, symbol)
+		}
+	}
+	return
+}

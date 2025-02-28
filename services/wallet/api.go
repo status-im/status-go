@@ -214,6 +214,11 @@ func (api *API) GetTokenList(ctx context.Context) (*token.ListWrapper, error) {
 	return rst, nil
 }
 
+func (api *API) GetTokensAvailableForBridgeOnChain(ctx context.Context, chainID uint64) []*token.Token {
+	logutils.ZapLogger().Debug("call to get tokens available for bridge on chain")
+	return api.s.router.GetTokensAvailableForBridgeOnChain(chainID)
+}
+
 // @deprecated
 func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*token.Token, error) {
 	logutils.ZapLogger().Debug("call to get tokens")
