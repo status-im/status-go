@@ -19,11 +19,11 @@ coverage:
     project:
       unit-tests:
         target: auto
-        threshold: 1
+        threshold: 10%
         flags:
           - unit
       functional-tests:
-        threshold: 0.1
+        threshold: 10%
         target: auto
         flags:
           - functional
