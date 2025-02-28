@@ -190,6 +190,20 @@ class TestChatMessages(MessengerTestCase):
         messages = response.get("result", {}).get("messages", [])
         assert messages is None
 
+    def test_first_unseen_message(self):
+        _, responses = self.send_multiple_one_to_one_messages(1)
+        sender_chat_id = self.receiver.public_key
+        messageId = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+
+        response = self.sender.wakuext_service.mark_message_as_unread(sender_chat_id, messageId)
+        self.sender.verify_json_schema(response, method="wakuext_markMessageAsUnread")
+
+        response = self.sender.wakuext_service.first_unseen_message_id(sender_chat_id)
+        self.sender.verify_json_schema(response, method="wakuext_firstUnseenMessageID")
+
+        result = response.get("result", "")
+        assert result == messageId
+
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc

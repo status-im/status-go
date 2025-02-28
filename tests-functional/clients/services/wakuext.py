@@ -141,3 +141,13 @@ class WakuextService(Service):
         params = [chat_id]
         response = self.rpc_request("deleteMessagesByChatID", params)
         return response.json()
+
+    def mark_message_as_unread(self, chat_id: str, message_id: str):
+        params = [chat_id, message_id]
+        response = self.rpc_request("markMessageAsUnread", params)
+        return response.json()
+
+    def first_unseen_message_id(self, chat_id: str):
+        params = [chat_id]
+        response = self.rpc_request("firstUnseenMessageID", params)
+        return response.json()

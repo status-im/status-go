@@ -1,0 +1,59 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "properties": {
+                "discordOldestMessageTimestamp": {
+                    "type": "integer"
+                },
+                "notifications": {
+                    "type": "null"
+                },
+                "seenAndUnseenMessages": {
+                    "items": {
+                        "properties": {
+                            "chatId": {
+                                "type": "string"
+                            },
+                            "count": {
+                                "type": "integer"
+                            },
+                            "countWithMentions": {
+                                "type": "integer"
+                            },
+                            "seen": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "chatId",
+                            "count",
+                            "countWithMentions",
+                            "seen"
+                        ],
+                        "type": "object"
+                    },
+                    "type": "array"
+                }
+            },
+            "required": [
+                "discordOldestMessageTimestamp",
+                "notifications",
+                "seenAndUnseenMessages"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}
