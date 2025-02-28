@@ -51,8 +51,8 @@ class TestChatMessages(MessengerTestCase):
     def test_message_by_message_id(self):
         sent_texts, responses = self.send_multiple_one_to_one_messages(1)
 
-        messageId = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
-        response = self.sender.wakuext_service.message_by_message_id(messageId)
+        message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+        response = self.sender.wakuext_service.message_by_message_id(message_id)
 
         self.sender.verify_json_schema(response, method="wakuext_messageByMessageID")
 
@@ -145,35 +145,53 @@ class TestChatMessages(MessengerTestCase):
 
     def test_edit_message(self):
         sent_texts, responses = self.send_multiple_one_to_one_messages(1)
-        messageId = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+        message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
 
-        response = self.sender.wakuext_service.message_by_message_id(messageId)
+        response = self.sender.wakuext_service.message_by_message_id(message_id)
         actual_text = response.get("result", {}).get("text", "")
         assert actual_text == sent_texts[0]
 
         new_text = "test_message_edited"
-        response = self.sender.wakuext_service.edit_message(messageId, new_text)
+        response = self.sender.wakuext_service.edit_message(message_id, new_text)
         self.sender.verify_json_schema(response, method="wakuext_editMessage")
 
-        response = self.sender.wakuext_service.message_by_message_id(messageId)
+        response = self.sender.wakuext_service.message_by_message_id(message_id)
         actual_text = response.get("result", {}).get("text", "")
         assert actual_text == new_text
 
     def test_delete_message(self):
         _, responses = self.send_multiple_one_to_one_messages(1)
 
-        messageId = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
-        response = self.sender.wakuext_service.message_by_message_id(messageId)
+        message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+        response = self.sender.wakuext_service.message_by_message_id(message_id)
         assert response.get("result", {}) != {}
 
-        response = self.sender.wakuext_service.delete_message(messageId)
+        response = self.sender.wakuext_service.delete_message(message_id)
         self.sender.verify_json_schema(response, method="wakuext_deleteMessage")
 
-        response = self.sender.rpc_request("wakuext_messageByMessageID", [messageId])
+        response = self.sender.rpc_request("wakuext_messageByMessageID", [message_id])
         error_code = response.json().get("error", {}).get("code", 0)
         error_message = response.json().get("error", {}).get("message", "")
         assert error_code == -32000
         assert error_message == "record not found"
+
+    def test_delete_message_and_send(self):
+        _, responses = self.send_multiple_one_to_one_messages(1)
+
+        message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+        response = self.sender.wakuext_service.message_by_message_id(message_id)
+        assert response.get("result", {}) != {}
+
+        response = self.sender.wakuext_service.delete_message_and_send(message_id)
+        self.sender.verify_json_schema(response, method="wakuext_deleteMessageAndSend")
+        removed_messages = response.get("result", {}).get("removedMessages", [])
+        assert len(removed_messages) == 1
+        assert removed_messages[0].get("messageId") == message_id
+
+        response = self.sender.wakuext_service.message_by_message_id(message_id)
+        message = response.get("result", {})
+        assert message.get("id", "") == message_id
+        assert message.get("deleted", None) is True
 
     def test_delete_messages_by_chat_id(self):
         _, _ = self.send_multiple_one_to_one_messages(3)
@@ -193,16 +211,16 @@ class TestChatMessages(MessengerTestCase):
     def test_first_unseen_message(self):
         _, responses = self.send_multiple_one_to_one_messages(1)
         sender_chat_id = self.receiver.public_key
-        messageId = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+        message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
 
-        response = self.sender.wakuext_service.mark_message_as_unread(sender_chat_id, messageId)
+        response = self.sender.wakuext_service.mark_message_as_unread(sender_chat_id, message_id)
         self.sender.verify_json_schema(response, method="wakuext_markMessageAsUnread")
 
         response = self.sender.wakuext_service.first_unseen_message_id(sender_chat_id)
         self.sender.verify_json_schema(response, method="wakuext_firstUnseenMessageID")
 
         result = response.get("result", "")
-        assert result == messageId
+        assert result == message_id
 
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
