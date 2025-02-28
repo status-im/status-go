@@ -35,7 +35,7 @@ class StatusBackend(RpcClient, SignalClient):
             url = option.status_backend_url
         else:
             self.docker_client = docker.from_env()
-            retries = 2
+            retries = 5
             ports_tried = []
             for _ in range(retries):
                 try:
