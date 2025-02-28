@@ -134,6 +134,22 @@ class TestChatMessages(MessengerTestCase):
         assert pinned_messages_page2[1].get("message", {}).get("text", "") == sent_texts[0]
         assert cursor2 == ""
 
+    def test_edit_message(self):
+        sent_texts, responses = self.send_multiple_one_to_one_messages(1)
+        messageId = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+
+        response = self.sender.wakuext_service.message_by_message_id(messageId)
+        actual_text = response.get("result", {}).get("text", "")
+        assert actual_text == sent_texts[0]
+
+        new_text = "test_message_edited"
+        response = self.sender.wakuext_service.edit_message(messageId, new_text)
+        self.sender.verify_json_schema(response, method="wakuext_editMessage")
+
+        response = self.sender.wakuext_service.message_by_message_id(messageId)
+        actual_text = response.get("result", {}).get("text", "")
+        assert actual_text == new_text
+
     def test_delete_message(self):
         _, responses = self.send_multiple_one_to_one_messages(1)
 
