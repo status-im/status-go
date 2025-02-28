@@ -31,6 +31,7 @@ type SwapParaswapTxArgs struct {
 
 type SwapParaswapProcessor struct {
 	paraswapClient paraswap.ClientInterface
+	tokenManager   *walletToken.Manager
 	transactor     transactions.TransactorIface
 	priceRoute     sync.Map // [fromChainName-toChainName-fromTokenSymbol-toTokenSymbol, paraswap.Route]
 }
@@ -66,8 +67,9 @@ func NewSwapParaswapProcessor(rpcClient *rpc.Client, transactor transactions.Tra
 			partnerAddress,
 			partnerFeePcnt,
 		),
-		transactor: transactor,
-		priceRoute: sync.Map{},
+		tokenManager: tokenManager,
+		transactor:   transactor,
+		priceRoute:   sync.Map{},
 	}
 }
 
@@ -113,35 +115,12 @@ func (s *SwapParaswapProcessor) AvailableFor(params ProcessorInputParams) (bool,
 	s.paraswapClient.SetPartnerAddress(partnerAddress)
 	s.paraswapClient.SetPartnerFeePcnt(partnerFeePcnt)
 
-	searchForToken := params.FromToken.Address == walletCommon.ZeroAddress()
-	searchForToToken := params.ToToken.Address == walletCommon.ZeroAddress()
-	if searchForToToken || searchForToken {
-		tokensList, err := s.paraswapClient.FetchTokensList(context.Background())
-		if err != nil {
-			return false, createSwapParaswapErrorResponse(err)
-		}
+	if !params.TestsMode {
+		fromToken := s.tokenManager.FindToken(params.FromChain, params.FromToken.Symbol)
+		params.FromToken = fromToken
 
-		for _, t := range tokensList {
-			if searchForToken && t.Symbol == params.FromToken.Symbol {
-				params.FromToken.Address = common.HexToAddress(t.Address)
-				params.FromToken.Decimals = t.Decimals
-				if !searchForToToken {
-					break
-				}
-			}
-
-			if searchForToToken && t.Symbol == params.ToToken.Symbol {
-				params.ToToken.Address = common.HexToAddress(t.Address)
-				params.ToToken.Decimals = t.Decimals
-				if !searchForToken {
-					break
-				}
-			}
-		}
-	}
-
-	if params.FromToken.Address == walletCommon.ZeroAddress() || params.ToToken.Address == walletCommon.ZeroAddress() {
-		return false, ErrCannotResolveTokens
+		toToken := s.tokenManager.FindToken(params.ToChain, params.ToToken.Symbol)
+		params.ToToken = toToken
 	}
 
 	return true, nil
