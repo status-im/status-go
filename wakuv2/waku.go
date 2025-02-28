@@ -491,8 +491,11 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 
 func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, successChan chan<- struct{}) {
 	retries := 0
+	applyFn := func(_ dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
+		wg.Done()
+	}
 	for {
-		err := w.dnsDiscover(ctx, addr, func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {}, false)
+		err := w.dnsDiscover(ctx, addr, applyFn, false)
 		if err == nil {
 			select {
 			case successChan <- struct{}{}:
