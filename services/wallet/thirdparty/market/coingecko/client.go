@@ -125,38 +125,48 @@ func (c *Client) getTokens() (map[string][]GeckoToken, error) {
 	return c.tokens, nil
 }
 
-func (c *Client) mapSymbolsToIds(symbols []string) (map[string]string, error) {
+func (c *Client) mapSymbolsToIds(symbols []string) (mappedSymbols map[string]string, unmappedSymbols []string, err error) {
 	tokens, err := c.getTokens()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	ids := make(map[string]string, 0)
+	mappedSymbols = make(map[string]string, 0)
+	unmappedSymbols = make([]string, 0)
 	for _, symbol := range symbols {
 		id, err := getIDFromSymbol(tokens, utils.GetRealSymbol(symbol))
-		if err == nil {
-			ids[symbol] = id
+		if err != nil {
+			unmappedSymbols = append(unmappedSymbols, symbol)
+		} else {
+			mappedSymbols[symbol] = id
 		}
 	}
 
-	return ids, nil
+	return mappedSymbols, unmappedSymbols, nil
 }
 
 func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
-	ids, err := c.mapSymbolsToIds(symbols)
+	mappedSymbols, unmappedSymbols, err := c.mapSymbolsToIds(symbols)
 	if err != nil {
 		return nil, err
 	}
 
-	simplePrices, err := c.FetchSimplePrice(context.Background(), maps.Values(ids), currencies)
+	simplePrices, err := c.FetchSimplePrice(context.Background(), maps.Values(mappedSymbols), currencies)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[string]map[string]float64)
-	for symbol, id := range ids {
+	for symbol, id := range mappedSymbols {
 		result[symbol] = map[string]float64{}
 		for _, currency := range currencies {
 			result[symbol][currency] = simplePrices[id][strings.ToLower(currency)]
+		}
+	}
+
+	for _, symbol := range unmappedSymbols {
+		result[symbol] = map[string]float64{}
+		for _, currency := range currencies {
+			result[symbol][currency] = 0
 		}
 	}
 
@@ -183,18 +193,18 @@ func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.Toke
 }
 
 func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
-	ids, err := c.mapSymbolsToIds(symbols)
+	mappedSymbols, unmappedSymbols, err := c.mapSymbolsToIds(symbols)
 	if err != nil {
 		return nil, err
 	}
 
-	marketValues, err := c.FetchCoinsMarkets(context.Background(), maps.Values(ids), currency)
+	marketValues, err := c.FetchCoinsMarkets(context.Background(), maps.Values(mappedSymbols), currency)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[string]thirdparty.TokenMarketValues)
-	for symbol, id := range ids {
+	for symbol, id := range mappedSymbols {
 		for _, marketValue := range marketValues {
 			if id != marketValue.ID {
 				continue
@@ -210,6 +220,10 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 				CHANGE24HOUR:    marketValue.PriceChange24h,
 			}
 		}
+	}
+
+	for _, symbol := range unmappedSymbols {
+		result[symbol] = thirdparty.TokenMarketValues{}
 	}
 
 	return result, nil

@@ -206,7 +206,7 @@ func TestFetchPrices(t *testing.T) {
 	symbols := []string{"ETH", "SNT", "UNSUPPORTED", "TOKENS"}
 	prices, err := geckoClient.FetchPrices(symbols, []string{"USD"})
 	require.NoError(t, err)
-	require.Len(t, prices, 2)
+	require.Len(t, prices, len(symbols))
 }
 
 func TestFetchMarketValues(t *testing.T) {
@@ -238,5 +238,5 @@ func TestFetchMarketValues(t *testing.T) {
 	symbols := []string{"ETH", "SNT", "UNSUPPORTED", "TOKENS"}
 	prices, err := geckoClient.FetchTokenMarketValues(symbols, "USD")
 	require.NoError(t, err)
-	require.Len(t, prices, 2)
+	require.Len(t, prices, len(symbols))
 }
