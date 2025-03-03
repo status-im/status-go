@@ -169,9 +169,9 @@ class TestChatMessages(MessengerTestCase):
         response = self.sender.wakuext_service.delete_message(message_id)
         self.sender.verify_json_schema(response, method="wakuext_deleteMessage")
 
-        response = self.sender.rpc_request("wakuext_messageByMessageID", [message_id])
-        error_code = response.json().get("error", {}).get("code", 0)
-        error_message = response.json().get("error", {}).get("message", "")
+        response = self.sender.wakuext_service.message_by_message_id(message_id, skip_validation=True)
+        error_code = response.get("error", {}).get("code", 0)
+        error_message = response.get("error", {}).get("message", "")
         assert error_code == -32000
         assert error_message == "record not found"
 

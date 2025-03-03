@@ -97,9 +97,9 @@ class WakuextService(Service):
         response = self.rpc_request("chatMessages", params)
         return response.json()
 
-    def message_by_message_id(self, message_id: str):
+    def message_by_message_id(self, message_id: str, skip_validation=False):
         params = [message_id]
-        response = self.rpc_request("messageByMessageID", params)
+        response = self.rpc_request("messageByMessageID", params, skip_validation=skip_validation)
         return response.json()
 
     def all_messages_from_chat_which_match_term(self, chat_id: str, searchTerm: str, caseSensitive: bool):

@@ -7,6 +7,6 @@ class Service:
         self.rpc_client = client
         self.name = name
 
-    def rpc_request(self, method: str, params=None):
+    def rpc_request(self, method: str, params=None, skip_validation=False):
         full_method_name = f"{self.name}_{method}"
-        return self.rpc_client.rpc_valid_request(full_method_name, params)
+        return self.rpc_client.rpc_valid_request(full_method_name, params, skip_validation=skip_validation)
