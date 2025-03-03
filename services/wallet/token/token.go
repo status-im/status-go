@@ -62,7 +62,6 @@ type Token struct {
 
 	CommunityData *community.Data `json:"community_data,omitempty"`
 	Verified      bool            `json:"verified"`
-	TokenListID   string          `json:"tokenListId"`
 }
 
 type ReceivedToken struct {

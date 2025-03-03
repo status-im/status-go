@@ -28,13 +28,12 @@ var {{ .TimestampName }} = int64({{ .Timestamp }})
 var {{ .AllTokensName }} = []*Token{
 {{ range $token := .Tokens }}
 	{
-		Address:     common.HexToAddress("{{ $token.Address }}"),
-		Name:        "{{ $token.Name }}",
-		Symbol:      "{{ $token.Symbol }}",
-		Decimals:    {{ $token.Decimals }},
-		ChainID:     {{ $token.ChainID }},
-		PegSymbol:   "{{ $token.PegSymbol }}",
-		TokenListID: "{{ $token.TokenListID }}",
+		Address:   common.HexToAddress("{{ $token.Address }}"),
+		Name:      "{{ $token.Name }}",
+		Symbol:    "{{ $token.Symbol }}",
+		Decimals:  {{ $token.Decimals }},
+		ChainID:   {{ $token.ChainID }},
+		PegSymbol: "{{ $token.PegSymbol }}",
 	},{{ end }}
 }
 `
@@ -142,10 +141,6 @@ func downloadTokens(client *http.Client, key string, source token.TokensSource) 
 	if err != nil {
 		fmt.Printf("Failed to parse token list: %v\n", err)
 		return
-	}
-
-	for _, t := range tokens {
-		t.TokenListID = key
 	}
 
 	version, timestamp, err := getVersionAndTimestamp(body)
