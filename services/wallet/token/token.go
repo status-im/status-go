@@ -76,10 +76,11 @@ func (t *Token) IsNative() bool {
 }
 
 type List struct {
-	Name    string   `json:"name"`
-	Tokens  []*Token `json:"tokens"`
-	Source  string   `json:"source"`
-	Version string   `json:"version"`
+	Name                string   `json:"name"`
+	Tokens              []*Token `json:"tokens"`
+	Source              string   `json:"source"`
+	Version             string   `json:"version"`
+	LastUpdateTimestamp int64    `json:"lastUpdateTimestamp"`
 }
 
 type ListWrapper struct {
@@ -571,16 +572,19 @@ func (tm *Manager) GetList() *ListWrapper {
 		})
 	}
 
-	updatedAt := time.Now().Unix()
 	for _, store := range tm.stores {
-		updatedAt = store.GetUpdatedAt()
 		data = append(data, &List{
-			Name:    store.GetName(),
-			Tokens:  store.GetTokens(),
-			Source:  store.GetSource(),
-			Version: store.GetVersion(),
+			Name:                store.GetName(),
+			Tokens:              store.GetTokens(),
+			Source:              store.GetSource(),
+			Version:             store.GetVersion(),
+			LastUpdateTimestamp: store.GetUpdatedAt(),
 		})
 	}
+
+	// for now we use current time, but this time should represent the time when the lists were updated last time
+	updatedAt := time.Now().Unix()
+
 	return &ListWrapper{
 		Data:      data,
 		UpdatedAt: updatedAt,
