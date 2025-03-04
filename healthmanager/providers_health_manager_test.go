@@ -64,15 +64,59 @@ func (s *ProvidersHealthManagerSuite) TestInitialStatus() {
 func (s *ProvidersHealthManagerSuite) TestUpdateProviderStatuses() {
 	ch := s.phm.Subscribe()
 	defer s.phm.Unsubscribe(ch)
+
+	now := time.Now()
+	duration1 := 100 * time.Millisecond
+	duration2 := 200 * time.Millisecond
+
 	s.updateAndWait(ch, []rpcstatus.RpcProviderCallStatus{
-		{Name: "Provider1", Timestamp: time.Now(), Err: nil},
-		{Name: "Provider2", Timestamp: time.Now(), Err: errors.New("connection error")},
+		{
+			Name:      "Provider1",
+			Timestamp: now,
+			Err:       nil,
+			StartTime: now.Add(-duration1),
+		},
+		{
+			Name:      "Provider2",
+			Timestamp: now,
+			Err:       context.DeadlineExceeded,
+			StartTime: now.Add(-duration2),
+		},
 	}, rpcstatus.StatusUp, time.Second)
 
 	statusMap := s.phm.GetStatuses()
 	s.Len(statusMap, 2, "Expected 2 provider statuses")
 	s.Equal(rpcstatus.StatusUp, statusMap["Provider1"].Status, "Expected Provider1 status to be Up")
 	s.Equal(rpcstatus.StatusDown, statusMap["Provider2"].Status, "Expected Provider2 status to be Down")
+
+	// Verify metrics for Provider1
+	s.Equal(duration1, statusMap["Provider1"].TotalDuration, "Expected Provider1 TotalDuration to match")
+	s.Equal(int64(1), statusMap["Provider1"].TotalRequests, "Expected Provider1 TotalRequests to be 1")
+	s.Equal(int64(0), statusMap["Provider1"].TotalTimeoutCount, "Expected Provider1 TotalTimeoutCount to be 0")
+
+	// Verify metrics for Provider2
+	s.Equal(duration2, statusMap["Provider2"].TotalDuration, "Expected Provider2 TotalDuration to match")
+	s.Equal(int64(1), statusMap["Provider2"].TotalRequests, "Expected Provider2 TotalRequests to be 1")
+	s.Equal(int64(1), statusMap["Provider2"].TotalTimeoutCount, "Expected Provider2 TotalTimeoutCount to be 1")
+
+	// Update with additional metrics
+	laterTime := now.Add(1 * time.Minute)
+	duration3 := 150 * time.Millisecond
+
+	s.updateAndExpectNoNotification(ch, []rpcstatus.RpcProviderCallStatus{
+		{
+			Name:      "Provider1",
+			Timestamp: laterTime,
+			Err:       nil,
+			StartTime: laterTime.Add(-duration3),
+		},
+	}, rpcstatus.StatusUp, 100*time.Millisecond)
+
+	// Verify accumulated metrics for Provider1
+	statusMap = s.phm.GetStatuses()
+	s.Equal(duration1+duration3, statusMap["Provider1"].TotalDuration, "Expected Provider1 TotalDuration to accumulate")
+	s.Equal(int64(2), statusMap["Provider1"].TotalRequests, "Expected Provider1 TotalRequests to be 2")
+	s.Equal(int64(0), statusMap["Provider1"].TotalTimeoutCount, "Expected Provider1 TotalTimeoutCount to remain 0")
 }
 
 func (s *ProvidersHealthManagerSuite) TestChainStatusUpdatesOnce() {

@@ -22,6 +22,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network"
@@ -518,6 +519,12 @@ func (api *API) StopSuggestedRoutesAsyncCalculation(ctx context.Context) {
 	logutils.ZapLogger().Debug("call to StopSuggestedRoutesAsyncCalculation")
 
 	api.s.router.StopSuggestedRoutesAsyncCalculation()
+}
+
+// GetBlockchainHealthStatus returns the status of rpc clients
+func (api *API) GetBlockchainHealthStatus(ctx context.Context) healthmanager.BlockchainFullStatus {
+	logutils.ZapLogger().Debug("call to GetBlockchainHealthStatus")
+	return api.s.GetRPCClient().GetHealthManagerFullStatus()
 }
 
 func (api *API) StopSuggestedRoutesCalculation(ctx context.Context) {

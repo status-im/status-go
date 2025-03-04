@@ -793,7 +793,9 @@ func convertFunctorCallStatuses(statuses []circuitbreaker.FunctorCallStatus, met
 			Name:      f.Name,
 			Method:    methodName,
 			Timestamp: f.Timestamp,
-			Err:       f.Err})
+			Err:       f.Err,
+			StartTime: f.StartTime,
+		})
 	}
 	return
 }

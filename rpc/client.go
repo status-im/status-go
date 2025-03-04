@@ -226,6 +226,10 @@ func (c *Client) monitorHealth(ctx context.Context, statusCh chan struct{}) {
 	}
 }
 
+func (c *Client) GetHealthManagerFullStatus() healthmanager.BlockchainFullStatus {
+	return c.healthMgr.GetFullStatus()
+}
+
 func (c *Client) GetNetworkManager() *network.Manager {
 	return c.NetworkManager
 }

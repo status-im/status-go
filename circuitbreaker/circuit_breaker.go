@@ -23,6 +23,7 @@ type CommandResult struct {
 type FunctorCallStatus struct {
 	Name      string
 	Timestamp time.Time
+	StartTime time.Time
 	Err       error
 }
 
@@ -42,10 +43,11 @@ func (cr *CommandResult) FunctorCallStatuses() []FunctorCallStatus {
 	return cr.functorCallStatuses
 }
 
-func (cr *CommandResult) addCallStatus(providerName string, err error) {
+func (cr *CommandResult) addCallStatus(providerName string, err error, startTime time.Time) {
 	cr.functorCallStatuses = append(cr.functorCallStatuses, FunctorCallStatus{
 		Name:      providerName,
 		Timestamp: time.Now(),
+		StartTime: startTime,
 		Err:       err,
 	})
 }
@@ -148,6 +150,9 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 			circuitName = cb.circuitNameHandler(circuitName)
 		}
 
+		// Record start time before execution
+		startTime := time.Now()
+
 		// if last command, execute without circuit
 		if i == len(cmd.functors)-1 || circuitName == "" {
 			res, execErr := f.exec()
@@ -156,7 +161,17 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 				result.res = res
 				result.err = nil
 			}
-			result.addCallStatus(f.providerName, err)
+			result.addCallStatus(f.providerName, err, startTime)
+
+			// Log error if present
+			if err != nil {
+				// Get the status that was just added
+				status := result.functorCallStatuses[len(result.functorCallStatuses)-1]
+				logutils.ZapLogger().Warn("direct execution error",
+					zap.String("provider", f.providerName),
+					zap.Error(err),
+					zap.Duration("duration", time.Since(status.StartTime)))
+			}
 		} else {
 			if hystrix.GetCircuitSettings()[circuitName] == nil {
 				hystrix.ConfigureCommand(circuitName, hystrix.CommandConfig{
@@ -169,13 +184,15 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 			}
 
 			err = hystrix.DoC(ctx, circuitName, func(ctx context.Context) error {
+				// We need to capture the execution time inside the hystrix function
+				execStartTime := time.Now()
 				res, err := f.exec()
 				// Write to result only if success
 				if err == nil {
 					result.res = res
 					result.err = nil
 				}
-				result.addCallStatus(f.providerName, err)
+				result.addCallStatus(f.providerName, err, execStartTime)
 
 				// If the command has been cancelled, we don't count
 				// the error towards breaking the circuit, and then we break
@@ -185,7 +202,12 @@ func (cb *CircuitBreaker) Execute(cmd *Command) CommandResult {
 					return nil
 				}
 				if err != nil {
-					logutils.ZapLogger().Warn("hystrix error", zap.String("provider", circuitName), zap.Error(err))
+					// Get the status that was just added
+					status := result.functorCallStatuses[len(result.functorCallStatuses)-1]
+					logutils.ZapLogger().Warn("hystrix error",
+						zap.String("provider", f.providerName),
+						zap.Error(err),
+						zap.Duration("duration", time.Since(status.StartTime)))
 				}
 				return err
 			}, nil)

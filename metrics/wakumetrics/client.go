@@ -8,10 +8,11 @@ import (
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
 
-	v1protocol "github.com/status-im/status-go/protocol/v1"
-	v2common "github.com/status-im/status-go/wakuv2/common"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
+
+	v1protocol "github.com/status-im/status-go/protocol/v1"
+	v2common "github.com/status-im/status-go/wakuv2/common"
 )
 
 type ReceivedMessages struct {

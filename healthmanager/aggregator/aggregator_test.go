@@ -34,8 +34,13 @@ func (suite *StatusAggregatorTestSuite) TestRegisterProvider() {
 	suite.aggregator.RegisterProvider(providerName)
 
 	assert.Len(suite.T(), suite.aggregator.providerStatuses, 1, "Expected 1 provider after registration")
-	_, exists := suite.aggregator.providerStatuses[providerName]
+	ps, exists := suite.aggregator.providerStatuses[providerName]
 	assert.True(suite.T(), exists, "Provider1 should be registered")
+
+	// Verify that the new fields are initialized to zero
+	assert.Equal(suite.T(), time.Duration(0), ps.TotalDuration, "TotalDuration should be initialized to zero")
+	assert.Equal(suite.T(), int64(0), ps.TotalRequests, "TotalRequests should be initialized to zero")
+	assert.Equal(suite.T(), int64(0), ps.TotalTimeoutCount, "TotalTimeoutCount should be initialized to zero")
 
 	// Attempt to register the same provider again
 	suite.aggregator.RegisterProvider(providerName)
@@ -49,11 +54,14 @@ func (suite *StatusAggregatorTestSuite) TestUpdate() {
 
 	now := time.Now()
 
-	// Update existing provider to up
+	// Update existing provider to up with metrics
 	statusUp := rpcstatus.ProviderStatus{
-		Name:          providerName,
-		Status:        rpcstatus.StatusUp,
-		LastSuccessAt: now,
+		Name:              providerName,
+		Status:            rpcstatus.StatusUp,
+		LastSuccessAt:     now,
+		TotalDuration:     100 * time.Millisecond,
+		TotalRequests:     5,
+		TotalTimeoutCount: 1,
 	}
 	suite.aggregator.Update(statusUp)
 
@@ -61,27 +69,58 @@ func (suite *StatusAggregatorTestSuite) TestUpdate() {
 	assert.True(suite.T(), exists, "Provider1 should exist after update")
 	assert.Equal(suite.T(), rpcstatus.StatusUp, ps.Status, "Provider1 status should be 'up'")
 	assert.Equal(suite.T(), now, ps.LastSuccessAt, "Provider1 LastSuccessAt should be updated")
+	assert.Equal(suite.T(), 100*time.Millisecond, ps.TotalDuration, "Provider1 TotalDuration should be updated")
+	assert.Equal(suite.T(), int64(5), ps.TotalRequests, "Provider1 TotalRequests should be updated")
+	assert.Equal(suite.T(), int64(1), ps.TotalTimeoutCount, "Provider1 TotalTimeoutCount should be updated")
+
+	// Update existing provider with additional metrics
+	statusUpdate := rpcstatus.ProviderStatus{
+		Name:              providerName,
+		Status:            rpcstatus.StatusUp,
+		LastSuccessAt:     now.Add(1 * time.Hour),
+		TotalDuration:     50 * time.Millisecond,
+		TotalRequests:     3,
+		TotalTimeoutCount: 0,
+	}
+	suite.aggregator.Update(statusUpdate)
+
+	ps, exists = suite.aggregator.providerStatuses[providerName]
+	assert.True(suite.T(), exists, "Provider1 should exist after second update")
+	assert.Equal(suite.T(), rpcstatus.StatusUp, ps.Status, "Provider1 status should be 'up'")
+	assert.Equal(suite.T(), now.Add(1*time.Hour), ps.LastSuccessAt, "Provider1 LastSuccessAt should be updated")
+	assert.Equal(suite.T(), 150*time.Millisecond, ps.TotalDuration, "Provider1 TotalDuration should be accumulated")
+	assert.Equal(suite.T(), int64(8), ps.TotalRequests, "Provider1 TotalRequests should be accumulated")
+	assert.Equal(suite.T(), int64(1), ps.TotalTimeoutCount, "Provider1 TotalTimeoutCount should be accumulated")
 
 	// Update existing provider to down
-	nowDown := now.Add(1 * time.Hour)
+	nowDown := now.Add(2 * time.Hour)
 	statusDown := rpcstatus.ProviderStatus{
-		Name:        providerName,
-		Status:      rpcstatus.StatusDown,
-		LastErrorAt: nowDown,
+		Name:              providerName,
+		Status:            rpcstatus.StatusDown,
+		LastErrorAt:       nowDown,
+		TotalDuration:     25 * time.Millisecond,
+		TotalRequests:     1,
+		TotalTimeoutCount: 1,
 	}
 	suite.aggregator.Update(statusDown)
 
 	ps, exists = suite.aggregator.providerStatuses[providerName]
-	assert.True(suite.T(), exists, "Provider1 should exist after second update")
+	assert.True(suite.T(), exists, "Provider1 should exist after third update")
 	assert.Equal(suite.T(), rpcstatus.StatusDown, ps.Status, "Provider1 status should be 'down'")
 	assert.Equal(suite.T(), nowDown, ps.LastErrorAt, "Provider1 LastErrorAt should be updated")
+	assert.Equal(suite.T(), 175*time.Millisecond, ps.TotalDuration, "Provider1 TotalDuration should be accumulated")
+	assert.Equal(suite.T(), int64(9), ps.TotalRequests, "Provider1 TotalRequests should be accumulated")
+	assert.Equal(suite.T(), int64(2), ps.TotalTimeoutCount, "Provider1 TotalTimeoutCount should be accumulated")
 
 	// Update a non-registered provider via Update (should add it)
 	provider2 := "Provider2"
 	statusUp2 := rpcstatus.ProviderStatus{
-		Name:          provider2,
-		Status:        rpcstatus.StatusUp,
-		LastSuccessAt: now,
+		Name:              provider2,
+		Status:            rpcstatus.StatusUp,
+		LastSuccessAt:     now,
+		TotalDuration:     75 * time.Millisecond,
+		TotalRequests:     2,
+		TotalTimeoutCount: 0,
 	}
 	suite.aggregator.Update(statusUp2)
 
@@ -89,6 +128,9 @@ func (suite *StatusAggregatorTestSuite) TestUpdate() {
 	ps2, exists := suite.aggregator.providerStatuses[provider2]
 	assert.True(suite.T(), exists, "Provider2 should be added via Update")
 	assert.Equal(suite.T(), rpcstatus.StatusUp, ps2.Status, "Provider2 status should be 'up'")
+	assert.Equal(suite.T(), 75*time.Millisecond, ps2.TotalDuration, "Provider2 TotalDuration should be set")
+	assert.Equal(suite.T(), int64(2), ps2.TotalRequests, "Provider2 TotalRequests should be set")
+	assert.Equal(suite.T(), int64(0), ps2.TotalTimeoutCount, "Provider2 TotalTimeoutCount should be set")
 }
 
 // TestComputeAggregatedStatus_NoProviders verifies aggregated status when no providers are registered.
@@ -123,16 +165,22 @@ func (suite *StatusAggregatorTestSuite) TestComputeAggregatedStatus_AllUp() {
 	now1 := time.Now()
 	now2 := now1.Add(1 * time.Hour)
 
-	// Update all providers to up
+	// Update all providers to up with metrics
 	suite.aggregator.Update(rpcstatus.ProviderStatus{
-		Name:          "Provider1",
-		Status:        rpcstatus.StatusUp,
-		LastSuccessAt: now1,
+		Name:              "Provider1",
+		Status:            rpcstatus.StatusUp,
+		LastSuccessAt:     now1,
+		TotalDuration:     100 * time.Millisecond,
+		TotalRequests:     5,
+		TotalTimeoutCount: 1,
 	})
 	suite.aggregator.Update(rpcstatus.ProviderStatus{
-		Name:          "Provider2",
-		Status:        rpcstatus.StatusUp,
-		LastSuccessAt: now2,
+		Name:              "Provider2",
+		Status:            rpcstatus.StatusUp,
+		LastSuccessAt:     now2,
+		TotalDuration:     200 * time.Millisecond,
+		TotalRequests:     10,
+		TotalTimeoutCount: 2,
 	})
 
 	aggStatus := suite.aggregator.ComputeAggregatedStatus()
@@ -140,6 +188,11 @@ func (suite *StatusAggregatorTestSuite) TestComputeAggregatedStatus_AllUp() {
 	assert.Equal(suite.T(), rpcstatus.StatusUp, aggStatus.Status, "Aggregated status should be 'up' when all providers are up")
 	assert.Equal(suite.T(), now2, aggStatus.LastSuccessAt, "LastSuccessAt should reflect the latest success time")
 	assert.True(suite.T(), aggStatus.LastErrorAt.IsZero(), "LastErrorAt should be zero when all providers are up")
+
+	// Verify aggregated metrics
+	assert.Equal(suite.T(), 300*time.Millisecond, aggStatus.TotalDuration, "TotalDuration should be the sum of all providers")
+	assert.Equal(suite.T(), int64(15), aggStatus.TotalRequests, "TotalRequests should be the sum of all providers")
+	assert.Equal(suite.T(), int64(3), aggStatus.TotalTimeoutCount, "TotalTimeoutCount should be the sum of all providers")
 }
 
 // TestComputeAggregatedStatus_AllDown verifies aggregated status when all providers are down.
@@ -209,21 +262,30 @@ func (suite *StatusAggregatorTestSuite) TestComputeAggregatedStatus_MixedUpAndDo
 	now1 := time.Now()
 	now2 := now1.Add(15 * time.Minute)
 
-	// Update providers
+	// Update providers with metrics
 	suite.aggregator.Update(rpcstatus.ProviderStatus{
-		Name:          "Provider1",
-		Status:        rpcstatus.StatusUp,
-		LastSuccessAt: now1,
+		Name:              "Provider1",
+		Status:            rpcstatus.StatusUp,
+		LastSuccessAt:     now1,
+		TotalDuration:     100 * time.Millisecond,
+		TotalRequests:     5,
+		TotalTimeoutCount: 1,
 	})
 	suite.aggregator.Update(rpcstatus.ProviderStatus{
-		Name:        "Provider2",
-		Status:      rpcstatus.StatusDown,
-		LastErrorAt: now2,
+		Name:              "Provider2",
+		Status:            rpcstatus.StatusDown,
+		LastErrorAt:       now2,
+		TotalDuration:     200 * time.Millisecond,
+		TotalRequests:     10,
+		TotalTimeoutCount: 2,
 	})
 	suite.aggregator.Update(rpcstatus.ProviderStatus{
-		Name:          "Provider3",
-		Status:        rpcstatus.StatusUp,
-		LastSuccessAt: now1,
+		Name:              "Provider3",
+		Status:            rpcstatus.StatusUp,
+		LastSuccessAt:     now1,
+		TotalDuration:     300 * time.Millisecond,
+		TotalRequests:     15,
+		TotalTimeoutCount: 3,
 	})
 
 	aggStatus := suite.aggregator.ComputeAggregatedStatus()
@@ -231,6 +293,11 @@ func (suite *StatusAggregatorTestSuite) TestComputeAggregatedStatus_MixedUpAndDo
 	assert.Equal(suite.T(), rpcstatus.StatusUp, aggStatus.Status, "Aggregated status should be 'up' when at least one provider is up")
 	assert.Equal(suite.T(), now1, aggStatus.LastSuccessAt, "LastSuccessAt should reflect the latest success time")
 	assert.Equal(suite.T(), now2, aggStatus.LastErrorAt, "LastErrorAt should reflect the latest error time")
+
+	// Verify aggregated metrics
+	assert.Equal(suite.T(), 600*time.Millisecond, aggStatus.TotalDuration, "TotalDuration should be the sum of all providers")
+	assert.Equal(suite.T(), int64(30), aggStatus.TotalRequests, "TotalRequests should be the sum of all providers")
+	assert.Equal(suite.T(), int64(6), aggStatus.TotalTimeoutCount, "TotalTimeoutCount should be the sum of all providers")
 }
 
 // TestGetAggregatedStatus verifies that GetAggregatedStatus returns the correct aggregated status.

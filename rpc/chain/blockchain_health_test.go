@@ -165,33 +165,43 @@ func (s *BlockchainHealthSuite) TestGetFullStatus() {
 	statusCh := s.blockchainHealthManager.Subscribe()
 	defer s.blockchainHealthManager.Unsubscribe(statusCh)
 
-	// Simulate provider statuses for chain 1
+	now := time.Now()
+	duration1 := 100 * time.Millisecond
+	duration2 := 200 * time.Millisecond
+	duration3 := 150 * time.Millisecond
+	duration4 := 250 * time.Millisecond
+
+	// Simulate provider statuses for chain 1 with metrics
 	providerCallStatusesChain1 := []rpcstatus.RpcProviderCallStatus{
 		{
 			Name:      "provider1_chain1",
-			Timestamp: time.Now(),
+			Timestamp: now,
 			Err:       nil, // Up
+			StartTime: now.Add(-duration1),
 		},
 		{
 			Name:      "provider2_chain1",
-			Timestamp: time.Now(),
-			Err:       errors.New("connection error"), // Down
+			Timestamp: now,
+			Err:       context.DeadlineExceeded, // Down
+			StartTime: now.Add(-duration2),
 		},
 	}
 	ctx := context.Background()
 	s.mockProviders[1].Update(ctx, providerCallStatusesChain1)
 
-	// Simulate provider statuses for chain 2
+	// Simulate provider statuses for chain 2 with metrics
 	providerCallStatusesChain2 := []rpcstatus.RpcProviderCallStatus{
 		{
 			Name:      "provider1_chain2",
-			Timestamp: time.Now(),
+			Timestamp: now,
 			Err:       nil, // Up
+			StartTime: now.Add(-duration3),
 		},
 		{
 			Name:      "provider2_chain2",
-			Timestamp: time.Now(),
-			Err:       nil, // Up
+			Timestamp: now,
+			Err:       context.DeadlineExceeded, // Down
+			StartTime: now.Add(-duration4),
 		},
 	}
 	s.mockProviders[2].Update(ctx, providerCallStatusesChain2)
@@ -216,9 +226,15 @@ func (s *BlockchainHealthSuite) TestGetFullStatus() {
 
 	provider1Chain1Status := providerStatusesChain1["provider1_chain1"]
 	require.Equal(s.T(), rpcstatus.StatusUp, provider1Chain1Status.Status)
+	require.Equal(s.T(), duration1, provider1Chain1Status.TotalDuration)
+	require.Equal(s.T(), int64(1), provider1Chain1Status.TotalRequests)
+	require.Equal(s.T(), int64(0), provider1Chain1Status.TotalTimeoutCount)
 
 	provider2Chain1Status := providerStatusesChain1["provider2_chain1"]
 	require.Equal(s.T(), rpcstatus.StatusDown, provider2Chain1Status.Status)
+	require.Equal(s.T(), duration2, provider2Chain1Status.TotalDuration)
+	require.Equal(s.T(), int64(1), provider2Chain1Status.TotalRequests)
+	require.Equal(s.T(), int64(1), provider2Chain1Status.TotalTimeoutCount)
 
 	// Provider statuses for chain 2
 	providerStatusesChain2 := fullStatus.StatusPerChainPerProvider[2]
@@ -227,9 +243,36 @@ func (s *BlockchainHealthSuite) TestGetFullStatus() {
 
 	provider1Chain2Status := providerStatusesChain2["provider1_chain2"]
 	require.Equal(s.T(), rpcstatus.StatusUp, provider1Chain2Status.Status)
+	require.Equal(s.T(), duration3, provider1Chain2Status.TotalDuration)
+	require.Equal(s.T(), int64(1), provider1Chain2Status.TotalRequests)
+	require.Equal(s.T(), int64(0), provider1Chain2Status.TotalTimeoutCount)
 
 	provider2Chain2Status := providerStatusesChain2["provider2_chain2"]
-	require.Equal(s.T(), rpcstatus.StatusUp, provider2Chain2Status.Status)
+	require.Equal(s.T(), rpcstatus.StatusDown, provider2Chain2Status.Status)
+	require.Equal(s.T(), duration4, provider2Chain2Status.TotalDuration)
+	require.Equal(s.T(), int64(1), provider2Chain2Status.TotalRequests)
+	require.Equal(s.T(), int64(1), provider2Chain2Status.TotalTimeoutCount)
+
+	// Verify aggregated status for chain 1
+	chain1Status := fullStatus.StatusPerChain[1]
+	require.Equal(s.T(), rpcstatus.StatusUp, chain1Status.Status)
+	require.Equal(s.T(), duration1+duration2, chain1Status.TotalDuration)
+	require.Equal(s.T(), int64(2), chain1Status.TotalRequests)
+	require.Equal(s.T(), int64(1), chain1Status.TotalTimeoutCount)
+
+	// Verify aggregated status for chain 2
+	chain2Status := fullStatus.StatusPerChain[2]
+	require.Equal(s.T(), rpcstatus.StatusUp, chain2Status.Status)
+	require.Equal(s.T(), duration3+duration4, chain2Status.TotalDuration)
+	require.Equal(s.T(), int64(2), chain2Status.TotalRequests)
+	require.Equal(s.T(), int64(1), chain2Status.TotalTimeoutCount)
+
+	// Verify overall aggregated status
+	overallStatus := fullStatus.Status
+	require.Equal(s.T(), rpcstatus.StatusUp, overallStatus.Status)
+	require.Equal(s.T(), duration1+duration2+duration3+duration4, overallStatus.TotalDuration)
+	require.Equal(s.T(), int64(4), overallStatus.TotalRequests)
+	require.Equal(s.T(), int64(2), overallStatus.TotalTimeoutCount)
 
 	// Serialization to JSON works without errors
 	jsonData, err := json.MarshalIndent(fullStatus, "", "  ")
@@ -245,33 +288,43 @@ func (s *BlockchainHealthSuite) TestGetShortStatus() {
 	statusCh := s.blockchainHealthManager.Subscribe()
 	defer s.blockchainHealthManager.Unsubscribe(statusCh)
 
-	// Simulate provider statuses for chain 1
+	now := time.Now()
+	duration1 := 100 * time.Millisecond
+	duration2 := 200 * time.Millisecond
+	duration3 := 150 * time.Millisecond
+	duration4 := 250 * time.Millisecond
+
+	// Simulate provider statuses for chain 1 with metrics
 	providerCallStatusesChain1 := []rpcstatus.RpcProviderCallStatus{
 		{
 			Name:      "provider1_chain1",
-			Timestamp: time.Now(),
+			Timestamp: now,
 			Err:       nil, // Up
+			StartTime: now.Add(-duration1),
 		},
 		{
 			Name:      "provider2_chain1",
-			Timestamp: time.Now(),
-			Err:       errors.New("connection error"), // Down
+			Timestamp: now,
+			Err:       context.DeadlineExceeded, // Down
+			StartTime: now.Add(-duration2),
 		},
 	}
 	ctx := context.Background()
 	s.mockProviders[1].Update(ctx, providerCallStatusesChain1)
 
-	// Simulate provider statuses for chain 2
+	// Simulate provider statuses for chain 2 with metrics
 	providerCallStatusesChain2 := []rpcstatus.RpcProviderCallStatus{
 		{
 			Name:      "provider1_chain2",
-			Timestamp: time.Now(),
+			Timestamp: now,
 			Err:       nil, // Up
+			StartTime: now.Add(-duration3),
 		},
 		{
 			Name:      "provider2_chain2",
-			Timestamp: time.Now(),
-			Err:       nil, // Up
+			Timestamp: now,
+			Err:       context.DeadlineExceeded, // Down
+			StartTime: now.Add(-duration4),
 		},
 	}
 	s.mockProviders[2].Update(ctx, providerCallStatusesChain2)
@@ -289,8 +342,26 @@ func (s *BlockchainHealthSuite) TestGetShortStatus() {
 	require.Contains(s.T(), shortStatus.StatusPerChain, uint64(1))
 	require.Contains(s.T(), shortStatus.StatusPerChain, uint64(2))
 
-	require.Equal(s.T(), rpcstatus.StatusUp, shortStatus.StatusPerChain[1].Status)
-	require.Equal(s.T(), rpcstatus.StatusUp, shortStatus.StatusPerChain[2].Status)
+	// Verify metrics for chain 1
+	chain1Status := shortStatus.StatusPerChain[1]
+	require.Equal(s.T(), rpcstatus.StatusUp, chain1Status.Status)
+	require.Equal(s.T(), duration1+duration2, chain1Status.TotalDuration)
+	require.Equal(s.T(), int64(2), chain1Status.TotalRequests)
+	require.Equal(s.T(), int64(1), chain1Status.TotalTimeoutCount)
+
+	// Verify metrics for chain 2
+	chain2Status := shortStatus.StatusPerChain[2]
+	require.Equal(s.T(), rpcstatus.StatusUp, chain2Status.Status)
+	require.Equal(s.T(), duration3+duration4, chain2Status.TotalDuration)
+	require.Equal(s.T(), int64(2), chain2Status.TotalRequests)
+	require.Equal(s.T(), int64(1), chain2Status.TotalTimeoutCount)
+
+	// Verify overall aggregated status
+	overallStatus := shortStatus.Status
+	require.Equal(s.T(), rpcstatus.StatusUp, overallStatus.Status)
+	require.Greater(s.T(), overallStatus.TotalDuration, time.Duration(0), "Overall should have non-zero duration")
+	require.Equal(s.T(), int64(4), overallStatus.TotalRequests)
+	require.Equal(s.T(), int64(2), overallStatus.TotalTimeoutCount)
 
 	// Serialization to JSON works without errors
 	jsonData, err := json.MarshalIndent(shortStatus, "", "  ")

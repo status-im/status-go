@@ -17,3 +17,4 @@ shell.nix             @status-im/devops
 /cmd/status-backend   @igor-sirotin
 /internal/sentry      @igor-sirotin
 /healthmanager	      @friofry
+/rpc/network          @friofry

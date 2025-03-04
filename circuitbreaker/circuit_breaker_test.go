@@ -10,6 +10,8 @@ import (
 	"github.com/afex/hystrix-go/hystrix"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/healthmanager/provider_errors"
 )
 
 const success = "Success"
@@ -448,4 +450,200 @@ func TestCircuitBreaker_LastFunctorDirectExecution(t *testing.T) {
 
 	require.Equal(t, statuses[1].Name, "providerName")
 	require.Nil(t, statuses[1].Err)
+}
+
+func TestFunctorCallStatus_NewFields(t *testing.T) {
+	cb := NewCircuitBreaker(Config{
+		Timeout: 100, // Short timeout for testing
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		// Create a functor
+		responseData := []any{"item1", "item2", "item3"}
+		functor := NewFunctor(func() ([]any, error) {
+			return responseData, nil
+		}, "successCircuit", "provider1")
+
+		cmd := NewCommand(context.Background(), []*Functor{functor})
+		result := cb.Execute(cmd)
+
+		require.NoError(t, result.Error())
+		require.Len(t, result.FunctorCallStatuses(), 1)
+
+		status := result.FunctorCallStatuses()[0]
+		assert.Equal(t, "provider1", status.Name)
+		assert.NoError(t, status.Err)
+		assert.False(t, provider_errors.IsTimeoutErr(status.Err))
+
+		// Verify timing information
+		assert.NotZero(t, status.StartTime)
+		assert.NotZero(t, status.Timestamp)
+		assert.True(t, status.Timestamp.After(status.StartTime) || status.Timestamp.Equal(status.StartTime))
+		duration := status.Timestamp.Sub(status.StartTime)
+		assert.True(t, duration > 0)
+	})
+
+	t.Run("Error with timeout", func(t *testing.T) {
+		// Create a test that directly sets the error to context.DeadlineExceeded
+		expectedErr := context.DeadlineExceeded
+		functor := NewFunctor(func() ([]any, error) {
+			return nil, expectedErr
+		}, "timeoutCircuit", "provider2")
+
+		cmd := NewCommand(context.Background(), []*Functor{functor})
+		result := cb.Execute(cmd)
+
+		require.Error(t, result.Error())
+		require.Len(t, result.FunctorCallStatuses(), 1)
+
+		status := result.FunctorCallStatuses()[0]
+		assert.Equal(t, "provider2", status.Name)
+		assert.Error(t, status.Err)
+		assert.True(t, provider_errors.IsTimeoutErr(status.Err))
+
+		// Verify timing information
+		assert.NotZero(t, status.StartTime)
+		assert.NotZero(t, status.Timestamp)
+		duration := status.Timestamp.Sub(status.StartTime)
+		assert.True(t, duration >= 0)
+	})
+
+	t.Run("Context cancellation", func(t *testing.T) {
+		// Create a test that directly sets the error to context.Canceled
+		expectedErr := context.Canceled
+		functor := NewFunctor(func() ([]any, error) {
+			return nil, expectedErr
+		}, "cancellationCircuit", "provider5")
+
+		cmd := NewCommand(context.Background(), []*Functor{functor})
+		result := cb.Execute(cmd)
+
+		require.Error(t, result.Error())
+		require.Len(t, result.FunctorCallStatuses(), 1)
+
+		status := result.FunctorCallStatuses()[0]
+		assert.Equal(t, "provider5", status.Name)
+		assert.Error(t, status.Err)
+		assert.False(t, provider_errors.IsTimeoutErr(status.Err))
+
+		// Verify timing information
+		assert.NotZero(t, status.StartTime)
+		assert.NotZero(t, status.Timestamp)
+		duration := status.Timestamp.Sub(status.StartTime)
+		assert.True(t, duration >= 0)
+	})
+
+	t.Run("Multiple functors", func(t *testing.T) {
+		// First functor fails
+		functor1 := NewFunctor(func() ([]any, error) {
+			return nil, errors.New("first functor error")
+		}, "multiCircuit1", "provider3")
+
+		// Second functor succeeds with response
+		responseData := []any{"response1", "response2"}
+		functor2 := NewFunctor(func() ([]any, error) {
+			return responseData, nil
+		}, "multiCircuit2", "provider4")
+
+		cmd := NewCommand(context.Background(), []*Functor{functor1, functor2})
+		result := cb.Execute(cmd)
+
+		require.NoError(t, result.Error())
+		require.Len(t, result.FunctorCallStatuses(), 2)
+
+		// Check first status (error)
+		status1 := result.FunctorCallStatuses()[0]
+		assert.Equal(t, "provider3", status1.Name)
+		assert.Error(t, status1.Err)
+		assert.False(t, provider_errors.IsTimeoutErr(status1.Err))
+
+		// Check second status (success)
+		status2 := result.FunctorCallStatuses()[1]
+		assert.Equal(t, "provider4", status2.Name)
+		assert.NoError(t, status2.Err)
+		assert.False(t, provider_errors.IsTimeoutErr(status2.Err))
+	})
+}
+
+func TestCircuitBreaker_ErrorLogging(t *testing.T) {
+	// We can't easily capture the log output, so we'll just verify that the code runs without errors
+	cb := NewCircuitBreaker(Config{})
+
+	// Test direct execution error logging
+	t.Run("Direct execution error logging", func(t *testing.T) {
+		expectedError := errors.New("direct test error")
+		functor := NewFunctor(func() ([]any, error) {
+			return nil, expectedError
+		}, "", "directProvider")
+
+		cmd := NewCommand(context.Background(), []*Functor{functor})
+		result := cb.Execute(cmd)
+
+		require.Error(t, result.Error())
+		require.Len(t, result.FunctorCallStatuses(), 1)
+
+		// Verify the status fields are set correctly
+		status := result.FunctorCallStatuses()[0]
+		assert.Equal(t, "directProvider", status.Name)
+		assert.Equal(t, expectedError, status.Err)
+		assert.False(t, provider_errors.IsTimeoutErr(status.Err))
+
+		// Verify timing information
+		assert.NotZero(t, status.StartTime)
+		assert.NotZero(t, status.Timestamp)
+		duration := status.Timestamp.Sub(status.StartTime)
+		assert.True(t, duration >= 0)
+	})
+
+	// Test hystrix error logging
+	t.Run("Hystrix error logging", func(t *testing.T) {
+		expectedError := errors.New("hystrix test error")
+		functor := NewFunctor(func() ([]any, error) {
+			return nil, expectedError
+		}, "hystrixCircuit", "hystrixProvider")
+
+		cmd := NewCommand(context.Background(), []*Functor{functor})
+		result := cb.Execute(cmd)
+
+		require.Error(t, result.Error())
+		require.Len(t, result.FunctorCallStatuses(), 1)
+
+		// Verify the status fields are set correctly
+		status := result.FunctorCallStatuses()[0]
+		assert.Equal(t, "hystrixProvider", status.Name)
+		assert.Equal(t, expectedError, status.Err)
+		assert.False(t, provider_errors.IsTimeoutErr(status.Err))
+
+		// Verify timing information
+		assert.NotZero(t, status.StartTime)
+		assert.NotZero(t, status.Timestamp)
+		duration := status.Timestamp.Sub(status.StartTime)
+		assert.True(t, duration >= 0)
+	})
+
+	// Test timeout error logging
+	t.Run("Timeout error logging", func(t *testing.T) {
+		expectedError := context.DeadlineExceeded
+		functor := NewFunctor(func() ([]any, error) {
+			return nil, expectedError
+		}, "timeoutCircuit", "timeoutProvider")
+
+		cmd := NewCommand(context.Background(), []*Functor{functor})
+		result := cb.Execute(cmd)
+
+		require.Error(t, result.Error())
+		require.Len(t, result.FunctorCallStatuses(), 1)
+
+		// Verify the status fields are set correctly
+		status := result.FunctorCallStatuses()[0]
+		assert.Equal(t, "timeoutProvider", status.Name)
+		assert.Equal(t, expectedError, status.Err)
+		assert.True(t, provider_errors.IsTimeoutErr(status.Err))
+
+		// Verify timing information
+		assert.NotZero(t, status.StartTime)
+		assert.NotZero(t, status.Timestamp)
+		duration := status.Timestamp.Sub(status.StartTime)
+		assert.True(t, duration >= 0)
+	})
 }

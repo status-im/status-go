@@ -74,12 +74,24 @@ func NewClientWithParams(params Params) *Client {
 		5,              // retries
 	)
 
+	// Ensure baseURL doesn't end with a slash
+	baseURL := strings.TrimSuffix(params.URL, "/")
+
 	return &Client{
 		id:         params.ID,
 		httpClient: httpClient,
-		baseURL:    params.URL,
+		baseURL:    baseURL,
 		creds:      creds,
 	}
+}
+
+// buildURL creates a URL by joining the base URL with the given path
+// ensuring there are no double slashes
+func (c *Client) buildURL(path string) string {
+	baseURL := strings.TrimRight(c.baseURL, "/")
+	trimmedPath := strings.TrimLeft(path, "/")
+
+	return baseURL + "/" + trimmedPath
 }
 
 func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
@@ -103,7 +115,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 		params.Add("relaxedValidation", "true")
 		params.Add("extraParams", extraParamStatus)
 
-		url := fmt.Sprintf("%s/data/pricemulti", c.baseURL)
+		url := c.buildURL("data/pricemulti")
 		response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, params, c.creds)
 		if err != nil {
 			return nil, err
@@ -126,7 +138,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 }
 
 func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
-	url := fmt.Sprintf("%s/data/all/coinlist", c.baseURL)
+	url := c.buildURL("data/all/coinlist")
 	response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, nil, c.creds)
 	if err != nil {
 		return nil, err
@@ -168,7 +180,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		params.Add("relaxedValidation", "true")
 		params.Add("extraParams", extraParamStatus)
 
-		url := fmt.Sprintf("%s/data/pricemultifull", c.baseURL)
+		url := c.buildURL("data/pricemultifull")
 		response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, params, c.creds)
 		if err != nil {
 			return nil, err
@@ -201,7 +213,7 @@ func (c *Client) FetchHistoricalHourlyPrices(symbol string, currency string, lim
 	params.Add("limit", fmt.Sprintf("%d", limit))
 	params.Add("extraParams", extraParamStatus)
 
-	url := fmt.Sprintf("%s/data/v2/histohour", c.baseURL)
+	url := c.buildURL("data/v2/histohour")
 	response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, params, c.creds)
 	if err != nil {
 		return item, err
@@ -229,7 +241,7 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 	params.Add("allData", fmt.Sprintf("%v", allData))
 	params.Add("extraParams", extraParamStatus)
 
-	url := fmt.Sprintf("%s/data/v2/histoday", c.baseURL)
+	url := c.buildURL("data/v2/histoday")
 	response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, params, c.creds)
 	if err != nil {
 		return item, err

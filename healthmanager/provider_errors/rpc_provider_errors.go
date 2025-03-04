@@ -74,7 +74,7 @@ func determineRpcErrorType(err error) RpcProviderErrorType {
 	return RpcErrorTypeRPCOther
 }
 
-// IsCriticalRpcError determines if the RPC error is critical.
+// IsNonCriticalRpcError determines if the RPC error is critical.
 func IsNonCriticalRpcError(err error) bool {
 	errorType := determineRpcErrorType(err)
 

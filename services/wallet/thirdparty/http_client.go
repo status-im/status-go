@@ -9,6 +9,10 @@ import (
 	"net/http"
 	netUrl "net/url"
 	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 const requestTimeout = 5 * time.Second
@@ -25,9 +29,13 @@ type HTTPClient struct {
 }
 
 func NewHTTPClient() *HTTPClient {
+	return NewHTTPClientWithTimeout(requestTimeout)
+}
+
+func NewHTTPClientWithTimeout(timeout time.Duration) *HTTPClient {
 	return &HTTPClient{
 		client: &http.Client{
-			Timeout: requestTimeout,
+			Timeout: timeout,
 		},
 		maxRetries: maxNumOfRequestRetries,
 	}
@@ -65,6 +73,7 @@ func NewHTTPClientWithDetailedTimeouts(
 // If etag is not empty, it will add an If-None-Match header to the request
 // If the server responds with a 304 status code (`http.StatusNotModified`), it will return an empty body and the same etag
 func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl.Values, creds *BasicCreds, etag string) (body []byte, newEtag string, err error) {
+	startTime := time.Now()
 	if len(params) > 0 {
 		url = url + "?" + params.Encode()
 	}
@@ -72,6 +81,9 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 	var req *http.Request
 	req, err = http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
+		logutils.ZapLogger().Debug("Failed to create GET request",
+			zap.String("url", url),
+			zap.Error(err))
 		return
 	}
 
@@ -87,18 +99,28 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 
 	var resp *http.Response
 	maxRetries := c.maxRetries
-	if maxRetries <= 0 {
+	if maxRetries < 0 {
 		maxRetries = maxNumOfRequestRetries // Use default if not set
 	}
 
+	var retryCount int
 	for i := 0; i < maxRetries; i++ {
+		retryCount = i
 		resp, err = c.client.Do(req)
 		if err == nil || i == maxRetries-1 {
 			break
 		}
+		logutils.ZapLogger().Debug("Retrying GET request after error",
+			zap.String("url", url),
+			zap.Int("retry", i+1),
+			zap.Error(err))
 		time.Sleep(200 * time.Millisecond)
 	}
 	if err != nil {
+		logutils.ZapLogger().Debug("GET request failed after retries",
+			zap.String("url", url),
+			zap.Int("retries", retryCount),
+			zap.Error(err))
 		return
 	}
 	defer resp.Body.Close()
@@ -111,8 +133,19 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 
 	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
+		logutils.ZapLogger().Debug("Failed to read GET response body",
+			zap.String("url", url),
+			zap.Error(err))
 		return
 	}
+
+	duration := time.Since(startTime)
+	logutils.ZapLogger().Debug("GET request completed",
+		zap.String("url", url),
+		zap.Int("status", resp.StatusCode),
+		zap.Int("retries", retryCount),
+		zap.Int("bodySize", len(body)),
+		zap.Duration("duration", duration))
 
 	return
 }
@@ -122,7 +155,6 @@ func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl
 	body, _, err = c.doGetRequest(ctx, url, params, nil, "")
 	return
 }
-
 // DoGetRequestWithCredentials performs a GET request with the given URL and parameters
 // If creds is not nil, it will add basic auth to the request
 func (c *HTTPClient) DoGetRequestWithCredentials(ctx context.Context, url string, params netUrl.Values, creds *BasicCreds) (body []byte, err error) {
@@ -136,7 +168,6 @@ func (c *HTTPClient) DoGetRequestWithCredentials(ctx context.Context, url string
 func (c *HTTPClient) DoGetRequestWithEtag(ctx context.Context, url string, params netUrl.Values, etag string) (body []byte, newEtag string, err error) {
 	return c.doGetRequest(ctx, url, params, nil, etag)
 }
-
 func (c *HTTPClient) DoPostRequest(ctx context.Context, url string, params map[string]interface{}, creds *BasicCreds) ([]byte, error) {
 	jsonData, err := json.Marshal(params)
 	if err != nil {
