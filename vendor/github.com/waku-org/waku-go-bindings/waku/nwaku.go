@@ -56,15 +56,6 @@ package waku
 	// resp must be set != NULL in case interest on retrieving data from the callback
 	void GoCallback(int ret, char* msg, size_t len, void* resp);
 
-	#define WAKU_CALL(call)                                                        \
-	do {                                                                           \
-		int ret = call;                                                            \
-		if (ret != 0) {                                                            \
-			printf("Failed the call to: %s. Returned code: %d\n", #call, ret);     \
-			exit(1);                                                               \
-		}                                                                          \
-	} while (0)
-
 	static void* cGoWakuNew(const char* configJson, void* resp) {
 		// We pass NULL because we are not interested in retrieving data from this callback
 		void* ret = waku_new(configJson, (WakuCallBack) GoCallback, resp);
@@ -72,27 +63,27 @@ package waku
 	}
 
 	static void cGoWakuStart(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_start(wakuCtx, (WakuCallBack) GoCallback, resp));
+		waku_start(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuStop(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_stop(wakuCtx, (WakuCallBack) GoCallback, resp));
+		waku_stop(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuDestroy(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_destroy(wakuCtx, (WakuCallBack) GoCallback, resp));
+		waku_destroy(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuStartDiscV5(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_start_discv5(wakuCtx, (WakuCallBack) GoCallback, resp));
+		waku_start_discv5(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuStopDiscV5(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_stop_discv5(wakuCtx, (WakuCallBack) GoCallback, resp));
+		waku_stop_discv5(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuVersion(void* wakuCtx, void* resp) {
-		WAKU_CALL(waku_version(wakuCtx, (WakuCallBack) GoCallback, resp));
+		waku_version(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuSetEventCallback(void* wakuCtx) {
@@ -118,21 +109,21 @@ package waku
 							char* encoding,
 							void* resp) {
 
-		WAKU_CALL( waku_content_topic(wakuCtx,
+		waku_content_topic(wakuCtx,
 							appName,
 							appVersion,
 							contentTopicName,
 							encoding,
 							(WakuCallBack) GoCallback,
-							resp) );
+							resp);
 	}
 
 	static void cGoWakuPubsubTopic(void* wakuCtx, char* topicName, void* resp) {
-		WAKU_CALL( waku_pubsub_topic(wakuCtx, topicName, (WakuCallBack) GoCallback, resp) );
+		waku_pubsub_topic(wakuCtx, topicName, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuDefaultPubsubTopic(void* wakuCtx, void* resp) {
-		WAKU_CALL (waku_default_pubsub_topic(wakuCtx, (WakuCallBack) GoCallback, resp));
+		waku_default_pubsub_topic(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuRelayPublish(void* wakuCtx,
@@ -141,44 +132,44 @@ package waku
                        int timeoutMs,
 					   void* resp) {
 
-		WAKU_CALL (waku_relay_publish(wakuCtx,
+		waku_relay_publish(wakuCtx,
                        pubSubTopic,
                        jsonWakuMessage,
                        timeoutMs,
                        (WakuCallBack) GoCallback,
-                       resp));
+                       resp);
 	}
 
 	static void cGoWakuRelaySubscribe(void* wakuCtx, char* pubSubTopic, void* resp) {
-		WAKU_CALL ( waku_relay_subscribe(wakuCtx,
+		waku_relay_subscribe(wakuCtx,
 							pubSubTopic,
 							(WakuCallBack) GoCallback,
-							resp) );
+							resp);
 	}
 
 	static void cGoWakuRelayAddProtectedShard(void* wakuCtx, int clusterId, int shardId, char* publicKey, void* resp) {
-		WAKU_CALL ( waku_relay_add_protected_shard(wakuCtx,
+		waku_relay_add_protected_shard(wakuCtx,
 							clusterId,
 							shardId,
 							publicKey,
 							(WakuCallBack) GoCallback,
-							resp) );
+							resp);
 	}
 
 	static void cGoWakuRelayUnsubscribe(void* wakuCtx, char* pubSubTopic, void* resp) {
 
-		WAKU_CALL ( waku_relay_unsubscribe(wakuCtx,
+		waku_relay_unsubscribe(wakuCtx,
 							pubSubTopic,
 							(WakuCallBack) GoCallback,
-							resp) );
+							resp);
 	}
 
 	static void cGoWakuConnect(void* wakuCtx, char* peerMultiAddr, int timeoutMs, void* resp) {
-		WAKU_CALL( waku_connect(wakuCtx,
+		waku_connect(wakuCtx,
 						peerMultiAddr,
 						timeoutMs,
 						(WakuCallBack) GoCallback,
-						resp) );
+						resp);
 	}
 
 	static void cGoWakuDialPeer(void* wakuCtx,
@@ -187,12 +178,12 @@ package waku
 									int timeoutMs,
 									void* resp) {
 
-		WAKU_CALL( waku_dial_peer(wakuCtx,
+		waku_dial_peer(wakuCtx,
 						peerMultiAddr,
 						protocol,
 						timeoutMs,
 						(WakuCallBack) GoCallback,
-						resp) );
+						resp);
 	}
 
 	static void cGoWakuDialPeerById(void* wakuCtx,
@@ -201,51 +192,51 @@ package waku
 									int timeoutMs,
 									void* resp) {
 
-		WAKU_CALL( waku_dial_peer_by_id(wakuCtx,
+		waku_dial_peer_by_id(wakuCtx,
 						peerId,
 						protocol,
 						timeoutMs,
 						(WakuCallBack) GoCallback,
-						resp) );
+						resp);
 	}
 
 	static void cGoWakuDisconnectPeerById(void* wakuCtx, char* peerId, void* resp) {
-		WAKU_CALL( waku_disconnect_peer_by_id(wakuCtx,
+		waku_disconnect_peer_by_id(wakuCtx,
 						peerId,
 						(WakuCallBack) GoCallback,
-						resp) );
+						resp);
 	}
 
 	static void cGoWakuListenAddresses(void* wakuCtx, void* resp) {
-		WAKU_CALL (waku_listen_addresses(wakuCtx, (WakuCallBack) GoCallback, resp) );
+		waku_listen_addresses(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuGetMyENR(void* ctx, void* resp) {
-		WAKU_CALL (waku_get_my_enr(ctx, (WakuCallBack) GoCallback, resp) );
+		waku_get_my_enr(ctx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuGetMyPeerId(void* ctx, void* resp) {
-		WAKU_CALL (waku_get_my_peerid(ctx, (WakuCallBack) GoCallback, resp) );
+		waku_get_my_peerid(ctx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuPingPeer(void* ctx, char* peerAddr, int timeoutMs, void* resp) {
-		WAKU_CALL (waku_ping_peer(ctx, peerAddr, timeoutMs, (WakuCallBack) GoCallback, resp) );
+		waku_ping_peer(ctx, peerAddr, timeoutMs, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuGetNumPeersInMesh(void* ctx, char* pubSubTopic, void* resp) {
-		WAKU_CALL (waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp) );
+		waku_relay_get_num_peers_in_mesh(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuGetNumConnectedRelayPeers(void* ctx, char* pubSubTopic, void* resp) {
-		WAKU_CALL (waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp) );
+		waku_relay_get_num_connected_peers(ctx, pubSubTopic, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuGetConnectedPeers(void* wakuCtx, void* resp) {
-		WAKU_CALL (waku_get_connected_peers(wakuCtx, (WakuCallBack) GoCallback, resp) );
+		waku_get_connected_peers(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuGetPeerIdsFromPeerStore(void* wakuCtx, void* resp) {
-		WAKU_CALL (waku_get_peerids_from_peerstore(wakuCtx, (WakuCallBack) GoCallback, resp) );
+		waku_get_peerids_from_peerstore(wakuCtx, (WakuCallBack) GoCallback, resp);
 	}
 
 	static void cGoWakuLightpushPublish(void* wakuCtx,
@@ -253,11 +244,11 @@ package waku
 					const char* jsonWakuMessage,
 					void* resp) {
 
-		WAKU_CALL (waku_lightpush_publish(wakuCtx,
+		waku_lightpush_publish(wakuCtx,
 						pubSubTopic,
 						jsonWakuMessage,
 						(WakuCallBack) GoCallback,
-						resp));
+						resp);
 	}
 
 	static void cGoWakuStoreQuery(void* wakuCtx,
@@ -266,32 +257,32 @@ package waku
 					int timeoutMs,
 					void* resp) {
 
-		WAKU_CALL (waku_store_query(wakuCtx,
-									jsonQuery,
-									peerAddr,
-									timeoutMs,
-									(WakuCallBack) GoCallback,
-									resp));
+		waku_store_query(wakuCtx,
+					jsonQuery,
+					peerAddr,
+					timeoutMs,
+					(WakuCallBack) GoCallback,
+					resp);
 	}
 
 	static void cGoWakuPeerExchangeQuery(void* wakuCtx,
 								uint64_t numPeers,
 								void* resp) {
 
-		WAKU_CALL (waku_peer_exchange_request(wakuCtx,
+		waku_peer_exchange_request(wakuCtx,
 									numPeers,
 									(WakuCallBack) GoCallback,
-									resp));
+									resp);
 	}
 
 	static void cGoWakuGetPeerIdsByProtocol(void* wakuCtx,
 									 const char* protocol,
 									 void* resp) {
 
-		WAKU_CALL (waku_get_peerids_by_protocol(wakuCtx,
+		waku_get_peerids_by_protocol(wakuCtx,
 									protocol,
 									(WakuCallBack) GoCallback,
-									resp));
+									resp);
 	}
 
 	static void cGoWakuDnsDiscovery(void* wakuCtx,
@@ -300,12 +291,12 @@ package waku
 									 int timeoutMs,
 									 void* resp) {
 
-		WAKU_CALL (waku_dns_discovery(wakuCtx,
-									entTreeUrl,
-									nameDnsServer,
-									timeoutMs,
-									(WakuCallBack) GoCallback,
-									resp));
+		waku_dns_discovery(wakuCtx,
+							entTreeUrl,
+							nameDnsServer,
+							timeoutMs,
+							(WakuCallBack) GoCallback,
+							resp);
 	}
 
 */
@@ -325,7 +316,6 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/peer"
 	libp2pproto "github.com/libp2p/go-libp2p/core/protocol"
@@ -333,7 +323,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"github.com/waku-org/waku-go-bindings/waku/common"
-	"go.uber.org/zap"
 )
 
 const requestTimeout = 30 * time.Second
@@ -436,11 +425,12 @@ func globalEventCallback(callerRet C.int, msg *C.char, len C.size_t, userData un
 			node.OnEvent(eventStr)
 		}
 	} else {
-		errMsgField := zap.Skip()
 		if len != 0 {
-			errMsgField = zap.String("error", C.GoStringN(msg, C.int(len)))
+			errMsg := C.GoStringN(msg, C.int(len))
+			Error("globalEventCallback retCode not ok, retCode: %v: %v", callerRet, errMsg)
+		} else {
+			Error("globalEventCallback retCode not ok, retCode: %v", callerRet)
 		}
-		log.Error("globalEventCallback retCode not ok", zap.Int("retCode", int(callerRet)), errMsgField)
 	}
 }
 
@@ -580,7 +570,7 @@ func (n *WakuNode) GetConnectedPeers() (peer.IDSlice, error) {
 	if C.getRet(resp) == C.RET_OK {
 		peersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		if peersStr == "" {
-			Debug("No connected peers found for " + n.nodeName)
+			Debug("No connected peers found for %v", n.nodeName)
 			return nil, nil
 		}
 
@@ -589,18 +579,18 @@ func (n *WakuNode) GetConnectedPeers() (peer.IDSlice, error) {
 		for _, peerID := range peerIDs {
 			id, err := peer.Decode(peerID)
 			if err != nil {
-				Error("Failed to decode peer ID for "+n.nodeName, zap.Error(err))
+				Error("Failed to decode peer ID for %v: %v", n.nodeName, err)
 				return nil, err
 			}
 			peers = append(peers, id)
 		}
 
-		Debug("Successfully fetched connected peers for "+n.nodeName, zap.Int("count", len(peers)))
+		Debug("Successfully fetched connected peers for %v, count: %v", n.nodeName, len(peers))
 		return peers, nil
 	}
 
 	errMsg := "error GetConnectedPeers: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	Error("Failed to get connected peers for "+n.nodeName, zap.String("error", errMsg))
+	Error("Failed to get connected peers for %v: %v", n.nodeName, errMsg)
 
 	return nil, errors.New(errMsg)
 }
@@ -627,11 +617,13 @@ func (n *WakuNode) RelaySubscribe(pubsubTopic string) error {
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
+		Debug("Successfully subscribed to relay on node %s, pubsubTopic: %s", n.nodeName, pubsubTopic)
 		return nil
 	}
 
-	errMsg := "error WakuRelaySubscribe: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to subscribe to relay on node %s, pubsubTopic: %s, error: %v", n.nodeName, pubsubTopic, errMsg)
+	return errors.New("error WakuRelaySubscribe: " + errMsg)
 }
 
 func (n *WakuNode) RelayAddProtectedShard(clusterId uint16, shardId uint16, pubkey *ecdsa.PublicKey) error {
@@ -667,7 +659,9 @@ func (n *WakuNode) RelayAddProtectedShard(clusterId uint16, shardId uint16, pubk
 
 func (n *WakuNode) RelayUnsubscribe(pubsubTopic string) error {
 	if pubsubTopic == "" {
-		return errors.New("pubsub topic is empty")
+		err := errors.New("pubsub topic is empty")
+		Error("Failed to unsubscribe from relay: %v", err)
+		return err
 	}
 
 	wg := sync.WaitGroup{}
@@ -683,15 +677,19 @@ func (n *WakuNode) RelayUnsubscribe(pubsubTopic string) error {
 	}
 
 	wg.Add(1)
+	Debug("Attempting to unsubscribe from relay on node %s, pubsubTopic: %s", n.nodeName, pubsubTopic)
 	C.cGoWakuRelayUnsubscribe(n.wakuCtx, cPubsubTopic, resp)
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
+
+		Debug("Successfully unsubscribed from relay on node %s, pubsubTopic: %s", n.nodeName, pubsubTopic)
 		return nil
 	}
 
-	errMsg := "error WakuRelayUnsubscribe: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	return errors.New(errMsg)
+	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to unsubscribe from relay on node %s, pubsubTopic: %s, error: %v", n.nodeName, pubsubTopic, errMsg)
+	return errors.New("error WakuRelayUnsubscribe: " + errMsg)
 }
 
 func (n *WakuNode) PeerExchangeRequest(numPeers uint64) (uint64, error) {
@@ -707,16 +705,20 @@ func (n *WakuNode) PeerExchangeRequest(numPeers uint64) (uint64, error) {
 		numRecvPeersStr := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 		numRecvPeers, err := strconv.ParseUint(numRecvPeersStr, 10, 64)
 		if err != nil {
+			Error("Failed to parse number of received peers: %v", err)
 			return 0, err
 		}
 		return numRecvPeers, nil
 	}
 
 	errMsg := C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("PeerExchangeRequest failed: %v", errMsg)
 	return 0, errors.New(errMsg)
 }
 
 func (n *WakuNode) StartDiscV5() error {
+
+	Debug("Starting DiscV5 for node: %s", n.nodeName)
 	wg := sync.WaitGroup{}
 
 	var resp = C.allocResp(unsafe.Pointer(&wg))
@@ -726,9 +728,11 @@ func (n *WakuNode) StartDiscV5() error {
 	C.cGoWakuStartDiscV5(n.wakuCtx, resp)
 	wg.Wait()
 	if C.getRet(resp) == C.RET_OK {
+		Debug("Successfully started DiscV5 for node: %s", n.nodeName)
 		return nil
 	}
 	errMsg := "error WakuStartDiscV5: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to start DiscV5 for node %s: %v", n.nodeName, errMsg)
 	return errors.New(errMsg)
 }
 
@@ -743,9 +747,11 @@ func (n *WakuNode) StopDiscV5() error {
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
+		Debug("Successfully stopped DiscV5 for node: %s", n.nodeName)
 		return nil
 	}
 	errMsg := "error WakuStopDiscV5: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to stop DiscV5 for node %s: %v", n.nodeName, errMsg)
 	return errors.New(errMsg)
 }
 
@@ -761,11 +767,13 @@ func (n *WakuNode) Version() (string, error) {
 
 	if C.getRet(resp) == C.RET_OK {
 		var version = C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+		Debug("Successfully fetched Waku version for node %s: %s", n.nodeName, version)
 		return version, nil
 	}
 
 	errMsg := "error WakuVersion: " +
 		C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
+	Error("Failed to fetch Waku version for node %s: %v", n.nodeName, errMsg)
 	return "", errors.New(errMsg)
 }
 
@@ -840,6 +848,29 @@ func (n *WakuNode) RelayPublish(ctx context.Context, message *pb.WakuMessage, pu
 	}
 	errMsg := "WakuRelayPublish: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
 	return common.MessageHash(""), errors.New(errMsg)
+}
+
+func (n *WakuNode) RelayPublishNoCTX(pubsubTopic string, message *pb.WakuMessage) (common.MessageHash, error) {
+	if n == nil {
+		err := errors.New("cannot publish message; node is nil")
+		Error("Failed to publish message via relay: %v", err)
+		return "", err
+	}
+
+	// Handling context internally with a timeout
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	Debug("Attempting to publish message via relay on node %s", n.nodeName)
+
+	msgHash, err := n.RelayPublish(ctx, message, pubsubTopic)
+	if err != nil {
+		Error("Failed to publish message via relay on node %s: %v", n.nodeName, err)
+		return "", err
+	}
+
+	Debug("Successfully published message via relay on node %s, messageHash: %s", n.nodeName, msgHash.String())
+	return msgHash, nil
 }
 
 func (n *WakuNode) DnsDiscovery(ctx context.Context, enrTreeUrl string, nameDnsServer string) ([]multiaddr.Multiaddr, error) {
@@ -966,12 +997,12 @@ func (n *WakuNode) Destroy() error {
 	wg.Wait()
 
 	if C.getRet(resp) == C.RET_OK {
-		Debug("Successfully destroyed " + n.nodeName)
+		Debug("Successfully destroyed %s", n.nodeName)
 		return nil
 	}
 
 	errMsg := "error WakuDestroy: " + C.GoStringN(C.getMyCharPtr(resp), C.int(C.getMyCharLen(resp)))
-	Error("Failed to destroy "+n.nodeName, zap.String("error", errMsg))
+	Error("Failed to destroy %v: %v", n.nodeName, errMsg)
 
 	return errors.New(errMsg)
 }
@@ -1215,7 +1246,7 @@ func (n *WakuNode) GetNumConnectedPeers() (int, error) {
 	}
 
 	numPeers := len(peers)
-	Debug("Successfully fetched number of connected peers for "+n.nodeName, zap.Int("count", numPeers))
+	Debug("Successfully fetched number of connected peers for %v, count: %v", n.nodeName, numPeers)
 
 	return numPeers, nil
 }
@@ -1237,7 +1268,7 @@ func GetFreePortIfNeeded(tcpPort int, discV5UDPPort int) (int, int, error) {
 		for i := 0; i < 10; i++ {
 			tcpAddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("localhost", "0"))
 			if err != nil {
-				Warn("unable to resolve tcp addr: %v", zap.Error(err))
+				Warn("unable to resolve tcp addr: %v", err)
 				continue
 			}
 			tcpListener, err := net.ListenTCP("tcp", tcpAddr)
@@ -1294,6 +1325,19 @@ func StartWakuNode(nodeName string, customCfg *common.WakuConfig) (*WakuNode, er
 		nodeCfg = *customCfg
 	}
 
+	tcpPort, udpPort, err := GetFreePortIfNeeded(nodeCfg.TcpPort, nodeCfg.Discv5UdpPort)
+	if err != nil {
+		Error("Failed to allocate unique ports: %v", err)
+		tcpPort, udpPort = 0, 0
+	}
+
+	if nodeCfg.TcpPort == 0 {
+		nodeCfg.TcpPort = tcpPort
+	}
+	if nodeCfg.Discv5UdpPort == 0 {
+		nodeCfg.Discv5UdpPort = udpPort
+	}
+
 	Debug("Creating %s", nodeName)
 	node, err := NewWakuNode(&nodeCfg, nodeName)
 	if err != nil {
@@ -1312,6 +1356,7 @@ func StartWakuNode(nodeName string, customCfg *common.WakuConfig) (*WakuNode, er
 }
 
 func (n *WakuNode) StopAndDestroy() error {
+	Debug("Stopping and destroying Node")
 	if n == nil {
 		err := errors.New("waku node is nil")
 		Error("Failed to stop and destroy: %v", err)
