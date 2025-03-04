@@ -18,7 +18,9 @@ prepare:
 	@echo "Cloning nwaku repository..."
 	@if [ ! -d "$(NWAKU_DIR)" ]; then \
 		cd $(THIRD_PARTY_DIR) && \
-		git clone $(NWAKU_REPO); \
+		git clone $(NWAKU_REPO) && \
+		cd $(NWAKU_DIR) && \
+		make update; \
 	else \
 		echo "nwaku repository already exists."; \
 	fi
