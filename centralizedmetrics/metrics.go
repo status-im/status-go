@@ -15,8 +15,9 @@ import (
 const defaultPollInterval = 10 * time.Second
 
 type MetricsInfo struct {
-	Enabled       bool `json:"enabled"`
-	UserConfirmed bool `json:"userConfirmed"`
+	Enabled       bool   `json:"enabled"`
+	UserConfirmed bool   `json:"userConfirmed"`
+	UserID        string `json:"userID"`
 }
 
 type MetricRepository interface {
