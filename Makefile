@@ -150,7 +150,7 @@ LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwa
 $(LIBWAKU):
 ifeq ($(USE_NWAKU),true)
 	@echo "Building libwaku"
-	@(cd $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku && $(MAKE))
+	$(MAKE) -C $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/waku SHELL=/bin/bash
 endif
 
 statusgo: ##@build Build status-go as statusd server
