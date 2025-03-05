@@ -211,7 +211,9 @@ func (s *NTPTimeSource) UpdateOffset() error {
 	s.timeDataMu.Lock()
 	defer s.timeDataMu.Unlock()
 	s.latestOffset = offset
-
+	//TBD: if we found offset is too large, we should notify user that system time might not be accurate via emit signal,
+	// and because go-waku doesn't use NTPTimeSource ATM (it just use time.Now()), this might be a problem for MissingMessageVerifier work normally.
+	// e.g. might get errInvalidTimeRange when validate StoreQueryRequest
 	return nil
 }
 
