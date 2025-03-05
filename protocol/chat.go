@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
+	"go.uber.org/zap"
 	"math/rand"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -413,12 +415,23 @@ func (c *Chat) NextClockAndTimestamp(timesource common.TimeSource) (uint64, uint
 }
 
 func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.TimeSource) error {
-	c.Timestamp = int64(timesource.GetCurrentTime())
+	currentTime := timesource.GetCurrentTime()
+
+	// validate use the time from our side to prevent time manipulation attack,
+	// such protect need NTP works well, e.g. get one correct offset at least or
+	// user device time is correct
+	if err := validateClockValue(message.Clock, currentTime); err != nil {
+		logutils.ZapLogger().Error("received a message that clock value is invalid", zap.Uint64("message clock", message.Clock),zap.Uint64("currentTime", currentTime), zap.Error(err))
+		return err
+	}
+
+	c.Timestamp = int64(currentTime)
 
 	// If the clock of the last message is lower, we set the message
 	if c.LastMessage == nil || c.LastMessage.Clock <= message.Clock {
 		c.LastMessage = message
 	}
+
 	// If the clock is higher we set the clock
 	if c.LastClockValue < message.Clock {
 		c.LastClockValue = message.Clock
