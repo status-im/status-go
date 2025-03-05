@@ -261,17 +261,18 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 		tc.responses[i] = queryResponse{Offset: responseOffset}
 	}
 
+	currentTime := time.Now()
 	ts := NTPTimeSource{
 		servers:           tc.servers,
 		allowedFailures:   tc.allowedFailures,
 		timeQuery:         tc.query,
 		slowNTPSyncPeriod: SlowNTPSyncPeriod,
 		now: func() time.Time {
-			return time.Unix(1, 0)
+			return currentTime
 		},
 	}
 
-	expectedTime := uint64(11000)
+	expectedTime := convertToMillis(currentTime.Add(responseOffset))
 	n := ts.GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
 	// test repeat invoke GetCurrentTimeInMillis
@@ -304,4 +305,281 @@ func TestGetCurrentTimeOffline(t *testing.T) {
 	// when GetCurrentTime() is invoked more than once when offline
 	_ = ts.GetCurrentTime()
 	_ = ts.GetCurrentTime()
+}
+
+func TestSystemTimeChangeDetection(t *testing.T) {
+	// Create a controlled time source with fixed time
+	currentTime := time.Now()
+	timeJump := 2 * time.Second // Greater than TimeChangeThreshold (1s)
+
+	// Track timeQuery calls (which indicates UpdateOffset was called)
+	timeQueryCalled := 0
+
+	testOffset := 500 * time.Millisecond
+
+	// Mock time function that returns our controlled time
+	mockTimeNow := func() time.Time {
+		return currentTime
+	}
+
+	// Create a time source with our mocks
+	ts := &NTPTimeSource{
+		servers:           []string{"test-server"},
+		allowedFailures:   0,
+		fastNTPSyncPeriod: 1 * time.Hour,
+		slowNTPSyncPeriod: 1 * time.Hour,
+		now:               mockTimeNow,
+		quit:              make(chan struct{}),
+	}
+
+	// Set up the timeQuery function to track calls
+	ts.timeQuery = func(string, ntp.QueryOptions) (*ntp.Response, error) {
+		timeQueryCalled++
+		return &ntp.Response{
+			ClockOffset: testOffset,
+			Stratum:     1,
+		}, nil
+	}
+
+	// Initialize time tracking fields
+	ts.latestOffset = testOffset
+	ts.lastMonotonic = currentTime
+	ts.lastWallTime = currentTime
+
+	// Test case 1: No time change
+	// -------------------------------------------------------------------------
+	// Reset the counter before this test case
+	timeQueryCalled = 0
+
+	time1 := ts.Now()
+	assert.Equal(t, currentTime.Add(testOffset), time1,
+		"Time should be adjusted by offset with no time change")
+	assert.Equal(t, currentTime, ts.lastMonotonic,
+		"lastMonotonic should be updated after Now() call")
+	assert.Equal(t, currentTime, ts.lastWallTime,
+		"lastWallTime should be updated after Now() call")
+	assert.Equal(t, 0, timeQueryCalled,
+		"UpdateOffset should not be called when no time change is detected")
+
+	// Test case 2: Small time change (below threshold)
+	// -------------------------------------------------------------------------
+	// Reset the counter before this test case
+	timeQueryCalled = 0
+
+	// Advance time by a small amount
+	oldTime := currentTime
+	currentTime = currentTime.Add(500 * time.Millisecond) // Below TimeChangeThreshold (1s)
+
+	// Set time tracking fields to simulate a small time difference
+	ts.lastMonotonic = oldTime
+	ts.lastWallTime = oldTime
+
+	// Call Now() with small time change
+	time2 := ts.Now()
+	assert.Equal(t, currentTime.Add(testOffset), time2,
+		"Time should be adjusted by offset with small time change")
+	assert.Equal(t, oldTime, ts.lastMonotonic,
+		"lastMonotonic should be updated after small time change")
+	assert.Equal(t, oldTime, ts.lastWallTime,
+		"lastWallTime should be updated after small time change")
+	assert.Equal(t, 0, timeQueryCalled,
+		"UpdateOffset should not be called when time change is below threshold")
+
+	// Test case 3: Large backward time change
+	// -------------------------------------------------------------------------
+	// Reset the counter before this test case
+	timeQueryCalled = 0
+
+	// Advance time significantly
+	oldTime = currentTime
+	currentTime = currentTime.Add(1 * time.Minute)
+
+	// Simulate wall clock being set backward
+	ts.lastMonotonic = oldTime
+	ts.lastWallTime = oldTime.Add(-timeJump)
+
+	// Call Now() which should detect the time change
+	time3 := ts.Now()
+	assert.Equal(t, currentTime.Add(testOffset), time3,
+		"Time should be adjusted by offset after backward time change")
+	assert.Equal(t, currentTime, ts.lastMonotonic,
+		"lastMonotonic should be updated after backward time change")
+	assert.Equal(t, currentTime, ts.lastWallTime,
+		"lastWallTime should be updated after backward time change")
+	assert.Equal(t, 1, timeQueryCalled,
+		"UpdateOffset should be called when backward time change is detected")
+
+	// Test case 4: Large forward time change
+	// -------------------------------------------------------------------------
+	// Reset the counter before this test case
+	timeQueryCalled = 0
+
+	// Advance time significantly
+	oldTime = currentTime
+	currentTime = currentTime.Add(1 * time.Minute)
+
+	// Simulate wall clock being set forward
+	ts.lastMonotonic = oldTime
+	ts.lastWallTime = oldTime.Add(timeJump)
+
+	// Call Now() which should detect the time change
+	time4 := ts.Now()
+	assert.Equal(t, currentTime.Add(testOffset), time4,
+		"Time should be adjusted by offset after forward time change")
+	assert.Equal(t, currentTime, ts.lastMonotonic,
+		"lastMonotonic should be updated after forward time change")
+	assert.Equal(t, currentTime, ts.lastWallTime,
+		"lastWallTime should be updated after forward time change")
+	assert.Equal(t, 1, timeQueryCalled,
+		"UpdateOffset should be called when forward time change is detected")
+}
+
+func TestTimeTrackingInitialization(t *testing.T) {
+	// Create a fixed time for testing
+	fixedTime := time.Now()
+
+	// Create a mock time function that returns our fixed time
+	mockTimeNow := func() time.Time {
+		return fixedTime
+	}
+
+	// Create a mock query function that always succeeds
+	mockQuery := func(string, ntp.QueryOptions) (*ntp.Response, error) {
+		return &ntp.Response{
+			ClockOffset: 100 * time.Millisecond,
+			Stratum:     1,
+		}, nil
+	}
+
+	// Create the time source with our controlled functions
+	ts := &NTPTimeSource{
+		servers:           mockedServers,
+		allowedFailures:   DefaultMaxAllowedFailures,
+		fastNTPSyncPeriod: 1 * time.Hour, // Use long periods to avoid actual periodic updates during test
+		slowNTPSyncPeriod: 1 * time.Hour,
+		timeQuery:         mockQuery,
+		now:               mockTimeNow,
+		quit:              make(chan struct{}),
+	}
+
+	// Verify that time tracking fields are initially zero
+	assert.True(t, ts.lastMonotonic.IsZero(), "lastMonotonic should be zero before Start()")
+	assert.True(t, ts.lastWallTime.IsZero(), "lastWallTime should be zero before Start()")
+
+	// Start the time source
+	ts.Start()
+	// Fix: Handle error from Stop in defer
+	defer func() {
+		err := ts.Stop()
+		assert.NoError(t, err, "Stop should not return an error")
+	}()
+
+	// Verify that time tracking fields are initialized
+	assert.Equal(t, fixedTime, ts.lastMonotonic, "lastMonotonic should be initialized to current time")
+	assert.Equal(t, fixedTime, ts.lastWallTime, "lastWallTime should be initialized to current time")
+
+	// Verify that the time source is marked as started
+	assert.True(t, ts.started, "Time source should be marked as started")
+}
+
+func TestTimeChangeDetectionSkippedWhenNotInitialized(t *testing.T) {
+	// Create a fixed time for testing
+	fixedTime := time.Now()
+
+	var offsetUpdateAttempted bool
+
+	// Create a mock time function that returns our fixed time
+	mockTimeNow := func() time.Time {
+		return fixedTime
+	}
+
+	// Create a mock query function that tracks if it was called
+	mockQuery := func(string, ntp.QueryOptions) (*ntp.Response, error) {
+		offsetUpdateAttempted = true
+		return &ntp.Response{
+			ClockOffset: 100 * time.Millisecond,
+			Stratum:     1,
+		}, nil
+	}
+
+	// Create the time source with our controlled functions
+	ts := &NTPTimeSource{
+		servers:           mockedServers,
+		allowedFailures:   DefaultMaxAllowedFailures,
+		fastNTPSyncPeriod: 1 * time.Hour,
+		slowNTPSyncPeriod: 1 * time.Hour,
+		timeQuery:         mockQuery,
+		now:               mockTimeNow,
+		latestOffset:      50 * time.Millisecond, // Set an initial offset
+	}
+
+	// Ensure time tracking fields are zero (not initialized)
+	assert.True(t, ts.lastMonotonic.IsZero(), "lastMonotonic should be zero initially")
+	assert.True(t, ts.lastWallTime.IsZero(), "lastWallTime should be zero initially")
+
+	// Call Now() which should skip time change detection
+	result := ts.Now()
+
+	// Verify that the result is correctly adjusted by the offset
+	expectedTime := fixedTime.Add(ts.latestOffset)
+	assert.Equal(t, expectedTime, result, "Time should be adjusted by offset")
+
+	// Verify that UpdateOffset was not called
+	assert.False(t, offsetUpdateAttempted, "UpdateOffset should not be called when time tracking is not initialized")
+}
+
+func TestTimeChangeDetectionWithUpdateFailure(t *testing.T) {
+	// Create a controlled time source for testing
+	var (
+		currentTime = time.Now()
+		mockOffset  = 500 * time.Millisecond
+		timeJump    = 2 * time.Second // Greater than TimeChangeThreshold (1s)
+	)
+
+	// Create a mock time function that we can control
+	mockTimeNow := func() time.Time {
+		return currentTime
+	}
+
+	// Create a mock query function that always fails
+	mockQuery := func(string, ntp.QueryOptions) (*ntp.Response, error) {
+		return nil, errors.New("network error")
+	}
+
+	// Create the time source with our controlled functions
+	ts := &NTPTimeSource{
+		servers:           mockedServers,
+		allowedFailures:   DefaultMaxAllowedFailures,
+		fastNTPSyncPeriod: 1 * time.Hour,
+		slowNTPSyncPeriod: 1 * time.Hour,
+		timeQuery:         mockQuery,
+		now:               mockTimeNow,
+		latestOffset:      mockOffset, // Set an initial offset
+	}
+
+	// Initialize the time tracking fields
+	ts.lastMonotonic = currentTime
+	ts.lastWallTime = currentTime
+
+	// First call to Now() with no time change
+	time1 := ts.Now()
+	assert.Equal(t, currentTime.Add(mockOffset), time1, "Time should be adjusted by offset")
+
+	// Simulate a time change
+	oldTime := currentTime
+	currentTime = currentTime.Add(1 * time.Minute) // Advance current time by 1 minute
+
+	// Set lastMonotonic to simulate that more time has passed in reality
+	ts.lastMonotonic = oldTime
+	ts.lastWallTime = oldTime.Add(-timeJump) // Wall time appears to have gone backward
+
+	// Call Now() which should detect the time change and attempt to update offset
+	time2 := ts.Now()
+
+	// Even though UpdateOffset fails, Now() should still return a time adjusted by the previous offset
+	assert.Equal(t, currentTime.Add(mockOffset), time2, "Time should still be adjusted by original offset after failed update")
+
+	// Verify that the time tracking fields are updated even when UpdateOffset fails
+	assert.Equal(t, currentTime, ts.lastMonotonic, "lastMonotonic should be updated even when UpdateOffset fails")
+	assert.Equal(t, currentTime, ts.lastWallTime, "lastWallTime should be updated even when UpdateOffset fails")
 }

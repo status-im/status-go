@@ -28,6 +28,10 @@ const (
 
 	// DefaultRPCTimeout defines write deadline for single ntp server request.
 	DefaultRPCTimeout = 2 * time.Second
+
+	// TimeChangeThreshold defines the minimum time difference that indicates
+	// system time has been changed. Values smaller than this are considered normal drift.
+	TimeChangeThreshold = 1 * time.Second
 )
 
 // defaultServers will be resolved to the closest available,
@@ -144,19 +148,57 @@ type NTPTimeSource struct {
 	timeQuery         ntpQuery // for ease of testing
 	now               func() time.Time
 
-	quit    chan struct{}
+	quit chan struct{}
+
+	stateMu sync.Mutex
 	started bool
 
-	mu           sync.RWMutex
-	latestOffset time.Duration
+	timeDataMu    sync.RWMutex
+	latestOffset  time.Duration
+	lastMonotonic time.Time
+	lastWallTime  time.Time
 }
 
 // Now returns time adjusted by latest known offset
+// and detects system time changes
 func (s *NTPTimeSource) Now() time.Time {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	n := s.now()
-	return n.Add(s.latestOffset)
+	s.timeDataMu.RLock()
+
+	currentTime := s.now()
+	adjustedTime := currentTime.Add(s.latestOffset)
+
+	// Skip time change detection if time tracking not initialized yet
+	if s.lastMonotonic.IsZero() {
+		s.timeDataMu.RUnlock()
+		return adjustedTime
+	}
+
+	// Check for time inconsistency
+	monotonicElapsed := time.Since(s.lastMonotonic)
+	wallClockElapsed := time.Duration(currentTime.UnixNano() - s.lastWallTime.UnixNano())
+	timeDiff := monotonicElapsed - wallClockElapsed
+
+	s.timeDataMu.RUnlock()
+
+	// If significant time change detected, update offset synchronously
+	if timeDiff.Abs() > TimeChangeThreshold {
+		logutils.ZapLogger().Warn("System time change detected",
+			zap.Duration("difference", timeDiff),
+			zap.Duration("threshold", TimeChangeThreshold))
+
+		// Synchronously update the NTP offset
+		if err := s.UpdateOffset(); err != nil {
+			logutils.ZapLogger().Error("Failed to update time offset after time change", zap.Error(err))
+		}
+
+		// Update the reference times only after significant time change
+		s.timeDataMu.Lock()
+		s.lastMonotonic = s.now()
+		s.lastWallTime = s.now()
+		s.timeDataMu.Unlock()
+	}
+
+	return adjustedTime
 }
 
 func (s *NTPTimeSource) UpdateOffset() error {
@@ -166,8 +208,8 @@ func (s *NTPTimeSource) UpdateOffset() error {
 		return errUpdateOffset
 	}
 	logutils.ZapLogger().Info("Difference with ntp servers", zap.Duration("offset", offset))
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.timeDataMu.Lock()
+	defer s.timeDataMu.Unlock()
 	s.latestOffset = offset
 
 	return nil
@@ -205,9 +247,16 @@ func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod 
 
 // Start initializes the local offset and starts a goroutine that periodically updates the local offset.
 func (s *NTPTimeSource) Start() {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 	if s.started {
 		return
 	}
+
+	// Initialize time tracking fields immediately
+	currentTime := s.now()
+	s.lastMonotonic = currentTime
+	s.lastWallTime = currentTime
 
 	// Attempt to update the offset synchronously so that user can have reliable messages right away
 	err := s.UpdateOffset()
