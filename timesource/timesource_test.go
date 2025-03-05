@@ -180,7 +180,7 @@ func TestNTPTimeSource(t *testing.T) {
 				now:             time.Now,
 			}
 			assert.WithinDuration(t, time.Now(), source.Now(), clockCompareDelta)
-			err := source.UpdateOffset()
+			err := source.updateOffset()
 			if tc.expectError {
 				assert.Equal(t, errUpdateOffset, err)
 			} else {
@@ -210,7 +210,7 @@ func TestRunningPeriodically(t *testing.T) {
 			now:               time.Now,
 		}
 		lastCall := time.Now()
-		// we're simulating a calls to UpdateOffset, testing ntp calls happens
+		// we're simulating a calls to updateOffset, testing ntp calls happens
 		// on NTPTimeSource specified periods (fastNTPSyncPeriod & slowNTPSyncPeriod)
 		wg := sync.WaitGroup{}
 		wg.Add(1)

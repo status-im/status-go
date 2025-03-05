@@ -8,20 +8,16 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/utils"
-	timesource2 "github.com/status-im/status-go/timesource"
 )
 
 var chatColors = []string{
@@ -404,34 +400,15 @@ func (c *Chat) updateChatFromGroupMembershipChanges(g *v1protocol.Group) {
 // NextClockAndTimestamp returns the next clock value
 // and the current timestamp
 func (c *Chat) NextClockAndTimestamp(timesource common.TimeSource) (uint64, uint64) {
-	clock, timestamp := c.calculateNextClock(timesource)
-
-	if err := ValidateClockValue(clock, timestamp); err != nil {
-		logutils.ZapLogger().Warn("detected invalid clock value, maybe caused by user set time manually",
-			zap.Uint64("clock", clock),
-			zap.Uint64("timestamp", timestamp),
-			zap.Error(err))
-
-		if err := timesource2.Default().UpdateOffset(); err == nil {
-			clock, timestamp = c.calculateNextClock(timesource)
-		}
-
-		// TODO: validate clock value again and return error if still invalid
-	}
-
-	c.LastClockValue = clock
-	return clock, timestamp
-}
-
-func (c *Chat) calculateNextClock(timesource common.TimeSource) (clock, timestamp uint64) {
-	timestamp = timesource.GetCurrentTime()
-	clock = c.LastClockValue
-
+	clock := c.LastClockValue
+	timestamp := timesource.GetCurrentTime()
 	if clock == 0 || clock < timestamp {
 		clock = timestamp
 	} else {
-		clock++
+		clock = clock + 1
 	}
+	c.LastClockValue = clock
+
 	return clock, timestamp
 }
 
