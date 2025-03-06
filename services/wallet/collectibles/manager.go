@@ -258,8 +258,9 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, c
 		return nil, cmdRes.Error()
 	}
 
+	var err error
 	assetContainer := cmdRes.Result()[0].(*thirdparty.FullCollectibleDataContainer)
-	_, err := o.processFullCollectibleData(ctx, assetContainer.Items, true)
+	_, assetContainer.Items, err = o.processFullCollectibleData(ctx, assetContainer.Items, true)
 	if err != nil {
 		return nil, err
 	}
@@ -309,12 +310,13 @@ func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommo
 	}
 
 	assetContainer := cmdRes.Result()[0].(*thirdparty.FullCollectibleDataContainer)
-	_, err := o.processFullCollectibleData(ctx, assetContainer.Items, true)
+	var err error
+	_, assetContainer.Items, err = o.processFullCollectibleData(ctx, assetContainer.Items, true)
 	if err != nil {
 		return nil, err
 	}
 
-	return assetContainer, nil
+	return assetContainer, err
 }
 
 func (o *Manager) FetchERC1155Balances(ctx context.Context, owner common.Address, chainID walletCommon.ChainID, contractAddress common.Address, tokenIDs []*bigint.BigInt) ([]*bigint.BigInt, error) {
@@ -457,7 +459,7 @@ func (o *Manager) FetchMissingAssetsByCollectibleUniqueID(ctx context.Context, u
 				return err
 			}
 
-			updatedCollectibles, err := o.processFullCollectibleData(ctx, fetchedAssets, asyncFetch)
+			updatedCollectibles, _, err := o.processFullCollectibleData(ctx, fetchedAssets, asyncFetch)
 			if err != nil {
 				logutils.ZapLogger().Error("processFullCollectibleData failed for",
 					zap.Stringer("chainID", chainID),
@@ -665,9 +667,11 @@ func isMetadataEmpty(asset thirdparty.CollectibleData) bool {
 // Processes collectible metadata obtained from a provider and ensures any missing data is fetched.
 // If asyncFetch is true, community collectibles metadata will be fetched async and an EventCollectiblesDataUpdated will be sent when the data is ready.
 // If asyncFetch is false, it will wait for all community collectibles' metadata to be retrieved before returning.
-func (o *Manager) processFullCollectibleData(ctx context.Context, assets []thirdparty.FullCollectibleData, asyncFetch bool) ([]thirdparty.CollectibleUniqueID, error) {
+// Returns the IDs of successfully processed collectibles and the list of full collectible data.
+func (o *Manager) processFullCollectibleData(ctx context.Context, assets []thirdparty.FullCollectibleData, asyncFetch bool) ([]thirdparty.CollectibleUniqueID, []thirdparty.FullCollectibleData, error) {
 	fullyFetchedAssets := make(map[string]*thirdparty.FullCollectibleData)
 	communityCollectibles := make(map[string][]*thirdparty.FullCollectibleData)
+	allIDs := make([]thirdparty.CollectibleUniqueID, 0, len(assets))
 	processedIDs := make([]thirdparty.CollectibleUniqueID, 0, len(assets))
 
 	// Start with all assets, remove if any of the fetch steps fail
@@ -675,6 +679,7 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 		asset := &assets[idx]
 		id := asset.CollectibleData.ID
 		fullyFetchedAssets[id.HashKey()] = asset
+		allIDs = append(allIDs, id)
 	}
 
 	// Detect community collectibles
@@ -755,23 +760,29 @@ func (o *Manager) processFullCollectibleData(ctx context.Context, assets []third
 
 	err := o.collectiblesDataDB.SetData(collectiblesData, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = o.collectionsDataDB.SetData(collectionsData, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(missingCollectionIDs) > 0 {
 		// Calling this ensures collection data is fetched and cached (if not already available)
 		_, err := o.FetchCollectionsDataByContractID(ctx, missingCollectionIDs)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	return processedIDs, nil
+	// Return latest up to date data from DB
+	items, err := o.getCacheFullCollectibleData(allIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return processedIDs, items, nil
 }
 
 func (o *Manager) fillTokenURI(ctx context.Context, asset *thirdparty.FullCollectibleData) error {
@@ -1058,7 +1069,7 @@ func (o *Manager) SearchCollectibles(ctx context.Context, chainID walletCommon.C
 			continue
 		}
 
-		_, err = o.processFullCollectibleData(ctx, container.Items, true)
+		_, container.Items, err = o.processFullCollectibleData(ctx, container.Items, true)
 		if err != nil {
 			return nil, err
 		}
