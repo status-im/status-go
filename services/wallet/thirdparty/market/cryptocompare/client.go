@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
@@ -64,9 +65,18 @@ func NewClientWithParams(params Params) *Client {
 		}
 	}
 
+	// Configure HTTP client with detailed timeouts:
+	httpClient := thirdparty.NewHTTPClientWithDetailedTimeouts(
+		5*time.Second,  // dialTimeout
+		5*time.Second,  // tlsHandshakeTimeout
+		5*time.Second,  // responseHeaderTimeout
+		20*time.Second, // requestTimeout
+		5,              // retries
+	)
+
 	return &Client{
 		id:         params.ID,
-		httpClient: thirdparty.NewHTTPClient(),
+		httpClient: httpClient,
 		baseURL:    params.URL,
 		creds:      creds,
 	}

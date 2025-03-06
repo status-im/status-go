@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"net"
 	"net/http"
 	netUrl "net/url"
 	"time"
@@ -19,7 +20,8 @@ type BasicCreds struct {
 }
 
 type HTTPClient struct {
-	client *http.Client
+	client     *http.Client
+	maxRetries int
 }
 
 func NewHTTPClient() *HTTPClient {
@@ -27,6 +29,34 @@ func NewHTTPClient() *HTTPClient {
 		client: &http.Client{
 			Timeout: requestTimeout,
 		},
+		maxRetries: maxNumOfRequestRetries,
+	}
+}
+
+// NewHTTPClientWithDetailedTimeouts creates a new HTTPClient with separate timeouts for
+// connection establishment and data transfer
+func NewHTTPClientWithDetailedTimeouts(
+	dialTimeout time.Duration,
+	tlsHandshakeTimeout time.Duration,
+	responseHeaderTimeout time.Duration,
+	requestTimeout time.Duration,
+	maxRetries int,
+) *HTTPClient {
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout: dialTimeout, // Timeout for establishing a connection
+		}).DialContext,
+		TLSHandshakeTimeout:   tlsHandshakeTimeout,   // Timeout for TLS handshake
+		ResponseHeaderTimeout: responseHeaderTimeout, // Timeout for receiving response headers
+		IdleConnTimeout:       90 * time.Second,      // How long to keep idle connections
+	}
+
+	return &HTTPClient{
+		client: &http.Client{
+			Transport: transport,
+			Timeout:   requestTimeout, // Overall request timeout
+		},
+		maxRetries: maxRetries,
 	}
 }
 
@@ -45,9 +75,14 @@ func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl
 	}
 
 	var resp *http.Response
-	for i := 0; i < maxNumOfRequestRetries; i++ {
+	maxRetries := c.maxRetries
+	if maxRetries <= 0 {
+		maxRetries = maxNumOfRequestRetries // Use default if not set
+	}
+
+	for i := 0; i < maxRetries; i++ {
 		resp, err = c.client.Do(req)
-		if err == nil || i == maxNumOfRequestRetries-1 {
+		if err == nil || i == maxRetries-1 {
 			break
 		}
 		time.Sleep(200 * time.Millisecond)

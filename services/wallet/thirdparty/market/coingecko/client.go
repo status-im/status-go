@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/exp/maps"
 
@@ -64,8 +65,21 @@ type Client struct {
 }
 
 func NewClient() *Client {
+	// Configure HTTP client with detailed timeouts:
+	// - 5 seconds for connection establishment (dialTimeout)
+	// - 5 seconds for TLS handshake (tlsHandshakeTimeout)
+	// - 10 seconds for receiving response headers (responseHeaderTimeout)
+	// - 30 seconds for overall request timeout (requestTimeout)
+	httpClient := thirdparty.NewHTTPClientWithDetailedTimeouts(
+		5*time.Second,  // dialTimeout
+		5*time.Second,  // tlsHandshakeTimeout
+		5*time.Second,  // responseHeaderTimeout
+		20*time.Second, // requestTimeout
+		5,              // retries
+	)
+
 	return &Client{
-		httpClient: thirdparty.NewHTTPClient(),
+		httpClient: httpClient,
 		tokens:     make(map[string][]GeckoToken),
 		baseURL:    baseURL,
 	}

@@ -53,7 +53,7 @@ type Manager struct {
 
 func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Manager {
 	cb := circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
-		Timeout:               10000,
+		Timeout:               60000,
 		MaxConcurrentRequests: 100,
 		SleepWindow:           300000,
 		ErrorPercentThreshold: 25,
