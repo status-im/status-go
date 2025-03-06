@@ -514,8 +514,13 @@ func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, su
 		}
 
 		t := time.NewTimer(backoff)
+		c := w.ctx
+		// c might be nil when w.Stop is invoked while this goroutine is running
+		if c == nil {
+			return
+		}
 		select {
-		case <-w.ctx.Done():
+		case <-c.Done():
 			t.Stop()
 			return
 		case <-t.C:
