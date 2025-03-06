@@ -63,8 +63,8 @@ type Manager struct {
 
 	collectiblesDataDB CollectibleDataStorage
 	collectionsDataDB  CollectionDataStorage
-	communityManager   *community.Manager
-	ownershipDB        *OwnershipDB
+	communityManager   community.CommunityManagerInterface
+	ownershipDB        OwnershipStorage
 
 	mediaServer *server.MediaServer
 
@@ -77,12 +77,12 @@ type Manager struct {
 func NewManager(
 	db *sql.DB,
 	rpcClient rpc.ClientInterface,
-	communityManager *community.Manager,
+	communityManager community.CommunityManagerInterface,
 	providers thirdparty.CollectibleProviders,
 	mediaServer *server.MediaServer,
 	feed *event.Feed) *Manager {
 
-	var ownershipDB *OwnershipDB
+	var ownershipDB OwnershipStorage
 	var statuses *sync.Map
 	var statusNotifier *connection.StatusNotifier
 	if db != nil {
@@ -1222,7 +1222,7 @@ func (o *Manager) updateStatusNotifier() {
 	o.statusNotifier = createStatusNotifier(o.statuses, o.feed)
 }
 
-func initStatuses(ownershipDB *OwnershipDB) *sync.Map {
+func initStatuses(ownershipDB OwnershipStorage) *sync.Map {
 	statuses := &sync.Map{}
 	for _, chainID := range walletCommon.AllChainIDs() {
 		status := connection.NewStatus()
