@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	mock_collectibles "github.com/status-im/status-go/services/wallet/collectibles/mock"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	mock_community "github.com/status-im/status-go/services/wallet/community/mock"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	mock_thirdparty "github.com/status-im/status-go/services/wallet/thirdparty/mock"
 )
@@ -101,11 +102,42 @@ func TestManager_FetchAllAssetsByOwner(t *testing.T) {
 	manager.statuses = &sync.Map{}
 	collectiblesDataDB := mock_collectibles.NewMockCollectibleDataStorage(mockCtrl)
 	collectiblesDataDB.EXPECT().SetData(gomock.Any(), gomock.Any()).Return(nil)
+	collectiblesDataDB.EXPECT().GetData(gomock.Any()).DoAndReturn(func(ids []thirdparty.CollectibleUniqueID) (map[string]thirdparty.CollectibleData, error) {
+		ret := make(map[string]thirdparty.CollectibleData)
+		for _, id := range ids {
+			ret[id.HashKey()] = thirdparty.CollectibleData{
+				ID: id,
+			}
+		}
+		return ret, nil
+	})
+	collectiblesDataDB.EXPECT().GetCommunityInfo(gomock.Any()).Return(&thirdparty.CollectibleCommunityInfo{}, nil).AnyTimes()
+
 	collectionsDataDB := mock_collectibles.NewMockCollectionDataStorage(mockCtrl)
 	collectionsDataDB.EXPECT().SetData(gomock.Any(), gomock.Any()).Return(nil)
+	collectionsDataDB.EXPECT().GetData(gomock.Any()).DoAndReturn(func(ids []thirdparty.ContractID) (map[string]thirdparty.CollectionData, error) {
+		ret := make(map[string]thirdparty.CollectionData)
+		for _, id := range ids {
+			ret[id.HashKey()] = thirdparty.CollectionData{
+				ID: id,
+			}
+		}
+		return ret, nil
+	})
+
+	communityManager := mock_community.NewMockCommunityManagerInterface(mockCtrl)
+	communityManager.EXPECT().GetCommunityID(gomock.Any()).Return(providerID).AnyTimes()
+	communityManager.EXPECT().FillCollectiblesMetadata(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+	communityManager.EXPECT().GetCommunityInfo(gomock.Any()).Return(&thirdparty.CommunityInfo{}, nil, nil).AnyTimes()
+
+	ownershipDB := mock_collectibles.NewMockOwnershipStorage(mockCtrl)
+	ownershipDB.EXPECT().GetLatestOwnershipUpdateTimestamp(gomock.Any()).Return(int64(0), nil).AnyTimes()
+	ownershipDB.EXPECT().GetOwnership(gomock.Any()).Return([]thirdparty.AccountBalance{}, nil).AnyTimes()
+
 	manager.collectiblesDataDB = collectiblesDataDB
 	manager.collectionsDataDB = collectionsDataDB
-
+	manager.communityManager = communityManager
+	manager.ownershipDB = ownershipDB
 	assetContainer, err := manager.FetchAllAssetsByOwner(ctx, chainID, owner, cursor, limit, providerID)
 
 	assert.NoError(t, err)

@@ -36,7 +36,7 @@ type timerPerAddressAndChainID = map[common.Address]timerPerChainID
 
 type Controller struct {
 	manager      *Manager
-	ownershipDB  *OwnershipDB
+	ownershipDB  OwnershipStorage
 	walletFeed   *event.Feed
 	accountsDB   *accounts.Database
 	accountsFeed *event.Feed

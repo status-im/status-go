@@ -63,7 +63,7 @@ type periodicRefreshOwnedCollectiblesCommand struct {
 	chainID                   walletCommon.ChainID
 	account                   common.Address
 	manager                   *Manager
-	ownershipDB               *OwnershipDB
+	ownershipDB               OwnershipStorage
 	walletFeed                *event.Feed
 	ownedCollectiblesChangeCb OwnedCollectiblesChangeCb
 
@@ -73,7 +73,7 @@ type periodicRefreshOwnedCollectiblesCommand struct {
 
 func newPeriodicRefreshOwnedCollectiblesCommand(
 	manager *Manager,
-	ownershipDB *OwnershipDB,
+	ownershipDB OwnershipStorage,
 	walletFeed *event.Feed,
 	chainID walletCommon.ChainID,
 	account common.Address,
@@ -161,7 +161,7 @@ type loadOwnedCollectiblesCommand struct {
 	chainID                   walletCommon.ChainID
 	account                   common.Address
 	manager                   *Manager
-	ownershipDB               *OwnershipDB
+	ownershipDB               OwnershipStorage
 	walletFeed                *event.Feed
 	ownedCollectiblesChangeCh chan<- OwnedCollectiblesChange
 
@@ -172,7 +172,7 @@ type loadOwnedCollectiblesCommand struct {
 
 func newLoadOwnedCollectiblesCommand(
 	manager *Manager,
-	ownershipDB *OwnershipDB,
+	ownershipDB OwnershipStorage,
 	walletFeed *event.Feed,
 	chainID walletCommon.ChainID,
 	account common.Address,

@@ -1,5 +1,7 @@
 package community
 
+//go:generate mockgen -package=mock_community -source=manager.go -destination=mock/manager.go
+
 import (
 	"database/sql"
 	"encoding/json"
@@ -13,6 +15,13 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
+
+type CommunityManagerInterface interface {
+	FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error)
+	GetCommunityInfo(id string) (*thirdparty.CommunityInfo, *InfoState, error)
+	GetCommunityID(tokenURI string) string
+	FillCollectiblesMetadata(communityID string, cs []*thirdparty.FullCollectibleData) (bool, error)
+}
 
 // These events are used to notify the UI of state changes
 const (

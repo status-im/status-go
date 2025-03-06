@@ -94,7 +94,7 @@ type Service struct {
 	manager          *Manager
 	controller       *Controller
 	db               *sql.DB
-	ownershipDB      *OwnershipDB
+	ownershipDB      OwnershipStorage
 	transferDB       *transfer.Database
 	communityManager *community.Manager
 	walletFeed       *event.Feed
