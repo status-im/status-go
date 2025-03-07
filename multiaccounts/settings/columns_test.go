@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -84,6 +85,15 @@ func TestValueHandler(t *testing.T) {
 	handledInt64Value, err := boolSetting.ValueHandler()(int64Value)
 	require.Error(t, err)
 	require.True(t, handledInt64Value == int64Value)
+
+	// Test time handler
+	timeSetting := SettingField{
+		valueHandler: TimeHandler,
+	}
+	timeValue := time.Now()
+	handledTimeValue, err := timeSetting.ValueHandler()(timeValue)
+	require.NoError(t, err)
+	require.True(t, timeValue == handledTimeValue)
 }
 
 func TestValueCastHandler(t *testing.T) {

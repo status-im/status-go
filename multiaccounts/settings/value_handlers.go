@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
@@ -80,4 +81,12 @@ func Float64ToInt64Handler(value interface{}) (interface{}, error) {
 		return value, nil
 	}
 	return int64(floatValue), nil
+}
+
+func TimeHandler(value interface{}) (interface{}, error) {
+	timeValue, ok := value.(time.Time)
+	if !ok {
+		return value, errors.ErrInvalidConfig
+	}
+	return timeValue, nil
 }

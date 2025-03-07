@@ -117,6 +117,8 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 
 	s.TestNetworksEnabled = false
 
+	s.AutoRefreshTokensEnabled = true
+
 	// Default user status
 	currentUserStatus, err := json.Marshal(protocol.UserStatus{
 		PublicKey:  chatKeyString,

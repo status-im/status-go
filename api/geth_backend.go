@@ -1759,6 +1759,7 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, inp
 	settings.PreviewPrivacy = request.PreviewPrivacy
 	settings.CurrentNetwork = request.CurrentNetwork
 	settings.TestNetworksEnabled = request.TestNetworksEnabled
+	settings.AutoRefreshTokensEnabled = request.AutoRefreshTokensEnabled
 	if !input.restoringAccount {
 		settings.Mnemonic = &input.mnemonic
 		// TODO(rasom): uncomment it as soon as address will be properly

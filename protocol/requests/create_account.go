@@ -70,6 +70,8 @@ type CreateAccount struct {
 
 	TestNetworksEnabled bool `json:"testNetworksEnabled"`
 
+	AutoRefreshTokensEnabled bool `json:"autoRefreshTokensEnabled"`
+
 	WalletSecretsConfig
 
 	TorrentConfigEnabled *bool
