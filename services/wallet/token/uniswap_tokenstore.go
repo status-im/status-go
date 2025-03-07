@@ -1,5 +1,7 @@
 package token
 
+import tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+
 type uniswapStore struct {
 }
 
@@ -7,7 +9,7 @@ func NewUniswapStore() *uniswapStore {
 	return &uniswapStore{}
 }
 
-func (s *uniswapStore) GetTokens() []*Token {
+func (s *uniswapStore) GetTokens() []*tokenTypes.Token {
 	return uniswapTokens
 }
 

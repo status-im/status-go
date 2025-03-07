@@ -15,7 +15,7 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/paraswap"
 	mock_paraswap "github.com/status-im/status-go/services/wallet/thirdparty/paraswap/mock"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,10 +37,10 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 
 	processor := NewSwapParaswapProcessor(nil, nil, nil)
 
-	fromToken := token.Token{
+	fromToken := tokenTypes.Token{
 		Symbol: walletCommon.EthSymbol,
 	}
-	toToken := token.Token{
+	toToken := tokenTypes.Token{
 		Symbol: walletCommon.UsdcSymbol,
 	}
 	chainIDs := []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.UnknownChainID}
@@ -108,10 +108,10 @@ func TestParaswapErrors(t *testing.T) {
 	processor := NewSwapParaswapProcessor(nil, nil, nil)
 	processor.paraswapClient = client
 
-	fromToken := token.Token{
+	fromToken := tokenTypes.Token{
 		Symbol: walletCommon.EthSymbol,
 	}
-	toToken := token.Token{
+	toToken := tokenTypes.Token{
 		Symbol: walletCommon.UsdcSymbol,
 	}
 	chainID := walletCommon.EthereumMainnet

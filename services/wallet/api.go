@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
@@ -85,7 +86,7 @@ func (api *API) GetBalancesByChain(ctx context.Context, chainIDs []uint64, addre
 	return api.s.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokens)
 }
 
-func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address, forceRefresh bool) (map[common.Address][]token.StorageToken, error) {
+func (api *API) FetchOrGetCachedWalletBalances(ctx context.Context, addresses []common.Address, forceRefresh bool) (map[common.Address][]tokenTypes.StorageToken, error) {
 	activeNetworks, err := api.s.rpcClient.NetworkManager.GetActiveNetworks()
 	if err != nil {
 		return nil, err
@@ -214,13 +215,13 @@ func (api *API) GetTokenList(ctx context.Context) (*token.ListWrapper, error) {
 	return rst, nil
 }
 
-func (api *API) GetTokensAvailableForBridgeOnChain(ctx context.Context, chainID uint64) []*token.Token {
+func (api *API) GetTokensAvailableForBridgeOnChain(ctx context.Context, chainID uint64) []*tokenTypes.Token {
 	logutils.ZapLogger().Debug("call to get tokens available for bridge on chain")
 	return api.s.router.GetTokensAvailableForBridgeOnChain(chainID)
 }
 
 // @deprecated
-func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*token.Token, error) {
+func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*tokenTypes.Token, error) {
 	logutils.ZapLogger().Debug("call to get tokens")
 	rst, err := api.s.tokenManager.GetTokens(chainID)
 	logutils.ZapLogger().Debug("result from token store", zap.Int("len", len(rst)))
@@ -228,20 +229,20 @@ func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*token.Token, 
 }
 
 // @deprecated
-func (api *API) GetCustomTokens(ctx context.Context) ([]*token.Token, error) {
+func (api *API) GetCustomTokens(ctx context.Context) ([]*tokenTypes.Token, error) {
 	logutils.ZapLogger().Debug("call to get custom tokens")
 	rst, err := api.s.tokenManager.GetCustoms(true)
 	logutils.ZapLogger().Debug("result from database for custom tokens", zap.Int("len", len(rst)))
 	return rst, err
 }
 
-func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*token.Token, error) {
+func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*tokenTypes.Token, error) {
 	logutils.ZapLogger().Debug("call to get discover token")
 	token, err := api.s.tokenManager.DiscoverToken(ctx, chainID, address)
 	return token, err
 }
 
-func (api *API) AddCustomToken(ctx context.Context, token token.Token) error {
+func (api *API) AddCustomToken(ctx context.Context, token tokenTypes.Token) error {
 	logutils.ZapLogger().Debug("call to create or edit custom token")
 	if token.ChainID == 0 {
 		token.ChainID = api.s.rpcClient.UpstreamChainID

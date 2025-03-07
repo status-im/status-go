@@ -9,19 +9,19 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router/fees"
-	walletToken "github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 type Path struct {
 	RouterInputParamsUuid string
 	ProcessorName         string
-	FromChain             *params.Network    // Source chain
-	ToChain               *params.Network    // Destination chain
-	FromToken             *walletToken.Token // Source token
-	ToToken               *walletToken.Token // Destination token, set if applicable
-	AmountIn              *hexutil.Big       // Amount that will be sent from the source chain
-	AmountInLocked        bool               // Is the amount locked
-	AmountOut             *hexutil.Big       // Amount that will be received on the destination chain
+	FromChain             *params.Network   // Source chain
+	ToChain               *params.Network   // Destination chain
+	FromToken             *tokenTypes.Token // Source token
+	ToToken               *tokenTypes.Token // Destination token, set if applicable
+	AmountIn              *hexutil.Big      // Amount that will be sent from the source chain
+	AmountInLocked        bool              // Is the amount locked
+	AmountOut             *hexutil.Big      // Amount that will be received on the destination chain
 
 	SuggestedLevelsForMaxFeesPerGas *fees.MaxFeesLevels // Suggested max fees by the network (in ETH WEI)
 	SuggestedMinPriorityFee         *hexutil.Big        // Suggested min priority fee by the network (in ETH WEI)
@@ -124,12 +124,12 @@ func (p *Path) Copy() *Path {
 	}
 
 	if p.FromToken != nil {
-		newPath.FromToken = &walletToken.Token{}
+		newPath.FromToken = &tokenTypes.Token{}
 		*newPath.FromToken = *p.FromToken
 	}
 
 	if p.ToToken != nil {
-		newPath.ToToken = &walletToken.Token{}
+		newPath.ToToken = &tokenTypes.Token{}
 		*newPath.ToToken = *p.ToToken
 	}
 

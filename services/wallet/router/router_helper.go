@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType, approvalContractAddress *common.Address, params pathprocessor.ProcessorInputParams) (
@@ -110,7 +111,7 @@ func CalculateL1Fee(chainID uint64, data []byte, ethClient chain.ClientInterface
 	return proxyContract.GetL1Fee(callOpt, data)
 }
 
-func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network, token *token.Token, account common.Address) (*big.Int, error) {
+func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network, token *tokenTypes.Token, account common.Address) (*big.Int, error) {
 	tokenID, success := new(big.Int).SetString(token.Symbol, 10)
 	if !success {
 		return nil, errors.New("failed to convert token symbol to big.Int")
@@ -134,7 +135,7 @@ func (r *Router) getERC1155Balance(ctx context.Context, network *params.Network,
 	return balances[0].Int, nil
 }
 
-func (r *Router) getBalance(ctx context.Context, chainID uint64, token *token.Token, account common.Address) (*big.Int, error) {
+func (r *Router) getBalance(ctx context.Context, chainID uint64, token *tokenTypes.Token, account common.Address) (*big.Int, error) {
 	client, err := r.rpcClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
@@ -358,7 +359,7 @@ func ParseCollectibleID(ID string) (contractAddress common.Address, tokenID *big
 	return
 }
 
-func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *token.Token {
+func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *tokenTypes.Token {
 	if !sendType.IsCollectiblesTransfer() {
 		return tokenManager.FindToken(network, tokenID)
 	}
@@ -377,7 +378,7 @@ func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collecti
 		return nil
 	}
 
-	return &token.Token{
+	return &tokenTypes.Token{
 		Address:  contractAddress,
 		Symbol:   collectibleTokenID.String(),
 		Decimals: 0,
@@ -411,10 +412,10 @@ func fetchPrices(sendType sendtype.SendType, marketManager *market.Manager, toke
 	return prices, nil
 }
 
-func (r *Router) GetTokensAvailableForBridgeOnChain(chainID uint64) []*token.Token {
+func (r *Router) GetTokensAvailableForBridgeOnChain(chainID uint64) []*tokenTypes.Token {
 	symbols := hop.GetSymbolsAvailableOnChain(chainID)
 
-	tokens := make([]*token.Token, 0)
+	tokens := make([]*tokenTypes.Token, 0)
 	for _, symbol := range symbols {
 		t, _ := r.tokenManager.LookupToken(&chainID, symbol)
 		if t == nil {

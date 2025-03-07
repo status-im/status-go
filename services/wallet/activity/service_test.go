@@ -19,8 +19,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/token"
 	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/t/helpers"
@@ -149,7 +149,7 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 
 	// Expect one call for the fungible token
 	state.tokenMock.EXPECT().LookupTokenIdentity(uint64(5), eth.HexToAddress("0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a"), false).Return(
-		&token.Token{
+		&tokenTypes.Token{
 			ChainID: 5,
 			Address: eth.HexToAddress("0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a"),
 			Symbol:  "STT",
@@ -311,7 +311,7 @@ func setupTransactions(t *testing.T, state testState, txCount int, testTxs []tra
 	allAddresses = append(append(allAddresses, fromTrs...), toTrs...)
 
 	state.tokenMock.EXPECT().LookupTokenIdentity(gomock.Any(), gomock.Any(), gomock.Any()).Return(
-		&token.Token{
+		&tokenTypes.Token{
 			ChainID: 5,
 			Address: eth.Address{},
 			Symbol:  "ETH",
@@ -319,7 +319,7 @@ func setupTransactions(t *testing.T, state testState, txCount int, testTxs []tra
 	).AnyTimes()
 
 	state.tokenMock.EXPECT().LookupToken(gomock.Any(), gomock.Any()).Return(
-		&token.Token{
+		&tokenTypes.Token{
 			ChainID: 5,
 			Address: eth.Address{},
 			Symbol:  "ETH",

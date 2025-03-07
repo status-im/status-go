@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/requests"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/sqlite"
@@ -46,18 +46,18 @@ func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresse
 		tt.timestamp
 		`).Distinct()
 	q = q.From("sent_transactions st").
-		LeftJoin(`route_path_transactions rpt ON 
-			st.chain_id = rpt.chain_id AND 
+		LeftJoin(`route_path_transactions rpt ON
+			st.chain_id = rpt.chain_id AND
 			st.tx_hash = rpt.tx_hash`).
-		LeftJoin(`tracked_transactions tt ON 
-			st.chain_id = tt.chain_id AND 
+		LeftJoin(`tracked_transactions tt ON
+			st.chain_id = tt.chain_id AND
 			st.tx_hash = tt.tx_hash`).
-		LeftJoin(`route_paths rp ON 
-			rpt.uuid = rp.uuid AND 
+		LeftJoin(`route_paths rp ON
+			rpt.uuid = rp.uuid AND
 			rpt.path_idx = rp.path_idx`).
-		LeftJoin(`route_build_tx_parameters rbtp ON 
+		LeftJoin(`route_build_tx_parameters rbtp ON
 			rpt.uuid = rbtp.uuid`).
-		LeftJoin(`route_input_parameters rip ON 
+		LeftJoin(`route_input_parameters rip ON
 			rpt.uuid = rip.uuid`)
 	q = q.OrderBy("tt.timestamp DESC", "rpt.is_approval ASC")
 
@@ -273,7 +273,7 @@ func getFinalizationPeriod(chainID wCommon.ChainID) int64 {
 	return L2FinalizationDuration
 }
 
-func getTransferType(fromToken *token.Token, processorName string) *TransferType {
+func getTransferType(fromToken *tokenTypes.Token, processorName string) *TransferType {
 	ret := new(TransferType)
 
 	switch processorName {
@@ -294,7 +294,7 @@ func getTransferType(fromToken *token.Token, processorName string) *TransferType
 	return ret
 }
 
-func getToken(token *token.Token, processorName string) *Token {
+func getToken(token *tokenTypes.Token, processorName string) *Token {
 	if token == nil {
 		return nil
 	}

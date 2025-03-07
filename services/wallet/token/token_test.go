@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/community"
 
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
@@ -49,7 +50,7 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 		}
 }
 
-func upsertCommunityToken(t *testing.T, token *Token, manager *Manager) {
+func upsertCommunityToken(t *testing.T, token *tokenTypes.Token, manager *Manager) {
 	require.NotNil(t, token.CommunityData)
 
 	err := manager.UpsertCustom(*token)
@@ -68,7 +69,7 @@ func TestCustoms(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	token := Token{
+	token := tokenTypes.Token{
 		Address:  common.Address{1},
 		Name:     "Zilliqa",
 		Symbol:   "ZIL",
@@ -100,7 +101,7 @@ func TestCommunityTokens(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	token := Token{
+	token := tokenTypes.Token{
 		Address:  common.Address{1},
 		Name:     "Zilliqa",
 		Symbol:   "ZIL",
@@ -111,7 +112,7 @@ func TestCommunityTokens(t *testing.T) {
 	err = manager.UpsertCustom(token)
 	require.NoError(t, err)
 
-	communityToken := Token{
+	communityToken := tokenTypes.Token{
 		Address:  common.Address{2},
 		Name:     "Communitia",
 		Symbol:   "COM",
@@ -136,7 +137,7 @@ func TestCommunityTokens(t *testing.T) {
 	require.Equal(t, communityToken, *rst[0])
 }
 
-func toTokenMap(tokens []*Token) storeMap {
+func toTokenMap(tokens []*tokenTypes.Token) storeMap {
 	tokenMap := storeMap{}
 
 	for _, token := range tokens {
@@ -175,23 +176,23 @@ func TestTokenOverride(t *testing.T) {
 		},
 	}
 
-	tokenList := []*Token{
-		&Token{
+	tokenList := []*tokenTypes.Token{
+		&tokenTypes.Token{
 			Address: common.Address{1},
 			Symbol:  "SNT",
 			ChainID: 1,
 		},
-		&Token{
+		&tokenTypes.Token{
 			Address: common.Address{2},
 			Symbol:  "TNT",
 			ChainID: 1,
 		},
-		&Token{
+		&tokenTypes.Token{
 			Address: common.Address{3},
 			Symbol:  "STT",
 			ChainID: 2,
 		},
-		&Token{
+		&tokenTypes.Token{
 			Address: common.Address{4},
 			Symbol:  "TTT",
 			ChainID: 2,
@@ -219,7 +220,7 @@ func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
 	defer stop()
 
 	owner := common.HexToAddress("0x1234567890abcdef")
-	token := &Token{
+	token := &tokenTypes.Token{
 		Address:  common.HexToAddress("0xabcdef1234567890"),
 		Name:     "TestToken",
 		Symbol:   "TT",
@@ -349,7 +350,7 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	manager := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, mediaServer, nil, &accountFeed, accountsDB, NewPersistence(walletDB))
 
 	// Insert balances for address
-	marked, err := manager.MarkAsPreviouslyOwnedToken(&Token{
+	marked, err := manager.MarkAsPreviouslyOwnedToken(&tokenTypes.Token{
 		Address:  common.HexToAddress("0x1234"),
 		Symbol:   "Dummy",
 		Decimals: 18,
@@ -416,7 +417,7 @@ func Test_tokensListsValidity(t *testing.T) {
 	allLists := tokensListWrapper.Data
 	require.Greater(t, len(allLists), 0)
 
-	tmpMap := make(map[string][]*Token)
+	tmpMap := make(map[string][]*tokenTypes.Token)
 	for _, list := range allLists {
 		for _, token := range list.Tokens {
 			key := fmt.Sprintf("%d-%s", token.ChainID, token.Address)
@@ -431,7 +432,7 @@ func Test_tokensListsValidity(t *testing.T) {
 
 				require.True(t, found, "Token %s not found in list %s", token.Symbol, list.Name)
 			} else {
-				tmpMap[key] = []*Token{token}
+				tmpMap[key] = []*tokenTypes.Token{token}
 			}
 		}
 	}

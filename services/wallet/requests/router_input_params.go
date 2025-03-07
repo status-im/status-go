@@ -11,7 +11,7 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/router/fees"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 var (
@@ -74,7 +74,7 @@ type RouteInputParams struct {
 }
 
 type RouterTestParams struct {
-	TokenFrom             *token.Token
+	TokenFrom             *tokenTypes.Token
 	TokenPrices           map[string]float64
 	EstimationMap         map[string]Estimation // [processor-name, estimation]
 	BonderFeeMap          map[string]*big.Int   // [token-symbol, bonder-fee]

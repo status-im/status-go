@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	token "github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 func main() {
@@ -21,17 +22,17 @@ func main() {
 	}
 
 	fmt.Println("")
-	tokensPerStore := make(map[string]map[string]*token.Token) // map[store][tokenID]*token.Token
+	tokensPerStore := make(map[string]map[string]*tokenTypes.Token) // map[store][tokenID]*tokenTypes.Token
 	for storeName, store := range storePerName {
 		fmt.Printf("Analizying store: %s\n", storeName)
 		tokens := store.GetTokens()
 		fmt.Printf("Total number of tokens: %d\n", len(tokens))
 
-		tokensPerStore[storeName] = make(map[string]*token.Token)
-		tokensPerChainID := make(map[uint64][]*token.Token) // map[chainID]*token.Token
+		tokensPerStore[storeName] = make(map[string]*tokenTypes.Token)
+		tokensPerChainID := make(map[uint64][]*tokenTypes.Token) // map[chainID]*tokenTypes.Token
 		for _, chainToken := range tokens {
 			if _, ok := tokensPerChainID[chainToken.ChainID]; !ok {
-				tokensPerChainID[chainToken.ChainID] = make([]*token.Token, 0, len(tokens))
+				tokensPerChainID[chainToken.ChainID] = make([]*tokenTypes.Token, 0, len(tokens))
 			}
 			tokensPerChainID[chainToken.ChainID] = append(tokensPerChainID[chainToken.ChainID], chainToken)
 
@@ -68,6 +69,6 @@ func main() {
 	}
 }
 
-func getTokenID(token *token.Token) string {
+func getTokenID(token *tokenTypes.Token) string {
 	return fmt.Sprintf("%d - %s", token.ChainID, token.Address.Hex())
 }

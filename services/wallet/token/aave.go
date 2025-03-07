@@ -2,13 +2,14 @@ package token
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 var aaveVersion = "3.0.85"
 
 var aaveTimestamp = int64(1739626918)
 
-var aaveTokens = []*Token{
+var aaveTokens = []*tokenTypes.Token{
 
 	{
 		Address:   common.HexToAddress("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"),

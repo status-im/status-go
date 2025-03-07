@@ -20,7 +20,7 @@ import (
 	"github.com/status-im/status-go/services/utils"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -155,7 +155,7 @@ func (s *ERC721Processor) sendOrBuild(sendArgs *MultipathProcessorTxArgs, signer
 		},
 		FromAddr: from,
 		ToAddr:   sendArgs.ERC721TransferTx.Recipient,
-		FromToken: &token.Token{
+		FromToken: &tokenTypes.Token{
 			Symbol:  sendArgs.ERC721TransferTx.TokenID.String(),
 			Address: common.Address(*sendArgs.ERC721TransferTx.To),
 		},

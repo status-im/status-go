@@ -28,7 +28,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/services/wallet/token"
-	walletToken "github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -659,7 +659,7 @@ func (r *Router) getSelectedChains(input *requests.RouteInputParams) (selectedFr
 }
 
 func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fromNetwork *params.Network, toNetwork *params.Network,
-	fromToken *token.Token, toToken *token.Token, amountIn *big.Int, slippagePercentage float32,
+	fromToken *tokenTypes.Token, toToken *tokenTypes.Token, amountIn *big.Int, slippagePercentage float32,
 	useCommunityTokenTransferDetailsAtIndex int) (pathprocessor.ProcessorInputParams, error) {
 	var err error
 	processorInputParams := pathprocessor.ProcessorInputParams{
@@ -721,7 +721,7 @@ func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fr
 	return processorInputParams, err
 }
 
-func (r *Router) findFromAndToTokens(testsMode bool, input *requests.RouteInputParams, network *params.Network) (fromToken *walletToken.Token, toToken *walletToken.Token) {
+func (r *Router) findFromAndToTokens(testsMode bool, input *requests.RouteInputParams, network *params.Network) (fromToken *tokenTypes.Token, toToken *tokenTypes.Token) {
 	if testsMode {
 		fromToken = input.TestParams.TokenFrom
 	} else {
@@ -873,7 +873,7 @@ func (r *Router) resolveCandidates(ctx context.Context, input *requests.RouteInp
 }
 
 func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams, fromNetwork *params.Network,
-	toNetwork *params.Network, fromToken *token.Token, toToken *token.Token, amountOption amountOption,
+	toNetwork *params.Network, fromToken *tokenTypes.Token, toToken *tokenTypes.Token, amountOption amountOption,
 	pathProcessor pathprocessor.PathProcessor, fetchedFees *fees.SuggestedFees, usedNonces map[uint64]uint64,
 	useCommunityTokenTransferDetailsAtIndex int) (*routes.Path, error) {
 	if !input.SendType.IsAvailableFor(fromNetwork) {

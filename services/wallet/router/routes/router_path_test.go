@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/router/fees"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 func TestCopyPath(t *testing.T) {
@@ -20,8 +20,8 @@ func TestCopyPath(t *testing.T) {
 		ProcessorName:  "test",
 		FromChain:      &params.Network{ChainID: 1},
 		ToChain:        &params.Network{ChainID: 2},
-		FromToken:      &token.Token{Symbol: "symbol1"},
-		ToToken:        &token.Token{Symbol: "symbol2"},
+		FromToken:      &tokenTypes.Token{Symbol: "symbol1"},
+		ToToken:        &tokenTypes.Token{Symbol: "symbol2"},
 		AmountIn:       (*hexutil.Big)(big.NewInt(100)),
 		AmountInLocked: true,
 		AmountOut:      (*hexutil.Big)(big.NewInt(200)),

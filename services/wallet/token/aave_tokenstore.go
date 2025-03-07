@@ -1,5 +1,7 @@
 package token
 
+import tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+
 type aaveStore struct {
 }
 
@@ -7,7 +9,7 @@ func NewAaveStore() *aaveStore {
 	return &aaveStore{}
 }
 
-func (s *aaveStore) GetTokens() []*Token {
+func (s *aaveStore) GetTokens() []*tokenTypes.Token {
 	return aaveTokens
 }
 

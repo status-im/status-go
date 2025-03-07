@@ -12,6 +12,7 @@ import (
 
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/services/wallet/blockchainstate"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/utils"
 
 	"github.com/pkg/errors"
@@ -1092,7 +1093,7 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
-	tokenManager.SetTokens([]*token.Token{
+	tokenManager.SetTokens([]*tokenTypes.Token{
 		{
 			Address:  tokenTXXAddress,
 			Symbol:   "TXX",
@@ -1363,7 +1364,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 	client.SetClient(tc.NetworkID(), tc)
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
-	tokenManager.SetTokens([]*token.Token{
+	tokenManager.SetTokens([]*tokenTypes.Token{
 		{
 			Address:  tokenTXXAddress,
 			Symbol:   "TXX",
@@ -1494,7 +1495,7 @@ func TestFetchNewBlocksCommand_findBlocksWithEthTransfers(t *testing.T) {
 		client.SetClient(tc.NetworkID(), tc)
 		tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
-		tokenManager.SetTokens([]*token.Token{
+		tokenManager.SetTokens([]*tokenTypes.Token{
 			{
 				Address:  tokenTXXAddress,
 				Symbol:   "TXX",
@@ -1705,7 +1706,7 @@ func TestFetchNewBlocksCommand(t *testing.T) {
 
 	tokenManager := token.NewTokenManager(db, client, community.NewManager(appdb, nil, nil), network.NewManager(appdb, nil, nil, nil), appdb, mediaServer, nil, nil, nil, token.NewPersistence(db))
 
-	tokenManager.SetTokens([]*token.Token{
+	tokenManager.SetTokens([]*tokenTypes.Token{
 		{
 			Address:  tokenTXXAddress,
 			Symbol:   "TXX",

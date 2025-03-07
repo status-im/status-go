@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	"github.com/xeipuuv/gojsonschema"
 )
@@ -19,13 +20,14 @@ const templateText = `package token
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 var {{ .VersionName }} = "{{ .Version }}"
 
 var {{ .TimestampName }} = int64({{ .Timestamp }})
 
-var {{ .AllTokensName }} = []*Token{
+var {{ .AllTokensName }} = []*tokenTypes.Token{
 {{ range $token := .Tokens }}
 	{
 		Address:   common.HexToAddress("{{ $token.Address }}"),
@@ -44,7 +46,7 @@ type templateData struct {
 	TimestampName string
 	Version       string
 	Timestamp     uint64
-	Tokens        []*token.Token
+	Tokens        []*tokenTypes.Token
 }
 
 type version struct {
@@ -73,13 +75,13 @@ func validateDocument(doc string, schemaURL string) (bool, error) {
 	return true, nil
 }
 
-func bytesToTokens(tokenListData []byte) ([]*token.Token, error) {
+func bytesToTokens(tokenListData []byte) ([]*tokenTypes.Token, error) {
 	var objmap map[string]json.RawMessage
 	err := json.Unmarshal(tokenListData, &objmap)
 	if err != nil {
 		return nil, err
 	}
-	var tokens []*token.Token
+	var tokens []*tokenTypes.Token
 	err = json.Unmarshal(objmap["tokens"], &tokens)
 	if err != nil {
 		return nil, err

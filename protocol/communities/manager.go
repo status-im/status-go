@@ -43,6 +43,7 @@ import (
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/signal"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -251,7 +252,7 @@ type managerOptions struct {
 type TokenManager interface {
 	GetBalancesByChain(ctx context.Context, accounts, tokens []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
 	GetCachedBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error)
-	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *token.Token
+	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token
 	GetAllChainIDs() ([]uint64, error)
 }
 
@@ -332,7 +333,7 @@ func (m *DefaultTokenManager) GetCachedBalancesByChain(ctx context.Context, acco
 	return resp, nil
 }
 
-func (m *DefaultTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *token.Token {
+func (m *DefaultTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token {
 	return m.tokenManager.FindOrCreateTokenByAddress(ctx, chainID, address)
 }
 

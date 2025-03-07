@@ -8,7 +8,7 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -128,7 +128,7 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &mainnet,
-				FromToken: &token.Token{
+				FromToken: &tokenTypes.Token{
 					Symbol: walletCommon.EthSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
@@ -154,10 +154,10 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &mainnet,
-				FromToken: &token.Token{
+				FromToken: &tokenTypes.Token{
 					Symbol: walletCommon.EthSymbol,
 				},
-				ToToken: &token.Token{
+				ToToken: &tokenTypes.Token{
 					Symbol: walletCommon.EthSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
@@ -183,10 +183,10 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &mainnet,
-				FromToken: &token.Token{
+				FromToken: &tokenTypes.Token{
 					Symbol: walletCommon.EthSymbol,
 				},
-				ToToken: &token.Token{
+				ToToken: &tokenTypes.Token{
 					Symbol: walletCommon.UsdcSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
@@ -235,7 +235,7 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &optimism,
-				FromToken: &token.Token{
+				FromToken: &tokenTypes.Token{
 					Symbol: walletCommon.EthSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
@@ -261,10 +261,10 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &optimism,
-				FromToken: &token.Token{
+				FromToken: &tokenTypes.Token{
 					Symbol: walletCommon.EthSymbol,
 				},
-				ToToken: &token.Token{
+				ToToken: &tokenTypes.Token{
 					Symbol: walletCommon.EthSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
@@ -290,7 +290,7 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &optimism,
 				ToChain:   &base,
-				FromToken: &token.Token{
+				FromToken: &tokenTypes.Token{
 					Symbol: walletCommon.DaiSymbol,
 				},
 				TestEstimationMap: testEstimationMap,
@@ -316,10 +316,10 @@ func TestPathProcessors(t *testing.T) {
 				TestsMode: true,
 				FromChain: &mainnet,
 				ToChain:   &optimism,
-				FromToken: &token.Token{
+				FromToken: &tokenTypes.Token{
 					Symbol: walletCommon.EthSymbol,
 				},
-				ToToken: &token.Token{
+				ToToken: &tokenTypes.Token{
 					Symbol: walletCommon.UsdcSymbol,
 				},
 				TestEstimationMap: testEstimationMap,

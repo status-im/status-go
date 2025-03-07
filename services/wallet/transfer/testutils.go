@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +34,7 @@ type TestTransfer struct {
 	TestTransaction
 	To    eth_common.Address // [address]
 	Value int64
-	Token *token.Token
+	Token *tokenTypes.Token
 }
 
 type TestCollectibleTransfer struct {
@@ -42,12 +42,12 @@ type TestCollectibleTransfer struct {
 	TestCollectible
 }
 
-func SeedToToken(seed int) *token.Token {
+func SeedToToken(seed int) *tokenTypes.Token {
 	tokenIndex := seed % len(TestTokens)
 	return TestTokens[tokenIndex]
 }
 
-func TestTrToToken(t *testing.T, tt *TestTransaction) (token *token.Token, isNative bool) {
+func TestTrToToken(t *testing.T, tt *TestTransaction) (token *tokenTypes.Token, isNative bool) {
 	// Sanity check that none of the markers changed and they should be equal to seed
 	require.Equal(t, tt.Timestamp, tt.BlkNumber)
 
@@ -94,7 +94,7 @@ func generateTestCollectibleTransfer(seed int) TestCollectibleTransfer {
 			TestTransaction: generateTestTransaction(seed),
 			To:              eth_common.HexToAddress(fmt.Sprintf("0x3%d", seed)),
 			Value:           int64(seed),
-			Token: &token.Token{
+			Token: &tokenTypes.Token{
 				Address: collectible.TokenAddress,
 				Name:    "Collectible",
 				ChainID: uint64(collectible.ChainID),
@@ -208,35 +208,35 @@ var TestCollectibles = []TestCollectible{
 	},
 }
 
-var EthMainnet = token.Token{
+var EthMainnet = tokenTypes.Token{
 	Address: eth_common.HexToAddress("0x"),
 	Name:    "Ether",
 	Symbol:  "ETH",
 	ChainID: 1,
 }
 
-var EthSepolia = token.Token{
+var EthSepolia = tokenTypes.Token{
 	Address: eth_common.HexToAddress("0x"),
 	Name:    "Ether",
 	Symbol:  "ETH",
 	ChainID: 11155111,
 }
 
-var EthOptimism = token.Token{
+var EthOptimism = tokenTypes.Token{
 	Address: eth_common.HexToAddress("0x"),
 	Name:    "Ether",
 	Symbol:  "ETH",
 	ChainID: 10,
 }
 
-var UsdcMainnet = token.Token{
+var UsdcMainnet = tokenTypes.Token{
 	Address: eth_common.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"),
 	Name:    "USD Coin",
 	Symbol:  "USDC",
 	ChainID: 1,
 }
 
-var UsdcSepolia = token.Token{
+var UsdcSepolia = tokenTypes.Token{
 	Address:  eth_common.HexToAddress("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"),
 	Name:     "USD Coin",
 	Symbol:   "USDC",
@@ -244,28 +244,28 @@ var UsdcSepolia = token.Token{
 	ChainID:  11155111,
 }
 
-var UsdcOptimism = token.Token{
+var UsdcOptimism = tokenTypes.Token{
 	Address: eth_common.HexToAddress("0x7f5c764cbc14f9669b88837ca1490cca17c31607"),
 	Name:    "USD Coin",
 	Symbol:  "USDC",
 	ChainID: 10,
 }
 
-var SntMainnet = token.Token{
+var SntMainnet = tokenTypes.Token{
 	Address: eth_common.HexToAddress("0x744d70fdbe2ba4cf95131626614a1763df805b9e"),
 	Name:    "Status Network Token",
 	Symbol:  "SNT",
 	ChainID: 1,
 }
 
-var DaiMainnet = token.Token{
+var DaiMainnet = tokenTypes.Token{
 	Address: eth_common.HexToAddress("0xf2edF1c091f683E3fb452497d9a98A49cBA84666"),
 	Name:    "DAI Stablecoin",
 	Symbol:  "DAI",
 	ChainID: 5,
 }
 
-var DaiSepolia = token.Token{
+var DaiSepolia = tokenTypes.Token{
 	Address:  eth_common.HexToAddress("0x3e622317f8c93f7328350cf0b56d9ed4c620c5d6"),
 	Name:     "DAI Stablecoin",
 	Symbol:   "DAI",
@@ -274,11 +274,11 @@ var DaiSepolia = token.Token{
 }
 
 // TestTokens contains ETH/Mainnet, ETH/Sepolia, ETH/Optimism, USDC/Mainnet, USDC/Sepolia, USDC/Optimism, SNT/Mainnet, DAI/Mainnet, DAI/Sepolia
-var TestTokens = []*token.Token{
+var TestTokens = []*tokenTypes.Token{
 	&EthMainnet, &EthSepolia, &EthOptimism, &UsdcMainnet, &UsdcSepolia, &UsdcOptimism, &SntMainnet, &DaiMainnet, &DaiSepolia,
 }
 
-func LookupTokenIdentity(chainID uint64, address eth_common.Address, native bool) *token.Token {
+func LookupTokenIdentity(chainID uint64, address eth_common.Address, native bool) *tokenTypes.Token {
 	for _, token := range TestTokens {
 		if token.ChainID == chainID && token.Address == address && token.IsNative() == native {
 			return token

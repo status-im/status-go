@@ -17,7 +17,7 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/router/routes"
 	"github.com/status-im/status-go/services/wallet/router/sendtype"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 const (
@@ -220,7 +220,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -258,7 +258,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -311,7 +311,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -438,7 +438,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -494,7 +494,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -574,7 +574,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -631,7 +631,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -736,7 +736,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -775,7 +775,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -814,7 +814,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -853,7 +853,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -910,7 +910,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -949,7 +949,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -984,7 +984,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -1133,7 +1133,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -1197,7 +1197,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -1346,7 +1346,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -1495,7 +1495,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -1530,7 +1530,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -1561,7 +1561,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -1689,7 +1689,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -1745,7 +1745,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -1825,7 +1825,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -1881,7 +1881,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -1962,7 +1962,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2001,7 +2001,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2040,7 +2040,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2079,7 +2079,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2136,7 +2136,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2175,7 +2175,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2206,7 +2206,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2517,7 +2517,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2621,7 +2621,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2671,7 +2671,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2757,7 +2757,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2807,7 +2807,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2894,7 +2894,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2927,7 +2927,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2966,7 +2966,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -2999,7 +2999,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -3068,7 +3068,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -3107,7 +3107,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -3140,7 +3140,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -3182,7 +3182,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -3224,7 +3224,7 @@ func getNormalTestParamsList() []normalTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -3277,7 +3277,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -3310,7 +3310,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -3356,7 +3356,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -3396,7 +3396,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -3458,7 +3458,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.UsdcSymbol,
 						Decimals: 6,
@@ -3535,7 +3535,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -3567,7 +3567,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -3599,7 +3599,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -3638,7 +3638,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -3676,7 +3676,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -3714,7 +3714,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -3760,7 +3760,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -3830,7 +3830,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -3894,7 +3894,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,
@@ -3945,7 +3945,7 @@ func getAmountOptionsTestParamsList() []amountOptionsTestParams {
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
-					TokenFrom: &token.Token{
+					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
 						Symbol:   walletCommon.EthSymbol,
 						Decimals: 18,

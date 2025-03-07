@@ -28,7 +28,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/onramp"
 	mock_onramp "github.com/status-im/status-go/services/wallet/onramp/mock"
 	"github.com/status-im/status-go/services/wallet/requests"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
@@ -252,13 +252,13 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 
 	testTokenAddress1 := common.Address{0x34}
 	testAccAddress1 := common.Address{0x12}
-	storageToken := token.StorageToken{
-		Token: token.Token{
+	storageToken := tokenTypes.StorageToken{
+		Token: tokenTypes.Token{
 			Name:     "USD Tether",
 			Symbol:   "USDT",
 			Decimals: 18,
 		},
-		BalancesPerChain: map[uint64]token.ChainBalance{
+		BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
 			1: {
 				RawBalance: "1000000000000000000",
 				Balance:    nil,
@@ -268,7 +268,7 @@ func TestAPI_FetchOrGetCachedWalletBalances(t *testing.T) {
 			},
 		},
 	}
-	expectedTokens := map[common.Address][]token.StorageToken{
+	expectedTokens := map[common.Address][]tokenTypes.StorageToken{
 		testAccAddress1: {storageToken},
 	}
 

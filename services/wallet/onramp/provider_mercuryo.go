@@ -14,6 +14,7 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/mercuryo"
 	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 const mercuryoID = "mercuryo"
@@ -21,7 +22,7 @@ const mercuryioNoFeesBaseURL = "https://exchange.mercuryo.io/?type=buy&networks=
 const supportedAssetsUpdateInterval = 24 * time.Hour
 
 type MercuryoProvider struct {
-	supportedTokens          []*token.Token
+	supportedTokens          []*tokenTypes.Token
 	supportedTokensTimestamp time.Time
 	supportedTokensLock      sync.RWMutex
 	httpClient               *mercuryo.Client
@@ -64,7 +65,7 @@ func (p *MercuryoProvider) GetCryptoOnRamp(ctx context.Context) (CryptoOnRamp, e
 	return provider, err
 }
 
-func (p *MercuryoProvider) getSupportedCurrencies(ctx context.Context) ([]*token.Token, error) {
+func (p *MercuryoProvider) getSupportedCurrencies(ctx context.Context) ([]*tokenTypes.Token, error) {
 	p.supportedTokensLock.Lock()
 	defer p.supportedTokensLock.Unlock()
 
@@ -77,7 +78,7 @@ func (p *MercuryoProvider) getSupportedCurrencies(ctx context.Context) ([]*token
 		return p.supportedTokens, err
 	}
 
-	newSupportedTokens := make([]*token.Token, 0, len(newSupportedCurrencies))
+	newSupportedTokens := make([]*tokenTypes.Token, 0, len(newSupportedCurrencies))
 	for _, currency := range newSupportedCurrencies {
 		chainID := mercuryo.NetworkToCommonChainID(currency.Network)
 		if chainID == walletCommon.UnknownChainID {

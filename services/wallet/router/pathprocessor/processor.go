@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/wallet/requests"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 )
 
@@ -60,8 +60,8 @@ type ProcessorInputParams struct {
 	ToChain   *params.Network
 	FromAddr  common.Address
 	ToAddr    common.Address
-	FromToken *token.Token
-	ToToken   *token.Token
+	FromToken *tokenTypes.Token
+	ToToken   *tokenTypes.Token
 	AmountIn  *big.Int
 	AmountOut *big.Int
 

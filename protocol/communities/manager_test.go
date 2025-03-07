@@ -28,7 +28,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/helpers"
 	wakutypes "github.com/status-im/status-go/waku/types"
 
@@ -201,7 +201,7 @@ func (m *testTokenManager) GetCachedBalancesByChain(ctx context.Context, account
 	return m.response, nil
 }
 
-func (m *testTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *token.Token {
+func (m *testTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token {
 	return nil
 }
 

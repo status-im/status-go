@@ -29,7 +29,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	walletToken "github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -112,7 +112,7 @@ func (m *TokenManagerMock) GetCachedBalancesByChain(ctx context.Context, account
 	return m.getBalanceBasedOnParams(accounts, tokenAddresses, chainIDs), nil
 }
 
-func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *walletToken.Token {
+func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *tokenTypes.Token {
 	time.Sleep(100 * time.Millisecond) // simulate response time
 	return nil
 }

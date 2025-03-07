@@ -38,6 +38,7 @@ import (
 	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/transactions"
 )
@@ -165,7 +166,7 @@ func (h *HopBridgeProcessor) AvailableFor(params ProcessorInputParams) (bool, er
 	return err == nil, err
 }
 
-func (c *HopBridgeProcessor) getAppropriateABI(contractType string, chainID uint64, token *token.Token) (abi.ABI, error) {
+func (c *HopBridgeProcessor) getAppropriateABI(contractType string, chainID uint64, token *tokenTypes.Token) (abi.ABI, error) {
 	switch contractType {
 	case hop.CctpL1Bridge:
 		return abi.JSON(strings.NewReader(hopL1CctpImplementation.HopL1CctpImplementationABI))
@@ -569,7 +570,7 @@ func (h *HopBridgeProcessor) packL1BridgeTx(abi abi.ABI, toChainID uint64, to co
 }
 
 func (h *HopBridgeProcessor) sendL1BridgeTx(contractAddress common.Address, ethClient chain.ClientInterface, toChainID uint64,
-	to common.Address, txOpts *bind.TransactOpts, token *token.Token, bonderFee *BonderFee) (tx *ethTypes.Transaction, err error) {
+	to common.Address, txOpts *bind.TransactOpts, token *tokenTypes.Token, bonderFee *BonderFee) (tx *ethTypes.Transaction, err error) {
 	if token.IsNative() {
 		contractInstance, err := hopL1EthBridge.NewHopL1EthBridge(
 			contractAddress,

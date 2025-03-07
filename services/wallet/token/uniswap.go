@@ -2,13 +2,14 @@ package token
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 var uniswapVersion = "13.11.0"
 
 var uniswapTimestamp = int64(1740787797)
 
-var uniswapTokens = []*Token{
+var uniswapTokens = []*tokenTypes.Token{
 
 	{
 		Address:   common.HexToAddress("0x111111111117dC0aa78b770fA6A738034120C302"),
