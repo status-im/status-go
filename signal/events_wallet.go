@@ -10,6 +10,7 @@ const (
 	RouterTransactionsSent           = SignalType("wallet.router.transactions-sent")
 	TransactionStatusChanged         = SignalType("wallet.transaction.status-changed")
 	SuggestedRoutes                  = SignalType("wallet.suggested.routes")
+	TokenListsUpdated                = SignalType("wallet.token-lists.updated")
 )
 
 // SendWalletEvent sends event from services/wallet/events.
