@@ -501,6 +501,22 @@ var (
 		dBColumnName:   "peer_syncing_enabled",
 		valueHandler:   BoolHandler,
 	}
+	AutoRefreshTokensEnabled = SettingField{
+		reactFieldName: "auto-refresh-tokens-enabled",
+		dBColumnName:   "auto_refresh_tokens_enabled",
+		valueHandler:   BoolHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			fromInterface:     autoRefreshTokensEnabledProtobufFactory,
+			fromStruct:        autoRefreshTokensEnabledProtobufFactoryStruct,
+			valueFromProtobuf: BoolFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_AUTO_REFRESH_TOKENS_ENABLED,
+		},
+	}
+	LastTokensUpdate = SettingField{
+		reactFieldName: "last-tokens-update",
+		dBColumnName:   "last_tokens_update",
+		valueHandler:   TimeHandler,
+	}
 	SettingFieldRegister = []SettingField{
 		AnonMetricsShouldSend,
 		Appearance,
@@ -577,6 +593,8 @@ var (
 		WalletSetUpPassed,
 		WalletVisibleTokens,
 		WebviewAllowPermissionRequests,
+		AutoRefreshTokensEnabled,
+		LastTokensUpdate,
 	}
 )
 

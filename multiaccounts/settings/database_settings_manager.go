@@ -5,6 +5,7 @@ package settings
 import (
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
@@ -80,4 +81,6 @@ type DatabaseSettingsManager interface {
 	SubscribeToChanges() chan *SyncSettingField
 	MnemonicWasShown() error
 	GetPeerSyncingEnabled() (result bool, err error)
+	AutoRefreshTokensEnabled() (result bool, err error)
+	LastTokensUpdate() (result time.Time, err error)
 }

@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"context"
+	"time"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -171,4 +172,8 @@ func (api *SettingsAPI) SetBio(bio string) error {
 
 func (api *SettingsAPI) MnemonicWasShown() error {
 	return api.db.MnemonicWasShown()
+}
+
+func (api *SettingsAPI) LastTokensUpdate() (time.Time, error) {
+	return api.db.LastTokensUpdate()
 }

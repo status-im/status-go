@@ -3,6 +3,7 @@ package settings
 import (
 	"encoding/json"
 	"reflect"
+	"time"
 
 	accountJson "github.com/status-im/status-go/account/json"
 	"github.com/status-im/status-go/eth-node/types"
@@ -222,6 +223,8 @@ type Settings struct {
 	CollectibleGroupByCommunity         bool                          `json:"collectible-group-by-community?,omitempty"`
 	URLUnfurlingMode                    URLUnfurlingModeType          `json:"url-unfurling-mode,omitempty"`
 	PeerSyncingEnabled                  bool                          `json:"peer-syncing-enabled?,omitempty"`
+	AutoRefreshTokensEnabled            bool                          `json:"auto-refresh-tokens-enabled,omitempty"`
+	LastTokensUpdate                    time.Time                     `json:"last-tokens-update,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {

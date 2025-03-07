@@ -301,6 +301,8 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 
 	defaultSettings.TestNetworksEnabled = false
 
+	defaultSettings.AutoRefreshTokensEnabled = true
+
 	visibleTokens := make(map[string][]string)
 	visibleTokens["mainnet"] = []string{"SNT"}
 	visibleTokensJSON, err := json.Marshal(visibleTokens)
