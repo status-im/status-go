@@ -1,3 +1,4 @@
+import logging
 import os
 
 import pytest
@@ -71,11 +72,27 @@ class TestLocalWakuFleet(MessengerTestCase):
         backend.wait_for_online()
         return backend
 
-    def test_1(self, request, temp_dir):
+    def test_contact_request(self, request, temp_dir):
         dir_1 = os.path.join(temp_dir, "1")
-        # dir_2 = os.path.join(temp_dir, "2")
+        dir_2 = os.path.join(temp_dir, "2")
         self.sender = self.create_backend(dir_1, "http://localhost:12345")
-        # self.receiver = self.create_backend(dir_2, "http://localhost:12346")
-        # self.make_contacts()
+        self.receiver = self.create_backend(dir_2, "http://localhost:12346")
+        self.make_contacts()
+        self.sender.logout()
+        self.receiver.logout()
+
+    def test_create_and_fetch_community(self, request, temp_dir):
+        dir_1 = os.path.join(temp_dir, "1")
+        dir_2 = os.path.join(temp_dir, "2")
+        self.sender = self.create_backend(dir_1, "http://localhost:12345")
+        self.receiver = self.create_backend(dir_2, "http://localhost:12346")
+
+        community_id = self.create_community(self.sender)
+        logging.info(f"community created {community_id}")
+
+        self.fetch_community(self.receiver, community_id)
+
+        self.sender.logout()
+        self.receiver.logout()
 
 
