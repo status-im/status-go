@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"os"
 
-	"go.uber.org/zap"
-
-	"github.com/status-im/status-go/logutils"
+	"github.com/pkg/errors"
 )
 
 // Define available fleets.
@@ -93,20 +91,22 @@ func init() {
 }
 
 func loadFleetsFromFile(filepath string) FleetsMapV2 {
-	logger := logutils.ZapLogger()
-
 	// Read the JSON file to populate the supportedFleets map
 	file, err := os.Open(filepath)
 	if err != nil {
-		logger.Error("failed to open fleets json file", zap.Error(err))
+		err = errors.Wrap(err, "failed to open fleets json file")
+		panic(err)
 	}
+
 	defer file.Close()
 
+	var overrideFleets FleetsMapV2
 	decoder := json.NewDecoder(file)
 
-	var overrideFleets FleetsMapV2
-	if err = decoder.Decode(&overrideFleets); err != nil {
-		logger.Error("failed to decode fleets json file", zap.Error(err))
+	err = decoder.Decode(&overrideFleets)
+	if err != nil {
+		err = errors.Wrap(err, "failed to decode fleets json file")
+		panic(err)
 	}
 
 	return overrideFleets
