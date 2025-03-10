@@ -26,6 +26,7 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
+	wakuv2 "github.com/status-im/status-go/wakuv2"
 )
 
 // Whisper message properties.
@@ -85,6 +86,8 @@ type MessageSender struct {
 
 	// handleSharedSecrets is a callback that is called every time a new shared secret is negotiated
 	handleSharedSecrets func([]*sharedsecret.Secret) error
+
+	metricsHandler wakuv2.IMetricsHandler
 }
 
 func NewMessageSender(
@@ -430,6 +433,7 @@ func (s *MessageSender) sendCommunity(
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
 	s.transport.Track(messageID, hashes, newMessages)
+	s.sendBandwidthMetrics(rawMessage)
 
 	return messageID, nil
 }
@@ -476,6 +480,7 @@ func (s *MessageSender) sendPrivate(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send message with datasync")
 		}
+		s.sendBandwidthMetrics(rawMessage)
 		// We don't need to receive confirmations from our own devices
 		if !IsPubKeyEqual(recipient, &s.identity.PublicKey) {
 			confirmation := &RawMessageConfirmation{
@@ -525,6 +530,7 @@ func (s *MessageSender) sendPrivate(
 			zap.Any("contentType", rawMessage.MessageType),
 			zap.Strings("hashes", types.EncodeHexes(hashes)))
 		s.transport.Track(messageID, hashes, newMessages)
+		s.sendBandwidthMetrics(rawMessage)
 
 	} else {
 		messageSpec, err := s.protocol.BuildEncryptedMessage(rawMessage.Sender, recipient, wrappedMessage)
@@ -545,6 +551,7 @@ func (s *MessageSender) sendPrivate(
 			zap.String("messageType", "private"),
 			zap.Strings("hashes", types.EncodeHexes(hashes)))
 		s.transport.Track(messageID, hashes, newMessages)
+		s.sendBandwidthMetrics(rawMessage)
 	}
 
 	return messageID, nil
@@ -576,6 +583,7 @@ func (s *MessageSender) SendPairInstallation(
 	}
 
 	s.transport.Track(messageID, hashes, newMessages)
+	s.sendBandwidthMetrics(&rawMessage)
 
 	return messageID, nil
 }
@@ -800,6 +808,7 @@ func (s *MessageSender) SendPublic(
 		zap.String("messageType", "public"),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
 	s.transport.Track(messageID, hashes, newMessages)
+	s.sendBandwidthMetrics(&rawMessage)
 
 	return messageID, nil
 }
@@ -1310,6 +1319,12 @@ func (s *MessageSender) GetEphemeralKey() (*ecdsa.PrivateKey, error) {
 	}
 
 	return privateKey, nil
+}
+
+func (s *MessageSender) sendBandwidthMetrics(rawMessage *RawMessage) {
+	if s.metricsHandler != nil {
+		s.metricsHandler.PushRawMessageByType(rawMessage.PubsubTopic, rawMessage.ContentTopic, rawMessage.MessageType.String(), uint32(len(rawMessage.Payload)))
+	}
 }
 
 func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*wakutypes.NewMessage, error) {

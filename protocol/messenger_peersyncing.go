@@ -416,6 +416,11 @@ func (m *Messenger) sendDataSync(receiver state.PeerID, payload *datasyncproto.P
 
 	m.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.Strings("hashes", types.EncodeHexes(hashes)))
 	m.transport.TrackMany(messageIDs, hashes, newMessages)
+	if m.wakuMetricsHandler != nil {
+		for _, message := range newMessages {
+			m.wakuMetricsHandler.PushRawMessageByType(message.PubsubTopic, message.Topic.String(), "DATASYNC", uint32(len(message.Payload)))
+		}
+	}
 
 	return nil
 }

@@ -126,6 +126,7 @@ type IMetricsHandler interface {
 	PushMissedRelevantMessage(message *common.ReceivedMessage)
 	PushMessageDeliveryConfirmed()
 	PushSentMessageTotal(messageSize uint32, publishMethod string)
+	PushRawMessageByType(pubsubTopic string, contentTopic string, messageType string, messageSize uint32)
 }
 
 // Waku represents a dark communication interface through the Ethereum

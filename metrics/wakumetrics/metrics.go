@@ -20,6 +20,8 @@ type MetricsCollection struct {
 	ConnectedPeers               prometheus.Gauge
 	PeersByOrigin                *prometheus.GaugeVec
 	PeersByShard                 *prometheus.GaugeVec
+	RawMessagesSizeBytes         *prometheus.CounterVec
+	RawMessagesSentTotal         *prometheus.CounterVec
 }
 
 var metrics = MetricsCollection{
@@ -137,6 +139,22 @@ var metrics = MetricsCollection{
 		},
 		[]string{"peer_id"},
 	),
+
+	RawMessagesSizeBytes: prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "statusgo_waku_raw_message_size_bytes",
+			Help: "Size of each raw message in bytes sent by this node",
+		},
+		[]string{"message_type", "pubsub_topic", "content_topic"},
+	),
+
+	RawMessagesSentTotal: prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "statusgo_waku_raw_message_sent_total",
+			Help: "Total number of raw messages sent by this node",
+		},
+		[]string{"message_type", "pubsub_topic", "content_topic"},
+	),
 }
 
 var collectors = []prometheus.Collector{
@@ -154,6 +172,8 @@ var collectors = []prometheus.Collector{
 	metrics.StoreQueryFailures,
 	metrics.MissedMessages,
 	metrics.NodePeerId,
+	metrics.RawMessagesSizeBytes,
+	metrics.RawMessagesSentTotal,
 }
 
 // RegisterMetrics registers all metrics with the provided registry
