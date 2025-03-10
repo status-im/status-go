@@ -236,6 +236,7 @@ class StatusBackend(RpcClient, SignalClient):
             "logEnabled": True,
             "logLevel": "DEBUG",
             "wakuV2LightClient": kwargs.get("wakuV2LightClient", False),
+            "wakuV2Fleet": kwargs.get("wakuV2Fleet", ""),
         }
 
         data = self._set_proxy_credentials(data)
