@@ -393,3 +393,14 @@ class StatusBackend(RpcClient, SignalClient):
 
         except Exception as e:
             raise RuntimeError(f"Failed to change container IP: {e}")
+
+    def wait_for_online(self, timeout=10):
+        start_time = time.time()
+        while time.time() - start_time <= timeout:
+            response = self.wakuext_service.peers(enable_logging=False)
+            if len(response["result"].keys()) == 0:
+                time.sleep(0.5)
+                continue
+            logging.info(f"StatusBackend is online after {time.time() - start_time} seconds")
+            return
+        raise TimeoutError(f"StatusBackend was not online after {timeout} seconds")
