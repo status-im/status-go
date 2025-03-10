@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sync"
 
 	"github.com/syndtr/goleveldb/leveldb"
@@ -256,7 +255,7 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 
 	// continue only if there was no error when starting node with a db
 	if err == nil && options.StartDiscovery && n.discoveryEnabled() {
-		err = n.startDiscovery()
+		//err = n.startDiscovery()
 	}
 
 	if err != nil {
@@ -375,63 +374,63 @@ func (n *StatusNode) discoverNode() (*enode.Node, error) {
 	return enode.New(enode.ValidSchemes[r.IdentityScheme()], r)
 }
 
-// StartDiscovery starts the peers discovery protocols depending on the node config.
-func (n *StatusNode) StartDiscovery() error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if n.discoveryEnabled() {
-		return n.startDiscovery()
-	}
-
-	return nil
-}
-
-func (n *StatusNode) startDiscovery() error {
-	if n.isDiscoveryRunning() {
-		return ErrDiscoveryRunning
-	}
-
-	discoveries := []discovery.Discovery{}
-	if !n.config.NoDiscovery {
-		discoveries = append(discoveries, discovery.NewDiscV5(
-			n.gethNode.Server().PrivateKey,
-			n.config.ListenAddr,
-			parseNodesV5(n.config.ClusterConfig.BootNodes)))
-	}
-
-	if len(discoveries) == 0 {
-		return errors.New("wasn't able to register any discovery")
-	} else if len(discoveries) > 1 {
-		n.discovery = discovery.NewMultiplexer(discoveries)
-	} else {
-		n.discovery = discoveries[0]
-	}
-	n.logger.Debug("using discovery",
-		zap.Any("instance", reflect.TypeOf(n.discovery)),
-		zap.Any("registerTopics", n.config.RegisterTopics),
-		zap.Any("requireTopics", n.config.RequireTopics),
-	)
-	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
-	options := peers.NewDefaultOptions()
-	// TODO(dshulyak) consider adding a flag to define this behaviour
-	options.AllowStop = len(n.config.RegisterTopics) == 0
-	options.TrustedMailServers = parseNodesToNodeID(n.config.ClusterConfig.TrustedMailServers)
-
-	n.peerPool = peers.NewPeerPool(
-		n.discovery,
-		n.config.RequireTopics,
-		peers.NewCache(n.db),
-		options,
-	)
-	if err := n.discovery.Start(); err != nil {
-		return err
-	}
-	if err := n.register.Start(); err != nil {
-		return err
-	}
-	return n.peerPool.Start(n.gethNode.Server())
-}
+//// StartDiscovery starts the peers discovery protocols depending on the node config.
+//func (n *StatusNode) StartDiscovery() error {
+//	n.mu.Lock()
+//	defer n.mu.Unlock()
+//
+//	if n.discoveryEnabled() {
+//		return n.startDiscovery()
+//	}
+//
+//	return nil
+//}
+//
+//func (n *StatusNode) startDiscovery() error {
+//	if n.isDiscoveryRunning() {
+//		return ErrDiscoveryRunning
+//	}
+//
+//	discoveries := []discovery.Discovery{}
+//	if !n.config.NoDiscovery {
+//		discoveries = append(discoveries, discovery.NewDiscV5(
+//			n.gethNode.Server().PrivateKey,
+//			n.config.ListenAddr,
+//			parseNodesV5(n.config.ClusterConfig.BootNodes)))
+//	}
+//
+//	if len(discoveries) == 0 {
+//		return errors.New("wasn't able to register any discovery")
+//	} else if len(discoveries) > 1 {
+//		n.discovery = discovery.NewMultiplexer(discoveries)
+//	} else {
+//		n.discovery = discoveries[0]
+//	}
+//	n.logger.Debug("using discovery",
+//		zap.Any("instance", reflect.TypeOf(n.discovery)),
+//		zap.Any("registerTopics", n.config.RegisterTopics),
+//		zap.Any("requireTopics", n.config.RequireTopics),
+//	)
+//	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
+//	options := peers.NewDefaultOptions()
+//	// TODO(dshulyak) consider adding a flag to define this behaviour
+//	options.AllowStop = len(n.config.RegisterTopics) == 0
+//	options.TrustedMailServers = parseNodesToNodeID(n.config.ClusterConfig.TrustedMailServers)
+//
+//	n.peerPool = peers.NewPeerPool(
+//		n.discovery,
+//		n.config.RequireTopics,
+//		peers.NewCache(n.db),
+//		options,
+//	)
+//	if err := n.discovery.Start(); err != nil {
+//		return err
+//	}
+//	if err := n.register.Start(); err != nil {
+//		return err
+//	}
+//	return n.peerPool.Start(n.gethNode.Server())
+//}
 
 // Stop will stop current StatusNode. A stopped node cannot be resumed.
 func (n *StatusNode) Stop() error {
@@ -553,55 +552,55 @@ func (n *StatusNode) isRunning() bool {
 	return n.gethNode != nil && n.gethNode.Server() != nil
 }
 
-// populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
-func (n *StatusNode) populateStaticPeers() error {
-	if !n.config.ClusterConfig.Enabled {
-		n.logger.Info("Static peers are disabled")
-		return nil
-	}
+//// populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
+//func (n *StatusNode) populateStaticPeers() error {
+//	if !n.config.ClusterConfig.Enabled {
+//		n.logger.Info("Static peers are disabled")
+//		return nil
+//	}
+//
+//	for _, enode := range n.config.ClusterConfig.StaticNodes {
+//		if err := n.addPeer(enode); err != nil {
+//			n.logger.Error("Static peer addition failed", zap.Error(err))
+//			return err
+//		}
+//		n.logger.Info("Static peer added", zap.String("enode", enode))
+//	}
+//
+//	return nil
+//}
 
-	for _, enode := range n.config.ClusterConfig.StaticNodes {
-		if err := n.addPeer(enode); err != nil {
-			n.logger.Error("Static peer addition failed", zap.Error(err))
-			return err
-		}
-		n.logger.Info("Static peer added", zap.String("enode", enode))
-	}
+//func (n *StatusNode) removeStaticPeers() error {
+//	if !n.config.ClusterConfig.Enabled {
+//		n.logger.Info("Static peers are disabled")
+//		return nil
+//	}
+//
+//	for _, enode := range n.config.ClusterConfig.StaticNodes {
+//		if err := n.removePeer(enode); err != nil {
+//			n.logger.Error("Static peer deletion failed", zap.Error(err))
+//			return err
+//		}
+//		n.logger.Info("Static peer deleted", zap.String("enode", enode))
+//	}
+//	return nil
+//}
 
-	return nil
-}
-
-func (n *StatusNode) removeStaticPeers() error {
-	if !n.config.ClusterConfig.Enabled {
-		n.logger.Info("Static peers are disabled")
-		return nil
-	}
-
-	for _, enode := range n.config.ClusterConfig.StaticNodes {
-		if err := n.removePeer(enode); err != nil {
-			n.logger.Error("Static peer deletion failed", zap.Error(err))
-			return err
-		}
-		n.logger.Info("Static peer deleted", zap.String("enode", enode))
-	}
-	return nil
-}
-
-// ReconnectStaticPeers removes and adds static peers to a server.
-func (n *StatusNode) ReconnectStaticPeers() error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if !n.isRunning() {
-		return ErrNoRunningNode
-	}
-
-	if err := n.removeStaticPeers(); err != nil {
-		return err
-	}
-
-	return n.populateStaticPeers()
-}
+//// ReconnectStaticPeers removes and adds static peers to a server.
+//func (n *StatusNode) ReconnectStaticPeers() error {
+//	n.mu.Lock()
+//	defer n.mu.Unlock()
+//
+//	if !n.isRunning() {
+//		return ErrNoRunningNode
+//	}
+//
+//	if err := n.removeStaticPeers(); err != nil {
+//		return err
+//	}
+//
+//	return n.populateStaticPeers()
+//}
 
 // AddPeer adds new static peer node
 func (n *StatusNode) AddPeer(url string) error {

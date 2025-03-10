@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	validator "gopkg.in/go-playground/validator.v9"
+	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
@@ -100,6 +100,7 @@ type WakuV2Config struct {
 	EnableConfirmations bool
 
 	// A name->libp2p_addr map for Wakuv2 custom nodes
+	// Deprecated: simply unused
 	CustomNodes map[string]string
 
 	// PeerExchange determines whether WakuV2 Peer Exchange is enabled or not
@@ -135,6 +136,18 @@ type WakuV2Config struct {
 
 	// EnableMissingMessageVerification indicates whether storenodes must be queried periodically to confirm if messages sent are actually propagated in the network
 	EnableStoreConfirmationForMessagesSent bool
+
+	// Fleet is a name of a selected Waku fleet
+	Fleet string
+
+	// WakuNodes is a list of waku2 multiaddresses
+	WakuNodes []string
+
+	// DiscV5Nodes is a list of enr to be used for ambient discovery
+	DiscV5BootstrapNodes []string
+
+	//Waku network identifier
+	ClusterID uint16
 }
 
 // ----------
@@ -170,13 +183,15 @@ type ClusterConfig struct {
 	Fleet string
 
 	// StaticNodes is a list of static nodes.
+	// Deprecated: Not used in Waku V2
 	StaticNodes []string
 
 	// BootNodes is a list of bootnodes.
-	// Deprecated: won't be used at all in wakuv2
+	// Deprecated: Not used in Waku V2
 	BootNodes []string
 
 	// TrustedMailServers is a list of verified and trusted Mail Server nodes.
+	// Deprecated: Not used in Waku V2
 	TrustedMailServers []string
 
 	// PushNotificationsServers is a list of default push notification servers.
@@ -351,6 +366,7 @@ type NodeConfig struct {
 	Networks []Network
 
 	// ClusterConfig extra configuration for supporting cluster peers.
+	// Deprecated: Use FleetConfig instead
 	ClusterConfig ClusterConfig `json:"ClusterConfig," validate:"structonly"`
 
 	// LightEthConfig extra configuration for LES
@@ -638,6 +654,7 @@ func WithMailserver() Option {
 func WithDiscV5BootstrapNodes(nodes []string) Option {
 	return func(c *NodeConfig) error {
 		c.ClusterConfig.DiscV5BootstrapNodes = nodes
+		c.WakuV2Config.DiscV5BootstrapNodes = nodes
 		return nil
 	}
 }
@@ -645,6 +662,7 @@ func WithDiscV5BootstrapNodes(nodes []string) Option {
 func WithWakuNodes(nodes []string) Option {
 	return func(c *NodeConfig) error {
 		c.ClusterConfig.WakuNodes = nodes
+		c.WakuV2Config.WakuNodes = nodes
 		return nil
 	}
 }
@@ -684,37 +702,43 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 }
 
 func (c *NodeConfig) setDefaultPushNotificationsServers() error {
-	if c.ClusterConfig.Fleet == FleetUndefined {
+	//if c.ClusterConfig.Fleet == FleetUndefined {
+	//	return nil
+	//}
+
+	//// If empty load defaults from the fleet
+	//if len(c.ClusterConfig.PushNotificationsServers) == 0 {
+	//	logutils.ZapLogger().Debug("empty push notification servers, setting", zap.String("fleet", c.ClusterConfig.Fleet))
+	//	defaultConfig := &NodeConfig{}
+	//	err := loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", c.ClusterConfig.Fleet), defaultConfig)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	c.ClusterConfig.PushNotificationsServers = defaultConfig.ClusterConfig.PushNotificationsServers
+	//}
+
+	if len(c.ShhextConfig.DefaultPushNotificationsServers) > 0 {
 		return nil
 	}
 
-	// If empty load defaults from the fleet
-	if len(c.ClusterConfig.PushNotificationsServers) == 0 {
-		logutils.ZapLogger().Debug("empty push notification servers, setting", zap.String("fleet", c.ClusterConfig.Fleet))
-		defaultConfig := &NodeConfig{}
-		err := loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", c.ClusterConfig.Fleet), defaultConfig)
+	// If empty set the default servers
+	logutils.ZapLogger().Debug("setting default push notification servers",
+		zap.Strings("servers", DefaultPushNotificationServers))
+
+	for _, pk := range DefaultPushNotificationServers {
+		keyBytes, err := hex.DecodeString("04" + pk)
 		if err != nil {
 			return err
 		}
-		c.ClusterConfig.PushNotificationsServers = defaultConfig.ClusterConfig.PushNotificationsServers
-	}
 
-	// If empty set the default servers
-	if len(c.ShhextConfig.DefaultPushNotificationsServers) == 0 {
-		logutils.ZapLogger().Debug("setting default push notification servers", zap.Strings("cluster servers", c.ClusterConfig.PushNotificationsServers))
-		for _, pk := range c.ClusterConfig.PushNotificationsServers {
-			keyBytes, err := hex.DecodeString("04" + pk)
-			if err != nil {
-				return err
-			}
-
-			key, err := crypto.UnmarshalPubkey(keyBytes)
-			if err != nil {
-				return err
-			}
-			c.ShhextConfig.DefaultPushNotificationsServers = append(c.ShhextConfig.DefaultPushNotificationsServers, &PushNotificationServer{PublicKey: key})
+		key, err := crypto.UnmarshalPubkey(keyBytes)
+		if err != nil {
+			return err
 		}
+
+		c.ShhextConfig.DefaultPushNotificationsServers = append(c.ShhextConfig.DefaultPushNotificationsServers, &PushNotificationServer{PublicKey: key})
 	}
+
 	return nil
 }
 
@@ -851,9 +875,23 @@ func NewConfigFromJSON(configJSON string) (*NodeConfig, error) {
 	return config, nil
 }
 
+const envFleetsFilePath = "STATUS_GO_FLEETS_FILE_PATH"
+
 func LoadClusterConfigFromFleet(fleet string) (*ClusterConfig, error) {
 	nodeConfig := &NodeConfig{}
-	err := loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet), nodeConfig)
+
+	var err error
+	//assetsDir := os.Getenv(envFleetsFilePath)
+	//fleetFileName := fmt.Sprintf("fleet-%s.json", fleet)
+
+	//if assetsDir != "" {
+	//	path := filepath.Join(assetsDir, fleetFileName)
+	//	err = loadConfigConfigFromFile(path, nodeConfig)
+	//} else {
+	path := fmt.Sprintf("../config/cli/%s", fleet)
+	err = loadConfigFromAsset(path, nodeConfig)
+	//}
+
 	if err != nil {
 		return nil, err
 	}

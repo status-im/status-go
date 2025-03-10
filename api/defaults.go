@@ -25,7 +25,7 @@ const (
 	pathEncryption           = pathEIP1581 + "/1'/0"
 	pathDefaultWallet        = pathWalletRoot + "/0"
 	defaultMnemonicLength    = 12
-	shardsTestClusterID      = 16
+	ShardsTestClusterID      = 16
 	walletAccountDefaultName = "Account 1"
 
 	DefaultKeystoreRelativePath   = "keystore"
@@ -135,10 +135,6 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	return s, nil
 }
 
-func SetDefaultFleet(nodeConfig *params.NodeConfig) error {
-	return SetFleet(DefaultFleet, nodeConfig)
-}
-
 func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	specifiedWakuV2Config := nodeConfig.WakuV2Config
 	nodeConfig.WakuV2Config = params.WakuV2Config{
@@ -154,18 +150,23 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		Nameserver:                             specifiedWakuV2Config.Nameserver,
 	}
 
-	clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
-	if err != nil {
-		return err
-	}
-	nodeConfig.ClusterConfig = *clusterConfig
-	nodeConfig.ClusterConfig.Fleet = fleet
-	nodeConfig.ClusterConfig.WakuNodes = params.DefaultWakuNodes(fleet)
-	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = params.DefaultDiscV5Nodes(fleet)
+	//clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
+	//if err != nil {
+	//	return err
+	//}
+	//nodeConfig.ClusterConfig = *clusterConfig
+	//nodeConfig.ClusterConfig.Fleet = fleet
+	//nodeConfig.ClusterConfig.WakuNodes = params.DefaultWakuNodes(fleet)
+	//nodeConfig.ClusterConfig.DiscV5BootstrapNodes = params.DefaultDiscV5Nodes(fleet)
+	//
+	//if fleet == params.FleetStatusProd {
+	//	nodeConfig.ClusterConfig.ClusterID = ShardsTestClusterID
+	//}
 
-	if fleet == params.FleetStatusProd {
-		nodeConfig.ClusterConfig.ClusterID = shardsTestClusterID
-	}
+	nodeConfig.WakuV2Config.Fleet = fleet
+	nodeConfig.WakuV2Config.WakuNodes = params.DefaultWakuNodes(fleet)
+	nodeConfig.WakuV2Config.DiscV5BootstrapNodes = params.DefaultDiscV5Nodes(fleet)
+	nodeConfig.WakuV2Config.ClusterID = params.DefaultClusterID(fleet)
 
 	return nil
 }

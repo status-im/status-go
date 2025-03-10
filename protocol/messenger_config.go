@@ -80,12 +80,13 @@ type config struct {
 	featureFlags     common.FeatureFlags
 	codeControlFlags common.CodeControlFlags
 
-	appDb                  *sql.DB
-	walletDb               *sql.DB
-	afterDbCreatedHooks    []Option
-	multiAccount           *multiaccounts.Database
-	mailserversDatabase    *mailservers.Database
-	account                *multiaccounts.Account
+	appDb               *sql.DB
+	walletDb            *sql.DB
+	afterDbCreatedHooks []Option
+	multiAccount        *multiaccounts.Database
+	mailserversDatabase *mailservers.Database
+	account             *multiaccounts.Account
+	// Deprecated: clusterConfig should be removed and not used
 	clusterConfig          params.ClusterConfig
 	browserDatabase        *browsers.Database
 	torrentConfig          *params.TorrentConfig

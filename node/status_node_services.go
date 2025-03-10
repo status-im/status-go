@@ -232,18 +232,18 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			Host:                                   nodeConfig.WakuV2Config.Host,
 			Port:                                   nodeConfig.WakuV2Config.Port,
 			LightClient:                            nodeConfig.WakuV2Config.LightClient,
-			WakuNodes:                              nodeConfig.ClusterConfig.WakuNodes,
+			WakuNodes:                              nodeConfig.WakuV2Config.WakuNodes,
 			EnableStore:                            nodeConfig.WakuV2Config.EnableStore,
 			StoreCapacity:                          nodeConfig.WakuV2Config.StoreCapacity,
 			StoreSeconds:                           nodeConfig.WakuV2Config.StoreSeconds,
 			DiscoveryLimit:                         nodeConfig.WakuV2Config.DiscoveryLimit,
-			DiscV5BootstrapNodes:                   nodeConfig.ClusterConfig.DiscV5BootstrapNodes,
+			DiscV5BootstrapNodes:                   nodeConfig.WakuV2Config.DiscV5BootstrapNodes,
 			Nameserver:                             nodeConfig.WakuV2Config.Nameserver,
 			UDPPort:                                nodeConfig.WakuV2Config.UDPPort,
 			AutoUpdate:                             nodeConfig.WakuV2Config.AutoUpdate,
 			DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
 			TelemetryServerURL:                     nodeConfig.WakuV2Config.TelemetryServerURL,
-			ClusterID:                              nodeConfig.ClusterConfig.ClusterID,
+			ClusterID:                              nodeConfig.WakuV2Config.ClusterID,
 			EnableMissingMessageVerification:       nodeConfig.WakuV2Config.EnableMissingMessageVerification,
 			EnableStoreConfirmationForMessagesSent: nodeConfig.WakuV2Config.EnableStoreConfirmationForMessagesSent,
 			UseThrottledPublish:                    true,
@@ -286,7 +286,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			}
 		}
 
-		w, err := wakuv2.New(nodeKey, nodeConfig.ClusterConfig.Fleet, cfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
+		w, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
 
 		if err != nil {
 			return nil, err

@@ -122,10 +122,10 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		nc.WSOrigins = []string{"*"}
 	}
 
-	if config.ClusterConfig.Enabled {
-		nc.P2P.BootstrapNodesV5 = parseNodesV5(config.ClusterConfig.BootNodes)
-		nc.P2P.StaticNodes = parseNodes(config.ClusterConfig.StaticNodes)
-	}
+	//if config.ClusterConfig.Enabled {
+	//	nc.P2P.BootstrapNodesV5 = parseNodesV5(config.ClusterConfig.BootNodes)
+	//	nc.P2P.StaticNodes = parseNodes(config.ClusterConfig.StaticNodes)
+	//}
 
 	if config.NodeKey != "" {
 		sk, err := crypto.HexToECDSA(config.NodeKey)
