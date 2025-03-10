@@ -9,7 +9,6 @@ import (
 
 type Node interface {
 	NewENSVerifier(logger *zap.Logger) enstypes.ENSVerifier
-	GetWaku(ctx interface{}) (wakutypes.Waku, error)
 	GetWakuV2(ctx interface{}) (wakutypes.Waku, error)
 	AddPeer(url string) error
 	RemovePeer(url string) error

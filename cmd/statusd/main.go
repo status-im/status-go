@@ -267,7 +267,7 @@ func main() {
 		messenger, err := protocol.NewMessenger(
 			config.Name,
 			identity,
-			gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
+			gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuV2Service()),
 			installationID.String(),
 			nil,
 			config.Version,
@@ -340,7 +340,7 @@ func main() {
 			messenger, err := protocol.NewMessenger(
 				config.Name,
 				identity,
-				gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuService(), backend.StatusNode().WakuV2Service()),
+				gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuV2Service()),
 				installationID.String(),
 				nil,
 				config.Version,

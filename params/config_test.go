@@ -29,10 +29,8 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.Equal(t, "/some/data/path", c.DataDir)
 	assert.Equal(t, "/some/data/path/keystore", c.KeyStoreDir)
 	// assert Whisper
-	assert.Equal(t, true, c.WakuConfig.Enabled)
-	assert.Equal(t, "/some/data/path/waku", c.WakuConfig.DataDir)
-	// assert MailServer
-	assert.Equal(t, false, c.WakuConfig.EnableMailServer)
+	assert.Equal(t, true, c.WakuV2Config.Enabled)
+	assert.Equal(t, "/some/data/path/wakuv2", c.WakuV2Config.DataDir)
 	// assert cluster
 	assert.Equal(t, false, c.NoDiscovery)
 	assert.Equal(t, params.FleetProd, c.ClusterConfig.Fleet)
@@ -212,10 +210,6 @@ func TestNodeConfigValidate(t *testing.T) {
 				"KeyStoreDir": "/some/dir",
 				"KeycardPairingDataFile": "/some/dir/keycard/pairings.json",
 				"NoDiscovery": true,
-				"WakuConfig": {
-					"Enabled": true,
-					"DataDir": "/foo"
-				},
 				"ShhextConfig": {
 					"PFSEnabled": true
 				}

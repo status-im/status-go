@@ -78,11 +78,6 @@ func randomInt(max int64) int {
 	return int(r.Int64())
 }
 
-func randomFloat(max int64) float64 {
-	r, _ := rand.Int(rand.Reader, big.NewInt(max))
-	return float64(r.Int64()) / (1 << 63)
-}
-
 func randomStringSlice() []string {
 	m := randomInt(7)
 	var result []string
@@ -222,34 +217,6 @@ func randomNodeConfig() *params.NodeConfig {
 			EnableDiscV5:        randomBool(),
 			UDPPort:             randomInt(math.MaxInt64),
 			AutoUpdate:          randomBool(),
-		},
-		WakuConfig: params.WakuConfig{
-			Enabled:                 randomBool(),
-			LightClient:             randomBool(),
-			FullNode:                randomBool(),
-			EnableMailServer:        randomBool(),
-			DataDir:                 randomString(),
-			MinimumPoW:              randomFloat(math.MaxInt64),
-			MailServerPassword:      randomString(),
-			MailServerRateLimit:     randomInt(math.MaxInt64),
-			MailServerDataRetention: randomInt(math.MaxInt64),
-			TTL:                     randomInt(math.MaxInt64),
-			MaxMessageSize:          uint32(randomInt(math.MaxInt64)),
-			DatabaseConfig: params.DatabaseConfig{
-				PGConfig: params.PGConfig{
-					Enabled: randomBool(),
-					URI:     randomString(),
-				},
-			},
-			EnableRateLimiter:      randomBool(),
-			PacketRateLimitIP:      int64(randomInt(math.MaxInt64)),
-			PacketRateLimitPeerID:  int64(randomInt(math.MaxInt64)),
-			BytesRateLimitIP:       int64(randomInt(math.MaxInt64)),
-			BytesRateLimitPeerID:   int64(randomInt(math.MaxInt64)),
-			RateLimitTolerance:     int64(randomInt(math.MaxInt64)),
-			BloomFilterMode:        randomBool(),
-			SoftBlacklistedPeerIDs: randomStringSlice(),
-			EnableConfirmations:    randomBool(),
 		},
 	}
 }

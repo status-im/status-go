@@ -53,13 +53,11 @@ import (
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/updates"
-	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/wakuv1"
 	"github.com/status-im/status-go/wakuv2"
 )
 
@@ -123,8 +121,6 @@ type StatusNode struct {
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         *timesource.NTPTimeSource
-	wakuSrvc               *wakuv1.Waku
-	wakuExtSrvc            *wakuext.Service
 	wakuV2Srvc             *wakuv2.Waku
 	wakuV2ExtSrvc          *wakuv2ext.Service
 	ensSrvc                *ens.Service
@@ -505,8 +501,6 @@ func (n *StatusNode) stop() error {
 	n.localNotificationsSrvc = nil
 	n.personalSrvc = nil
 	n.timeSourceSrvc = nil
-	n.wakuSrvc = nil
-	n.wakuExtSrvc = nil
 	n.wakuV2Srvc = nil
 	n.wakuV2ExtSrvc = nil
 	n.ensSrvc = nil
@@ -664,10 +658,6 @@ func (n *StatusNode) PeerCount() int {
 }
 
 func (n *StatusNode) ConnectionChanged(state connection.State) {
-	if n.wakuExtSrvc != nil {
-		n.wakuExtSrvc.ConnectionChanged(state)
-	}
-
 	if n.wakuV2ExtSrvc != nil {
 		n.wakuV2ExtSrvc.ConnectionChanged(state)
 	}

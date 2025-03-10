@@ -123,7 +123,7 @@ func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 
 	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
 		APIModules: "", // no whitelisted API modules; use only public APIs
-		WakuConfig: params.WakuConfig{
+		WakuV2Config: params.WakuV2Config{
 			Enabled: true,
 		},
 	})
@@ -155,7 +155,7 @@ func TestNodeRPCPrivateClientCallPrivateService(t *testing.T) {
 	var err error
 
 	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
-		WakuConfig: params.WakuConfig{
+		WakuV2Config: params.WakuV2Config{
 			Enabled: true,
 		},
 	})

@@ -3,7 +3,6 @@ package ext
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -21,14 +20,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/rlp"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/mailserver"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol"
@@ -1853,46 +1850,6 @@ func (api *PublicAPI) DeleteCommunityMemberMessages(request *requests.DeleteComm
 // -----
 // HELPER
 // -----
-
-// MakeMessagesRequestPayload makes a specific payload for MailServer
-// to request historic messages.
-// DEPRECATED
-func MakeMessagesRequestPayload(r MessagesRequest) ([]byte, error) {
-	cursor, err := hex.DecodeString(r.Cursor)
-	if err != nil {
-		return nil, fmt.Errorf("invalid cursor: %v", err)
-	}
-
-	if len(cursor) > 0 && len(cursor) != mailserver.CursorLength {
-		return nil, fmt.Errorf("invalid cursor size: expected %d but got %d", mailserver.CursorLength, len(cursor))
-	}
-
-	payload := mailserver.MessagesRequestPayload{
-		Lower: r.From,
-		Upper: r.To,
-		// We need to pass bloom filter for
-		// backward compatibility
-		Bloom:  createBloomFilter(r),
-		Topics: topicsToByteArray(r.Topics),
-		Limit:  r.Limit,
-		Cursor: cursor,
-		// Client must tell the MailServer if it supports batch responses.
-		// This can be removed in the future.
-		Batch: true,
-	}
-
-	return rlp.EncodeToBytes(payload)
-}
-
-func topicsToByteArray(topics []wakutypes.TopicType) [][]byte {
-
-	var response [][]byte
-	for idx := range topics {
-		response = append(response, topics[idx][:])
-	}
-
-	return response
-}
 
 func createBloomFilter(r MessagesRequest) []byte {
 	if len(r.Topics) > 0 {

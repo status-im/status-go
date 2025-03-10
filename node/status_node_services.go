@@ -16,11 +16,9 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/wakuv1"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/appmetrics"
@@ -29,7 +27,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	gethnode "github.com/status-im/status-go/eth-node/node"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -57,15 +54,14 @@ import (
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/updates"
-	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
-	wakuv1common "github.com/status-im/status-go/wakuv1/common"
 	"github.com/status-im/status-go/wakuv2"
+	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
 
 var (
@@ -120,26 +116,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	// by a certain account and check community entry permissions.
 	// We handle circular dependency between the two by delaying ininitalization of the CommunityCollectibleInfoProvider
 	// in the CollectiblesManager.
-	if config.WakuConfig.Enabled {
-		wakuService, err := b.wakuService(&config.WakuConfig, &config.ClusterConfig)
-		if err != nil {
-			return err
-		}
-
-		services = append(services, wakuService)
-
-		wakuext, err := b.wakuExtService(config)
-		if err != nil {
-			return err
-		}
-
-		b.wakuExtSrvc = wakuext
-
-		services = append(services, wakuext)
-
-		b.SetWalletCommunityInfoProvider(wakuext)
-	}
-
 	if config.WakuV2Config.Enabled {
 		telemetryServerURL := ""
 		if accDB.DB() != nil {
@@ -207,20 +183,7 @@ func (b *StatusNode) addPublicMethods(apis []gethrpc.API) {
 }
 
 func (b *StatusNode) nodeBridge() gethnode.Node {
-	return gethbridge.NewNodeBridge(b.gethNode, b.wakuSrvc, b.wakuV2Srvc)
-}
-
-func (b *StatusNode) wakuExtService(config *params.NodeConfig) (*wakuext.Service, error) {
-	if b.gethNode == nil {
-		return nil, errors.New("geth node not initialized")
-	}
-
-	if b.wakuExtSrvc == nil {
-		b.wakuExtSrvc = wakuext.New(*config, b.nodeBridge(), b.rpcClient, ext.EnvelopeSignalHandler{}, b.db)
-	}
-
-	b.wakuExtSrvc.SetP2PServer(b.gethNode.Server())
-	return b.wakuExtSrvc, nil
+	return gethbridge.NewNodeBridge(b.gethNode, b.wakuV2Srvc)
 }
 
 func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Service, error) {
@@ -258,14 +221,6 @@ func (b *StatusNode) EnsService() *ens.Service {
 	return b.ensSrvc
 }
 
-func (b *StatusNode) WakuService() *wakuv1.Waku {
-	return b.wakuSrvc
-}
-
-func (b *StatusNode) WakuExtService() *wakuext.Service {
-	return b.wakuExtSrvc
-}
-
 func (b *StatusNode) WakuV2ExtService() *wakuv2ext.Service {
 	return b.wakuV2ExtSrvc
 }
@@ -273,58 +228,10 @@ func (b *StatusNode) WakuV2Service() *wakuv2.Waku {
 	return b.wakuV2Srvc
 }
 
-func (b *StatusNode) wakuService(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*wakuv1.Waku, error) {
-	if b.wakuSrvc == nil {
-		cfg := &wakuv1.Config{
-			MaxMessageSize:         wakuv1common.DefaultMaxMessageSize,
-			BloomFilterMode:        wakuCfg.BloomFilterMode,
-			FullNode:               wakuCfg.FullNode,
-			SoftBlacklistedPeerIDs: wakuCfg.SoftBlacklistedPeerIDs,
-			MinimumAcceptedPoW:     params.WakuMinimumPoW,
-			EnableConfirmations:    wakuCfg.EnableConfirmations,
-		}
-
-		if wakuCfg.MaxMessageSize > 0 {
-			cfg.MaxMessageSize = wakuCfg.MaxMessageSize
-		}
-		if wakuCfg.MinimumPoW > 0 {
-			cfg.MinimumAcceptedPoW = wakuCfg.MinimumPoW
-		}
-
-		w := wakuv1.New(cfg, logutils.ZapLogger())
-
-		if wakuCfg.EnableRateLimiter {
-			r := wakuRateLimiter(wakuCfg, clusterCfg)
-			w.RegisterRateLimiter(r)
-		}
-
-		if timesource := b.timeSource(); timesource != nil {
-			w.SetTimeSource(timesource.Now)
-		}
-
-		// enable mail service
-		if wakuCfg.EnableMailServer {
-			if err := registerWakuMailServer(w, wakuCfg); err != nil {
-				return nil, fmt.Errorf("failed to register WakuMailServer: %v", err)
-			}
-		}
-
-		if wakuCfg.LightClient {
-			emptyBloomFilter := make([]byte, 64)
-			if err := w.SetBloomFilter(emptyBloomFilter); err != nil {
-				return nil, err
-			}
-		}
-		b.wakuSrvc = w
-	}
-	return b.wakuSrvc, nil
-
-}
-
 func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku, error) {
 	if b.wakuV2Srvc == nil {
 		cfg := &wakuv2.Config{
-			MaxMessageSize:                         wakuv1common.DefaultMaxMessageSize,
+			MaxMessageSize:                         wakuv2common.DefaultMaxMessageSize,
 			Host:                                   nodeConfig.WakuV2Config.Host,
 			Port:                                   nodeConfig.WakuV2Config.Port,
 			LightClient:                            nodeConfig.WakuV2Config.LightClient,
@@ -401,35 +308,6 @@ func setSettingsNotifier(db *accounts.Database, feed *event.Feed) {
 			Value:   val,
 		})
 	})
-}
-
-func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) *wakuv1common.PeerRateLimiter {
-	enodes := append(
-		parseNodes(clusterCfg.StaticNodes),
-		parseNodes(clusterCfg.TrustedMailServers)...,
-	)
-	var (
-		ips     []string
-		peerIDs []enode.ID
-	)
-	for _, item := range enodes {
-		ips = append(ips, item.IP().String())
-		peerIDs = append(peerIDs, item.ID())
-	}
-	return wakuv1common.NewPeerRateLimiter(
-		&wakuv1common.PeerRateLimiterConfig{
-			PacketLimitPerSecIP:     wakuCfg.PacketRateLimitIP,
-			PacketLimitPerSecPeerID: wakuCfg.PacketRateLimitPeerID,
-			BytesLimitPerSecIP:      wakuCfg.BytesRateLimitIP,
-			BytesLimitPerSecPeerID:  wakuCfg.BytesRateLimitPeerID,
-			WhitelistedIPs:          ips,
-			WhitelistedPeerIDs:      peerIDs,
-		},
-		&wakuv1common.MetricsRateLimiterHandler{},
-		&wakuv1common.DropPeerRateLimiterHandler{
-			Tolerance: wakuCfg.RateLimitTolerance,
-		},
-	)
 }
 
 func (b *StatusNode) connectorService() *connector.Service {
@@ -627,13 +505,6 @@ func (b *StatusNode) ethService() *eth.Service {
 	return b.ethSrvc
 }
 
-func registerWakuMailServer(wakuService *wakuv1.Waku, config *params.WakuConfig) (err error) {
-	var mailServer mailserver.WakuMailServer
-	wakuService.RegisterMailServer(&mailServer)
-
-	return mailServer.Init(wakuService, config)
-}
-
 func appendIf(condition bool, services []common.StatusService, service common.StatusService) []common.StatusService {
 	if !condition {
 		return services
@@ -719,12 +590,6 @@ func (b *StatusNode) timeSourceNow() func() time.Time {
 }
 
 func (b *StatusNode) Cleanup() error {
-	if b.wakuSrvc != nil {
-		if err := b.wakuSrvc.DeleteKeyPairs(); err != nil {
-			return fmt.Errorf("%s: %v", ErrWakuClearIdentitiesFailure, err)
-		}
-	}
-
 	if b.Config() != nil && b.Config().WalletConfig.Enabled {
 		if b.walletSrvc != nil {
 			if b.walletSrvc.IsStarted() {

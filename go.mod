@@ -22,7 +22,7 @@ require (
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/davecgh/go-spew v1.1.1
-	github.com/deckarep/golang-set v1.8.0
+	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/forPelevin/gomoji v1.1.2
 	github.com/golang/protobuf v1.5.3
@@ -58,7 +58,6 @@ require (
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
 	github.com/stretchr/testify v1.9.0
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
-	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
 	github.com/wealdtech/go-ens/v3 v3.5.0
 	github.com/wealdtech/go-multicodec v1.4.0
 	github.com/xeipuuv/gojsonschema v1.2.0
@@ -92,6 +91,7 @@ require (
 	github.com/ladydascalie/currency v1.6.0
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
+	github.com/prometheus/client_model v0.6.1
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 	github.com/urfave/cli/v2 v2.27.2
@@ -240,7 +240,6 @@ require (
 	github.com/pion/turn/v2 v2.1.6 // indirect
 	github.com/pion/webrtc/v3 v3.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/prometheus/tsdb v0.10.0 // indirect

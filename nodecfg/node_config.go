@@ -35,7 +35,7 @@ type insertFn func(tx *sql.Tx, c *params.NodeConfig) error
 func insertNodeConfigBase(tx *sql.Tx, c *params.NodeConfig, includeConnector bool) error {
 	query := `
 	INSERT OR REPLACE INTO node_config (
-		network_id, data_dir, keystore_dir, node_key, no_discovery, 
+		network_id, data_dir, keystore_dir, node_key, no_discovery,
 		listen_addr, advertise_addr, name, version, api_modules, tls_enabled,
 		max_peers, max_pending_peers, enable_status_service, enable_ntp_sync,
 		bridge_enabled, wallet_enabled, local_notifications_enabled,
@@ -288,39 +288,6 @@ func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func insertWakuV1Config(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`
-	INSERT OR REPLACE INTO waku_config (
-		enabled, light_client, full_node, enable_mailserver, data_dir, minimum_pow, mailserver_password, mailserver_rate_limit, mailserver_data_retention,
-		ttl, max_message_size, enable_rate_limiter, packet_rate_limit_ip, packet_rate_limit_peer_id, bytes_rate_limit_ip, bytes_rate_limit_peer_id,
-		rate_limit_tolerance, bloom_filter_mode, enable_confirmations, synthetic_id
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
-		c.WakuConfig.Enabled, c.WakuConfig.LightClient, c.WakuConfig.FullNode, c.WakuConfig.EnableMailServer, c.WakuConfig.DataDir, c.WakuConfig.MinimumPoW,
-		c.WakuConfig.MailServerPassword, c.WakuConfig.MailServerRateLimit, c.WakuConfig.MailServerDataRetention, c.WakuConfig.TTL, c.WakuConfig.MaxMessageSize,
-		c.WakuConfig.EnableRateLimiter, c.WakuConfig.PacketRateLimitIP, c.WakuConfig.PacketRateLimitPeerID, c.WakuConfig.BytesRateLimitIP, c.WakuConfig.BytesRateLimitPeerID,
-		c.WakuConfig.RateLimitTolerance, c.WakuConfig.BloomFilterMode, c.WakuConfig.EnableConfirmations,
-	)
-	if err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(`INSERT OR REPLACE INTO waku_config_db_pg (enabled, uri, synthetic_id) VALUES (?, ?, 'id')`, c.WakuConfig.DatabaseConfig.PGConfig.Enabled, c.WakuConfig.DatabaseConfig.PGConfig.URI); err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(`DELETE FROM waku_softblacklisted_peers WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for _, peerID := range c.WakuConfig.SoftBlacklistedPeerIDs {
-		_, err := tx.Exec(`INSERT OR REPLACE INTO waku_softblacklisted_peers (peer_id, synthetic_id) VALUES (?, 'id')`, peerID)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func insertPushNotificationsServerConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	hexPrivKey := ""
 	if c.PushNotificationServerConfig.Identity != nil {
@@ -371,7 +338,6 @@ func nodeConfigUpgradeInserts() []insertFn {
 		insertRequireTopics,
 		insertPushNotificationsServerConfig,
 		insertShhExtConfig,
-		insertWakuV1Config,
 		insertWakuV2ConfigPreMigration,
 	}
 }
@@ -394,7 +360,6 @@ func nodeConfigNormalInserts() []insertFn {
 		insertRequireTopics,
 		insertPushNotificationsServerConfig,
 		insertShhExtConfig,
-		insertWakuV1Config,
 		insertWakuV2ConfigPreMigration,
 		insertTorrentConfig,
 		insertWakuV2ConfigPostMigration,
@@ -724,40 +689,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 			return nil, err
 		}
 		nodecfg.WakuV2Config.CustomNodes[name] = multiaddress
-	}
-
-	err = tx.QueryRow(`
-	SELECT enabled, light_client, full_node, enable_mailserver, data_dir, minimum_pow, mailserver_password, mailserver_rate_limit, mailserver_data_retention,
-	ttl, max_message_size, enable_rate_limiter, packet_rate_limit_ip, packet_rate_limit_peer_id, bytes_rate_limit_ip, bytes_rate_limit_peer_id,
-	rate_limit_tolerance, bloom_filter_mode, enable_confirmations
-	FROM waku_config WHERE synthetic_id = 'id'
-	`).Scan(
-		&nodecfg.WakuConfig.Enabled, &nodecfg.WakuConfig.LightClient, &nodecfg.WakuConfig.FullNode, &nodecfg.WakuConfig.EnableMailServer, &nodecfg.WakuConfig.DataDir, &nodecfg.WakuConfig.MinimumPoW,
-		&nodecfg.WakuConfig.MailServerPassword, &nodecfg.WakuConfig.MailServerRateLimit, &nodecfg.WakuConfig.MailServerDataRetention, &nodecfg.WakuConfig.TTL, &nodecfg.WakuConfig.MaxMessageSize,
-		&nodecfg.WakuConfig.EnableRateLimiter, &nodecfg.WakuConfig.PacketRateLimitIP, &nodecfg.WakuConfig.PacketRateLimitPeerID, &nodecfg.WakuConfig.BytesRateLimitIP, &nodecfg.WakuConfig.BytesRateLimitPeerID,
-		&nodecfg.WakuConfig.RateLimitTolerance, &nodecfg.WakuConfig.BloomFilterMode, &nodecfg.WakuConfig.EnableConfirmations,
-	)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	err = tx.QueryRow("SELECT enabled, uri FROM waku_config_db_pg WHERE synthetic_id = 'id'").Scan(&nodecfg.WakuConfig.DatabaseConfig.PGConfig.Enabled, &nodecfg.WakuConfig.DatabaseConfig.PGConfig.URI)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	rows, err = tx.Query(`SELECT peer_id FROM waku_softblacklisted_peers WHERE synthetic_id = 'id' ORDER BY peer_id ASC`)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var peerID string
-		err = rows.Scan(&peerID)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.WakuConfig.SoftBlacklistedPeerIDs = append(nodecfg.WakuConfig.SoftBlacklistedPeerIDs, peerID)
 	}
 
 	return nodecfg, nil

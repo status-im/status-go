@@ -2181,8 +2181,8 @@ func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) erro
 		}
 	}
 
-	// Start WakuV1 if WakuV2 is not enabled
-	conf.WakuConfig.Enabled = !conf.WakuV2Config.Enabled
+	// TODO: Consider removing the Enabled field from the config as WakuV1 has been removed.
+	conf.WakuV2Config.Enabled = true
 	// NodeConfig.Version should be taken from version.Version
 	// which is set at the compile time.
 	// What's cached is usually outdated so we overwrite it here.
@@ -2624,10 +2624,6 @@ func (b *GethStatusBackend) AppStateChange(state AppState) {
 		return
 	}
 
-	if b.statusNode.WakuExtService() != nil {
-		messenger = b.statusNode.WakuExtService().Messenger()
-	}
-
 	if b.statusNode.WakuV2ExtService() != nil {
 		messenger = b.statusNode.WakuV2ExtService().Messenger()
 	}
@@ -2869,15 +2865,6 @@ func (b *GethStatusBackend) KeyUID() string {
 }
 
 func (b *GethStatusBackend) injectAccountsIntoServices() error {
-	if b.statusNode.WakuService() != nil {
-		return b.injectAccountsIntoWakuService(b.statusNode.WakuService(), func() *ext.Service {
-			if b.statusNode.WakuExtService() == nil {
-				return nil
-			}
-			return b.statusNode.WakuExtService().Service
-		}())
-	}
-
 	if b.statusNode.WakuV2Service() != nil {
 		return b.injectAccountsIntoWakuService(b.statusNode.WakuV2Service(), func() *ext.Service {
 			if b.statusNode.WakuV2ExtService() == nil {

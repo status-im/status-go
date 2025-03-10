@@ -68,12 +68,8 @@ func (n *testNode) RemovePeer(_ string) error {
 	panic("not implemented")
 }
 
-func (n *testNode) GetWaku(_ interface{}) (wakutypes.Waku, error) {
-	return n.shh, nil
-}
-
 func (n *testNode) GetWakuV2(_ interface{}) (wakutypes.Waku, error) {
-	return nil, errors.New("No waku v2 support")
+	return n.shh, nil
 }
 
 func (n *testNode) PeersCount() int {
