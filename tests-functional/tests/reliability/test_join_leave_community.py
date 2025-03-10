@@ -1,11 +1,11 @@
 from time import sleep
 import pytest
-from tests.test_cases import MessengerTestCase
+from steps.messenger import MessengerSteps
 
 
 @pytest.mark.usefixtures("setup_two_privileged_nodes")
 @pytest.mark.reliability
-class TestJoinLeaveCommunities(MessengerTestCase):
+class TestJoinLeaveCommunities(MessengerSteps):
 
     def test_join_leave_community_baseline(self, num_joins=1, network_condition=None):
         nodes_list = [self.sender, self.receiver]

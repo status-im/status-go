@@ -1,6 +1,6 @@
 import pytest
 
-from tests.test_cases import MessengerTestCase
+from steps.messenger import MessengerSteps
 
 from clients.services.wakuext import SendPinMessagePayload
 from clients.signals import SignalType
@@ -8,7 +8,7 @@ from clients.signals import SignalType
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc
-class TestChatMessages(MessengerTestCase):
+class TestChatMessages(MessengerSteps):
 
     def test_chat_messages(self):
         sent_texts, _ = self.send_multiple_one_to_one_messages(1)
@@ -137,7 +137,7 @@ class TestChatMessages(MessengerTestCase):
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc
-class TestUserStatus(MessengerTestCase):
+class TestUserStatus(MessengerSteps):
 
     def test_status_updates(self):
         self.make_contacts()

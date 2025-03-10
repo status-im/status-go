@@ -3,10 +3,10 @@ import random
 import pytest
 import logging
 
-from test_cases import StatusBackendTestCase
+from steps.status_backend import StatusBackendSteps
 
 
-class TestProfile(StatusBackendTestCase):
+class TestProfile(StatusBackendSteps):
     @pytest.mark.parametrize(
         "method, params",
         [

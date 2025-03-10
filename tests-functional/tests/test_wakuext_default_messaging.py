@@ -1,10 +1,10 @@
 import pytest
-from test_cases import MessengerTestCase
+from steps.messenger import MessengerSteps
 
 
 @pytest.mark.rpc
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
-class TestDefaultMessaging(MessengerTestCase):
+class TestDefaultMessaging(MessengerSteps):
 
     def test_one_to_one_messages(self):
         responses = self.one_to_one_message(5)

@@ -1,14 +1,14 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from tests.test_cases import MessengerTestCase
+from steps.messenger import MessengerSteps
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 from resources.constants import USE_IPV6
 
 
 @pytest.mark.reliability
-class TestContactRequests(MessengerTestCase):
+class TestContactRequests(MessengerSteps):
 
     def test_contact_request_baseline(self, execution_number=1, network_condition=None):
         self.add_contact(execution_number, network_condition)

@@ -2,13 +2,13 @@ from time import sleep, time
 from uuid import uuid4
 import pytest
 
-from tests.test_cases import MessengerTestCase
+from steps.messenger import MessengerSteps
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 
 
 @pytest.mark.reliability
-class TestLightClientRateLimiting(MessengerTestCase):
+class TestLightClientRateLimiting(MessengerSteps):
 
     def test_light_client_rate_limiting(self):
         self.sender = self.initialize_backend(await_signals=self.await_signals, wakuV2LightClient=True)

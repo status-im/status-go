@@ -1,14 +1,14 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from tests.test_cases import MessengerTestCase
+from steps.messenger import MessengerSteps
 from clients.signals import SignalType
 from resources.constants import USE_IPV6
 
 
 @pytest.mark.usefixtures("setup_two_privileged_nodes")
 @pytest.mark.reliability
-class TestCommunityMessages(MessengerTestCase):
+class TestCommunityMessages(MessengerSteps):
 
     def test_community_messages_baseline(self, message_count=1, network_condition=None):
         self.create_community(self.sender)

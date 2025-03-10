@@ -3,7 +3,7 @@ from typing import Union
 import pytest
 
 from clients.status_backend import StatusBackend
-from tests.test_cases import MessengerTestCase
+from steps.messenger import MessengerSteps
 
 
 def _get_activity_center_notifications(
@@ -17,7 +17,7 @@ def _get_activity_center_notifications(
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc
-class TestActivityCenterNotifications(MessengerTestCase):
+class TestActivityCenterNotifications(MessengerSteps):
 
     def test_activity_center_notifications(self):
         message_id = self.send_contact_request_and_wait_for_signal_to_be_received()

@@ -1,5 +1,5 @@
 from resources.constants import USER_DIR
-from test_cases import StatusBackend
+from clients.status_backend import StatusBackend
 import pytest
 from clients.signals import SignalType
 import os

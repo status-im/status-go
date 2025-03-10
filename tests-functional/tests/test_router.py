@@ -4,7 +4,7 @@ import pytest
 import logging
 import resources.constants as constants
 
-from test_cases import StatusBackendTestCase
+from steps.status_backend import StatusBackendSteps
 from clients.signals import SignalType
 from utils import wallet_utils
 
@@ -12,7 +12,7 @@ from utils import wallet_utils
 @pytest.mark.rpc
 @pytest.mark.transaction
 @pytest.mark.wallet
-class TestRouter(StatusBackendTestCase):
+class TestRouter(StatusBackendSteps):
     await_signals = [
         SignalType.NODE_LOGIN.value,
         SignalType.WALLET_SUGGESTED_ROUTES.value,

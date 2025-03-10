@@ -1,6 +1,6 @@
 import pytest
 
-from test_cases import EthRpcTestCase
+from steps.eth_rpc import EthRpcSteps
 
 
 def validate_header(header, block_number, block_hash):
@@ -26,7 +26,7 @@ def validate_receipt(receipt, tx_hash, block_number, block_hash):
 
 @pytest.mark.rpc
 @pytest.mark.ethclient
-class TestEth(EthRpcTestCase):
+class TestEth(EthRpcSteps):
 
     def test_block_number(self):
         self.rpc_client.rpc_valid_request("ethclient_blockNumber", [self.network_id])

@@ -4,12 +4,12 @@ import pytest
 
 from clients.signals import SignalType
 from resources.enums import MessageContentType
-from tests.test_cases import MessengerTestCase
+from steps.messenger import MessengerSteps
 
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc
-class TestMessageReactions(MessengerTestCase):
+class TestMessageReactions(MessengerSteps):
     def test_one_to_one_message_reactions(self):
         self.make_contacts()
         response = self.sender.wakuext_service.send_message(self.receiver.public_key, "test_message")

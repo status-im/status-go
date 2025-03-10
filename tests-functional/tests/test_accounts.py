@@ -3,12 +3,12 @@ import random
 import pytest
 
 from resources.constants import user_1
-from test_cases import StatusBackendTestCase
+from steps.status_backend import StatusBackendSteps
 
 
 @pytest.mark.accounts
 @pytest.mark.rpc
-class TestAccounts(StatusBackendTestCase):
+class TestAccounts(StatusBackendSteps):
 
     @pytest.mark.parametrize(
         "method, params",

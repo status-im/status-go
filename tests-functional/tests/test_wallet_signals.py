@@ -4,12 +4,12 @@ import random
 import pytest
 
 from resources.constants import user_1
-from test_cases import StatusBackendTestCase
+from steps.status_backend import StatusBackendSteps
 
 
 @pytest.mark.wallet
 @pytest.mark.rpc
-class TestWalletSignals(StatusBackendTestCase):
+class TestWalletSignals(StatusBackendSteps):
 
     def setup_class(self):
         self.await_signals.append("wallet")

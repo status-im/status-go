@@ -6,13 +6,14 @@ import pytest
 
 from conftest import option
 from resources.constants import user_1
-from test_cases import StatusBackendTestCase, TransactionTestCase
+from steps.status_backend import StatusBackendSteps
+from steps.transaction import TransactionSteps
 
 
 @pytest.mark.wallet
 @pytest.mark.tx
 @pytest.mark.rpc
-class TestTransactionRpc(TransactionTestCase):
+class TestTransactionRpc(TransactionSteps):
 
     @pytest.mark.parametrize(
         "method, params",
@@ -83,7 +84,7 @@ class TestTransactionRpc(TransactionTestCase):
 
 @pytest.mark.wallet
 @pytest.mark.rpc
-class TestRpc(StatusBackendTestCase):
+class TestRpc(StatusBackendSteps):
 
     @pytest.mark.parametrize(
         "method, params",

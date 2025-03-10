@@ -1,14 +1,14 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from tests.test_cases import MessengerTestCase
+from steps.messenger import MessengerSteps
 from clients.signals import SignalType
 from resources.constants import USE_IPV6
 
 
 @pytest.mark.usefixtures("setup_two_privileged_nodes")
 @pytest.mark.reliability
-class TestCreatePrivateGroups(MessengerTestCase):
+class TestCreatePrivateGroups(MessengerSteps):
 
     def test_create_private_group_baseline(self, private_groups_count=1):
         self.make_contacts()

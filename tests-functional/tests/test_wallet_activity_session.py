@@ -5,7 +5,7 @@ import uuid as uuid_lib
 import pytest
 
 from resources.constants import user_1, user_2
-from test_cases import StatusBackendTestCase
+from steps.status_backend import StatusBackendSteps
 from clients.signals import SignalType
 
 EventActivityFilteringDone = "wallet-activity-filtering-done"
@@ -20,7 +20,7 @@ def validate_entry(entry, tx_data):
 
 @pytest.mark.wallet
 @pytest.mark.rpc
-class TestWalletActivitySession(StatusBackendTestCase):
+class TestWalletActivitySession(StatusBackendSteps):
     await_signals = [
         SignalType.NODE_LOGIN.value,
         "wallet",

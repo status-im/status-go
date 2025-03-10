@@ -1,14 +1,14 @@
 from time import sleep
 from uuid import uuid4
 import pytest
-from tests.test_cases import MessengerTestCase
+from steps.messenger import MessengerSteps
 from clients.signals import SignalType
 from resources.constants import USE_IPV6
 
 
 @pytest.mark.usefixtures("setup_two_privileged_nodes")
 @pytest.mark.reliability
-class TestOneToOneMessages(MessengerTestCase):
+class TestOneToOneMessages(MessengerSteps):
 
     def test_one_to_one_message_baseline(self, message_count=1):
         self.one_to_one_message(message_count)

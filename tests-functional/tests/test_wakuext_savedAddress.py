@@ -1,12 +1,12 @@
 import pytest
 import logging
 
-from test_cases import StatusBackendTestCase
+from steps.status_backend import StatusBackendSteps
 
 
 @pytest.mark.rpc
 @pytest.mark.wallet
-class TestSavedAddresses(StatusBackendTestCase):
+class TestSavedAddresses(StatusBackendSteps):
 
     @pytest.mark.parametrize(
         "method, params",
