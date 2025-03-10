@@ -263,9 +263,9 @@ generate:  ##@ Run generate for all given packages using go-generate-fast, fallb
 generate-contracts:
 	go generate ./contracts
 download-tokens:
-	go run ./services/wallet/token/downloader/main.go
+	go run ./services/wallet/token/token-lists/default-lists/downloader/main.go
 analyze-token-stores:
-	go run ./services/wallet/token/analyzer/main.go
+	go run ./services/wallet/token/token-lists/analyzer/main.go
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
