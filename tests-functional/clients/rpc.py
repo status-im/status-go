@@ -12,6 +12,7 @@ class RpcClient:
     def __init__(self, rpc_url, client=requests.Session()):
         self.client = client
         self.rpc_url = rpc_url
+        self.request_counter = 0
 
     def _check_decode_and_key_errors_in_response(self, response, key):
         try:
@@ -45,7 +46,8 @@ class RpcClient:
     @retry(stop=stop_after_delay(10), wait=wait_fixed(0.5), reraise=True)
     def rpc_request(self, method, params=None, request_id=None, url=None, enable_logging=True):
         if not request_id:
-            request_id = 13
+            request_id = self.request_counter
+            self.request_counter += 1
         if params is None:
             params = []
         url = url if url else self.rpc_url
