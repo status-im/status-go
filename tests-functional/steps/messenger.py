@@ -33,7 +33,7 @@ class MessengerSteps(NetworkConditionsSteps):
 
     def initialize_backend(self, await_signals, privileged=True, ipv6=USE_IPV6, **kwargs):
         backend = StatusBackend(await_signals, privileged=privileged, ipv6=ipv6)
-        backend.init_status_backend()
+        backend.init_status_backend(data_dir)
         backend.create_account_and_login(**kwargs)
         backend.find_public_key()
         backend.wakuext_service.start_messenger()
