@@ -9,9 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -38,6 +36,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token/balancefetcher"
+	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -84,7 +83,6 @@ type Manager struct {
 	RPCClient            rpc.ClientInterface
 	ContractMaker        *contracts.ContractMaker
 	networkManager       network.ManagerInterface
-	stores               []Store // Set on init, not changed afterwards
 	communityTokensDB    *communitytokensdatabase.Database
 	communityManager     *community.Manager
 	mediaServer          *server.MediaServer
@@ -94,50 +92,7 @@ type Manager struct {
 	accountsDB           *accounts.Database
 	tokenBalancesStorage TokenBalancesStorage
 
-	tokens []*tokenTypes.Token
-
-	tokenLock sync.RWMutex
-}
-
-func mergeTokens(sliceLists [][]*tokenTypes.Token) []*tokenTypes.Token {
-	allKeys := make(map[string]bool)
-	res := []*tokenTypes.Token{}
-	for _, list := range sliceLists {
-		for _, token := range list {
-			key := strconv.FormatUint(token.ChainID, 10) + token.Address.String()
-			if _, value := allKeys[key]; !value {
-				allKeys[key] = true
-				res = append(res, token)
-			}
-		}
-	}
-	return res
-}
-
-func prepareTokens(networkManager network.ManagerInterface, stores []Store) []*tokenTypes.Token {
-	tokens := make([]*tokenTypes.Token, 0)
-
-	networks, err := networkManager.GetAll()
-	if err != nil {
-		return nil
-	}
-
-	for _, store := range stores {
-		validTokens := make([]*tokenTypes.Token, 0)
-		for _, token := range store.GetTokens() {
-			token.Verified = true
-
-			for _, network := range networks {
-				if network.ChainID == token.ChainID {
-					validTokens = append(validTokens, token)
-					break
-				}
-			}
-		}
-
-		tokens = mergeTokens([][]*tokenTypes.Token{tokens, validTokens})
-	}
-	return tokens
+	tokenLists *tokenlists.TokenLists
 }
 
 func NewTokenManager(
@@ -153,8 +108,12 @@ func NewTokenManager(
 	tokenBalancesStorage TokenBalancesStorage,
 ) *Manager {
 	maker, _ := contracts.NewContractMaker(RPCClient)
-	stores := []Store{NewUniswapStore(), NewDefaultStore(), NewAaveStore()}
-	tokens := prepareTokens(networkManager, stores)
+
+	tokensLists, err := tokenlists.NewTokenLists(appDB, db)
+	if err != nil {
+		logutils.ZapLogger().Error("Failed to create token lists", zap.Error(err))
+		return nil
+	}
 
 	return &Manager{
 		BalanceFetcher:       balancefetcher.NewDefaultBalanceFetcher(maker),
@@ -163,23 +122,29 @@ func NewTokenManager(
 		ContractMaker:        maker,
 		networkManager:       networkManager,
 		communityManager:     communityManager,
-		stores:               stores,
 		communityTokensDB:    communitytokensdatabase.NewCommunityTokensDatabase(appDB),
-		tokens:               tokens,
 		mediaServer:          mediaServer,
 		walletFeed:           walletFeed,
 		accountFeed:          accountFeed,
 		accountsDB:           accountsDB,
 		tokenBalancesStorage: tokenBalancesStorage,
+		tokenLists:           tokensLists,
 	}
 }
 
 func (tm *Manager) Start() {
 	tm.startAccountsWatcher()
+
+	// TODO: make `autoRefreshInterval` configurable from the client
+	autoRefreshInterval := 30 * time.Minute     // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
+	autoRefreshCheckInterval := 3 * time.Minute // interval after which we should check if we should trigger the auto-refresh
+	// For now we don't have the list of tokens lists remotely set so we're uisng the harcoded default lists. Once we have it
+	//we will just need to update the empty string with the correct URL.
+	tm.tokenLists.Start("", autoRefreshInterval, autoRefreshCheckInterval)
 }
 
 func (tm *Manager) startAccountsWatcher() {
-	if tm.accountWatcher != nil {
+	if tm.accountWatcher != nil || tm.accountFeed == nil || tm.accountsDB == nil {
 		return
 	}
 
@@ -188,6 +153,7 @@ func (tm *Manager) startAccountsWatcher() {
 }
 
 func (tm *Manager) Stop() {
+	tm.tokenLists.Stop()
 	tm.stopAccountsWatcher()
 }
 
@@ -214,19 +180,6 @@ func overrideTokensInPlace(networks []params.Network, tokens []*tokenTypes.Token
 			}
 		}
 	}
-}
-
-func (tm *Manager) getTokens() []*tokenTypes.Token {
-	tm.tokenLock.RLock()
-	defer tm.tokenLock.RUnlock()
-
-	return tm.tokens
-}
-
-func (tm *Manager) SetTokens(tokens []*tokenTypes.Token) {
-	tm.tokenLock.Lock()
-	defer tm.tokenLock.Unlock()
-	tm.tokens = tokens
 }
 
 func (tm *Manager) FindToken(network *params.Network, tokenSymbol string) *tokenTypes.Token {
@@ -301,8 +254,9 @@ func (tm *Manager) FindTokenByAddress(chainID uint64, address common.Address) *t
 }
 
 func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) *tokenTypes.Token {
+	uniqueListsTokens := tm.tokenLists.GetUniqueTokens()
 	// If token comes datasource, simply returns it
-	for _, token := range tm.getTokens() {
+	for _, token := range uniqueListsTokens {
 		if token.ChainID != chainID {
 			continue
 		}
@@ -478,7 +432,9 @@ func (tm *Manager) GetAllTokens() ([]*tokenTypes.Token, error) {
 		logutils.ZapLogger().Error("can't fetch custom tokens", zap.Error(err))
 	}
 
-	allTokens = append(tm.getTokens(), allTokens...)
+	uniqueListsTokens := tm.tokenLists.GetUniqueTokens()
+
+	allTokens = append(uniqueListsTokens, allTokens...)
 
 	overrideTokensInPlace(tm.networkManager.GetEmbeddedNetworks(), allTokens)
 
@@ -550,18 +506,30 @@ func (tm *Manager) GetList() *ListWrapper {
 		})
 	}
 
-	for _, store := range tm.stores {
+	tokensLists := tm.tokenLists.GetTokensLists()
+	for _, tokensList := range tokensLists {
+		timestamp, err := time.Parse(time.RFC3339, tokensList.Timestamp)
+		if err != nil {
+			logutils.ZapLogger().Error("Failed to parse timestamp", zap.Error(err))
+			continue
+		}
 		data = append(data, &List{
-			Name:                store.GetName(),
-			Tokens:              store.GetTokens(),
-			Source:              store.GetSource(),
-			Version:             store.GetVersion(),
-			LastUpdateTimestamp: store.GetUpdatedAt(),
+			Name:                tokensList.Name,
+			Tokens:              tokensList.Tokens,
+			Source:              tokensList.Source,
+			Version:             tokensList.GetVersion(),
+			LastUpdateTimestamp: timestamp.Unix(),
 		})
 	}
 
-	// for now we use current time, but this time should represent the time when the lists were updated last time
-	updatedAt := time.Now().Unix()
+	lastUpdate, err := tm.tokenLists.LastTokensUpdate()
+	if err != nil {
+		logutils.ZapLogger().Error("Failed to get last update timestamp", zap.Error(err))
+	}
+	var updatedAt int64
+	if !lastUpdate.IsZero() {
+		updatedAt = lastUpdate.Unix()
+	}
 
 	return &ListWrapper{
 		Data:      data,

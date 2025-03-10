@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/community"
 
+	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
@@ -33,20 +34,27 @@ import (
 )
 
 func setupTestTokenDB(t *testing.T) (*Manager, func()) {
-	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	tokensLists, err := tokenlists.NewTokenLists(appDb, walletDb)
 	require.NoError(t, err)
 
 	return &Manager{
-			db:                   db,
+			db:                   walletDb,
 			RPCClient:            nil,
 			ContractMaker:        nil,
 			networkManager:       nil,
-			stores:               nil,
 			communityTokensDB:    nil,
 			communityManager:     nil,
-			tokenBalancesStorage: NewPersistence(db),
+			tokenBalancesStorage: NewPersistence(walletDb),
+			tokenLists:           tokensLists,
 		}, func() {
-			require.NoError(t, db.Close())
+			require.NoError(t, appDb.Close())
+			require.NoError(t, walletDb.Close())
 		}
 }
 
@@ -198,13 +206,9 @@ func TestTokenOverride(t *testing.T) {
 			ChainID: 2,
 		},
 	}
-	testStore := &DefaultStore{
-		tokenList,
-	}
 
 	overrideTokensInPlace(networks, tokenList)
-	tokens := testStore.GetTokens()
-	tokenMap := toTokenMap(tokens)
+	tokenMap := toTokenMap(tokenList)
 	_, found := tokenMap[1][common.Address{1}]
 	require.False(t, found)
 	require.Equal(t, common.Address{11}, tokenMap[1][common.Address{11}].Address)
