@@ -167,6 +167,14 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 		swapSide = paraswap.BuySide
 	}
 
+	// TODO: this is an extra check, we should remove it once we set the proper address for the native (ETH) token
+	if params.FromToken.IsNative() {
+		params.FromToken.Address = common.HexToAddress("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") // ETH address across all chains that we support
+	}
+	if params.ToToken.IsNative() {
+		params.ToToken.Address = common.HexToAddress("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") // ETH address across all chains that we support
+	}
+
 	priceRoute, err := s.paraswapClient.FetchPriceRoute(context.Background(), params.FromToken.Address, params.FromToken.Decimals,
 		params.ToToken.Address, params.ToToken.Decimals, params.AmountIn, params.FromAddr, params.ToAddr, swapSide)
 	if err != nil {
