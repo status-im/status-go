@@ -278,7 +278,7 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams, input []by
 			// TODO: this is a temporary solution until we find a better way to estimate the gas
 			// hardcoding the estimation for other than ETH, cause we cannot get a proper estimation without having an approval placed first
 			// this is an error we're facing otherwise: `execution reverted: ERC20: transfer amount exceeds allowance`
-			estimation = 350000
+			estimation = 600000 // temporary increase for the release, an issue for addressing this is https://github.com/status-im/status-desktop/issues/17551
 		} else {
 			return 0, createBridgeHopErrorResponse(err)
 		}
