@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -55,6 +56,28 @@ import (
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
 )
+
+var initOnce sync.Once
+
+func InitializeStatusGo() {
+	initOnce.Do(func() {
+		fmt.Println("status-go: Starting Go runtime initialization")
+		time.Sleep(1 * time.Second)
+
+		// Force a garbage collection to initialize GC state.
+		runtime.GC()
+
+		// Spawn a dummy goroutine and wait for it to finish.
+		done := make(chan struct{})
+		go func() {
+			// Minimal work just to kick off the scheduler.
+			close(done)
+		}()
+		<-done
+
+		fmt.Println("status-go: Go runtime initialization complete")
+	})
+}
 
 func call(fn any, params ...any) any {
 	return callog.Call(logutils.ZapLogger(), requestlog.GetRequestLogger(), fn, params...)
