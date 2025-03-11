@@ -90,7 +90,6 @@ import (
 
 	node "github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	_ "github.com/waku-org/waku-go-bindings/waku"
 )
 
 const messageQueueLimit = 1024

@@ -1,3 +1,6 @@
+//go:build use_nwaku
+// +build use_nwaku
+
 package wakuv2
 
 import (
@@ -7,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+
+	_ "github.com/waku-org/waku-go-bindings/waku"
 )
 
 type NwakuInfo struct {
