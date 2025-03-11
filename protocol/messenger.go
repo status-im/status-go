@@ -522,6 +522,7 @@ func NewMessenger(
 		if c.wakuService != nil {
 			c.wakuService.SetMetricsHandler(wakuMetricsHandler)
 		}
+		sender.SetMetricsHandler(wakuMetricsHandler)
 		err = wakuMetricsHandler.RegisterWithRegistry()
 		if err != nil {
 			return nil, err

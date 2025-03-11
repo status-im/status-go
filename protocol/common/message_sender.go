@@ -128,6 +128,10 @@ func (s *MessageSender) SetHandleSharedSecrets(handler func([]*sharedsecret.Secr
 	s.handleSharedSecrets = handler
 }
 
+func (s *MessageSender) SetMetricsHandler(handler wakuv2.IMetricsHandler) {
+	s.metricsHandler = handler
+}
+
 func (s *MessageSender) StartDatasync(statusChangeEvent chan datasyncnode.PeerStatusChangeEvent, handler func(peer state.PeerID, payload *datasyncproto.Payload) error) error {
 	if !s.datasyncEnabled {
 		return nil
@@ -480,7 +484,6 @@ func (s *MessageSender) sendPrivate(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send message with datasync")
 		}
-		s.sendBandwidthMetrics(rawMessage)
 		// We don't need to receive confirmations from our own devices
 		if !IsPubKeyEqual(recipient, &s.identity.PublicKey) {
 			confirmation := &RawMessageConfirmation{
@@ -530,7 +533,6 @@ func (s *MessageSender) sendPrivate(
 			zap.Any("contentType", rawMessage.MessageType),
 			zap.Strings("hashes", types.EncodeHexes(hashes)))
 		s.transport.Track(messageID, hashes, newMessages)
-		s.sendBandwidthMetrics(rawMessage)
 
 	} else {
 		messageSpec, err := s.protocol.BuildEncryptedMessage(rawMessage.Sender, recipient, wrappedMessage)
@@ -551,8 +553,9 @@ func (s *MessageSender) sendPrivate(
 			zap.String("messageType", "private"),
 			zap.Strings("hashes", types.EncodeHexes(hashes)))
 		s.transport.Track(messageID, hashes, newMessages)
-		s.sendBandwidthMetrics(rawMessage)
 	}
+
+	s.sendBandwidthMetrics(rawMessage)
 
 	return messageID, nil
 }
