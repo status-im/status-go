@@ -96,6 +96,7 @@ require (
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 	github.com/urfave/cli/v2 v2.27.2
 	github.com/waku-org/go-waku v0.8.1-0.20250103101727-4ef460cb951a
+	github.com/waku-org/waku-go-bindings v0.0.0-20250311130535-8051e17fab0c
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
@@ -259,6 +260,7 @@ require (
 	github.com/segmentio/encoding v0.3.4 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
+	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
