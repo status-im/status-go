@@ -2361,6 +2361,20 @@ func setLogNamespaces(requestJSON string) string {
 	return makeJSONResponse(statusBackend.SetLogNamespaces(request.LogNamespaces))
 }
 
+func SetLogEnabled(requestJSON string) string {
+	return callWithResponse(setLogEnabled, requestJSON)
+}
+
+func setLogEnabled(requestJSON string) string {
+	var request requests.SetLogEnabled
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(statusBackend.SetLogEnabled(request.Enabled))
+}
+
 func IntendedPanic(message string) string {
 	type intendedPanic struct {
 		error

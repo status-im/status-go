@@ -48,6 +48,7 @@ func (m *Messenger) SetLogNamespaces(request *requests.SetLogNamespaces) error {
 	return nodecfg.SetLogNamespaces(m.database, request.LogNamespaces)
 }
 
+// Deprecated: Use SetLogEnabled from status.go instead.
 func (m *Messenger) SetLogEnabled(enabled bool) error {
 	return nodecfg.SetLogEnabled(m.database, enabled)
 }

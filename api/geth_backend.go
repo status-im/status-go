@@ -3005,3 +3005,16 @@ func (b *GethStatusBackend) SetLogNamespaces(namespaces string) error {
 
 	return logutils.OverrideRootLoggerWithConfig(b.config.DefaultLogSettings())
 }
+
+func (b *GethStatusBackend) SetLogEnabled(enabled bool) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	err := nodecfg.SetLogEnabled(b.appDB, enabled)
+	if err != nil {
+		return err
+	}
+	b.config.LogEnabled = enabled
+
+	return logutils.OverrideRootLoggerWithConfig(b.config.DefaultLogSettings())
+}
