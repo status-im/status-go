@@ -4,16 +4,17 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"go.uber.org/zap"
 	"math/rand"
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/logutils"
 	userimage "github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -421,7 +422,7 @@ func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.Time
 	// such protect need NTP works well, e.g. get one correct offset at least or
 	// user device time is correct
 	if err := validateClockValue(message.Clock, currentTime); err != nil {
-		logutils.ZapLogger().Error("received a message that clock value is invalid", zap.Uint64("message clock", message.Clock),zap.Uint64("currentTime", currentTime), zap.Error(err))
+		logutils.ZapLogger().Error("received a message that clock value is invalid", zap.Uint64("message clock", message.Clock), zap.Uint64("currentTime", currentTime), zap.Error(err))
 		return err
 	}
 
