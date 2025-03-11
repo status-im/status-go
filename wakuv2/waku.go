@@ -1,3 +1,6 @@
+//go:build !use_nwaku
+// +build !use_nwaku
+
 // Copyright 2019 The Waku Library Authors.
 //
 // The Waku library is free software: you can redistribute it and/or modify

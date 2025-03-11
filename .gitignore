@@ -89,6 +89,9 @@ vendor/github.com/waku-org/go-zerokit-rln-x86_64/
 vendor/github.com/waku-org/go-zerokit-rln-apple/
 vendor/github.com/waku-org/go-zerokit-rln-arm/
 
+# waku-go-bindings third_party directory
+vendor/**/waku-go-bindings/third_party/
+
 # status-cli logs
 alice.log
 bob.log
