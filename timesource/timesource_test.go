@@ -310,7 +310,7 @@ func TestGetCurrentTimeOffline(t *testing.T) {
 func TestSystemTimeChangeDetection(t *testing.T) {
 	// Create a controlled time source with fixed time
 	currentTime := time.Now()
-	timeJump := 2 * time.Second // Greater than TimeChangeThreshold (1s)
+	timeJump := 2 * TimeChangeThreshold
 
 	// Track timeQuery calls (which indicates UpdateOffset was called)
 	timeQueryCalled := 0

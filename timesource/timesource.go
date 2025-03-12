@@ -186,10 +186,8 @@ func (s *NTPTimeSource) Now() time.Time {
 			zap.Duration("difference", timeDiff),
 			zap.Duration("threshold", TimeChangeThreshold))
 
-		// Synchronously update the NTP offset
-		if err := s.updateOffset(); err != nil {
-			logutils.ZapLogger().Error("Failed to update time offset after time change", zap.Error(err))
-		}
+		// Ignore error as it's logged in updateOffset
+		_ = s.updateOffset()
 
 		// Update the reference times only after significant time change
 		s.timeDataMu.Lock()
