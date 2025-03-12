@@ -1,4 +1,4 @@
-package shard
+package wakuv2
 
 import (
 	wakuproto "github.com/waku-org/go-waku/waku/v2/protocol"

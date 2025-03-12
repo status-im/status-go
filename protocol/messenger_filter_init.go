@@ -12,9 +12,9 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/deprecation"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 // InitFilters analyzes chats and contacts in order to setup filters
@@ -24,7 +24,7 @@ func (m *Messenger) InitFilters() error {
 	rand.Seed(time.Now().Unix())
 
 	// Community requests will arrive in this pubsub topic
-	if err := m.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil); err != nil {
+	if err := m.SubscribeToPubsubTopic(wakuv2.DefaultNonProtectedPubsubTopic(), nil); err != nil {
 		return err
 	}
 

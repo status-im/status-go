@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/wakuv2"
 	waku2 "github.com/status-im/status-go/wakuv2"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -62,7 +62,7 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 
 	err = wakuNode.Start()
 	if cfg.enableStore {
-		err := wakuNode.SubscribeToPubsubTopic(shard.DefaultNonProtectedPubsubTopic(), nil)
+		err := wakuNode.SubscribeToPubsubTopic(wakuv2.DefaultNonProtectedPubsubTopic(), nil)
 		s.Require().NoError(err)
 	}
 	s.Require().NoError(err)
@@ -77,7 +77,7 @@ func CreateWakuV2Network(s *suite.Suite, parentLogger *zap.Logger, nodeNames []s
 		nodes[i] = NewTestWakuV2(s, testWakuV2Config{
 			logger:      parentLogger.Named("waku-" + name),
 			enableStore: false,
-			clusterID:   shard.MainStatusShardCluster,
+			clusterID:   wakuv2.MainStatusShardCluster,
 		})
 	}
 
