@@ -27,7 +27,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/common/shard"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -83,7 +82,7 @@ func (s *SyncDeviceSuite) SetupTest() {
 		EnableDiscV5:                           true,
 		EnablePeerExchangeServer:               true,
 		ClusterID:                              16,
-		DefaultShardPubsubTopic:                shard.DefaultShardPubsubTopic(),
+		DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
 		EnableStoreConfirmationForMessagesSent: false,
 	}
 	var err error
