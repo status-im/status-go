@@ -16,15 +16,8 @@ bump_version() {
     local is_breaking_change=$2
     IFS='v.' read -r _ major minor patch <<< "$tag"
 
-    # Bump the version based on the type of change
-    if [[ "$is_breaking_change" = true ]]; then
-        ((major++))
-        ((minor=0))
-        ((patch=0))
-    else
-        ((minor++))
-        ((patch=0))
-    fi
+    ((minor++))
+    ((patch=0))
 
     new_version="$major.$minor.$patch"
     echo "v$new_version"
