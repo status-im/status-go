@@ -203,6 +203,8 @@ var DefaultPushNotificationServers = []string{
 	"5ffc34d5ffda180d94cd3974d9ed2bb082ede68f342babdbe801ceffb7da902087d43f9aa961c7b85029358874c08ef04ecad9f1d95a1f0e448cbdd5d04350c7",
 }
 
+const envFleetsFilePath = "STATUS_GO_FLEETS_FILE_PATH"
+
 func init() {
 	if fleetsOverride := os.Getenv(envFleetsFilePath); fleetsOverride != "" {
 		supportedFleets = loadFleetsFromFile(fleetsOverride)

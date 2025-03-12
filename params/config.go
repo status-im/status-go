@@ -875,8 +875,6 @@ func NewConfigFromJSON(configJSON string) (*NodeConfig, error) {
 	return config, nil
 }
 
-const envFleetsFilePath = "STATUS_GO_FLEETS_FILE_PATH"
-
 func LoadClusterConfigFromFleet(fleet string) (*ClusterConfig, error) {
 	nodeConfig := &NodeConfig{}
 
