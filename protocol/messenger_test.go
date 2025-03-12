@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/timesource"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
@@ -324,7 +325,8 @@ func (s *MessengerSuite) TestMarkAllRead() {
 
 func (s *MessengerSuite) TestSendPublic() {
 	chat := CreatePublicChat("test-chat", s.m.transport)
-	chat.LastClockValue = uint64(100000000000000)
+	clock := getTimeWithAllowedFutureDrift()
+	chat.LastClockValue = clock
 	err := s.m.SaveChat(chat)
 	s.NoError(err)
 	inputMessage := buildTestMessage(*chat)
@@ -334,8 +336,8 @@ func (s *MessengerSuite) TestSendPublic() {
 	s.Require().Equal(1, len(response.Messages()), "it returns the message")
 	outputMessage := response.Messages()[0]
 
-	s.Require().Equal(uint64(100000000000001), outputMessage.Clock, "it correctly sets the clock")
-	s.Require().Equal(uint64(100000000000001), chat.LastClockValue, "it correctly sets the last-clock-value")
+	s.Require().Equal(clock+1, outputMessage.Clock, "it correctly sets the clock")
+	s.Require().Equal(clock+1, chat.LastClockValue, "it correctly sets the last-clock-value")
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
@@ -388,7 +390,8 @@ func (s *MessengerSuite) TestSendPrivateOneToOne() {
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
-	chat.LastClockValue = uint64(100000000000000)
+	clock := getTimeWithAllowedFutureDrift()
+	chat.LastClockValue = clock
 	err = s.m.SaveChat(chat)
 	s.NoError(err)
 	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
@@ -396,8 +399,8 @@ func (s *MessengerSuite) TestSendPrivateOneToOne() {
 	s.Require().Equal(1, len(response.Messages()), "it returns the message")
 	outputMessage := response.Messages()[0]
 
-	s.Require().Equal(uint64(100000000000001), outputMessage.Clock, "it correctly sets the clock")
-	s.Require().Equal(uint64(100000000000001), chat.LastClockValue, "it correctly sets the last-clock-value")
+	s.Require().Equal(clock+1, outputMessage.Clock, "it correctly sets the clock")
+	s.Require().Equal(clock+1, chat.LastClockValue, "it correctly sets the last-clock-value")
 
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
@@ -424,7 +427,8 @@ func (s *MessengerSuite) TestSendPrivateGroup() {
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
-	chat.LastClockValue = uint64(100000000000000)
+	clock := getTimeWithAllowedFutureDrift()
+	chat.LastClockValue = clock
 	err = s.m.SaveChat(chat)
 	s.NoError(err)
 	response, err = s.m.SendChatMessage(context.Background(), inputMessage)
@@ -432,8 +436,8 @@ func (s *MessengerSuite) TestSendPrivateGroup() {
 	s.Require().Equal(1, len(response.Messages()), "it returns the message")
 	outputMessage := response.Messages()[0]
 
-	s.Require().Equal(uint64(100000000000001), outputMessage.Clock, "it correctly sets the clock")
-	s.Require().Equal(uint64(100000000000001), chat.LastClockValue, "it correctly sets the last-clock-value")
+	s.Require().Equal(clock+1, outputMessage.Clock, "it correctly sets the clock")
+	s.Require().Equal(clock+1, chat.LastClockValue, "it correctly sets the last-clock-value")
 
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
@@ -452,7 +456,8 @@ func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
-	chat.LastClockValue = uint64(100000000000000)
+	clock := getTimeWithAllowedFutureDrift()
+	chat.LastClockValue = clock
 	err = s.m.SaveChat(chat)
 	s.NoError(err)
 	response, err = s.m.SendChatMessage(context.Background(), inputMessage)
@@ -460,8 +465,8 @@ func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
 	s.Require().Equal(1, len(response.Messages()), "it returns the message")
 	outputMessage := response.Messages()[0]
 
-	s.Require().Equal(uint64(100000000000001), outputMessage.Clock, "it correctly sets the clock")
-	s.Require().Equal(uint64(100000000000001), chat.LastClockValue, "it correctly sets the last-clock-value")
+	s.Require().Equal(clock+1, outputMessage.Clock, "it correctly sets the clock")
+	s.Require().Equal(clock+1, chat.LastClockValue, "it correctly sets the last-clock-value")
 
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
@@ -2621,4 +2626,9 @@ func (s *MessengerSuite) TestFilterCommunityChats() {
 
 	s.Require().NotContains(filteredIDs, nonCommunityChat.ID, "Should not contain ID of nonCommunityChat")
 	s.Require().NotContains(filteredIDs, communityWithTimestamp.ID, "Should not contain ID of communityWithTimestamp")
+}
+
+func getTimeWithAllowedFutureDrift() uint64 {
+	currentTime := timesource.GetCurrentTimeInMillis()
+	return currentTime + MaxWhisperFutureDriftMs/2
 }
