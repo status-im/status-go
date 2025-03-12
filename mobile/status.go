@@ -61,8 +61,8 @@ var initOnce sync.Once
 
 func InitializeStatusGo() {
 	initOnce.Do(func() {
-		fmt.Println("status-go: Starting Go runtime initialization")
-		time.Sleep(1 * time.Second)
+		fmt.Println("👉 status-go: Starting Go runtime initialization")
+		defer fmt.Println("✅ status-go: Go runtime initialization complete")
 
 		// Force a garbage collection to initialize GC state.
 		runtime.GC()
@@ -74,8 +74,6 @@ func InitializeStatusGo() {
 			close(done)
 		}()
 		<-done
-
-		fmt.Println("status-go: Go runtime initialization complete")
 	})
 }
 
