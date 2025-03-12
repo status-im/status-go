@@ -180,3 +180,18 @@ func TestClient_PushErrorSendingEnvelope(t *testing.T) {
 	)
 	require.Equal(t, float64(1), value)
 }
+
+func TestClient_PushRawMessageByType(t *testing.T) {
+	client := createTestClient(t)
+
+	pubsubTopic := "test-pubsub-topic"
+	contentTopic := "test-content-topic"
+	messageType := "test-message-type"
+	client.PushRawMessageByType(pubsubTopic, contentTopic, messageType, 10)
+
+	value := getCounterValue(metrics.RawMessagesSentTotal, messageType, pubsubTopic, contentTopic)
+	require.Equal(t, float64(1), value)
+
+	valueBytes := getCounterValue(metrics.RawMessagesSizeBytes, messageType, pubsubTopic, contentTopic)
+	require.Equal(t, float64(10), valueBytes)
+}
