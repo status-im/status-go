@@ -1,6 +1,7 @@
 package timesource
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -214,7 +215,7 @@ func TestRunningPeriodically(t *testing.T) {
 		// on NTPTimeSource specified periods (fastNTPSyncPeriod & slowNTPSyncPeriod)
 		wg := sync.WaitGroup{}
 		wg.Add(1)
-		source.runPeriodically(func() error {
+		source.runPeriodically(context.TODO(), func() error {
 			mu.Lock()
 			periods = append(periods, time.Since(lastCall))
 			mu.Unlock()
@@ -278,14 +279,12 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 	// test repeat invoke GetCurrentTimeInMillis
 	n = ts.GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
-	e := ts.Stop()
-	require.NoError(t, e)
+	ts.Stop()
 
 	// test invoke after stop
 	n = ts.GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
-	e = ts.Stop()
-	require.NoError(t, e)
+	ts.Stop()
 }
 
 func TestGetCurrentTimeOffline(t *testing.T) {

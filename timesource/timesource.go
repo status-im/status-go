@@ -2,6 +2,7 @@ package timesource
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"sort"
 	"sync"
@@ -148,9 +149,8 @@ type NTPTimeSource struct {
 	timeQuery         ntpQuery // for ease of testing
 	now               func() time.Time
 
-	quit chan struct{}
-
 	stateMu sync.Mutex
+	cancel  context.CancelFunc
 	started bool
 
 	timeDataMu    sync.RWMutex
@@ -215,7 +215,7 @@ func (s *NTPTimeSource) updateOffset() error {
 
 // runPeriodically runs periodically the given function based on NTPTimeSource
 // synchronization limits (fastNTPSyncPeriod / slowNTPSyncPeriod)
-func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod bool) {
+func (s *NTPTimeSource) runPeriodically(ctx context.Context, fn func() error, starWithSlowSyncPeriod bool) {
 	if s.started {
 		return
 	}
@@ -224,7 +224,6 @@ func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod 
 	if starWithSlowSyncPeriod {
 		period = s.slowNTPSyncPeriod
 	}
-	s.quit = make(chan struct{})
 	go func() {
 		defer common.LogOnPanic()
 		for {
@@ -236,7 +235,7 @@ func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod 
 					period = s.fastNTPSyncPeriod
 				}
 
-			case <-s.quit:
+			case <-ctx.Done():
 				return
 			}
 		}
@@ -244,16 +243,17 @@ func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod 
 }
 
 // Start initializes the local offset and starts a goroutine that periodically updates the local offset.
-func (s *NTPTimeSource) Start() {
+func (s *NTPTimeSource) Start(ctx context.Context) error {
 	s.stateMu.Lock()
 	defer s.stateMu.Unlock()
 	if s.started {
-		return
+		return nil
 	}
 
 	// Initialize time tracking fields immediately
 	currentTime := s.now()
 	s.lastMonotonic = currentTime
+	ctx, cancel := context.WithCancel(ctx)
 
 	// Attempt to update the offset synchronously so that user can have reliable messages right away
 	err := s.updateOffset()
@@ -263,23 +263,28 @@ func (s *NTPTimeSource) Start() {
 		logutils.ZapLogger().Error("failed to update offset", zap.Error(err))
 	}
 
-	s.runPeriodically(s.updateOffset, err == nil)
+	s.runPeriodically(ctx, s.updateOffset, err == nil)
 
 	s.started = true
-}
+	s.cancel = cancel
 
-// Stop goroutine that updates time source.
-func (s *NTPTimeSource) Stop() error {
-	if s.quit == nil {
-		return nil
-	}
-	close(s.quit)
-	s.started = false
 	return nil
 }
 
+// Stop goroutine that updates time source.
+func (s *NTPTimeSource) Stop() {
+	if s.cancel == nil {
+		return
+	}
+	s.cancel()
+	s.started = false
+}
+
 func (s *NTPTimeSource) GetCurrentTime() time.Time {
-	s.Start()
+	err := s.Start(context.Background())
+	if err != nil {
+		panic("could not obtain timesource")
+	}
 	return s.Now()
 }
 
@@ -289,7 +294,10 @@ func (s *NTPTimeSource) GetCurrentTimeInMillis() uint64 {
 
 func GetCurrentTime() time.Time {
 	ts := Default()
-	ts.Start()
+	err := ts.Start(context.Background())
+	if err != nil {
+		panic("could not obtain timesource")
+	}
 	return ts.Now()
 }
 
