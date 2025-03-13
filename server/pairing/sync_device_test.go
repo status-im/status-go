@@ -100,6 +100,10 @@ func (s *SyncDeviceSuite) SetupTest() {
 	s.pxAddress = addrs[0]
 }
 
+func (s *SyncDeviceSuite) TearDownTest() {
+	s.Require().NoError(s.pxBootNode.Stop())
+}
+
 func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *api.GethStatusBackend {
 	backend := s.prepareBackendWithoutAccount(tmpdir)
 
