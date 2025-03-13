@@ -1788,14 +1788,17 @@ func (api *PublicAPI) SetStoreConfirmationForMessagesSent(request *requests.SetS
 	return api.service.messenger.SetStoreConfirmationForMessagesSent(request)
 }
 
+// Deprecated: Use SetLogLevel from status.go instead. BTW, mobile don't use this anymore.
 func (api *PublicAPI) SetLogLevel(request *requests.SetLogLevel) error {
 	return api.service.messenger.SetLogLevel(request)
 }
 
+// Deprecated: Use SetLogNamespaces from status.go instead. BTW, mobile don't use this anymore.
 func (api *PublicAPI) SetLogNamespaces(request *requests.SetLogNamespaces) error {
 	return api.service.messenger.SetLogNamespaces(request)
 }
 
+// Deprecated: Use SetLogEnabled from status.go instead. BTW, mobile don't use this anymore.
 func (api *PublicAPI) SetLogEnabled(enabled bool) error {
 	return api.service.messenger.SetLogEnabled(enabled)
 }
