@@ -1447,14 +1447,6 @@ func (api *PublicAPI) StorePubsubTopicKey(topic string, privKey string) error {
 	return api.service.messenger.StorePubsubTopicKey(topic, p)
 }
 
-func (api *PublicAPI) AddStorePeer(address string) (peer.ID, error) {
-	maddr, err := multiaddr.NewMultiaddr(address)
-	if err != nil {
-		return "", err
-	}
-	return api.service.messenger.AddStorePeer(maddr)
-}
-
 func (api *PublicAPI) AddRelayPeer(address string) (peer.ID, error) {
 	maddr, err := multiaddr.NewMultiaddr(address)
 	if err != nil {

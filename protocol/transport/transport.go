@@ -518,10 +518,6 @@ func (t *Transport) ENR() (*enode.Node, error) {
 	return t.waku.ENR()
 }
 
-func (t *Transport) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	return t.waku.AddStorePeer(address)
-}
-
 func (t *Transport) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
 	return t.waku.AddRelayPeer(address)
 }

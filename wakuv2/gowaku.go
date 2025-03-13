@@ -1923,14 +1923,6 @@ func (w *Waku) restartDiscV5(useOnlyDNSDiscCache bool) error {
 	return w.node.SetDiscV5Bootnodes(bootnodes)
 }
 
-func (w *Waku) AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, store.StoreQueryID_v300)
-	if err != nil {
-		return "", err
-	}
-	return peerID, nil
-}
-
 func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
 }

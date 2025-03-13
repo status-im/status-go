@@ -824,17 +824,10 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	response := &MessengerResponse{}
 
-	storenodes, err := m.AllMailservers()
+	response.Mailservers, err = m.AllMailservers()
 	if err != nil {
 		return nil, err
 	}
-
-	err = m.setupStorenodes(storenodes)
-	if err != nil {
-		return nil, err
-	}
-
-	response.Mailservers = storenodes
 
 	m.transport.SetStorenodeConfigProvider(m)
 

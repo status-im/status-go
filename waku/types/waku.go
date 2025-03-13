@@ -137,8 +137,6 @@ type Waku interface {
 
 	RemovePubsubTopicKey(topic string) error
 
-	AddStorePeer(address multiaddr.Multiaddr) (peer.ID, error)
-
 	AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error)
 
 	DialPeer(address multiaddr.Multiaddr) error
