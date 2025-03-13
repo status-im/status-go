@@ -69,7 +69,7 @@ class RpcClient:
         return response
 
     def rpc_valid_request(self, method, params=None, _id=None, url=None, skip_validation=False, enable_logging=True):
-        response = self.rpc_request(method, params, _id, url, enable_logging=enable_loggin)
+        response = self.rpc_request(method, params, _id, url, enable_logging=enable_logging)
         self.verify_is_valid_json_rpc_response(response, _id, skip_validation=skip_validation)
         return response
 
