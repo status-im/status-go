@@ -204,3 +204,28 @@ func TestSQLiteMetricRepository_EnabledDelete(t *testing.T) {
 	require.False(t, info.Enabled)
 	require.True(t, info.UserConfirmed)
 }
+
+func TestSQLiteMetricRepository_Info(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewSQLiteMetricRepository(db)
+
+	// Verify default behavior ignores sql.ErrNoRows.
+	info, err := repo.Info()
+	require.NoError(t, err)
+	require.False(t, info.Enabled)
+	require.False(t, info.UserConfirmed)
+	require.Empty(t, info.UserID)
+
+	// Call UserID() because on first usage it will insert a new UUID.
+	userID, err := repo.UserID(nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, userID)
+
+	info, err = repo.Info()
+	require.NoError(t, err)
+	require.False(t, info.Enabled)
+	require.False(t, info.UserConfirmed)
+	require.Equal(t, userID, info.UserID)
+}
