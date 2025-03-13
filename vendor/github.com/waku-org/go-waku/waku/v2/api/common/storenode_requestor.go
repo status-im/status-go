@@ -8,5 +8,5 @@ import (
 )
 
 type StorenodeRequestor interface {
-	Query(ctx context.Context, peerID peer.ID, query *pb.StoreQueryRequest) (StoreRequestResult, error)
+	Query(ctx context.Context, peerInfo peer.AddrInfo, query *pb.StoreQueryRequest) (StoreRequestResult, error)
 }

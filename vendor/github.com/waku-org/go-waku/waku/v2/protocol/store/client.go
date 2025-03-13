@@ -196,15 +196,15 @@ func (s *WakuStore) Request(ctx context.Context, criteria Criteria, opts ...Requ
 	return result, nil
 }
 
-func (s *WakuStore) RequestRaw(ctx context.Context, peerID peer.ID, storeRequest *pb.StoreQueryRequest) (Result, error) {
+func (s *WakuStore) RequestRaw(ctx context.Context, peerInfo peer.AddrInfo, storeRequest *pb.StoreQueryRequest) (Result, error) {
 	err := storeRequest.Validate()
 	if err != nil {
 		return nil, err
 	}
 
 	var params Parameters
-	params.selectedPeer = peerID
-	if params.selectedPeer == "" {
+	params.peerAddr = peerInfo.Addrs
+	if len(params.peerAddr) == 0 {
 		return nil, ErrMustSelectPeer
 	}
 

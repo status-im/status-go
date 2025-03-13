@@ -111,8 +111,6 @@ func (mgr *FilterManager) startFilterSubLoop() {
 				mgr.incompleteFilterBatch = make(map[string]filterConfig)
 				mgr.Unlock()
 			}
-			subs := mgr.node.Subscriptions()
-			mgr.logger.Debug("filter stats", zap.Int("agg filters count", len(mgr.filterSubscriptions)), zap.Int("filter subs count", len(subs)))
 		}
 	}
 }

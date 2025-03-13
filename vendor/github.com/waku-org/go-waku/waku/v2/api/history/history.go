@@ -37,7 +37,7 @@ type HistoryRetriever struct {
 
 type HistoryProcessor interface {
 	OnEnvelope(env *protocol.Envelope, processEnvelopes bool) error
-	OnRequestFailed(requestID []byte, peerID peer.ID, err error)
+	OnRequestFailed(requestID []byte, peerInfo peer.AddrInfo, err error)
 }
 
 func NewHistoryRetriever(store common.StorenodeRequestor, historyProcessor HistoryProcessor, logger *zap.Logger) *HistoryRetriever {
@@ -51,7 +51,7 @@ func NewHistoryRetriever(store common.StorenodeRequestor, historyProcessor Histo
 func (hr *HistoryRetriever) Query(
 	ctx context.Context,
 	criteria store.FilterCriteria,
-	storenodeID peer.ID,
+	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
@@ -178,7 +178,7 @@ loop:
 				newCriteria.TimeStart = timeStart
 				newCriteria.TimeEnd = timeEnd
 
-				cursor, envelopesCount, err := hr.createMessagesRequest(queryCtx, storenodeID, newCriteria, w.cursor, w.limit, true, processEnvelopes, logger)
+				cursor, envelopesCount, err := hr.createMessagesRequest(queryCtx, storenode, newCriteria, w.cursor, w.limit, true, processEnvelopes, logger)
 				queryCancel()
 
 				if err != nil {
@@ -241,7 +241,7 @@ loop:
 
 func (hr *HistoryRetriever) createMessagesRequest(
 	ctx context.Context,
-	peerID peer.ID,
+	peerInfo peer.AddrInfo,
 	criteria store.FilterCriteria,
 	cursor []byte,
 	limit uint64,
@@ -257,7 +257,7 @@ func (hr *HistoryRetriever) createMessagesRequest(
 		})
 
 		go func() {
-			storeCursor, envelopesCount, err = hr.requestStoreMessages(ctx, peerID, criteria, cursor, limit, processEnvelopes)
+			storeCursor, envelopesCount, err = hr.requestStoreMessages(ctx, peerInfo, criteria, cursor, limit, processEnvelopes)
 			resultCh <- struct {
 				storeCursor    []byte
 				envelopesCount int
@@ -273,7 +273,7 @@ func (hr *HistoryRetriever) createMessagesRequest(
 		}
 	} else {
 		go func() {
-			_, _, err = hr.requestStoreMessages(ctx, peerID, criteria, cursor, limit, false)
+			_, _, err = hr.requestStoreMessages(ctx, peerInfo, criteria, cursor, limit, false)
 			if err != nil {
 				logger.Error("failed to request store messages", zap.Error(err))
 			}
@@ -283,9 +283,9 @@ func (hr *HistoryRetriever) createMessagesRequest(
 	return
 }
 
-func (hr *HistoryRetriever) requestStoreMessages(ctx context.Context, peerID peer.ID, criteria store.FilterCriteria, cursor []byte, limit uint64, processEnvelopes bool) ([]byte, int, error) {
+func (hr *HistoryRetriever) requestStoreMessages(ctx context.Context, peerInfo peer.AddrInfo, criteria store.FilterCriteria, cursor []byte, limit uint64, processEnvelopes bool) ([]byte, int, error) {
 	requestID := protocol.GenerateRequestID()
-	logger := hr.logger.With(zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", peerID))
+	logger := hr.logger.With(zap.String("requestID", hexutil.Encode(requestID)), zap.Stringer("peerID", peerInfo.ID))
 
 	logger.Debug("store.query",
 		logging.Timep("startTime", criteria.TimeStart),
@@ -307,12 +307,12 @@ func (hr *HistoryRetriever) requestStoreMessages(ctx context.Context, peerID pee
 	}
 
 	queryStart := time.Now()
-	result, err := hr.store.Query(ctx, peerID, storeQueryRequest)
+	result, err := hr.store.Query(ctx, peerInfo, storeQueryRequest)
 	queryDuration := time.Since(queryStart)
 	if err != nil {
 		logger.Error("error querying storenode", zap.Error(err))
 
-		hr.historyProcessor.OnRequestFailed(requestID, peerID, err)
+		hr.historyProcessor.OnRequestFailed(requestID, peerInfo, err)
 
 		return nil, 0, err
 	}
