@@ -234,7 +234,6 @@ class StatusBackend(RpcClient, SignalClient):
         data = self._set_proxy_credentials(data)
         resp = self.api_valid_request(method, data)
         self.node_login_event = self.wait_for_login()
-        # self.node_login_event = self.find_signal_containing_pattern(SignalType.NODE_LOGIN.value, event_pattern=self.display_name)
         return resp
 
     def restore_account_and_login(
