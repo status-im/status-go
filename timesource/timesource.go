@@ -283,7 +283,7 @@ func (s *NTPTimeSource) Stop() {
 func (s *NTPTimeSource) GetCurrentTime() time.Time {
 	err := s.Start(context.Background())
 	if err != nil {
-		panic("could not obtain timesource")
+		panic("could not obtain timesource: " + err.Error())
 	}
 	return s.Now()
 }
@@ -296,7 +296,7 @@ func GetCurrentTime() time.Time {
 	ts := Default()
 	err := ts.Start(context.Background())
 	if err != nil {
-		panic("could not obtain timesource")
+		panic("could not obtain timesource: " + err.Error())
 	}
 	return ts.Now()
 }
