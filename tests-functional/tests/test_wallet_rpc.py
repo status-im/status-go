@@ -2,8 +2,6 @@ import random
 
 import pytest
 
-from conftest import option
-from resources.constants import user_1
 from steps.status_backend import StatusBackendSteps
 
 
