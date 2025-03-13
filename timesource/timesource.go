@@ -156,7 +156,6 @@ type NTPTimeSource struct {
 	timeDataMu    sync.RWMutex
 	latestOffset  time.Duration
 	lastMonotonic time.Time
-	lastWallTime  time.Time
 }
 
 // Now returns time adjusted by latest known offset
@@ -175,7 +174,7 @@ func (s *NTPTimeSource) Now() time.Time {
 
 	// Check for time inconsistency
 	monotonicElapsed := time.Since(s.lastMonotonic)
-	wallClockElapsed := time.Duration(currentTime.UnixNano() - s.lastWallTime.UnixNano())
+	wallClockElapsed := time.Duration(currentTime.UnixNano() - s.lastMonotonic.UnixNano())
 	timeDiff := monotonicElapsed - wallClockElapsed
 
 	s.timeDataMu.RUnlock()
@@ -192,7 +191,6 @@ func (s *NTPTimeSource) Now() time.Time {
 		// Update the reference times only after significant time change
 		s.timeDataMu.Lock()
 		s.lastMonotonic = s.now()
-		s.lastWallTime = s.now()
 		s.timeDataMu.Unlock()
 	}
 
@@ -256,7 +254,6 @@ func (s *NTPTimeSource) Start() {
 	// Initialize time tracking fields immediately
 	currentTime := s.now()
 	s.lastMonotonic = currentTime
-	s.lastWallTime = currentTime
 
 	// Attempt to update the offset synchronously so that user can have reliable messages right away
 	err := s.updateOffset()

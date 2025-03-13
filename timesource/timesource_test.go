@@ -344,7 +344,6 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 	// Initialize time tracking fields
 	ts.latestOffset = testOffset
 	ts.lastMonotonic = currentTime
-	ts.lastWallTime = currentTime
 
 	// Test case 1: No time change
 	// -------------------------------------------------------------------------
@@ -356,8 +355,6 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 		"Time should be adjusted by offset with no time change")
 	assert.Equal(t, currentTime, ts.lastMonotonic,
 		"lastMonotonic should be updated after Now() call")
-	assert.Equal(t, currentTime, ts.lastWallTime,
-		"lastWallTime should be updated after Now() call")
 	assert.Equal(t, 0, timeQueryCalled,
 		"UpdateOffset should not be called when no time change is detected")
 
@@ -372,7 +369,6 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 
 	// Set time tracking fields to simulate a small time difference
 	ts.lastMonotonic = oldTime
-	ts.lastWallTime = oldTime
 
 	// Call Now() with small time change
 	time2 := ts.Now()
@@ -380,8 +376,6 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 		"Time should be adjusted by offset with small time change")
 	assert.Equal(t, oldTime, ts.lastMonotonic,
 		"lastMonotonic should be updated after small time change")
-	assert.Equal(t, oldTime, ts.lastWallTime,
-		"lastWallTime should be updated after small time change")
 	assert.Equal(t, 0, timeQueryCalled,
 		"UpdateOffset should not be called when time change is below threshold")
 
@@ -395,8 +389,7 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 	currentTime = currentTime.Add(1 * time.Minute)
 
 	// Simulate wall clock being set backward
-	ts.lastMonotonic = oldTime
-	ts.lastWallTime = oldTime.Add(-timeJump)
+	ts.lastMonotonic = oldTime.Add(-timeJump)
 
 	// Call Now() which should detect the time change
 	time3 := ts.Now()
@@ -404,8 +397,6 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 		"Time should be adjusted by offset after backward time change")
 	assert.Equal(t, currentTime, ts.lastMonotonic,
 		"lastMonotonic should be updated after backward time change")
-	assert.Equal(t, currentTime, ts.lastWallTime,
-		"lastWallTime should be updated after backward time change")
 	assert.Equal(t, 1, timeQueryCalled,
 		"UpdateOffset should be called when backward time change is detected")
 
@@ -419,8 +410,7 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 	currentTime = currentTime.Add(1 * time.Minute)
 
 	// Simulate wall clock being set forward
-	ts.lastMonotonic = oldTime
-	ts.lastWallTime = oldTime.Add(timeJump)
+	ts.lastMonotonic = oldTime.Add(timeJump)
 
 	// Call Now() which should detect the time change
 	time4 := ts.Now()
@@ -428,8 +418,6 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 		"Time should be adjusted by offset after forward time change")
 	assert.Equal(t, currentTime, ts.lastMonotonic,
 		"lastMonotonic should be updated after forward time change")
-	assert.Equal(t, currentTime, ts.lastWallTime,
-		"lastWallTime should be updated after forward time change")
 	assert.Equal(t, 1, timeQueryCalled,
 		"UpdateOffset should be called when forward time change is detected")
 }
@@ -464,7 +452,6 @@ func TestTimeTrackingInitialization(t *testing.T) {
 
 	// Verify that time tracking fields are initially zero
 	assert.True(t, ts.lastMonotonic.IsZero(), "lastMonotonic should be zero before Start()")
-	assert.True(t, ts.lastWallTime.IsZero(), "lastWallTime should be zero before Start()")
 
 	// Start the time source
 	ts.Start()
@@ -476,7 +463,6 @@ func TestTimeTrackingInitialization(t *testing.T) {
 
 	// Verify that time tracking fields are initialized
 	assert.Equal(t, fixedTime, ts.lastMonotonic, "lastMonotonic should be initialized to current time")
-	assert.Equal(t, fixedTime, ts.lastWallTime, "lastWallTime should be initialized to current time")
 
 	// Verify that the time source is marked as started
 	assert.True(t, ts.started, "Time source should be marked as started")
@@ -515,7 +501,6 @@ func TestTimeChangeDetectionSkippedWhenNotInitialized(t *testing.T) {
 
 	// Ensure time tracking fields are zero (not initialized)
 	assert.True(t, ts.lastMonotonic.IsZero(), "lastMonotonic should be zero initially")
-	assert.True(t, ts.lastWallTime.IsZero(), "lastWallTime should be zero initially")
 
 	// Call Now() which should skip time change detection
 	result := ts.Now()
@@ -559,7 +544,6 @@ func TestTimeChangeDetectionWithUpdateFailure(t *testing.T) {
 
 	// Initialize the time tracking fields
 	ts.lastMonotonic = currentTime
-	ts.lastWallTime = currentTime
 
 	// First call to Now() with no time change
 	time1 := ts.Now()
@@ -570,8 +554,7 @@ func TestTimeChangeDetectionWithUpdateFailure(t *testing.T) {
 	currentTime = currentTime.Add(1 * time.Minute) // Advance current time by 1 minute
 
 	// Set lastMonotonic to simulate that more time has passed in reality
-	ts.lastMonotonic = oldTime
-	ts.lastWallTime = oldTime.Add(-timeJump) // Wall time appears to have gone backward
+	ts.lastMonotonic = oldTime.Add(-timeJump)
 
 	// Call Now() which should detect the time change and attempt to update offset
 	time2 := ts.Now()
@@ -581,5 +564,4 @@ func TestTimeChangeDetectionWithUpdateFailure(t *testing.T) {
 
 	// Verify that the time tracking fields are updated even when UpdateOffset fails
 	assert.Equal(t, currentTime, ts.lastMonotonic, "lastMonotonic should be updated even when UpdateOffset fails")
-	assert.Equal(t, currentTime, ts.lastWallTime, "lastWallTime should be updated even when UpdateOffset fails")
 }
