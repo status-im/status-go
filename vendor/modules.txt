@@ -944,9 +944,6 @@ github.com/shopspring/decimal
 # github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 ## explicit; go 1.18
 github.com/siphiuel/lc-proxy-wrapper
-# github.com/sirupsen/logrus v1.9.0
-## explicit; go 1.13
-github.com/sirupsen/logrus
 # github.com/spaolacci/murmur3 v1.1.0
 ## explicit
 github.com/spaolacci/murmur3
@@ -1116,7 +1113,7 @@ github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-pc-windows-gnu
 github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-unknown-linux-gnu
 github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-unknown-linux-musl
 github.com/waku-org/go-zerokit-rln-x86_64/rln
-# github.com/waku-org/waku-go-bindings v0.0.0-20250311130535-8051e17fab0c
+# github.com/waku-org/waku-go-bindings v0.0.0-20250313132258-6f95d51df46c
 ## explicit; go 1.21
 github.com/waku-org/waku-go-bindings/waku
 github.com/waku-org/waku-go-bindings/waku/common
