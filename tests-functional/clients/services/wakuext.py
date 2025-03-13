@@ -187,8 +187,8 @@ class WakuextService(Service):
         response = self.rpc_request("deleteMessageAndSend", params)
         return response.json()
 
-    def delete_message_for_me_and_sync(self, localChatID: str, message_id: str):
-        params = [localChatID, message_id]
+    def delete_message_for_me_and_sync(self, local_chat_id: str, message_id: str):
+        params = [local_chat_id, message_id]
         response = self.rpc_request("deleteMessageForMeAndSync", params)
         return response.json()
 
@@ -200,4 +200,9 @@ class WakuextService(Service):
     def first_unseen_message_id(self, chat_id: str):
         params = [chat_id]
         response = self.rpc_request("firstUnseenMessageID", params)
+        return response.json()
+
+    def update_message_outgoing_status(self, message_id: str, new_status: str):
+        params = [message_id, new_status]
+        response = self.rpc_request("updateMessageOutgoingStatus", params)
         return response.json()

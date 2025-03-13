@@ -240,6 +240,18 @@ class TestChatMessages(MessengerSteps):
         result = response.get("result", "")
         assert result == message_id
 
+    def test_update_message_outgoing_status(self):
+        _, responses = self.send_multiple_one_to_one_messages(1)
+        message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+        new_status = "delivered"
+
+        response = self.sender.wakuext_service.update_message_outgoing_status(message_id, new_status)
+        self.sender.verify_json_schema(response, method="wakuext_updateMessageOutgoingStatus")
+
+        response = self.sender.wakuext_service.message_by_message_id(message_id)
+        outgoing_status = response.get("result", {}).get("outgoingStatus", "")
+        assert outgoing_status == new_status
+
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
 @pytest.mark.rpc
