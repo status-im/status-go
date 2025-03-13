@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
@@ -178,11 +179,6 @@ func insertIPCConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func insertClusterConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	_, err := tx.Exec(`INSERT OR REPLACE INTO cluster_config (enabled, fleet, synthetic_id) VALUES (?, ?, 'id')`, c.ClusterConfig.Enabled, c.ClusterConfig.Fleet)
-	return err
-}
-
 func insertLightETHConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`INSERT OR REPLACE INTO light_eth_config (enabled, database_cache, min_trusted_fraction, synthetic_id) VALUES (?, ?, ?, 'id')`, c.LightEthConfig.Enabled, c.LightEthConfig.DatabaseCache, c.LightEthConfig.MinTrustedFraction)
 	return err
@@ -297,31 +293,6 @@ func insertPushNotificationsServerConfig(tx *sql.Tx, c *params.NodeConfig) error
 	return err
 }
 
-func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
-	if _, err := tx.Exec(`DELETE FROM cluster_nodes WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	nodeMap := make(map[string][]string)
-	nodeMap[StaticNodes] = c.ClusterConfig.StaticNodes
-	nodeMap[BootNodes] = c.ClusterConfig.BootNodes
-	nodeMap[TrustedMailServers] = c.ClusterConfig.TrustedMailServers
-	nodeMap[PushNotificationsServers] = c.ClusterConfig.PushNotificationsServers
-	nodeMap[DiscV5BootstrapNodes] = c.ClusterConfig.DiscV5BootstrapNodes
-	nodeMap[WakuNodes] = c.ClusterConfig.WakuNodes
-
-	for nodeType, nodes := range nodeMap {
-		for _, node := range nodes {
-			_, err := tx.Exec(`INSERT OR REPLACE INTO cluster_nodes (node, type, synthetic_id) VALUES (?, ?, 'id')`, node, nodeType)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 // List of inserts to be executed when upgrading a node
 // These INSERT queries should not be modified
 func nodeConfigUpgradeInserts() []insertFn {
@@ -330,8 +301,6 @@ func nodeConfigUpgradeInserts() []insertFn {
 		insertHTTPConfig,
 		insertIPCConfig,
 		insertLogConfig,
-		insertClusterConfig,
-		insertClusterConfigNodes,
 		insertLightETHConfig,
 		insertLightETHConfigTrustedNodes,
 		insertRegisterTopics,
@@ -352,8 +321,6 @@ func nodeConfigNormalInserts() []insertFn {
 		insertHTTPConfig,
 		insertIPCConfig,
 		insertLogConfigWithNamespaces,
-		insertClusterConfig,
-		insertClusterConfigNodes,
 		insertLightETHConfig,
 		insertLightETHConfigTrustedNodes,
 		insertRegisterTopics,
@@ -769,6 +736,7 @@ func SetMaxLogBackups(db *sql.DB, maxLogBackups uint) error {
 	return err
 }
 
+// Deprecated: use SetWakuV2CustomNodes instead
 func SaveNewWakuNode(db *sql.DB, nodeAddress string) error {
 	_, err := db.Exec(`INSERT OR REPLACE INTO cluster_nodes (node, type, synthetic_id) VALUES (?, ?, 'id')`, nodeAddress, WakuNodes)
 	return err

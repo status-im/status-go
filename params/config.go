@@ -639,6 +639,7 @@ func WithFleet(fleet string) Option {
 
 // WithLES enabled LES protocol.
 func WithLES() Option {
+	
 	return func(c *NodeConfig) error {
 		return loadConfigFromAsset("../config/cli/les-enabled.json", c)
 	}

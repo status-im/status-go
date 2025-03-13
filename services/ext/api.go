@@ -1818,10 +1818,12 @@ func (api *PublicAPI) LogTest() error {
 	return l1.Sync()
 }
 
+// Deprecated: Use STATUS_GO_FLEETS_FILE_PATH env variable instead
 func (api *PublicAPI) SetCustomNodes(request *requests.SetCustomNodes) error {
 	return api.service.messenger.SetCustomNodes(request)
 }
 
+// Deprecated: Use STATUS_GO_FLEETS_FILE_PATH env variable instead
 func (api *PublicAPI) SaveNewWakuNode(request *requests.SaveNewWakuNode) error {
 	return api.service.messenger.SaveNewWakuNode(request)
 }
