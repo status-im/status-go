@@ -147,7 +147,7 @@ type Waku interface {
 
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
-	SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []TopicType) error
+	SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []TopicType) error
 
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64
@@ -200,8 +200,8 @@ type Waku interface {
 	// PeerID returns node's PeerID
 	PeerID() peer.ID
 
-	// GetActiveStorenode returns the peer ID of the currently active storenode. It will be empty if no storenode is active
-	GetActiveStorenode() peer.ID
+	// GetActiveStorenode returns the peer AddrInfo of the currently active storenode. It will be empty if no storenode is active
+	GetActiveStorenode() peer.AddrInfo
 
 	// OnStorenodeChanged is triggered when a new storenode is promoted to become the active storenode or when the active storenode is removed
 	OnStorenodeChanged() <-chan peer.ID
@@ -222,7 +222,7 @@ type Waku interface {
 	ProcessMailserverBatch(
 		ctx context.Context,
 		batch MailserverBatch,
-		storenodeID peer.ID,
+		storenode peer.AddrInfo,
 		pageLimit uint64,
 		shouldProcessNextPage func(int) (bool, uint64),
 		processEnvelopes bool,

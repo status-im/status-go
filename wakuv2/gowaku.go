@@ -198,7 +198,7 @@ type Waku struct {
 	// discV5BootstrapNodes is the ENR to be used to fetch bootstrap nodes for discovery
 	discV5BootstrapNodes []string
 
-	onHistoricMessagesRequestFailed func([]byte, peer.ID, error)
+	onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error)
 	onPeerStats                     func(types.ConnStatus)
 
 	metricsHandler IMetricsHandler
@@ -222,7 +222,7 @@ func newTTLCache() *ttlcache.Cache[gethcommon.Hash, *common.ReceivedMessage] {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.ID, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
+func New(nodeKey *ecdsa.PrivateKey, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.AddrInfo, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -1403,11 +1403,11 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
 }
 
-func (w *Waku) SetTopicsToVerifyForMissingMessages(peerID peer.ID, pubsubTopic string, contentTopics []string) {
+func (w *Waku) SetTopicsToVerifyForMissingMessages(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []string) {
 	if !w.cfg.EnableMissingMessageVerification {
 		return
 	}
-	w.missingMsgVerifier.SetCriteriaInterest(peerID, protocol.NewContentFilter(pubsubTopic, contentTopics...))
+	w.missingMsgVerifier.SetCriteriaInterest(peerInfo, protocol.NewContentFilter(pubsubTopic, contentTopics...))
 }
 
 func (w *Waku) setupRelaySubscriptions() error {
@@ -1928,7 +1928,7 @@ func (w *Waku) timestamp() int64 {
 }
 
 func (w *Waku) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {
-	peerID, err := w.node.AddPeer(address, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer([]multiaddr.Multiaddr{address}, wps.Static, w.cfg.DefaultShardedPubsubTopics, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}
@@ -2052,8 +2052,8 @@ func (w *Waku) GetCurrentTime() time.Time {
 	return w.CurrentTime()
 }
 
-func (w *Waku) GetActiveStorenode() peer.ID {
-	return w.StorenodeCycle.GetActiveStorenode()
+func (w *Waku) GetActiveStorenode() peer.AddrInfo {
+	return w.StorenodeCycle.GetActiveStorenodePeerInfo()
 }
 
 func (w *Waku) OnStorenodeChanged() <-chan peer.ID {
@@ -2079,7 +2079,7 @@ func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
 func (w *Waku) ProcessMailserverBatch(
 	ctx context.Context,
 	batch types.MailserverBatch,
-	storenodeID peer.ID,
+	storenode peer.AddrInfo,
 	pageLimit uint64,
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
@@ -2096,7 +2096,7 @@ func (w *Waku) ProcessMailserverBatch(
 		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
 	}
 
-	return w.HistoryRetriever.Query(ctx, criteria, storenodeID, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
@@ -2121,13 +2121,13 @@ func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
 	return NewPublicWakuAPI(w)
 }
 
-func (w *Waku) SetCriteriaForMissingMessageVerification(peerID peer.ID, pubsubTopic string, contentTopics []types.TopicType) error {
+func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
 	var cTopics []string
 	for _, ct := range contentTopics {
 		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
 	}
 	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
-	w.SetTopicsToVerifyForMissingMessages(peerID, pubsubTopic, cTopics)
+	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
 
 	return nil
 }

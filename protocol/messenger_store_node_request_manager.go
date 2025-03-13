@@ -564,7 +564,7 @@ func (r *storeNodeRequest) routine() {
 		}
 
 		return nil, r.manager.messenger.processMailserverBatchWithOptions(storeNode, batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
-	}, history.WithPeerID(storeNode))
+	}, history.WithPeerID(storeNode.ID))
 
 	r.result.err = err
 }

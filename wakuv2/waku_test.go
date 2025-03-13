@@ -545,9 +545,9 @@ func TestWakuV2Store(t *testing.T) {
 	}()
 
 	// Connect the two nodes directly
-	peer2Addr := w2.node.ListenAddresses()[0].String()
-	err = w1.node.DialPeer(context.Background(), peer2Addr)
+	peer2Addr, err := w2.ListenAddresses()
 	require.NoError(t, err)
+	err = w1.node.DialPeer(context.Background(), peer2Addr[0].String())
 
 	waitForPeerConnection(t, w2.node.Host().ID(), w1PeersCh)
 
@@ -720,7 +720,10 @@ func TestLightpushRateLimit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	//Connect the relay peer and full node
-	err = w1.node.DialPeer(ctx, w0.node.ListenAddresses()[0].String())
+	peerAddr, err := w0.ListenAddresses()
+
+	require.NoError(t, err)
+	err = w1.node.DialPeer(ctx, peerAddr[0].String())
 	require.NoError(t, err)
 
 	err = tt.RetryWithBackOff(func() error {
@@ -747,7 +750,11 @@ func TestLightpushRateLimit(t *testing.T) {
 	}()
 
 	//Use this instead of DialPeer to make sure the peer is added to PeerStore and can be selected for Lighpush
-	w2.node.AddDiscoveredPeer(w1.PeerID(), w1.node.ListenAddresses(), wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
+	addresses, err := w1.ListenAddresses()
+	require.NoError(t, err)
+	peerID, err := w1.PeerID()
+	require.NoError(t, err)
+	w2.node.AddDiscoveredPeer(peerID, addresses, wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
 
 	waitForPeerConnectionWithTimeout(t, w2.node.Host().ID(), w1PeersCh, 5*time.Second)
 
