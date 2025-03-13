@@ -17,7 +17,7 @@ from clients.services.wallet import WalletService
 from clients.services.wakuext import WakuextService
 from clients.services.accounts import AccountService
 from clients.services.settings import SettingsService
-from clients.signals import SignalClient, SignalType
+from clients.signals import SignalClient
 from clients.rpc import RpcClient
 from conftest import option
 from resources.constants import USE_IPV6, user_1, DEFAULT_DISPLAY_NAME, USER_DIR
