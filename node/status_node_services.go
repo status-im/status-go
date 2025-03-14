@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/json"
@@ -582,7 +583,7 @@ func (b *StatusNode) timeSource() *timesource.NTPTimeSource {
 		b.timeSourceSrvc = timesource.Default()
 		go func() {
 			defer common.LogOnPanic()
-			b.timeSourceSrvc.Start()
+			b.timeSourceSrvc.Start(context.Background())
 		}()
 	}
 	return b.timeSourceSrvc
