@@ -328,7 +328,6 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 		fastNTPSyncPeriod: 1 * time.Hour,
 		slowNTPSyncPeriod: 1 * time.Hour,
 		now:               mockTimeNow,
-		quit:              make(chan struct{}),
 	}
 
 	// Set up the timeQuery function to track calls
@@ -446,18 +445,17 @@ func TestTimeTrackingInitialization(t *testing.T) {
 		slowNTPSyncPeriod: 1 * time.Hour,
 		timeQuery:         mockQuery,
 		now:               mockTimeNow,
-		quit:              make(chan struct{}),
 	}
 
 	// Verify that time tracking fields are initially zero
 	assert.True(t, ts.lastMonotonic.IsZero(), "lastMonotonic should be zero before Start()")
 
 	// Start the time source
-	ts.Start()
+	err := ts.Start(context.TODO())
+	assert.NoError(t, err, "Start should not return an error")
 
 	defer func() {
-		err := ts.Stop()
-		assert.NoError(t, err, "Stop should not return an error")
+		ts.Stop()
 	}()
 
 	// Verify that time tracking fields are initialized
