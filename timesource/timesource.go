@@ -181,7 +181,7 @@ func (s *NTPTimeSource) Now() time.Time {
 
 	// If significant time change detected, update offset synchronously
 	if timeDiff.Abs() > TimeChangeThreshold {
-		logutils.ZapLogger().Warn("System time change detected",
+		logutils.ZapLogger().Warn("system time change detected",
 			zap.Duration("difference", timeDiff),
 			zap.Duration("threshold", TimeChangeThreshold))
 

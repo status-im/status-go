@@ -310,7 +310,7 @@ func TestGetCurrentTimeOffline(t *testing.T) {
 func TestSystemTimeChangeDetection(t *testing.T) {
 	// Create a controlled time source with fixed time
 	currentTime := time.Now()
-	timeJump := 2 * TimeChangeThreshold
+	const timeJump = 2 * TimeChangeThreshold
 
 	// Track timeQuery calls (which indicates UpdateOffset was called)
 	timeQueryCalled := 0
@@ -375,7 +375,7 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 	assert.Equal(t, currentTime.Add(testOffset), time2,
 		"Time should be adjusted by offset with small time change")
 	assert.Equal(t, oldTime, ts.lastMonotonic,
-		"lastMonotonic should be updated after small time change")
+		"lastMonotonic should not be updated after small time change")
 	assert.Equal(t, 0, timeQueryCalled,
 		"UpdateOffset should not be called when time change is below threshold")
 
@@ -455,7 +455,7 @@ func TestTimeTrackingInitialization(t *testing.T) {
 
 	// Start the time source
 	ts.Start()
-	// Fix: Handle error from Stop in defer
+
 	defer func() {
 		err := ts.Stop()
 		assert.NoError(t, err, "Stop should not return an error")
