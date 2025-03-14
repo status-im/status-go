@@ -24,8 +24,28 @@ class WakuextService(Service):
         response = self.rpc_request("acceptContactRequest", params)
         return response.json()
 
+    def accept_latest_contact_request_for_contact(self, request_id: str):
+        params = [{"id": request_id}]
+        response = self.rpc_request("acceptLatestContactRequestForContact", params)
+        return response.json()
+
+    def decline_contact_request(self, request_id: str):
+        params = [{"id": request_id}]
+        response = self.rpc_request("declineContactRequest", params)
+        return response.json()
+
+    def dismiss_latest_contact_request_for_contact(self, request_id: str):
+        params = [{"id": request_id}]
+        response = self.rpc_request("dismissLatestContactRequestForContact", params)
+        return response.json()
+
     def get_contacts(self):
         response = self.rpc_request("contacts")
+        return response.json()
+
+    def add_contact(self, contact_id: str, displayName: str):
+        params = [{"id": contact_id, "nickname": "fake_nickname", "displayName": displayName, "ensName": ""}]
+        response = self.rpc_request("addContact", params)
         return response.json()
 
     def send_message(self, contact_id: str, message: str):
