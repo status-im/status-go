@@ -2,7 +2,7 @@
 library 'status-jenkins-lib@v1.9.20'
 
 pipeline {
-  agent { label 'macos && aarch64 && xcode-15.1 && nix-2.24' }
+  agent { label 'macos && aarch64 && xcode-16.2 && nix-2.24' }
 
   parameters {
     string(
