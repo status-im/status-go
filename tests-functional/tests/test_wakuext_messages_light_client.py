@@ -3,26 +3,9 @@ from steps.messenger import MessengerSteps
 
 
 @pytest.mark.rpc
-@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
-class TestDefaultMessaging(MessengerSteps):
-
-    def test_add_contact(self):
-        self.add_contact(execution_number=1, network_condition=None, privileged=False)
-
-    def test_create_private_group(self):
-        self.make_contacts()
-        self.create_private_group(1)
-
-    def test_private_group_messages(self):
-        self.make_contacts()
-        self.private_group_id = self.join_private_group()
-        self.private_group_message(5, self.private_group_id)
-
-
-@pytest.mark.rpc
 @pytest.mark.skip
 @pytest.mark.usefixtures("setup_two_privileged_nodes")
-class TestLightClientMessaging(TestDefaultMessaging):
+class TestLightClientMessaging(MessengerSteps):
 
     @pytest.fixture(scope="function", autouse=False)
     def setup_two_unprivileged_nodes(self, request):
