@@ -73,7 +73,7 @@ func getGaugeVecValue(metric *prometheus.GaugeVec, labels ...string) float64 {
 	return pb.Gauge.GetValue()
 }
 
-func TestClient_DoubleRegsiter(t *testing.T) {
+func TestClient_DoubleRegister(t *testing.T) {
 	client := createTestClient(t)
 	require.Error(t, client.RegisterWithRegistry())
 }
