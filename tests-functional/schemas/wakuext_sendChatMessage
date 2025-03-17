@@ -182,6 +182,7 @@
                                     "whisperTimestamp"
                                 ],
                                 "type": "object"
+
                             },
                             "members": {
                                 "items": {
@@ -296,8 +297,8 @@
                                 "type": "object"
                             },
                             "chats": {
-                                "properties": {
-                                    "e2298adb-a2f4-47c0-85db-77fe9184b8b0": {
+                            "patternProperties": {
+                                    "^[a-zA-Z0-9-]+$": {
                                         "properties": {
                                             "canPost": {
                                                 "type": "boolean"
@@ -377,9 +378,6 @@
                                         "type": "object"
                                     }
                                 },
-                                "required": [
-                                    "e2298adb-a2f4-47c0-85db-77fe9184b8b0"
-                                ],
                                 "type": "object"
                             },
                             "clock": {
@@ -425,9 +423,12 @@
                                 "type": "integer"
                             },
                             "members": {
-                                "properties": {
-                                    "0x0472e102c7deec0176ea89c055c4c5c6d702da9e987bf5216ee7712ff32df0cc773049d267f75a99a98b7bb600dad3f7a04c43f05f66cb0a9ff66145850f7e67cb": {
+                                "patternProperties": {
+                                    "^[a-zA-Z0-9-]+$": {
                                         "properties": {
+                                            "last_update_clock": {
+                                                "type": "integer"
+                                            },
                                             "roles": {
                                                 "items": {
                                                     "type": "integer"
@@ -435,27 +436,9 @@
                                                 "type": "array"
                                             }
                                         },
-                                        "required": [
-                                            "roles"
-                                        ],
-                                        "type": "object"
-                                    },
-                                    "0x049ed13afa09cbf74548a6ff2e6235b2986fc4b788cea472d2d73bb68bd696f1d8d57af38c55ac11b87d56ce4d5876725da9b105603010dcfc43589d52d02fbb60": {
-                                        "properties": {
-                                            "last_update_clock": {
-                                                "type": "integer"
-                                            }
-                                        },
-                                        "required": [
-                                            "last_update_clock"
-                                        ],
                                         "type": "object"
                                     }
                                 },
-                                "required": [
-                                    "0x0472e102c7deec0176ea89c055c4c5c6d702da9e987bf5216ee7712ff32df0cc773049d267f75a99a98b7bb600dad3f7a04c43f05f66cb0a9ff66145850f7e67cb",
-                                    "0x049ed13afa09cbf74548a6ff2e6235b2986fc4b788cea472d2d73bb68bd696f1d8d57af38c55ac11b87d56ce4d5876725da9b105603010dcfc43589d52d02fbb60"
-                                ],
                                 "type": "object"
                             },
                             "muteTill": {
@@ -568,8 +551,8 @@
                                 "type": "object"
                             },
                             "chatsModified": {
-                                "properties": {
-                                    "e2298adb-a2f4-47c0-85db-77fe9184b8b0": {
+                                "patternProperties": {
+                                    "^[a-zA-Z0-9-]+$": {
                                         "properties": {
                                             "CategoryModified": {
                                                 "type": "string"
@@ -601,9 +584,6 @@
                                         "type": "object"
                                     }
                                 },
-                                "required": [
-                                    "e2298adb-a2f4-47c0-85db-77fe9184b8b0"
-                                ],
                                 "type": "object"
                             },
                             "chatsRemoved": {
@@ -641,8 +621,8 @@
                                         "type": "object"
                                     },
                                     "chats": {
-                                        "properties": {
-                                            "e2298adb-a2f4-47c0-85db-77fe9184b8b0": {
+                                        "patternProperties": {
+                                            "^[a-zA-Z0-9-]+$": {
                                                 "properties": {
                                                     "canPost": {
                                                         "type": "boolean"
@@ -722,9 +702,6 @@
                                                 "type": "object"
                                             }
                                         },
-                                        "required": [
-                                            "e2298adb-a2f4-47c0-85db-77fe9184b8b0"
-                                        ],
                                         "type": "object"
                                     },
                                     "clock": {
@@ -770,9 +747,12 @@
                                         "type": "integer"
                                     },
                                     "members": {
-                                        "properties": {
-                                            "0x0472e102c7deec0176ea89c055c4c5c6d702da9e987bf5216ee7712ff32df0cc773049d267f75a99a98b7bb600dad3f7a04c43f05f66cb0a9ff66145850f7e67cb": {
+                                        "patternProperties": {
+                                            "^[a-zA-Z0-9-]+$": {
                                                 "properties": {
+                                                    "last_update_clock": {
+                                                        "type": "integer"
+                                                    },
                                                     "roles": {
                                                         "items": {
                                                             "type": "integer"
@@ -780,27 +760,9 @@
                                                         "type": "array"
                                                     }
                                                 },
-                                                "required": [
-                                                    "roles"
-                                                ],
-                                                "type": "object"
-                                            },
-                                            "0x049ed13afa09cbf74548a6ff2e6235b2986fc4b788cea472d2d73bb68bd696f1d8d57af38c55ac11b87d56ce4d5876725da9b105603010dcfc43589d52d02fbb60": {
-                                                "properties": {
-                                                    "last_update_clock": {
-                                                        "type": "integer"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "last_update_clock"
-                                                ],
                                                 "type": "object"
                                             }
                                         },
-                                        "required": [
-                                            "0x0472e102c7deec0176ea89c055c4c5c6d702da9e987bf5216ee7712ff32df0cc773049d267f75a99a98b7bb600dad3f7a04c43f05f66cb0a9ff66145850f7e67cb",
-                                            "0x049ed13afa09cbf74548a6ff2e6235b2986fc4b788cea472d2d73bb68bd696f1d8d57af38c55ac11b87d56ce4d5876725da9b105603010dcfc43589d52d02fbb60"
-                                        ],
                                         "type": "object"
                                     },
                                     "muteTill": {
