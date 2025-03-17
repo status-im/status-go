@@ -183,15 +183,10 @@ class MessengerSteps(NetworkConditionsSteps):
         assert response.get("result", {}).get("joined") is joined
 
     def community_messages(self, message_chat_id, message_count):
-        sent_messages = []
-        for i in range(message_count):
-            message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.send_community_chat_message(message_chat_id, message_text)
-            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
-            sent_messages.append(expected_message)
-            time.sleep(0.01)
+        _, responses = self.send_multiple_community_messages(message_chat_id, message_count)
+        messages = list(map(lambda r: r.get("result", {}).get("messages", [])[0], responses))
 
-        for i, expected_message in enumerate(sent_messages):
+        for i, expected_message in enumerate(messages):
             messages_new_event = self.receiver.find_signal_containing_pattern(
                 SignalType.MESSAGES_NEW.value,
                 event_pattern=expected_message.get("id"),
@@ -202,6 +197,18 @@ class MessengerSteps(NetworkConditionsSteps):
                 fields_to_validate={"text": "text"},
                 expected_message=expected_message,
             )
+
+    def send_multiple_community_messages(self, community_chat_id, message_count=1) -> tuple[list[str], list[dict]]:
+        sent_texts = []
+        responses = []
+
+        for i in range(message_count):
+            message_text = f"test_message_{i}_{uuid4()}"
+            sent_texts.append(message_text)
+            response = self.sender.wakuext_service.send_community_chat_message(community_chat_id, message_text)
+            responses.append(response)
+
+        return sent_texts, responses
 
     def one_to_one_message(self, message_count):
         _, responses = self.send_multiple_one_to_one_messages(message_count)
