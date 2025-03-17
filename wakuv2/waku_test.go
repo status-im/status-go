@@ -548,6 +548,7 @@ func TestWakuV2Store(t *testing.T) {
 	peer2Addr, err := w2.ListenAddresses()
 	require.NoError(t, err)
 	err = w1.node.DialPeer(context.Background(), peer2Addr[0].String())
+	require.NoError(t, err)
 
 	waitForPeerConnection(t, w2.node.Host().ID(), w1PeersCh)
 
@@ -752,8 +753,7 @@ func TestLightpushRateLimit(t *testing.T) {
 	//Use this instead of DialPeer to make sure the peer is added to PeerStore and can be selected for Lighpush
 	addresses, err := w1.ListenAddresses()
 	require.NoError(t, err)
-	peerID, err := w1.PeerID()
-	require.NoError(t, err)
+	peerID := w1.PeerID()
 	w2.node.AddDiscoveredPeer(peerID, addresses, wps.Static, w1.cfg.DefaultShardedPubsubTopics, w1.node.ENR(), true)
 
 	waitForPeerConnectionWithTimeout(t, w2.node.Host().ID(), w1PeersCh, 5*time.Second)

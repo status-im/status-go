@@ -77,7 +77,7 @@ func (s *MessageSenderSuite) SetupTest() {
 		s.logger,
 		database,
 		nil,
-		func([]byte, peer.ID, error) {},
+		func([]byte, peer.AddrInfo, error) {},
 		nil,
 	)
 	s.Require().NoError(err)

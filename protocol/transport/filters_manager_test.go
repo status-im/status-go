@@ -98,7 +98,7 @@ func (s *FiltersManagerSuite) SetupTest() {
 		s.logger,
 		nil,
 		nil,
-		func([]byte, peer.ID, error) {},
+		func([]byte, peer.AddrInfo, error) {},
 		nil,
 	)
 	s.Require().NoError(err)

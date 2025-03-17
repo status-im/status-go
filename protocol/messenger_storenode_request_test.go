@@ -191,7 +191,7 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 	WaitForPeersConnected(&s.Suite, s.ownerWaku, func() peer.IDSlice {
 		err := s.owner.DialPeer(s.storeNodeAddress)
 		s.Require().NoError(err)
-		peerID, err := s.wakuStoreNode.PeerID()
+		peerID := s.wakuStoreNode.PeerID()
 		s.Require().NoError(err)
 		return peer.IDSlice{peerID}
 	})
@@ -1238,8 +1238,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingCommunityWithOwnerToken() {
 
 func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 	storeAddress := s.storeNodeAddress
-	storePeerID, err := s.wakuStoreNode.PeerID()
-	s.Require().NoError(err)
+	storePeerID := s.wakuStoreNode.PeerID()
 
 	// Create messengers
 	s.createOwner()

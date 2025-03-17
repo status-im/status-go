@@ -92,7 +92,7 @@ func newTestWakuNode(logger *zap.Logger) (wakutypes.Waku, error) {
 		logger,
 		nil,
 		nil,
-		func([]byte, peer.ID, error) {},
+		func([]byte, peer.AddrInfo, error) {},
 		nil,
 	)
 }
