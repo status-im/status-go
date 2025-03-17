@@ -590,6 +590,7 @@ func NewMessenger(
 			communitiesManager.Stop,
 			archiveManager.Stop,
 			encryptionProtocol.Stop,
+			wakumetrics.UnregisterMetrics,
 			func() error {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 				defer cancel()
