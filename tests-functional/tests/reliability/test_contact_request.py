@@ -7,6 +7,7 @@ from resources.enums import MessageContentType
 from resources.constants import USE_IPV6
 
 
+@pytest.mark.usefixtures("setup_two_privileged_nodes")
 @pytest.mark.reliability
 class TestContactRequests(MessengerSteps):
 
