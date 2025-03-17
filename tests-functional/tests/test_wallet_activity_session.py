@@ -5,7 +5,7 @@ import uuid as uuid_lib
 import pytest
 
 from resources.constants import user_1, user_2
-from steps.status_backend import StatusBackendSteps
+from steps.wallet import WalletSteps
 from clients.signals import SignalType
 
 EventActivityFilteringDone = "wallet-activity-filtering-done"
@@ -20,7 +20,8 @@ def validate_entry(entry, tx_data):
 
 @pytest.mark.wallet
 @pytest.mark.rpc
-class TestWalletActivitySession(StatusBackendSteps):
+@pytest.mark.activity
+class TestWalletActivitySession(WalletSteps):
     await_signals = [
         SignalType.NODE_LOGIN.value,
         SignalType.WALLET.value,
@@ -32,6 +33,7 @@ class TestWalletActivitySession(StatusBackendSteps):
 
     def setup_method(self):
         self.request_id = str(random.randint(1, 8888))
+        self.mint_snt(user_1.address, 1000000000000000000000000)
 
     def test_wallet_start_activity_filter_session(self):
         uuid = str(uuid_lib.uuid4())
@@ -96,10 +98,27 @@ class TestWalletActivitySession(StatusBackendSteps):
         # First activity entry should match last sent transaction
         validate_entry(message["activities"][0], tx_data[-1])
 
-        # Trigger new transaction
+        # Trigger new ETH transfer
         uuid = str(uuid_lib.uuid4())
         input_params["uuid"] = uuid
 
+        self.rpc_client.prepare_wait_for_signal(
+            "wallet",
+            1,
+            lambda signal: signal["event"]["type"] == EventActivitySessionUpdated and signal["event"]["requestId"] == sessionID,
+        )
+        tx_data.append(wallet_utils.send_router_transaction(self.rpc_client, **input_params))
+        event_response = self.rpc_client.wait_for_signal("wallet", timeout=10)["event"]
+
+        # Check response event
+        assert int(event_response["requestId"]) == sessionID
+        message = json.loads(event_response["message"].replace("'", '"'))
+        assert message["hasNewOnTop"]  # New entries reported
+
+        # Trigger new STT transfer
+        uuid = str(uuid_lib.uuid4())
+        input_params["uuid"] = uuid
+        input_params["tokenID"] = "SNT"
         self.rpc_client.prepare_wait_for_signal(
             "wallet",
             1,
@@ -128,10 +147,13 @@ class TestWalletActivitySession(StatusBackendSteps):
         assert int(event_response["requestId"]) == sessionID
         message = json.loads(event_response["message"].replace("'", '"'))
         assert int(message["errorCode"]) == 1
-        assert len(message["activities"]) > 1  # Should have at least 2 entries
+        assert len(message["activities"]) > 2  # Should have at least 3 entries
 
         # First activity entry should match last sent transaction
         validate_entry(message["activities"][0], tx_data[-1])
 
         # Second activity entry should match second to last sent transaction
         validate_entry(message["activities"][1], tx_data[-2])
+
+        # Third activity entry should match third to last sent transaction
+        validate_entry(message["activities"][2], tx_data[-3])

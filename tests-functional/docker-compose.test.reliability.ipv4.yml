@@ -12,11 +12,7 @@ services:
     networks:
       - default
 
-  deploy-sntv2:
-    networks:
-      - default
-
-  deploy-communities-contracts:
+  foundry:
     networks:
       - default
 

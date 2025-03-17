@@ -5,8 +5,10 @@ RUN apk update && \
 
 WORKDIR /app
 
+COPY clone_and_run.sh /app
+RUN chmod +x /app/clone_and_run.sh
+
 COPY entrypoint.sh /app
 RUN chmod +x /app/entrypoint.sh
 
 ENTRYPOINT [ "/app/entrypoint.sh" ]
-WORKDIR /app/$GITHUB_REPO

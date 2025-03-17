@@ -11,6 +11,7 @@ from steps.status_backend import StatusBackendSteps
 @pytest.mark.rpc
 class TestWalletSignals(StatusBackendSteps):
 
+    @classmethod
     def setup_class(self):
         self.await_signals.append("wallet")
         super().setup_class()
@@ -39,4 +40,3 @@ class TestWalletSignals(StatusBackendSteps):
         assert signal_response["event"]["type"] == "wallet-owned-collectibles-filtering-done"
         message = json.loads(signal_response["event"]["message"].replace("'", '"'))
         assert user_1.address in message["ownershipStatus"].keys()
-

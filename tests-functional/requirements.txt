@@ -12,3 +12,4 @@ black~=24.10.0
 pre-commit~=3.6.2
 pytest-xdist~=3.6.1
 pytest-rerunfailures==13.0
+web3~=7.9.0

@@ -20,7 +20,7 @@ from clients.services.settings import SettingsService
 from clients.signals import SignalClient
 from clients.rpc import RpcClient
 from conftest import option
-from resources.constants import USE_IPV6, user_1, DEFAULT_DISPLAY_NAME, USER_DIR
+from resources.constants import USE_IPV6, user_1, DEFAULT_DISPLAY_NAME, USER_DIR, ANVIL_NETWORK_ID
 from docker.errors import APIError
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
@@ -193,6 +193,13 @@ class StatusBackend(RpcClient, SignalClient):
         data["StatusProxyStageName"] = "test"
         return data
 
+    def _set_token_overrides(self, network, token_overrides):
+        if not token_overrides:
+            return network
+
+        network["TokenOverrides"] = token_overrides
+        return network
+
     def extract_data(self, path: str):
         if not self.container:
             return path
@@ -241,9 +248,36 @@ class StatusBackend(RpcClient, SignalClient):
         data_dir=USER_DIR,
         display_name=DEFAULT_DISPLAY_NAME,
         user=user_1,
-        network_id=31337,
+        network_id=ANVIL_NETWORK_ID,
+        **kwargs,
     ):
         method = "RestoreAccountAndLogin"
+        anvil_network = {
+            "chainID": network_id,
+            "chainName": "Anvil",
+            "rpcProviders": [
+                {
+                    "chainId": network_id,
+                    "name": "Anvil Direct",
+                    "url": "http://anvil:8545",
+                    "enableRpsLimiter": False,
+                    "type": "embedded-direct",
+                    "enabled": True,
+                    "authType": "no-auth",
+                }
+            ],
+            "shortName": "eth",
+            "nativeCurrencyName": "Ether",
+            "nativeCurrencySymbol": "ETH",
+            "nativeCurrencyDecimals": 18,
+            "isTest": False,
+            "layer": 1,
+            "enabled": True,
+            "isActive": True,
+            "isDeactivatable": False,
+        }
+        anvil_network = self._set_token_overrides(anvil_network, kwargs.get("token_overrides", []))
+
         data = {
             "rootDataDir": data_dir,
             "kdfIterations": 256000,
@@ -255,30 +289,7 @@ class StatusBackend(RpcClient, SignalClient):
             "logLevel": "DEBUG",
             "testNetworksEnabled": False,
             "networkId": network_id,
-            "networksOverride": [
-                {
-                    "ChainID": network_id,
-                    "ChainName": "Anvil",
-                    "RpcProviders": [
-                        {
-                            "chainId": network_id,
-                            "name": "Anvil Direct",
-                            "url": "http://anvil:8545",
-                            "enableRpsLimiter": False,
-                            "type": "embedded-direct",
-                            "enabled": True,
-                            "authType": "no-auth",
-                        }
-                    ],
-                    "ShortName": "eth",
-                    "NativeCurrencyName": "Ether",
-                    "NativeCurrencySymbol": "ETH",
-                    "NativeCurrencyDecimals": 18,
-                    "IsTest": False,
-                    "Layer": 1,
-                    "Enabled": True,
-                }
-            ],
+            "networksOverride": [anvil_network],
         }
         data = self._set_proxy_credentials(data)
         return self.api_valid_request(method, data)

@@ -8,8 +8,9 @@ from resources.constants import user_1, user_2
 from utils import wallet_utils
 from uuid import uuid4
 
+
 class EthRpcSteps(WalletSteps):
-    await_signals = [        
+    await_signals = [
         SignalType.NODE_LOGIN.value,
         SignalType.WALLET.value,
         SignalType.WALLET_SUGGESTED_ROUTES.value,

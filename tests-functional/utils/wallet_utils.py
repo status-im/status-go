@@ -29,9 +29,10 @@ def get_suggested_routes(rpc_client, **kwargs):
     rpc_client.prepare_wait_for_signal("wallet.suggested.routes", 1)
     _ = rpc_client.rpc_valid_request(method, params)
 
-    routes = rpc_client.wait_for_signal("wallet.suggested.routes")
+    routes_signal = rpc_client.wait_for_signal("wallet.suggested.routes")
+    routes = routes_signal["event"]
 
-    return routes["event"]
+    return routes
 
 
 def build_transactions_from_route(rpc_client, **kwargs):
@@ -48,14 +49,16 @@ def build_transactions_from_route(rpc_client, **kwargs):
     params = [build_tx_params]
     _ = rpc_client.rpc_valid_request(method, params)
 
-    wallet_router_sign_transactions = rpc_client.wait_for_signal("wallet.router.sign-transactions")
+    wallet_router_sign_transactions_signal = rpc_client.wait_for_signal("wallet.router.sign-transactions")
+    wallet_router_sign_transactions = wallet_router_sign_transactions_signal["event"]
 
-    assert wallet_router_sign_transactions["event"]["signingDetails"]["signOnKeycard"] is False
-    transaction_hashes = wallet_router_sign_transactions["event"]["signingDetails"]["hashes"]
+    assert "signingDetails" in wallet_router_sign_transactions
+    assert wallet_router_sign_transactions["signingDetails"]["signOnKeycard"] is False
+    transaction_hashes = wallet_router_sign_transactions["signingDetails"]["hashes"]
 
     assert transaction_hashes, "Transaction hashes are empty!"
 
-    return wallet_router_sign_transactions["event"]
+    return wallet_router_sign_transactions
 
 
 def sign_messages(rpc_client, hashes, address):
@@ -172,6 +175,7 @@ def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
 
 def send_router_transaction(rpc_client, **kwargs):
     routes = get_suggested_routes(rpc_client, **kwargs)
+    assert "Best" in routes, f"No best route found: {routes}"
 
     router_build_tx_params = {}
     for key in kwargs:
