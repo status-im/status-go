@@ -294,16 +294,11 @@ class MessengerSteps(NetworkConditionsSteps):
                 fields_to_validate={"text": "text"},
             )
 
-    def private_group_message(self, message_count, private_group_id):
-        sent_messages = []
-        for i in range(message_count):
-            message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.send_group_chat_message(private_group_id, message_text)
-            expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
-            sent_messages.append(expected_message)
-            time.sleep(0.01)
+    def private_group_message(self, private_group_id, message_count):
+        _, responses = self.send_multiple_group_messages(private_group_id, message_count)
+        messages = list(map(lambda r: r.get("result", {}).get("messages", [])[0], responses))
 
-        for _, expected_message in enumerate(sent_messages):
+        for expected_message in messages:
             messages_new_event = self.receiver.find_signal_containing_pattern(
                 SignalType.MESSAGES_NEW.value,
                 event_pattern=expected_message.get("id"),
@@ -314,3 +309,15 @@ class MessengerSteps(NetworkConditionsSteps):
                 fields_to_validate={"text": "text"},
                 expected_message=expected_message,
             )
+
+    def send_multiple_group_messages(self, private_group_id, message_count=1) -> tuple[list[str], list[dict]]:
+        sent_texts = []
+        responses = []
+
+        for i in range(message_count):
+            message_text = f"test_message_{i}_{uuid4()}"
+            sent_texts.append(message_text)
+            response = self.sender.wakuext_service.send_group_chat_message(private_group_id, message_text)
+            responses.append(response)
+
+        return sent_texts, responses
