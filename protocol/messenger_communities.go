@@ -5173,9 +5173,9 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 
 // getCommunityStorenode returns the active mailserver if a communityID is present then it'll return the mailserver
 // for that community if it has a mailserver setup otherwise it'll return the global mailserver
-func (m *Messenger) getCommunityStorenode(communityID ...string) peer.ID {
+func (m *Messenger) getCommunityStorenode(communityID ...string) peer.AddrInfo {
 	if m.transport.WakuVersion() != 2 {
-		return ""
+		return peer.AddrInfo{}
 	}
 
 	if len(communityID) == 0 || communityID[0] == "" {
@@ -5191,11 +5191,11 @@ func (m *Messenger) getCommunityStorenode(communityID ...string) peer.ID {
 		return m.transport.GetActiveStorenode()
 	}
 
-	peerID, err := ms.PeerID()
+	peerInfo, err := ms.PeerInfo()
 	if err != nil {
 		m.logger.Error("getting storenode for community, using global", zap.String("communityID", gocommon.TruncateWithDot(communityID[0])), zap.Error(err))
 		return m.transport.GetActiveStorenode()
 	}
 
-	return peerID
+	return peerInfo
 }
