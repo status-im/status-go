@@ -3,6 +3,8 @@ import random
 import pytest
 import logging
 
+from clients.signals import SignalType
+from steps.messenger import MessengerSteps
 from steps.status_backend import StatusBackendSteps
 
 
@@ -125,3 +127,30 @@ class TestProfile(StatusBackendSteps):
         self.rpc_client.rpc_valid_request(method, [setting_name, set_value], _id)
         response = self.rpc_client.rpc_valid_request("settings_getSettings", [])
         assert setting_name not in response.json()["result"]
+
+
+@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
+@pytest.mark.rpc
+class TestUserStatus(MessengerSteps):
+
+    def test_status_updates(self):
+        self.make_contacts()
+
+        statuses = [[1, "text_1"], [2, "text_2"], [3, "text_3"], [4, "text_4"]]
+
+        for new_status, custom_text in statuses:
+            response = self.sender.wakuext_service.set_user_status(new_status, custom_text)
+            self.sender.verify_json_schema(response, method="wakuext_setUserStatus")
+
+            self.receiver.find_signal_containing_pattern(
+                SignalType.MESSAGES_NEW.value,
+                event_pattern=custom_text,
+                timeout=10,
+            )
+
+            response = self.receiver.wakuext_service.status_updates()
+            self.sender.verify_json_schema(response, method="wakuext_statusUpdates")
+
+            statusUpdate = response.get("result", {}).get("statusUpdates", [])[0]
+            assert statusUpdate.get("statusType", -1) == new_status
+            assert statusUpdate.get("text", "") == custom_text
