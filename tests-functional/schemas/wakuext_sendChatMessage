@@ -182,7 +182,6 @@
                                     "whisperTimestamp"
                                 ],
                                 "type": "object"
-
                             },
                             "members": {
                                 "items": {
