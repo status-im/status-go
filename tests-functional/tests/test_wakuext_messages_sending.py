@@ -46,3 +46,13 @@ class TestSendingChatMessages(MessengerSteps):
         expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         actual_text = expected_message.get("text", "")
         assert actual_text == sent_texts[0]
+
+    def test_resend_one_to_one_message(self):
+        self.make_contacts()
+
+        sent_texts, responses = self.send_multiple_one_to_one_messages(1)
+        message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+
+        self.sender.wakuext_service.resend_chat_message(message_id)
+
+        # TODO: Find out how to assert

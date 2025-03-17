@@ -14,6 +14,15 @@ class WakuextService(Service):
     def __init__(self, client: RpcClient):
         super().__init__(client, "wakuext")
 
+    def start_messenger(self):
+        response = self.rpc_request("startMessenger")
+        json_response = response.json()
+
+        if "error" in json_response:
+            assert json_response["error"]["code"] == -32000
+            assert json_response["error"]["message"] == "messenger already started"
+            return
+
     def send_contact_request(self, contact_id: str, message: str):
         params = [{"id": contact_id, "message": message}]
         response = self.rpc_request("sendContactRequest", params)
@@ -73,15 +82,6 @@ class WakuextService(Service):
         response = self.rpc_request("sendOneToOneMessage", params)
         return response.json()
 
-    def start_messenger(self):
-        response = self.rpc_request("startMessenger")
-        json_response = response.json()
-
-        if "error" in json_response:
-            assert json_response["error"]["code"] == -32000
-            assert json_response["error"]["message"] == "messenger already started"
-            return
-
     def create_group_chat_with_members(self, pubkey_list: list, group_chat_name: str):
         params = [None, group_chat_name, pubkey_list]
         response = self.rpc_request("createGroupChatWithMembers", params)
@@ -115,6 +115,11 @@ class WakuextService(Service):
     def send_community_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value):
         params = [{"chatId": chat_id, "text": message, "contentType": content_type}]
         response = self.rpc_request("sendChatMessage", params)
+        return response.json()
+
+    def resend_chat_message(self, message_id: str):
+        params = [message_id]
+        response = self.rpc_request("reSendChatMessage", params)
         return response.json()
 
     def leave_community(self, community_id):
