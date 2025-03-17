@@ -192,7 +192,6 @@ func (s *MessengerStoreNodeRequestSuite) createOwner() {
 		err := s.owner.DialPeer(s.storeNodeAddress)
 		s.Require().NoError(err)
 		peerID := s.wakuStoreNode.PeerID()
-		s.Require().NoError(err)
 		return peer.IDSlice{peerID}
 	})
 }
