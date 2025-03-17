@@ -94,7 +94,7 @@ class TestChatMessages(MessengerSteps):
 
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.chat_pinned_messages(sender_chat_id)
-        self.sender.verify_json_schema(response, method="wakuext_schatPinnedMessages")
+        self.sender.verify_json_schema(response, method="wakuext_chatPinnedMessages")
 
         pinned_messages = response.get("result", {}).get("pinnedMessages", [])
         assert len(pinned_messages) == 1
@@ -251,6 +251,23 @@ class TestChatMessages(MessengerSteps):
         response = self.sender.wakuext_service.message_by_message_id(message_id)
         outgoing_status = response.get("result", {}).get("outgoingStatus", "")
         assert outgoing_status == new_status
+
+
+@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
+@pytest.mark.rpc
+class TestCommunityMessages(MessengerSteps):
+    def test_send_community_message(self):
+        self.create_community(self.sender)
+        community_chat_id = self.join_community(self.receiver)
+
+        sent_texts, responses = self.send_multiple_community_messages(community_chat_id, 1)
+        self.sender.verify_json_schema(responses[0], method="wakuext_sendChatMessage")
+
+        response = self.sender.wakuext_service.chat_messages(community_chat_id)
+        messages = response.get("result", {}).get("messages", [])
+        assert len(messages) == 1
+        actual_text = messages[0].get("text", "")
+        assert actual_text == sent_texts[0]
 
 
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
