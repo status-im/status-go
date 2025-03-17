@@ -169,11 +169,12 @@ func (r *Router) setCustomTxDetails(ctx context.Context, pathTxIdentity *request
 		return err
 	}
 
+	pathFound := false
 	for _, path := range r.activeRoutes.Best {
 		if path.PathIdentity() != pathTxIdentity.PathIdentity() {
 			continue
 		}
-
+		pathFound = true
 		// update the custom params
 		r.lastInputParamsMutex.Lock()
 		if r.lastInputParams.PathTxCustomParams == nil {
@@ -188,13 +189,17 @@ func (r *Router) setCustomTxDetails(ctx context.Context, pathTxIdentity *request
 		if err != nil {
 			return err
 		}
-		// inform the client about the changes
-		sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, nil)
-
-		return nil
 	}
 
-	return ErrCannotFindPathForProvidedIdentity
+	if !pathFound {
+		return ErrCannotFindPathForProvidedIdentity
+	}
+
+	_, err = r.checkBalancesForTheBestRoute(ctx, r.activeRoutes.Best)
+
+	// inform the client about the changes
+	sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, err)
+	return nil
 }
 
 func (r *Router) SetFeeMode(ctx context.Context, pathTxIdentity *requests.PathTxIdentity, feeMode fees.GasFeeMode) error {
