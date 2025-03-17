@@ -12,7 +12,7 @@ from steps.messenger import MessengerSteps
 class TestMessageReactions(MessengerSteps):
     def test_one_to_one_message_reactions(self):
         self.make_contacts()
-        response = self.sender.wakuext_service.send_message(self.receiver.public_key, "test_message")
+        response = self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, "test_message")
         message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         message_id, sender_chat_id = message["id"], message["chatId"]
         receiver_chat_id = self.receiver.wakuext_service.rpc_request(method="chats").json()["result"][0]["id"]
@@ -60,7 +60,7 @@ class TestMessageReactions(MessengerSteps):
         )
         assert not response.json()["result"]
 
-        response = self.sender.wakuext_service.send_message(self.receiver.public_key, "test_message 1")
+        response = self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, "test_message 1")
         message_1 = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         emoji_1_id = self.receiver.wakuext_service.rpc_request(method="sendEmojiReaction", params=[receiver_chat_id, message_1["id"], 2]).json()[
             "result"
@@ -71,7 +71,7 @@ class TestMessageReactions(MessengerSteps):
             timeout=60,
         )
 
-        response = self.receiver.wakuext_service.send_message(self.sender.public_key, "test_message 2")
+        response = self.receiver.wakuext_service.send_one_to_one_message(self.sender.public_key, "test_message 2")
         message_2 = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         emoji_2_id = self.sender.wakuext_service.rpc_request(method="sendEmojiReaction", params=[sender_chat_id, message_2["id"], 3]).json()[
             "result"

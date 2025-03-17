@@ -17,7 +17,7 @@ class TestLightClientRateLimiting(MessengerSteps):
 
         for i in range(200):
             message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.send_message(self.receiver.public_key, message_text)
+            response = self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, message_text)
             expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
             sent_messages.append(expected_message)
             sleep(0.1)

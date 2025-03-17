@@ -31,7 +31,7 @@ class TestOneToOneMessages(MessengerSteps):
     def test_one_to_one_message_with_node_pause_30_seconds(self):
         with self.node_pause(self.receiver):
             message_text = f"test_message_{uuid4()}"
-            self.sender.wakuext_service.send_message(self.receiver.public_key, message_text)
+            self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, message_text)
             sleep(30)
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
         self.sender.wait_for_signal(SignalType.MESSAGE_DELIVERED.value)

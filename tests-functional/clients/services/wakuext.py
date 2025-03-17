@@ -68,7 +68,7 @@ class WakuextService(Service):
         response = self.rpc_request("addContact", params)
         return response.json()
 
-    def send_message(self, contact_id: str, message: str):
+    def send_one_to_one_message(self, contact_id: str, message: str):
         params = [{"id": contact_id, "message": message}]
         response = self.rpc_request("sendOneToOneMessage", params)
         return response.json()
