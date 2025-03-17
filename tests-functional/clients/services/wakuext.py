@@ -152,6 +152,13 @@ class WakuextService(Service):
         response = self.rpc_request("allMessagesFromChatWhichMatchTerm", params)
         return response.json()
 
+    def all_messages_from_chats_and_communities_which_match_term(
+        self, community_ids: list[str], chat_ids: list[str], searchTerm: str, caseSensitive: bool
+    ):
+        params = [community_ids, chat_ids, searchTerm, caseSensitive]
+        response = self.rpc_request("allMessagesFromChatsAndCommunitiesWhichMatchTerm", params)
+        return response.json()
+
     def send_pin_message(self, message: SendPinMessagePayload):
         params = [message]
         response = self.rpc_request("sendPinMessage", params)

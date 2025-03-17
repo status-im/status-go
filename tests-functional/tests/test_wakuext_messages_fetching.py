@@ -74,6 +74,55 @@ class TestFetchingChatMessages(MessengerSteps):
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == expectedCount
 
+    def test_all_messages_from_chats_and_communities_which_match_term(self):
+        # One to one
+        self.make_contacts()
+        sent_texts_one_to_one, _ = self.send_multiple_one_to_one_messages(1)
+        one_to_one_chat_id = self.receiver.public_key
+
+        # Group
+        private_group_chat_id = self.join_private_group()
+        sent_texts_group, _ = self.send_multiple_group_messages(private_group_chat_id, 1)
+
+        # Community
+        self.create_community(self.sender)
+        community_chat_id = self.join_community(self.receiver)
+        sent_texts_community, _ = self.send_multiple_community_messages(community_chat_id, 1)
+
+        response = self.sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
+            [self.community_id], [one_to_one_chat_id, private_group_chat_id], "TEST_MESSAGE", False
+        )
+        self.sender.verify_json_schema(response, method="wakuext_allMessagesFromChatsAndCommunitiesWhichMatchTerm")
+
+        messages = response.get("result", {}).get("messages", [])
+        actual_texts = [message.get("text", "") for message in messages]
+        assert sent_texts_one_to_one[0] in actual_texts
+        assert sent_texts_group[0] in actual_texts
+        assert sent_texts_community[0] in actual_texts
+
+    @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6359")
+    def test_all_messages_from_chats_and_communities_which_match_term_case_sensitive(self):
+        # One to one
+        self.make_contacts()
+        _, _ = self.send_multiple_one_to_one_messages(1)
+        one_to_one_chat_id = self.receiver.public_key
+
+        # Group
+        private_group_chat_id = self.join_private_group()
+        _, _ = self.send_multiple_group_messages(private_group_chat_id, 1)
+
+        # Community
+        self.create_community(self.sender)
+        community_chat_id = self.join_community(self.receiver)
+        _, _ = self.send_multiple_community_messages(community_chat_id, 1)
+
+        response = self.sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
+            [self.community_id], [one_to_one_chat_id, private_group_chat_id], "TEST_MESSAGE", True
+        )
+
+        messages = response.get("result", {}).get("messages", [])
+        assert len(messages) == 0
+
     def test_first_unseen_message(self):
         _, responses = self.send_multiple_one_to_one_messages(1)
         sender_chat_id = self.receiver.public_key
