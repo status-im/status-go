@@ -182,6 +182,7 @@ type Settings struct {
 	// RemotePushNotificationsEnabled indicates whether we should be using remote notifications (ios only for now)
 	RemotePushNotificationsEnabled bool             `json:"remote-push-notifications-enabled?,omitempty"`
 	NewsNotificationsEnabled       bool             `json:"news-notifications-enabled?,omitempty"`
+	MessengerNotificationsEnabled  bool             `json:"messenger-notifications-enabled?,omitempty"`
 	SigningPhrase                  string           `json:"signing-phrase"`
 	StickerPacksInstalled          *json.RawMessage `json:"stickers/packs-installed,omitempty"`
 	StickerPacksPending            *json.RawMessage `json:"stickers/packs-pending,omitempty"`

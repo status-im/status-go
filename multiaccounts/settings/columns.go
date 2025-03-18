@@ -329,6 +329,11 @@ var (
 		dBColumnName:   "news_notifications_enabled",
 		valueHandler:   BoolHandler,
 	}
+	MessengerNotificationsEnabled = SettingField{
+		reactFieldName: "messenger-notifications-enabled?",
+		dBColumnName:   "messenger_notifications_enabled",
+		valueHandler:   BoolHandler,
+	}
 	SendPushNotifications = SettingField{
 		reactFieldName: "send-push-notifications?",
 		dBColumnName:   "send_push_notifications",
@@ -565,6 +570,7 @@ var (
 		NetworksCurrentNetwork,
 		NetworksNetworks,
 		NewsNotificationsEnabled,
+		MessengerNotificationsEnabled,
 		NodeConfig,
 		NotificationsEnabled,
 		OpenseaEnabled,
