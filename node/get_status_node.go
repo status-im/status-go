@@ -22,7 +22,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enr"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/discovery"
@@ -101,8 +100,6 @@ type StatusNode struct {
 	accountsManager    *accounts.Manager
 	transactor         *transactions.Transactor
 
-	// services
-	services      []common.StatusService
 	publicMethods map[string]bool
 	// we explicitly list every service, we could use interfaces
 	// and store them in a nicer way and user reflection, but for now stupid is good

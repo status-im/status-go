@@ -47,9 +47,6 @@ type TokenLists struct {
 
 	tokensListsMu sync.RWMutex
 	tokensLists   map[string]*TokensList // map[list-id][tokens-list]
-
-	fetcherCtx context.Context
-	cancel     context.CancelFunc
 }
 
 // NewTokenLists creates a new instance of TokenLists.
@@ -75,10 +72,8 @@ func NewTokenLists(appDb *sql.DB, walletDb *sql.DB) (*TokenLists, error) {
 // If the remote list url is not set (empty string provided), the hardcoded default list will be used.
 // The auto-refresh interval is used to fetch the list of token lists from the remote source and update the local cache.
 // The auto-refresh check interval is used to check if the auto-refresh should be triggered.
-func (t *TokenLists) Start(remoteListUrl string, autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) {
-	// TODO: remove the context from the struct and use the context passed to the function
-	t.fetcherCtx, t.cancel = context.WithCancel(context.Background())
-
+func (t *TokenLists) Start(ctx context.Context, remoteListUrl string, autoRefreshInterval time.Duration,
+	autoRefreshCheckInterval time.Duration) {
 	err := t.initializeTokensLists()
 	if err != nil {
 		logutils.ZapLogger().Error("Failed to initialize token lists", zap.Error(err))
@@ -88,14 +83,13 @@ func (t *TokenLists) Start(remoteListUrl string, autoRefreshInterval time.Durati
 
 	go func() {
 		defer common.LogOnPanic()
-		t.listenForNotifications()
+		t.listenForNotifications(ctx)
 	}()
 
-	t.startAutoRefreshLoop(autoRefreshInterval, autoRefreshCheckInterval)
+	t.startAutoRefreshLoop(ctx, autoRefreshInterval, autoRefreshCheckInterval)
 }
 
 func (t *TokenLists) Stop() {
-	t.cancel()
 }
 
 func (t *TokenLists) initializeTokensLists() error {
@@ -112,7 +106,7 @@ func (t *TokenLists) initializeTokensLists() error {
 	return t.rebuildTokensListsMap()
 }
 
-func (t *TokenLists) listenForNotifications() {
+func (t *TokenLists) listenForNotifications(ctx context.Context) {
 	for {
 		select {
 		case <-t.notifyCh:
@@ -122,7 +116,7 @@ func (t *TokenLists) listenForNotifications() {
 				continue
 			}
 			signal.SendWalletEvent(signal.TokenListsUpdated, nil)
-		case <-t.fetcherCtx.Done():
+		case <-ctx.Done():
 			return
 		}
 	}

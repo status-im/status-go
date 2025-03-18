@@ -1,6 +1,7 @@
 package tokenlists
 
 import (
+	"context"
 	"time"
 
 	"go.uber.org/zap"
@@ -10,7 +11,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 )
 
-func (t *TokenLists) startAutoRefreshLoop(autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) {
+func (t *TokenLists) startAutoRefreshLoop(ctx context.Context, autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) {
 	if t.settings == nil {
 		logutils.ZapLogger().Error("settings is nil")
 		return
@@ -38,7 +39,7 @@ func (t *TokenLists) startAutoRefreshLoop(autoRefreshInterval time.Duration, aut
 					continue
 				}
 
-				storedListsCount, err := t.tokenListsFetcher.FetchAndStore(t.fetcherCtx)
+				storedListsCount, err := t.tokenListsFetcher.FetchAndStore(ctx)
 				if err != nil {
 					logutils.ZapLogger().Error("failed to fetch and store token lists", zap.Error(err))
 					// Just log an error and don't continue, cause we have to store last tokens update timestamp
@@ -55,7 +56,7 @@ func (t *TokenLists) startAutoRefreshLoop(autoRefreshInterval time.Duration, aut
 					t.notifyCh <- struct{}{}
 				}
 
-			case <-t.fetcherCtx.Done():
+			case <-ctx.Done():
 				ticker.Stop()
 				return
 			}

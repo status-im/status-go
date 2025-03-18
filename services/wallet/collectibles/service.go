@@ -330,7 +330,7 @@ func (s *Service) RefetchOwnedCollectibles() {
 	s.controller.RefetchOwnedCollectibles()
 }
 
-func (s *Service) Start() {
+func (s *Service) Start(ctx context.Context) {
 	s.controller.Start()
 }
 

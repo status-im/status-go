@@ -160,8 +160,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		b.RegisterLifecycle(services[i])
 	}
 
-	b.services = services
-
 	return nil
 }
 

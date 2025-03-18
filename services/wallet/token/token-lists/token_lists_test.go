@@ -1,6 +1,7 @@
 package tokenlists
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"testing"
@@ -113,7 +114,7 @@ func TestTokensLists(t *testing.T) {
 	const autoRefreshInterval = 3 * time.Second
 	const autoRefreshCheckInterval = 1 * time.Second
 
-	tokensLists.Start(server.URL, autoRefreshInterval, autoRefreshCheckInterval)
+	tokensLists.Start(context.Background(), server.URL, autoRefreshInterval, autoRefreshCheckInterval)
 
 	// immediately after starting the server check if the initial token lists are loaded
 	allTokensLists := tokensLists.GetTokensLists()

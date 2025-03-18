@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -14,7 +15,7 @@ func main() {
 		fmt.Printf("Error creating token lists: %v\n", err)
 		return
 	}
-	tokensLists.Start("", time.Hour, time.Hour)
+	tokensLists.Start(context.Background(), "", time.Hour, time.Hour)
 	allTokensLists := tokensLists.GetTokensLists()
 
 	fmt.Println("")

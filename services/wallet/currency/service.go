@@ -24,7 +24,6 @@ type Service struct {
 
 	tokenManager *token.Manager
 	walletFeed   *event.Feed
-	cancelFn     context.CancelFunc
 }
 
 func NewService(db *sql.DB, walletFeed *event.Feed, tokenManager *token.Manager, marketManager *market.Manager) *Service {
@@ -36,16 +35,13 @@ func NewService(db *sql.DB, walletFeed *event.Feed, tokenManager *token.Manager,
 	}
 }
 
-func (s *Service) Start() {
+func (s *Service) Start(ctx context.Context) {
 	// Update all fiat currency formats in cache
 	fiatFormats, err := s.getAllFiatCurrencyFormats()
 
 	if err == nil {
 		_ = s.db.UpdateCachedFormats(fiatFormats)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancelFn = cancel
 
 	go func() {
 		defer gocommon.LogOnPanic()
@@ -62,12 +58,6 @@ func (s *Service) Start() {
 			}
 		}
 	}()
-}
-
-func (s *Service) Stop() {
-	if s.cancelFn != nil {
-		s.cancelFn()
-	}
 }
 
 func (s *Service) GetCachedCurrencyFormats() (FormatPerSymbol, error) {

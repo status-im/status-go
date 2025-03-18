@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -103,7 +104,6 @@ func NewService(
 	communityManager := community.NewManager(db, mediaServer, feed)
 	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
 	tokenManager := token.NewTokenManager(db, rpcClient, communityManager, rpcClient.NetworkManager, appDB, mediaServer, feed, accountFeed, accountsDB, token.NewPersistence(db))
-	tokenManager.Start()
 
 	cryptoOnRampProviders := []onramp.Provider{
 		onramp.NewRampProvider(),
@@ -130,7 +130,7 @@ func NewService(
 	blockChainState := blockchainstate.NewBlockChainState()
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
 		tokenManager, balanceCacher, blockChainState)
-	transferController.Start()
+
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
 	cryptoCompareProxy := cryptocompare.NewClientWithParams(cryptocompare.Params{
@@ -335,15 +335,21 @@ type Service struct {
 	featureFlags          *protocolCommon.FeatureFlags
 	router                *router.Router
 	routeExecutionManager *routeexecution.Manager
+
+	cancelWalletServiceCtx context.CancelFunc
 }
 
 // Start signals transmitter.
 func (s *Service) Start() error {
-	s.transferController.Start()
-	s.currency.Start()
-	err := s.signals.Start()
-	s.history.Start()
-	s.collectibles.Start()
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancelWalletServiceCtx = cancel
+
+	s.tokenManager.Start(ctx)
+	s.transferController.Start(ctx)
+	s.currency.Start(ctx)
+	err := s.signals.Start(ctx)
+	s.history.Start(ctx)
+	s.collectibles.Start(ctx)
 	s.started = true
 	return err
 }
@@ -359,7 +365,6 @@ func (s *Service) Stop() error {
 	s.router.Stop()
 	s.signals.Stop()
 	s.transferController.Stop()
-	s.currency.Stop()
 	s.reader.Stop()
 	s.history.Stop()
 	s.activity.Stop()
@@ -367,6 +372,13 @@ func (s *Service) Stop() error {
 	s.tokenManager.Stop()
 	s.started = false
 	logutils.ZapLogger().Info("wallet stopped")
+
+	// Cancel wallet service context
+	if s.cancelWalletServiceCtx != nil {
+		s.cancelWalletServiceCtx()
+		s.cancelWalletServiceCtx = nil
+	}
+
 	return nil
 }
 

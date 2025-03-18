@@ -1,6 +1,7 @@
 package walletevent
 
 import (
+	"context"
 	"sync"
 
 	"go.uber.org/zap"
@@ -25,7 +26,7 @@ type SignalsTransmitter struct {
 }
 
 // Start runs loop in background.
-func (tmr *SignalsTransmitter) Start() error {
+func (tmr *SignalsTransmitter) Start(ctx context.Context) error {
 	if tmr.quit != nil {
 		// already running, nothing to do
 		return nil

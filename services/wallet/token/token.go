@@ -132,7 +132,7 @@ func NewTokenManager(
 	}
 }
 
-func (tm *Manager) Start() {
+func (tm *Manager) Start(ctx context.Context) {
 	tm.startAccountsWatcher()
 
 	// TODO: make `autoRefreshInterval` configurable from the client
@@ -140,7 +140,7 @@ func (tm *Manager) Start() {
 	autoRefreshCheckInterval := 3 * time.Minute // interval after which we should check if we should trigger the auto-refresh
 	// For now we don't have the list of tokens lists remotely set so we're uisng the harcoded default lists. Once we have it
 	//we will just need to update the empty string with the correct URL.
-	tm.tokenLists.Start("", autoRefreshInterval, autoRefreshCheckInterval)
+	tm.tokenLists.Start(ctx, "", autoRefreshInterval, autoRefreshCheckInterval)
 }
 
 func (tm *Manager) startAccountsWatcher() {
