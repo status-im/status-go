@@ -36,6 +36,7 @@ type Login struct {
 	// - KeyUID is ignored and replaced with hash of the master public key
 	Mnemonic string `json:"mnemonic"`
 
+	WalletConfig
 	WalletSecretsConfig
 
 	APIConfig *APIConfig `json:"apiConfig"`

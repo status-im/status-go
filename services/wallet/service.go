@@ -47,6 +47,9 @@ import (
 
 const (
 	EventBlockchainStatusChanged walletevent.EventType = "wallet-blockchain-status-changed"
+
+	defaultAutoRefreshInterval      = 30 * time.Minute // interval after which we should fetch the token lists from the remote source (or use the default one if remote source is not set)
+	defaultAutoRefreshCheckInterval = 3 * time.Minute  // interval after which we should check if we should trigger the auto-refresh
 )
 
 // NewService initializes service instance.
@@ -344,7 +347,16 @@ func (s *Service) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancelWalletServiceCtx = cancel
 
-	s.tokenManager.Start(ctx)
+	autoRefreshInterval := defaultAutoRefreshInterval
+	autoRefreshCheckInterval := defaultAutoRefreshCheckInterval
+	if s.config.WalletConfig.TokensListsAutoRefreshInterval > 0 &&
+		s.config.WalletConfig.TokensListsAutoRefreshCheckInterval > 0 &&
+		s.config.WalletConfig.TokensListsAutoRefreshInterval > s.config.WalletConfig.TokensListsAutoRefreshCheckInterval {
+		autoRefreshInterval = time.Duration(s.config.WalletConfig.TokensListsAutoRefreshInterval) * time.Second
+		autoRefreshCheckInterval = time.Duration(s.config.WalletConfig.TokensListsAutoRefreshCheckInterval) * time.Second
+	}
+
+	s.tokenManager.Start(ctx, autoRefreshInterval, autoRefreshCheckInterval)
 	s.transferController.Start(ctx)
 	s.currency.Start(ctx)
 	err := s.signals.Start(ctx)

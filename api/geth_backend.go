@@ -680,6 +680,7 @@ func (b *GethStatusBackend) overridePartialWithOldNodeConfig(conf *params.NodeCo
 
 func (b *GethStatusBackend) convertLoginRequestToAccountRequest(loginRequest *requests.Login) *requests.CreateAccount {
 	createAccount := &requests.CreateAccount{}
+	createAccount.WalletConfig = loginRequest.WalletConfig
 	createAccount.WalletSecretsConfig = loginRequest.WalletSecretsConfig
 	createAccount.WakuV2Nameserver = &loginRequest.WakuV2Nameserver
 	createAccount.WakuV2LightClient = loginRequest.WakuV2LightClient
@@ -745,7 +746,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		KeycardPairingDataFile: DefaultKeycardPairingDataFile,
 	}
 
-	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
+	defaultCfg.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
 
 	err = b.UpdateNodeConfigFleet(acc, request.Password, defaultCfg)
 	if err != nil {

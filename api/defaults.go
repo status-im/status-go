@@ -170,11 +170,14 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	return nil
 }
 
-func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfig {
+func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.WalletSecretsConfig) params.WalletConfig {
 	walletConfig := params.WalletConfig{
 		Enabled:                true,
 		EnableMercuryoProvider: true,
 		AlchemyAPIKeys:         make(map[uint64]string),
+
+		TokensListsAutoRefreshCheckInterval: walletRequest.TokensListsAutoRefreshCheckInterval,
+		TokensListsAutoRefreshInterval:      walletRequest.TokensListsAutoRefreshInterval,
 	}
 
 	if request.StatusProxyStageName != "" {
@@ -322,7 +325,7 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	nodeConfig.MaxPeers = DefaultMaxPeers
 	nodeConfig.MaxPendingPeers = DefaultMaxPendingPeers
 
-	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
+	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletConfig, &request.WalletSecretsConfig)
 
 	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}

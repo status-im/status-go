@@ -72,6 +72,7 @@ type CreateAccount struct {
 
 	AutoRefreshTokensEnabled bool `json:"autoRefreshTokensEnabled"`
 
+	WalletConfig
 	WalletSecretsConfig
 
 	TorrentConfigEnabled *bool
@@ -88,7 +89,10 @@ type CreateAccount struct {
 	KeycardPairingKey      string  `json:"keycardPairingKey"`
 	KeycardPairingDataFile *string `json:"keycardPairingDataFile"`
 }
-
+type WalletConfig struct {
+	TokensListsAutoRefreshInterval      int `json:"tokensListsAutoRefreshInterval"`      // in seconds
+	TokensListsAutoRefreshCheckInterval int `json:"tokensListsAutoRefreshCheckInterval"` // in seconds
+}
 type WalletSecretsConfig struct {
 	PoktToken            string `json:"poktToken"`
 	InfuraToken          string `json:"infuraToken"`

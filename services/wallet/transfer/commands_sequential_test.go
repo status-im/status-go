@@ -1146,7 +1146,7 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 	err = tokenListsFetcher.StoreTokenList("sequential-commands-tests-list", "abcd", sequentialCommandsTestsListJsonData)
 	require.NoError(t, err)
 
-	tokenManager.Start(context.Background())
+	tokenManager.Start(context.Background(), time.Hour, time.Hour)
 
 	accDB, err := accounts.NewDB(appDb)
 	require.NoError(t, err)

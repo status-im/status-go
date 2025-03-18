@@ -434,19 +434,26 @@ type WalletConfig struct {
 	EthRpcProxyUrl         string `json:"EthRpcProxyUrl"`
 	EthRpcProxyUser        string `json:"EthRpcProxyUser"`
 	EthRpcProxyPassword    string `json:"EthRpcProxyPassword"`
+
+	TokensListsAutoRefreshInterval      int `json:"TokensListsAutoRefreshInterval"`      // in seconds
+	TokensListsAutoRefreshCheckInterval int `json:"TokensListsAutoRefreshCheckInterval"` // in seconds
 }
 
 // MarshalJSON custom marshalling to avoid exposing sensitive data in log,
 // there's a function called `startNode` will log NodeConfig which include WalletConfig
 func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Enabled                bool `json:"Enabled"`
-		EnableCelerBridge      bool `json:"EnableCelerBridge"`
-		EnableMercuryoProvider bool `json:"EnableMercuryoProvider"`
+		Enabled                             bool `json:"Enabled"`
+		EnableCelerBridge                   bool `json:"EnableCelerBridge"`
+		EnableMercuryoProvider              bool `json:"EnableMercuryoProvider"`
+		TokensListsAutoRefreshInterval      int  `json:"TokensListsAutoRefreshInterval"`
+		TokensListsAutoRefreshCheckInterval int  `json:"TokensListsAutoRefreshCheckInterval"`
 	}{
-		Enabled:                wc.Enabled,
-		EnableCelerBridge:      wc.EnableCelerBridge,
-		EnableMercuryoProvider: wc.EnableMercuryoProvider,
+		Enabled:                             wc.Enabled,
+		EnableCelerBridge:                   wc.EnableCelerBridge,
+		EnableMercuryoProvider:              wc.EnableMercuryoProvider,
+		TokensListsAutoRefreshInterval:      wc.TokensListsAutoRefreshInterval,
+		TokensListsAutoRefreshCheckInterval: wc.TokensListsAutoRefreshCheckInterval,
 	})
 }
 
