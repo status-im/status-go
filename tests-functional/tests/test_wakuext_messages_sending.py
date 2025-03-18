@@ -92,13 +92,14 @@ class TestSendingChatMessages(MessengerSteps):
         self.make_contacts()
         private_group_id = self.join_private_group()
 
-        sent_texts, responses = self.send_multiple_group_messages(private_group_id, 1)
-        self.sender.verify_json_schema(responses[0], method="wakuext_sendGroupChatMessage")
+        text = "test_message_group"
+        response = self.sender.wakuext_service.send_group_chat_message(private_group_id, text)
+        self.sender.verify_json_schema(response, method="wakuext_sendGroupChatMessage")
 
         response = self.sender.wakuext_service.chat_messages(private_group_id)
         expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         actual_text = expected_message.get("text", "")
-        assert actual_text == sent_texts[0]
+        assert actual_text == text
 
     def test_resend_one_to_one_message(self):
         self.make_contacts()

@@ -82,13 +82,14 @@ class TestFetchingChatMessages(MessengerSteps):
 
         # Group
         private_group_chat_id = self.join_private_group()
-        sent_texts_group, _ = self.send_multiple_group_messages(private_group_chat_id, 1)
+        text_group = "test_message_group"
+        response = self.sender.wakuext_service.send_group_chat_message(private_group_chat_id, text_group)
 
         # Community
         self.create_community(self.sender)
         community_chat_id = self.join_community(self.receiver)
-        text = "test_message"
-        response = self.sender.wakuext_service.send_chat_message(community_chat_id, text)
+        text_community = "test_message_community"
+        response = self.sender.wakuext_service.send_chat_message(community_chat_id, text_community)
 
         response = self.sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
             [self.community_id], [one_to_one_chat_id, private_group_chat_id], "TEST_MESSAGE", False
@@ -98,8 +99,8 @@ class TestFetchingChatMessages(MessengerSteps):
         messages = response.get("result", {}).get("messages", [])
         actual_texts = [message.get("text", "") for message in messages]
         assert sent_texts_one_to_one[0] in actual_texts
-        assert sent_texts_group[0] in actual_texts
-        assert text in actual_texts
+        assert text_group in actual_texts
+        assert text_community in actual_texts
 
     @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6359")
     def test_all_messages_from_chats_and_communities_which_match_term_case_sensitive(self):
@@ -110,13 +111,12 @@ class TestFetchingChatMessages(MessengerSteps):
 
         # Group
         private_group_chat_id = self.join_private_group()
-        _, _ = self.send_multiple_group_messages(private_group_chat_id, 1)
+        self.sender.wakuext_service.send_group_chat_message(private_group_chat_id, "test_message_group")
 
         # Community
         self.create_community(self.sender)
         community_chat_id = self.join_community(self.receiver)
-        text = "test_message"
-        response = self.sender.wakuext_service.send_chat_message(community_chat_id, text)
+        self.sender.wakuext_service.send_chat_message(community_chat_id, "test_message_community")
 
         response = self.sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
             [self.community_id], [one_to_one_chat_id, private_group_chat_id], "TEST_MESSAGE", True

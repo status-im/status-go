@@ -13,7 +13,7 @@ class TestPrivateGroupMessages(MessengerSteps):
     def test_private_group_messages_baseline(self, message_count=1):
         self.make_contacts()
         self.private_group_id = self.join_private_group()
-        self.private_group_message(self.private_group_id, message_count)
+        self.private_group_message(message_count, self.private_group_id)
 
     def test_multiple_group_chat_messages(self):
         self.test_private_group_messages_baseline(message_count=50)
@@ -45,6 +45,6 @@ class TestPrivateGroupMessages(MessengerSteps):
     def test_private_group_messages_with_ip_change(self):
         self.make_contacts()
         self.private_group_id = self.join_private_group()
-        self.private_group_message(self.private_group_id, 1)
+        self.private_group_message(1, self.private_group_id)
         self.receiver.change_container_ip()
-        self.private_group_message(self.private_group_id, 1)
+        self.private_group_message(1, self.private_group_id)
