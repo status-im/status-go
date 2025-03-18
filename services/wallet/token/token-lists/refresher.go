@@ -45,6 +45,10 @@ func (t *TokenLists) startAutoRefreshLoop(ctx context.Context, autoRefreshInterv
 					// Just log an error and don't continue, cause we have to store last tokens update timestamp
 				}
 
+				if storedListsCount > 0 {
+					logutils.ZapLogger().Info("updated token lists", zap.Int("count", storedListsCount))
+				}
+
 				currentTimestamp := time.Unix(time.Now().Unix(), 0)
 				err = t.settings.SaveSettingField(settings.LastTokensUpdate, currentTimestamp)
 				if err != nil {
@@ -52,9 +56,7 @@ func (t *TokenLists) startAutoRefreshLoop(ctx context.Context, autoRefreshInterv
 					continue
 				}
 
-				if storedListsCount > 0 {
-					t.notifyCh <- struct{}{}
-				}
+				t.notifyCh <- struct{}{}
 
 			case <-ctx.Done():
 				ticker.Stop()

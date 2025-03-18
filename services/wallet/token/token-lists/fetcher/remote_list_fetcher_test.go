@@ -31,7 +31,7 @@ func TestFetchingListOfTokensList(t *testing.T) {
 			name:           "status not found response",
 			setURL:         true,
 			responseStatus: http.StatusNotFound,
-			response:       listOfTokenListsJsonResponse,
+			response:       "",
 			expected:       defaultTokensList,
 		},
 		{

@@ -3,14 +3,13 @@ package fetcher
 import (
 	"context"
 	"database/sql"
-	"net"
-	"net/http"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 const (
@@ -18,6 +17,7 @@ const (
 	tlsHandshakeTimeout   = 5 * time.Second
 	responseHeaderTimeout = 5 * time.Second
 	requestTimeout        = 20 * time.Second
+	retries               = 3
 )
 
 type TokenList struct {
@@ -28,6 +28,7 @@ type TokenList struct {
 
 type FetchedTokenList struct {
 	TokenList
+	Etag     string
 	Fetched  time.Time
 	JsonData string
 }
@@ -35,23 +36,14 @@ type FetchedTokenList struct {
 type TokenListsFetcher struct {
 	listOfTokenListsURL string
 	walletDb            *sql.DB
-	client              *http.Client
+	httpClient          *thirdparty.HTTPClient
 }
 
 // NewTokenListsFetcher creates a new instance of TokenListsFetcher.
 func NewTokenListsFetcher(walletDb *sql.DB) *TokenListsFetcher {
 	return &TokenListsFetcher{
-		walletDb: walletDb,
-		client: &http.Client{
-			Timeout: requestTimeout,
-			Transport: &http.Transport{
-				DialContext: (&net.Dialer{
-					Timeout: dialTimeout, // Timeout for establishing a connection
-				}).DialContext,
-				TLSHandshakeTimeout:   tlsHandshakeTimeout,   // Timeout for TLS handshake
-				ResponseHeaderTimeout: responseHeaderTimeout, // Timeout for receiving response headers
-			},
-		},
+		walletDb:   walletDb,
+		httpClient: thirdparty.NewHTTPClientWithDetailedTimeouts(dialTimeout, tlsHandshakeTimeout, responseHeaderTimeout, requestTimeout, retries),
 	}
 }
 
@@ -72,7 +64,12 @@ func (t *TokenListsFetcher) FetchAndStore(ctx context.Context) (int, error) {
 
 	for _, tokenList := range tokenLists {
 		group.Add(func(c context.Context) error {
-			err := t.fetchTokenList(ctx, tokenList, tokenChannel)
+			dbEtag, err := t.GetEtagForTokenList(tokenList.ID)
+			if err != nil {
+				logutils.ZapLogger().Error("Failed to get etag for token list", zap.Error(err), zap.String("list-id", tokenList.ID))
+				return nil
+			}
+			err = t.fetchTokenList(ctx, tokenList, dbEtag, tokenChannel)
 			if err != nil {
 				logutils.ZapLogger().Error("Failed to fetch token list", zap.Error(err), zap.String("list-id", tokenList.ID))
 			}
@@ -86,7 +83,7 @@ func (t *TokenListsFetcher) FetchAndStore(ctx context.Context) (int, error) {
 
 	var successfullyFetchedListsCount int
 	for fetchedList := range tokenChannel {
-		if err := t.StoreTokenList(fetchedList.ID, fetchedList.JsonData); err != nil {
+		if err := t.StoreTokenList(fetchedList.ID, fetchedList.Etag, fetchedList.JsonData); err != nil {
 			logutils.ZapLogger().Error("Failed to store token list", zap.Error(err))
 		} else {
 			successfullyFetchedListsCount++

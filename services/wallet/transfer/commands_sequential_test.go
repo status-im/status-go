@@ -1143,7 +1143,7 @@ func setupFindBlocksCommand(t *testing.T, accountAddress common.Address, fromBlo
 	tokenManager = token.NewTokenManager(walletDb, client, community.NewManager(appDb, nil, nil), network.NewManager(appDb, nil, nil, nil), appDb, mediaServer, nil, nil, nil, token.NewPersistence(walletDb))
 
 	tokenListsFetcher := fetcher.NewTokenListsFetcher(walletDb)
-	err = tokenListsFetcher.StoreTokenList("sequential-commands-tests-list", sequentialCommandsTestsListJsonData)
+	err = tokenListsFetcher.StoreTokenList("sequential-commands-tests-list", "abcd", sequentialCommandsTestsListJsonData)
 	require.NoError(t, err)
 
 	tokenManager.Start(context.Background())

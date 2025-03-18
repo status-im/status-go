@@ -16,6 +16,8 @@ func TestFetchingTokensList(t *testing.T) {
 		closeServer()
 	})
 
+	ctx := context.TODO()
+
 	// Copy the token list to avoid modifying the original
 	tokenList0 := listOfTokenLists[0]
 	tokenList := TokenList{
@@ -27,11 +29,31 @@ func TestFetchingTokensList(t *testing.T) {
 
 	tokenListsFetcher := NewTokenListsFetcher(walletDb)
 
-	err := tokenListsFetcher.fetchTokenList(context.TODO(), tokenList, tokenChannel)
+	// Fetch the token list for the first time, for an empty Etag, when the server returns the Etag
+	err := tokenListsFetcher.fetchTokenList(ctx, tokenList, "", tokenChannel)
 	require.NoError(t, err)
 
 	fetchedTokenList := <-tokenChannel
 
 	require.Equal(t, tokenList.ID, fetchedTokenList.ID)
+	require.Equal(t, UniswapEtag, fetchedTokenList.Etag)
+	require.Equal(t, uniswapTokenListJsonResponse, fetchedTokenList.JsonData)
+
+	// Fetch the token list again using the previously returned Etag when the server returns the same Etag with status 304 (http.StatusNotModified)
+	tokenList.SourceURL = server.URL + "/uniswap-same-etag.json"
+
+	err = tokenListsFetcher.fetchTokenList(ctx, tokenList, fetchedTokenList.Etag, tokenChannel)
+	require.NoError(t, err)
+
+	// Fetch the token list again using the previously returned Etag when the server returns a new Etag
+	tokenList.SourceURL = server.URL + "/uniswap-new-etag.json"
+
+	err = tokenListsFetcher.fetchTokenList(ctx, tokenList, fetchedTokenList.Etag, tokenChannel)
+	require.NoError(t, err)
+
+	fetchedTokenList = <-tokenChannel
+
+	require.Equal(t, tokenList.ID, fetchedTokenList.ID)
+	require.Equal(t, UniswapNewEtag, fetchedTokenList.Etag)
 	require.Equal(t, uniswapTokenListJsonResponse, fetchedTokenList.JsonData)
 }

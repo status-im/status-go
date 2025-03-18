@@ -7,10 +7,14 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-func (t *TokenListsFetcher) fetchTokenList(ctx context.Context, tokenList TokenList, ch chan<- FetchedTokenList) error {
-	body, err := t.fetchContent(ctx, tokenList.SourceURL)
+func (t *TokenListsFetcher) fetchTokenList(ctx context.Context, tokenList TokenList, etag string, ch chan<- FetchedTokenList) error {
+	body, newEtag, err := t.httpClient.DoGetRequestWithEtag(ctx, tokenList.SourceURL, nil, etag)
 	if err != nil {
 		return err
+	}
+
+	if newEtag == etag {
+		return nil
 	}
 
 	if tokenList.Schema != "" {
@@ -21,9 +25,14 @@ func (t *TokenListsFetcher) fetchTokenList(ctx context.Context, tokenList TokenL
 	}
 
 	ch <- FetchedTokenList{
-		TokenList: tokenList,
-		Fetched:   time.Now(),
-		JsonData:  string(body),
+		TokenList: TokenList{
+			ID:        tokenList.ID,
+			SourceURL: tokenList.SourceURL,
+			Schema:    tokenList.Schema,
+		},
+		Etag:     newEtag,
+		Fetched:  time.Now(),
+		JsonData: string(body),
 	}
 
 	return nil

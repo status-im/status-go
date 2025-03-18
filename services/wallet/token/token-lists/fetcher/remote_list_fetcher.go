@@ -12,7 +12,7 @@ import (
 )
 
 func (t *TokenListsFetcher) fetchRemoteListOfTokenLists(ctx context.Context) ([]TokenList, error) {
-	body, err := t.fetchContent(ctx, t.listOfTokenListsURL)
+	body, err := t.httpClient.DoGetRequest(ctx, t.listOfTokenListsURL, nil)
 	if err != nil {
 		return nil, err
 	}

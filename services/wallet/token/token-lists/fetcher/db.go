@@ -2,18 +2,32 @@ package fetcher
 
 import "database/sql"
 
-func (t *TokenListsFetcher) StoreTokenList(id string, jsonData string) error {
+func (t *TokenListsFetcher) StoreTokenList(id string, etag string, jsonData string) error {
 	_, err := t.walletDb.Exec(`
 	INSERT INTO
-		token_lists (id, tokens_json)
+		token_lists (id, etag, tokens_json)
 	VALUES
-		(?, ?)`,
-		id, jsonData)
+		(?, ?, ?)`,
+		id, etag, jsonData)
 	return err
 }
 
+// GetEtagForTokenList returns the etag for the token list with the given id.
+// If the token list does not exist, it returns an empty string.
+func (t *TokenListsFetcher) GetEtagForTokenList(id string) (string, error) {
+	var etag sql.NullString
+	err := t.walletDb.QueryRow("SELECT etag FROM token_lists WHERE id = ?", id).Scan(&etag)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+	if !etag.Valid {
+		return "", nil
+	}
+	return etag.String, nil
+}
+
 func (t *TokenListsFetcher) GetAllTokenLists() ([]FetchedTokenList, error) {
-	rows, err := t.walletDb.Query("SELECT id, fetched, tokens_json FROM token_lists")
+	rows, err := t.walletDb.Query("SELECT id, etag, fetched, tokens_json FROM token_lists")
 	if err != nil {
 		return nil, err
 	}
@@ -23,11 +37,15 @@ func (t *TokenListsFetcher) GetAllTokenLists() ([]FetchedTokenList, error) {
 	for rows.Next() {
 		var (
 			tokenList FetchedTokenList
+			etag      sql.NullString
 			fetched   sql.NullTime
 		)
-		err = rows.Scan(&tokenList.ID, &fetched, &tokenList.JsonData)
+		err = rows.Scan(&tokenList.ID, &etag, &fetched, &tokenList.JsonData)
 		if err != nil {
 			return nil, err
+		}
+		if etag.Valid {
+			tokenList.Etag = etag.String
 		}
 		if fetched.Valid {
 			tokenList.Fetched = fetched.Time
