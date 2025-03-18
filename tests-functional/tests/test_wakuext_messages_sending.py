@@ -18,11 +18,12 @@ class TestSendingChatMessages(MessengerSteps):
         self.create_community(self.sender)
         community_chat_id = self.join_community(self.receiver)
 
-        sent_texts, responses = self.send_multiple_community_messages(community_chat_id, 1)
-        self.sender.verify_json_schema(responses[0], method="wakuext_sendChatMessage")
+        text = "test_message"
+        response = self.sender.wakuext_service.send_community_chat_message(community_chat_id, text)
+        self.sender.verify_json_schema(response, method="wakuext_sendChatMessage")
 
         response = self.sender.wakuext_service.chat_messages(community_chat_id)
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == 1
         actual_text = messages[0].get("text", "")
-        assert actual_text == sent_texts[0]
+        assert actual_text == text
