@@ -428,7 +428,6 @@ type WalletConfig struct {
 	StatusProxyBlockchainUser     string `json:"StatusProxyBlockchainUser"`
 	StatusProxyBlockchainPassword string `json:"StatusProxyBlockchainPassword"`
 
-	StatusProxyEnabled     bool   `json:"StatusProxyEnabled"`
 	StatusProxyStageName   string `json:"StatusProxyStageName"`
 	EnableCelerBridge      bool   `json:"EnableCelerBridge"`
 	EnableMercuryoProvider bool   `json:"EnableMercuryoProvider"`
@@ -442,12 +441,10 @@ type WalletConfig struct {
 func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Enabled                bool `json:"Enabled"`
-		StatusProxyEnabled     bool `json:"StatusProxyEnabled"`
 		EnableCelerBridge      bool `json:"EnableCelerBridge"`
 		EnableMercuryoProvider bool `json:"EnableMercuryoProvider"`
 	}{
 		Enabled:                wc.Enabled,
-		StatusProxyEnabled:     wc.StatusProxyEnabled,
 		EnableCelerBridge:      wc.EnableCelerBridge,
 		EnableMercuryoProvider: wc.EnableMercuryoProvider,
 	})

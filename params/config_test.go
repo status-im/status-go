@@ -316,12 +316,10 @@ func TestMarshalWalletConfigJSON(t *testing.T) {
 	require.NoError(t, err)
 	// check if sensitive fields are not present
 	require.NotContains(t, string(bytes), "OpenseaAPIKey")
-	require.Contains(t, string(bytes), "StatusProxyEnabled")
 
 	// check if deserializing are still working with sensitive fields
 	walletConfig = params.WalletConfig{}
-	err = json.Unmarshal([]byte(`{"OpenseaAPIKey":"some-key", "StatusProxyEnabled":true}`), &walletConfig)
+	err = json.Unmarshal([]byte(`{"OpenseaAPIKey":"some-key"}`), &walletConfig)
 	require.NoError(t, err)
 	require.Equal(t, "some-key", walletConfig.OpenseaAPIKey)
-	require.True(t, walletConfig.StatusProxyEnabled)
 }

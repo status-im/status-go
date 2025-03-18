@@ -170,7 +170,7 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	return nil
 }
 
-func buildWalletConfig(request *requests.WalletSecretsConfig, statusProxyEnabled bool) params.WalletConfig {
+func buildWalletConfig(request *requests.WalletSecretsConfig) params.WalletConfig {
 	walletConfig := params.WalletConfig{
 		Enabled:                true,
 		EnableMercuryoProvider: true,
@@ -250,8 +250,6 @@ func buildWalletConfig(request *requests.WalletSecretsConfig, statusProxyEnabled
 		walletConfig.EthRpcProxyPassword = request.EthRpcProxyPassword
 	}
 
-	walletConfig.StatusProxyEnabled = statusProxyEnabled
-
 	return walletConfig
 }
 
@@ -324,7 +322,7 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 	nodeConfig.MaxPeers = DefaultMaxPeers
 	nodeConfig.MaxPendingPeers = DefaultMaxPendingPeers
 
-	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig, request.StatusProxyEnabled)
+	nodeConfig.WalletConfig = buildWalletConfig(&request.WalletSecretsConfig)
 
 	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}

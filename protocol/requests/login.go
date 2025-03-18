@@ -38,8 +38,7 @@ type Login struct {
 
 	WalletSecretsConfig
 
-	APIConfig          *APIConfig `json:"apiConfig"`
-	StatusProxyEnabled bool       `json:"statusProxyEnabled"`
+	APIConfig *APIConfig `json:"apiConfig"`
 
 	// Following fields are used for migration from old node config to new one
 	WakuV2LightClient                            bool    `json:"wakuV2LightClient"`

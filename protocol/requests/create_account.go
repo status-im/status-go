@@ -87,7 +87,6 @@ type CreateAccount struct {
 	// for recovering account
 	KeycardPairingKey      string  `json:"keycardPairingKey"`
 	KeycardPairingDataFile *string `json:"keycardPairingDataFile"`
-	StatusProxyEnabled     bool    `json:"statusProxyEnabled"`
 }
 
 type WalletSecretsConfig struct {
