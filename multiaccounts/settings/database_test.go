@@ -195,3 +195,21 @@ func TestSyncColumnsSet(t *testing.T) {
 		}
 	}
 }
+
+func TestDatabase_NewsPushNotificationsEnabled(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	settings, err := db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, false, settings.NewsPushNotificationsEnabled)
+
+	err = db.SaveSetting(NewsPushNotificationsEnabled.GetReactName(), true)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, true, settings.NewsPushNotificationsEnabled)
+}
