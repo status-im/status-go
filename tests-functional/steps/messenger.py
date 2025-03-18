@@ -186,7 +186,7 @@ class MessengerSteps(NetworkConditionsSteps):
         sent_messages = []
         for i in range(message_count):
             message_text = f"test_message_{i+1}_{uuid4()}"
-            response = self.sender.wakuext_service.send_community_chat_message(message_chat_id, message_text)
+            response = self.sender.wakuext_service.send_chat_message(message_chat_id, message_text)
             expected_message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
             sent_messages.append(expected_message)
             time.sleep(0.01)

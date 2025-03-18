@@ -10,6 +10,12 @@ class SendPinMessagePayload(TypedDict):
     pinned: bool
 
 
+class SendChatMessagePayload(TypedDict):
+    chat_id: str
+    text: str
+    content_type: int
+
+
 class WakuextService(Service):
     def __init__(self, client: RpcClient):
         super().__init__(client, "wakuext")
@@ -112,9 +118,14 @@ class WakuextService(Service):
         response = self.rpc_request("acceptRequestToJoinCommunity", params)
         return response.json()
 
-    def send_community_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value):
+    def send_chat_message(self, chat_id, message, content_type=MessageContentType.TEXT_PLAIN.value):
         params = [{"chatId": chat_id, "text": message, "contentType": content_type}]
         response = self.rpc_request("sendChatMessage", params)
+        return response.json()
+
+    def send_chat_messages(self, messages: list[SendChatMessagePayload]):
+        params = [[{"chatId": m["chat_id"], "text": m["text"], "contentType": m["content_type"]} for m in messages]]
+        response = self.rpc_request("sendChatMessages", params)
         return response.json()
 
     def resend_chat_message(self, message_id: str):

@@ -35,7 +35,7 @@ class TestCommunityMessages(MessengerSteps):
 
         with self.node_pause(self.receiver):
             message_text = f"test_message_{uuid4()}"
-            self.sender.wakuext_service.send_community_chat_message(message_chat_id, message_text)
+            self.sender.wakuext_service.send_chat_message(message_chat_id, message_text)
             sleep(30)
         self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_text)
 

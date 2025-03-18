@@ -87,7 +87,8 @@ class TestFetchingChatMessages(MessengerSteps):
         # Community
         self.create_community(self.sender)
         community_chat_id = self.join_community(self.receiver)
-        sent_texts_community, _ = self.send_multiple_community_messages(community_chat_id, 1)
+        text = "test_message"
+        response = self.sender.wakuext_service.send_chat_message(community_chat_id, text)
 
         response = self.sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
             [self.community_id], [one_to_one_chat_id, private_group_chat_id], "TEST_MESSAGE", False
@@ -98,7 +99,7 @@ class TestFetchingChatMessages(MessengerSteps):
         actual_texts = [message.get("text", "") for message in messages]
         assert sent_texts_one_to_one[0] in actual_texts
         assert sent_texts_group[0] in actual_texts
-        assert sent_texts_community[0] in actual_texts
+        assert text in actual_texts
 
     @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6359")
     def test_all_messages_from_chats_and_communities_which_match_term_case_sensitive(self):
@@ -114,7 +115,8 @@ class TestFetchingChatMessages(MessengerSteps):
         # Community
         self.create_community(self.sender)
         community_chat_id = self.join_community(self.receiver)
-        _, _ = self.send_multiple_community_messages(community_chat_id, 1)
+        text = "test_message"
+        response = self.sender.wakuext_service.send_chat_message(community_chat_id, text)
 
         response = self.sender.wakuext_service.all_messages_from_chats_and_communities_which_match_term(
             [self.community_id], [one_to_one_chat_id, private_group_chat_id], "TEST_MESSAGE", True
