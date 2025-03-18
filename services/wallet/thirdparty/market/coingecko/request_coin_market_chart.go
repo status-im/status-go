@@ -19,7 +19,7 @@ func (c *Client) FetchHistoryMarketData(ctx context.Context, id string, currency
 	params.Add("vs_currency", currency)
 	params.Add("days", "30")
 	url := fmt.Sprintf(coinMarketChartURL, c.baseURL, id)
-	response, err := c.httpClient.DoGetRequest(ctx, url, params, nil)
+	response, err := c.httpClient.DoGetRequest(ctx, url, params)
 	if err != nil {
 		return HistoricalPriceContainer{}, err
 	}

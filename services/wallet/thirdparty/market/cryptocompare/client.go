@@ -104,7 +104,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 		params.Add("extraParams", extraParamStatus)
 
 		url := fmt.Sprintf("%s/data/pricemulti", c.baseURL)
-		response, err := c.httpClient.DoGetRequest(context.Background(), url, params, c.creds)
+		response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, params, c.creds)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +127,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 
 func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
 	url := fmt.Sprintf("%s/data/all/coinlist", c.baseURL)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, nil, c.creds)
+	response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, nil, c.creds)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		params.Add("extraParams", extraParamStatus)
 
 		url := fmt.Sprintf("%s/data/pricemultifull", c.baseURL)
-		response, err := c.httpClient.DoGetRequest(context.Background(), url, params, c.creds)
+		response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, params, c.creds)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +202,7 @@ func (c *Client) FetchHistoricalHourlyPrices(symbol string, currency string, lim
 	params.Add("extraParams", extraParamStatus)
 
 	url := fmt.Sprintf("%s/data/v2/histohour", c.baseURL)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, c.creds)
+	response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, params, c.creds)
 	if err != nil {
 		return item, err
 	}
@@ -230,7 +230,7 @@ func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limi
 	params.Add("extraParams", extraParamStatus)
 
 	url := fmt.Sprintf("%s/data/v2/histoday", c.baseURL)
-	response, err := c.httpClient.DoGetRequest(context.Background(), url, params, c.creds)
+	response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, params, c.creds)
 	if err != nil {
 		return item, err
 	}

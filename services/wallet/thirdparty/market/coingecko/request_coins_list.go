@@ -52,7 +52,7 @@ func (c *Client) FetchTokens(ctx context.Context) ([]GeckoToken, error) {
 	params := netUrl.Values{}
 	params.Add("include_platform", "true")
 	url := fmt.Sprintf(coinsListURL, c.baseURL)
-	response, err := c.httpClient.DoGetRequest(ctx, url, params, nil)
+	response, err := c.httpClient.DoGetRequest(ctx, url, params)
 	if err != nil {
 		return nil, err
 	}

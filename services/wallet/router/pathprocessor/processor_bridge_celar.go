@@ -89,7 +89,7 @@ func (s *CelerBridgeProcessor) estimateAmt(from, to *params.Network, amountIn *b
 	params.Add("slippage_tolerance", "500")
 
 	url := fmt.Sprintf("%s/v2/estimateAmt", base)
-	response, err := s.httpClient.DoGetRequest(context.Background(), url, params, nil)
+	response, err := s.httpClient.DoGetRequest(context.Background(), url, params)
 	if err != nil {
 		return nil, createBridgeCellerErrorResponse(err)
 	}
@@ -116,7 +116,7 @@ func (s *CelerBridgeProcessor) getTransferConfig(isTest bool) (*cbridge.GetTrans
 		base = testBaseURL
 	}
 	url := fmt.Sprintf("%s/v2/getTransferConfigs", base)
-	response, err := s.httpClient.DoGetRequest(context.Background(), url, nil, nil)
+	response, err := s.httpClient.DoGetRequest(context.Background(), url, nil)
 	if err != nil {
 		return nil, createBridgeCellerErrorResponse(err)
 	}

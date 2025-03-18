@@ -33,7 +33,7 @@ func (c *Client) FetchCoinsMarkets(ctx context.Context, ids []string, currency s
 	params.Add("sparkline", "false")
 	params.Add("price_change_percentage", "1h,24h")
 	url := fmt.Sprintf(coinsMarketsURL, c.baseURL)
-	response, err := c.httpClient.DoGetRequest(ctx, url, params, nil)
+	response, err := c.httpClient.DoGetRequest(ctx, url, params)
 	if err != nil {
 		return nil, err
 	}

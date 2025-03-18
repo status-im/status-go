@@ -19,7 +19,7 @@ func (c *Client) FetchSimplePrice(ctx context.Context, ids []string, currencies 
 	params.Add("ids", strings.Join(ids, ","))
 	params.Add("vs_currencies", strings.Join(currencies, ","))
 	url := fmt.Sprintf(simplePriceURL, c.baseURL)
-	response, err := c.httpClient.DoGetRequest(ctx, url, params, nil)
+	response, err := c.httpClient.DoGetRequest(ctx, url, params)
 	if err != nil {
 		return nil, err
 	}
