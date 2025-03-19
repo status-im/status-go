@@ -42,8 +42,16 @@ type TokenListsFetcher struct {
 // NewTokenListsFetcher creates a new instance of TokenListsFetcher.
 func NewTokenListsFetcher(walletDb *sql.DB) *TokenListsFetcher {
 	return &TokenListsFetcher{
-		walletDb:   walletDb,
-		httpClient: thirdparty.NewHTTPClientWithDetailedTimeouts(dialTimeout, tlsHandshakeTimeout, responseHeaderTimeout, requestTimeout, retries),
+		walletDb: walletDb,
+		httpClient: thirdparty.NewHTTPClient(
+			thirdparty.WithDetailedTimeouts(
+				dialTimeout,
+				tlsHandshakeTimeout,
+				responseHeaderTimeout,
+				requestTimeout,
+			),
+			thirdparty.WithMaxRetries(retries),
+		),
 	}
 }
 

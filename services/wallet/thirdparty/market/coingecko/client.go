@@ -70,12 +70,14 @@ func NewClient() *Client {
 	// - 5 seconds for TLS handshake (tlsHandshakeTimeout)
 	// - 5 seconds for receiving response headers (responseHeaderTimeout)
 	// - 20 seconds for overall request timeout (requestTimeout)
-	httpClient := thirdparty.NewHTTPClientWithDetailedTimeouts(
-		5*time.Second,  // dialTimeout
-		5*time.Second,  // tlsHandshakeTimeout
-		5*time.Second,  // responseHeaderTimeout
-		20*time.Second, // requestTimeout
-		5,              // maxRetries
+	httpClient := thirdparty.NewHTTPClient(
+		thirdparty.WithDetailedTimeouts(
+			5*time.Second,
+			5*time.Second,
+			5*time.Second,
+			20*time.Second,
+		),
+		thirdparty.WithMaxRetries(5),
 	)
 
 	return &Client{

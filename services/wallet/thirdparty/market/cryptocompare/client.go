@@ -65,13 +65,15 @@ func NewClientWithParams(params Params) *Client {
 		}
 	}
 
-	// Configure HTTP client with detailed timeouts:
-	httpClient := thirdparty.NewHTTPClientWithDetailedTimeouts(
-		5*time.Second,  // dialTimeout
-		5*time.Second,  // tlsHandshakeTimeout
-		5*time.Second,  // responseHeaderTimeout
-		20*time.Second, // requestTimeout
-		5,              // retries
+	// Configure HTTP client with detailed timeouts
+	httpClient := thirdparty.NewHTTPClient(
+		thirdparty.WithDetailedTimeouts(
+			5*time.Second,  // dialTimeout
+			5*time.Second,  // tlsHandshakeTimeout
+			5*time.Second,  // responseHeaderTimeout
+			20*time.Second, // requestTimeout
+		),
+		thirdparty.WithMaxRetries(5),
 	)
 
 	// Ensure baseURL doesn't end with a slash

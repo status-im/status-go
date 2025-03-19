@@ -15,57 +15,71 @@ import (
 	"github.com/status-im/status-go/logutils"
 )
 
-const requestTimeout = 5 * time.Second
-const maxNumOfRequestRetries = 5
+const (
+	defaultRequestTimeout  = 5 * time.Second
+	defaultMaxRetries      = 5
+	defaultIdleConnTimeout = 90 * time.Second
+)
 
 type BasicCreds struct {
 	User     string
 	Password string
 }
 
+// HTTPClient represents an HTTP client with configurable options
 type HTTPClient struct {
 	client     *http.Client
 	maxRetries int
 }
 
-func NewHTTPClient() *HTTPClient {
-	return NewHTTPClientWithTimeout(requestTimeout)
-}
+// Option defines a function type for configuring HTTPClient
+type Option func(*HTTPClient)
 
-func NewHTTPClientWithTimeout(timeout time.Duration) *HTTPClient {
-	return &HTTPClient{
-		client: &http.Client{
-			Timeout: timeout,
-		},
-		maxRetries: maxNumOfRequestRetries,
+// WithTimeout sets the overall request timeout
+func WithTimeout(timeout time.Duration) Option {
+	return func(c *HTTPClient) {
+		c.client.Timeout = timeout
 	}
 }
 
-// NewHTTPClientWithDetailedTimeouts creates a new HTTPClient with separate timeouts for
-// connection establishment and data transfer
-func NewHTTPClientWithDetailedTimeouts(
-	dialTimeout time.Duration,
-	tlsHandshakeTimeout time.Duration,
-	responseHeaderTimeout time.Duration,
-	requestTimeout time.Duration,
-	maxRetries int,
-) *HTTPClient {
-	transport := &http.Transport{
-		DialContext: (&net.Dialer{
-			Timeout: dialTimeout, // Timeout for establishing a connection
-		}).DialContext,
-		TLSHandshakeTimeout:   tlsHandshakeTimeout,   // Timeout for TLS handshake
-		ResponseHeaderTimeout: responseHeaderTimeout, // Timeout for receiving response headers
-		IdleConnTimeout:       90 * time.Second,      // How long to keep idle connections
+// WithMaxRetries sets the maximum number of retries for failed requests
+func WithMaxRetries(maxRetries int) Option {
+	return func(c *HTTPClient) {
+		c.maxRetries = maxRetries
+	}
+}
+
+// WithDetailedTimeouts sets detailed timeouts for different connection phases
+func WithDetailedTimeouts(dialTimeout, tlsHandshakeTimeout, responseHeaderTimeout, requestTimeout time.Duration) Option {
+	return func(c *HTTPClient) {
+		transport := &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout: dialTimeout,
+			}).DialContext,
+			TLSHandshakeTimeout:   tlsHandshakeTimeout,
+			ResponseHeaderTimeout: responseHeaderTimeout,
+			IdleConnTimeout:       defaultIdleConnTimeout,
+		}
+		c.client.Transport = transport
+		c.client.Timeout = requestTimeout
+	}
+}
+
+// NewHTTPClient creates a new HTTPClient with the provided options
+func NewHTTPClient(opts ...Option) *HTTPClient {
+	client := &HTTPClient{
+		client: &http.Client{
+			Timeout: defaultRequestTimeout,
+		},
+		maxRetries: defaultMaxRetries,
 	}
 
-	return &HTTPClient{
-		client: &http.Client{
-			Transport: transport,
-			Timeout:   requestTimeout, // Overall request timeout
-		},
-		maxRetries: maxRetries,
+	// Apply all provided options
+	for _, opt := range opts {
+		opt(client)
 	}
+
+	return client
 }
 
 // doGetRequest performs a GET request with the given URL and parameters
@@ -100,7 +114,7 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 	var resp *http.Response
 	maxRetries := c.maxRetries
 	if maxRetries < 0 {
-		maxRetries = maxNumOfRequestRetries // Use default if not set
+		maxRetries = defaultMaxRetries // Use default if not set
 	}
 
 	var retryCount int
@@ -155,6 +169,7 @@ func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl
 	body, _, err = c.doGetRequest(ctx, url, params, nil, "")
 	return
 }
+
 // DoGetRequestWithCredentials performs a GET request with the given URL and parameters
 // If creds is not nil, it will add basic auth to the request
 func (c *HTTPClient) DoGetRequestWithCredentials(ctx context.Context, url string, params netUrl.Values, creds *BasicCreds) (body []byte, err error) {
