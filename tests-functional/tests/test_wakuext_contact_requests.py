@@ -1,3 +1,4 @@
+from uuid import uuid4
 import pytest
 from steps.messenger import MessengerSteps
 from resources.enums import MessageContentType
@@ -106,3 +107,58 @@ class TestContactRequests(MessengerSteps):
         contact_request_messages = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)
         assert len(contact_request_messages) == 1, f"Expected one message with contentType {MessageContentType.CONTACT_REQUEST.value}"
         assert contact_request_messages[0].get("text") == "contact_request"
+
+    def test_get_latest_contact_request_for_contact(self):
+        self.send_contact_request_and_wait_for_signal_to_be_received()
+        response = self.receiver.wakuext_service.get_latest_contact_request_for_contact(self.sender.public_key)
+        self.sender.verify_json_schema(response, "wakuext_getLatestContactRequestForContact")
+
+        contact_request_message = self.get_message_by_content_type(response, content_type=MessageContentType.CONTACT_REQUEST.value)
+        assert len(contact_request_message) == 1, f"Expected one message with contentType {MessageContentType.CONTACT_REQUEST.value}"
+        assert contact_request_message[0].get("text") == "contact_request"
+
+    def test_retract_contact_request(self):
+        self.send_contact_request_and_wait_for_signal_to_be_received()
+        response = self.sender.wakuext_service.retract_contact_request(self.receiver.public_key)
+        self.sender.verify_json_schema(response, "wakuext_retractContactRequest")
+
+        contacts = response.get("result", {}).get("contacts", [])
+        assert len(contacts) >= 1, "Expected response to have at least one contact"
+
+        retract_request_messages = self.get_message_by_content_type(
+            response, content_type=MessageContentType.SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED.value
+        )
+        assert (
+            len(retract_request_messages) == 1
+        ), f"Expected one message with contentType {MessageContentType.SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED.value}"
+        assert retract_request_messages[0].get("text") == f"You removed @{self.receiver.public_key} as a contact"
+
+    def test_remove_contact(self):
+        message_id = self.send_contact_request_and_wait_for_signal_to_be_received()
+        self.accept_contact_request_and_wait_for_signal_to_be_received(message_id)
+        response = self.sender.wakuext_service.remove_contact(self.receiver.public_key)
+        self.sender.verify_json_schema(response, "wakuext_removeContact")
+
+        contacts = response.get("result", {}).get("contacts", [])
+        assert len(contacts) >= 1, "Expected response to have at least one contact"
+
+        retract_request_messages = self.get_message_by_content_type(
+            response, content_type=MessageContentType.SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED.value
+        )
+        assert (
+            len(retract_request_messages) == 1
+        ), f"Expected one message with contentType {MessageContentType.SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED.value}"
+        assert retract_request_messages[0].get("text") == f"You removed @{self.receiver.public_key} as a contact"
+
+    def test_set_contact_local_nickname(self):
+        message_id = self.send_contact_request_and_wait_for_signal_to_be_received()
+        self.accept_contact_request_and_wait_for_signal_to_be_received(message_id)
+        nickname = str(uuid4())
+        response = self.sender.wakuext_service.set_contact_local_nickname(self.receiver.public_key, nickname)
+        self.sender.verify_json_schema(response, "wakuext_setContactLocalNickname")
+
+        contacts = response.get("result", {}).get("contacts", [])
+        assert len(contacts) >= 1, "Expected response to have at least one contact"
+        assert contacts[0].get("displayName") == self.receiver.display_name
+        assert contacts[0].get("localNickname") == nickname
+        assert contacts[0].get("primaryName") == nickname

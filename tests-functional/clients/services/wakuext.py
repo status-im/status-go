@@ -39,6 +39,26 @@ class WakuextService(Service):
         response = self.rpc_request("dismissLatestContactRequestForContact", params)
         return response.json()
 
+    def get_latest_contact_request_for_contact(self, request_id: str):
+        params = [request_id]
+        response = self.rpc_request("getLatestContactRequestForContact", params)
+        return response.json()
+
+    def retract_contact_request(self, request_id: str):
+        params = [{"id": request_id}]
+        response = self.rpc_request("retractContactRequest", params)
+        return response.json()
+
+    def remove_contact(self, request_id: str):
+        params = [request_id]
+        response = self.rpc_request("removeContact", params)
+        return response.json()
+
+    def set_contact_local_nickname(self, request_id: str, nickname: str):
+        params = [{"id": request_id, "nickname": nickname}]
+        response = self.rpc_request("setContactLocalNickname", params)
+        return response.json()
+
     def get_contacts(self):
         response = self.rpc_request("contacts")
         return response.json()
