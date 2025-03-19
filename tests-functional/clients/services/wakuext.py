@@ -206,3 +206,8 @@ class WakuextService(Service):
         params = [message_id, new_status]
         response = self.rpc_request("updateMessageOutgoingStatus", params)
         return response.json()
+
+    def request_transaction(self, chat_id: str, value: str, contract: str, address: str):
+        params = [chat_id, value, contract, address]
+        response = self.rpc_request("requestTransaction", params)
+        return response.json()
