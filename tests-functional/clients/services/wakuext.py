@@ -211,3 +211,8 @@ class WakuextService(Service):
         params = [chat_id, value, contract, address]
         response = self.rpc_request("requestTransaction", params)
         return response.json()
+
+    def decline_request_transaction(self, message_id: str):
+        params = [message_id]
+        response = self.rpc_request("declineRequestTransaction", params)
+        return response.json()
