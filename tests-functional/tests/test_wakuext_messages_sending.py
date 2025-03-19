@@ -103,7 +103,9 @@ class TestSendingChatMessages(MessengerSteps):
         actual_text = expected_message.get("text", "")
         assert actual_text == text
 
-    # TODO: Improve the test, create more realistic scenario where the message is intercepted in the network and not delivered
+    # Using delete_message is a workaround that might be considered an incorrect behaviour
+    # TODO: create more realistic scenario where the message is intercepted in the network and not delivered,
+    # use community messages to avoid 1-1 and group chats reliability mechanisms on protocol level
     def test_resend_one_to_one_message(self):
         self.make_contacts()
 
