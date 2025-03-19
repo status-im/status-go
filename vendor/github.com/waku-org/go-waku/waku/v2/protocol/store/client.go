@@ -203,8 +203,8 @@ func (s *WakuStore) RequestRaw(ctx context.Context, peerInfo peer.AddrInfo, stor
 	}
 
 	var params Parameters
-	params.peerAddr = peerInfo.Addrs
-	if len(params.peerAddr) == 0 {
+	params.selectedPeer = peerInfo.ID
+	if params.selectedPeer == "" {
 		return nil, ErrMustSelectPeer
 	}
 
