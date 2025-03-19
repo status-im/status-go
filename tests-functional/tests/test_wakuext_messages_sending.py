@@ -1,6 +1,8 @@
+from time import sleep
 import pytest
 
 from clients.services.wakuext import SendChatMessagePayload
+from clients.signals import SignalType
 from resources.enums import MessageContentType
 from steps.messenger import MessengerSteps
 
@@ -101,12 +103,28 @@ class TestSendingChatMessages(MessengerSteps):
         actual_text = expected_message.get("text", "")
         assert actual_text == text
 
+    # TODO: Improve the test, create more realistic scenario where the message is intercepted in the network and not delivered
     def test_resend_one_to_one_message(self):
         self.make_contacts()
 
-        sent_texts, responses = self.send_multiple_one_to_one_messages(1)
+        _, responses = self.send_multiple_one_to_one_messages(1)
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
+        receiver_chat_id = self.sender.public_key
+
+        self.receiver.find_signal_containing_pattern(SignalType.MESSAGES_NEW.value, event_pattern=message_id, timeout=5)
+
+        response = self.receiver.wakuext_service.chat_messages(receiver_chat_id)
+        messages = response.get("result", {}).get("messages", [])
+        assert len(messages) == 4
+
+        self.receiver.wakuext_service.delete_message(message_id)
+        response = self.receiver.wakuext_service.chat_messages(receiver_chat_id)
+        messages = response.get("result", {}).get("messages", [])
+        assert len(messages) == 3
 
         self.sender.wakuext_service.resend_chat_message(message_id)
+        sleep(5)
 
-        # TODO: Find out how to assert
+        response = self.receiver.wakuext_service.chat_messages(receiver_chat_id)
+        messages = response.get("result", {}).get("messages", [])
+        assert len(messages) == 4
