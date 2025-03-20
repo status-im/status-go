@@ -205,22 +205,12 @@ func (s *WakuStore) RequestRaw(ctx context.Context, peerInfo peer.AddrInfo, stor
 
 	var params Parameters
 	params.peerAddr = peerInfo.Addrs
-	if len(params.peerAddr) == 0 {
+	params.selectedPeer = peerInfo.ID
+	if len(params.peerAddr) == 0 || params.selectedPeer == "" {
 		return nil, ErrMustSelectPeer
 	}
 
-	//Add Peer to peerstore.
-	if s.pm != nil && params.peerAddr != nil {
-		infoArr, err := peer.AddrInfosFromP2pAddrs(params.peerAddr...)
-		if err != nil {
-			return nil, err
-		}
-		for _, info := range infoArr {
-			s.h.Peerstore().AddAddrs(info.ID, info.Addrs, libp2pPeerstore.AddressTTL)
-
-		}
-		params.selectedPeer = infoArr[0].ID
-	}
+	s.h.Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, libp2pPeerstore.AddressTTL)
 
 	response, err := s.queryFrom(ctx, storeRequest, &params)
 	if err != nil {
