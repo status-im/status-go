@@ -210,6 +210,7 @@ func (s *WakuStore) RequestRaw(ctx context.Context, peerInfo peer.AddrInfo, stor
 		return nil, ErrMustSelectPeer
 	}
 
+	//Add Peer to peerstore.
 	s.h.Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, libp2pPeerstore.AddressTTL)
 
 	response, err := s.queryFrom(ctx, storeRequest, &params)
