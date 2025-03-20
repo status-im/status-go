@@ -10,6 +10,8 @@ from steps.messenger import MessengerSteps
 class TestTransactionsChatMessages(MessengerSteps):
     REQUEST_TRANSACTION_TEXT = "Request transaction"
     REQUEST_TRANSACTION_DECLINED_TEXT = "Transaction request declined"
+    REQUEST_ADDRESS_FOR_TRANSACTION_TEXT = "Request address for transaction"
+    REQUEST_ADDRESS_FOR_TRANSACTION_DECLINED_TEXT = "Request address for transaction declined"
 
     def test_request_transaction(self):
         self.make_contacts()
@@ -52,3 +54,51 @@ class TestTransactionsChatMessages(MessengerSteps):
         assert command_parameters.get("value", "") == value
         assert command_parameters.get("contract", "") == contract
         assert command_parameters.get("address", "") == address
+
+    def test_request_address_for_transaction(self):
+        self.make_contacts()
+        value = "1"
+        contract = "TEST_CONTRACT"
+        address_from = "TEST_ADDRESS_FROM"
+        response = self.sender.wakuext_service.request_address_for_transaction(self.receiver.public_key, address_from, value, contract)
+        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
+
+        self.receiver.find_signal_containing_pattern(
+            SignalType.MESSAGES_NEW.value, event_pattern=self.REQUEST_ADDRESS_FOR_TRANSACTION_TEXT, timeout=5
+        )
+
+        response = self.receiver.wakuext_service.chat_messages(self.sender.public_key)
+        message = self.get_message_by_content_type(response, content_type=MessageContentType.TRANSACTION_COMMAND.value)[0]
+        assert message.get("text", "") == self.REQUEST_ADDRESS_FOR_TRANSACTION_TEXT
+        command_parameters = message.get("commandParameters", {})
+        # assert command_parameters.get("from", "") == address_from
+        assert command_parameters.get("value", "") == value
+        assert command_parameters.get("contract", "") == contract
+
+    def test_decline_request_address_for_transaction(self):
+        self.make_contacts()
+        sender_chat_id = self.receiver.public_key
+        value = "1"
+        contract = "TEST_CONTRACT"
+        address_from = "TEST_ADDRESS_FROM"
+        response = self.sender.wakuext_service.request_address_for_transaction(self.receiver.public_key, address_from, value, contract)
+        message_id = response.get("result", {}).get("messages", [])[0].get("id", "")
+
+        self.receiver.find_signal_containing_pattern(
+            SignalType.MESSAGES_NEW.value, event_pattern=self.REQUEST_ADDRESS_FOR_TRANSACTION_TEXT, timeout=5
+        )
+
+        response = self.receiver.wakuext_service.decline_request_address_for_transaction(message_id)
+        self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
+
+        self.sender.find_signal_containing_pattern(
+            SignalType.MESSAGES_NEW.value, event_pattern=self.REQUEST_ADDRESS_FOR_TRANSACTION_DECLINED_TEXT, timeout=5
+        )
+
+        response = self.sender.wakuext_service.chat_messages(sender_chat_id)
+        message = self.get_message_by_content_type(response, content_type=MessageContentType.TRANSACTION_COMMAND.value)[0]
+        assert message.get("text", "") == self.REQUEST_ADDRESS_FOR_TRANSACTION_DECLINED_TEXT
+        command_parameters = message.get("commandParameters", {})
+        assert command_parameters.get("from", "") == address_from
+        assert command_parameters.get("value", "") == value
+        assert command_parameters.get("contract", "") == contract
