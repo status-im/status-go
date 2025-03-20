@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"path/filepath"
 
@@ -149,8 +150,12 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		Nameserver:                             specifiedWakuV2Config.Nameserver,
 	}
 
-	nodeConfig.ClusterConfig = params.DefaultClusterConfig(fleet)
+	if !params.IsFleetSupported(fleet) {
+		return fmt.Errorf("unknown fleet %s", fleet)
+	}
 
+	nodeConfig.ClusterConfig = params.DefaultClusterConfig(fleet)
+    
 	return nil
 }
 
