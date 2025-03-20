@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"path/filepath"
 
@@ -162,6 +163,10 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	//if fleet == params.FleetStatusProd {
 	//	nodeConfig.ClusterConfig.ClusterID = ShardsTestClusterID
 	//}
+
+	if !params.IsFleetSupported(fleet) {
+		return fmt.Errorf("unknown fleet %s", fleet)
+	}
 
 	nodeConfig.WakuV2Config.Fleet = fleet
 	nodeConfig.WakuV2Config.WakuNodes = params.DefaultWakuNodes(fleet)
