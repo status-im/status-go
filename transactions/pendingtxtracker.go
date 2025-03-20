@@ -588,23 +588,6 @@ func (tm *PendingTxTracker) GetPendingEntry(chainID common.ChainID, hash eth.Has
 	return trs[0], nil
 }
 
-func (tm *PendingTxTracker) CountPendingTxsFromNonce(chainID common.ChainID, address eth.Address, nonce uint64) (pendingTx uint64, err error) {
-	err = tm.db.QueryRow(`
-		SELECT
-			COUNT(nonce)
-		FROM
-			pending_transactions
-		WHERE
-			network_id = ?
-		AND
-			from_address = ?
-		AND
-			nonce >= ?`,
-		chainID, address, nonce).
-		Scan(&pendingTx)
-	return
-}
-
 // StoreAndTrackPendingTx store the details of a pending transaction and track it until it is mined
 func (tm *PendingTxTracker) StoreAndTrackPendingTx(transaction *PendingTransaction) error {
 	err := tm.addPendingAndNotify(transaction)

@@ -104,27 +104,7 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 
 func (t *Transactor) NextNonce(ctx context.Context, rpcClient rpc.ClientInterface, chainID uint64, from types.Address) (uint64, error) {
 	wrapper := newRPCWrapper(rpcClient, chainID)
-	nonce, err := wrapper.PendingNonceAt(ctx, common.Address(from))
-	if err != nil {
-		return 0, err
-	}
-
-	// We need to take into consideration all pending transactions in case of networks based on the Optimism stack, cause the network returns always
-	// the nonce of last executed tx + 1 for the next nonce value.
-	if chainID == wallet_common.OptimismMainnet ||
-		chainID == wallet_common.OptimismSepolia ||
-		chainID == wallet_common.BaseMainnet ||
-		chainID == wallet_common.BaseSepolia {
-		if t.pendingTracker != nil {
-			countOfPendingTXs, err := t.pendingTracker.CountPendingTxsFromNonce(wallet_common.ChainID(chainID), common.Address(from), nonce)
-			if err != nil {
-				return 0, err
-			}
-			return nonce + countOfPendingTXs, nil
-		}
-	}
-
-	return nonce, err
+	return wrapper.PendingNonceAt(ctx, common.Address(from))
 }
 
 func (t *Transactor) EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error) {
