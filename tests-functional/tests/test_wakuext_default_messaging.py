@@ -5,6 +5,7 @@ import pytest
 import tempfile
 
 from steps.messenger import MessengerSteps
+from clients.status_backend import StatusBackend
 from test_cases import MessengerTestCase
 from clients.status_backend import StatusBackend
 
@@ -61,12 +62,16 @@ def temp_dir():
 
 
 @pytest.mark.rpc
-class TestLocalWakuFleet(MessengerTestCase):
-    def create_backend(self, data_dir, url):
+class TestLocalWakuFleet(MessengerSteps):
+    def create_backend(self, data_dir, url, wakuV2LightClient=False):
         backend = StatusBackend(self.await_signals, status_backend_url=url)
+        try:
+            backend.logout()
+        except Exception:
+            logging.warning("failed to logout from %s", url)
         backend.init_status_backend(data_dir)
-        backend.create_account_and_login(data_dir, wakuV2Fleet="sirotin.test")
-        # backend.create_account_and_login(data_dir, wakuV2Fleet="status.prod")
+        backend.create_account_and_login(data_dir, wakuV2Fleet="sirotin.dev", wakuV2LightClient=wakuV2LightClient)
+        # backend.create_account_and_login(data_dir, wakuV2Fleet="status.prod", wakuV2LightClient=wakuV2LightClient)
         backend.find_public_key()
         backend.wakuext_service.start_messenger()
         backend.wait_for_online()
@@ -81,18 +86,35 @@ class TestLocalWakuFleet(MessengerTestCase):
         self.sender.logout()
         self.receiver.logout()
 
-    def test_create_and_fetch_community(self, request, temp_dir):
+    def test_community(self, request, temp_dir):
         dir_1 = os.path.join(temp_dir, "1")
         dir_2 = os.path.join(temp_dir, "2")
-        self.sender = self.create_backend(dir_1, "http://localhost:12345")
-        self.receiver = self.create_backend(dir_2, "http://localhost:12346")
+        dir_3 = os.path.join(temp_dir, "3")
 
-        community_id = self.create_community(self.sender)
-        logging.info(f"community created {community_id}")
+        owner = self.create_backend(dir_1, "http://localhost:12345")
+        desktop = self.create_backend(dir_2, "http://localhost:12346", wakuV2LightClient=False)
+        mobile = self.create_backend(dir_3, "http://localhost:12347", wakuV2LightClient=True)
 
-        self.fetch_community(self.receiver, community_id)
+        self.sender = owner
 
-        self.sender.logout()
-        self.receiver.logout()
+        self.community_id = self.create_community(owner)
+        logging.info(f"✅ community created {self.community_id}")
 
+        try:
+            self.join_community(desktop)
+            logging.info(f"✅community joined on DESKTOP")
+            self.join_community(mobile)
+            logging.info(f"✅community joined on MOBILE")
+        except Exception as e:
+            logging.error(f"❌failed to join community: {e}")
 
+            print("keeping status-backend running")
+            print(f"status-backend-1: {dir_1}")
+            print(f"status-backend-2: {dir_2}")
+            print(f"status-backend-3: {dir_3}")
+
+            input("Press Enter to continue...")
+
+        owner.logout()
+        desktop.logout()
+        mobile.logout()
