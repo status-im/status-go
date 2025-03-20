@@ -138,16 +138,16 @@ type WakuV2Config struct {
 	EnableStoreConfirmationForMessagesSent bool
 
 	// Fleet is a name of a selected Waku fleet
-	Fleet string
+	Fleet string `json:"fleet"`
 
 	// WakuNodes is a list of waku2 multiaddresses
-	WakuNodes []string
+	WakuNodes []string `json:"waku_nodes"`
 
 	// DiscV5Nodes is a list of enr to be used for ambient discovery
-	DiscV5BootstrapNodes []string
+	DiscV5BootstrapNodes []string `json:"disc_v5_bootstrap_nodes"`
 
 	//Waku network identifier
-	ClusterID uint16
+	ClusterID uint16 `json:"cluster_id"`
 }
 
 // ----------
@@ -639,7 +639,7 @@ func WithFleet(fleet string) Option {
 
 // WithLES enabled LES protocol.
 func WithLES() Option {
-	
+
 	return func(c *NodeConfig) error {
 		return loadConfigFromAsset("../config/cli/les-enabled.json", c)
 	}
