@@ -188,8 +188,9 @@ func (r *Router) setCustomTxDetails(ctx context.Context, pathTxIdentity *request
 		if err != nil {
 			return err
 		}
+		_, err = r.checkBalancesForTheBestRoute(ctx, r.activeRoutes.Best)
 		// inform the client about the changes
-		sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, nil)
+		sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, err)
 
 		return nil
 	}
