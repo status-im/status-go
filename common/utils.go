@@ -141,3 +141,11 @@ func TruncateWithDotN(s string, n int) string {
 func TruncateWithDot(s string) string {
 	return TruncateWithDotN(s, DefaultTruncateLength)
 }
+
+func StrPtr(s string) *string {
+	return &s
+}
+
+func BoolPtr(b bool) *bool {
+	return &b
+}

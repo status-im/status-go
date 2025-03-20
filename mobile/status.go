@@ -160,14 +160,11 @@ func initializeLogging(request *requests.InitializeApplication) error {
 		request.LogDir = request.DataDir
 	}
 
-	if request.LogLevel == "" {
-		request.LogLevel = params.DefaultPreLoginLogLevel
-	}
-
-	logSettings := logutils.LogSettings{
-		Enabled: true, // always enable pre-login logging
-		Level:   request.LogLevel,
-		File:    path.Join(request.LogDir, params.DefaultPreLoginLogFile),
+	preLoginLog := statusBackend.PreLoginLog()
+	preLoginLog.SetEnabled(request.LogEnabled)
+	if request.LogLevel != "" {
+		// ignore the error since it's already validated
+		_ = preLoginLog.SetLevel(request.LogLevel)
 	}
 
 	err := os.MkdirAll(request.LogDir, 0700)
@@ -175,13 +172,16 @@ func initializeLogging(request *requests.InitializeApplication) error {
 		return err
 	}
 
+	preLoginLog.SetLogDir(request.LogDir)
+
+	logSettings := preLoginLog.Settings()
 	err = logutils.OverrideRootLoggerWithConfig(logSettings)
 	if err != nil {
 		return err
 	}
 
 	logutils.ZapLogger().Info("logging initialised",
-		zap.Any("logSettings", logSettings),
+		zap.Any("pre-login logSettings", logSettings),
 		zap.Bool("APILoggingEnabled", request.APILoggingEnabled),
 	)
 
@@ -2337,11 +2337,16 @@ func addCentralizedMetric(requestJSON string) string {
 	return metric.ID
 }
 
+// Deprecated: Use SetProfileLogLevel instead.
 func SetLogLevel(requestJSON string) string {
-	return callWithResponse(setLogLevel, requestJSON)
+	return callWithResponse(setProfileLogLevel, requestJSON)
 }
 
-func setLogLevel(requestJSON string) string {
+func SetProfileLogLevel(requestJSON string) string {
+	return callWithResponse(setProfileLogLevel, requestJSON)
+}
+
+func setProfileLogLevel(requestJSON string) string {
 	var request requests.SetLogLevel
 	err := json.Unmarshal([]byte(requestJSON), &request)
 	if err != nil {
@@ -2353,7 +2358,7 @@ func setLogLevel(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	return makeJSONResponse(statusBackend.SetLogLevel(request.LogLevel))
+	return makeJSONResponse(statusBackend.SetProfileLogLevel(request.LogLevel))
 }
 
 func SetLogNamespaces(requestJSON string) string {
@@ -2375,18 +2380,54 @@ func setLogNamespaces(requestJSON string) string {
 	return makeJSONResponse(statusBackend.SetLogNamespaces(request.LogNamespaces))
 }
 
+// Deprecated: Use SetProfileLogEnabled instead.
 func SetLogEnabled(requestJSON string) string {
-	return callWithResponse(setLogEnabled, requestJSON)
+	return callWithResponse(setProfileLogEnabled, requestJSON)
 }
 
-func setLogEnabled(requestJSON string) string {
+func SetProfileLogEnabled(requestJSON string) string {
+	return callWithResponse(setProfileLogEnabled, requestJSON)
+}
+
+func setProfileLogEnabled(requestJSON string) string {
 	var request requests.SetLogEnabled
 	err := json.Unmarshal([]byte(requestJSON), &request)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	return makeJSONResponse(statusBackend.SetProfileLogEnabled(request.Enabled))
+}
 
-	return makeJSONResponse(statusBackend.SetLogEnabled(request.Enabled))
+func SetPreLoginLogEnabled(requestJSON string) string {
+	return callWithResponse(setPreLoginLogEnabled, requestJSON)
+}
+
+func setPreLoginLogEnabled(requestJSON string) string {
+	var request requests.SetLogEnabled
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(statusBackend.SetPreLoginLogEnabled(request.Enabled))
+}
+
+func SetPreLoginLogLevel(requestJSON string) string {
+	return callWithResponse(setPreLoginLogLevel, requestJSON)
+}
+
+func setPreLoginLogLevel(requestJSON string) string {
+	var request requests.SetLogLevel
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(statusBackend.SetPreLoginLogLevel(request.LogLevel))
 }
 
 func IntendedPanic(message string) string {

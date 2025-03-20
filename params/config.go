@@ -1060,28 +1060,12 @@ func (c *NodeConfig) LogFilePath() string {
 	return filepath.Join(c.LogDir, c.LogFile)
 }
 
-func (c *NodeConfig) DefaultLogSettings() logutils.LogSettings {
+func (c *NodeConfig) ProfileLogSettings() logutils.LogSettings {
 	return logutils.LogSettings{
 		Enabled:         c.LogEnabled,
 		Level:           c.LogLevel,
 		Namespaces:      c.LogNamespaces,
 		File:            c.LogFilePath(),
-		MaxSize:         c.LogMaxSize,
-		MaxBackups:      c.LogMaxBackups,
-		CompressRotated: c.LogCompressRotated,
-	}
-}
-
-func (c *NodeConfig) PreLoginLogSettings() logutils.LogSettings {
-	logFile := filepath.Join(c.LogDir, DefaultPreLoginLogFile)
-	if c.LogLevel == "" {
-		c.LogLevel = DefaultPreLoginLogLevel
-	}
-	return logutils.LogSettings{
-		Enabled:         true,
-		Level:           c.LogLevel,
-		Namespaces:      c.LogNamespaces,
-		File:            logFile,
 		MaxSize:         c.LogMaxSize,
 		MaxBackups:      c.LogMaxBackups,
 		CompressRotated: c.LogCompressRotated,

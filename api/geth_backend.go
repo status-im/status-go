@@ -109,6 +109,7 @@ type GethStatusBackend struct {
 	sentryDSN                string
 
 	logger *zap.Logger
+	preLoginLog *logutils.PreLoginLog
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -116,6 +117,7 @@ func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
 	logger = logger.Named("GethStatusBackend")
 	backend := &GethStatusBackend{
 		logger: logger,
+		preLoginLog: logutils.NewPreLoginLog(),
 	}
 	backend.initialize()
 
@@ -125,6 +127,10 @@ func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
 		zap.String("IpfsGatewayURL", params.IpfsGatewayURL))
 
 	return backend
+}
+
+func (b *GethStatusBackend) PreLoginLog() *logutils.PreLoginLog {
+	return b.preLoginLog
 }
 
 func (b *GethStatusBackend) initialize() {
@@ -509,7 +515,7 @@ func (b *GethStatusBackend) SetupLogSettings() error {
 	if err := logutils.ZapLogger().Sync(); err != nil {
 		return errors.Wrap(err, "failed to sync logger")
 	}
-	logSettings := b.config.DefaultLogSettings()
+	logSettings := b.config.ProfileLogSettings()
 	return logutils.OverrideRootLoggerWithConfig(logSettings)
 }
 
@@ -639,7 +645,7 @@ func (b *GethStatusBackend) workaroundToFixBadMigration(request *requests.Login)
 
 		// the createAccount contains all the fields that are needed to create the default node config
 		createAccount := b.convertLoginRequestToAccountRequest(request)
-		defaultNodeConf, err = DefaultNodeConfig(oldNodeConf.ShhextConfig.InstallationID, createAccount)
+		defaultNodeConf, err = DefaultNodeConfig(oldNodeConf.ShhextConfig.InstallationID, request.KeyUID, createAccount)
 		if err != nil {
 			return err
 		}
@@ -1775,7 +1781,7 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, inp
 }
 
 func (b *GethStatusBackend) prepareConfig(request *requests.CreateAccount, input *prepareAccountInput, installationID string) (*params.NodeConfig, error) {
-	nodeConfig, err := DefaultNodeConfig(installationID, request, input.opts...)
+	nodeConfig, err := DefaultNodeConfig(installationID, input.keyUID, request, input.opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2706,7 +2712,7 @@ func (b *GethStatusBackend) switchToPreLoginLog() error {
 	if err != nil {
 		return err
 	}
-	return logutils.OverrideRootLoggerWithConfig(b.config.PreLoginLogSettings())
+	return logutils.OverrideRootLoggerWithConfig(b.preLoginLog.Settings())
 }
 
 // cleanupServices stops parts of services that doesn't managed by a node and removes injected data from services.
@@ -2980,7 +2986,7 @@ func (b *GethStatusBackend) TogglePanicReporting(enabled bool) error {
 	return b.DisablePanicReporting()
 }
 
-func (b *GethStatusBackend) SetLogLevel(level string) error {
+func (b *GethStatusBackend) SetProfileLogLevel(level string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -2990,7 +2996,7 @@ func (b *GethStatusBackend) SetLogLevel(level string) error {
 	}
 	b.config.LogLevel = level
 
-	return logutils.OverrideRootLoggerWithConfig(b.config.DefaultLogSettings())
+	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
 func (b *GethStatusBackend) SetLogNamespaces(namespaces string) error {
@@ -3003,10 +3009,10 @@ func (b *GethStatusBackend) SetLogNamespaces(namespaces string) error {
 	}
 	b.config.LogNamespaces = namespaces
 
-	return logutils.OverrideRootLoggerWithConfig(b.config.DefaultLogSettings())
+	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
 }
 
-func (b *GethStatusBackend) SetLogEnabled(enabled bool) error {
+func (b *GethStatusBackend) SetProfileLogEnabled(enabled bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -3016,5 +3022,21 @@ func (b *GethStatusBackend) SetLogEnabled(enabled bool) error {
 	}
 	b.config.LogEnabled = enabled
 
-	return logutils.OverrideRootLoggerWithConfig(b.config.DefaultLogSettings())
+	return logutils.OverrideRootLoggerWithConfig(b.config.ProfileLogSettings())
+}
+
+func (b *GethStatusBackend) SetPreLoginLogEnabled(enabled bool) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.preLoginLog.SetEnabled(enabled)
+	return logutils.OverrideRootLoggerWithConfig(b.preLoginLog.Settings())
+}
+
+func (b *GethStatusBackend) SetPreLoginLogLevel(level string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if err := b.preLoginLog.SetLevel(level); err != nil {
+		return err
+	}
+	return logutils.OverrideRootLoggerWithConfig(b.preLoginLog.Settings())
 }

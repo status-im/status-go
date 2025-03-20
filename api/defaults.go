@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api/common"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -32,7 +33,6 @@ const (
 	DefaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
 	DefaultDataDir                = "/ethereum/mainnet_rpc"
 	DefaultNodeName               = "StatusIM"
-	DefaultLogFile                = "geth.log"
 	DefaultAPILogFile             = "api.log"
 
 	DefaultLogLevel                   = "ERROR"
@@ -275,12 +275,12 @@ func getMainnetRPCURL(networks []params.Network) string {
 	return ""
 }
 
-func DefaultNodeConfig(installationID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
+func DefaultNodeConfig(installationID,keyUID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.RootDataDir = request.RootDataDir
 	nodeConfig.LogEnabled = request.LogEnabled
-	nodeConfig.LogFile = DefaultLogFile
+	nodeConfig.LogFile = gocommon.TruncateWithDot(keyUID)+".log"
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = DefaultLogLevel
 	nodeConfig.DataDir = DefaultDataDir

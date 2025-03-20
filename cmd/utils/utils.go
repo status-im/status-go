@@ -15,7 +15,7 @@ func SetupLogging(logLevel *string, logWithoutColors *bool, config *params.NodeC
 		config.LogLevel = *logLevel
 	}
 
-	logSettings := config.DefaultLogSettings()
+	logSettings := config.ProfileLogSettings()
 	logSettings.Colorized = !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
 	if err := logutils.OverrideRootLoggerWithConfig(logSettings); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)

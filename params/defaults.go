@@ -83,9 +83,6 @@ const (
 
 	// IpfsGatewayURL is the Gateway URL to use for IPFS
 	IpfsGatewayURL = "https://ipfs.status.im/"
-
-	DefaultPreLoginLogFile  = "pre_login.log"
-	DefaultPreLoginLogLevel = "ERROR"
 )
 
 var (
