@@ -128,14 +128,18 @@ class MessengerSteps(NetworkConditionsSteps):
         return node.wakuext_service.fetch_community(community_id)
 
     def join_community(self, node):
+        logging.info(f"⬇️ Fetching community {self.community_id}")
         self.fetch_community(node)
+
+        logging.info(f"🏃Joining community {self.community_id}")
         response_to_join = node.wakuext_service.request_to_join_community(self.community_id)
         join_id = response_to_join.get("result", {}).get("requestsToJoinCommunity", [{}])[0].get("id")
+        logging.info(f"☝️Request to join community ID: {join_id}")
 
         # I couldn't find any signal related to the requestToJoinCommunity request in the peer node.
         # That's why I need this retry logic for accepting the request to join the community.
-        max_retries = 40
-        retry_interval = 0.5
+        max_retries = 5
+        retry_interval = 2
         for attempt in range(max_retries):
             try:
                 response = self.sender.wakuext_service.accept_request_to_join_community(join_id)
