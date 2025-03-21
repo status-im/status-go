@@ -35,7 +35,7 @@ func overrideCoreWithConfig(filteringCore *namespaceFilteringCore, settings LogS
 	if settings.Level == "" {
 		settings.Level = "info"
 	}
-	level, err := lvlFromString(settings.Level)
+	level, err := LvlFromString(settings.Level)
 	if err != nil {
 		return err
 	}

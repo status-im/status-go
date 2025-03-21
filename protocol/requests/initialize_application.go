@@ -2,8 +2,7 @@ package requests
 
 import (
 	"errors"
-
-	"gopkg.in/go-playground/validator.v9"
+	"github.com/status-im/status-go/logutils"
 )
 
 var (
@@ -25,7 +24,7 @@ type InitializeApplication struct {
 	// Specify if enable Pre-Login Log
 	LogEnabled bool `json:"logEnabled"`
 	// Specify the Pre-Login log level
-	LogLevel          string `json:"logLevel" validate:"omitempty,eq=ERROR|eq=WARN|eq=INFO|eq=DEBUG|eq=TRACE"`
+	LogLevel          string `json:"logLevel"`
 	APILoggingEnabled bool   `json:"apiLoggingEnabled"`
 
 	MetricsEnabled bool   `json:"metricsEnabled"`
@@ -41,5 +40,10 @@ func (i *InitializeApplication) Validate() error {
 	if len(i.DataDir) == 0 {
 		return ErrInitializeApplicationInvalidDataDir
 	}
-	return validator.New().Struct(i)
+	if i.LogLevel != "" {
+		if _,err := logutils.LvlFromString(i.LogLevel); err != nil {
+			return err
+		}
+	}
+	return nil
 }

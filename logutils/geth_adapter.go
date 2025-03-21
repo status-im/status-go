@@ -14,7 +14,7 @@ import (
 // Logs are forwarded raw as if geth were printing them.
 func gethAdapter(logger *zap.Logger) log.Handler {
 	return log.FuncHandler(func(r *log.Record) error {
-		level, err := lvlFromString(r.Lvl.String())
+		level, err := LvlFromString(r.Lvl.String())
 		if err != nil {
 			return err
 		}
@@ -30,8 +30,8 @@ func gethAdapter(logger *zap.Logger) log.Handler {
 
 const traceLevel = zapcore.DebugLevel - 1
 
-// lvlFromString returns the appropriate zapcore.Level from a string.
-func lvlFromString(lvlString string) (zapcore.Level, error) {
+// LvlFromString returns the appropriate zapcore.Level from a string.
+func LvlFromString(lvlString string) (zapcore.Level, error) {
 	switch strings.ToLower(lvlString) {
 	case "trace", "trce":
 		return traceLevel, nil // zap does not have a trace level, use custom

@@ -181,7 +181,7 @@ func initializeLogging(request *requests.InitializeApplication) error {
 	}
 
 	logutils.ZapLogger().Info("logging initialised",
-		zap.Any("pre-login logSettings", logSettings),
+		zap.Any("logSettings", logSettings),
 		zap.Bool("APILoggingEnabled", request.APILoggingEnabled),
 	)
 

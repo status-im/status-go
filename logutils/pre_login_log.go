@@ -1,13 +1,12 @@
 package logutils
 
 import (
-	"errors"
 	"path/filepath"
 )
 
-const(
-	defaultPreLoginLogFile  = "pre_login.log"
-	defaultPreLoginLogLevel = "ERROR"
+const (
+	defaultPreLoginLogFile    = "pre_login.log"
+	defaultPreLoginLogLevel   = "ERROR"
 	defaultPreLoginLogEnabled = true
 )
 
@@ -30,13 +29,11 @@ func (l *PreLoginLog) SetEnabled(enabled bool) {
 }
 
 func (l *PreLoginLog) SetLevel(level string) error {
-	switch level {
-	case "ERROR", "WARN", "INFO", "DEBUG", "TRACE":
-		l.level = level
-		return nil
-	default:
-		return errors.New("invalid log level")
+	if _, err := LvlFromString(level); err != nil {
+		return err
 	}
+	l.level = level
+	return nil
 }
 
 func (l *PreLoginLog) SetLogDir(dir string) {
@@ -46,8 +43,8 @@ func (l *PreLoginLog) SetLogDir(dir string) {
 func (l *PreLoginLog) Settings() LogSettings {
 	logFile := filepath.Join(l.logDir, defaultPreLoginLogFile)
 	return LogSettings{
-		Enabled:         l.enabled,
-		Level:           l.level,
-		File:            logFile,
+		Enabled: l.enabled,
+		Level:   l.level,
+		File:    logFile,
 	}
 }
