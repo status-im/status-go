@@ -30,14 +30,9 @@ import (
 
 // Whisper message properties.
 const (
-	whisperTTL        = 15
-	whisperDefaultPoW = 0.002
-	// whisperLargeSizePoW is the PoWTarget for larger payload sizes
-	whisperLargeSizePoW = 0.000002
 	// largeSizeInBytes is when should we be using a lower POW.
 	// Roughly this is 50KB
 	largeSizeInBytes              = 50000
-	whisperPoWTime                = 5
 	maxMessageSenderEphemeralKeys = 3
 )
 
@@ -662,10 +657,7 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 	}
 
 	newMessage := &wakutypes.NewMessage{
-		TTL:         whisperTTL,
 		Payload:     payload,
-		PowTarget:   calculatePoW(payload),
-		PowTime:     whisperPoWTime,
 		PubsubTopic: rawMessage.PubsubTopic,
 	}
 
@@ -757,10 +749,7 @@ func (s *MessageSender) SendPublic(
 		}
 	} else {
 		newMessage = &wakutypes.NewMessage{
-			TTL:       whisperTTL,
-			Payload:   wrappedMessage,
-			PowTarget: calculatePoW(wrappedMessage),
-			PowTime:   whisperPoWTime,
+			Payload: wrappedMessage,
 		}
 	}
 
@@ -1105,10 +1094,7 @@ func (s *MessageSender) addToDataSync(publicKey *ecdsa.PublicKey, message []byte
 // sendPrivateRawMessage sends a message not wrapped in an encryption layer
 func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *RawMessage, publicKey *ecdsa.PublicKey, payload []byte) ([][]byte, []*wakutypes.NewMessage, error) {
 	newMessage := &wakutypes.NewMessage{
-		TTL:         whisperTTL,
 		Payload:     payload,
-		PowTarget:   calculatePoW(payload),
-		PowTime:     whisperPoWTime,
 		PubsubTopic: rawMessage.PubsubTopic,
 	}
 
@@ -1167,10 +1153,7 @@ func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey 
 	}
 
 	newMessage := &wakutypes.NewMessage{
-		TTL:         whisperTTL,
 		Payload:     payload,
-		PowTarget:   calculatePoW(payload),
-		PowTime:     whisperPoWTime,
 		PubsubTopic: pubsubTopic,
 	}
 
@@ -1338,23 +1321,9 @@ func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*wakutypes.NewM
 	}
 
 	newMessage = &wakutypes.NewMessage{
-		TTL:       whisperTTL,
-		Payload:   payload,
-		PowTarget: calculatePoW(payload),
-		PowTime:   whisperPoWTime,
+		Payload: payload,
 	}
 	return newMessage, nil
-}
-
-// calculatePoW returns the PoWTarget to be used.
-// We check the size and arbitrarily set it to a lower PoW if the packet is
-// greater than 50KB. We do this as the defaultPoW is too high for clients to send
-// large messages.
-func calculatePoW(payload []byte) float64 {
-	if len(payload) > largeSizeInBytes {
-		return whisperLargeSizePoW
-	}
-	return whisperDefaultPoW
 }
 
 func (s *MessageSender) StopDatasync() {

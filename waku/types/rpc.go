@@ -11,14 +11,9 @@ type NewMessage struct {
 	SymKeyID    string    `json:"symKeyID"`
 	PublicKey   []byte    `json:"pubKey"`
 	SigID       string    `json:"sig"`
-	TTL         uint32    `json:"ttl"`
 	PubsubTopic string    `json:"pubsubTopic"`
 	Topic       TopicType `json:"topic"`
 	Payload     []byte    `json:"payload"`
-	Padding     []byte    `json:"padding"`
-	PowTime     uint32    `json:"powTime"`
-	PowTarget   float64   `json:"powTarget"`
-	TargetPeer  string    `json:"targetPeer"`
 	Ephemeral   bool      `json:"ephemeral"`
 	Priority    *int      `json:"priority"`
 }

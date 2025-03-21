@@ -58,7 +58,6 @@ func replicateMessageWithNewPayload(message *wakutypes.NewMessage, payload []byt
 	}
 
 	copy.Payload = payload
-	copy.PowTarget = calculatePoW(payload)
 	return copy, nil
 }
 
