@@ -8,6 +8,7 @@ import (
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api/common"
+	"github.com/status-im/status-go/contracts/resolver"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
@@ -41,6 +42,7 @@ const (
 	DefaultListenAddr                 = ":0"
 	DefaultMaxMessageDeliveryAttempts = 3
 	DefaultVerifyTransactionChainID   = 1
+	DefaultVerifyENSChainID           = 1
 	DefaultCurrentNetwork             = "mainnet_rpc"
 )
 
@@ -364,6 +366,11 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 		nodeConfig.WakuV2Config.TelemetryServerURL = request.TelemetryServerURL
 	}
 
+	verifyENSContractAddress, err := resolver.ContractAddress(DefaultVerifyENSChainID)
+	if err != nil {
+		return nil, err
+	}
+
 	nodeConfig.ShhextConfig = params.ShhextConfig{
 		InstallationID:             installationID,
 		MaxMessageDeliveryAttempts: DefaultMaxMessageDeliveryAttempts,
@@ -371,18 +378,17 @@ func DefaultNodeConfig(installationID string, request *requests.CreateAccount, o
 		VerifyTransactionChainID:   DefaultVerifyTransactionChainID,
 		DataSyncEnabled:            true,
 		PFSEnabled:                 true,
+		VerifyTransactionURL:       getMainnetRPCURL(nodeConfig.Networks),
+		VerifyENSURL:               getMainnetRPCURL(nodeConfig.Networks),
+		VerifyENSContractAddress:   verifyENSContractAddress.String(),
 	}
 
 	if request.VerifyTransactionURL != nil {
 		nodeConfig.ShhextConfig.VerifyTransactionURL = *request.VerifyTransactionURL
-	} else {
-		nodeConfig.ShhextConfig.VerifyTransactionURL = getMainnetRPCURL(nodeConfig.Networks)
 	}
 
 	if request.VerifyENSURL != nil {
 		nodeConfig.ShhextConfig.VerifyENSURL = *request.VerifyENSURL
-	} else {
-		nodeConfig.ShhextConfig.VerifyENSURL = getMainnetRPCURL(nodeConfig.Networks)
 	}
 
 	if request.VerifyTransactionChainID != nil {
