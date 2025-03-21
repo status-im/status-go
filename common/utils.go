@@ -142,10 +142,6 @@ func TruncateWithDot(s string) string {
 	return TruncateWithDotN(s, DefaultTruncateLength)
 }
 
-func StrPtr(s string) *string {
-	return &s
-}
-
-func BoolPtr(b bool) *bool {
-	return &b
+func Ptr[T any](v T) *T {
+	return &v
 }

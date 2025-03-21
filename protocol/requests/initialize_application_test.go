@@ -1,8 +1,9 @@
 package requests
 
 import (
-	"github.com/status-im/status-go/common"
 	"testing"
+
+	"github.com/status-im/status-go/common"
 )
 
 func TestInitializeApplication_Validate(t *testing.T) {
@@ -76,8 +77,8 @@ func TestInitializeApplication_Validate(t *testing.T) {
 		{
 			name: "All valid log levels",
 			app: InitializeApplication{
-				DataDir:          "/valid/path",
-				LogLevel:         "ERROR",
+				DataDir:  "/valid/path",
+				LogLevel: "ERROR",
 			},
 			wantErr: false,
 		},
@@ -87,7 +88,7 @@ func TestInitializeApplication_Validate(t *testing.T) {
 				DataDir:              "/valid/path",
 				MixpanelAppID:        "app-id",
 				MixpanelToken:        "token",
-				MediaServerEnableTLS: common.BoolPtr(true),
+				MediaServerEnableTLS: common.Ptr(true),
 				SentryDSN:            "sentry-dsn",
 				LogDir:               "/logs/path",
 				LogEnabled:           true,
