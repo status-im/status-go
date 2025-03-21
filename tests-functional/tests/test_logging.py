@@ -1,3 +1,4 @@
+from resources.constants import USER_DIR
 import re
 from clients.status_backend import StatusBackend
 import pytest
@@ -39,32 +40,34 @@ class TestLogging:
             r"ERROR\s+test1\.test2\.test3\s+",
         ]
 
-        log_path = os.path.join(backend_client.data_dir, "geth.log")
-
+        key_uid = str(backend_client.find_key_uid())
+        formatted_key_uid = f"{key_uid[:4]}..{key_uid[-4:]}"
+        profile_log_file_name = f"{formatted_key_uid}.log"
+        log_path = os.path.join(backend_client.data_dir, profile_log_file_name)
         # Ensure changes take effect at runtime
         backend_client.rpc_valid_request("wakuext_logTest")
-        geth_log = backend_client.extract_data(log_path)
-        self.expect_logs(geth_log, "test message", log_pattern, count=1)
+        profile_log = backend_client.extract_data(log_path)
+        self.expect_logs(profile_log, "test message", log_pattern, count=1)
 
         # Disable logging
         backend_client.api_valid_request("SetLogEnabled", {"enabled": False})
         backend_client.rpc_valid_request("wakuext_logTest")
-        geth_log = backend_client.extract_data(log_path)
-        self.expect_logs(geth_log, "test message", log_pattern, count=1)
+        profile_log = backend_client.extract_data(log_path)
+        self.expect_logs(profile_log, "test message", log_pattern, count=1)
 
         # Enable logging
         backend_client.api_valid_request("SetLogEnabled", {"enabled": True})
         backend_client.rpc_valid_request("wakuext_logTest")
-        geth_log = backend_client.extract_data(log_path)
+        profile_log = backend_client.extract_data(log_path)
         self.expect_logs(geth_log, "test message", log_pattern, count=2)
 
         # Ensure changes are persisted after re-login
         backend_client.logout()
-        backend_client.login(str(backend_client.find_key_uid()))
+        backend_client.login(key_uid)
         backend_client.wait_for_login()
         backend_client.rpc_valid_request("wakuext_logTest")
-        geth_log = backend_client.extract_data(log_path)
-        self.expect_logs(geth_log, "test message", log_pattern, count=3)
+        profile_log = backend_client.extract_data(log_path)
+        self.expect_logs(profile_log, "test message", log_pattern, count=3)
 
     def expect_logs(self, log_file, filter_keyword, expected_logs, count):
         with open(log_file, "r") as f:
