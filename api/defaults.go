@@ -275,12 +275,12 @@ func getMainnetRPCURL(networks []params.Network) string {
 	return ""
 }
 
-func DefaultNodeConfig(installationID,keyUID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
+func DefaultNodeConfig(installationID, keyUID string, request *requests.CreateAccount, opts ...params.Option) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
 	nodeConfig.RootDataDir = request.RootDataDir
 	nodeConfig.LogEnabled = request.LogEnabled
-	nodeConfig.LogFile = gocommon.TruncateWithDot(keyUID)+".log"
+	nodeConfig.LogFile = gocommon.TruncateWithDot(keyUID) + ".log"
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = DefaultLogLevel
 	nodeConfig.DataDir = DefaultDataDir

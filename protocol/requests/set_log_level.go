@@ -9,7 +9,7 @@ type SetLogLevel struct {
 }
 
 func (c *SetLogLevel) Validate() error {
-	if _,err := logutils.LvlFromString(c.LogLevel); err != nil {
+	if _, err := logutils.LvlFromString(c.LogLevel); err != nil {
 		return err
 	}
 	return nil

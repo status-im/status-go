@@ -2,6 +2,7 @@ package requests
 
 import (
 	"errors"
+
 	"github.com/status-im/status-go/logutils"
 )
 
@@ -41,7 +42,7 @@ func (i *InitializeApplication) Validate() error {
 		return ErrInitializeApplicationInvalidDataDir
 	}
 	if i.LogLevel != "" {
-		if _,err := logutils.LvlFromString(i.LogLevel); err != nil {
+		if _, err := logutils.LvlFromString(i.LogLevel); err != nil {
 			return err
 		}
 	}

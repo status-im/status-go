@@ -108,7 +108,7 @@ type GethStatusBackend struct {
 	prometheusMetrics        *metrics.Server
 	sentryDSN                string
 
-	logger *zap.Logger
+	logger      *zap.Logger
 	preLoginLog *logutils.PreLoginLog
 }
 
@@ -116,7 +116,7 @@ type GethStatusBackend struct {
 func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
 	logger = logger.Named("GethStatusBackend")
 	backend := &GethStatusBackend{
-		logger: logger,
+		logger:      logger,
 		preLoginLog: logutils.NewPreLoginLog(),
 	}
 	backend.initialize()
