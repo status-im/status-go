@@ -251,7 +251,9 @@ class StatusBackend(RpcClient, SignalClient):
 
     def extract_data(self, path: str):
         if not self.container:
-            return path
+            if os.path.exists(path):
+                return path
+            return None
 
         try:
             stream, _ = self.container.get_archive(path)

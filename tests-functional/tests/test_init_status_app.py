@@ -54,7 +54,7 @@ def assert_file_first_line(path, pattern: str, expected: bool):
 
 @pytest.mark.rpc
 @pytest.mark.init
-@pytest.mark.parametrize("log_enabled,api_logging_enabled", [(True, True), (False, False)])
+@pytest.mark.parametrize("log_enabled,api_logging_enabled", [(False, False), (True, True)])
 def test_check_logs(log_enabled: bool, api_logging_enabled: bool):
     backend = StatusBackend()
 
@@ -75,7 +75,7 @@ def test_check_logs(log_enabled: bool, api_logging_enabled: bool):
     pre_login_log = backend.extract_data(os.path.join(logs_dir, "pre_login.log"))
     local_api_log = backend.extract_data(os.path.join(logs_dir, "api.log"))
 
-    assert_file_first_line(path=pre_login_log, pattern="logging initialised", expected=True)
+    assert_file_first_line(path=pre_login_log, pattern="logging initialised", expected=log_enabled)
 
     assert_file_first_line(
         path=local_api_log,
