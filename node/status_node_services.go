@@ -286,7 +286,7 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 			}
 		}
 
-		w, err := wakuv2.New(nodeKey, nodeConfig.ClusterConfig.Fleet, cfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
+		w, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
 
 		if err != nil {
 			return nil, err

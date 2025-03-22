@@ -86,7 +86,7 @@ func (s *SyncDeviceSuite) SetupTest() {
 		EnableStoreConfirmationForMessagesSent: false,
 	}
 	var err error
-	s.pxBootNode, err = wakuv2.New(nil, "", exchangeNodeConfig, s.logger.Named("pxServerNode"), nil, nil, nil, nil)
+	s.pxBootNode, err = wakuv2.New(nil, exchangeNodeConfig, s.logger.Named("pxServerNode"), nil, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(s.pxBootNode.Start())
 

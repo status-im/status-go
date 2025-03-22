@@ -72,7 +72,6 @@ func (s *MessageSenderSuite) SetupTest() {
 	wakuConfig := wakuv2.DefaultConfig
 	shh, err := wakuv2.New(
 		nil,
-		"",
 		&wakuConfig,
 		s.logger,
 		database,

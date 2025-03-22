@@ -87,7 +87,6 @@ func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logge
 func newTestWakuNode(logger *zap.Logger) (wakutypes.Waku, error) {
 	return wakuv2.New(
 		nil,
-		"",
 		&wakuv2.DefaultConfig,
 		logger,
 		nil,

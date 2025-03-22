@@ -93,7 +93,6 @@ func (s *FiltersManagerSuite) SetupTest() {
 
 	waku, err := wakuv2.New(
 		nil,
-		"",
 		&wakuv2.DefaultConfig,
 		s.logger,
 		nil,

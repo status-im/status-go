@@ -50,7 +50,6 @@ func NewTestWakuV2(s *suite.Suite, cfg testWakuV2Config) *waku2.Waku {
 
 	wakuNode, err := waku2.New(
 		nodeKey,
-		"",
 		wakuConfig,
 		cfg.logger,
 		db,
