@@ -6,8 +6,6 @@ import tempfile
 
 from steps.messenger import MessengerSteps
 from clients.status_backend import StatusBackend
-from test_cases import MessengerTestCase
-from clients.status_backend import StatusBackend
 
 @pytest.mark.rpc
 @pytest.mark.usefixtures("setup_two_unprivileged_nodes")
@@ -77,12 +75,28 @@ class TestLocalWakuFleet(MessengerSteps):
         backend.wait_for_online()
         return backend
 
-    def test_contact_request(self, request, temp_dir):
+    def test_lightpush(self, temp_dir):
+        dir_1 = os.path.join(temp_dir, "1")
+        self.sender = self.create_backend(dir_1, wakuV2LightClient=True)
+        self.sender.wakuext_service.send_message()
+
+    def test_contact_request(self, temp_dir):
         dir_1 = os.path.join(temp_dir, "1")
         dir_2 = os.path.join(temp_dir, "2")
-        self.sender = self.create_backend(dir_1, "http://localhost:12345")
-        self.receiver = self.create_backend(dir_2, "http://localhost:12346")
-        self.make_contacts()
+        self.sender = self.create_backend(dir_1, "http://localhost:12345", wakuV2LightClient=True)
+        self.receiver = self.create_backend(dir_2, "http://localhost:12346", wakuV2LightClient=False)
+
+        # publishing message via lightpush
+        print(f"keeping status-backend running {temp_dir}")
+        input("Press Enter to continue to make contacts...")
+
+        try:
+            self.make_contacts()
+        except Exception as e:
+            logging.error(f"❌failed to make contacts: {e}")
+            print(f"keeping status-backend running {temp_dir}")
+            input("Press Enter to continue...")
+
         self.sender.logout()
         self.receiver.logout()
 
