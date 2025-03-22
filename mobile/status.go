@@ -1661,10 +1661,23 @@ func Fleets() string {
 	return callWithResponse(fleets)
 }
 
+// convertFleets transforms a FleetsMap into a nested map structure.
+// This is done to keep the old API response format.
+func convertFleets(fleetsMap params.FleetsMap) map[string]map[string][]string {
+	var oldFleetMap = make(map[string]map[string][]string)
+	for fleet, nodes := range fleetsMap {
+		oldFleetMap[fleet] = map[string][]string{
+			"WakuNodes":            nodes.WakuNodes,
+			"DiscV5BootstrapNodes": nodes.DiscV5BootstrapNodes,
+		}
+	}
+	return oldFleetMap
+}
+
 func fleets() string {
 	fleets := FleetDescription{
 		DefaultFleet: api.DefaultFleet,
-		Fleets:       params.GetSupportedFleets(),
+		Fleets:       convertFleets(params.GetSupportedFleets()),
 	}
 
 	data, err := json.Marshal(fleets)

@@ -10,28 +10,22 @@ const (
 	FleetWakuTest      = "waku.test"
 )
 
-// Cluster defines a list of Ethereum nodes.
-type Cluster struct {
-	StaticNodes []string `json:"staticnodes"`
-	BootNodes   []string `json:"bootnodes"`
-	MailServers []string `json:"mailservers"` // list of trusted mail servers
+type FleetInfo struct {
+	WakuNodes            []string                 `json:"wakuNodes"`
+	DiscV5BootstrapNodes []string                 `json:"discV5BootstrapNodes"`
+	ClusterID            uint16                   `json:"clusterID"`
+	StoreNodes           []mailservers.Mailserver `json:"storeNodes"`
 }
-
-type FleetName = string
-type NodeType = string
-
-const (
-	WakuNodes            NodeType = "WakuNodes"
-	DiscV5BootstrapNodes NodeType = "DiscV5BootstrapNodes"
-)
+type FleetsMap map[string]FleetInfo
 
 // DefaultWakuNodes is a list of "supported" fleets. This list is populated to clients UI settings.
-var supportedFleets = map[FleetName]map[NodeType][]string{
+var supportedFleets = FleetsMap{
 	FleetStatusStaging: {
-		WakuNodes: {
+		ClusterID: 16,
+		WakuNodes: []string{
 			"enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@boot.staging.status.nodes.status.im",
 		},
-		DiscV5BootstrapNodes: {
+		DiscV5BootstrapNodes: []string{
 			"enrtree://AI4W5N5IFEUIHF5LESUAOSMV6TKWF2MB6GU2YK7PU4TYUGUNOCEPW@boot.staging.status.nodes.status.im",
 			"enr:-QEQuEBuiQgFlJNcv255042zwyl4pOBOivakX8N30Dr9vaaEU2q8-7N4GVY4Hk87iEKELjlIXTpE9Wj6EQq1lrBuc7ayAYJpZIJ2NIJpcISPxvrpim11bHRpYWRkcnO4YAAtNihib290LTAxLmRvLWFtczMuc3RhdHVzLnN0YWdpbmcuc3RhdHVzLmltBnZfAC82KGJvb3QtMDEuZG8tYW1zMy5zdGF0dXMuc3RhZ2luZy5zdGF0dXMuaW0GAbveA4Jyc40AEAUAAQAgAEAAgAEAiXNlY3AyNTZrMaEDq-yGgpuoUG6NKkbIDRmrMiT-bEVzFlpWLEK_rF3yKUaDdGNwgnZfg3VkcIIjKIV3YWt1Mg0",
 			"enr:-QEiuED2UusuHo1d6WN2-tHjtj0T0gdnsOh7aRZnFF6OEYLDbyxOtQo2_4dFUHhc9xm5SHNrWJJq8X7FRsxc4VCMGjjbAYJpZIJ2NIJpcIRoxQVgim11bHRpYWRkcnO4cgA2NjFib290LTAxLmdjLXVzLWNlbnRyYWwxLWEuc3RhdHVzLnN0YWdpbmcuc3RhdHVzLmltBnZfADg2MWJvb3QtMDEuZ2MtdXMtY2VudHJhbDEtYS5zdGF0dXMuc3RhZ2luZy5zdGF0dXMuaW0GAbveA4Jyc40AEAUAAQAgAEAAgAEAiXNlY3AyNTZrMaEDNAvlGjekD1YV4WpmjwArGAH2g9kHFJnMRfgUhcIkoA2DdGNwgnZfg3VkcIIjKIV3YWt1Mg0",
@@ -39,10 +33,11 @@ var supportedFleets = map[FleetName]map[NodeType][]string{
 		},
 	},
 	FleetStatusProd: {
-		WakuNodes: {
+		ClusterID: 16,
+		WakuNodes: []string{
 			"enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im",
 		},
-		DiscV5BootstrapNodes: {
+		DiscV5BootstrapNodes: []string{
 			"enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im",
 			"enr:-QEKuED9AJm2HGgrRpVaJY2nj68ao_QiPeUT43sK-aRM7sMJ6R4G11OSDOwnvVacgN1sTw-K7soC5dzHDFZgZkHU0u-XAYJpZIJ2NIJpcISnYxMvim11bHRpYWRkcnO4WgAqNiVib290LTAxLmRvLWFtczMuc3RhdHVzLnByb2Quc3RhdHVzLmltBnZfACw2JWJvb3QtMDEuZG8tYW1zMy5zdGF0dXMucHJvZC5zdGF0dXMuaW0GAbveA4Jyc40AEAUAAQAgAEAAgAEAiXNlY3AyNTZrMaEC3rRtFQSgc24uWewzXaxTY8hDAHB8sgnxr9k8Rjb5GeSDdGNwgnZfg3VkcIIjKIV3YWt1Mg0",
 			"enr:-QEcuED7ww5vo2rKc1pyBp7fubBUH-8STHEZHo7InjVjLblEVyDGkjdTI9VdqmYQOn95vuQH-Htku17WSTzEufx-Wg4mAYJpZIJ2NIJpcIQihw1Xim11bHRpYWRkcnO4bAAzNi5ib290LTAxLmdjLXVzLWNlbnRyYWwxLWEuc3RhdHVzLnByb2Quc3RhdHVzLmltBnZfADU2LmJvb3QtMDEuZ2MtdXMtY2VudHJhbDEtYS5zdGF0dXMucHJvZC5zdGF0dXMuaW0GAbveA4Jyc40AEAUAAQAgAEAAgAEAiXNlY3AyNTZrMaECxjqgDQ0WyRSOilYU32DA5k_XNlDis3m1VdXkK9xM6kODdGNwgnZfg3VkcIIjKIV3YWt1Mg0",
@@ -50,30 +45,33 @@ var supportedFleets = map[FleetName]map[NodeType][]string{
 		},
 	},
 	FleetWakuSandbox: {
-		WakuNodes: {
+		WakuNodes: []string{
 			"enrtree://AIRVQ5DDA4FFWLRBCHJWUWOO6X6S4ZTZ5B667LQ6AJU6PEYDLRD5O@sandbox.waku.nodes.status.im",
 		},
-		DiscV5BootstrapNodes: {
+		DiscV5BootstrapNodes: []string{
 			"enrtree://AIRVQ5DDA4FFWLRBCHJWUWOO6X6S4ZTZ5B667LQ6AJU6PEYDLRD5O@sandbox.waku.nodes.status.im",
 		},
 	},
 	FleetWakuTest: {
-		WakuNodes: {
+		WakuNodes: []string{
 			"enrtree://AOGYWMBYOUIMOENHXCHILPKY3ZRFEULMFI4DOM442QSZ73TT2A7VI@test.waku.nodes.status.im",
 		},
-		DiscV5BootstrapNodes: {
+		DiscV5BootstrapNodes: []string{
 			"enrtree://AOGYWMBYOUIMOENHXCHILPKY3ZRFEULMFI4DOM442QSZ73TT2A7VI@test.waku.nodes.status.im",
 		},
 	},
 }
 
 func DefaultWakuNodes(fleet string) []string {
-	return supportedFleets[fleet][WakuNodes]
+	return supportedFleets[fleet].WakuNodes
 }
 
 func DefaultDiscV5Nodes(fleet string) []string {
-	return supportedFleets[fleet][DiscV5BootstrapNodes]
+	return supportedFleets[fleet].DiscV5BootstrapNodes
+}
 
+func DefaultClusterID(fleet string) uint16 {
+	return supportedFleets[fleet].ClusterID
 }
 
 func IsFleetSupported(fleet string) bool {
@@ -81,6 +79,6 @@ func IsFleetSupported(fleet string) bool {
 	return ok
 }
 
-func GetSupportedFleets() map[FleetName]map[NodeType][]string {
+func GetSupportedFleets() FleetsMap {
 	return supportedFleets
 }
