@@ -22,9 +22,6 @@ type Core struct {
 	encoder atomic.Value  // encoderWrapper
 	syncer  *atomic.Value // writeSyncerWrapper
 	level   zap.AtomicLevel
-
-	next       *Core
-	nextFields []zapcore.Field
 }
 
 var (
@@ -70,9 +67,6 @@ func (core *Core) With(fields []zapcore.Field) zapcore.Core {
 	clone := *core
 	clone.encoder.Store(clonedEncoder)
 
-	core.next = &clone
-	core.nextFields = fields
-
 	return &clone
 }
 
@@ -109,19 +103,4 @@ func (core *Core) Sync() error {
 func (core *Core) UpdateSyncer(newSyncer zapcore.WriteSyncer) {
 	oldSyncer := core.syncer.Swap(writeSyncerWrapper{WriteSyncer: newSyncer})
 	_ = oldSyncer.(zapcore.WriteSyncer).Sync() // may fail but doesn't impact syncer update
-}
-
-func (core *Core) UpdateEncoder(newEncoder zapcore.Encoder) {
-	core.encoder.Store(encoderWrapper{Encoder: newEncoder})
-
-	// Update next Cores with newEncoder
-	current := core
-	for current.next != nil {
-		clonedEncoder := encoderWrapper{Encoder: core.getEncoder().Clone()}
-		for i := range core.nextFields {
-			current.nextFields[i].AddTo(clonedEncoder)
-		}
-		current.next.encoder.Store(clonedEncoder)
-		current = current.next
-	}
 }

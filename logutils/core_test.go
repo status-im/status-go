@@ -2,7 +2,6 @@ package logutils
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -30,35 +29,25 @@ func TestCore(t *testing.T) {
 	childWithMoreContext := childWithContext.With(zap.String("key2", "value2"))
 	grandChild := childWithMoreContext.Named("grandChild")
 
-	parent.Debug("Status")
-	child.Debug("Super")
-	childWithContext.Debug("App")
-	childWithMoreContext.Debug("The")
-	grandChild.Debug("Best")
-
-	core.UpdateSyncer(zapcore.AddSync(buffer2))
-	core.UpdateEncoder(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()))
-
-	parent.Debug("Status")
-	child.Debug("Super")
-	childWithContext.Debug("App")
-	childWithMoreContext.Debug("The")
-	grandChild.Debug("Best")
-
-	fmt.Println(buffer1.String())
-	fmt.Println(buffer2.String())
+	print := func() {
+		parent.Debug("Status")
+		child.Debug("Super")
+		childWithContext.Debug("App")
+		childWithMoreContext.Debug("The")
+		grandChild.Debug("Best")
+	}
 
 	// Ensure that the first buffer has the console encoder output
+	print()
 	buffer1Lines := strings.Split(buffer1.String(), "\n")
 	require.Len(t, buffer1Lines, 5+1)
 	require.Regexp(t, `\s+child\s+`, buffer1Lines[1])
 	require.Regexp(t, `\s+child\.grandChild\s+`, buffer1Lines[4])
 
-	// Ensure that the second buffer has the JSON encoder output
-	buffer2Lines := strings.Split(buffer2.String(), "\n")
-	require.Len(t, buffer2Lines, 5+1)
-	require.Regexp(t, `"logger"\s*:\s*"child"`, buffer2Lines[1])
-	require.Regexp(t, `"logger"\s*:\s*"child\.grandChild"`, buffer2Lines[4])
+	// Ensure syncer was updated
+	core.UpdateSyncer(zapcore.AddSync(buffer2))
+	print()
+	require.Equal(t, buffer1, buffer2)
 }
 
 func benchmarkCore(b *testing.B, core zapcore.Core) {
