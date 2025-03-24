@@ -37,7 +37,7 @@ func TestRemoveSensitiveInfo(t *testing.T) {
 		{
 			name:     "password field with spaces",
 			input:    `{"username":"user1", "password" : "secret123"}`,
-			expected: fmt.Sprintf(`{"username":"user1", "password":"%s"}`, redactionPlaceholder),
+			expected: fmt.Sprintf(`{"username":"user1", "password" : "%s"}`, redactionPlaceholder),
 		},
 		{
 			name:     "multiple password fields",
@@ -53,6 +53,11 @@ func TestRemoveSensitiveInfo(t *testing.T) {
 			name:     "should not match password substring in field names",
 			input:    `{"eventValue":{"flowType":"UserProfileCreatePassword","viewId":"UserProfileCreatePassword"}}`,
 			expected: `{"eventValue":{"flowType":"UserProfileCreatePassword","viewId":"UserProfileCreatePassword"}}`,
+		},
+		{
+			name:     "JSON array with escaped JSON string containing mnemonic",
+			input:    `["{\"mnemonic\":\"a b c d\"}"]`,
+			expected: fmt.Sprintf(`["{\"mnemonic\":\"%s\"}"]`, redactionPlaceholder),
 		},
 	}
 

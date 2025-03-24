@@ -43,7 +43,7 @@ var sensitiveKeys = []string{
 	"gifs/api-key",
 }
 
-var sensitiveRegexString = fmt.Sprintf(`(?i)("\w*?(%s)\w*?")\s*:\s*(".*?")`, strings.Join(sensitiveKeys, "|"))
+var sensitiveRegexString = fmt.Sprintf(`(?i)(\\?"(?:\w*?%s\w*?)\\?"\s*:\s*\\?").*?(\\?")`, strings.Join(sensitiveKeys, "|"))
 
 var sensitiveRegex = regexp.MustCompile(sensitiveRegexString)
 
@@ -115,7 +115,7 @@ func removeSensitiveInfo(jsonStr string) string {
 	// see related test for the usage of this function
 	return sensitiveRegex.ReplaceAllStringFunc(jsonStr, func(match string) string {
 		parts := sensitiveRegex.FindStringSubmatch(match)
-		return fmt.Sprintf(`%s:"%s"`, parts[1], redactionPlaceholder)
+		return fmt.Sprintf(`%s%s%s`, parts[1], redactionPlaceholder, parts[2])
 	})
 }
 
