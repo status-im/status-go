@@ -2510,6 +2510,10 @@ func (m *Messenger) DefaultFilters(o *communities.Community) []transport.Filters
 		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: uncompressedPubKey, PubsubTopic: wakuv2.DefaultNonProtectedPubsubTopic()},
+		// TODO only filter if interested in communities
+		{ChatID: uncompressedPubKey, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()},
+		// TODO only filter if interested in communities
+		{ChatID: uncompressedPubKey, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()},
 	}
 
 	return filters

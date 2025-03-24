@@ -28,6 +28,18 @@ func (m *Messenger) InitFilters() error {
 		return err
 	}
 
+	// TODO only subscribe if interested in communities
+	// TODO will need to start sending the communities' control messages to this pubsub topic
+	if err := m.SubscribeToPubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic(), nil); err != nil {
+		return err
+	}
+
+	// TODO only subscribe if interested in communities
+	// TODO will need to start sending the communities' content messages to this pubsub topic
+	if err := m.SubscribeToPubsubTopic(wakuv2.GlobalCommunityContentPubsubTopic(), nil); err != nil {
+		return err
+	}
+
 	filters, publicKeys, err := m.collectFiltersAndKeys()
 	if err != nil {
 		return err

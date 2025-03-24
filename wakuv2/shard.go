@@ -57,3 +57,17 @@ func DefaultNonProtectedShard() *Shard {
 func DefaultNonProtectedPubsubTopic() string {
 	return DefaultNonProtectedShard().PubsubTopic()
 }
+
+// GlobalCommunityControlPubsubTopic returns the pubsub topic for the global community control
+//
+// Specs: https://github.com/vacp2p/rfc-index/blob/8ee2a6d6b232838d83374c35e2413f84436ecf64/status/56/communities.md?plain=1#L329
+func GlobalCommunityControlPubsubTopic() string {
+	return wakuproto.NewStaticShardingPubsubTopic(MainStatusShardCluster, 128).String()
+}
+
+// GlobalCommunityContentPubsubTopic returns the pubsub topic for the global community content
+//
+// Specs: https://github.com/vacp2p/rfc-index/blob/8ee2a6d6b232838d83374c35e2413f84436ecf64/status/56/communities.md?plain=1#L330
+func GlobalCommunityContentPubsubTopic() string {
+	return wakuproto.NewStaticShardingPubsubTopic(MainStatusShardCluster, 256).String()
+}
