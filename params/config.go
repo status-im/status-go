@@ -851,6 +851,7 @@ func NewConfigFromJSON(configJSON string) (*NodeConfig, error) {
 	return config, nil
 }
 
+// Deprecated: `fleet-*.json` files are deprecated. Use params.GetSupportedFleets instead.
 func LoadClusterConfigFromFleet(fleet string) (*ClusterConfig, error) {
 	nodeConfig := &NodeConfig{}
 	err := loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet), nodeConfig)

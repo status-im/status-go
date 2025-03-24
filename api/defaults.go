@@ -149,12 +149,7 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		Nameserver:                             specifiedWakuV2Config.Nameserver,
 	}
 
-	nodeConfig.ClusterConfig.Enabled = true
-	nodeConfig.ClusterConfig.Fleet = fleet
-	nodeConfig.ClusterConfig.WakuNodes = params.DefaultWakuNodes(fleet)
-	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = params.DefaultDiscV5Nodes(fleet)
-	nodeConfig.ClusterConfig.ClusterID = params.DefaultClusterID(fleet)
-	nodeConfig.ClusterConfig.PushNotificationsServers = params.DefaultPushNotificationServers()
+	nodeConfig.ClusterConfig = params.DefaultClusterConfig(fleet)
 
 	return nil
 }

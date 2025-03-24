@@ -1701,15 +1701,8 @@ func switchFleet(fleet string, configJSON string) string {
 		}
 	}
 
-	clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
 	conf.ClusterConfig.Fleet = fleet
-	conf.ClusterConfig.ClusterID = clusterConfig.ClusterID
-
-	err = statusBackend.SwitchFleet(fleet, &conf)
+	err := statusBackend.SwitchFleet(fleet, &conf)
 
 	return makeJSONResponse(err)
 }
