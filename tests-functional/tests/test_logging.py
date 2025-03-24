@@ -44,13 +44,25 @@ class TestLogging:
         geth_log = backend_client.extract_data(os.path.join(USER_DIR, "geth.log"))
         self.expect_logs(geth_log, "test message", log_pattern, count=1)
 
+        # Disable logging
+        backend_client.api_valid_request("SetLogEnabled", {"enabled": False})
+        backend_client.rpc_valid_request("wakuext_logTest")
+        geth_log = backend_client.extract_data(os.path.join(USER_DIR, "geth.log"))
+        self.expect_logs(geth_log, "test message", log_pattern, count=1)
+
+        # Enable logging
+        backend_client.api_valid_request("SetLogEnabled", {"enabled": True})
+        backend_client.rpc_valid_request("wakuext_logTest")
+        geth_log = backend_client.extract_data(os.path.join(USER_DIR, "geth.log"))
+        self.expect_logs(geth_log, "test message", log_pattern, count=2)
+
         # Ensure changes are persisted after re-login
         backend_client.logout()
         backend_client.login(str(backend_client.find_key_uid()))
         backend_client.wait_for_login()
         backend_client.rpc_valid_request("wakuext_logTest")
         geth_log = backend_client.extract_data(os.path.join(USER_DIR, "geth.log"))
-        self.expect_logs(geth_log, "test message", log_pattern, count=2)
+        self.expect_logs(geth_log, "test message", log_pattern, count=3)
 
     def expect_logs(self, log_file, filter_keyword, expected_logs, count):
         with open(log_file, "r") as f:
