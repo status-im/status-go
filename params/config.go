@@ -183,6 +183,7 @@ type ClusterConfig struct {
 	TrustedMailServers []string
 
 	// PushNotificationsServers is a list of default push notification servers.
+	// Deprecated: Use ShhextConfig.DefaultPushNotificationsServers instead
 	PushNotificationsServers []string
 
 	// WakuNodes is a list of waku2 multiaddresses
@@ -687,37 +688,33 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 }
 
 func (c *NodeConfig) setDefaultPushNotificationsServers() error {
-	if c.ClusterConfig.Fleet == FleetUndefined {
+	if len(c.ShhextConfig.DefaultPushNotificationsServers) > 0 {
 		return nil
 	}
 
-	// If empty load defaults from the fleet
-	if len(c.ClusterConfig.PushNotificationsServers) == 0 {
-		logutils.ZapLogger().Debug("empty push notification servers, setting", zap.String("fleet", c.ClusterConfig.Fleet))
-		defaultConfig := &NodeConfig{}
-		err := loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", c.ClusterConfig.Fleet), defaultConfig)
+	servers := DefaultPushNotificationServers()
+
+	// If empty set the default servers
+	logutils.ZapLogger().Debug("setting default push notification servers",
+		zap.Strings("servers", servers))
+
+	for _, pk := range servers {
+		keyBytes, err := hex.DecodeString("04" + pk)
 		if err != nil {
 			return err
 		}
-		c.ClusterConfig.PushNotificationsServers = defaultConfig.ClusterConfig.PushNotificationsServers
-	}
 
-	// If empty set the default servers
-	if len(c.ShhextConfig.DefaultPushNotificationsServers) == 0 {
-		logutils.ZapLogger().Debug("setting default push notification servers", zap.Strings("cluster servers", c.ClusterConfig.PushNotificationsServers))
-		for _, pk := range c.ClusterConfig.PushNotificationsServers {
-			keyBytes, err := hex.DecodeString("04" + pk)
-			if err != nil {
-				return err
-			}
-
-			key, err := crypto.UnmarshalPubkey(keyBytes)
-			if err != nil {
-				return err
-			}
-			c.ShhextConfig.DefaultPushNotificationsServers = append(c.ShhextConfig.DefaultPushNotificationsServers, &PushNotificationServer{PublicKey: key})
+		key, err := crypto.UnmarshalPubkey(keyBytes)
+		if err != nil {
+			return err
 		}
+
+		c.ShhextConfig.DefaultPushNotificationsServers = append(
+			c.ShhextConfig.DefaultPushNotificationsServers,
+			&PushNotificationServer{PublicKey: key},
+		)
 	}
+
 	return nil
 }
 

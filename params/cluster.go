@@ -182,6 +182,12 @@ var supportedFleets = FleetsMap{
 	},
 }
 
+var defaultPushNotificationServers = []string{
+	"401ba5eda402678dc78a0a40fd0795f4ea8b1e34972c4d15cf33ac01292341c89f0cbc637fa9f7a3ffe0b9dfe90e9cdae7a14925500ab01b6a91c67bae42a97a",
+	"181141b1d111908aaf05f4788e6778ec07073a1d4e1ce43c73815c40ee4e7345a1cbf5a90a45f601bf3763f12be63b01624ba1f36eeb9572455e7034b8f9f2c4",
+	"5ffc34d5ffda180d94cd3974d9ed2bb082ede68f342babdbe801ceffb7da902087d43f9aa961c7b85029358874c08ef04ecad9f1d95a1f0e448cbdd5d04350c7",
+}
+
 func DefaultWakuNodes(fleet string) []string {
 	return supportedFleets[fleet].WakuNodes
 }
@@ -205,4 +211,8 @@ func GetSupportedFleets() FleetsMap {
 
 func DefaultStoreNodes(fleet string) []mailservers.Mailserver {
 	return supportedFleets[fleet].StoreNodes
+}
+
+func DefaultPushNotificationServers() []string {
+	return defaultPushNotificationServers
 }
