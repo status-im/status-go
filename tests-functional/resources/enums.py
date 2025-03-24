@@ -21,3 +21,13 @@ class MessageContentType(Enum):
     SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED = 16
     SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED = 17
     BRIDGE_MESSAGE = 18
+
+
+class ChatType(Enum):
+    UNKNOWN_TYPE = 0
+    ONE_TO_ONE = 1
+    PUBLIC = 2
+    PRIVATE_GROUP_CHAT = 3
+    PROFILE = 4  # Deprecated
+    TIMELINE = 5  # Deprecated
+    COMMUNITY_CHAT = 6
