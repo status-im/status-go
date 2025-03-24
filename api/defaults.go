@@ -25,7 +25,6 @@ const (
 	pathEncryption           = pathEIP1581 + "/1'/0"
 	pathDefaultWallet        = pathWalletRoot + "/0"
 	defaultMnemonicLength    = 12
-	shardsTestClusterID      = 16
 	walletAccountDefaultName = "Account 1"
 
 	DefaultKeystoreRelativePath   = "keystore"
@@ -135,10 +134,6 @@ func defaultSettings(keyUID string, address string, derivedAddresses map[string]
 	return s, nil
 }
 
-func SetDefaultFleet(nodeConfig *params.NodeConfig) error {
-	return SetFleet(DefaultFleet, nodeConfig)
-}
-
 func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	specifiedWakuV2Config := nodeConfig.WakuV2Config
 	nodeConfig.WakuV2Config = params.WakuV2Config{
@@ -154,18 +149,12 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 		Nameserver:                             specifiedWakuV2Config.Nameserver,
 	}
 
-	clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
-	if err != nil {
-		return err
-	}
-	nodeConfig.ClusterConfig = *clusterConfig
+	nodeConfig.ClusterConfig.Enabled = true
 	nodeConfig.ClusterConfig.Fleet = fleet
 	nodeConfig.ClusterConfig.WakuNodes = params.DefaultWakuNodes(fleet)
 	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = params.DefaultDiscV5Nodes(fleet)
-
-	if fleet == params.FleetStatusProd {
-		nodeConfig.ClusterConfig.ClusterID = shardsTestClusterID
-	}
+	nodeConfig.ClusterConfig.ClusterID = params.DefaultClusterID(fleet)
+	nodeConfig.ClusterConfig.PushNotificationsServers = params.DefaultPushNotificationServers()
 
 	return nil
 }
