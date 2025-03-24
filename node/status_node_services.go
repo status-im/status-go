@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,6 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
+	bindings "github.com/waku-org/waku-go-bindings/waku/common"
 
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/common"
@@ -271,6 +274,15 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig) (*wakuv2.Waku,
 					return nil, fmt.Errorf("could not convert nodekey into a valid private key: %v", err)
 				}
 			}
+		}
+
+		cfg.NwakuConfig = &bindings.WakuConfig{
+			Nodekey:   hex.EncodeToString(crypto.FromECDSA(nodeKey)),
+			Host:      nodeConfig.WakuV2Config.Host,
+			TcpPort:   nodeConfig.WakuV2Config.Port,
+			LogLevel:  "DEBUG", // TODO-nwaku ?
+			ClusterID: nodeConfig.ClusterConfig.ClusterID,
+			Shards:    []uint16{wakuv2.DefaultShardIndex, wakuv2.NonProtectedShardIndex},
 		}
 
 		w, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger(), b.appDB, b.timeSource(), signal.SendHistoricMessagesRequestFailed, signal.SendPeerStats)
