@@ -100,6 +100,7 @@ type WakuV2Config struct {
 	EnableConfirmations bool
 
 	// A name->libp2p_addr map for Wakuv2 custom nodes
+	// Deprecated: simply unused
 	CustomNodes map[string]string
 
 	// PeerExchange determines whether WakuV2 Peer Exchange is enabled or not
@@ -170,13 +171,15 @@ type ClusterConfig struct {
 	Fleet string
 
 	// StaticNodes is a list of static nodes.
+	// Deprecated: Not used in Waku V2
 	StaticNodes []string
 
 	// BootNodes is a list of bootnodes.
-	// Deprecated: won't be used at all in wakuv2
+	// Deprecated: Not used in Waku V2
 	BootNodes []string
 
 	// TrustedMailServers is a list of verified and trusted Mail Server nodes.
+	// Deprecated: Not used in Waku V2
 	TrustedMailServers []string
 
 	// PushNotificationsServers is a list of default push notification servers.
@@ -240,7 +243,7 @@ type NodeConfig struct {
 	NodeKey string
 
 	// NoDiscovery set to true will disable discovery protocol.
-	// Deprecated: won't be used at all in wakuv2
+	// Deprecated: won't be used at all in wakuv2 and is always `true`.
 	NoDiscovery bool
 
 	// ListenAddr is an IP address and port of this node (e.g. 127.0.0.1:30303).

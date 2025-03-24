@@ -122,6 +122,7 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		nc.WSOrigins = []string{"*"}
 	}
 
+	// FIXME: config.ClusterConfig.Enabled is always true?
 	if config.ClusterConfig.Enabled {
 		nc.P2P.BootstrapNodesV5 = parseNodesV5(config.ClusterConfig.BootNodes)
 		nc.P2P.StaticNodes = parseNodes(config.ClusterConfig.StaticNodes)

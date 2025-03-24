@@ -349,6 +349,8 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	return
 }
 
+// Deprecated: in WakuV2 discoveryEnabled always returns false,
+// because n.config.NoDiscovery is always true.
 func (n *StatusNode) discoveryEnabled() bool {
 	return n.config != nil && (!n.config.NoDiscovery) && n.config.ClusterConfig.Enabled
 }
