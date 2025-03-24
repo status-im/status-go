@@ -12,12 +12,14 @@ import (
 	"unsafe"
 
 	"go.uber.org/zap"
-	validator "gopkg.in/go-playground/validator.v9"
+	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/zxcvbn-go"
 	"github.com/status-im/zxcvbn-go/scoring"
+
+	"github.com/status-im/status-go/extkeys"
 
 	abi_spec "github.com/status-im/status-go/abi-spec"
 	"github.com/status-im/status-go/account"
@@ -29,7 +31,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
-	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/logutils/callog"
@@ -131,6 +132,13 @@ func initializeApplication(requestJSON string) string {
 	statusBackend.SetSentryDSN(request.SentryDSN)
 	if metricsInfo.Enabled {
 		err = statusBackend.EnablePanicReporting()
+		if err != nil {
+			return makeJSONResponse(err)
+		}
+	}
+
+	if request.WakuFleetsConfigFilePath != "" {
+		err = params.LoadFleetsFromFile(request.WakuFleetsConfigFilePath)
 		if err != nil {
 			return makeJSONResponse(err)
 		}

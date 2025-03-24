@@ -26,6 +26,11 @@ type InitializeApplication struct {
 
 	MetricsEnabled bool   `json:"metricsEnabled"`
 	MetricsAddress string `json:"metricsAddress"`
+
+	// WakuFleetsConfigFilePath specifies the file path for configuring fleets supported by the app.
+	// File structure must be as params.FleetsMap.
+	// When successfully loaded, overrides all hard-coded fleets with file contents.
+	WakuFleetsConfigFilePath string `json:"wakuFleetsConfigFilePath"`
 }
 
 func (i *InitializeApplication) Validate() error {

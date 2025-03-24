@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	validator "gopkg.in/go-playground/validator.v9"
+	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
