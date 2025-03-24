@@ -6,6 +6,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	ensservice "github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/waku/types"
 
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
@@ -23,7 +24,6 @@ import (
 	"github.com/status-im/status-go/protocol/storenodes"
 	"github.com/status-im/status-go/protocol/verification"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
-	"github.com/status-im/status-go/services/mailservers"
 )
 
 type RemovedMessage struct {
@@ -49,7 +49,7 @@ type MessengerResponse struct {
 	Invitations                   []*GroupChatInvitation
 	CommunityChanges              []*communities.CommunityChanges
 	AnonymousMetrics              []*appmetrics.AppMetric
-	Mailservers                   []mailservers.Mailserver
+	Mailservers                   []types.Mailserver
 	CommunityStorenodes           []storenodes.Storenode
 	Bookmarks                     []*browsers.Bookmark
 	Settings                      []*settings.SyncSettingField
@@ -109,7 +109,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Invitations             []*GroupChatInvitation              `json:"invitations,omitempty"`
 		CommunityChanges        []*communities.CommunityChanges     `json:"communityChanges,omitempty"`
 		RequestsToJoinCommunity []*communities.RequestToJoin        `json:"requestsToJoinCommunity,omitempty"`
-		Mailservers             []mailservers.Mailserver            `json:"mailservers,omitempty"`
+		Mailservers             []types.Mailserver                  `json:"mailservers,omitempty"`
 		CommunityStorenodes     []storenodes.Storenode              `json:"communityStorenodes,omitempty"`
 		Bookmarks               []*browsers.Bookmark                `json:"bookmarks,omitempty"`
 		ClearedHistories        []*ClearedHistory                   `json:"clearedHistories,omitempty"`

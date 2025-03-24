@@ -8,9 +8,10 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/waku/types"
 )
 
-func (m *Messenger) AllMailservers() ([]mailservers.Mailserver, error) {
+func (m *Messenger) AllMailservers() ([]types.Mailserver, error) {
 	// Get configured fleet
 	fleet, err := m.getFleet()
 	if err != nil {
@@ -149,7 +150,7 @@ func (m *Messenger) checkForStorenodeCycleSignals() {
 		return
 	}
 
-	mailserverMap := make(map[peer.ID]mailservers.Mailserver)
+	mailserverMap := make(map[peer.ID]types.Mailserver)
 	for _, ms := range allMailservers {
 		peerID, err := ms.PeerID()
 		if err != nil {

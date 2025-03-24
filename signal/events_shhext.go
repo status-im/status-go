@@ -8,9 +8,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/services/mailservers"
 
+	"github.com/status-im/status-go/eth-node/types"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
@@ -222,7 +221,7 @@ func SendNewMessages(obj json.Marshaler) {
 	send(EventNewMessages, obj)
 }
 
-func sendMailserverSignal(ms *mailservers.Mailserver, event string) {
+func sendMailserverSignal(ms *wakutypes.Mailserver, event string) {
 	msSignal := MailserverSignal{}
 	if ms != nil {
 		msSignal.Address = ms.Addr
@@ -231,11 +230,11 @@ func sendMailserverSignal(ms *mailservers.Mailserver, event string) {
 	send(event, msSignal)
 }
 
-func SendMailserverAvailable(ms *mailservers.Mailserver) {
+func SendMailserverAvailable(ms *wakutypes.Mailserver) {
 	sendMailserverSignal(ms, EventMailserverAvailable)
 }
 
-func SendMailserverChanged(ms *mailservers.Mailserver) {
+func SendMailserverChanged(ms *wakutypes.Mailserver) {
 	sendMailserverSignal(ms, EventMailserverChanged)
 }
 

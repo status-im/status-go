@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -123,7 +124,7 @@ func (s *MessengerStoreNodeCommunitySuite) newMessenger(name string, storenodeAd
 	s.Require().NoError(err)
 
 	mailserversDatabase := mailserversDB.NewDB(mailserversSQLDb)
-	err = mailserversDatabase.Add(mailserversDB.Mailserver{
+	err = mailserversDatabase.Add(wakutypes.Mailserver{
 		ID:    localMailserverID,
 		Name:  localMailserverID,
 		Addr:  storenodeAddress,

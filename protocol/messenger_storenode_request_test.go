@@ -1070,7 +1070,7 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 	// We run a separate request for each node in the fleet.
 	for i, mailserver := range nodesList {
 		wg.Add(1)
-		go func(i int, mailserver mailserversDB.Mailserver) {
+		go func(i int, mailserver wakutypes.Mailserver) {
 			defer wg.Done()
 
 			fmt.Printf("--- starting request [%d] from %s\n", i, mailserver.ID)

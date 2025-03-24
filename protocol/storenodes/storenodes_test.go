@@ -6,7 +6,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/waku/types"
 )
 
 func TestSerialization(t *testing.T) {
@@ -74,7 +74,7 @@ func TestUpdateStorenodesInDB(t *testing.T) {
 	matchStoreNode(t, snodes2[0], ms2)
 }
 
-func matchStoreNode(t *testing.T, sn Storenode, ms mailservers.Mailserver) {
+func matchStoreNode(t *testing.T, sn Storenode, ms types.Mailserver) {
 	require.Equal(t, sn.StorenodeID, ms.ID)
 	require.Equal(t, sn.Name, ms.Name)
 	require.Equal(t, sn.Address.String(), (*ms.Addr).String())

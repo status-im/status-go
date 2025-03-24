@@ -26,10 +26,10 @@ func TestAddGetDeleteMailserver(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
 	api := &API{db: db}
-	testMailserver := Mailserver{
+	testMailserver := wakutypes.Mailserver{
 		ID:     "mailserver001",
 		Name:   "My Mailserver",
-		Addr:   MustDecodeMultiaddress("/dns4/node-01.do-ams3.waku.test.status.im/tcp/30303/p2p/16Uiu2HAkykgaECHswi3YKJ5dMLbq2kPVCo89fcyTd38UcQD6ej5W"),
+		Addr:   wakutypes.MustDecodeMultiaddress("/dns4/node-01.do-ams3.waku.test.status.im/tcp/30303/p2p/16Uiu2HAkykgaECHswi3YKJ5dMLbq2kPVCo89fcyTd38UcQD6ej5W"),
 		Custom: true,
 		Fleet:  "prod",
 	}
@@ -44,14 +44,14 @@ func TestAddGetDeleteMailserver(t *testing.T) {
 
 	mailservers, err := api.GetMailservers(context.Background())
 	require.NoError(t, err)
-	require.EqualValues(t, []Mailserver{testMailserver, testMailserverWithPassword}, mailservers)
+	require.EqualValues(t, []wakutypes.Mailserver{testMailserver, testMailserverWithPassword}, mailservers)
 
 	err = api.DeleteMailserver(context.Background(), testMailserver.ID)
 	require.NoError(t, err)
 	// Verify they was deleted.
 	mailservers, err = api.GetMailservers(context.Background())
 	require.NoError(t, err)
-	require.EqualValues(t, []Mailserver{testMailserverWithPassword}, mailservers)
+	require.EqualValues(t, []wakutypes.Mailserver{testMailserverWithPassword}, mailservers)
 	// Delete non-existing mailserver.
 	err = api.DeleteMailserver(context.Background(), "other-id")
 	require.NoError(t, err)

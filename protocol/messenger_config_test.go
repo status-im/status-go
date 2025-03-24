@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/waku/types"
 )
 
 func WithTestStoreNode(s *suite.Suite, id string, address multiaddr.Multiaddr, fleet string, collectiblesServiceMock *CollectiblesServiceMock) Option {
@@ -17,7 +18,7 @@ func WithTestStoreNode(s *suite.Suite, id string, address multiaddr.Multiaddr, f
 		s.Require().NoError(err)
 
 		db := mailservers.NewDB(sqldb)
-		err = db.Add(mailservers.Mailserver{
+		err = db.Add(types.Mailserver{
 			ID:    id,
 			Name:  id,
 			Addr:  &address,
