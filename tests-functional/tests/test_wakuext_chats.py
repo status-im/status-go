@@ -18,3 +18,14 @@ class TestChatActions(MessengerSteps):
         assert len(chats) == 1
         assert chats[0].get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chats[0].get("lastMessage", {}).get("text", "") == sent_texts[0]
+
+    def test_chat(self):
+        sent_texts, _ = self.send_multiple_one_to_one_messages(1)
+        chat_id = self.receiver.public_key
+
+        response = self.sender.wakuext_service.chat(chat_id)
+        self.sender.verify_json_schema(response, method="wakuext_chat")
+
+        chat = response.get("result", {})
+        assert chat.get("chatType", 0) == ChatType.ONE_TO_ONE.value
+        assert chat.get("lastMessage", {}).get("text", "") == sent_texts[0]

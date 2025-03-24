@@ -269,3 +269,8 @@ class WakuextService(Service):
         params = []
         response = self.rpc_request("chats", params)
         return response.json()
+
+    def chat(self, chat_id: str):
+        params = [chat_id]
+        response = self.rpc_request("chat", params)
+        return response.json()
