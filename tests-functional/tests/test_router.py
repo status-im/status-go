@@ -12,7 +12,6 @@ from utils import wallet_utils
 @pytest.mark.rpc
 @pytest.mark.transaction
 @pytest.mark.wallet
-@pytest.mark.xdist_group(name="TestRouter")
 class TestRouter(StatusBackendSteps):
     await_signals = [
         SignalType.NODE_LOGIN.value,

@@ -57,7 +57,7 @@ pip install -r "${root_path}/requirements.txt"
 pytest -m contracts --docker_project_name=${project_name} 
 
 # Run functional tests
-pytest --reruns 2 -m rpc -n 12 --docker_project_name=${project_name} --codecov_dir=${binary_coverage_reports_path} --junitxml=${test_results_path}/report.xml
+pytest --reruns 2 -m rpc -n auto --docker_project_name=${project_name} --codecov_dir=${binary_coverage_reports_path} --junitxml=${test_results_path}/report.xml
 exit_code=$?
 
 # Stop containers
