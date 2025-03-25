@@ -6,6 +6,7 @@ from steps.status_backend import StatusBackendSteps
 
 @pytest.mark.rpc
 @pytest.mark.wallet
+@pytest.mark.xdist_group(name="group1")
 class TestSavedAddresses(StatusBackendSteps):
 
     @pytest.mark.parametrize(
