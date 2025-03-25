@@ -113,7 +113,7 @@ class SmartContractRunner:
         with tarfile.open(fileobj=tar_bytes) as tar:
             tar.extractall(path=output_dir)
             # If the tar contains a single file, return the path to that file
-            # Otherwise it's a directory, just return repo_dir.
+            # Otherwise it's a directory, just return output_dir.
             if len(tar.getmembers()) == 1:
                 return os.path.join(output_dir, tar.getmembers()[0].name)
 
