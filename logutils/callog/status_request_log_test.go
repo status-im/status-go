@@ -245,3 +245,54 @@ func TestSignal(t *testing.T) {
 	require.NotNil(t, resultDataMap)
 	require.Equal(t, redactionPlaceholder, resultDataMap["password"])
 }
+
+func TestLogRPCCall(t *testing.T) {
+	tempLogFile, err := os.CreateTemp(t.TempDir(), "TestCall*.log")
+	require.NoError(t, err)
+	requestLogger, err := requestlog.CreateRequestLogger(tempLogFile.Name())
+	require.NoError(t, err)
+	require.NotNil(t, requestLogger)
+
+	testCases := []struct {
+		name           string
+		method         string
+		params         string
+		fn             func() string
+		expectedLogged bool
+		expectedResult string
+	}{
+		{
+			name:           "sensitive method",
+			method:         "accounts_importMnemonic",
+			params:         `{"mnemonic":"mnemonic123 xyz"}`,
+			fn:             func() string { return "test result1" },
+			expectedLogged: false,
+			expectedResult: "test result1",
+		},
+		{
+			name:           "non-sensitive method",
+			method:         "eth_blockNumber",
+			params:         `{"address":"0x1234567890123456789012345678901234567890"}`,
+			fn:             func() string { return "test result2" },
+			expectedLogged: true,
+			expectedResult: "test result2",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := logRPCCall(requestLogger, tc.params, tc.method, tc.fn)
+			logData, err := os.ReadFile(tempLogFile.Name())
+			require.NoError(t, err)
+			requestLogOutput := string(logData)
+			require.Equal(t, tc.expectedResult, result)
+			if tc.expectedLogged {
+				require.Contains(t, requestLogOutput, tc.method)
+				require.Contains(t, requestLogOutput, tc.params)
+				require.Contains(t, requestLogOutput, tc.expectedResult)
+			} else {
+				require.Empty(t, requestLogOutput)
+			}
+		})
+	}
+}

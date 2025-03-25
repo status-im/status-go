@@ -12,6 +12,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/sentry"
+	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/logutils/requestlog"
 )
 
 const redactionPlaceholder = "***"
@@ -47,6 +49,10 @@ var sensitiveRegexString = fmt.Sprintf(`(?i)(\\?"(?:\w*?%s\w*?)\\?"\s*:\s*\\?").
 
 var sensitiveRegex = regexp.MustCompile(sensitiveRegexString)
 
+var sensitiveMethod = map[string]bool{
+	"accounts_importMnemonic": true,
+}
+
 func getFunctionName(fn any) string {
 	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
 }
@@ -75,7 +81,7 @@ func getShortFunctionName(fn any) string {
 func Call(logger, requestLogger *zap.Logger, fn any, params ...any) any {
 	defer Recover(logger)
 
-	startTime := requestStartTime(requestLogger != nil)
+	startTime := RequestStartTime(requestLogger != nil)
 	fnValue := reflect.ValueOf(fn)
 	fnType := fnValue.Type()
 	if fnType.Kind() != reflect.Func {
@@ -119,7 +125,7 @@ func removeSensitiveInfo(jsonStr string) string {
 	})
 }
 
-func requestStartTime(enabled bool) time.Time {
+func RequestStartTime(enabled bool) time.Time {
 	if !enabled {
 		return time.Time{}
 	}
@@ -141,8 +147,18 @@ func Recover(logger *zap.Logger) {
 	panic(err)
 }
 
+func isSensitiveMethod(method string) bool {
+	if _, ok := sensitiveMethod[method]; ok {
+		return true
+	}
+	return false
+}
+
 func LogCall(logger *zap.Logger, method string, params any, resp any, startTime time.Time) {
 	if logger == nil {
+		return
+	}
+	if isSensitiveMethod(method) {
 		return
 	}
 	duration := time.Since(startTime)
@@ -162,6 +178,18 @@ func LogSignal(logger *zap.Logger, eventType string, event interface{}) {
 		zap.String("type", eventType),
 		dataField("event", event),
 	)
+}
+
+func LogRPCCall(params, method string, fn func() string) string {
+	defer Recover(logutils.ZapLogger())
+	return logRPCCall(requestlog.GetRequestLogger(), params, method, fn)
+}
+
+func logRPCCall(requestLogger *zap.Logger, params, method string, fn func() string) string {
+	startTime := RequestStartTime(requestLogger != nil)
+	resp := fn()
+	LogCall(requestLogger, method, params, resp, startTime)
+	return resp
 }
 
 func dataField(name string, data any) zap.Field {

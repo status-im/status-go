@@ -7,6 +7,8 @@ import (
 	"go.uber.org/zap"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/status-im/status-go/logutils/callog"
 )
 
 const (
@@ -59,6 +61,14 @@ type jsonError struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
+// rpcMethodParams contains the parsed data from a JSON-RPC request
+type rpcMethodParams struct {
+	ChainID uint64
+	Method  string
+	Params  []any
+	ID      json.RawMessage
+}
+
 // callRawContext performs a JSON-RPC call with already crafted JSON-RPC body and
 // given context. It returns string in JSON format with response (successful or error).
 //
@@ -74,7 +84,14 @@ func (c *Client) callRawContext(ctx context.Context, body json.RawMessage) strin
 		return c.callBatchMethods(ctx, body)
 	}
 
-	return c.callSingleMethod(ctx, body)
+	methodParams, err := methodAndParamsFromBody(body)
+	if err != nil {
+		c.logger.Error("failed to unmarshal rpc request:", zap.String("request", string(body)), zap.Error(err))
+		return newErrorResponse(errInvalidMessageCode, err, methodParams.ID)
+	}
+	return callog.LogRPCCall(string(body), methodParams.Method, func() string {
+		return c.callSingleMethod(ctx, &methodParams)
+	})
 }
 
 // callBatchMethods handles batched JSON-RPC requests, calling each of
@@ -97,8 +114,17 @@ func (c *Client) callBatchMethods(ctx context.Context, msgs json.RawMessage) str
 	// See: https://github.com/ethereum/wiki/wiki/JavaScript-API#batch-requests
 	responses := make([]json.RawMessage, len(requests))
 	for i := range requests {
-		resp := c.callSingleMethod(ctx, requests[i])
-		responses[i] = json.RawMessage(resp)
+		methodParams, err := methodAndParamsFromBody(requests[i])
+		if err != nil {
+			responses[i] = json.RawMessage(newErrorResponse(errInvalidMessageCode, err, methodParams.ID))
+			c.logger.Error("failed to unmarshal batch rpc request:", zap.String("request", string(requests[i])), zap.Error(err))
+			continue
+		}
+		callog.LogRPCCall(string(requests[i]), methodParams.Method, func() string {
+			resp := c.callSingleMethod(ctx, &methodParams)
+			responses[i] = json.RawMessage(resp)
+			return resp
+		})
 	}
 
 	data, err := json.Marshal(responses)
@@ -111,12 +137,9 @@ func (c *Client) callBatchMethods(ctx context.Context, msgs json.RawMessage) str
 }
 
 // callSingleMethod executes single JSON-RPC message and constructs proper response.
-func (c *Client) callSingleMethod(ctx context.Context, msg json.RawMessage) string {
+func (c *Client) callSingleMethod(ctx context.Context, rpcMethodParams *rpcMethodParams) string {
 	// unmarshal JSON body into json-rpc request
-	chainID, method, params, id, err := methodAndParamsFromBody(msg)
-	if err != nil {
-		return newErrorResponse(errInvalidMessageCode, err, id)
-	}
+	chainID, method, params, id := rpcMethodParams.ChainID, rpcMethodParams.Method, rpcMethodParams.Params, rpcMethodParams.ID
 
 	if chainID == 0 {
 		chainID = c.UpstreamChainID
@@ -124,7 +147,7 @@ func (c *Client) callSingleMethod(ctx context.Context, msg json.RawMessage) stri
 
 	// route and execute
 	var result json.RawMessage
-	err = c.CallContext(ctx, &result, chainID, method, params...)
+	err := c.CallContext(ctx, &result, chainID, method, params...)
 
 	// as we have to return original JSON, we have to
 	// analyze returned error and reconstruct original
@@ -142,23 +165,30 @@ func (c *Client) callSingleMethod(ctx context.Context, msg json.RawMessage) stri
 }
 
 // methodAndParamsFromBody extracts Method and Params of
-// JSON-RPC body into values ready to use with ethereum-go's
-// RPC client Call() function. A lot of empty interface usage is
-// due to the underlying code design :/
-func methodAndParamsFromBody(body json.RawMessage) (uint64, string, []interface{}, json.RawMessage, error) {
+// JSON-RPC body into a structured format ready to use with ethereum-go's
+// RPC client Call() function.
+func methodAndParamsFromBody(body json.RawMessage) (rpcMethodParams, error) {
+	result := rpcMethodParams{
+		Params: []any{},
+	}
+
 	msg, err := unmarshalMessage(body)
 	if err != nil {
-		return 0, "", nil, nil, err
+		return result, err
 	}
-	params := []interface{}{}
+
 	if msg.Params != nil {
-		err = json.Unmarshal(msg.Params, &params)
+		err = json.Unmarshal(msg.Params, &result.Params)
 		if err != nil {
-			return 0, "", nil, nil, err
+			return result, err
 		}
 	}
 
-	return msg.ChainID, msg.Method, params, msg.ID, nil
+	result.ChainID = msg.ChainID
+	result.Method = msg.Method
+	result.ID = msg.ID
+
+	return result, nil
 }
 
 // unmarshalMessage tries to unmarshal JSON-RPC message.

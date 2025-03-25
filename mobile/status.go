@@ -32,8 +32,8 @@ import (
 	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/logutils/callog"
 	"github.com/status-im/status-go/logutils/requestlog"
-	"github.com/status-im/status-go/mobile/callog"
 	m_requests "github.com/status-im/status-go/mobile/requests"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -345,7 +345,7 @@ func resetChainData() string {
 }
 
 func CallRPC(inputJSON string) string {
-	return callWithResponse(callRPC, inputJSON)
+	return callRPC(inputJSON)
 }
 
 // callRPC calls public APIs via RPC.
@@ -358,7 +358,7 @@ func callRPC(inputJSON string) string {
 }
 
 func CallPrivateRPC(inputJSON string) string {
-	return callWithResponse(callPrivateRPC, inputJSON)
+	return callPrivateRPC(inputJSON)
 }
 
 // callPrivateRPC calls both public and private APIs via RPC.

@@ -132,16 +132,16 @@ func TestMethodAndParamsFromBody(t *testing.T) {
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			chainID, method, params, id, err := methodAndParamsFromBody(test.body)
+			rpcMethodParams, err := methodAndParamsFromBody(test.body)
 			if test.shouldFail {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, test.chainID, chainID)
-			require.Equal(t, test.method, method)
-			require.Equal(t, test.params, params)
-			require.EqualValues(t, test.id, id)
+			require.Equal(t, test.chainID, rpcMethodParams.ChainID)
+			require.Equal(t, test.method, rpcMethodParams.Method)
+			require.Equal(t, test.params, rpcMethodParams.Params)
+			require.EqualValues(t, test.id, rpcMethodParams.ID)
 		})
 	}
 }
