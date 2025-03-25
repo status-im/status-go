@@ -30,6 +30,7 @@ const (
 	Grove            = "grove"
 	DirectInfura     = "direct-infura"
 	DirectGrove      = "direct-grove"
+	DirectStatus     = "direct-status"
 )
 
 // Direct proxy endpoint (1 endpoint per chain/network)
@@ -346,6 +347,39 @@ func baseSepolia(proxyHost, stageName string) params.Network {
 	}
 }
 
+func statusNetworkSepolia(proxyHost string) params.Network {
+	const chainID = common.StatusNetworkSepoliaChainID
+	const chainName = "status"
+	const networkName = "sepolia"
+
+	rpcProviders := []params.RpcProvider{
+		// Smart proxy provider
+		*params.NewEthRpcProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(proxyHost, chainName, networkName), false),
+		// Direct providers
+		*params.NewDirectProvider(chainID, DirectStatus, "https://public.sepolia.rpc.status.network", false),
+	}
+
+	return params.Network{
+		ChainID:                chainID,
+		ChainName:              "Status Network Sepolia",
+		RpcProviders:           rpcProviders,
+		BlockExplorerURL:       "https://sepoliascan.status.network/",
+		IconURL:                "network/Network=Status-test",
+		ChainColor:             "#7140FD",
+		ShortName:              "status",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 true,
+		Layer:                  2,
+		Enabled:                true,
+		IsActive:               true,
+		IsDeactivatable:        true,
+		// TODO: Update related chain ID
+		// RelatedChainID:  1,
+	}
+}
+
 func defaultNetworks(proxyHost, stageName string) []params.Network {
 	return []params.Network{
 		mainnet(proxyHost, stageName),
@@ -356,6 +390,7 @@ func defaultNetworks(proxyHost, stageName string) []params.Network {
 		arbitrumSepolia(proxyHost, stageName),
 		base(proxyHost, stageName),
 		baseSepolia(proxyHost, stageName),
+		statusNetworkSepolia(proxyHost),
 	}
 }
 

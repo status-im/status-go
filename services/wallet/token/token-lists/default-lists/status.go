@@ -11,7 +11,7 @@ var StatusTokenList = fetcher.FetchedTokenList{
 		ID:        "status",
 		SourceURL: "https://github.com/status-im/status-go/blob/develop/services/wallet/token/token-lists/default-lists/status.go",
 	},
-	Fetched: time.Unix(1697613003, 0),
+	Fetched: time.Unix(1742471186, 0),
 	JsonData: `
 	{
   "name": "Status Token List",
@@ -1132,6 +1132,13 @@ var StatusTokenList = fetcher.FetchedTokenList{
       "symbol": "SNT",
       "decimals": 18,
       "chainId": 31337
+    },
+    {
+      "address": "0x1C3Ac2a186c6149Ae7Cb4D716eBbD0766E4f898a",
+      "name": "Status Test Token",
+      "symbol": "STT",
+      "decimals": 18,
+      "chainId": 1660990954
     }
   ]
 }

@@ -28,18 +28,19 @@ const (
 type ChainID uint64
 
 const (
-	UnknownChainID     uint64 = 0
-	EthereumMainnet    uint64 = 1
-	EthereumSepolia    uint64 = 11155111
-	OptimismMainnet    uint64 = 10
-	OptimismSepolia    uint64 = 11155420
-	ArbitrumMainnet    uint64 = 42161
-	ArbitrumSepolia    uint64 = 421614
-	BinanceChainID     uint64 = 56 // obsolete?
-	BinanceTestChainID uint64 = 97 // obsolete?
-	AnvilMainnet       uint64 = 31337
-	BaseMainnet        uint64 = 8453
-	BaseSepolia        uint64 = 84532
+	UnknownChainID       uint64 = 0
+	EthereumMainnet      uint64 = 1
+	EthereumSepolia      uint64 = 11155111
+	OptimismMainnet      uint64 = 10
+	OptimismSepolia      uint64 = 11155420
+	ArbitrumMainnet      uint64 = 42161
+	ArbitrumSepolia      uint64 = 421614
+	BinanceChainID       uint64 = 56 // obsolete?
+	BinanceTestChainID   uint64 = 97 // obsolete?
+	AnvilMainnet         uint64 = 31337
+	BaseMainnet          uint64 = 8453
+	BaseSepolia          uint64 = 84532
+	StatusNetworkSepolia uint64 = 1660990954
 )
 
 var (
@@ -51,10 +52,11 @@ var (
 	}
 
 	SupportedTestNetworks = map[uint64]bool{
-		EthereumSepolia: true,
-		OptimismSepolia: true,
-		ArbitrumSepolia: true,
-		BaseSepolia:     true,
+		EthereumSepolia:      true,
+		OptimismSepolia:      true,
+		ArbitrumSepolia:      true,
+		BaseSepolia:          true,
+		StatusNetworkSepolia: true,
 	}
 )
 
@@ -91,7 +93,7 @@ func (c ChainID) IsMainnet() bool {
 	switch uint64(c) {
 	case EthereumMainnet, OptimismMainnet, ArbitrumMainnet, BaseMainnet:
 		return true
-	case EthereumSepolia, OptimismSepolia, ArbitrumSepolia, BaseSepolia:
+	case EthereumSepolia, OptimismSepolia, ArbitrumSepolia, BaseSepolia, StatusNetworkSepolia:
 		return false
 	case UnknownChainID:
 		return false
@@ -109,6 +111,7 @@ func AllChainIDs() []ChainID {
 		ChainID(ArbitrumSepolia),
 		ChainID(BaseMainnet),
 		ChainID(BaseSepolia),
+		ChainID(StatusNetworkSepolia),
 	}
 }
 

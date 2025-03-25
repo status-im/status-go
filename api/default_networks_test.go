@@ -27,7 +27,7 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 	actualNetworks := BuildDefaultNetworks(&request.WalletSecretsConfig)
 
-	require.Len(t, actualNetworks, 8)
+	require.Len(t, actualNetworks, 9)
 	for _, n := range actualNetworks {
 		var err error
 		switch n.ChainID {
@@ -39,22 +39,30 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		case common.ArbitrumSepoliaChainID:
 		case common.BaseChainID:
 		case common.BaseSepoliaChainID:
+		case common.StatusNetworkSepoliaChainID:
 		default:
 			err = errors.Errorf("unexpected chain id: %d", n.ChainID)
 		}
 		require.NoError(t, err)
 
 		// check default chains
-		// DefaultRPCURL and DefaultFallbackURL are mandatory
-		require.True(t, strings.Contains(n.DefaultRPCURL, stageName))
-		require.True(t, strings.Contains(n.DefaultFallbackURL, stageName))
+		if n.DefaultRPCURL != "" {
+			require.True(t, strings.Contains(n.DefaultRPCURL, stageName))
+		}
+		if n.DefaultFallbackURL != "" {
+			require.True(t, strings.Contains(n.DefaultFallbackURL, stageName))
+		}
 		if n.DefaultFallbackURL2 != "" {
 			require.True(t, strings.Contains(actualNetworks[0].DefaultFallbackURL2, stageName))
 		}
 
 		// check fallback options
-		require.True(t, strings.Contains(n.RPCURL, infuraToken))
-		require.True(t, strings.Contains(n.FallbackURL, poktToken))
+		if strings.Contains(n.RPCURL, "infura.io") {
+			require.True(t, strings.Contains(n.RPCURL, infuraToken))
+		}
+		if strings.Contains(n.FallbackURL, "grove.city") {
+			require.True(t, strings.Contains(n.FallbackURL, poktToken))
+		}
 
 		// Check proxy providers for stageName
 		for _, provider := range n.RpcProviders {

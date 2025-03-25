@@ -48,12 +48,13 @@ const (
 var (
 	// This will work only for binance testnet as mainnet doesn't support
 	// archival request.
-	binanceChainErc20BatchSize    = big.NewInt(5000)
-	sepoliaErc20BatchSize         = big.NewInt(100000)
-	sepoliaErc20ArbitrumBatchSize = big.NewInt(10000)
-	sepoliaErc20OptimismBatchSize = big.NewInt(10000)
-	sepoliaErc20BaseBatchSize     = big.NewInt(10000)
-	erc20BatchSize                = big.NewInt(100000)
+	binanceChainErc20BatchSize         = big.NewInt(5000)
+	sepoliaErc20BatchSize              = big.NewInt(100000)
+	sepoliaErc20ArbitrumBatchSize      = big.NewInt(10000)
+	sepoliaErc20OptimismBatchSize      = big.NewInt(10000)
+	sepoliaErc20BaseBatchSize          = big.NewInt(10000)
+	sepoliaErc20StatusNetworkBatchSize = big.NewInt(10000)
+	erc20BatchSize                     = big.NewInt(100000)
 
 	transfersRetryInterval = 5 * time.Second
 )
@@ -156,6 +157,8 @@ func getErc20BatchSize(chainID uint64) *big.Int {
 		return sepoliaErc20ArbitrumBatchSize
 	case w_common.BaseSepolia:
 		return sepoliaErc20BaseBatchSize
+	case w_common.StatusNetworkSepolia:
+		return sepoliaErc20StatusNetworkBatchSize
 	case w_common.BinanceChainID:
 		return binanceChainErc20BatchSize
 	case w_common.BinanceTestChainID:

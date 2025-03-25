@@ -43,6 +43,8 @@ func getChainPriority(chainID uint64) int {
 		return 3
 	case common.BaseMainnet, common.BaseSepolia:
 		return 4
+	case common.StatusNetworkSepolia:
+		return 5
 	default:
 		return 0
 	}
