@@ -33,7 +33,7 @@ Functional tests for status-go
     * Status-im contracts will be deployed to the network
 
 ### Run tests
-- In `./tests-functional` run `docker compose -f docker-compose.anvil.yml -f docker-compose.test.status-go.yml -f docker-compose.status-go.local.yml up --build --remove-orphans`, as result:
+- In `./tests-functional` run `./start-docker-infra.sh`, as result:
     * a container with [status-backend](https://github.com/status-im/status-go/pull/5847) will be created with endpoint exposed on `0.0.0.0:3333`
     * status-go will use [anvil](https://book.getfoundry.sh/reference/anvil/) as RPCURL with ChainID 31337 
     * Status-im contracts will be deployed to the network
