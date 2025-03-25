@@ -32,7 +32,7 @@ class StatusBackend(RpcClient, SignalClient):
 
     def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6, status_backend_url=""):
         self.ipv6 = True if ipv6 == "Yes" else False
-        logging.info(f"Flag USE_IPV6 is: {self.ipv6}")
+        logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
         self.docker_project_name = option.docker_project_name
         self.network_name = f"{self.docker_project_name}_default"
         if option.status_backend_url:
@@ -144,16 +144,16 @@ class StatusBackend(RpcClient, SignalClient):
         url = url if url else self.api_url
         url = f"{url}/{method}"
         if enable_logging:
-            logging.info(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True, indent=4)}")
+            logging.debug(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True)}")
         response = requests.post(url, json=data)
         if enable_logging:
-            logging.info(f"Got response: {response.content}")
+            logging.debug(f"Got response: {response.content}")
         return response
 
     def verify_is_valid_api_response(self, response):
         assert response.status_code == 200, f"Got response {response.content}, status code {response.status_code}"
         assert response.content
-        logging.info(f"Got response: {response.content}")
+        logging.debug(f"Got response: {response.content}")
         try:
             error = response.json()["error"]
             assert not error, f"Error: {error}"

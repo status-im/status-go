@@ -55,17 +55,17 @@ class RpcClient:
         if params:
             data["params"] = params
         if enable_logging:
-            logging.info(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True, indent=4)}")
+            logging.debug(f"Sending POST request to url {url} with data: {json.dumps(data, sort_keys=True)}")
         response = self.client.post(url, json=data)
         try:
             resp_json = response.json()
             if enable_logging:
-                logging.info(f"Got response: {json.dumps(resp_json, sort_keys=True, indent=4)}")
+                logging.debug(f"Got response: {json.dumps(resp_json, sort_keys=True)}")
             if resp_json.get("error"):
                 assert "JSON-RPC client is unavailable" != resp_json["error"]
         except JSONDecodeError:
             if enable_logging:
-                logging.info(f"Got response: {response.content}")
+                logging.debug(f"Got response: {response.content}")
         return response
 
     def rpc_valid_request(self, method, params=None, _id=None, url=None, skip_validation=False, enable_logging=True):
