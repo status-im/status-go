@@ -339,11 +339,12 @@ test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional:
 	@./_assets/scripts/run_functional_tests.sh
 
+lint-panics: export GOFLAGS ?= -tags='$(BUILD_TAGS)'
 lint-panics: generate
 	go run ./cmd/lint-panics -root="$(call sh, pwd)" -skip=./cmd -test=false ./...
 
 lint: generate lint-panics
-	golangci-lint run ./...
+	golangci-lint --build-tags '$(BUILD_TAGS)' run ./...
 
 ci: generate lint test-unit test-e2e ##@tests Run all linters and tests at once
 
