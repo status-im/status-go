@@ -254,28 +254,28 @@ func TestLogRPCCall(t *testing.T) {
 	require.NotNil(t, requestLogger)
 
 	testCases := []struct {
-		name           string
-		method         string
-		params         string
-		fn             func() string
-		expectedLogged bool
-		expectedResult string
+		name                string
+		method              string
+		params              string
+		fn                  func() string
+		expectedLogContains string
+		expectedResult      string
 	}{
 		{
-			name:           "sensitive method",
-			method:         "accounts_importMnemonic",
-			params:         `{"mnemonic":"mnemonic123 xyz"}`,
-			fn:             func() string { return "test result1" },
-			expectedLogged: false,
-			expectedResult: "test result1",
+			name:                "sensitive method",
+			method:              "accounts_importMnemonic",
+			params:              `{"mnemonic":"mnemonic123 xyz"}`,
+			fn:                  func() string { return "test result1" },
+			expectedLogContains: redactionPlaceholder,
+			expectedResult:      "test result1",
 		},
 		{
-			name:           "non-sensitive method",
-			method:         "eth_blockNumber",
-			params:         `{"address":"0x1234567890123456789012345678901234567890"}`,
-			fn:             func() string { return "test result2" },
-			expectedLogged: true,
-			expectedResult: "test result2",
+			name:                "non-sensitive method",
+			method:              "eth_blockNumber",
+			params:              `{"address":"0x1234567890123456789012345678901234567890"}`,
+			fn:                  func() string { return "test result2" },
+			expectedLogContains: "0x1234567890123456789012345678901234567890",
+			expectedResult:      "test result2",
 		},
 	}
 
@@ -286,13 +286,8 @@ func TestLogRPCCall(t *testing.T) {
 			require.NoError(t, err)
 			requestLogOutput := string(logData)
 			require.Equal(t, tc.expectedResult, result)
-			if tc.expectedLogged {
-				require.Contains(t, requestLogOutput, tc.method)
-				require.Contains(t, requestLogOutput, tc.params)
-				require.Contains(t, requestLogOutput, tc.expectedResult)
-			} else {
-				require.Empty(t, requestLogOutput)
-			}
+			require.Contains(t, requestLogOutput, tc.method)
+			require.Contains(t, requestLogOutput, tc.expectedLogContains)
 		})
 	}
 }

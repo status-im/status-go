@@ -50,7 +50,34 @@ var sensitiveRegexString = fmt.Sprintf(`(?i)(\\?"(?:\w*?%s\w*?)\\?"\s*:\s*\\?").
 var sensitiveRegex = regexp.MustCompile(sensitiveRegexString)
 
 var sensitiveMethod = map[string]bool{
-	"accounts_importMnemonic": true,
+	"accounts_importMnemonic":                            true,
+	"accounts_importPrivateKey":                          true,
+	"accounts_makeSeedPhraseKeypairFullyOperable":        true,
+	"accounts_getRandomMnemonic":                         true,
+	"accounts_migrateNonProfileKeycardKeypairToApp":      true,
+	"accounts_addKeypair":                                true,
+	"accounts_createKeystoreFileForAccount":              true,
+	"accounts_addAccount":                                true,
+	"accounts_makePrivateKeyKeypairFullyOperable":        true,
+	"accounts_makePartiallyOperableAccoutsFullyOperable": true,
+	"accounts_verifyKeystoreFileForAccount":              true,
+	"ens_register":                                       true,
+	"ens_release":                                        true,
+	"ens_setPubKey":                                      true,
+	"wakuext_signData":                                   true,
+	"wakuext_exportCommunity":                            true,
+	"wakuext_importCommunity":                            true,
+	"wakuext_getCommunityPublicKeyFromPrivateKey":        true,
+	"personal_sign":                                      true,
+	"wallet_signTypedDataV4":                             true,
+	"wallet_safeSignTypedDataForDApps":                   true,
+	"wallet_getDerivedAddresses":                         true,
+	"wallet_signMessage":                                 true,
+	"wallet_getVerifiedWalletAccount":                    true,
+	"wallet_getDerivedAddressesForMnemonic":              true,
+	"provider_getVerifiedWalletAccount":                  true,
+	"provider_web3SignatureResponse":                     true,
+	"provider_processWeb3ReadOnlyRequest":                true,
 }
 
 func getFunctionName(fn any) string {
@@ -148,10 +175,8 @@ func Recover(logger *zap.Logger) {
 }
 
 func isSensitiveMethod(method string) bool {
-	if _, ok := sensitiveMethod[method]; ok {
-		return true
-	}
-	return false
+	_, ok := sensitiveMethod[method]
+	return ok
 }
 
 func LogCall(logger *zap.Logger, method string, params any, resp any, startTime time.Time) {
@@ -159,7 +184,8 @@ func LogCall(logger *zap.Logger, method string, params any, resp any, startTime 
 		return
 	}
 	if isSensitiveMethod(method) {
-		return
+		params = redactionPlaceholder
+		resp = redactionPlaceholder
 	}
 	duration := time.Since(startTime)
 	logger.Debug("call",
