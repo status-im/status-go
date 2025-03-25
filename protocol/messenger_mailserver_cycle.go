@@ -6,12 +6,11 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
-func (m *Messenger) AllMailservers() ([]types.Mailserver, error) {
+func (m *Messenger) AllMailservers() ([]wakutypes.Mailserver, error) {
 	// Get configured fleet
 	fleet, err := m.getFleet()
 	if err != nil {
@@ -21,7 +20,7 @@ func (m *Messenger) AllMailservers() ([]types.Mailserver, error) {
 	return m.allMailserversByFleet(fleet)
 }
 
-func (m *Messenger) allMailserversByFleet(fleet string) ([]mailservers.Mailserver, error) {
+func (m *Messenger) allMailserversByFleet(fleet string) ([]wakutypes.Mailserver, error) {
 	// Get default mailservers for given fleet
 	allMailservers := params.DefaultStoreNodes(fleet)
 
@@ -144,7 +143,7 @@ func (m *Messenger) checkForStorenodeCycleSignals() {
 		return
 	}
 
-	mailserverMap := make(map[peer.ID]types.Mailserver)
+	mailserverMap := make(map[peer.ID]wakutypes.Mailserver)
 	for _, ms := range allMailservers {
 		peerID, err := ms.PeerID()
 		if err != nil {

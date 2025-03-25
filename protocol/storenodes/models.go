@@ -8,7 +8,7 @@ import (
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
-// Storenode is a struct that represents a storenode, it is very closely related to `mailservers.Mailserver`
+// Storenode is a struct that represents a storenode, it is very closely related to `wakutypes.Mailserver`
 type Storenode struct {
 	CommunityID types.HexBytes      `json:"community_id"`
 	StorenodeID string              `json:"storenode_id"`
