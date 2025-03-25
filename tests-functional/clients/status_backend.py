@@ -30,15 +30,15 @@ class StatusBackend(RpcClient, SignalClient):
 
     container = None
 
-    def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6, status_backend_url=""):
+    def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6):
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
         self.docker_project_name = option.docker_project_name
         self.network_name = f"{self.docker_project_name}_default"
+
         if option.status_backend_url:
-            url = option.status_backend_url
-        elif status_backend_url != "":
-            url = status_backend_url
+            url = next(option.status_backend_urls)
+            assert url != "", "not enough status-backend urls provided"
         else:
             self.docker_client = docker.from_env()
             retries = 5
