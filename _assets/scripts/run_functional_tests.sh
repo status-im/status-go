@@ -54,7 +54,9 @@ pip install --upgrade pip
 pip install -r "${root_path}/requirements.txt"
 
 # Deploy smart contracts
-pytest -m contracts --docker_project_name=${project_name} 
+export PYTHONPATH="${root_path}:${PYTHONPATH:-}"
+export DOCKER_PROJECT_NAME=$project_name
+python -m clients.contract_deployers.deployer
 
 # Run functional tests
 pytest --reruns 2 -m rpc -n 12 --docker_project_name=${project_name} --codecov_dir=${binary_coverage_reports_path} --junitxml=${test_results_path}/report.xml

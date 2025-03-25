@@ -7,8 +7,14 @@ import docker
 import docker.errors
 import os
 
-from conftest import option
-from resources.constants import user_1, ANVIL_NETWORK_ID
+logging.basicConfig(level=logging.INFO)
+
+ANVIL_NETWORK_ID = 31337
+DEPLOYER_ACCOUNT = {
+    "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "private_key": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+}
+DOCKER_PROJECT_NAME = os.environ.get("DOCKER_PROJECT_NAME", "tests-functional")
 
 
 class SmartContractRunner:
@@ -17,7 +23,7 @@ class SmartContractRunner:
 
     def __init__(self):
         self.docker_client = docker.from_env()
-        self.docker_project_name = option.docker_project_name
+        self.docker_project_name = DOCKER_PROJECT_NAME
         self.network_name = f"{self.docker_project_name}_default"
         network = self.docker_client.networks.get(self.network_name)
         self.container_name = None
@@ -71,8 +77,8 @@ class SmartContractRunner:
         smart_contract_filename = kwargs.get("smart_contract_filename")
         if not smart_contract_filename:
             raise ValueError("smart_contract_filename is required")
-        private_key = kwargs.get("private_key", user_1.private_key)
-        sender_address = kwargs.get("sender_address", user_1.address)
+        private_key = kwargs.get("private_key", DEPLOYER_ACCOUNT["private_key"])
+        sender_address = kwargs.get("sender_address", DEPLOYER_ACCOUNT["address"])
 
         cmd = f"/app/clone_and_run.sh {github_org} {github_repo} {smart_contract_dir} {smart_contract_filename} {private_key} {sender_address}"
         logging.info(f"Running command: {cmd}")
@@ -121,6 +127,11 @@ class SmartContractRunner:
 
     def get_output_dir(self, repo_name: str):
         working_dir = os.getcwd()
+
+        tests_functional = "tests-functional"
+        if tests_functional not in working_dir:
+            working_dir = os.path.join(working_dir, tests_functional)
+
         output_dir = os.path.join(working_dir, "tmp", "smart-contracts-output", repo_name)
 
         return output_dir
