@@ -39,7 +39,7 @@ def pytest_addoption(parser):
         "--user_dir",
         action="store",
         help="",
-        default=None,
+        default="/usr/status-user",
     )
 
 

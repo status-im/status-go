@@ -7,13 +7,10 @@ import docker
 import docker.errors
 import os
 
+from resources.constants import ANVIL_NETWORK_ID, DEPLOYER_ACCOUNT
+
 logging.basicConfig(level=logging.INFO)
 
-ANVIL_NETWORK_ID = 31337
-DEPLOYER_ACCOUNT = {
-    "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-    "private_key": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-}
 DOCKER_PROJECT_NAME = os.environ.get("DOCKER_PROJECT_NAME", "tests-functional")
 
 
@@ -77,8 +74,8 @@ class SmartContractRunner:
         smart_contract_filename = kwargs.get("smart_contract_filename")
         if not smart_contract_filename:
             raise ValueError("smart_contract_filename is required")
-        private_key = kwargs.get("private_key", DEPLOYER_ACCOUNT["private_key"])
-        sender_address = kwargs.get("sender_address", DEPLOYER_ACCOUNT["address"])
+        private_key = kwargs.get("private_key", DEPLOYER_ACCOUNT.private_key)
+        sender_address = kwargs.get("sender_address", DEPLOYER_ACCOUNT.address)
 
         cmd = f"/app/clone_and_run.sh {github_org} {github_repo} {smart_contract_dir} {smart_contract_filename} {private_key} {sender_address}"
         logging.info(f"Running command: {cmd}")

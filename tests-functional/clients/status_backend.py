@@ -20,7 +20,7 @@ from clients.services.settings import SettingsService
 from clients.signals import SignalClient
 from clients.rpc import RpcClient
 from conftest import option
-from resources.constants import USE_IPV6, user_1, DEFAULT_DISPLAY_NAME, USER_DIR, ANVIL_NETWORK_ID
+from resources.constants import USE_IPV6, user_1, DEFAULT_DISPLAY_NAME, ANVIL_NETWORK_ID
 from docker.errors import APIError
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
@@ -167,7 +167,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.verify_is_valid_api_response(response)
         return response
 
-    def init_status_backend(self, data_dir=USER_DIR):
+    def init_status_backend(self, data_dir=option.user_dir):
         method = "InitializeApplication"
         data = {
             "dataDir": data_dir,
@@ -221,7 +221,7 @@ class StatusBackend(RpcClient, SignalClient):
 
         return temp_dir
 
-    def create_account_and_login(self, data_dir=USER_DIR, **kwargs):
+    def create_account_and_login(self, data_dir=option.user_dir, **kwargs):
         self.display_name = kwargs.get(
             "display_name",
             f"DISP_NAME_{''.join(random.choices(string.ascii_letters + string.digits + '_-', k=10))}",
@@ -245,7 +245,7 @@ class StatusBackend(RpcClient, SignalClient):
 
     def restore_account_and_login(
         self,
-        data_dir=USER_DIR,
+        data_dir=option.user_dir,
         display_name=DEFAULT_DISPLAY_NAME,
         user=user_1,
         network_id=ANVIL_NETWORK_ID,
