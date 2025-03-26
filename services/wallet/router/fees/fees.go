@@ -12,7 +12,7 @@ import (
 
 const (
 	RewardPercentiles1 = 10
-	RewardPercentiles2 = 50
+	RewardPercentiles2 = 45
 	RewardPercentiles3 = 90
 )
 
@@ -99,7 +99,7 @@ type FeeManager struct {
 }
 
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
-	feeHistory, err := f.getFeeHistory(ctx, chainID, 300, "latest", []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3})
+	feeHistory, err := f.getFeeHistory(ctx, chainID, "latest", []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3})
 	if err != nil {
 		return f.getNonEIP1559SuggestedFees(ctx, chainID)
 	}
@@ -153,13 +153,9 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 		}
 	}
 
-	feeHistory, err = f.getFeeHistoryForTimeEstimation(ctx, chainID)
-	if err != nil {
-		return nil, err
-	}
-	suggestedFees.MaxFeesLevels.LowEstimatedTime = f.estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Low.ToInt(), suggestedFees.MaxFeesLevels.LowPriority.ToInt(), chainID)
-	suggestedFees.MaxFeesLevels.MediumEstimatedTime = f.estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Medium.ToInt(), suggestedFees.MaxFeesLevels.MediumPriority.ToInt(), chainID)
-	suggestedFees.MaxFeesLevels.HighEstimatedTime = f.estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.High.ToInt(), suggestedFees.MaxFeesLevels.HighPriority.ToInt(), chainID)
+	suggestedFees.MaxFeesLevels.LowEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Low.ToInt(), suggestedFees.MaxFeesLevels.LowPriority.ToInt(), chainID)
+	suggestedFees.MaxFeesLevels.MediumEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Medium.ToInt(), suggestedFees.MaxFeesLevels.MediumPriority.ToInt(), chainID)
+	suggestedFees.MaxFeesLevels.HighEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.High.ToInt(), suggestedFees.MaxFeesLevels.HighPriority.ToInt(), chainID)
 
 	return suggestedFees, nil
 }

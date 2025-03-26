@@ -29,14 +29,17 @@ func (fh *FeeHistory) isEIP1559Compatible() bool {
 	return false
 }
 
-func (f *FeeManager) getFeeHistory(ctx context.Context, chainID uint64, blockCount uint64, newestBlock string, rewardPercentiles []int) (feeHistory *FeeHistory, err error) {
-	feeHistory = &FeeHistory{}
-	err = f.RPCClient.Call(feeHistory, chainID, "eth_feeHistory", blockCount, newestBlock, rewardPercentiles)
-	if err != nil {
-		return nil, err
+func (f *FeeManager) getFeeHistory(ctx context.Context, chainID uint64, newestBlock string, rewardPercentiles []int) (*FeeHistory, error) {
+	blockCount := uint64(10) // use the last 10 blocks for L1 chains
+	if chainID != common.EthereumMainnet &&
+		chainID != common.EthereumSepolia &&
+		chainID != common.AnvilMainnet {
+		blockCount = 50 // use the last 50 blocks for L2 chains
 	}
 
-	return feeHistory, nil
+	feeHistory := &FeeHistory{}
+	err := f.RPCClient.Call(feeHistory, chainID, "eth_feeHistory", blockCount, newestBlock, rewardPercentiles)
+	return feeHistory, err
 }
 
 // GetL1Fee returns L1 fee for placing a transaction to L1 chain, appicable only for txs made from L2.

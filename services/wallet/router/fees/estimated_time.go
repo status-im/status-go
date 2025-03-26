@@ -35,7 +35,7 @@ const (
 )
 
 func (f *FeeManager) TransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Int) TransactionEstimation {
-	feeHistory, err := f.getFeeHistory(ctx, chainID, 100, "latest", nil)
+	feeHistory, err := f.getFeeHistory(ctx, chainID, "latest", nil)
 	if err != nil {
 		return Unknown
 	}
@@ -44,7 +44,7 @@ func (f *FeeManager) TransactionEstimatedTime(ctx context.Context, chainID uint6
 }
 
 func (f *FeeManager) estimatedTime(feeHistory *FeeHistory, maxFeePerGas *big.Int) TransactionEstimation {
-	fees := f.convertToBigIntAndSort(feeHistory.BaseFeePerGas)
+	fees := convertToBigIntAndSort(feeHistory.BaseFeePerGas)
 	if len(fees) == 0 {
 		return Unknown
 	}
@@ -116,7 +116,7 @@ func (f *FeeManager) estimatedTime(feeHistory *FeeHistory, maxFeePerGas *big.Int
 	return MoreThanFiveMinutes
 }
 
-func (f *FeeManager) convertToBigIntAndSort(hexArray []string) []*big.Int {
+func convertToBigIntAndSort(hexArray []string) []*big.Int {
 	values := []*big.Int{}
 	for _, sValue := range hexArray {
 		iValue := new(big.Int)
@@ -131,14 +131,18 @@ func (f *FeeManager) convertToBigIntAndSort(hexArray []string) []*big.Int {
 	return values
 }
 
-func (f *FeeManager) getFeeHistoryForTimeEstimation(ctx context.Context, chainID uint64) (*FeeHistory, error) {
-	blockCount := uint64(10) // use the last 10 blocks for L1 chains
-	if chainID != common.EthereumMainnet &&
-		chainID != common.EthereumSepolia &&
-		chainID != common.AnvilMainnet {
-		blockCount = 50 // use the last 50 blocks for L2 chains
+func removeDuplicatesFromSortedArray(array []*big.Int) []*big.Int {
+	if len(array) == 0 {
+		return array
 	}
-	return f.getFeeHistory(ctx, chainID, blockCount, "latest", []int{RewardPercentiles2})
+
+	uniqueArray := []*big.Int{array[0]}
+	for i := 1; i < len(array); i++ {
+		if array[i].Cmp(array[i-1]) != 0 {
+			uniqueArray = append(uniqueArray, array[i])
+		}
+	}
+	return uniqueArray
 }
 
 func calculateTimeForInclusion(chainID uint64, expectedInclusionInBlock int) uint {
@@ -162,42 +166,47 @@ func getBaseFeePercentileIndex(sortedBaseFees []*big.Int, percentile float64, ne
 
 // TransactionEstimatedTimeV2 returns the estimated time in seconds for a transaction to be included in a block
 func (f *FeeManager) TransactionEstimatedTimeV2(ctx context.Context, chainID uint64, maxFeePerGas *big.Int, priorityFee *big.Int) uint {
-	feeHistory, err := f.getFeeHistoryForTimeEstimation(ctx, chainID)
+	feeHistory, err := f.getFeeHistory(ctx, chainID, "latest", []int{RewardPercentiles2})
+
 	if err != nil {
 		return 0
 	}
 
-	return f.estimatedTimeV2(feeHistory, maxFeePerGas, priorityFee, chainID)
+	return estimatedTimeV2(feeHistory, maxFeePerGas, priorityFee, chainID)
 }
 
-func (f *FeeManager) estimatedTimeV2(feeHistory *FeeHistory, txMaxFeePerGas *big.Int, txPriorityFee *big.Int, chainID uint64) uint {
-	sortedBaseFees := f.convertToBigIntAndSort(feeHistory.BaseFeePerGas)
+func estimatedTimeV2(feeHistory *FeeHistory, txMaxFeePerGas *big.Int, txPriorityFee *big.Int, chainID uint64) uint {
+	sortedBaseFees := convertToBigIntAndSort(feeHistory.BaseFeePerGas)
 	if len(sortedBaseFees) == 0 {
 		return 0
 	}
+	uniqueBaseFees := removeDuplicatesFromSortedArray(sortedBaseFees)
 
 	var mediumPriorityFees []string // based on 50th percentile in the last 100 blocks
 	for _, fee := range feeHistory.Reward {
 		mediumPriorityFees = append(mediumPriorityFees, fee[0])
 	}
-	mediumPriorityFeesSorted := f.convertToBigIntAndSort(mediumPriorityFees)
+	mediumPriorityFeesSorted := convertToBigIntAndSort(mediumPriorityFees)
 	if len(mediumPriorityFeesSorted) == 0 {
 		return 0
 	}
+	uniqueMediumPriorityFees := removeDuplicatesFromSortedArray(mediumPriorityFeesSorted)
 
 	txBaseFee := new(big.Int).Sub(txMaxFeePerGas, txPriorityFee)
 
-	networkCongestion := calculateNetworkCongestion(feeHistory)
+	// results are not good if we include the network congestion, cause we reduced the number of blocks we are looking at
+	// and also removed duplicates from the arrays, thus for now we will ignore it and use `1.0` for the network congestion
+	networkCongestion := 1.0 // calculateNetworkCongestion(feeHistory)
 
 	// Priority fee for the first two blocks has to be higher than 60th percentile of the mediumPriorityFeesSorted
-	priorityFeePercentileIndex := int(float64(len(mediumPriorityFeesSorted)) * priorityFeePercentileHigh)
-	priorityFeeForFirstTwoBlock := mediumPriorityFeesSorted[priorityFeePercentileIndex]
+	priorityFeePercentileIndex := int(float64(len(uniqueMediumPriorityFees)) * priorityFeePercentileHigh)
+	priorityFeeForFirstTwoBlock := uniqueMediumPriorityFees[priorityFeePercentileIndex]
 	// Priority fee for the second two blocks has to be higher than 50th percentile of the mediumPriorityFeesSorted
-	priorityFeePercentileIndex = int(float64(len(mediumPriorityFeesSorted)) * priorityFeePercentileMedium)
-	priorityFeeForSecondTwoBlocks := mediumPriorityFeesSorted[priorityFeePercentileIndex]
+	priorityFeePercentileIndex = int(float64(len(uniqueMediumPriorityFees)) * priorityFeePercentileMedium)
+	priorityFeeForSecondTwoBlocks := uniqueMediumPriorityFees[priorityFeePercentileIndex]
 	// Priority fee for the third two blocks has to be higher than 40th percentile of the mediumPriorityFeesSorted
-	priorityFeePercentileIndex = int(float64(len(mediumPriorityFeesSorted)) * priorityFeePercentileLow)
-	priorityFeeForThirdTwoBlocks := mediumPriorityFeesSorted[priorityFeePercentileIndex]
+	priorityFeePercentileIndex = int(float64(len(uniqueMediumPriorityFees)) * priorityFeePercentileLow)
+	priorityFeeForThirdTwoBlocks := uniqueMediumPriorityFees[priorityFeePercentileIndex]
 
 	// To include the transaction in the block `inclusionInBlock` its base fee has to be in a higher than `baseFeePercentile`
 	// and its priority fee has to be higher than the `priorityFee`
@@ -214,9 +223,11 @@ func (f *FeeManager) estimatedTimeV2(feeHistory *FeeHistory, txMaxFeePerGas *big
 		{6, baseFeePercentileSixthBlock, priorityFeeForThirdTwoBlocks},
 	}
 
+	// check priority fee for L1 chains only
+	checkPriorityFee := chainID == common.EthereumMainnet || chainID == common.EthereumSepolia || chainID == common.AnvilMainnet
 	for _, p := range inclusions {
-		baseFeePercentileIndex := getBaseFeePercentileIndex(sortedBaseFees, p.baseFeePercentile, networkCongestion)
-		if txBaseFee.Cmp(sortedBaseFees[baseFeePercentileIndex]) >= 0 && txPriorityFee.Cmp(p.priorityFee) >= 0 {
+		baseFeePercentileIndex := getBaseFeePercentileIndex(uniqueBaseFees, p.baseFeePercentile, networkCongestion)
+		if txBaseFee.Cmp(uniqueBaseFees[baseFeePercentileIndex]) >= 0 && (!checkPriorityFee || txPriorityFee.Cmp(p.priorityFee) >= 0) {
 			return calculateTimeForInclusion(chainID, p.inclusionInBlock)
 		}
 	}

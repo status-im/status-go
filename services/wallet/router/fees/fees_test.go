@@ -34,7 +34,7 @@ func TestEstimatedTime(t *testing.T) {
 	state := setupTest(t)
 	// no fee history
 	feeHistory := &FeeHistory{}
-	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(100), "latest", nil).Times(1).Return(nil)
+	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", nil).Times(1).Return(nil)
 
 	maxFeesPerGas := big.NewInt(2e9)
 	estimation := state.feeManager.TransactionEstimatedTime(context.Background(), uint64(1), maxFeesPerGas)
@@ -42,7 +42,7 @@ func TestEstimatedTime(t *testing.T) {
 	assert.Equal(t, Unknown, estimation)
 
 	// there is fee history
-	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(100), "latest", nil).Times(1).Return(nil).
+	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", nil).Times(1).Return(nil).
 		Do(func(feeHistory, chainID, method any, args ...any) {
 			feeHistoryResponse := &FeeHistory{
 				BaseFeePerGas: []string{
@@ -175,7 +175,7 @@ func TestSuggestedFeesForNotEIP1559CompatibleChains(t *testing.T) {
 	gasPrice := big.NewInt(1)
 	feeHistory := &FeeHistory{}
 	percentiles := []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3}
-	state.rpcClient.EXPECT().Call(feeHistory, chainID, "eth_feeHistory", uint64(300), "latest", percentiles).Times(1).Return(nil)
+	state.rpcClient.EXPECT().Call(feeHistory, chainID, "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil)
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
 	state.rpcClient.EXPECT().EthClient(chainID).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(gasPrice, nil)
@@ -252,13 +252,6 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 	chainID := uint64(1)
 	feeHistory := &FeeHistory{}
 	percentiles := []int{RewardPercentiles1, RewardPercentiles2, RewardPercentiles3}
-	state.rpcClient.EXPECT().Call(feeHistory, chainID, "eth_feeHistory", uint64(300), "latest", percentiles).Times(1).Return(nil).
-		Do(func(feeHistory, chainID, method any, args ...any) {
-			*feeHistory.(*FeeHistory) = *feeHistoryResponse
-		})
-
-	feeHistory = &FeeHistory{}
-	percentiles = []int{RewardPercentiles2}
 	state.rpcClient.EXPECT().Call(feeHistory, chainID, "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil).
 		Do(func(feeHistory, chainID, method any, args ...any) {
 			*feeHistory.(*FeeHistory) = *feeHistoryResponse
@@ -289,7 +282,7 @@ func TestSuggestedFeesForEIP1559CompatibleChains(t *testing.T) {
 	assert.Equal(t, big.NewInt(100000000), suggestedFees.MaxPriorityFeeSuggestedBounds.Lower)
 	assert.Equal(t, big.NewInt(1915584245), suggestedFees.MaxPriorityFeeSuggestedBounds.Upper)
 	assert.True(t, suggestedFees.EIP1559Enabled)
-	assert.Equal(t, uint(40), suggestedFees.MaxFeesLevels.LowEstimatedTime)
+	assert.Equal(t, uint(65), suggestedFees.MaxFeesLevels.LowEstimatedTime)
 	assert.Equal(t, uint(15), suggestedFees.MaxFeesLevels.MediumEstimatedTime)
 	assert.Equal(t, uint(15), suggestedFees.MaxFeesLevels.HighEstimatedTime)
 }
