@@ -19,46 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func amountOptionEqual(a, b amountOption) bool {
-	return a.amount.Cmp(b.amount) == 0 && a.locked == b.locked
-}
-
-func contains(slice []amountOption, val amountOption) bool {
-	for _, item := range slice {
-		if amountOptionEqual(item, val) {
-			return true
-		}
-	}
-	return false
-}
-
-func amountOptionsMapsEqual(map1, map2 map[uint64][]amountOption) bool {
-	if len(map1) != len(map2) {
-		return false
-	}
-
-	for key, slice1 := range map1 {
-		slice2, ok := map2[key]
-		if !ok || len(slice1) != len(slice2) {
-			return false
-		}
-
-		for _, val1 := range slice1 {
-			if !contains(slice2, val1) {
-				return false
-			}
-		}
-
-		for _, val2 := range slice2 {
-			if !contains(slice1, val2) {
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
 func assertPathsEqual(t *testing.T, expected, actual routes.Route) {
 	assert.Equal(t, len(expected), len(actual))
 	if len(expected) == 0 {
@@ -258,28 +218,6 @@ func TestNoBalanceForTheBestRouteRouter(t *testing.T) {
 			case <-time.After(10 * time.Second):
 				t.FailNow()
 			}
-		})
-	}
-}
-
-func TestAmountOptions(t *testing.T) {
-	router, cleanTmpDb := setupRouter(t)
-	defer cleanTmpDb()
-
-	tests := getAmountOptionsTestParamsList()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-
-			selectedFromChains, _, err := router.getSelectedChains(tt.input)
-			assert.NoError(t, err)
-
-			router.SetTestBalanceMap(tt.input.TestParams.BalanceMap)
-			amountOptions, err := router.findOptionsForSendingAmount(tt.input, selectedFromChains)
-			assert.NoError(t, err)
-
-			assert.Equal(t, len(tt.expectedAmountOptions), len(amountOptions))
-			assert.True(t, amountOptionsMapsEqual(tt.expectedAmountOptions, amountOptions))
 		})
 	}
 }

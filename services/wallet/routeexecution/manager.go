@@ -88,7 +88,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 
 		// re-use path processor input params structure to pass extra params to transaction manager
 		var extraParams pathprocessor.ProcessorInputParams
-		extraParams, err = m.router.CreateProcessorInputParams(&routeInputParams, nil, nil, nil, nil, nil, buildInputParams.SlippagePercentage, 0)
+		extraParams, err = m.router.CreateProcessorInputParams(&routeInputParams, nil, nil, nil, nil, buildInputParams.SlippagePercentage, 0)
 		if err != nil {
 			return
 		}

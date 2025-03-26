@@ -978,9 +978,6 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				TokenID:     walletCommon.EthSymbol,
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
-				},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -1004,112 +1001,112 @@ func getNormalTestParamsList() []normalTestParams {
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &base,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point8ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 			},
@@ -1125,11 +1122,6 @@ func getNormalTestParamsList() []normalTestParams {
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				TokenID:            walletCommon.EthSymbol,
 				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
-					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
-					walletCommon.BaseMainnet:     (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
-				},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -1153,28 +1145,28 @@ func getNormalTestParamsList() []normalTestParams {
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testAmount0Point2ETHInWei - testAmount0Point3ETHInWei - testAmount0Point3ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)), //(*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)), //(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)), //(*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)), //(*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 			},
@@ -1189,11 +1181,6 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				TokenID:     walletCommon.EthSymbol,
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
-					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
-					walletCommon.BaseMainnet:     (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
-				},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -1217,112 +1204,112 @@ func getNormalTestParamsList() []normalTestParams {
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &base,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 			},
@@ -1337,12 +1324,6 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrTo:      common.HexToAddress("0x2"),
 				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 				TokenID:     walletCommon.EthSymbol,
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
-					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
-					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
-					walletCommon.BaseMainnet:     (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
-				},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -1366,112 +1347,112 @@ func getNormalTestParamsList() []normalTestParams {
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &mainnet,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &optimism,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &arbitrum,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
 					FromChain:        &base,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point3ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount0Point2ETHInWei - testBonderFeeETH)),
+					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount1ETHInWei - testBonderFeeETH)),
 					ApprovalRequired: false,
 				},
 			},
@@ -2221,6 +2202,10 @@ func getNormalTestParamsList() []normalTestParams {
 					ApprovalL1Fee:         testApprovalL1Fee,
 				},
 			},
+			expectedError: &errors.ErrorResponse{
+				Code:    ErrNotEnoughTokenBalance.Code,
+				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, walletCommon.UsdcSymbol, walletCommon.OptimismMainnet),
+			},
 			expectedCandidates: routes.Route{
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
@@ -2230,24 +2215,10 @@ func getNormalTestParamsList() []normalTestParams {
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
-					FromChain:        &mainnet,
-					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
-					ApprovalRequired: false,
-				},
-				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
 					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(3.5*testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &mainnet,
-					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
@@ -2260,22 +2231,8 @@ func getNormalTestParamsList() []normalTestParams {
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &mainnet,
-					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &mainnet,
 					ToChain:          &base,
 					AmountOut:        (*hexutil.Big)(big.NewInt(3.5*testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &mainnet,
-					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
@@ -2286,13 +2243,6 @@ func getNormalTestParamsList() []normalTestParams {
 					ApprovalRequired: false,
 				},
 				{
-					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
-					FromChain:        &optimism,
-					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
-					ApprovalRequired: false,
-				},
-				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
 					ToChain:          &mainnet,
@@ -2302,22 +2252,8 @@ func getNormalTestParamsList() []normalTestParams {
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &optimism,
-					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &optimism,
 					ToChain:          &arbitrum,
 					AmountOut:        (*hexutil.Big)(big.NewInt(3.5*testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &optimism,
-					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
@@ -2326,27 +2262,6 @@ func getNormalTestParamsList() []normalTestParams {
 					ToChain:          &base,
 					AmountOut:        (*hexutil.Big)(big.NewInt(3.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &optimism,
-					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
-					FromChain:        &arbitrum,
-					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(0.5 * testAmount100USDC)),
-					ApprovalRequired: false,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
-					FromChain:        &arbitrum,
-					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
-					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
@@ -2359,35 +2274,7 @@ func getNormalTestParamsList() []normalTestParams {
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &arbitrum,
-					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &arbitrum,
-					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(3.5*testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &arbitrum,
-					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &arbitrum,
-					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
@@ -2401,36 +2288,8 @@ func getNormalTestParamsList() []normalTestParams {
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &arbitrum,
 					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &arbitrum,
-					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &arbitrum,
-					ToChain:          &base,
 					AmountOut:        (*hexutil.Big)(big.NewInt(3.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
-					FromChain:        &base,
-					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(0.5 * testAmount100USDC)),
-					ApprovalRequired: false,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
-					FromChain:        &base,
-					ToChain:          &base,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC)),
-					ApprovalRequired: false,
 				},
 				{
 					ProcessorName:    pathProcessorCommon.ProcessorTransferName,
@@ -2443,20 +2302,6 @@ func getNormalTestParamsList() []normalTestParams {
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &base,
-					ToChain:          &mainnet,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &base,
-					ToChain:          &mainnet,
 					AmountOut:        (*hexutil.Big)(big.NewInt(3.5*testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
@@ -2464,35 +2309,7 @@ func getNormalTestParamsList() []normalTestParams {
 					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
 					FromChain:        &base,
 					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &base,
-					ToChain:          &optimism,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &base,
-					ToChain:          &optimism,
 					AmountOut:        (*hexutil.Big)(big.NewInt(3.5*testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &base,
-					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(0.5*testAmount100USDC - testBonderFeeUSDC)),
-					ApprovalRequired: true,
-				},
-				{
-					ProcessorName:    pathProcessorCommon.ProcessorBridgeHopName,
-					FromChain:        &base,
-					ToChain:          &arbitrum,
-					AmountOut:        (*hexutil.Big)(big.NewInt(testAmount100USDC - testBonderFeeUSDC)),
 					ApprovalRequired: true,
 				},
 				{
@@ -3509,479 +3326,6 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 					FromChain:        &arbitrum,
 					ToChain:          &optimism,
 					ApprovalRequired: true,
-				},
-			},
-		},
-	}
-}
-
-type amountOptionsTestParams struct {
-	name                  string
-	input                 *requests.RouteInputParams
-	expectedAmountOptions map[uint64][]amountOption
-}
-
-func getAmountOptionsTestParamsList() []amountOptionsTestParams {
-	return []amountOptionsTestParams{
-		{
-			name: "Transfer - Single From Chain - No Locked Amount",
-			input: &requests.RouteInputParams{
-				TestnetMode:          false,
-				Uuid:                 uuid.NewString(),
-				SendType:             sendtype.Transfer,
-				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              walletCommon.EthSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
-
-				TestsMode: true,
-				TestParams: &requests.RouterTestParams{
-					TokenFrom: &tokenTypes.Token{
-						ChainID:  1,
-						Symbol:   walletCommon.EthSymbol,
-						Decimals: 18,
-					},
-					BalanceMap: map[string]*big.Int{},
-				},
-			},
-			expectedAmountOptions: map[uint64][]amountOption{
-				walletCommon.OptimismMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: false,
-					},
-				},
-			},
-		},
-		{
-			name: "Transfer - Single From Chain - Locked Amount To Single Chain Equal Total Amount",
-			input: &requests.RouteInputParams{
-				TestnetMode:          false,
-				Uuid:                 uuid.NewString(),
-				SendType:             sendtype.Transfer,
-				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				TokenID:              walletCommon.EthSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet},
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				},
-
-				TestsMode: true,
-				TestParams: &requests.RouterTestParams{
-					TokenFrom: &tokenTypes.Token{
-						ChainID:  1,
-						Symbol:   walletCommon.EthSymbol,
-						Decimals: 18,
-					},
-					BalanceMap: map[string]*big.Int{},
-				},
-			},
-			expectedAmountOptions: map[uint64][]amountOption{
-				walletCommon.OptimismMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: true,
-					},
-				},
-			},
-		},
-		{
-			name: "Transfer - Multiple From Chains - Locked Amount To Single Chain Is Less Than Total Amount",
-			input: &requests.RouteInputParams{
-				TestnetMode:          false,
-				Uuid:                 uuid.NewString(),
-				SendType:             sendtype.Transfer,
-				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
-				TokenID:              walletCommon.EthSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.BaseMainnet},
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				},
-
-				TestsMode: true,
-				TestParams: &requests.RouterTestParams{
-					TokenFrom: &tokenTypes.Token{
-						ChainID:  1,
-						Symbol:   walletCommon.EthSymbol,
-						Decimals: 18,
-					},
-					BalanceMap: map[string]*big.Int{},
-				},
-			},
-			expectedAmountOptions: map[uint64][]amountOption{
-				walletCommon.OptimismMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: true,
-					},
-				},
-				walletCommon.ArbitrumMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: false,
-					},
-				},
-			},
-		},
-		{
-			name: "Transfer - Multiple From Chains - Locked Amount To Multiple Chains",
-			input: &requests.RouteInputParams{
-				TestnetMode:          false,
-				Uuid:                 uuid.NewString(),
-				SendType:             sendtype.Transfer,
-				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
-				TokenID:              walletCommon.EthSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				},
-
-				TestsMode: true,
-				TestParams: &requests.RouterTestParams{
-					TokenFrom: &tokenTypes.Token{
-						ChainID:  1,
-						Symbol:   walletCommon.EthSymbol,
-						Decimals: 18,
-					},
-					BalanceMap: map[string]*big.Int{},
-				},
-			},
-			expectedAmountOptions: map[uint64][]amountOption{
-				walletCommon.OptimismMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: true,
-					},
-				},
-				walletCommon.ArbitrumMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: true,
-					},
-				},
-			},
-		},
-		{
-			name: "Transfer - All From Chains - Locked Amount To Multiple Chains Equal Total Amount",
-			input: &requests.RouteInputParams{
-				TestnetMode: false,
-				Uuid:        uuid.NewString(),
-				SendType:    sendtype.Transfer,
-				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount2ETHInWei)),
-				TokenID:     walletCommon.EthSymbol,
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				},
-
-				TestsMode: true,
-				TestParams: &requests.RouterTestParams{
-					TokenFrom: &tokenTypes.Token{
-						ChainID:  1,
-						Symbol:   walletCommon.EthSymbol,
-						Decimals: 18,
-					},
-					BalanceMap: map[string]*big.Int{},
-				},
-			},
-			expectedAmountOptions: map[uint64][]amountOption{
-				walletCommon.OptimismMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: true,
-					},
-				},
-				walletCommon.ArbitrumMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: true,
-					},
-				},
-			},
-		},
-		{
-			name: "Transfer - All From Chains - Locked Amount To Multiple Chains Is Less Than Total Amount",
-			input: &requests.RouteInputParams{
-				TestnetMode: false,
-				Uuid:        uuid.NewString(),
-				SendType:    sendtype.Transfer,
-				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount5ETHInWei)),
-				TokenID:     walletCommon.EthSymbol,
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-					walletCommon.ArbitrumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				},
-
-				TestsMode: true,
-				TestParams: &requests.RouterTestParams{
-					TokenFrom: &tokenTypes.Token{
-						ChainID:  1,
-						Symbol:   walletCommon.EthSymbol,
-						Decimals: 18,
-					},
-					BalanceMap: map[string]*big.Int{},
-				},
-			},
-			expectedAmountOptions: map[uint64][]amountOption{
-				walletCommon.OptimismMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: true,
-					},
-				},
-				walletCommon.ArbitrumMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: true,
-					},
-				},
-				walletCommon.EthereumMainnet: {
-					{
-						amount: big.NewInt(testAmount3ETHInWei),
-						locked: false,
-					},
-				},
-				walletCommon.BaseMainnet: {
-					{
-						amount: big.NewInt(testAmount3ETHInWei),
-						locked: false,
-					},
-				},
-			},
-		},
-		{
-			name: "Transfer - All From Chain - No Locked Amount - Enough Token Balance If All Chains Are Used",
-			input: &requests.RouteInputParams{
-				TestnetMode: false,
-				Uuid:        uuid.NewString(),
-				SendType:    sendtype.Transfer,
-				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei + testAmount1ETHInWei)),
-				TokenID:     walletCommon.EthSymbol,
-
-				TestsMode: true,
-				TestParams: &requests.RouterTestParams{
-					TokenFrom: &tokenTypes.Token{
-						ChainID:  1,
-						Symbol:   walletCommon.EthSymbol,
-						Decimals: 18,
-					},
-					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.BaseMainnet, walletCommon.EthSymbol):     big.NewInt(testAmount1ETHInWei),
-					},
-				},
-			},
-			expectedAmountOptions: map[uint64][]amountOption{
-				walletCommon.OptimismMainnet: {
-					{
-						amount: big.NewInt(testAmount3ETHInWei + testAmount1ETHInWei),
-						locked: false,
-					},
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: false,
-					},
-				},
-				walletCommon.ArbitrumMainnet: {
-					{
-						amount: big.NewInt(testAmount3ETHInWei + testAmount1ETHInWei),
-						locked: false,
-					},
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: false,
-					},
-				},
-				walletCommon.EthereumMainnet: {
-					{
-						amount: big.NewInt(testAmount3ETHInWei + testAmount1ETHInWei),
-						locked: false,
-					},
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: false,
-					},
-				},
-				walletCommon.BaseMainnet: {
-					{
-						amount: big.NewInt(testAmount3ETHInWei + testAmount1ETHInWei),
-						locked: false,
-					},
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: false,
-					},
-				},
-			},
-		},
-		{
-			name: "Transfer - All From Chain - Locked Amount To Single Chain - Enough Token Balance If All Chains Are Used",
-			input: &requests.RouteInputParams{
-				TestnetMode: false,
-				Uuid:        uuid.NewString(),
-				SendType:    sendtype.Transfer,
-				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
-				TokenID:     walletCommon.EthSymbol,
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
-				},
-
-				TestsMode: true,
-				TestParams: &requests.RouterTestParams{
-					TokenFrom: &tokenTypes.Token{
-						ChainID:  1,
-						Symbol:   walletCommon.EthSymbol,
-						Decimals: 18,
-					},
-					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount2ETHInWei),
-						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount3ETHInWei),
-						makeBalanceKey(walletCommon.BaseMainnet, walletCommon.EthSymbol):     big.NewInt(testAmount3ETHInWei),
-					},
-				},
-			},
-			expectedAmountOptions: map[uint64][]amountOption{
-				walletCommon.OptimismMainnet: {
-					{
-						amount: big.NewInt(testAmount0Point5ETHInWei),
-						locked: true,
-					},
-				},
-				walletCommon.ArbitrumMainnet: {
-					{
-						amount: big.NewInt(testAmount2ETHInWei + testAmount0Point5ETHInWei),
-						locked: false,
-					},
-				},
-				walletCommon.EthereumMainnet: {
-					{
-						amount: big.NewInt(testAmount2ETHInWei + testAmount0Point5ETHInWei),
-						locked: false,
-					},
-					{
-						amount: big.NewInt(testAmount2ETHInWei),
-						locked: false,
-					},
-				},
-				walletCommon.BaseMainnet: {
-					{
-						amount: big.NewInt(testAmount0Point5ETHInWei),
-						locked: false,
-					},
-					{
-						amount: big.NewInt(testAmount2ETHInWei + testAmount0Point5ETHInWei),
-						locked: false,
-					},
-				},
-			},
-		},
-		{
-			name: "Transfer - All From Chain - Locked Amount To Multiple Chains - Enough Token Balance If All Chains Are Used",
-			input: &requests.RouteInputParams{
-				TestnetMode: false,
-				Uuid:        uuid.NewString(),
-				SendType:    sendtype.Transfer,
-				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount3ETHInWei)),
-				TokenID:     walletCommon.EthSymbol,
-				FromLockedAmount: map[uint64]*hexutil.Big{
-					walletCommon.OptimismMainnet: (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
-					walletCommon.BaseMainnet:     (*hexutil.Big)(big.NewInt(testAmount0Point5ETHInWei)),
-					walletCommon.EthereumMainnet: (*hexutil.Big)(big.NewInt(testAmount1ETHInWei)),
-				},
-
-				TestsMode: true,
-				TestParams: &requests.RouterTestParams{
-					TokenFrom: &tokenTypes.Token{
-						ChainID:  1,
-						Symbol:   walletCommon.EthSymbol,
-						Decimals: 18,
-					},
-					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount2ETHInWei),
-						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount3ETHInWei),
-						makeBalanceKey(walletCommon.BaseMainnet, walletCommon.EthSymbol):     big.NewInt(testAmount3ETHInWei),
-					},
-				},
-			},
-			expectedAmountOptions: map[uint64][]amountOption{
-				walletCommon.OptimismMainnet: {
-					{
-						amount: big.NewInt(testAmount0Point5ETHInWei),
-						locked: true,
-					},
-				},
-				walletCommon.BaseMainnet: {
-					{
-						amount: big.NewInt(testAmount0Point5ETHInWei),
-						locked: true,
-					},
-				},
-				walletCommon.ArbitrumMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: false,
-					},
-				},
-				walletCommon.EthereumMainnet: {
-					{
-						amount: big.NewInt(testAmount1ETHInWei),
-						locked: true,
-					},
-				},
-			},
-		},
-		{
-			name: "Transfer - All From Chain - No Locked Amount - Not Enough Token Balance",
-			input: &requests.RouteInputParams{
-				TestnetMode: false,
-				Uuid:        uuid.NewString(),
-				SendType:    sendtype.Transfer,
-				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount5ETHInWei)),
-				TokenID:     walletCommon.EthSymbol,
-
-				TestsMode: true,
-				TestParams: &requests.RouterTestParams{
-					TokenFrom: &tokenTypes.Token{
-						ChainID:  1,
-						Symbol:   walletCommon.EthSymbol,
-						Decimals: 18,
-					},
-					BalanceMap: map[string]*big.Int{
-						makeBalanceKey(walletCommon.EthereumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.OptimismMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.ArbitrumMainnet, walletCommon.EthSymbol): big.NewInt(testAmount1ETHInWei),
-						makeBalanceKey(walletCommon.BaseMainnet, walletCommon.EthSymbol):     big.NewInt(testAmount1ETHInWei),
-					},
-				},
-			},
-			expectedAmountOptions: map[uint64][]amountOption{
-				walletCommon.OptimismMainnet: {
-					{
-						amount: big.NewInt(testAmount5ETHInWei),
-						locked: false,
-					},
-				},
-				walletCommon.ArbitrumMainnet: {
-					{
-						amount: big.NewInt(testAmount5ETHInWei),
-						locked: false,
-					},
-				},
-				walletCommon.BaseMainnet: {
-					{
-						amount: big.NewInt(testAmount5ETHInWei),
-						locked: false,
-					},
-				},
-				walletCommon.EthereumMainnet: {
-					{
-						amount: big.NewInt(testAmount5ETHInWei),
-						locked: false,
-					},
 				},
 			},
 		},
