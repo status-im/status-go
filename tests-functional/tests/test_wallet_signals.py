@@ -12,8 +12,8 @@ from steps.status_backend import StatusBackendSteps
 class TestWalletSignals(StatusBackendSteps):
 
     @classmethod
-    def setup_class(self):
-        self.await_signals.append("wallet")
+    def setup_class(cls, skip_login=False):
+        cls.await_signals.append("wallet")
         super().setup_class()
 
     def setup_method(self):
