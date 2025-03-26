@@ -20,7 +20,7 @@ from clients.services.settings import SettingsService
 from clients.signals import SignalClient
 from clients.rpc import RpcClient
 from conftest import option
-from resources.constants import USE_IPV6, user_1, DEFAULT_DISPLAY_NAME, USER_DIR, ANVIL_NETWORK_ID
+from resources.constants import USE_IPV6, user_1, USER_DIR, ANVIL_NETWORK_ID
 from docker.errors import APIError
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
@@ -61,7 +61,6 @@ class StatusBackend(RpcClient, SignalClient):
         self.ws_url = f"{url}".replace("http", "ws")
         self.rpc_url = f"{url}/statusgo/CallRPC"
         self.public_key = ""
-        self.node_login_event = None
 
         RpcClient.__init__(self, self.rpc_url)
         SignalClient.__init__(self, self.ws_url, await_signals)
@@ -269,10 +268,7 @@ class StatusBackend(RpcClient, SignalClient):
             f"DISP_NAME_{''.join(random.choices(string.ascii_letters + string.digits + '_-', k=10))}",
         )
 
-    def _create_account_request(self,
-                                data_dir,
-                                user,
-                                **kwargs):
+    def _create_account_request(self, data_dir, user, **kwargs):
         data = {
             "rootDataDir": data_dir,
             "kdfIterations": 256000,
