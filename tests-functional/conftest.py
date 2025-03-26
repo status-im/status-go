@@ -41,6 +41,12 @@ def pytest_addoption(parser):
         help="",
         default=None,
     )
+    parser.addoption(
+        "--logout",
+        action="store_true",
+        help="When set, will automatically call Logout() before InitializeApplication()",
+        default=False,
+    )
 
 
 @dataclass
