@@ -170,7 +170,12 @@ class StatusBackend(RpcClient, SignalClient):
     def init_status_backend(self, data_dir=USER_DIR):
         if option.logout:
             logging.warning("automatically logging out before InitializeApplication")
-            self.logout()
+            try:
+                self.logout()
+                logging.debug("successfully logged out")
+            except Exception:
+                logging.debug("failed to log out")
+                pass
 
         method = "InitializeApplication"
         data = {
