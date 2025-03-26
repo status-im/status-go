@@ -26,7 +26,7 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 		return err
 	}
 
-	if utils.IsENSName(displayName) || currDisplayName == displayName {
+	if currDisplayName == displayName {
 		return nil // Do nothing
 	}
 

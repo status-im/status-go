@@ -50,6 +50,10 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameChange() {
 	err = s.m.SetDisplayName(testDisplayName)
 	s.Require().NoError(err)
 
+	// set the same display name (should do nothing)
+	err = s.m.SetDisplayName(testDisplayName)
+	s.Require().NoError(err)
+
 	// check display name after change - mutliaccount
 	multiAcc, err := s.m.multiAccounts.GetAccount(s.m.account.KeyUID)
 	s.Require().NoError(err)
@@ -219,14 +223,23 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameRestrictions() 
 	s.Require().Equal("name with space", displayName)
 }
 
-func (s *MessengerProfileDisplayNameHandlerSuite) TestUpdateImageWhenEnsNameIsSet() {
-	err := s.m.settings.SaveSetting("preferred-name", "kounkou.stateofus.eth")
+func (s *MessengerProfileDisplayNameHandlerSuite) TestSaveAccountWhenEnsNameIsSet() {
+	// try to manually set display name to ens name (will fail)
+	err := s.m.SetDisplayName("godfrain.stateofus.eth")
+	s.Require().Error(err)
+
+	displayName, err := s.m.settings.DisplayName()
+	s.Require().NoError(err)
+	s.Require().NotEqual("godfrain.stateofus.eth", displayName)
+
+	// Set the preffered name to ens name (will work)
+	err = s.m.settings.SaveSetting("preferred-name", "godfrain.stateofus.eth")
 	s.Require().NoError(err)
 
-	// check display name for the created instance
-	displayName, err := s.m.settings.GetPreferredUsername()
+	// check preffered name for the created instance
+	displayName, err = s.m.settings.GetPreferredUsername()
 	s.Require().NoError(err)
-	s.Require().Equal("kounkou.stateofus.eth", displayName)
+	s.Require().Equal("godfrain.stateofus.eth", displayName)
 
 	// add profile keypair
 	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
@@ -244,9 +257,5 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestUpdateImageWhenEnsNameIsSe
 
 	// save account will create the account
 	err = s.m.multiAccounts.SaveAccount(*s.m.account)
-	s.Require().NoError(err)
-
-	// set new description
-	err = s.m.SetDisplayName("godfrain.stateofus.eth")
 	s.Require().NoError(err)
 }
