@@ -17,14 +17,13 @@ import (
 func TestCopyPath(t *testing.T) {
 	addr := common.HexToAddress("0x123")
 	path := &Path{
-		ProcessorName:  "test",
-		FromChain:      &params.Network{ChainID: 1},
-		ToChain:        &params.Network{ChainID: 2},
-		FromToken:      &tokenTypes.Token{Symbol: "symbol1"},
-		ToToken:        &tokenTypes.Token{Symbol: "symbol2"},
-		AmountIn:       (*hexutil.Big)(big.NewInt(100)),
-		AmountInLocked: true,
-		AmountOut:      (*hexutil.Big)(big.NewInt(200)),
+		ProcessorName: "test",
+		FromChain:     &params.Network{ChainID: 1},
+		ToChain:       &params.Network{ChainID: 2},
+		FromToken:     &tokenTypes.Token{Symbol: "symbol1"},
+		ToToken:       &tokenTypes.Token{Symbol: "symbol2"},
+		AmountIn:      (*hexutil.Big)(big.NewInt(100)),
+		AmountOut:     (*hexutil.Big)(big.NewInt(200)),
 		SuggestedLevelsForMaxFeesPerGas: &fees.MaxFeesLevels{
 			Low:    (*hexutil.Big)(big.NewInt(100)),
 			Medium: (*hexutil.Big)(big.NewInt(200)),

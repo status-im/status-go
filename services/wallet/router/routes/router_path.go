@@ -20,7 +20,6 @@ type Path struct {
 	FromToken             *tokenTypes.Token // Source token
 	ToToken               *tokenTypes.Token // Destination token, set if applicable
 	AmountIn              *hexutil.Big      // Amount that will be sent from the source chain
-	AmountInLocked        bool              // Is the amount locked
 	AmountOut             *hexutil.Big      // Amount that will be received on the destination chain
 
 	SuggestedLevelsForMaxFeesPerGas *fees.MaxFeesLevels // Suggested max fees by the network (in ETH WEI)
@@ -100,7 +99,6 @@ func (p *Path) Copy() *Path {
 	newPath := &Path{
 		RouterInputParamsUuid:      p.RouterInputParamsUuid,
 		ProcessorName:              p.ProcessorName,
-		AmountInLocked:             p.AmountInLocked,
 		SuggestedTxGasAmount:       p.SuggestedTxGasAmount,
 		SuggestedApprovalGasAmount: p.SuggestedApprovalGasAmount,
 		TxGasFeeMode:               p.TxGasFeeMode,

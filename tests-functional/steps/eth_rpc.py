@@ -36,7 +36,6 @@ class EthRpcSteps(StatusBackendSteps):
             "disabledFromChainIDs": [],
             "disabledToChainIDs": [],
             "gasFeeMode": 1,
-            "fromLockedAmount": {},
             # params for building tx from route
             "slippagePercentage": 0,
         }

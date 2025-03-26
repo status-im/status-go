@@ -15,45 +15,44 @@ import (
 )
 
 var (
-	ErrENSRegisterRequiresUsernameAndPubKey      = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-001"), Details: "username and public key are required for ENSRegister"}
-	ErrENSRegisterTestnetSTTOnly                 = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-002"), Details: "only STT is supported for ENSRegister on testnet"}
-	ErrENSRegisterMainnetSNTOnly                 = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-003"), Details: "only SNT is supported for ENSRegister on mainnet"}
-	ErrENSReleaseRequiresUsername                = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-004"), Details: "username is required for ENSRelease"}
-	ErrENSSetPubKeyRequiresUsernameAndPubKey     = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-005"), Details: "username and public key are required for ENSSetPubKey"}
-	ErrStickersBuyRequiresPackID                 = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-006"), Details: "packID is required for StickersBuy"}
-	ErrSwapRequiresToTokenID                     = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-007"), Details: "toTokenID is required for Swap"}
-	ErrSwapTokenIDMustBeDifferent                = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-008"), Details: "tokenID and toTokenID must be different"}
-	ErrSwapAmountInAmountOutMustBeExclusive      = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-009"), Details: "only one of amountIn or amountOut can be set"}
-	ErrSwapAmountInMustBePositive                = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-010"), Details: "amountIn must be positive"}
-	ErrSwapAmountOutMustBePositive               = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-011"), Details: "amountOut must be positive"}
-	ErrLockedAmountNotSupportedForNetwork        = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-012"), Details: "locked amount is not supported for the selected network"}
-	ErrLockedAmountNotNegative                   = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-013"), Details: "locked amount must not be negative"}
-	ErrLockedAmountExceedsTotalSendAmount        = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-014"), Details: "locked amount exceeds the total amount to send"}
-	ErrLockedAmountLessThanSendAmountAllNetworks = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-015"), Details: "locked amount is less than the total amount to send, but all networks are locked"}
-	ErrDisabledChainFoundAmongLockedNetworks     = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-016"), Details: "disabled chain found among locked networks"}
-	ErrENSSetPubKeyInvalidUsername               = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-017"), Details: "a valid username, ending in '.eth', is required for ENSSetPubKey"}
-	ErrLockedAmountExcludesAllSupported          = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-018"), Details: "all supported chains are excluded, routing impossible"}
-	ErrCannotCheckLockedAmounts                  = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-019"), Details: "cannot check locked amounts"}
-	ErrNoCommunityParametersProvided             = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-020"), Details: "no community parameters provided"}
-	ErrNoFromChainProvided                       = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-021"), Details: "from chain not provided"}
-	ErrNoToChainProvided                         = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-022"), Details: "to chain not provided"}
-	ErrFromAndToChainMustBeTheSame               = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-023"), Details: "from and to chain IDs must be the same"}
+	ErrENSRegisterRequiresUsernameAndPubKey  = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-001"), Details: "username and public key are required for ENSRegister"}
+	ErrENSRegisterTestnetSTTOnly             = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-002"), Details: "only STT is supported for ENSRegister on testnet"}
+	ErrENSRegisterMainnetSNTOnly             = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-003"), Details: "only SNT is supported for ENSRegister on mainnet"}
+	ErrENSReleaseRequiresUsername            = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-004"), Details: "username is required for ENSRelease"}
+	ErrENSSetPubKeyRequiresUsernameAndPubKey = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-005"), Details: "username and public key are required for ENSSetPubKey"}
+	ErrStickersBuyRequiresPackID             = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-006"), Details: "packID is required for StickersBuy"}
+	ErrSwapRequiresToTokenID                 = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-007"), Details: "toTokenID is required for Swap"}
+	ErrSwapTokenIDMustBeDifferent            = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-008"), Details: "tokenID and toTokenID must be different"}
+	ErrSwapAmountInAmountOutMustBeExclusive  = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-009"), Details: "only one of amountIn or amountOut can be set"}
+	ErrSwapAmountInMustBePositive            = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-010"), Details: "amountIn must be positive"}
+	ErrSwapAmountOutMustBePositive           = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-011"), Details: "amountOut must be positive"}
+	// ErrLockedAmountNotSupportedForNetwork        = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-012"), Details: "locked amount is not supported for the selected network"}
+	// ErrLockedAmountNotNegative                   = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-013"), Details: "locked amount must not be negative"}
+	// ErrLockedAmountExceedsTotalSendAmount        = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-014"), Details: "locked amount exceeds the total amount to send"}
+	// ErrLockedAmountLessThanSendAmountAllNetworks = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-015"), Details: "locked amount is less than the total amount to send, but all networks are locked"}
+	// ErrDisabledChainFoundAmongLockedNetworks     = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-016"), Details: "disabled chain found among locked networks"}
+	ErrENSSetPubKeyInvalidUsername = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-017"), Details: "a valid username, ending in '.eth', is required for ENSSetPubKey"}
+	// ErrLockedAmountExcludesAllSupported = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-018"), Details: "all supported chains are excluded, routing impossible"}
+	// ErrCannotCheckLockedAmounts         = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-019"), Details: "cannot check locked amounts"}
+	ErrNoCommunityParametersProvided = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-020"), Details: "no community parameters provided"}
+	ErrNoFromChainProvided           = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-021"), Details: "from chain not provided"}
+	ErrNoToChainProvided             = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-022"), Details: "to chain not provided"}
+	ErrFromAndToChainMustBeTheSame   = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-023"), Details: "from and to chain IDs must be the same"}
 )
 
 type RouteInputParams struct {
-	Uuid                 string                  `json:"uuid"`
-	SendType             sendtype.SendType       `json:"sendType" validate:"required"`
-	AddrFrom             common.Address          `json:"addrFrom" validate:"required"`
-	AddrTo               common.Address          `json:"addrTo" validate:"required"`
-	AmountIn             *hexutil.Big            `json:"amountIn" validate:"required"`
-	AmountOut            *hexutil.Big            `json:"amountOut"`
-	TokenID              string                  `json:"tokenID" validate:"required"`
-	TokenIDIsOwnerToken  bool                    `json:"tokenIDIsOwnerToken"`
-	ToTokenID            string                  `json:"toTokenID"`
-	DisabledFromChainIDs []uint64                `json:"disabledFromChainIDs"`
-	DisabledToChainIDs   []uint64                `json:"disabledToChainIDs"`
-	GasFeeMode           fees.GasFeeMode         `json:"gasFeeMode" validate:"required"`
-	FromLockedAmount     map[uint64]*hexutil.Big `json:"fromLockedAmount"`
+	Uuid                 string            `json:"uuid"`
+	SendType             sendtype.SendType `json:"sendType" validate:"required"`
+	AddrFrom             common.Address    `json:"addrFrom" validate:"required"`
+	AddrTo               common.Address    `json:"addrTo" validate:"required"`
+	AmountIn             *hexutil.Big      `json:"amountIn" validate:"required"`
+	AmountOut            *hexutil.Big      `json:"amountOut"`
+	TokenID              string            `json:"tokenID" validate:"required"`
+	TokenIDIsOwnerToken  bool              `json:"tokenIDIsOwnerToken"`
+	ToTokenID            string            `json:"toTokenID"`
+	DisabledFromChainIDs []uint64          `json:"disabledFromChainIDs"`
+	DisabledToChainIDs   []uint64          `json:"disabledToChainIDs"`
+	GasFeeMode           fees.GasFeeMode   `json:"gasFeeMode" validate:"required"`
 	TestnetMode          bool
 
 	// For send types like EnsRegister, EnsRelease, EnsSetPubKey, StickersBuy
@@ -193,64 +192,5 @@ func (i *RouteInputParams) Validate() error {
 		return i.CommunityRouteInputParams.validateCommunityRelatedInputs(i.SendType)
 	}
 
-	return i.validateFromLockedAmount()
-}
-
-func (i *RouteInputParams) validateFromLockedAmount() error {
-	if i.FromLockedAmount == nil || len(i.FromLockedAmount) == 0 {
-		return nil
-	}
-
-	var suppNetworks map[uint64]bool
-	if i.TestnetMode {
-		suppNetworks = walletCommon.CopyMapGeneric(walletCommon.SupportedTestNetworks, nil).(map[uint64]bool)
-	} else {
-		suppNetworks = walletCommon.CopyMapGeneric(walletCommon.SupportedNetworks, nil).(map[uint64]bool)
-	}
-
-	if suppNetworks == nil {
-		return ErrCannotCheckLockedAmounts
-	}
-
-	totalLockedAmount := big.NewInt(0)
-	excludedChainCount := 0
-
-	for chainID, amount := range i.FromLockedAmount {
-		if walletCommon.ArrayContainsElement(chainID, i.DisabledFromChainIDs) {
-			return ErrDisabledChainFoundAmongLockedNetworks
-		}
-
-		if i.TestnetMode {
-			if !walletCommon.SupportedTestNetworks[chainID] {
-				return ErrLockedAmountNotSupportedForNetwork
-			}
-		} else {
-			if !walletCommon.SupportedNetworks[chainID] {
-				return ErrLockedAmountNotSupportedForNetwork
-			}
-		}
-
-		if amount == nil || amount.ToInt().Sign() < 0 {
-			return ErrLockedAmountNotNegative
-		}
-
-		if !(amount.ToInt().Sign() > 0) {
-			excludedChainCount++
-		}
-		delete(suppNetworks, chainID)
-		totalLockedAmount = new(big.Int).Add(totalLockedAmount, amount.ToInt())
-	}
-
-	if (!i.TestnetMode && excludedChainCount == len(walletCommon.SupportedNetworks)) ||
-		(i.TestnetMode && excludedChainCount == len(walletCommon.SupportedTestNetworks)) {
-		return ErrLockedAmountExcludesAllSupported
-	}
-
-	if totalLockedAmount.Cmp(i.AmountIn.ToInt()) > 0 {
-		return ErrLockedAmountExceedsTotalSendAmount
-	}
-	if totalLockedAmount.Cmp(i.AmountIn.ToInt()) < 0 && len(suppNetworks) == 0 {
-		return ErrLockedAmountLessThanSendAmountAllNetworks
-	}
 	return nil
 }

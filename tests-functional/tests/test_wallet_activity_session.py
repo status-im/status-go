@@ -53,7 +53,6 @@ class TestWalletActivitySession(WalletSteps):
             "disabledFromChainIDs": [10, 42161],
             "disabledToChainIDs": [10, 42161],
             "gasFeeMode": 1,
-            "fromLockedAmount": {},
             # params for building tx from route
             "slippagePercentage": 0,
         }

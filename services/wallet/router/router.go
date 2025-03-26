@@ -232,7 +232,7 @@ func newSuggestedRoutes(
 		Children: routes.BuildGraph(input.AmountIn.ToInt(), candidates, 0, []uint64{}),
 	}
 	allRoutes := node.BuildAllRoutes()
-	allRoutes = filterRoutes(allRoutes, input.AmountIn.ToInt(), input.FromLockedAmount)
+	allRoutes = filterRoutes(allRoutes, input.AmountIn.ToInt())
 
 	if len(allRoutes) > 0 {
 		sort.Slice(allRoutes, func(i, j int) bool {
@@ -791,7 +791,6 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		FromToken:             fromToken,
 		ToToken:               toToken,
 		AmountIn:              (*hexutil.Big)(processorInputParams.AmountIn),
-		AmountInLocked:        false,
 		AmountOut:             (*hexutil.Big)(amountOut),
 
 		// set params that we don't want to be recalculated with every new block creation

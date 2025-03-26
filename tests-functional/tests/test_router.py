@@ -39,7 +39,6 @@ class TestRouter(StatusBackendSteps):
             "disabledFromChainIDs": [1, 10, 42161],
             "disabledToChainIDs": [1, 10, 42161],
             "gasFeeMode": 1,
-            "fromLockedAmount": {},
         }
 
         routes = wallet_utils.get_suggested_routes(self.rpc_client, **params)
@@ -68,7 +67,6 @@ class TestRouter(StatusBackendSteps):
             "disabledFromChainIDs": [1, 10, 42161],
             "disabledToChainIDs": [1, 10, 42161],
             "gasFeeMode": gas_fee_mode,
-            "fromLockedAmount": {},
         }
 
         logging.info("Step: getting the best route")
@@ -135,7 +133,6 @@ class TestRouter(StatusBackendSteps):
             "disabledFromChainIDs": [1, 10, 42161],
             "disabledToChainIDs": [1, 10, 42161],
             "gasFeeMode": gas_fee_mode,
-            "fromLockedAmount": {},
         }
 
         logging.info("Step: getting the best route")
