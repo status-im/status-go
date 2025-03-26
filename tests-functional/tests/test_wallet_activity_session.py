@@ -21,6 +21,7 @@ def validate_entry(entry, tx_data):
 @pytest.mark.wallet
 @pytest.mark.rpc
 @pytest.mark.activity
+@pytest.mark.xdist_group(name="WalletSteps")
 class TestWalletActivitySession(WalletSteps):
     await_signals = [
         SignalType.NODE_LOGIN.value,

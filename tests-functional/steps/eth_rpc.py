@@ -2,14 +2,14 @@ import json
 import time
 from collections import namedtuple
 import pytest
-from steps.wallet import WalletSteps
+from steps.status_backend import StatusBackendSteps
 from clients.signals import SignalType
 from resources.constants import user_1, user_2
 from utils import wallet_utils
 from uuid import uuid4
 
 
-class EthRpcSteps(WalletSteps):
+class EthRpcSteps(StatusBackendSteps):
     await_signals = [
         SignalType.NODE_LOGIN.value,
         SignalType.WALLET.value,

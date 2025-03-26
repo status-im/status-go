@@ -7,11 +7,9 @@ import docker
 import docker.errors
 import os
 
+from conftest import option
 from resources.constants import ANVIL_NETWORK_ID, DEPLOYER_ACCOUNT
-
-logging.basicConfig(level=logging.INFO)
-
-DOCKER_PROJECT_NAME = os.environ.get("DOCKER_PROJECT_NAME", "tests-functional")
+from tenacity import retry, wait_fixed, stop_after_attempt
 
 
 class SmartContractRunner:
@@ -20,20 +18,27 @@ class SmartContractRunner:
 
     def __init__(self):
         self.docker_client = docker.from_env()
-        self.docker_project_name = DOCKER_PROJECT_NAME
+        self.docker_project_name = option.docker_project_name
         self.network_name = f"{self.docker_project_name}_default"
-        network = self.docker_client.networks.get(self.network_name)
-        self.container_name = None
-        for container in network.containers:
-            container_name_prefix = f"{self.docker_project_name}-foundry"
-            container_name = container.name
-            if container_name is not None and container_name_prefix in container_name:
-                self.container_name = container_name
-                break
+
+        container_name_prefix = f"{self.docker_project_name}-foundry"
+        self.container_name = self.find_container_name(self.network_name, container_name_prefix)
+
         if not self.container_name:
             raise Exception("Foundry container not found")
         self.container = self.docker_client.containers.get(self.container_name)
         self.wait_for_healthy()
+
+    @retry(stop=stop_after_attempt(10), wait=wait_fixed(0.1), reraise=True)
+    def find_container_name(self, network_name, searched_container):
+        network = self.docker_client.networks.get(network_name)
+
+        for container in network.containers:
+            container_name = container.name
+            if container_name is not None and searched_container in container_name:
+                return container_name
+
+        return None
 
     def wait_for_healthy(self, timeout=10):
         start_time = time.time()
@@ -92,8 +97,6 @@ class SmartContractRunner:
         host_output_path = self._extract_data(container_output_path, github_repo)
         if not host_output_path:
             raise Exception(f"Failed to extract data from {container_output_path}")
-
-    def get_output(self, host_output_path):
         with open(host_output_path, "r") as f:
             output = json.load(f)
         return output["returns"]
@@ -107,7 +110,7 @@ class SmartContractRunner:
         except docker.errors.NotFound:
             return None
 
-        output_dir = self.get_output_dir(repo_name)
+        output_dir = self._get_output_dir(repo_name)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -122,7 +125,7 @@ class SmartContractRunner:
 
         return output_dir
 
-    def get_output_dir(self, repo_name: str):
+    def _get_output_dir(self, repo_name: str):
         working_dir = os.getcwd()
 
         tests_functional = "tests-functional"
