@@ -253,8 +253,6 @@
                             "muteTill",
                             "muted",
                             "name",
-                            "syncedFrom",
-                            "syncedTo",
                             "timestamp",
                             "unviewedMentionsCount",
                             "unviewedMessagesCount",
