@@ -26,6 +26,7 @@ def validate_receipt(receipt, tx_hash, block_number, block_hash):
 
 @pytest.mark.rpc
 @pytest.mark.ethclient
+@pytest.mark.xdist_group(name="eth")
 class TestEth(EthRpcSteps):
 
     def test_block_number(self):
