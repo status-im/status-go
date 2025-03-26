@@ -1,9 +1,8 @@
-import os
-import pytest
-
-from clients.signals import SignalType
+from resources.constants import USER_DIR
 from clients.status_backend import StatusBackend
-from conftest import option
+import pytest
+from clients.signals import SignalType
+import os
 
 
 @pytest.mark.create_account
@@ -58,8 +57,8 @@ def assert_file_first_line(path, pattern: str, expected: bool):
 @pytest.mark.init
 @pytest.mark.parametrize("log_enabled,api_logging_enabled", [(True, True), (False, False)])
 def test_check_logs(log_enabled: bool, api_logging_enabled: bool):
-    data_dir = os.path.join(option.user_dir, "data")
-    logs_dir = os.path.join(option.user_dir, "logs")
+    data_dir = os.path.join(USER_DIR, "data")
+    logs_dir = os.path.join(USER_DIR, "logs")
 
     backend = StatusBackend()
     backend.api_valid_request(

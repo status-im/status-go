@@ -8,7 +8,7 @@ import docker.errors
 import os
 
 from conftest import option
-from resources.constants import ANVIL_NETWORK_ID, DEPLOYER_ACCOUNT
+from resources.constants import user_1, ANVIL_NETWORK_ID
 from tenacity import retry, wait_fixed, stop_after_attempt
 
 
@@ -79,8 +79,8 @@ class SmartContractRunner:
         smart_contract_filename = kwargs.get("smart_contract_filename")
         if not smart_contract_filename:
             raise ValueError("smart_contract_filename is required")
-        private_key = kwargs.get("private_key", DEPLOYER_ACCOUNT.private_key)
-        sender_address = kwargs.get("sender_address", DEPLOYER_ACCOUNT.address)
+        private_key = kwargs.get("private_key", user_1.private_key)
+        sender_address = kwargs.get("sender_address", user_1.address)
 
         cmd = f"/app/clone_and_run.sh {github_org} {github_repo} {smart_contract_dir} {smart_contract_filename} {private_key} {sender_address}"
         logging.info(f"Running command: {cmd}")
