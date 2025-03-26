@@ -113,7 +113,6 @@ report/results.xml
 tests-functional/**/coverage
 tests-functional/reports
 tests-functional/signals
-tests-functional/tmp
 tests-functional/*.log
 .venv
 
