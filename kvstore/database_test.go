@@ -1,16 +1,24 @@
 package kvstore
 
 import (
+	"database/sql"
 	"testing"
 
-	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/stretchr/testify/require"
 )
 
+type DbInitializer struct {
+}
+
+func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
+	return sqlite.OpenDB(path, password, kdfIterationsNumber)
+}
+
 func setupTestDB(t *testing.T) (*Database, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "kvstore-tests")
+	db, cleanup, err := helpers.SetupTestSQLDB(DbInitializer{}, "kvstore-tests")
 	require.NoError(t, err)
 	return NewDB(db), func() { require.NoError(t, cleanup()) }
 }

@@ -99,7 +99,10 @@ func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, erro
 	}
 
 	kvStore := kvstore.NewDB(db)
-	kvStore.DropDeprecatedKeys(kvstore.DeprecatedKeys)
+	err = kvStore.DropDeprecatedKeys(kvstore.DeprecatedKeys)
+	if err != nil {
+		return nil, err
+	}
 
 	return db, nil
 }
