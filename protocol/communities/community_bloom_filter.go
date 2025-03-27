@@ -44,13 +44,6 @@ func nextPowerOfTwo(x int) uint {
 	return 1 << bits.Len(uint(x))
 }
 
-func max(x, y uint) uint {
-	if x > y {
-		return x
-	}
-	return y
-}
-
 func generateBloomFilter(members map[string]*protobuf.CommunityMember, privateKey *ecdsa.PrivateKey, channelID string, clock uint64) (*bloom.BloomFilter, error) {
 	membersCount := len(members)
 	if membersCount == 0 {

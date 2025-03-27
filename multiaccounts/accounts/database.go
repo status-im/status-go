@@ -1696,10 +1696,7 @@ func (db *Database) resolveNumOfAddressesToGenerate(keypair *Keypair) uint64 {
 	}
 
 	final := numOfGeneratedAddressesKeycardKeypair + keypair.LastUsedDerivationIndex
-	if final < maxNumOfGeneratedAddresses {
-		return final
-	}
-	return maxNumOfGeneratedAddresses
+	return min(maxNumOfGeneratedAddresses, final)
 }
 
 func (db *Database) GetNumOfAddressesToGenerateForKeypair(keyUID string) (uint64, error) {
