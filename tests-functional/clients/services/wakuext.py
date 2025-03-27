@@ -275,6 +275,11 @@ class WakuextService(Service):
         response = self.rpc_request("chat", params)
         return response.json()
 
+    def active_chats(self):
+        params = []
+        response = self.rpc_request("activeChats", params)
+        return response.json()
+
     def mute_chat(self, chat_id: str):
         params = [chat_id]
         response = self.rpc_request("muteChat", params)
@@ -288,9 +293,4 @@ class WakuextService(Service):
     def unmute_chat(self, chat_id: str):
         params = [chat_id]
         response = self.rpc_request("unmuteChat", params)
-        return response.json()
-
-    def active_chats(self):
-        params = []
-        response = self.rpc_request("activeChats", params)
         return response.json()
