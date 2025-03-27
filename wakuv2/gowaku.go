@@ -41,6 +41,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"google.golang.org/protobuf/proto"
 
 	"go.uber.org/zap"
@@ -539,7 +540,6 @@ func (w *Waku) discoverAndConnectPeers() {
 	}
 
 	for _, addrString := range w.cfg.WakuNodes {
-		addrString := addrString
 		if strings.HasPrefix(addrString, "enrtree://") {
 			// Use DNS Discovery
 			go func() {
@@ -548,14 +548,11 @@ func (w *Waku) discoverAndConnectPeers() {
 					w.logger.Error("could not obtain dns discovery peers for ClusterConfig.WakuNodes", zap.Error(err), zap.String("dnsDiscURL", addrString))
 				}
 			}()
-		} else {
-			// It is a normal multiaddress
-			addr, err := multiaddr.NewMultiaddr(addrString)
-			if err != nil {
-				w.logger.Warn("invalid peer multiaddress", zap.String("ma", addrString), zap.Error(err))
-				continue
-			}
+			continue
+		}
 
+		if addr, err := multiaddr.NewMultiaddr(addrString); err == nil {
+			// It is a normal multiaddress
 			peerInfo, err := peer.AddrInfoFromP2pAddr(addr)
 			if err != nil {
 				w.logger.Warn("invalid peer multiaddress", zap.Stringer("addr", addr), zap.Error(err))
@@ -563,7 +560,32 @@ func (w *Waku) discoverAndConnectPeers() {
 			}
 
 			go w.connect(*peerInfo, nil, wps.Static)
+			continue
 		}
+
+		if strings.HasPrefix(addrString, "enr:") {
+			// Parse as ENR
+			node, err := enode.Parse(enode.ValidSchemes, addrString)
+			if err != nil {
+				w.logger.Warn("invalid ENR", zap.String("addr", addrString), zap.Error(err))
+				continue
+			}
+
+			id, addrs, err := enr.Multiaddress(node)
+			if err != nil {
+				w.logger.Warn("invalid peer ID", zap.Error(err))
+				continue
+			}
+
+			peerInfo := peer.AddrInfo{
+				ID:    id,
+				Addrs: addrs,
+			}
+			go w.connect(peerInfo, node, wps.Static)
+			continue
+		}
+
+		w.logger.Warn("unknown format of waku node address", zap.String("addr", addrString))
 	}
 }
 
