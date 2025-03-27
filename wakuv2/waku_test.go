@@ -42,6 +42,7 @@ import (
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/t/helpers"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
