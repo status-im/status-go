@@ -2,6 +2,7 @@ import base64
 import pytest
 
 from clients.signals import SignalType
+from resources.enums import MessageContentType
 from steps.messenger import MessengerSteps
 
 
@@ -36,6 +37,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         message_id = self.get_message_id(response)
         message = self.get_message_by_message_id(response, message_id)
         assert message.get("text", "") == self.REQUEST_TRANSACTION_TEXT
+        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
         command_parameters = message.get("commandParameters", {})
         assert command_parameters.get("value", "") == transaction_data["value"]
         assert command_parameters.get("contract", "") == transaction_data["contract"]
@@ -57,6 +59,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         message_id = self.get_message_id(response)
         message = self.get_message_by_message_id(response, message_id)
         assert message.get("text", "") == self.REQUEST_TRANSACTION_DECLINED_TEXT
+        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
         command_parameters = message.get("commandParameters", {})
         assert command_parameters.get("value", "") == transaction_data["value"]
         assert command_parameters.get("contract", "") == transaction_data["contract"]
@@ -78,6 +81,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         message_id = self.get_message_id(response)
         message = self.get_message_by_message_id(response, message_id)
         assert message.get("text", "") == self.TRANSACTION_SENT_TEXT
+        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
         command_parameters = message.get("commandParameters", {})
         assert command_parameters.get("value", "") == transaction_data["value"]
         assert command_parameters.get("contract", "") == transaction_data["contract"]
@@ -95,6 +99,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         message_id = self.get_message_id(response)
         message = self.get_message_by_message_id(response, message_id)
         assert message.get("text", "") == self.REQUEST_ADDRESS_FOR_TRANSACTION_TEXT
+        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
         command_parameters = message.get("commandParameters", {})
         assert command_parameters.get("from", "") == transaction_data["from"]
         assert command_parameters.get("value", "") == transaction_data["value"]
@@ -118,6 +123,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         message_id = self.get_message_id(response)
         message = self.get_message_by_message_id(response, message_id)
         assert message.get("text", "") == self.REQUEST_ADDRESS_FOR_TRANSACTION_DECLINED_TEXT
+        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
         command_parameters = message.get("commandParameters", {})
         assert command_parameters.get("value", "") == transaction_data["value"]
         assert command_parameters.get("contract", "") == transaction_data["contract"]
@@ -140,6 +146,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         message_id = self.get_message_id(response)
         message = self.get_message_by_message_id(response, message_id)
         assert message.get("text", "") == self.REQUEST_ADDRESS_FOR_TRANSACTION_ACCEPTED_TEXT
+        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
         command_parameters = message.get("commandParameters", {})
         assert command_parameters.get("address", "") == transaction_data["address"]
         assert command_parameters.get("value", "") == transaction_data["value"]
@@ -156,6 +163,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         message_id = self.get_message_id(response)
         message = self.get_message_by_message_id(response, message_id)
         assert message.get("text", "") == self.TRANSACTION_SENT_TEXT
+        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
         command_parameters = message.get("commandParameters", {})
         assert command_parameters.get("value", "") == transaction_data["value"]
         assert command_parameters.get("contract", "") == transaction_data["contract"]
