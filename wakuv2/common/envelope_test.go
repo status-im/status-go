@@ -1,0 +1,44 @@
+package common
+
+import (
+	"testing"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+)
+
+func TestNewEnvelope(t *testing.T) {
+	version := uint32(1)
+	timestamp := int64(1234567890)
+	ephemeral := true
+	hashBytes := []byte{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0}
+	hashStr := hexutil.Encode(hashBytes)
+
+	jsonStr := `{
+		"wakuMessage": {
+			"payload": "aGVsbG8=",
+			"contentTopic": "test-topic",
+			"version": 1,
+			"timestamp": 1234567890,
+			"meta": "bWV0YQ==",
+			"ephemeral": true,
+			"proof": "cHJvb2Y="
+		},
+		"pubsubTopic": "test-pubsub",
+		"messageHash": "` + hashStr + `"
+	}`
+
+	env, err := NewEnvelope(jsonStr)
+	assert.NoError(t, err)
+	assert.NotNil(t, env)
+
+	msg := env.Message()
+	assert.NotNil(t, msg)
+	assert.Equal(t, "test-topic", msg.ContentTopic)
+	assert.Equal(t, &version, msg.Version)
+	assert.Equal(t, &timestamp, msg.Timestamp)
+	assert.Equal(t, ephemeral, *msg.Ephemeral)
+	assert.Equal(t, "test-pubsub", env.PubsubTopic())
+	assert.Equal(t, pb.ToMessageHash(hashBytes), env.Hash())
+}
