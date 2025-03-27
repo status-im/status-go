@@ -11,7 +11,7 @@ from steps.messenger import MessengerSteps
 @pytest.mark.rpc
 class TestChatActions(MessengerSteps):
 
-    def test_chats(self):
+    def test_all_chats(self):
         sent_texts, _ = self.send_multiple_one_to_one_messages(1)
 
         response = self.sender.wakuext_service.chats()
@@ -22,7 +22,7 @@ class TestChatActions(MessengerSteps):
         assert chats[0].get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chats[0].get("lastMessage", {}).get("text", "") == sent_texts[0]
 
-    def test_chat(self):
+    def test_chat_by_chat_id(self):
         sent_texts, _ = self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key
 
