@@ -53,9 +53,9 @@ class Option:
 option = Option()
 
 
-def status_backend_url_generator():
-    if hasattr(option, "status_backend_url") and option.status_backend_url is not None:
-        urls = option.status_backend_url
+def status_backend_url_generator(config):
+    if hasattr(option, "status_backend_url") and config.status_backend_url is not None:
+        urls = config.status_backend_url
     else:
         print("status_backend_url option not found or is None")
         return
@@ -85,7 +85,7 @@ def pytest_configure(config):
     option.status_backend_containers = []
 
     option.base_dir = os.path.dirname(os.path.abspath(__file__))  # schemas directory
-    option.status_backend_urls = status_backend_url_generator()
+    option.status_backend_urls = status_backend_url_generator(config)
 
 
 @pytest.fixture(scope="function", autouse=True)

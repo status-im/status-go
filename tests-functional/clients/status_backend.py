@@ -84,8 +84,7 @@ class StatusBackend(RpcClient, SignalClient):
             self.temp_dir.cleanup()
 
     def _start_container(self, host_port, privileged):
-        identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else os.popen(
-            "git rev-parse --short HEAD").read().strip()
+        identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else os.popen("git rev-parse --short HEAD").read().strip()
         image_name = f"{self.docker_project_name}-status-backend:latest"
         container_name = f"{self.docker_project_name}-{identifier}-status-backend-{host_port}"
 
@@ -338,8 +337,7 @@ class StatusBackend(RpcClient, SignalClient):
         try:
             exec_result = self.container.exec_run(cmd=["sh", "-c", command], stdout=True, stderr=True, tty=False)
             if exec_result.exit_code != 0:
-                raise RuntimeError(
-                    f"Failed to execute command in container {self.container.id}:\n" f"OUTPUT: {exec_result.output.decode().strip()}")
+                raise RuntimeError(f"Failed to execute command in container {self.container.id}:\n" f"OUTPUT: {exec_result.output.decode().strip()}")
             return exec_result.output.decode().strip()
         except APIError as e:
             raise RuntimeError(f"API error during container execution: {str(e)}") from e
@@ -403,8 +401,7 @@ class StatusBackend(RpcClient, SignalClient):
             if not self.ipv6 and current_ipv4 == updated_ipv4:
                 raise RuntimeError("IPV4 is the same after network reconnect")
 
-            logging.info(
-                f"Changed container {self.container.name} IPs - New IPv4: {updated_ipv4}, New IPv6: {updated_ipv6}")
+            logging.info(f"Changed container {self.container.name} IPs - New IPv4: {updated_ipv4}, New IPv6: {updated_ipv6}")
 
         except Exception as e:
             raise RuntimeError(f"Failed to change container IP: {e}")
