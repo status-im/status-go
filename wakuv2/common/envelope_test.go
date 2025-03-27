@@ -3,8 +3,9 @@ package common
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 )
 
