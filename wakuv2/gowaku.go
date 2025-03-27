@@ -26,6 +26,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -81,6 +82,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
 	ethtypes "github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/kvstore"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/wakuv2/common"
@@ -132,8 +134,9 @@ type IMetricsHandler interface {
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
-	node  *node.WakuNode // reference to a libp2p waku node
-	appDB *sql.DB
+	node    *node.WakuNode // reference to a libp2p waku node
+	appDB   *sql.DB
+	kvStore *kvstore.Database
 
 	dnsAddressCache             map[string][]dnsdisc.DiscoveredNode // Map to store the multiaddresses returned by dns discovery
 	dnsAddressCacheLock         *sync.RWMutex                       // lock to handle access to the map
@@ -247,6 +250,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, appDB *sql.
 
 	waku := &Waku{
 		appDB:                           appDB,
+		kvStore:                         kvstore.NewDB(appDB),
 		cfg:                             cfg,
 		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
 		symKeys:                         make(map[string][]byte),
@@ -1340,7 +1344,55 @@ func (w *Waku) startMessageSender() error {
 		publishMethod = publish.LightPush
 	}
 
-	sender, err := publish.NewMessageSender(publishMethod, publish.NewDefaultPublisher(w.node.Lightpush(), w.node.Relay()), nil, w.logger)
+	var rateLimiter publish.PublishRateLimiter
+	rlnRateLimitEnabled, err := w.kvStore.GetBool(kvstore.ConfigRlnRateLimitEnabled)
+	if err != nil {
+		w.logger.Error("failed to get rln rate limit enabled", zap.Error(err))
+		return err
+	}
+	if rlnRateLimitEnabled {
+		state := publish.RlnRateLimitState{
+			RemainingTokens: publish.DefaultRlnLimiterCapacity,
+			LastRefill:      time.Now(),
+		}
+		stateStored, err := w.kvStore.Get(kvstore.WakuRlnRateLimitState)
+		if err != nil {
+			w.logger.Error("failed to get rln rate limit state", zap.Error(err))
+			return err
+		}
+		if stateStored != nil {
+			err = json.Unmarshal(stateStored, &state)
+			if err != nil {
+				w.logger.Error("failed to unmarshal rln rate limit state", zap.Error(err))
+				return err
+			}
+		}
+
+		updateCh := make(chan publish.RlnRateLimitState, 10)
+		rateLimiter = publish.NewRlnRateLimiter(publish.DefaultRlnLimiterCapacity, publish.DefaultRlnLimiterRefillInterval, state, updateCh)
+
+		go func() {
+			defer gocommon.LogOnPanic()
+			for {
+				select {
+				case <-w.ctx.Done():
+					return
+				case state := <-updateCh:
+					stateBytes, err := json.Marshal(state)
+					if err != nil {
+						w.logger.Error("failed to marshal rln rate limit state", zap.Error(err))
+						continue
+					}
+					err = w.kvStore.Set(kvstore.WakuRlnRateLimitState, stateBytes)
+					if err != nil {
+						w.logger.Error("failed to put rln rate limit state", zap.Error(err))
+					}
+				}
+			}
+		}()
+	}
+
+	sender, err := publish.NewMessageSender(publishMethod, publish.NewDefaultPublisher(w.node.Lightpush(), w.node.Relay()), rateLimiter, w.logger)
 	if err != nil {
 		w.logger.Error("failed to create message sender", zap.Error(err))
 		return err
