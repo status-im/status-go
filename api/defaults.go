@@ -155,7 +155,7 @@ func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
 	}
 
 	nodeConfig.ClusterConfig = params.DefaultClusterConfig(fleet)
-    
+
 	return nil
 }
 
