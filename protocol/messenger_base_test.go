@@ -8,10 +8,12 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -85,11 +87,15 @@ func newMessengerWithKey(shh wakutypes.Waku, privateKey *ecdsa.PrivateKey, logge
 }
 
 func newTestWakuNode(logger *zap.Logger) (wakutypes.Waku, error) {
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	if err != nil {
+		return nil, err
+	}
 	return wakuv2.New(
 		nil,
 		&wakuv2.DefaultConfig,
 		logger,
-		nil,
+		db,
 		nil,
 		func([]byte, peer.AddrInfo, error) {},
 		nil,
