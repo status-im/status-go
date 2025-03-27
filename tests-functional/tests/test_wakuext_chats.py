@@ -1,5 +1,3 @@
-import logging
-import random
 import pytest
 
 from datetime import datetime, timedelta
@@ -57,20 +55,21 @@ class TestChatActions(MessengerSteps):
         assert chat.get("muted", False) is True
         assert chat.get("muteTill", "") == result
 
-    def test_mute_chat_v2(self):
-        # Choose test case randomly
-        mute_type, time_delta = random.choice(
-            [
-                (MuteType.MUTE_FOR15_MIN.value, timedelta(minutes=15)),
-                (MuteType.MUTE_FOR1_HR.value, timedelta(hours=1)),
-                (MuteType.MUTE_FOR8_HR.value, timedelta(hours=8)),
-                (MuteType.MUTE_FOR1_WEEK.value, timedelta(days=7)),
-                (MuteType.MUTE_TILL1_MIN.value, timedelta(minutes=1)),
-                (MuteType.MUTE_FOR24_HR.value, timedelta(hours=24)),
-            ]
-        )
-        logging.info(f"test_mute_chat_v2: mute_type {mute_type}, time_delta {time_delta}")
-
+    @pytest.mark.parametrize(
+        "mute_type, time_delta",
+        [
+            # We use 3 cases here to reduce execution time.
+            # Uncomment the other cases below if additional scenarios need to be tested
+            # or if debugging specific mute durations is required.
+            (MuteType.MUTE_FOR15_MIN.value, timedelta(minutes=15)),
+            # (MuteType.MUTE_FOR1_HR.value, timedelta(hours=1)),
+            # (MuteType.MUTE_FOR8_HR.value, timedelta(hours=8)),
+            (MuteType.MUTE_FOR1_WEEK.value, timedelta(days=7)),
+            # (MuteType.MUTE_TILL1_MIN.value, timedelta(minutes=1)),
+            (MuteType.MUTE_FOR24_HR.value, timedelta(hours=24)),
+        ],
+    )
+    def test_mute_chat_v2(self, mute_type, time_delta):
         _, _ = self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key
 
@@ -87,15 +86,15 @@ class TestChatActions(MessengerSteps):
         assert chat.get("muted", False) is True
         assert chat.get("muteTill", "") == result
 
-    def test_unmute_mute_chat_v2_till_unmuted(self):
-        # Choose test case randomly
-        mute_type = random.choice(
-            [
-                (MuteType.MUTE_TILL_UNMUTED.value),
-                (MuteType.UNMUTED.value),
-            ]
-        )
-        logging.info(f"test_mute_chat_v2_till_unmuted: mute_type {mute_type}")
+    @pytest.mark.parametrize(
+        "mute_type",
+        [
+            # As test above
+            MuteType.MUTE_TILL_UNMUTED.value,
+            # MuteType.UNMUTED.value,
+        ],
+    )
+    def test_unmute_mute_chat_v2_till_unmuted(self, mute_type):
 
         _, _ = self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key

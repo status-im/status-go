@@ -27,6 +27,17 @@ class TestTransactionsChatMessages(MessengerSteps):
             "signature": "0xa123",
         }
 
+    def assertTransactionCommandResponse(self, response, expected_text, parameters_to_assert):
+        message_id = self.get_message_id(response)
+        message = self.get_message_by_message_id(response, message_id)
+        assert message.get("text", "") == expected_text
+        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
+        command_parameters = message.get("commandParameters", {})
+
+        for parameter, expected_value in parameters_to_assert:
+            print(parameter, expected_value)
+            assert command_parameters.get(parameter, "") == expected_value
+
     def test_request_transaction(self, transaction_data):
         self.make_contacts()
         response = self.sender.wakuext_service.request_transaction(
@@ -34,14 +45,11 @@ class TestTransactionsChatMessages(MessengerSteps):
         )
         self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")
 
-        message_id = self.get_message_id(response)
-        message = self.get_message_by_message_id(response, message_id)
-        assert message.get("text", "") == self.REQUEST_TRANSACTION_TEXT
-        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
-        command_parameters = message.get("commandParameters", {})
-        assert command_parameters.get("value", "") == transaction_data["value"]
-        assert command_parameters.get("contract", "") == transaction_data["contract"]
-        assert command_parameters.get("address", "") == transaction_data["address"]
+        self.assertTransactionCommandResponse(
+            response,
+            self.REQUEST_TRANSACTION_TEXT,
+            [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
+        )
 
     def test_decline_request_transaction(self, transaction_data):
         self.make_contacts()
@@ -56,14 +64,11 @@ class TestTransactionsChatMessages(MessengerSteps):
         response = self.receiver.wakuext_service.decline_request_transaction(message_id)
         self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
 
-        message_id = self.get_message_id(response)
-        message = self.get_message_by_message_id(response, message_id)
-        assert message.get("text", "") == self.REQUEST_TRANSACTION_DECLINED_TEXT
-        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
-        command_parameters = message.get("commandParameters", {})
-        assert command_parameters.get("value", "") == transaction_data["value"]
-        assert command_parameters.get("contract", "") == transaction_data["contract"]
-        assert command_parameters.get("address", "") == transaction_data["address"]
+        self.assertTransactionCommandResponse(
+            response,
+            self.REQUEST_TRANSACTION_DECLINED_TEXT,
+            [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
+        )
 
     def test_accept_request_transaction(self, transaction_data):
         self.make_contacts()
@@ -78,16 +83,17 @@ class TestTransactionsChatMessages(MessengerSteps):
         response = self.receiver.wakuext_service.accept_request_transaction(transaction_data["tx_hash"], message_id, transaction_data["signature"])
         self.receiver.verify_json_schema(response, method="wakuext_acceptRequestTransaction")
 
-        message_id = self.get_message_id(response)
-        message = self.get_message_by_message_id(response, message_id)
-        assert message.get("text", "") == self.TRANSACTION_SENT_TEXT
-        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
-        command_parameters = message.get("commandParameters", {})
-        assert command_parameters.get("value", "") == transaction_data["value"]
-        assert command_parameters.get("contract", "") == transaction_data["contract"]
-        assert command_parameters.get("address", "") == transaction_data["address"]
-        assert command_parameters.get("transactionHash", "") == transaction_data["tx_hash"]
-        assert command_parameters.get("signature", "") == base64.b64encode(bytes.fromhex(transaction_data["signature"].replace("0x", ""))).decode()
+        self.assertTransactionCommandResponse(
+            response,
+            self.TRANSACTION_SENT_TEXT,
+            [
+                ("value", transaction_data["value"]),
+                ("contract", transaction_data["contract"]),
+                ("address", transaction_data["address"]),
+                ("transactionHash", transaction_data["tx_hash"]),
+                ("signature", base64.b64encode(bytes.fromhex(transaction_data["signature"].replace("0x", ""))).decode()),
+            ],
+        )
 
     def test_request_address_for_transaction(self, transaction_data):
         self.make_contacts()
@@ -96,14 +102,11 @@ class TestTransactionsChatMessages(MessengerSteps):
         )
         self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
 
-        message_id = self.get_message_id(response)
-        message = self.get_message_by_message_id(response, message_id)
-        assert message.get("text", "") == self.REQUEST_ADDRESS_FOR_TRANSACTION_TEXT
-        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
-        command_parameters = message.get("commandParameters", {})
-        assert command_parameters.get("from", "") == transaction_data["from"]
-        assert command_parameters.get("value", "") == transaction_data["value"]
-        assert command_parameters.get("contract", "") == transaction_data["contract"]
+        self.assertTransactionCommandResponse(
+            response,
+            self.REQUEST_ADDRESS_FOR_TRANSACTION_TEXT,
+            [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("from", transaction_data["from"])],
+        )
 
     def test_decline_request_address_for_transaction(self, transaction_data):
         self.make_contacts()
@@ -120,13 +123,11 @@ class TestTransactionsChatMessages(MessengerSteps):
         response = self.receiver.wakuext_service.decline_request_address_for_transaction(message_id)
         self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
 
-        message_id = self.get_message_id(response)
-        message = self.get_message_by_message_id(response, message_id)
-        assert message.get("text", "") == self.REQUEST_ADDRESS_FOR_TRANSACTION_DECLINED_TEXT
-        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
-        command_parameters = message.get("commandParameters", {})
-        assert command_parameters.get("value", "") == transaction_data["value"]
-        assert command_parameters.get("contract", "") == transaction_data["contract"]
+        self.assertTransactionCommandResponse(
+            response,
+            self.REQUEST_ADDRESS_FOR_TRANSACTION_DECLINED_TEXT,
+            [("value", transaction_data["value"]), ("contract", transaction_data["contract"])],
+        )
 
     def test_accept_request_address_for_transaction(self, transaction_data):
         self.make_contacts()
@@ -143,14 +144,11 @@ class TestTransactionsChatMessages(MessengerSteps):
         response = self.receiver.wakuext_service.accept_request_address_for_transaction(message_id, transaction_data["address"])
         self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
 
-        message_id = self.get_message_id(response)
-        message = self.get_message_by_message_id(response, message_id)
-        assert message.get("text", "") == self.REQUEST_ADDRESS_FOR_TRANSACTION_ACCEPTED_TEXT
-        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
-        command_parameters = message.get("commandParameters", {})
-        assert command_parameters.get("address", "") == transaction_data["address"]
-        assert command_parameters.get("value", "") == transaction_data["value"]
-        assert command_parameters.get("contract", "") == transaction_data["contract"]
+        self.assertTransactionCommandResponse(
+            response,
+            self.REQUEST_ADDRESS_FOR_TRANSACTION_ACCEPTED_TEXT,
+            [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
+        )
 
     def test_send_transaction(self, transaction_data):
         self.make_contacts()
@@ -160,12 +158,13 @@ class TestTransactionsChatMessages(MessengerSteps):
         )
         self.receiver.verify_json_schema(response, method="wakuext_sendTransaction")
 
-        message_id = self.get_message_id(response)
-        message = self.get_message_by_message_id(response, message_id)
-        assert message.get("text", "") == self.TRANSACTION_SENT_TEXT
-        assert message.get("contentType", -1) == MessageContentType.TRANSACTION_COMMAND.value
-        command_parameters = message.get("commandParameters", {})
-        assert command_parameters.get("value", "") == transaction_data["value"]
-        assert command_parameters.get("contract", "") == transaction_data["contract"]
-        assert command_parameters.get("transactionHash", "") == transaction_data["tx_hash"]
-        assert command_parameters.get("signature", "") == base64.b64encode(bytes.fromhex(transaction_data["signature"].replace("0x", ""))).decode()
+        self.assertTransactionCommandResponse(
+            response,
+            self.TRANSACTION_SENT_TEXT,
+            [
+                ("value", transaction_data["value"]),
+                ("contract", transaction_data["contract"]),
+                ("transactionHash", transaction_data["tx_hash"]),
+                ("signature", base64.b64encode(bytes.fromhex(transaction_data["signature"].replace("0x", ""))).decode()),
+            ],
+        )
