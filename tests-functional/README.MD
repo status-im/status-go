@@ -39,7 +39,7 @@ Functional tests for status-go
     * Status-im contracts will be deployed to the network
 
 * In `./tests-functional/tests` directory run `pytest -m rpc`
-* To run tests against binary run `pytest -m <your mark> --url=http:<binary_url>:<binary_port> --user_dir=/<path>`
+* To run tests against binary run `pytest -m <your mark> --status_backend_url=http://<binary_url>:<binary_port>`
 
 ### Prerequisites for Mac OSx users
 If you see errors at attempt to run tests, try to run in terminal:

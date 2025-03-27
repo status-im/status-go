@@ -20,14 +20,13 @@ from clients.services.settings import SettingsService
 from clients.signals import SignalClient
 from clients.rpc import RpcClient
 from conftest import option
-from resources.constants import USE_IPV6, user_1, USER_DIR, ANVIL_NETWORK_ID
+from resources.constants import USE_IPV6, user_1, ANVIL_NETWORK_ID
 from docker.errors import APIError
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 
 
 class StatusBackend(RpcClient, SignalClient):
-
     container = None
 
     def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6):
@@ -39,7 +38,10 @@ class StatusBackend(RpcClient, SignalClient):
         if option.status_backend_url:
             url = next(option.status_backend_urls)
             assert url != "", "not enough status-backend urls provided"
+            self.temp_dir = tempfile.TemporaryDirectory()
+            self.data_dir = self.temp_dir.name
         else:
+            self.data_dir = "/usr/status-user"
             self.docker_client = docker.from_env()
             retries = 5
             ports_tried = []
@@ -56,6 +58,7 @@ class StatusBackend(RpcClient, SignalClient):
             else:
                 raise RuntimeError(f"Failed to start container on ports: {ports_tried}")
 
+        assert self.data_dir != ""
         self.base_url = url
         self.api_url = f"{url}/statusgo"
         self.ws_url = f"{url}".replace("http", "ws")
@@ -76,8 +79,13 @@ class StatusBackend(RpcClient, SignalClient):
         self.accounts_service = AccountService(self)
         self.settings_service = SettingsService(self)
 
+    def __del__(self):
+        if self.temp_dir is not None:
+            self.temp_dir.cleanup()
+
     def _start_container(self, host_port, privileged):
-        identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else os.popen("git rev-parse --short HEAD").read().strip()
+        identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else os.popen(
+            "git rev-parse --short HEAD").read().strip()
         image_name = f"{self.docker_project_name}-status-backend:latest"
         container_name = f"{self.docker_project_name}-{identifier}-status-backend-{host_port}"
 
@@ -167,7 +175,7 @@ class StatusBackend(RpcClient, SignalClient):
         self.verify_is_valid_api_response(response)
         return response
 
-    def init_status_backend(self, data_dir=USER_DIR):
+    def init_status_backend(self):
         if option.logout:
             logging.warning("automatically logging out before InitializeApplication")
             try:
@@ -179,7 +187,7 @@ class StatusBackend(RpcClient, SignalClient):
 
         method = "InitializeApplication"
         data = {
-            "dataDir": data_dir,
+            "dataDir": self.data_dir,
             "logEnabled": True,
             "logLevel": "DEBUG",
             "apiLogging": True,
@@ -268,9 +276,9 @@ class StatusBackend(RpcClient, SignalClient):
             f"DISP_NAME_{''.join(random.choices(string.ascii_letters + string.digits + '_-', k=10))}",
         )
 
-    def _create_account_request(self, data_dir, user, **kwargs):
+    def _create_account_request(self, user, **kwargs):
         data = {
-            "rootDataDir": data_dir,
+            "rootDataDir": self.data_dir,
             "kdfIterations": 256000,
             # Profile config
             "displayName": self.display_name,
@@ -285,16 +293,16 @@ class StatusBackend(RpcClient, SignalClient):
         data = self._set_proxy_credentials(data)
         return data
 
-    def create_account_and_login(self, data_dir=USER_DIR, user=user_1, **kwargs):
+    def create_account_and_login(self, user=user_1, **kwargs):
         self._set_display_name(**kwargs)
         method = "CreateAccountAndLogin"
-        data = self._create_account_request(data_dir, user, **kwargs)
+        data = self._create_account_request(user, **kwargs)
         return self.api_valid_request(method, data)
 
-    def restore_account_and_login(self, data_dir=USER_DIR, user=user_1, **kwargs):
+    def restore_account_and_login(self, user=user_1, **kwargs):
         self._set_display_name(**kwargs)
         method = "RestoreAccountAndLogin"
-        data = self._create_account_request(data_dir, user, **kwargs)
+        data = self._create_account_request(user, **kwargs)
         data["mnemonic"] = user.passphrase
         return self.api_valid_request(method, data)
 
@@ -330,7 +338,8 @@ class StatusBackend(RpcClient, SignalClient):
         try:
             exec_result = self.container.exec_run(cmd=["sh", "-c", command], stdout=True, stderr=True, tty=False)
             if exec_result.exit_code != 0:
-                raise RuntimeError(f"Failed to execute command in container {self.container.id}:\n" f"OUTPUT: {exec_result.output.decode().strip()}")
+                raise RuntimeError(
+                    f"Failed to execute command in container {self.container.id}:\n" f"OUTPUT: {exec_result.output.decode().strip()}")
             return exec_result.output.decode().strip()
         except APIError as e:
             raise RuntimeError(f"API error during container execution: {str(e)}") from e
@@ -394,7 +403,8 @@ class StatusBackend(RpcClient, SignalClient):
             if not self.ipv6 and current_ipv4 == updated_ipv4:
                 raise RuntimeError("IPV4 is the same after network reconnect")
 
-            logging.info(f"Changed container {self.container.name} IPs - New IPv4: {updated_ipv4}, New IPv6: {updated_ipv6}")
+            logging.info(
+                f"Changed container {self.container.name} IPs - New IPv4: {updated_ipv4}, New IPv6: {updated_ipv6}")
 
         except Exception as e:
             raise RuntimeError(f"Failed to change container IP: {e}")

@@ -36,12 +36,6 @@ def pytest_addoption(parser):
         default=None,
     )
     parser.addoption(
-        "--user_dir",
-        action="store",
-        help="",
-        default=None,
-    )
-    parser.addoption(
         "--logout",
         action="store_true",
         help="When set, will automatically call Logout() before InitializeApplication()",
@@ -90,7 +84,7 @@ def pytest_configure(config):
     option.status_backend_port_range = list(range(start_port, end_port))
     option.status_backend_containers = []
 
-    option.base_dir = os.path.dirname(os.path.abspath(__file__))
+    option.base_dir = os.path.dirname(os.path.abspath(__file__))  # schemas directory
     option.status_backend_urls = status_backend_url_generator()
 
 

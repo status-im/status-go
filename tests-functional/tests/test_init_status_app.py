@@ -1,4 +1,3 @@
-from resources.constants import USER_DIR
 from clients.status_backend import StatusBackend
 import pytest
 from clients.signals import SignalType
@@ -57,10 +56,11 @@ def assert_file_first_line(path, pattern: str, expected: bool):
 @pytest.mark.init
 @pytest.mark.parametrize("log_enabled,api_logging_enabled", [(True, True), (False, False)])
 def test_check_logs(log_enabled: bool, api_logging_enabled: bool):
-    data_dir = os.path.join(USER_DIR, "data")
-    logs_dir = os.path.join(USER_DIR, "logs")
-
     backend = StatusBackend()
+
+    data_dir = os.path.join(backend.data_dir, "data")
+    logs_dir = os.path.join(backend.data_dir, "logs")
+
     backend.api_valid_request(
         "InitializeApplication",
         {
