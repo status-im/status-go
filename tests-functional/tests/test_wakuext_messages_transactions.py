@@ -27,7 +27,7 @@ class TestTransactionsChatMessages(MessengerSteps):
             "signature": "0xa123",
         }
 
-    def assertTransactionCommandResponse(self, response, expected_text, parameters_to_assert):
+    def assert_transaction_command_response(self, response, expected_text: str, parameters_to_assert: list[tuple[str, str]]):
         message_id = self.get_message_id(response)
         message = self.get_message_by_message_id(response, message_id)
         assert message.get("text", "") == expected_text
@@ -45,7 +45,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         )
         self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")
 
-        self.assertTransactionCommandResponse(
+        self.assert_transaction_command_response(
             response,
             self.REQUEST_TRANSACTION_TEXT,
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
@@ -64,7 +64,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         response = self.receiver.wakuext_service.decline_request_transaction(message_id)
         self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
 
-        self.assertTransactionCommandResponse(
+        self.assert_transaction_command_response(
             response,
             self.REQUEST_TRANSACTION_DECLINED_TEXT,
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
@@ -83,7 +83,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         response = self.receiver.wakuext_service.accept_request_transaction(transaction_data["tx_hash"], message_id, transaction_data["signature"])
         self.receiver.verify_json_schema(response, method="wakuext_acceptRequestTransaction")
 
-        self.assertTransactionCommandResponse(
+        self.assert_transaction_command_response(
             response,
             self.TRANSACTION_SENT_TEXT,
             [
@@ -102,7 +102,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         )
         self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
 
-        self.assertTransactionCommandResponse(
+        self.assert_transaction_command_response(
             response,
             self.REQUEST_ADDRESS_FOR_TRANSACTION_TEXT,
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("from", transaction_data["from"])],
@@ -123,7 +123,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         response = self.receiver.wakuext_service.decline_request_address_for_transaction(message_id)
         self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
 
-        self.assertTransactionCommandResponse(
+        self.assert_transaction_command_response(
             response,
             self.REQUEST_ADDRESS_FOR_TRANSACTION_DECLINED_TEXT,
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"])],
@@ -144,7 +144,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         response = self.receiver.wakuext_service.accept_request_address_for_transaction(message_id, transaction_data["address"])
         self.receiver.verify_json_schema(response, method="wakuext_requestTransaction")  # same schema
 
-        self.assertTransactionCommandResponse(
+        self.assert_transaction_command_response(
             response,
             self.REQUEST_ADDRESS_FOR_TRANSACTION_ACCEPTED_TEXT,
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
@@ -158,7 +158,7 @@ class TestTransactionsChatMessages(MessengerSteps):
         )
         self.receiver.verify_json_schema(response, method="wakuext_sendTransaction")
 
-        self.assertTransactionCommandResponse(
+        self.assert_transaction_command_response(
             response,
             self.TRANSACTION_SENT_TEXT,
             [
