@@ -427,3 +427,10 @@ func WithAccountsFeed(feed *event.Feed) Option {
 		return nil
 	}
 }
+
+func WithNewsFeed() func(c *config) error {
+	return func(c *config) error {
+		c.featureFlags.EnableNewsFeed = true
+		return nil
+	}
+}

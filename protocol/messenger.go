@@ -16,6 +16,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mmcdole/gofeed"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
@@ -35,6 +36,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/internal/newsfeed"
 	"github.com/status-im/status-go/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 
@@ -199,6 +201,8 @@ type Messenger struct {
 	mvdsStatusChangeEvent chan datasyncnode.PeerStatusChangeEvent
 
 	backedUpFetchingStatus *BackupFetchingStatus
+
+	newsFeedManager *newsfeed.NewsFeedManager
 }
 
 type EnvelopeEventsInterceptor struct {
@@ -917,7 +921,27 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}
 	}
 
+	if m.config.featureFlags.EnableNewsFeed {
+		// TODO get the last time we opened the app
+		twoHoursAgo := time.Now().Add(-2 * time.Hour)
+		m.newsFeedManager = newsfeed.NewNewsFeedManager(
+			newsfeed.WithURL(newsfeed.STATUS_FEED_URL),
+			newsfeed.WithParser(gofeed.NewParser()),
+			newsfeed.WithHandler(m),
+			newsfeed.WithPollingInterval(30*time.Minute),
+			newsfeed.WithFetchFrom(twoHoursAgo),
+		)
+
+		// TODO only start if the setting is enabled
+		m.newsFeedManager.StartFetching(m.ctx)
+	}
+
 	return response, nil
+}
+
+// TODO move this to the AC file
+func (m *Messenger) HandleFeed(item *gofeed.Item) {
+	fmt.Println("Received new item:", item.Title)
 }
 
 func (m *Messenger) startHistoryArchivesImportLoop() {

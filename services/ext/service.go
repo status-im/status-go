@@ -433,6 +433,8 @@ func buildMessengerOptions(
 		protocol.WithWakuService(wakuService),
 		protocol.WithAccountManager(accountManager),
 		protocol.WithAccountsFeed(accountsFeed),
+		// TODO uncomment this to enable the news feed in dev
+		// protocol.WithNewsFeed(),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {
