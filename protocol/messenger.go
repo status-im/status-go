@@ -73,6 +73,8 @@ import (
 
 	gethnode "github.com/status-im/status-go/eth-node/node"
 	wakutypes "github.com/status-im/status-go/waku/types"
+
+	_ "github.com/mmcdole/gofeed"
 )
 
 const (

@@ -5,7 +5,7 @@ github.com/BurntSushi/toml/internal
 # github.com/Masterminds/squirrel v1.5.4
 ## explicit; go 1.14
 github.com/Masterminds/squirrel
-# github.com/PuerkitoBio/goquery v1.6.1
+# github.com/PuerkitoBio/goquery v1.8.0
 ## explicit; go 1.13
 github.com/PuerkitoBio/goquery
 # github.com/RoaringBitmap/roaring v0.9.4
@@ -117,8 +117,8 @@ github.com/anacrolix/utp
 ## explicit; go 1.13
 github.com/andybalholm/brotli
 github.com/andybalholm/brotli/matchfinder
-# github.com/andybalholm/cascadia v1.2.0
-## explicit; go 1.13
+# github.com/andybalholm/cascadia v1.3.1
+## explicit; go 1.16
 github.com/andybalholm/cascadia
 # github.com/avast/retry-go/v4 v4.5.1
 ## explicit; go 1.18
@@ -458,6 +458,9 @@ github.com/jinzhu/copier
 ## explicit; go 1.10
 github.com/jmoiron/sqlx
 github.com/jmoiron/sqlx/reflectx
+# github.com/json-iterator/go v1.1.12
+## explicit; go 1.12
+github.com/json-iterator/go
 # github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
 ## explicit
 github.com/keighl/metabolize
@@ -648,6 +651,23 @@ github.com/mitchellh/mapstructure
 # github.com/mitchellh/pointerstructure v1.2.0
 ## explicit; go 1.13
 github.com/mitchellh/pointerstructure
+# github.com/mmcdole/gofeed v1.3.0
+## explicit; go 1.19
+github.com/mmcdole/gofeed
+github.com/mmcdole/gofeed/atom
+github.com/mmcdole/gofeed/extensions
+github.com/mmcdole/gofeed/internal/shared
+github.com/mmcdole/gofeed/json
+github.com/mmcdole/gofeed/rss
+# github.com/mmcdole/goxpp v1.1.1-0.20240225020742-a0c311522b23
+## explicit; go 1.19
+github.com/mmcdole/goxpp
+# github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+## explicit
+github.com/modern-go/concurrent
+# github.com/modern-go/reflect2 v1.0.2
+## explicit; go 1.12
+github.com/modern-go/reflect2
 # github.com/mr-tron/base58 v1.2.0
 ## explicit; go 1.12
 github.com/mr-tron/base58/base58
