@@ -31,3 +31,14 @@ class ChatType(Enum):
     PROFILE = 4  # Deprecated
     TIMELINE = 5  # Deprecated
     COMMUNITY_CHAT = 6
+
+
+class MuteType(Enum):
+    MUTE_FOR15_MIN = 1
+    MUTE_FOR1_HR = 2
+    MUTE_FOR8_HR = 3
+    MUTE_FOR1_WEEK = 4
+    MUTE_TILL_UNMUTED = 5
+    MUTE_TILL1_MIN = 6
+    UNMUTED = 7
+    MUTE_FOR24_HR = 8

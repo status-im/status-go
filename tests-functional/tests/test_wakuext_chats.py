@@ -1,6 +1,9 @@
+import logging
+import random
 import pytest
 
-from resources.enums import ChatType
+from datetime import datetime, timedelta
+from resources.enums import ChatType, MuteType
 from steps.messenger import MessengerSteps
 
 
@@ -29,3 +32,68 @@ class TestChatActions(MessengerSteps):
         chat = response.get("result", {})
         assert chat.get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chat.get("lastMessage", {}).get("text", "") == sent_texts[0]
+
+    def test_mute_chat(self):
+        _, _ = self.send_multiple_one_to_one_messages(1)
+        chat_id = self.receiver.public_key
+
+        response = self.sender.wakuext_service.mute_chat(chat_id)
+        result = response.get("result", "")
+        assert result == "0001-01-01T00:00:00Z"
+
+        response = self.sender.wakuext_service.chat(chat_id)
+        chat = response.get("result", {})
+        assert chat.get("muted", False) is True
+        assert chat.get("muteTill", "") == result
+
+    def test_mute_chat_v2(self):
+        # Run one random test case
+        mute_type, time_delta = random.choice(
+            [
+                (MuteType.MUTE_FOR15_MIN.value, timedelta(minutes=15)),
+                (MuteType.MUTE_FOR1_HR.value, timedelta(hours=1)),
+                (MuteType.MUTE_FOR8_HR.value, timedelta(hours=8)),
+                (MuteType.MUTE_FOR1_WEEK.value, timedelta(days=7)),
+                (MuteType.MUTE_TILL1_MIN.value, timedelta(minutes=1)),
+                (MuteType.MUTE_FOR24_HR.value, timedelta(hours=24)),
+            ]
+        )
+        logging.info(f"test_mute_chat_v2: mute_type {mute_type}, time_delta {time_delta}")
+
+        _, _ = self.send_multiple_one_to_one_messages(1)
+        chat_id = self.receiver.public_key
+
+        response = self.sender.wakuext_service.mute_chat_v2(chat_id, mute_type)
+        result = response.get("result", "")
+        actual = datetime.strptime(result, "%Y-%m-%dT%H:%M:%SZ")
+
+        expected = datetime.now() + time_delta
+        diff = expected - actual
+        assert diff.total_seconds() < 2  # 2sec margin
+
+        response = self.sender.wakuext_service.chat(chat_id)
+        chat = response.get("result", {})
+        assert chat.get("muted", False) is True
+        assert chat.get("muteTill", "") == result
+
+    def test_mute_chat_v2_till_unmuted(self):
+        # Run one random test case
+        mute_type = random.choice(
+            [
+                (MuteType.MUTE_TILL_UNMUTED.value),
+                (MuteType.UNMUTED.value),
+            ]
+        )
+        logging.info(f"test_mute_chat_v2_till_unmuted: mute_type {mute_type}")
+
+        _, _ = self.send_multiple_one_to_one_messages(1)
+        chat_id = self.receiver.public_key
+
+        response = self.sender.wakuext_service.mute_chat_v2(chat_id, mute_type)
+        result = response.get("result", "")
+        assert result == "0001-01-01T00:00:00Z"
+
+        response = self.sender.wakuext_service.chat(chat_id)
+        chat = response.get("result", {})
+        assert chat.get("muted", False) is True
+        assert chat.get("muteTill", "") == result
