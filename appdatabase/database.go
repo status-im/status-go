@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	d_common "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/kvstore"
 	"github.com/status-im/status-go/logutils"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -96,6 +97,9 @@ func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, erro
 	if err != nil {
 		return nil, err
 	}
+
+	kvStore := kvstore.NewDB(db)
+	kvStore.DropDeprecatedKeys(kvstore.DeprecatedKeys)
 
 	return db, nil
 }
