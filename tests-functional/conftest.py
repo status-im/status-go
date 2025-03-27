@@ -54,8 +54,8 @@ option = Option()
 
 
 def status_backend_url_generator(config):
-    if hasattr(option, "status_backend_url") and config.status_backend_url is not None:
-        urls = config.status_backend_url
+    if hasattr(option, "status_backend_url") and config.option.status_backend_url is not None:
+        urls = config.option.status_backend_url
     else:
         print("status_backend_url option not found or is None")
         return
