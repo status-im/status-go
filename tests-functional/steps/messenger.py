@@ -100,6 +100,20 @@ class MessengerSteps(NetworkConditionsSteps):
         else:
             raise ValueError(f"Failed to find a message with contentType '{content_type}' in response")
 
+    def get_message_id(self, response, index=0):
+        return response.get("result", {}).get("messages", [])[index].get("id", "")
+
+    def get_message_by_message_id(self, response, message_id: str):
+        messages = response.get("result", {}).get("messages", [])
+        matched_message = None
+        for message in messages:
+            if message.get("id", "") == message_id:
+                matched_message = message
+                break
+        if matched_message is None:
+            raise ValueError(f"Failed to find a message with message id '{message_id}' in response")
+        return matched_message
+
     def join_private_group(self):
         private_group_name = f"private_group_{uuid4()}"
         response = self.sender.wakuext_service.create_group_chat_with_members([self.receiver.public_key], private_group_name)
