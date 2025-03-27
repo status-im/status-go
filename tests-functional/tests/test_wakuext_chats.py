@@ -33,6 +33,17 @@ class TestChatActions(MessengerSteps):
         assert chat.get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chat.get("lastMessage", {}).get("text", "") == sent_texts[0]
 
+    def test_active_chats(self):
+        sent_texts, _ = self.send_multiple_one_to_one_messages(1)
+
+        response = self.sender.wakuext_service.active_chats()
+        self.sender.verify_json_schema(response, method="wakuext_chats")
+
+        chats = response.get("result", [])
+        assert len(chats) == 1
+        assert chats[0].get("chatType", 0) == ChatType.ONE_TO_ONE.value
+        assert chats[0].get("lastMessage", {}).get("text", "") == sent_texts[0]
+
     def test_mute_chat(self):
         _, _ = self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key
@@ -47,7 +58,7 @@ class TestChatActions(MessengerSteps):
         assert chat.get("muteTill", "") == result
 
     def test_mute_chat_v2(self):
-        # Run one random test case
+        # Choose test case randomly
         mute_type, time_delta = random.choice(
             [
                 (MuteType.MUTE_FOR15_MIN.value, timedelta(minutes=15)),
@@ -76,8 +87,8 @@ class TestChatActions(MessengerSteps):
         assert chat.get("muted", False) is True
         assert chat.get("muteTill", "") == result
 
-    def test_mute_chat_v2_till_unmuted(self):
-        # Run one random test case
+    def test_unmute_mute_chat_v2_till_unmuted(self):
+        # Choose test case randomly
         mute_type = random.choice(
             [
                 (MuteType.MUTE_TILL_UNMUTED.value),
@@ -93,7 +104,9 @@ class TestChatActions(MessengerSteps):
         result = response.get("result", "")
         assert result == "0001-01-01T00:00:00Z"
 
+        response = self.sender.wakuext_service.unmute_chat(chat_id)
+        assert response.get("result", "") is None
+
         response = self.sender.wakuext_service.chat(chat_id)
         chat = response.get("result", {})
-        assert chat.get("muted", False) is True
-        assert chat.get("muteTill", "") == result
+        assert chat.get("muted", True) is False
