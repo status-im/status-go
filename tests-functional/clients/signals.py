@@ -106,6 +106,7 @@ class SignalClient:
         if "error" in signal["event"]:
             error_details = signal["event"]["error"]
             assert not error_details, f"Unexpected error during login: {error_details}"
+        self.node_login_event = signal
         return signal
 
     def wait_for_logout(self):

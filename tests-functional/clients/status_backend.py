@@ -289,18 +289,14 @@ class StatusBackend(RpcClient, SignalClient):
         self._set_display_name(**kwargs)
         method = "CreateAccountAndLogin"
         data = self._create_account_request(data_dir, user, **kwargs)
-        resp = self.api_valid_request(method, data)
-        self.node_login_event = self.wait_for_login()
-        return resp
+        return self.api_valid_request(method, data)
 
     def restore_account_and_login(self, data_dir=USER_DIR, user=user_1, **kwargs):
         self._set_display_name(**kwargs)
         method = "RestoreAccountAndLogin"
         data = self._create_account_request(data_dir, user, **kwargs)
         data["mnemonic"] = user.passphrase
-        resp = self.api_valid_request(method, data)
-        self.node_login_event = self.wait_for_login()
-        return resp
+        return self.api_valid_request(method, data)
 
     def login(self, keyUid, user=user_1):
         method = "LoginAccount"

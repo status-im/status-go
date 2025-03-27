@@ -23,6 +23,7 @@ class TestLogging:
         # Init and login
         backend_client.init_status_backend()
         backend_client.create_account_and_login()
+        backend_client.wait_for_login()
 
         # Configure logging
         backend_client.api_valid_request("SetLogLevel", {"logLevel": "ERROR"})
