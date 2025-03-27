@@ -14,13 +14,27 @@ type DbInitializer struct {
 }
 
 func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
-	return sqlite.OpenDB(path, password, kdfIterationsNumber)
+	db, err := sqlite.OpenDB(path, password, kdfIterationsNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS kv_store (
+		key TEXT PRIMARY KEY,
+		value BLOB
+	);`)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
 
 func setupTestDB(t *testing.T) (*Database, func()) {
-	db, cleanup, err := helpers.SetupTestSQLDB(DbInitializer{}, "kvstore-tests")
+	db, err := helpers.SetupTestMemorySQLDB(DbInitializer{})
 	require.NoError(t, err)
-	return NewDB(db), func() { require.NoError(t, cleanup()) }
+	return NewDB(db), func() { require.NoError(t, db.Close()) }
 }
 
 func TestSetGetDelete(t *testing.T) {
