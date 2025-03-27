@@ -294,6 +294,7 @@ class StatusBackend(RpcClient, SignalClient):
         return resp
 
     def restore_account_and_login(self, data_dir=USER_DIR, user=user_1, **kwargs):
+        self._set_display_name(**kwargs)
         method = "RestoreAccountAndLogin"
         data = self._create_account_request(data_dir, user, **kwargs)
         data["mnemonic"] = user.passphrase
