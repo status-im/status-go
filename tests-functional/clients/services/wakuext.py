@@ -294,3 +294,8 @@ class WakuextService(Service):
         params = [chat_id]
         response = self.rpc_request("unmuteChat", params)
         return response.json()
+
+    def clear_history(self, chat_id: str):
+        params = [{"id": chat_id}]
+        response = self.rpc_request("clearHistory", params)
+        return response.json()

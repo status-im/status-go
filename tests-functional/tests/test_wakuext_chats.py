@@ -98,7 +98,6 @@ class TestChatActions(MessengerSteps):
         ],
     )
     def test_unmute_mute_chat_v2_till_unmuted(self, mute_type):
-
         _, _ = self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key
 
@@ -112,3 +111,17 @@ class TestChatActions(MessengerSteps):
         response = self.sender.wakuext_service.chat(chat_id)
         chat = response.get("result", {})
         assert chat.get("muted", True) is False
+
+    def test_clear_history(self):
+        _, _ = self.send_multiple_one_to_one_messages(2)
+        chat_id = self.receiver.public_key
+
+        response = self.sender.wakuext_service.chat(chat_id)
+        last_message = response.get("result", {}).get("lastMessage", -1)
+        assert isinstance(last_message, dict)
+
+        response = self.sender.wakuext_service.clear_history(chat_id)
+        self.sender.verify_json_schema(response, method="wakuext_clearHistory")
+
+        last_message = response.get("result", {}).get("chats", [])[0].get("lastMessage", -1)
+        assert last_message is None
