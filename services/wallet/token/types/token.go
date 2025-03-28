@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/services/wallet/community"
+	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
 )
 
 type Token struct {
@@ -37,4 +38,17 @@ type StorageToken struct {
 
 func (t *Token) IsNative() bool {
 	return strings.EqualFold(t.Symbol, "ETH")
+}
+
+func (t *Token) TokenKey() string {
+	return utils.MakeTokenKey(t.ChainID, t.Symbol)
+}
+
+func GetEthTokenKeyForChain(chainID uint64) string {
+	t := Token{
+		ChainID: chainID,
+		Symbol:  "ETH",
+		Address: common.HexToAddress(utils.EthAddress),
+	}
+	return t.TokenKey()
 }

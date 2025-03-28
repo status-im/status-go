@@ -2,8 +2,21 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
+
+const (
+	// TODO: consider replacing `0x` ETH address with the address below everywhere (mmany services are already using it, source: https://eips.ethereum.org/EIPS/eip-7726) and move it to `common` package.
+	// Currently used for makret data fetching.
+	EthAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+
+	tokenKeyPattern = "%d-%s"
+)
+
+func MakeTokenKey(chainID uint64, tokenID string) string {
+	return fmt.Sprintf(tokenKeyPattern, chainID, tokenID)
+}
 
 var renameMapping = map[string]string{
 	"STT": "SNT",

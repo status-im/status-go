@@ -7,59 +7,25 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 
+	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
 )
 
-const baseURL = "https://api.coingecko.com/api/v3"
+const (
+	baseURL = "https://api.coingecko.com/api/v3"
 
-var coinGeckoMapping = map[string]string{
-	"STT":   "status",
-	"SNT":   "status",
-	"ETH":   "ethereum",
-	"AST":   "airswap",
-	"ABT":   "arcblock",
-	"BNB":   "binancecoin",
-	"BLT":   "bloom",
-	"COMP":  "compound-coin",
-	"EDG":   "edgeless",
-	"ENG":   "enigma",
-	"EOS":   "eos",
-	"GEN":   "daostack",
-	"MANA":  "decentraland-wormhole",
-	"LEND":  "ethlend",
-	"LRC":   "loopring",
-	"MET":   "metronome",
-	"POLY":  "polymath",
-	"PPT":   "populous",
-	"SAN":   "santiment-network-token",
-	"DNT":   "district0x",
-	"SPN":   "sapien",
-	"USDS":  "stableusd",
-	"STX":   "stox",
-	"SUB":   "substratum",
-	"PAY":   "tenx",
-	"GRT":   "the-graph",
-	"TNT":   "tierion",
-	"TRX":   "tron",
-	"RARE":  "superrare",
-	"UNI":   "uniswap",
-	"USDC":  "usd-coin",
-	"USDP":  "paxos-standard",
-	"USDT":  "tether",
-	"SHIB":  "shiba-inu",
-	"LINK":  "chainlink",
-	"MATIC": "matic-network",
-	"DAI":   "dai",
-	"ARB":   "arbitrum",
-	"OP":    "optimism",
-}
+	ethTokenID = "ethereum"
+)
 
 type Client struct {
 	httpClient       *thirdparty.HTTPClient
-	tokens           map[string][]GeckoToken
+	tokenIDTokenMap  map[string]GeckoToken // map[id]GeckoToken
+	tokenKeyIDMap    map[string]string     // map[tokenKey]id
 	baseURL          string
 	fetchTokensMutex sync.Mutex
 }
@@ -81,9 +47,10 @@ func NewClient() *Client {
 	)
 
 	return &Client{
-		httpClient: httpClient,
-		tokens:     make(map[string][]GeckoToken),
-		baseURL:    baseURL,
+		httpClient:      httpClient,
+		tokenIDTokenMap: make(map[string]GeckoToken),
+		tokenKeyIDMap:   make(map[string]string),
+		baseURL:         baseURL,
 	}
 }
 
@@ -91,142 +58,177 @@ func (c *Client) ID() string {
 	return "coingecko"
 }
 
-func mapTokensToSymbols(tokens []GeckoToken, tokenMap map[string][]GeckoToken) {
+func updateLocalMaps(tokens []GeckoToken, tokenIdMap map[string]GeckoToken, tokenKeyMap map[string]string) {
 	for _, token := range tokens {
-		symbol := strings.ToUpper(token.Symbol)
-		if id, ok := coinGeckoMapping[symbol]; ok {
-			if id != token.ID {
+		tokenIdMap[token.ID] = token
+		for _, chainID := range common.AllChains() {
+			tokenKey, err := token.getKeyForChain(chainID)
+			if err != nil {
 				continue
 			}
-		}
-		tokenMap[symbol] = append(tokenMap[symbol], token)
-	}
-}
-
-func getGeckoTokenFromSymbol(tokens map[string][]GeckoToken, symbol string) (GeckoToken, error) {
-	tokenList, ok := tokens[strings.ToUpper(symbol)]
-	if !ok {
-		return GeckoToken{}, fmt.Errorf("token not found for symbol %s", symbol)
-	}
-	for _, t := range tokenList {
-		if t.EthPlatform {
-			return t, nil
+			tokenKeyMap[tokenKey] = token.ID
 		}
 	}
-	return tokenList[0], nil
 }
 
-func getIDFromSymbol(tokens map[string][]GeckoToken, symbol string) (string, error) {
-	token, err := getGeckoTokenFromSymbol(tokens, symbol)
-	if err != nil {
-		return "", err
-	}
-	return token.ID, nil
-}
-
-func (c *Client) getTokens() (map[string][]GeckoToken, error) {
+func (c *Client) refreshTokens() error {
 	c.fetchTokensMutex.Lock()
 	defer c.fetchTokensMutex.Unlock()
 
-	if len(c.tokens) > 0 {
-		return c.tokens, nil
+	// TODO: check how often we should refresh tokens
+	// From coingecko website: "Cache/Update Frequency: every 5 minutes for Pro API (Analyst, Lite, Pro, Enterprise)."
+	if len(c.tokenIDTokenMap) > 0 {
+		return nil
 	}
 
 	tokens, err := c.FetchTokens(context.Background())
 	if err != nil {
+		return err
+	}
+
+	updateLocalMaps(tokens, c.tokenIDTokenMap, c.tokenKeyIDMap)
+	return nil
+}
+
+func (c *Client) getTokenIDTokenMap() (map[string]GeckoToken, error) {
+	err := c.refreshTokens()
+	if err != nil {
+		logutils.ZapLogger().Error("failed to refresh tokens", zap.Error(err))
 		return nil, err
 	}
 
-	mapTokensToSymbols(tokens, c.tokens)
-	return c.tokens, nil
+	c.fetchTokensMutex.Lock()
+	defer c.fetchTokensMutex.Unlock()
+	return c.tokenIDTokenMap, nil
 }
 
-func (c *Client) mapSymbolsToIds(symbols []string) (mappedSymbols map[string]string, unmappedSymbols []string, err error) {
-	tokens, err := c.getTokens()
+func (c *Client) getTokenKeyIDMap() (map[string]string, error) {
+	err := c.refreshTokens()
 	if err != nil {
-		return nil, nil, err
+		logutils.ZapLogger().Error("failed to refresh tokens", zap.Error(err))
+		return nil, err
 	}
-	mappedSymbols = make(map[string]string, 0)
-	unmappedSymbols = make([]string, 0)
-	for _, symbol := range symbols {
-		id, err := getIDFromSymbol(tokens, utils.GetRealSymbol(symbol))
-		if err != nil {
-			unmappedSymbols = append(unmappedSymbols, symbol)
+
+	c.fetchTokensMutex.Lock()
+	defer c.fetchTokensMutex.Unlock()
+	return c.tokenKeyIDMap, nil
+}
+
+func mapTokenKeysToIDs(tokenKeys []string, tokenKeyMap map[string]string) (mappedKeys map[string]string, uniqueIDs []string, unmappedKeys []string) {
+	mappedKeys = make(map[string]string, 0)
+	uniqueIDsMap := make(map[string]struct{}, 0)
+	unmappedKeys = make([]string, 0)
+	for _, tokenKey := range tokenKeys {
+		tokenKeyUpper := strings.ToUpper(tokenKey) // use upper case for search and comparison
+		id, ok := tokenKeyMap[tokenKeyUpper]
+		if ok {
+			mappedKeys[tokenKey] = id
+			uniqueIDsMap[id] = struct{}{}
 		} else {
-			mappedSymbols[symbol] = id
+			if strings.Contains(tokenKeyUpper, strings.ToUpper(utils.EthAddress)) {
+				mappedKeys[tokenKey] = ethTokenID
+				uniqueIDsMap[ethTokenID] = struct{}{}
+				continue
+			}
+			unmappedKeys = append(unmappedKeys, tokenKey)
 		}
 	}
-
-	return mappedSymbols, unmappedSymbols, nil
+	uniqueIDs = maps.Keys(uniqueIDsMap)
+	return
 }
 
-func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
-	mappedSymbols, unmappedSymbols, err := c.mapSymbolsToIds(symbols)
+// FetchPrices fetches the prices for the given tokens token keys (following token key pattern) in the given currencies.
+// When providing a token key for ETH, use `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE` address.
+func (c *Client) FetchPrices(tokenKeys []string, currencies []string) (map[string]map[string]float64, error) {
+	tokenKeyIDMap, err := c.getTokenKeyIDMap()
 	if err != nil {
 		return nil, err
 	}
+	mappedKeys, uniqueIDs, unmappedKeys := mapTokenKeysToIDs(tokenKeys, tokenKeyIDMap)
 
-	simplePrices, err := c.FetchSimplePrice(context.Background(), maps.Values(mappedSymbols), currencies)
+	simplePrices, err := c.FetchSimplePrice(context.Background(), uniqueIDs, currencies)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[string]map[string]float64)
-	for symbol, id := range mappedSymbols {
-		result[symbol] = map[string]float64{}
+	for tokenKey, id := range mappedKeys {
+		result[tokenKey] = map[string]float64{}
 		for _, currency := range currencies {
-			result[symbol][currency] = simplePrices[id][strings.ToLower(currency)]
+			result[tokenKey][currency] = simplePrices[id][strings.ToLower(currency)]
 		}
 	}
 
-	for _, symbol := range unmappedSymbols {
-		result[symbol] = map[string]float64{}
+	for _, tokenKey := range unmappedKeys {
+		result[tokenKey] = map[string]float64{}
 		for _, currency := range currencies {
-			result[symbol][currency] = 0
+			result[tokenKey][currency] = 0
 		}
 	}
 
 	return result, nil
 }
 
-func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
-	tokens, err := c.getTokens()
+// FetchTokenDetails fetches the token details for the given token keys (following token key pattern).
+// When providing a token key for ETH, use `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE` address.
+func (c *Client) FetchTokenDetails(tokenKeys []string) (map[string]thirdparty.TokenDetails, error) {
+	tokenKeyIDMap, err := c.getTokenKeyIDMap()
 	if err != nil {
 		return nil, err
 	}
+
+	tokenIDMap, err := c.getTokenIDTokenMap()
+	if err != nil {
+		return nil, err
+	}
+
+	mappedKeys, _, unmappedKeys := mapTokenKeysToIDs(tokenKeys, tokenKeyIDMap)
+
 	result := make(map[string]thirdparty.TokenDetails)
-	for _, symbol := range symbols {
-		token, err := getGeckoTokenFromSymbol(tokens, utils.GetRealSymbol(symbol))
-		if err == nil {
-			result[symbol] = thirdparty.TokenDetails{
+	for tokenKey, id := range mappedKeys {
+		token, ok := tokenIDMap[id]
+		if ok {
+			result[tokenKey] = thirdparty.TokenDetails{
 				ID:     token.ID,
 				Name:   token.Name,
-				Symbol: symbol,
+				Symbol: token.Symbol,
 			}
+		} else {
+			// should never be reached
+			logutils.ZapLogger().Error("token not found", zap.String("tokenKey", tokenKey), zap.String("id", id))
 		}
 	}
+
+	for _, tokenKey := range unmappedKeys {
+		result[tokenKey] = thirdparty.TokenDetails{}
+	}
+
 	return result, nil
 }
 
-func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
-	mappedSymbols, unmappedSymbols, err := c.mapSymbolsToIds(symbols)
+// FetchTokenMarketValues fetches the market values for the given token keys (following token key pattern) in the given currency.
+// When providing a token key for ETH, use `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE` address.
+func (c *Client) FetchTokenMarketValues(tokenKeys []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
+	tokenKeyIDMap, err := c.getTokenKeyIDMap()
 	if err != nil {
 		return nil, err
 	}
 
-	marketValues, err := c.FetchCoinsMarkets(context.Background(), maps.Values(mappedSymbols), currency)
+	mappedKeys, uniqueIDs, unmappedKeys := mapTokenKeysToIDs(tokenKeys, tokenKeyIDMap)
+
+	marketValues, err := c.FetchCoinsMarkets(context.Background(), uniqueIDs, currency)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[string]thirdparty.TokenMarketValues)
-	for symbol, id := range mappedSymbols {
+	for tokenKey, id := range mappedKeys {
 		for _, marketValue := range marketValues {
 			if id != marketValue.ID {
 				continue
 			}
 
-			result[symbol] = thirdparty.TokenMarketValues{
+			result[tokenKey] = thirdparty.TokenMarketValues{
 				MKTCAP:          marketValue.MarketCap,
 				HIGHDAY:         marketValue.High24h,
 				LOWDAY:          marketValue.Low24h,
@@ -238,29 +240,30 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 		}
 	}
 
-	for _, symbol := range unmappedSymbols {
+	for _, symbol := range unmappedKeys {
 		result[symbol] = thirdparty.TokenMarketValues{}
 	}
 
 	return result, nil
 }
 
-func (c *Client) FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+func (c *Client) FetchHistoricalHourlyPrices(tokenKey string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	return []thirdparty.HistoricalPrice{}, nil
 }
 
-func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
-	tokens, err := c.getTokens()
+func (c *Client) FetchHistoricalDailyPrices(tokenKey string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+	tokenKeyIDMap, err := c.getTokenKeyIDMap()
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := getIDFromSymbol(tokens, utils.GetRealSymbol(symbol))
-	if err != nil {
-		return nil, err
+	mappedKeys, _, _ := mapTokenKeysToIDs([]string{tokenKey}, tokenKeyIDMap)
+	if len(mappedKeys) != 1 {
+		logutils.ZapLogger().Error("token not found", zap.String("tokenKey", tokenKey))
+		return nil, fmt.Errorf("token not found")
 	}
 
-	container, err := c.FetchHistoryMarketData(context.Background(), id, currency)
+	container, err := c.FetchHistoryMarketData(context.Background(), mappedKeys[tokenKey], currency)
 	if err != nil {
 		return nil, err
 	}
