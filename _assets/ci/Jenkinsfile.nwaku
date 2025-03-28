@@ -89,10 +89,12 @@ pipeline {
             }
         }
 
-    stage('Build Shared Lib') {
+     stage('Build Shared Lib with nwaku') {
         steps {
             script {
-                shell('make statusgo-shared-library')
+              if (env.PLATFORM == 'linux') {
+                shell('USE_NWAKU=true make statusgo-shared-library')
+              }
             }
         }
     }
