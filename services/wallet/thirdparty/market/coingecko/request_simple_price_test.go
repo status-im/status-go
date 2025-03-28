@@ -11,7 +11,7 @@ import (
 )
 
 func TestFetchingSimplePriceData(t *testing.T) {
-	expectedData := SymbolPriceMap{
+	expectedData := idPriceMap{
 		"ethereum": {
 			"usd": 2419.65,
 			"eur": 2304.62,

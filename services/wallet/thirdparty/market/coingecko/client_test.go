@@ -1,7 +1,6 @@
 package coingecko
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -12,17 +11,12 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
-type TestTokenPlatform struct {
-	Ethereum string `json:"ethereum"`
-	Arb      string `json:"arb"`
-}
-
-type TestGeckoToken struct {
-	ID        string            `json:"id"`
-	Symbol    string            `json:"symbol"`
-	Name      string            `json:"name"`
-	Platforms TestTokenPlatform `json:"platforms"`
-}
+const (
+	ethGroupedTokenKey         = "ethereum"
+	statusGroupedTokenKey      = "status"
+	unsupprotedGroupedTokenKey = "UNSUPPORTED"
+	tokensGroupedTokenKey      = "TOKENS"
+)
 
 func setupTest(t *testing.T, response []byte) (*httptest.Server, func()) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -38,153 +32,51 @@ func setupTest(t *testing.T, response []byte) (*httptest.Server, func()) {
 	}
 }
 
-func TestGetTokensSuccess(t *testing.T) {
-	expected := []GeckoToken{
-		{
-			ID:     "ethereum",
-			Symbol: "eth",
-			Name:   "Ethereum",
-		},
-		{
-			ID:     "status",
-			Symbol: "snt",
-			Name:   "Status",
-		},
+func TestGettingTokens(t *testing.T) {
+	expectedTokenIDTokenMap := make(map[string]GeckoToken)
+	for _, token := range coinsList {
+		expectedTokenIDTokenMap[token.ID] = token
 	}
 
-	expectedMap := map[string][]GeckoToken{
-		"ETH": {{
-			ID:     "ethereum",
-			Symbol: "eth",
-			Name:   "Ethereum",
-		}},
-		"SNT": {{
-			ID:     "status",
-			Symbol: "snt",
-			Name:   "Status",
-		}},
-	}
-	response, _ := json.Marshal(expected)
-
-	srv, stop := setupTest(t, response)
+	srv, stop := setupTest(t, responseCoinsListData)
 	defer stop()
 
 	geckoClient := &Client{
-		httpClient: thirdparty.NewHTTPClient(),
-		tokens:     make(map[string][]GeckoToken),
-		baseURL:    srv.URL,
+		httpClient:      thirdparty.NewHTTPClient(),
+		baseURL:         srv.URL,
+		tokenIDTokenMap: make(map[string]GeckoToken),
 	}
 
-	tokenMap, err := geckoClient.getTokens()
+	tokenIDTokenMap, err := geckoClient.getTokenIDTokenMap()
 	require.NoError(t, err)
-	require.True(t, reflect.DeepEqual(expectedMap, tokenMap))
-}
-
-func TestGetTokensEthPlatform(t *testing.T) {
-	tokenList := []TestGeckoToken{
-		{
-			ID:     "ethereum",
-			Symbol: "eth-test",
-			Name:   "Ethereum",
-			Platforms: TestTokenPlatform{
-				Ethereum: "0x123",
-			},
-		},
-		{
-			ID:     "usdt-bridge-test",
-			Symbol: "usdt-test",
-			Name:   "USDT Bridge Test",
-			Platforms: TestTokenPlatform{
-				Arb: "0x123",
-			},
-		},
-		{
-			ID:     "tether",
-			Symbol: "usdt-test",
-			Name:   "Tether",
-			Platforms: TestTokenPlatform{
-				Arb:      "0x1234",
-				Ethereum: "0x12345",
-			},
-		},
-		{
-			ID:     "AirDao",
-			Symbol: "amb-test",
-			Name:   "Amber",
-			Platforms: TestTokenPlatform{
-				Arb: "0x123455",
-			},
-		},
-	}
-
-	expectedMap := map[string][]GeckoToken{
-		"ETH-TEST": {{
-			ID:          "ethereum",
-			Symbol:      "eth-test",
-			Name:        "Ethereum",
-			EthPlatform: true,
-		}},
-		"USDT-TEST": {
-			{
-				ID:          "usdt-bridge-test",
-				Symbol:      "usdt-test",
-				Name:        "USDT Bridge Test",
-				EthPlatform: false,
-			},
-			{
-				ID:          "tether",
-				Symbol:      "usdt-test",
-				Name:        "Tether",
-				EthPlatform: true,
-			},
-		},
-		"AMB-TEST": {{
-			ID:          "AirDao",
-			Symbol:      "amb-test",
-			Name:        "Amber",
-			EthPlatform: false,
-		}},
-	}
-
-	response, _ := json.Marshal(tokenList)
-
-	srv, stop := setupTest(t, response)
-	defer stop()
-
-	geckoClient := &Client{
-		httpClient: thirdparty.NewHTTPClient(),
-		tokens:     make(map[string][]GeckoToken),
-		baseURL:    srv.URL,
-	}
-
-	tokenMap, err := geckoClient.getTokens()
-	require.NoError(t, err)
-	require.True(t, reflect.DeepEqual(expectedMap, tokenMap))
-}
-
-func TestGetTokensFailure(t *testing.T) {
-	resp := []byte{}
-	srv, stop := setupTest(t, resp)
-	defer stop()
-
-	geckoClient := &Client{
-		httpClient: thirdparty.NewHTTPClient(),
-		tokens:     make(map[string][]GeckoToken),
-		baseURL:    srv.URL,
-	}
-
-	_, err := geckoClient.getTokens()
-	require.Error(t, err)
+	require.True(t, reflect.DeepEqual(expectedTokenIDTokenMap, tokenIDTokenMap))
 }
 
 func TestFetchPrices(t *testing.T) {
+	groupedTokensKeys := []string{
+		ethGroupedTokenKey,
+		statusGroupedTokenKey,
+		unsupprotedGroupedTokenKey,
+		tokensGroupedTokenKey,
+	}
+
+	var expectedPrices = make(map[string]map[string]float64)
+	expectedPrices[ethGroupedTokenKey] = make(map[string]float64)
+	expectedPrices[ethGroupedTokenKey]["USD"] = 3181.32
+	expectedPrices[statusGroupedTokenKey] = make(map[string]float64)
+	expectedPrices[statusGroupedTokenKey]["USD"] = 0.02391704
+	expectedPrices[unsupprotedGroupedTokenKey] = make(map[string]float64)
+	expectedPrices[unsupprotedGroupedTokenKey]["USD"] = 0
+	expectedPrices[tokensGroupedTokenKey] = make(map[string]float64)
+	expectedPrices[tokensGroupedTokenKey]["USD"] = 0
+
 	mux := http.NewServeMux()
 
 	// Register handlers for different URL paths
 	mux.HandleFunc("/coins/list", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
-		response := "[{\"id\":\"ethereum\",\"symbol\":\"eth\",\"name\":\"Ethereum\",\"platforms\":{\"ethereum\":\"0x5e21d1ee5cf0077b314c381720273ae82378d613\"}},{\"id\":\"status\",\"symbol\":\"snt\",\"name\":\"Status\",\"platforms\":{\"ethereum\":\"0x78ba134c3ace18e69837b01703d07f0db6fb0a60\"}}]"
+		response := "[{\"id\":\"ethereum\",\"symbol\":\"eth\",\"name\":\"Ethereum\",\"platforms\":{\"ethereum\":\"0x5e21d1ee5cf0077b314c381720273ae82378d613\"}},{\"id\":\"status\",\"symbol\":\"snt\",\"name\":\"Status\",\"platforms\":{\"ethereum\":\"0x78ba134c3ace18e69837b01703d07f0db6fb0a60\",\"optimistic-ethereum\":\"0x78ba134c3ace18e69837b01703d07f0db6fb0a60\"}}]"
 		_, _ = w.Write([]byte(response))
 	})
 
@@ -198,25 +90,53 @@ func TestFetchPrices(t *testing.T) {
 	srv := httptest.NewServer(mux)
 
 	geckoClient := &Client{
-		httpClient: thirdparty.NewHTTPClient(),
-		tokens:     make(map[string][]GeckoToken),
-		baseURL:    srv.URL,
+		httpClient:      thirdparty.NewHTTPClient(),
+		baseURL:         srv.URL,
+		tokenIDTokenMap: make(map[string]GeckoToken),
 	}
 
-	symbols := []string{"ETH", "SNT", "UNSUPPORTED", "TOKENS"}
-	prices, err := geckoClient.FetchPrices(symbols, []string{"USD"})
+	prices, err := geckoClient.FetchPrices(groupedTokensKeys, []string{"USD"})
 	require.NoError(t, err)
-	require.Len(t, prices, len(symbols))
+	require.True(t, reflect.DeepEqual(expectedPrices, prices))
 }
 
 func TestFetchMarketValues(t *testing.T) {
+	groupedTokensKeys := []string{
+		ethGroupedTokenKey,
+		statusGroupedTokenKey,
+		unsupprotedGroupedTokenKey,
+		tokensGroupedTokenKey,
+	}
+
+	var expectedMarketValues = make(map[string]thirdparty.TokenMarketValues)
+	expectedMarketValues[ethGroupedTokenKey] = thirdparty.TokenMarketValues{
+		MKTCAP:          3.82035912506e+11,
+		HIGHDAY:         3325.57,
+		LOWDAY:          3139.38,
+		CHANGEPCTHOUR:   -0.14302683386053758,
+		CHANGEPCTDAY:    -4.41377,
+		CHANGEPCT24HOUR: -4.41377,
+		CHANGE24HOUR:    -146.70781392198978,
+	}
+	expectedMarketValues[statusGroupedTokenKey] = thirdparty.TokenMarketValues{
+		MKTCAP:          9.4492012e+07,
+		HIGHDAY:         0.02528227,
+		LOWDAY:          0.02351923,
+		CHANGEPCTHOUR:   -0.21239208982552796,
+		CHANGEPCTDAY:    -4.69961,
+		CHANGEPCT24HOUR: -4.69961,
+		CHANGE24HOUR:    -0.001177587387552543,
+	}
+	expectedMarketValues[unsupprotedGroupedTokenKey] = thirdparty.TokenMarketValues{}
+	expectedMarketValues[tokensGroupedTokenKey] = thirdparty.TokenMarketValues{}
+
 	mux := http.NewServeMux()
 
 	// Register handlers for different URL paths
 	mux.HandleFunc("/coins/list", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
-		response := "[{\"id\":\"ethereum\",\"symbol\":\"eth\",\"name\":\"Ethereum\",\"platforms\":{\"ethereum\":\"0x5e21d1ee5cf0077b314c381720273ae82378d613\"}},{\"id\":\"status\",\"symbol\":\"snt\",\"name\":\"Status\",\"platforms\":{\"ethereum\":\"0x78ba134c3ace18e69837b01703d07f0db6fb0a60\"}}]"
+		response := "[{\"id\":\"ethereum\",\"symbol\":\"eth\",\"name\":\"Ethereum\",\"platforms\":{\"ethereum\":\"0x5e21d1ee5cf0077b314c381720273ae82378d613\"}},{\"id\":\"status\",\"symbol\":\"snt\",\"name\":\"Status\",\"platforms\":{\"ethereum\":\"0x78ba134c3ace18e69837b01703d07f0db6fb0a60\",\"optimistic-ethereum\":\"0x78ba134c3ace18e69837b01703d07f0db6fb0a60\"}}]"
 		_, _ = w.Write([]byte(response))
 	})
 
@@ -230,13 +150,12 @@ func TestFetchMarketValues(t *testing.T) {
 	srv := httptest.NewServer(mux)
 
 	geckoClient := &Client{
-		httpClient: thirdparty.NewHTTPClient(),
-		tokens:     make(map[string][]GeckoToken),
-		baseURL:    srv.URL,
+		httpClient:      thirdparty.NewHTTPClient(),
+		baseURL:         srv.URL,
+		tokenIDTokenMap: make(map[string]GeckoToken),
 	}
 
-	symbols := []string{"ETH", "SNT", "UNSUPPORTED", "TOKENS"}
-	prices, err := geckoClient.FetchTokenMarketValues(symbols, "USD")
+	prices, err := geckoClient.FetchTokenMarketValues(groupedTokensKeys, "USD")
 	require.NoError(t, err)
-	require.Len(t, prices, len(symbols))
+	require.True(t, reflect.DeepEqual(expectedMarketValues, prices))
 }
