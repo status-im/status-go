@@ -9,8 +9,10 @@ import (
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/services/wallet/common"
 	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/token-lists/default-lists"
 	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 func (t *TokenLists) rebuildTokensMap(fetchedLists []fetcher.FetchedTokenList) error {
@@ -26,6 +28,15 @@ func (t *TokenLists) rebuildTokensMap(fetchedLists []fetcher.FetchedTokenList) e
 
 		list.Source = fetchedTokenList.SourceURL
 		list.FetchedTimestamp = fetchedTokenList.Fetched.Format(time.RFC3339)
+
+		// remove tokens if the address is empty
+		var tokens []*tokentypes.Token
+		for _, token := range list.Tokens {
+			if token.Address != common.ZeroAddress() {
+				tokens = append(tokens, token)
+			}
+		}
+		list.Tokens = tokens
 
 		t.tokensListsMu.Lock()
 		t.tokensLists[fetchedTokenList.ID] = &list
