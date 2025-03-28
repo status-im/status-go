@@ -188,6 +188,8 @@ type Waku struct {
 	defaultShardInfo protocol.RelayShards
 }
 
+var _ types.Waku = (*Waku)(nil)
+
 func (w *Waku) SetMetricsHandler(client IMetricsHandler) {
 	w.metricsHandler = client
 }
@@ -338,7 +340,21 @@ func (w *Waku) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription, er
 	return subscription, nil
 }
 
-/* TODO-nwaku
+func (w *Waku) GetNodeENRString() (string, error) {
+	if w.node == nil {
+		return "", errors.New("node not initialized")
+	}
+
+	enr, err := w.node.ENR()
+	if err != nil {
+		w.logger.Error("failed retrieving node's enr", zap.Error(err))
+		return "", err
+	}
+
+	return enr.String(), nil
+}
+
+/* TODO-nwaku* (this logic should be directly in nwaku?)
 func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, useOnlyDnsDiscCache bool) ([]*enode.Node, error) {
 	wg := sync.WaitGroup{}
 	mu := sync.Mutex{}
@@ -367,8 +383,11 @@ func (w *Waku) getDiscV5BootstrapNodes(ctx context.Context, addresses []string, 
 				defer gocommon.LogOnPanic()
 				defer wg.Done()
 				if err := w.dnsDiscover(ctx, addr, retrieveENR, useOnlyDnsDiscCache); err != nil {
+					// prevent w.ctx in retryDnsDiscoveryWithBackoff from set to nil when w.Stop() is called
+					w.wg.Add(1)
 					go func() {
 						defer gocommon.LogOnPanic()
+						defer w.wg.Done()
 						w.retryDnsDiscoveryWithBackoff(ctx, addr, w.dnsDiscAsyncRetrievedSignal)
 					}()
 				}
@@ -440,8 +459,11 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 
 func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, successChan chan<- struct{}) {
 	retries := 0
+	applyFn := func(_ dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
+		wg.Done()
+	}
 	for {
-		err := w.dnsDiscover(ctx, addr, func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {}, false)
+		err := w.dnsDiscover(ctx, addr, applyFn, false)
 		if err == nil {
 			select {
 			case successChan <- struct{}{}:
@@ -530,7 +552,7 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	}
 }
 
-/* TODO-nwaku
+/* TODO-nwaku - implement when metrics are supported
 func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
 	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
@@ -557,14 +579,7 @@ func (w *Waku) telemetryBandwidthStats(telemetryServerURL string) {
 }
 */
 
-func (w *Waku) StartDiscV5() error {
-	return w.node.StartDiscV5()
-}
-
-func (w *Waku) StopDiscV5() error {
-	return w.node.StopDiscV5()
-}
-
+// TODO-nwaku - implement when metrics are supported
 func (w *Waku) GetStats() types.StatsSummary {
 	return types.StatsSummary{
 		UploadRate:   uint64(1),
@@ -578,7 +593,7 @@ func (w *Waku) GetStats() types.StatsSummary {
 	} */
 }
 
-/* TODO-nwaku
+/* TODO-nwaku* (this logic should be directly in nwaku?)
 func (w *Waku) runPeerExchangeLoop() {
 	defer gocommon.LogOnPanic()
 	defer w.wg.Done()
@@ -1005,37 +1020,6 @@ func (w *Waku) subscribe(f *common.Filter) (string, error) {
 	return id, nil
 }
 
-func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
-	var (
-		err     error
-		keyAsym *ecdsa.PrivateKey
-		keySym  []byte
-	)
-
-	if opts.SymKeyID != "" {
-		keySym, err = w.GetSymKey(opts.SymKeyID)
-		if err != nil {
-			return "", err
-		}
-	}
-	if opts.PrivateKeyID != "" {
-		keyAsym, err = w.GetPrivateKey(opts.PrivateKeyID)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	f := &common.Filter{
-		KeyAsym:       keyAsym,
-		KeySym:        keySym,
-		ContentTopics: common.NewTopicSetFromBytes(opts.Topics),
-		PubsubTopic:   opts.PubsubTopic,
-		Messages:      common.NewMemoryMessageStore(),
-	}
-
-	return w.subscribe(f)
-}
-
 // Unsubscribe removes an installed message handler.
 func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 	ok := w.filters.Uninstall(id)
@@ -1077,11 +1061,9 @@ func (w *Waku) SkipPublishToTopic(value bool) {
 
 func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
 	w.messageSender.MessagesDelivered(hashes)
-	/* TODO-nwaku
 	if w.metricsHandler != nil {
 		w.metricsHandler.PushMessageDeliveryConfirmed()
 	}
-	*/
 }
 
 // OnNewEnvelope is an interface from Waku FilterManager API that gets invoked when any new message is received by Filter.
@@ -1309,7 +1291,7 @@ func (w *Waku) checkForConnectionChanges() {
 	}) */
 }
 
-/* TODO: nwaku
+/* TODO-nwaku - implement when metrics are supported
 func (w *Waku) reportPeerMetrics() {
 	if w.metricsHandler != nil {
 		connFailures := FormatPeerConnFailures(w.node)
@@ -1355,10 +1337,9 @@ func (w *Waku) reportPeerMetrics() {
 
 func (w *Waku) startMessageSender() error {
 	publishMethod := publish.Relay
-	/* TODO-nwaku
 	if w.cfg.LightClient {
 		publishMethod = publish.LightPush
-	}*/
+	}
 
 	sender, err := publish.NewMessageSender(publishMethod, newPublisher(w.node), nil, w.logger)
 	if err != nil {
@@ -1366,10 +1347,10 @@ func (w *Waku) startMessageSender() error {
 		return err
 	}
 
-	/* TODO-nwaku
+	/* TODO-nwaku - check what WithMessageSentEmitter does
 	if w.cfg.TelemetryServerURL != "" {
 		sender.WithMessageSentEmitter(w.node.Host())
-	}*/
+	} */
 
 	if w.cfg.EnableStoreConfirmationForMessagesSent {
 		msgStoredChan := make(chan gethcommon.Hash, 1000)
@@ -1390,7 +1371,6 @@ func (w *Waku) startMessageSender() error {
 						Hash:  hash,
 						Event: common.EventEnvelopeSent,
 					})
-
 					if w.metricsHandler != nil {
 						w.metricsHandler.PushMessageCheckSuccess()
 					}
@@ -1399,7 +1379,6 @@ func (w *Waku) startMessageSender() error {
 						Hash:  hash,
 						Event: common.EventEnvelopeExpired,
 					})
-
 					if w.metricsHandler != nil {
 						w.metricsHandler.PushMessageCheckFailure()
 					}
@@ -1503,12 +1482,13 @@ func (w *Waku) OnNewEnvelopes(envelope common.Envelope, msgType common.MessageTy
 		return nil
 	}
 
-	/* TODO-nwaku
+	/* TODO-nwaku - implement when metrics are supported
 	if w.metricsHandler != nil {
 		if msgType == common.MissingMessageType {
 			w.metricsHandler.PushMissedMessage(envelope)
 		}
-	} */
+	}
+	*/
 
 	logger := w.logger.With(
 		zap.String("messageType", msgType),
@@ -1628,11 +1608,9 @@ func (w *Waku) processMessage(e *common.ReceivedMessage) {
 		w.storeMsgIDsMu.Unlock()
 	} else {
 		logger.Debug("filters did match")
-		/* TODO-nwaku
 		if w.metricsHandler != nil && e.MsgType == common.MissingMessageType {
 			w.metricsHandler.PushMissedRelevantMessage(e)
 		}
-		*/
 		e.Processed.Store(true)
 	}
 
@@ -1755,93 +1733,12 @@ func (w *Waku) RemovePubsubTopicKey(topic string) error {
 	return w.protectedTopicStore.Delete(topic)
 }
 
-func (w *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
-	return w.node.ListenAddresses()
+func (w *Waku) StartDiscV5() error {
+	return w.node.StartDiscV5()
 }
 
-func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool) {
-	// TODO-nwaku
-	return
-}
-
-func (w *Waku) GetActiveStorenode() peer.AddrInfo {
-	// TODO-nwaku
-	return peer.AddrInfo{}
-}
-
-// GetCurrentTime returns current time.
-func (w *Waku) GetCurrentTime() time.Time {
-	return w.CurrentTime()
-}
-
-func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
-	return w.StorenodeCycle.IsStorenodeAvailable(peerID)
-}
-
-func (w *Waku) OnStorenodeAvailable() <-chan peer.ID {
-	return w.StorenodeCycle.StorenodeAvailableEmitter.Subscribe()
-}
-
-func (w *Waku) OnStorenodeChanged() <-chan peer.ID {
-	return w.StorenodeCycle.StorenodeChangedEmitter.Subscribe()
-}
-
-func (w *Waku) OnStorenodeNotWorking() <-chan struct{} {
-	return w.StorenodeCycle.StorenodeNotWorkingEmitter.Subscribe()
-}
-
-func (w *Waku) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
-	return w.StorenodeCycle.PerformStorenodeTask(fn, opts...)
-}
-
-func (w *Waku) ProcessMailserverBatch(
-	ctx context.Context,
-	batch types.MailserverBatch,
-	storenode peer.AddrInfo,
-	pageLimit uint64,
-	shouldProcessNextPage func(int) (bool, uint64),
-	processEnvelopes bool,
-) error {
-	pubsubTopic := w.GetPubsubTopic(batch.PubsubTopic)
-	contentTopics := []string{}
-	for _, topic := range batch.Topics {
-		contentTopics = append(contentTopics, common.BytesToTopic(topic.Bytes()).ContentTopic())
-	}
-
-	criteria := store.FilterCriteria{
-		TimeStart:     proto.Int64(batch.From.UnixNano()),
-		TimeEnd:       proto.Int64(batch.To.UnixNano()),
-		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
-	}
-
-	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
-}
-
-func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
-	return NewPublicWakuAPI(w)
-}
-
-func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
-	var cTopics []string
-	for _, ct := range contentTopics {
-		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
-	}
-	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
-	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
-
-	return nil
-}
-
-func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
-	w.StorenodeCycle.SetStorenodeConfigProvider(c)
-}
-
-func (w *Waku) Version() uint {
-	return 2
-}
-
-func (w *Waku) WaitForAvailableStoreNode(ctx context.Context) bool {
-	return w.StorenodeCycle.WaitForAvailableStoreNode(ctx)
+func (w *Waku) StopDiscV5() error {
+	return w.node.StopDiscV5()
 }
 
 func (w *Waku) handleNetworkChangeFromApp(state connection.State) {
@@ -2168,6 +2065,126 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 func (w *Waku) LegacyStoreNode() legacy_store.Store {
 	// return w.node.LegacyStore()
 	return nil
+}
+
+// GetCurrentTime returns current time.
+func (w *Waku) GetCurrentTime() time.Time {
+	return w.CurrentTime()
+}
+
+func (w *Waku) GetActiveStorenode() peer.AddrInfo {
+	// TODO-nwaku
+	return peer.AddrInfo{}
+}
+
+func (w *Waku) OnStorenodeChanged() <-chan peer.ID {
+	return w.StorenodeCycle.StorenodeChangedEmitter.Subscribe()
+}
+
+func (w *Waku) OnStorenodeNotWorking() <-chan struct{} {
+	return w.StorenodeCycle.StorenodeNotWorkingEmitter.Subscribe()
+}
+
+func (w *Waku) OnStorenodeAvailable() <-chan peer.ID {
+	return w.StorenodeCycle.StorenodeAvailableEmitter.Subscribe()
+}
+
+func (w *Waku) WaitForAvailableStoreNode(ctx context.Context) bool {
+	return w.StorenodeCycle.WaitForAvailableStoreNode(ctx)
+}
+
+func (w *Waku) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
+	w.StorenodeCycle.SetStorenodeConfigProvider(c)
+}
+
+func (w *Waku) ProcessMailserverBatch(
+	ctx context.Context,
+	batch types.MailserverBatch,
+	storenode peer.AddrInfo,
+	pageLimit uint64,
+	shouldProcessNextPage func(int) (bool, uint64),
+	processEnvelopes bool,
+) error {
+	pubsubTopic := w.GetPubsubTopic(batch.PubsubTopic)
+	contentTopics := []string{}
+	for _, topic := range batch.Topics {
+		contentTopics = append(contentTopics, common.BytesToTopic(topic.Bytes()).ContentTopic())
+	}
+
+	criteria := store.FilterCriteria{
+		TimeStart:     proto.Int64(batch.From.UnixNano()),
+		TimeEnd:       proto.Int64(batch.To.UnixNano()),
+		ContentFilter: protocol.NewContentFilter(pubsubTopic, contentTopics...),
+	}
+
+	return w.HistoryRetriever.Query(ctx, criteria, storenode, pageLimit, shouldProcessNextPage, processEnvelopes)
+}
+
+func (w *Waku) IsStorenodeAvailable(peerID peer.ID) bool {
+	return w.StorenodeCycle.IsStorenodeAvailable(peerID)
+}
+
+func (w *Waku) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTaskOption) error {
+	return w.StorenodeCycle.PerformStorenodeTask(fn, opts...)
+}
+
+func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool) {
+	// TODO-nwaku
+	return
+}
+
+func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
+	return NewPublicWakuAPI(w)
+}
+
+func (w *Waku) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, pubsubTopic string, contentTopics []types.TopicType) error {
+	var cTopics []string
+	for _, ct := range contentTopics {
+		cTopics = append(cTopics, common.BytesToTopic(ct.Bytes()).ContentTopic())
+	}
+	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
+	w.SetTopicsToVerifyForMissingMessages(peerInfo, pubsubTopic, cTopics)
+
+	return nil
+}
+
+func (w *Waku) Subscribe(opts *types.SubscriptionOptions) (string, error) {
+	var (
+		err     error
+		keyAsym *ecdsa.PrivateKey
+		keySym  []byte
+	)
+
+	if opts.SymKeyID != "" {
+		keySym, err = w.GetSymKey(opts.SymKeyID)
+		if err != nil {
+			return "", err
+		}
+	}
+	if opts.PrivateKeyID != "" {
+		keyAsym, err = w.GetPrivateKey(opts.PrivateKeyID)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	f := &common.Filter{
+		KeyAsym:       keyAsym,
+		KeySym:        keySym,
+		ContentTopics: common.NewTopicSetFromBytes(opts.Topics),
+		PubsubTopic:   opts.PubsubTopic,
+		Messages:      common.NewMemoryMessageStore(),
+	}
+
+	return w.subscribe(f)
+}
+
+func (w *Waku) Version() uint {
+	return 2
+}
+
+func (w *Waku) ListenAddresses() ([]multiaddr.Multiaddr, error) {
+	return w.node.ListenAddresses()
 }
 
 func printStackTrace() {
