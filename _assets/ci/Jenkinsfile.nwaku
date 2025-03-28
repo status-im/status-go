@@ -89,10 +89,12 @@ pipeline {
             }
         }
 
-    stage('Build Shared Lib') {
+     stage('Build Shared Lib with nwaku') {
         steps {
             script {
-                shell('make statusgo-shared-library')
+              if (env.PLATFORM == 'linux') {
+                shell('USE_NWAKU=true make statusgo-shared-library')
+              }
             }
         }
     }
@@ -149,7 +151,7 @@ def shell(cmd) {
     if (env.PLATFORM == 'windows') {
         sh "${cmd} SHELL=/bin/sh"
     } else {
-        nix.develop(cmd, pure: false) // Use nix.develop for Linux/macOS
+        nix.shell(cmd, pure: false) // Use nix.shell for Linux/macOS
     }
 }
 
