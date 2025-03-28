@@ -299,3 +299,8 @@ class WakuextService(Service):
         params = [{"id": chat_id}]
         response = self.rpc_request("clearHistory", params)
         return response.json()
+
+    def deactivate_chat(self, chat_id: str, preserve_history: bool):
+        params = [{"id": chat_id, "preserveHistory": preserve_history}]
+        response = self.rpc_request("deactivateChat", params)
+        return response.json()

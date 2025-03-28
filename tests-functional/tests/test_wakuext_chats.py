@@ -113,7 +113,7 @@ class TestChatActions(MessengerSteps):
         assert chat.get("muted", True) is False
 
     def test_clear_history(self):
-        _, _ = self.send_multiple_one_to_one_messages(2)
+        _, _ = self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key
 
         response = self.sender.wakuext_service.chat(chat_id)
@@ -125,3 +125,21 @@ class TestChatActions(MessengerSteps):
 
         last_message = response.get("result", {}).get("chats", [])[0].get("lastMessage", -1)
         assert last_message is None
+
+    @pytest.mark.parametrize(
+        "preserve_history, expected",
+        [
+            (False, type(None)),
+            (True, dict),
+        ],
+    )
+    def test_deactivate_chat(self, preserve_history, expected):
+        _, _ = self.send_multiple_one_to_one_messages(1)
+        chat_id = self.receiver.public_key
+
+        response = self.sender.wakuext_service.deactivate_chat(chat_id, preserve_history)
+        self.sender.verify_json_schema(response, method="wakuext_deactivateChat")
+
+        chat = response.get("result", {}).get("chats", [])[0]
+        assert chat.get("active", -1) is False
+        assert isinstance(chat.get("lastMessage", -1), expected)
