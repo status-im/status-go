@@ -174,7 +174,7 @@ func initializeLogging(request *requests.InitializeApplication) error {
 
 	preLoginLog.SetLogDir(request.LogDir)
 
-	logSettings := preLoginLog.Settings()
+	logSettings := preLoginLog.ConvertToLogSettings()
 	err = logutils.OverrideRootLoggerWithConfig(logSettings)
 	if err != nil {
 		return err

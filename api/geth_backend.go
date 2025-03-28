@@ -108,16 +108,16 @@ type GethStatusBackend struct {
 	prometheusMetrics        *metrics.Server
 	sentryDSN                string
 
-	logger      *zap.Logger
-	preLoginLog *logutils.PreLoginLog
+	logger            *zap.Logger
+	preLoginLogConfig *logutils.PreLoginLogConfig
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
 func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
 	logger = logger.Named("GethStatusBackend")
 	backend := &GethStatusBackend{
-		logger:      logger,
-		preLoginLog: logutils.NewPreLoginLog(),
+		logger:            logger,
+		preLoginLogConfig: logutils.NewPreLoginLogConfig(),
 	}
 	backend.initialize()
 
@@ -129,8 +129,8 @@ func NewGethStatusBackend(logger *zap.Logger) *GethStatusBackend {
 	return backend
 }
 
-func (b *GethStatusBackend) PreLoginLog() *logutils.PreLoginLog {
-	return b.preLoginLog
+func (b *GethStatusBackend) PreLoginLog() *logutils.PreLoginLogConfig {
+	return b.preLoginLogConfig
 }
 
 func (b *GethStatusBackend) initialize() {
@@ -2712,7 +2712,7 @@ func (b *GethStatusBackend) switchToPreLoginLog() error {
 	if err != nil {
 		return err
 	}
-	return logutils.OverrideRootLoggerWithConfig(b.preLoginLog.Settings())
+	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
 // cleanupServices stops parts of services that doesn't managed by a node and removes injected data from services.
@@ -3028,15 +3028,15 @@ func (b *GethStatusBackend) SetProfileLogEnabled(enabled bool) error {
 func (b *GethStatusBackend) SetPreLoginLogEnabled(enabled bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.preLoginLog.SetEnabled(enabled)
-	return logutils.OverrideRootLoggerWithConfig(b.preLoginLog.Settings())
+	b.preLoginLogConfig.SetEnabled(enabled)
+	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
 
 func (b *GethStatusBackend) SetPreLoginLogLevel(level string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if err := b.preLoginLog.SetLevel(level); err != nil {
+	if err := b.preLoginLogConfig.SetLevel(level); err != nil {
 		return err
 	}
-	return logutils.OverrideRootLoggerWithConfig(b.preLoginLog.Settings())
+	return logutils.OverrideRootLoggerWithConfig(b.preLoginLogConfig.ConvertToLogSettings())
 }
