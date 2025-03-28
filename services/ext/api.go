@@ -1358,6 +1358,13 @@ func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids
 	return err
 }
 
+// FetchNewsMessages fetches news messages from the News Feed
+// and returns a MessengerResponse containing the AC notifications
+func (api *PublicAPI) FetchNewsMessages() (*protocol.MessengerResponse, error) {
+	m := api.service.messenger
+	return m.FetchNewsMessages()
+}
+
 func (api *PublicAPI) RequestAllHistoricMessages(forceFetchingBackup bool) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RequestAllHistoricMessages(forceFetchingBackup, false)
 }

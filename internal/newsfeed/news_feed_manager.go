@@ -2,10 +2,10 @@ package newsfeed
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/mmcdole/gofeed"
+	"go.uber.org/zap"
 
 	gocommon "github.com/status-im/status-go/common"
 )
@@ -18,7 +18,7 @@ type FeedParser interface {
 }
 
 type FeedHandler interface {
-	HandleFeed(item *gofeed.Item)
+	HandleFeedItemAndSend(item *gofeed.Item) error
 }
 
 type NewsFeedManager struct {
@@ -28,6 +28,7 @@ type NewsFeedManager struct {
 	fetchFrom       time.Time
 	pollingInterval time.Duration
 	cancel          context.CancelFunc
+	logger          *zap.Logger
 }
 
 type Option func(*NewsFeedManager)
@@ -47,6 +48,12 @@ func WithParser(parser FeedParser) Option {
 func WithHandler(handler FeedHandler) Option {
 	return func(nfm *NewsFeedManager) {
 		nfm.handler = handler
+	}
+}
+
+func WithLogger(logger *zap.Logger) Option {
+	return func(nfm *NewsFeedManager) {
+		nfm.logger = logger.Named("NewsFeedManager")
 	}
 }
 
@@ -75,24 +82,40 @@ func NewNewsFeedManager(opts ...Option) *NewsFeedManager {
 	return nfm
 }
 
-func (n *NewsFeedManager) fetchRSS() error {
+func (n *NewsFeedManager) FetchRSS() ([]*gofeed.Item, error) {
 	feed, err := n.parser.ParseURL(n.url)
 	if err != nil {
-		fmt.Println("Error fetching feed:", err)
-		return err
+		n.logger.Error("error fetching feed", zap.Error(err))
+		return nil, err
 	}
 
-	fmt.Println("Feed Title:", feed.Title)
+	filteredItems := []*gofeed.Item{}
 	for _, item := range feed.Items {
 		if item.PublishedParsed != nil && item.PublishedParsed.After(n.fetchFrom) {
-			fmt.Printf("NEW ITEM:\n  Title: %s\n  Link: %s\n  Published: %s\n\n",
-				item.Title, item.Link, item.PublishedParsed)
-			n.handler.HandleFeed(item)
+			filteredItems = append(filteredItems, item)
 		}
 	}
 
 	// Update fetchFrom to now
 	n.fetchFrom = time.Now()
+
+	return filteredItems, nil
+}
+
+func (n *NewsFeedManager) fetchRSSAndHandle() error {
+	itemsToHandle, err := n.FetchRSS()
+	if err != nil {
+		n.logger.Error("error fetching feed", zap.Error(err))
+		return err
+	}
+
+	for _, item := range itemsToHandle {
+		err := n.handler.HandleFeedItemAndSend(item)
+		if err != nil {
+			n.logger.Error("error handling item", zap.Error(err))
+			return err
+		}
+	}
 
 	return nil
 }
@@ -101,21 +124,19 @@ func (n *NewsFeedManager) StartFetching(ctx context.Context) {
 	// Derive the given context, save the CancelFunc
 	ctx, n.cancel = context.WithCancel(ctx)
 
-	// Initial fetch
-	_ = n.fetchRSS()
-
-	ticker := time.NewTicker(n.pollingInterval)
-
 	go func() {
 		defer gocommon.LogOnPanic()
-		defer ticker.Stop()
+
+		// Initialize interval to 0 for immediate execution
+		var interval time.Duration = 0
+
 		for {
 			select {
-			case <-ticker.C:
-				_ = n.fetchRSS()
+			case <-time.After(interval):
+				// Immediate execution on first run, then set to regular interval
+				interval = n.pollingInterval
+				_ = n.fetchRSSAndHandle()
 			case <-ctx.Done():
-				// TODO use logger
-				fmt.Println("Polling stopped for:", n.url)
 				return
 			}
 		}

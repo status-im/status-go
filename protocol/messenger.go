@@ -928,6 +928,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 			newsfeed.WithURL(newsfeed.STATUS_FEED_URL),
 			newsfeed.WithParser(gofeed.NewParser()),
 			newsfeed.WithHandler(m),
+			newsfeed.WithLogger(m.logger),
 			newsfeed.WithPollingInterval(30*time.Minute),
 			newsfeed.WithFetchFrom(twoHoursAgo),
 		)
@@ -937,11 +938,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	return response, nil
-}
-
-// TODO move this to the AC file
-func (m *Messenger) HandleFeed(item *gofeed.Item) {
-	fmt.Println("Received new item:", item.Title)
 }
 
 func (m *Messenger) startHistoryArchivesImportLoop() {
