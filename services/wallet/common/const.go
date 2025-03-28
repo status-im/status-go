@@ -101,6 +101,19 @@ func (c ChainID) IsMainnet() bool {
 	return false
 }
 
+func AllChains() []uint64 {
+	return []uint64{
+		EthereumMainnet,
+		EthereumSepolia,
+		OptimismMainnet,
+		OptimismSepolia,
+		ArbitrumMainnet,
+		ArbitrumSepolia,
+		BaseMainnet,
+		BaseSepolia,
+	}
+}
+
 func AllChainIDs() []ChainID {
 	return []ChainID{
 		ChainID(EthereumMainnet),
