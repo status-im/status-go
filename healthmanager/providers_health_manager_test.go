@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/healthmanager/aggregator"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 )
 
@@ -182,6 +183,43 @@ func (s *ProvidersHealthManagerSuite) TestConcurrency() {
 
 	chainStatus := s.phm.Status().Status
 	s.Equal(chainStatus, rpcstatus.StatusUp, "Expected chain status to be either Up or Down")
+}
+
+// TestPanicWithNilAggregator tests that Update handles nil aggregator without panicking
+// (refs https://github.com/status-im/status-go/issues/6462)
+func (s *ProvidersHealthManagerSuite) TestPanicWithNilAggregator() {
+	// Create ProvidersHealthManager with nil aggregator for testing
+	phm := &ProvidersHealthManager{
+		chainID:             1,
+		aggregator:          nil, // Explicitly set to nil
+		subscriptionManager: NewSubscriptionManager(),
+	}
+
+	// Test data
+	callStatuses := []rpcstatus.RpcProviderCallStatus{
+		{Name: "Provider1", Timestamp: time.Now(), Err: nil},
+	}
+
+	// Call should not panic due to our nil check
+	s.NotPanics(func() {
+		phm.Update(context.Background(), callStatuses)
+	}, "Update should not panic with nil aggregator thanks to nil check")
+}
+
+// TestPanicWithNilSubscriptionManager tests that emitChainStatus handles nil subscriptionManager without panicking
+// (refs https://github.com/status-im/status-go/issues/6462)
+func (s *ProvidersHealthManagerSuite) TestPanicWithNilSubscriptionManager() {
+	// Create ProvidersHealthManager with nil subscriptionManager for testing
+	phm := &ProvidersHealthManager{
+		chainID:             1,
+		aggregator:          aggregator.NewAggregator("1"),
+		subscriptionManager: nil, // Explicitly set to nil
+	}
+
+	// Call should not panic due to our nil check
+	s.NotPanics(func() {
+		phm.emitChainStatus(context.Background())
+	}, "emitChainStatus should not panic with nil subscriptionManager thanks to nil check")
 }
 
 func TestProvidersHealthManagerSuite(t *testing.T) {

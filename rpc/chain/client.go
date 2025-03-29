@@ -84,15 +84,16 @@ type ClientWithFallback struct {
 
 func (c *ClientWithFallback) Copy() interface{} {
 	return &ClientWithFallback{
-		ChainID:        c.ChainID,
-		ethClients:     c.ethClients,
-		commonLimiter:  c.commonLimiter,
-		circuitbreaker: c.circuitbreaker,
-		WalletNotifier: c.WalletNotifier,
-		isConnected:    c.isConnected,
-		LastCheckedAt:  c.LastCheckedAt,
-		tag:            c.tag,
-		groupTag:       c.groupTag,
+		ChainID:                c.ChainID,
+		ethClients:             c.ethClients,
+		commonLimiter:          c.commonLimiter,
+		circuitbreaker:         c.circuitbreaker,
+		providersHealthManager: c.providersHealthManager,
+		WalletNotifier:         c.WalletNotifier,
+		isConnected:            c.isConnected,
+		LastCheckedAt:          c.LastCheckedAt,
+		tag:                    c.tag,
+		groupTag:               c.groupTag,
 	}
 }
 

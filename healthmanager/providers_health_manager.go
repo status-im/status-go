@@ -32,6 +32,12 @@ func NewProvidersHealthManager(chainID uint64) *ProvidersHealthManager {
 func (p *ProvidersHealthManager) Update(ctx context.Context, callStatuses []rpcstatus.RpcProviderCallStatus) {
 	p.mu.Lock()
 
+	// Check if aggregator is nil
+	if p.aggregator == nil {
+		p.mu.Unlock()
+		return
+	}
+
 	// Update the aggregator with the new provider statuses
 	for _, rpcCallStatus := range callStatuses {
 		providerStatus := rpcstatus.NewRpcProviderStatus(rpcCallStatus)
@@ -74,7 +80,9 @@ func (p *ProvidersHealthManager) Unsubscribe(ch chan struct{}) {
 func (p *ProvidersHealthManager) Reset() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.aggregator = aggregator.NewAggregator(fmt.Sprintf("%d", p.chainID))
+	newAgg := aggregator.NewAggregator(fmt.Sprintf("%d", p.chainID))
+	p.aggregator = newAgg
+	p.lastStatus = nil
 }
 
 // Status returns the current aggregated status.
@@ -91,5 +99,8 @@ func (p *ProvidersHealthManager) ChainID() uint64 {
 
 // emitChainStatus sends a notification to all subscribers.
 func (p *ProvidersHealthManager) emitChainStatus(ctx context.Context) {
+	if p.subscriptionManager == nil {
+		return
+	}
 	p.subscriptionManager.Emit(ctx)
 }
