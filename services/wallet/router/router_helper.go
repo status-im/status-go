@@ -189,13 +189,17 @@ func (r *Router) applyCustomFields(ctx context.Context, path *routes.Path, fetch
 		}
 	}
 
+	// set appropriate gas amount and update later in this function if custom gas amount is provided
+	path.TxGasAmount = path.SuggestedTxGasAmount
+	path.ApprovalGasAmount = path.SuggestedApprovalGasAmount
+
 	// set appropriate nonce/s, and update later in this function if custom nonce/s are provided
 	err := r.resolveNonceForPath(ctx, path, r.lastInputParams.AddrFrom, usedNonces)
 	if err != nil {
 		return err
 	}
 
-	if r.lastInputParams.PathTxCustomParams == nil || len(r.lastInputParams.PathTxCustomParams) == 0 {
+	if len(r.lastInputParams.PathTxCustomParams) == 0 {
 		// if no custom params are provided, use the initial fee mode
 		maxFeesPerGas, priorityFee, estimatedTime, err := fetchedFees.FeeFor(r.lastInputParams.GasFeeMode)
 		if err != nil {
