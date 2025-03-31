@@ -143,3 +143,13 @@ class TestChatActions(MessengerSteps):
         chat = response.get("result", {}).get("chats", [])[0]
         assert chat.get("active", -1) is False
         assert isinstance(chat.get("lastMessage", -1), expected)
+
+    def test_save_chat(self):
+        chat_id = "123"
+        response = self.sender.wakuext_service.save_chat(chat_id, True)
+        assert response.get("result", -1) is None
+
+        response = self.sender.wakuext_service.chat("123")
+        chat = response.get("result", {})
+        assert chat.get("id", "") == chat_id
+        assert chat.get("active", -1) is True
