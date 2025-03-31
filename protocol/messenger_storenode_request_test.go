@@ -13,8 +13,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 
@@ -374,26 +372,6 @@ func (s *MessengerStoreNodeRequestSuite) wakuListenAddress(waku *waku2.Waku) mul
 	return addresses[0]
 }
 
-func (s *MessengerStoreNodeRequestSuite) ensureStoreNodeEnvelopes(contentTopic *wakutypes.TopicType, minimumCount int) {
-	// Give some time for store node to put envelope into database. Otherwise, the test is flaky.
-	// Although we subscribed to EnvelopeEvents and waited, the actual saving to database happens asynchronously.
-	// It would be nice to implement a subscription for database storing event, but it isn't worth it right now.
-	time.Sleep(100 * time.Millisecond)
-
-	// Directly ensure profile is available on store node
-	queryOptions := []legacy_store.HistoryRequestOption{
-		legacy_store.WithLocalQuery(),
-	}
-	query := legacy_store.Query{
-		PubsubTopic:   "",
-		ContentTopics: []string{contentTopic.ContentTopic()},
-	}
-	result, err := s.wakuStoreNode.LegacyStoreNode().Query(context.Background(), query, queryOptions...)
-	s.Require().NoError(err)
-	s.Require().GreaterOrEqual(len(result.Messages), minimumCount)
-	s.logger.Debug("store node query result", zap.Int("messagesCount", len(result.Messages)))
-}
-
 func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityInfo() {
 	s.createOwner()
 	s.createBob()
@@ -628,7 +606,6 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	s.Require().NoError(err)
 
 	s.waitForEnvelopes(storeNodeSubscription, 1)
-	s.ensureStoreNodeEnvelopes(&contentTopic, 1)
 
 	// Fetch profile
 	s.createBob()

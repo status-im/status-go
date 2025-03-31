@@ -71,7 +71,6 @@ import (
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
-	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
@@ -2028,10 +2027,6 @@ func FormatPeerStats(wakuNode *node.WakuNode) types.PeerStats {
 	return p
 }
 
-func (w *Waku) StoreNode() *store.WakuStore {
-	return w.node.Store()
-}
-
 func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 	p := make(map[string]int)
 	for _, peerID := range wakuNode.Host().Network().Peers() {
@@ -2042,10 +2037,6 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 		}
 	}
 	return p
-}
-
-func (w *Waku) LegacyStoreNode() legacy_store.Store {
-	return w.node.LegacyStore()
 }
 
 // GetCurrentTime returns current time.
