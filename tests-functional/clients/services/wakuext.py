@@ -309,3 +309,8 @@ class WakuextService(Service):
         params = [{"id": chat_id, "active": active}]
         response = self.rpc_request("saveChat", params)
         return response.json()
+
+    def create_one_to_one_chat(self, chat_id: str, ens_name: str):
+        params = [{"id": chat_id, "ensName": ens_name}]
+        response = self.rpc_request("createOneToOneChat", params)
+        return response.json()

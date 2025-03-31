@@ -1,0 +1,135 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "jsonrpc": {
+            "type": "string"
+        },
+        "result": {
+            "properties": {
+                "chats": {
+                    "items": {
+                        "properties": {
+                            "ReadMessagesAtClockValue": {
+                                "type": "integer"
+                            },
+                            "active": {
+                                "type": "boolean"
+                            },
+                            "alias": {
+                                "type": "string"
+                            },
+                            "chatType": {
+                                "type": "integer"
+                            },
+                            "color": {
+                                "type": "string"
+                            },
+                            "deletedAtClockValue": {
+                                "type": "integer"
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "emoji": {
+                                "type": "string"
+                            },
+                            "highlight": {
+                                "type": "boolean"
+                            },
+                            "id": {
+                                "type": "string"
+                            },
+                            "identicon": {
+                                "type": "string"
+                            },
+                            "joined": {
+                                "type": "integer"
+                            },
+                            "lastClockValue": {
+                                "type": "integer"
+                            },
+                            "lastMessage": {
+                                "type": "null"
+                            },
+                            "members": {
+                                "type": "null"
+                            },
+                            "membershipUpdateEvents": {
+                                "type": "null"
+                            },
+                            "muteTill": {
+                                "type": "string"
+                            },
+                            "muted": {
+                                "type": "boolean"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "timestamp": {
+                                "type": "integer"
+                            },
+                            "unviewedMentionsCount": {
+                                "type": "integer"
+                            },
+                            "unviewedMessagesCount": {
+                                "type": "integer"
+                            },
+                            "viewersCanPostReactions": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "ReadMessagesAtClockValue",
+                            "active",
+                            "alias",
+                            "chatType",
+                            "color",
+                            "deletedAtClockValue",
+                            "description",
+                            "emoji",
+                            "highlight",
+                            "id",
+                            "identicon",
+                            "joined",
+                            "lastClockValue",
+                            "lastMessage",
+                            "members",
+                            "membershipUpdateEvents",
+                            "muteTill",
+                            "muted",
+                            "name",
+                            "timestamp",
+                            "unviewedMentionsCount",
+                            "unviewedMessagesCount",
+                            "viewersCanPostReactions"
+                        ],
+                        "type": "object"
+                    },
+                    "type": "array"
+                },
+                "discordOldestMessageTimestamp": {
+                    "type": "integer"
+                },
+                "notifications": {
+                    "type": "null"
+                }
+            },
+            "required": [
+                "chats",
+                "discordOldestMessageTimestamp",
+                "notifications"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "id",
+        "jsonrpc",
+        "result"
+    ],
+    "type": "object"
+}

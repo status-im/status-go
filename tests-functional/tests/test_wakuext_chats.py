@@ -146,10 +146,21 @@ class TestChatActions(MessengerSteps):
 
     def test_save_chat(self):
         chat_id = "123"
-        response = self.sender.wakuext_service.save_chat(chat_id, True)
+        response = self.sender.wakuext_service.save_chat(chat_id, active=True)
         assert response.get("result", -1) is None
 
-        response = self.sender.wakuext_service.chat("123")
+        response = self.sender.wakuext_service.chat(chat_id)
         chat = response.get("result", {})
+        assert chat.get("id", "") == chat_id
+        assert chat.get("active", -1) is True
+
+    def test_create_one_to_one_chat(self):
+        chat_id = self.receiver.public_key
+        response = self.sender.wakuext_service.create_one_to_one_chat(chat_id, ens_name="")
+        self.sender.verify_json_schema(response, method="wakuext_createOneToOneChat")
+
+        chats = response.get("result", {}).get("chats", [])
+        assert len(chats) == 1
+        chat = chats[0]
         assert chat.get("id", "") == chat_id
         assert chat.get("active", -1) is True
