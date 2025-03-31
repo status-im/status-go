@@ -2073,8 +2073,7 @@ func (w *Waku) GetCurrentTime() time.Time {
 }
 
 func (w *Waku) GetActiveStorenode() peer.AddrInfo {
-	// TODO-nwaku
-	return peer.AddrInfo{}
+	return w.StorenodeCycle.GetActiveStorenodePeerInfo()
 }
 
 func (w *Waku) OnStorenodeChanged() <-chan peer.ID {
