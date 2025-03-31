@@ -1,4 +1,3 @@
-from resources.constants import USER_DIR
 import re
 from clients.status_backend import StatusBackend
 import pytest
@@ -59,7 +58,7 @@ class TestLogging:
         backend_client.api_valid_request("SetLogEnabled", {"enabled": True})
         backend_client.rpc_valid_request("wakuext_logTest")
         profile_log = backend_client.extract_data(log_path)
-        self.expect_logs(geth_log, "test message", log_pattern, count=2)
+        self.expect_logs(profile_log, "test message", log_pattern, count=2)
 
         # Ensure changes are persisted after re-login
         backend_client.logout()
