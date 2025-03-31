@@ -15,23 +15,23 @@ func NewCurrencyDB(sqlDb *sql.DB) *DB {
 	}
 }
 
-func getCachedFormatsFromDBRows(rows *sql.Rows) (FormatPerSymbol, error) {
-	formats := make(FormatPerSymbol)
+func getCachedFormatsFromDBRows(rows *sql.Rows) (Formats, error) {
+	formats := make(Formats)
 
 	for rows.Next() {
 		var format Format
-		if err := rows.Scan(&format.Symbol, &format.DisplayDecimals, &format.StripTrailingZeroes); err != nil {
+		if err := rows.Scan(&format.TokenKey, &format.DisplayDecimals, &format.StripTrailingZeroes); err != nil {
 			return nil, err
 		}
 
-		formats[format.Symbol] = format
+		formats[format.TokenKey] = format
 	}
 
 	return formats, nil
 }
 
-func (cdb *DB) GetCachedFormats() (FormatPerSymbol, error) {
-	rows, err := cdb.db.Query("SELECT symbol, display_decimals, strip_trailing_zeroes FROM currency_format_cache")
+func (cdb *DB) GetCachedFormats() (Formats, error) {
+	rows, err := cdb.db.Query("SELECT token_key, display_decimals, strip_trailing_zeroes FROM currency_format_cache")
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (cdb *DB) GetCachedFormats() (FormatPerSymbol, error) {
 	return getCachedFormatsFromDBRows(rows)
 }
 
-func (cdb *DB) UpdateCachedFormats(formats FormatPerSymbol) error {
+func (cdb *DB) UpdateCachedFormats(formats Formats) error {
 	tx, err := cdb.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -56,7 +56,7 @@ func (cdb *DB) UpdateCachedFormats(formats FormatPerSymbol) error {
 	}()
 
 	insert, err := tx.Prepare(`INSERT OR REPLACE INTO currency_format_cache
-				(symbol, display_decimals, strip_trailing_zeroes)
+				(token_key, display_decimals, strip_trailing_zeroes)
 				VALUES
 				(?, ?, ?)`)
 	if err != nil {
@@ -64,7 +64,7 @@ func (cdb *DB) UpdateCachedFormats(formats FormatPerSymbol) error {
 	}
 
 	for _, format := range formats {
-		_, err = insert.Exec(format.Symbol, format.DisplayDecimals, format.StripTrailingZeroes)
+		_, err = insert.Exec(format.TokenKey, format.DisplayDecimals, format.StripTrailingZeroes)
 		if err != nil {
 			return err
 		}

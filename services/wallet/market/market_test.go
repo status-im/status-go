@@ -19,20 +19,26 @@ func setupMarketManager(t *testing.T, providers []thirdparty.MarketDataProvider)
 	return NewManager(providers, &event.Feed{})
 }
 
+const (
+	btcTokenKey = "1-0x1111" // BTC on chain 1
+	ethTokenKey = "1-0x1112" // ETH on chain 1
+	sntTokenKey = "1-0x1113" // SNT on chain 1
+)
+
 var mockPrices = map[string]map[string]float64{
-	"BTC": {
+	btcTokenKey: {
 		"USD": 1.23456,
 		"EUR": 2.34567,
 		"DAI": 3.45678,
 		"ARS": 9.87654,
 	},
-	"ETH": {
+	ethTokenKey: {
 		"USD": 4.56789,
 		"EUR": 5.67891,
 		"DAI": 6.78912,
 		"ARS": 8.76543,
 	},
-	"SNT": {
+	sntTokenKey: {
 		"USD": 7.654,
 		"EUR": 6.0,
 		"DAI": 1455.12,
@@ -54,25 +60,25 @@ func TestPrice(t *testing.T) {
 	}
 
 	{
-		symbols := []string{"BTC", "ETH"}
+		tokenKeys := []string{btcTokenKey, ethTokenKey}
 		currencies := []string{"USD", "EUR"}
-		rst, err := manager.FetchPrices(symbols, currencies)
+		rst, err := manager.FetchPrices(tokenKeys, currencies)
 		require.NoError(t, err)
-		for _, symbol := range symbols {
+		for _, tokenKey := range tokenKeys {
 			for _, currency := range currencies {
-				require.Equal(t, rst[symbol][currency], mockPrices[symbol][currency])
+				require.Equal(t, rst[tokenKey][currency], mockPrices[tokenKey][currency])
 			}
 		}
 	}
 
 	{
-		symbols := []string{"BTC", "ETH", "SNT"}
+		tokenKeys := []string{btcTokenKey, ethTokenKey, sntTokenKey}
 		currencies := []string{"USD", "EUR", "DAI", "ARS"}
-		rst, err := manager.FetchPrices(symbols, currencies)
+		rst, err := manager.FetchPrices(tokenKeys, currencies)
 		require.NoError(t, err)
-		for _, symbol := range symbols {
+		for _, tokenKey := range tokenKeys {
 			for _, currency := range currencies {
-				require.Equal(t, rst[symbol][currency], mockPrices[symbol][currency])
+				require.Equal(t, rst[tokenKey][currency], mockPrices[tokenKey][currency])
 			}
 		}
 	}
@@ -94,15 +100,15 @@ func TestFetchPriceErrorFirstProvider(t *testing.T) {
 	customErr := errors.New("error")
 	priceProviderWithError := mock_market.NewMockPriceProviderWithError(ctrl, customErr)
 
-	symbols := []string{"BTC", "ETH"}
+	tokenKeys := []string{btcTokenKey, ethTokenKey}
 	currencies := []string{"USD", "EUR"}
 
 	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{priceProviderWithError, priceProvider})
-	rst, err := manager.FetchPrices(symbols, currencies)
+	rst, err := manager.FetchPrices(tokenKeys, currencies)
 	require.NoError(t, err)
-	for _, symbol := range symbols {
+	for _, tokenKey := range tokenKeys {
 		for _, currency := range currencies {
-			require.Equal(t, rst[symbol][currency], mockPrices[symbol][currency])
+			require.Equal(t, rst[tokenKey][currency], mockPrices[tokenKey][currency])
 		}
 	}
 }

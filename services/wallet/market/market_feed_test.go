@@ -17,7 +17,7 @@ import (
 type MarketTestSuite struct {
 	suite.Suite
 	feedSub    *mock_common.FeedSubscription
-	symbols    []string
+	tokenKeys  []string
 	currencies []string
 }
 
@@ -25,7 +25,7 @@ func (s *MarketTestSuite) SetupTest() {
 	feed := new(event.Feed)
 	s.feedSub = mock_common.NewFeedSubscription(feed)
 
-	s.symbols = []string{"BTC", "ETH"}
+	s.tokenKeys = []string{btcTokenKey, ethTokenKey}
 	s.currencies = []string{"USD", "EUR"}
 }
 
@@ -42,7 +42,7 @@ func (s *MarketTestSuite) TestEventOnRpsError() {
 	manager := NewManager([]thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
 
 	// WHEN
-	_, err := manager.FetchPrices(s.symbols, s.currencies)
+	_, err := manager.FetchPrices(s.tokenKeys, s.currencies)
 	s.Require().Error(err, "expected error from FetchPrices due to MockPriceProviderWithError")
 	event, ok := s.feedSub.WaitForEvent(5 * time.Second)
 	s.Require().True(ok, "expected an event, but none was received")
@@ -60,7 +60,7 @@ func (s *MarketTestSuite) TestEventOnNetworkError() {
 	priceProviderWithError := mock_market.NewMockPriceProviderWithError(ctrl, customErr)
 	manager := NewManager([]thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
 
-	_, err := manager.FetchPrices(s.symbols, s.currencies)
+	_, err := manager.FetchPrices(s.tokenKeys, s.currencies)
 	s.Require().Error(err, "expected error from FetchPrices due to MockPriceProviderWithError")
 	event, ok := s.feedSub.WaitForEvent(500 * time.Millisecond)
 	s.Require().True(ok, "expected an event, but none was received")

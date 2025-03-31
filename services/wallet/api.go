@@ -376,9 +376,10 @@ func (api *API) GetFlatEthereumChains(ctx context.Context) ([]*params.Network, e
 }
 
 // @deprecated
-func (api *API) FetchPrices(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]float64, error) {
+// FetchPrice returns price map per token key and currency, for passed token keys in fromat `chainId-address` and currencies.
+func (api *API) FetchPrices(ctx context.Context, tokenKeys []string, currencies []string) (map[string]map[string]float64, error) {
 	logutils.ZapLogger().Debug("call to FetchPrices")
-	return api.s.marketManager.FetchPrices(symbols, currencies)
+	return api.s.marketManager.FetchPrices(tokenKeys, currencies)
 }
 
 // @deprecated
@@ -712,12 +713,12 @@ func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []wcomm
 	return api.s.transactionManager.GetMultiTransactions(ctx, transactionIDs)
 }
 
-func (api *API) GetCachedCurrencyFormats() (currency.FormatPerSymbol, error) {
+func (api *API) GetCachedCurrencyFormats() (currency.Formats, error) {
 	logutils.ZapLogger().Debug("call to GetCachedCurrencyFormats")
 	return api.s.currency.GetCachedCurrencyFormats()
 }
 
-func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
+func (api *API) FetchAllCurrencyFormats() (currency.Formats, error) {
 	logutils.ZapLogger().Debug("call to FetchAllCurrencyFormats")
 	return api.s.currency.FetchAllCurrencyFormats()
 }

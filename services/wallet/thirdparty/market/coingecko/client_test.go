@@ -78,8 +78,8 @@ func TestGettingTokens(t *testing.T) {
 
 func TestFetchPrices(t *testing.T) {
 	var (
-		ethTokenKeyChain1    = utils.MakeTokenKey(1, ethAddress)
-		ethTokenKeyChain2    = utils.MakeTokenKey(11155111, ethAddress)
+		ethTokenKeyChain1    = utils.MakeTokenKey(1, utils.EthAddress)
+		ethTokenKeyChain2    = utils.MakeTokenKey(11155111, utils.EthAddress)
 		statusTokenKeyChain1 = utils.MakeTokenKey(1, "0x78ba134c3ace18e69837b01703d07f0db6fb0a60")
 		statusTokenKeyChain2 = utils.MakeTokenKey(10, "0x78ba134c3ace18e69837b01703d07f0db6fb0a60")
 	)
@@ -137,8 +137,8 @@ func TestFetchPrices(t *testing.T) {
 
 func TestFetchMarketValues(t *testing.T) {
 	var (
-		ethTokenKeyChain1    = utils.MakeTokenKey(1, ethAddress)
-		ethTokenKeyChain2    = utils.MakeTokenKey(11155111, ethAddress)
+		ethTokenKeyChain1    = utils.MakeTokenKey(1, utils.EthAddress)
+		ethTokenKeyChain2    = utils.MakeTokenKey(11155111, utils.EthAddress)
 		statusTokenKeyChain1 = utils.MakeTokenKey(1, "0x78ba134c3ace18e69837b01703d07f0db6fb0a60")
 		statusTokenKeyChain2 = utils.MakeTokenKey(10, "0x78ba134c3ace18e69837b01703d07f0db6fb0a60")
 	)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math/big"
-	"slices"
 	"strings"
 
 	"github.com/ethereum/go-ethereum"
@@ -386,27 +385,25 @@ func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collecti
 	}
 }
 
-func fetchPrices(sendType sendtype.SendType, marketManager *market.Manager, tokenIDs []string) (map[string]float64, error) {
-	nonUniqueSymbols := append(tokenIDs, "ETH")
-	// remove duplicate enteries
-	slices.Sort(nonUniqueSymbols)
-	symbols := slices.Compact(nonUniqueSymbols)
-	if sendType.IsCollectiblesTransfer() {
-		symbols = []string{"ETH"}
+// fetchPrices fetches prices for passed token keys. ETH is always included in the list of tokens to fetch prices for.
+func fetchPrices(sendType sendtype.SendType, marketManager *market.Manager, tokenKeys []string) (map[string]float64, error) {
+	allTokenKeys := []string{tokenTypes.GetEthTokenKeyForChain(walletCommon.EthereumMainnet)}
+	if !sendType.IsCollectiblesTransfer() {
+		allTokenKeys = append(allTokenKeys, tokenKeys...)
 	}
 
-	pricesMap, err := marketManager.GetOrFetchPrices(symbols, []string{"USD"}, market.MaxAgeInSecondsForFresh)
+	pricesMap, err := marketManager.GetOrFetchPrices(allTokenKeys, []string{"USD"}, market.MaxAgeInSecondsForFresh)
 
 	if err != nil {
 		return nil, err
 	}
 	prices := make(map[string]float64, 0)
-	for symbol, pricePerCurrency := range pricesMap {
-		prices[symbol] = pricePerCurrency["USD"].Price
+	for tokenKey, pricePerCurrency := range pricesMap {
+		prices[tokenKey] = pricePerCurrency["USD"].Price
 	}
 	if sendType.IsCollectiblesTransfer() {
-		for _, tokenID := range tokenIDs {
-			prices[tokenID] = 0
+		for _, tokenKey := range tokenKeys {
+			prices[tokenKey] = 0
 		}
 	}
 	return prices, nil

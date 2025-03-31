@@ -96,6 +96,7 @@ func (c *Client) buildURL(path string) string {
 	return baseURL + "/" + trimmedPath
 }
 
+// @deprecated - not in use since we've switched to fetch using token key (chain+address) which is not supported by cryptocompare
 func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
 	const maxFsymsLength = 300
 	chunkSymbolParams := utils.ChunkSymbolsParams{
@@ -139,6 +140,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 	return result, nil
 }
 
+// @deprecated - not in use since we've switched to fetch using token key (chain+address) which is not supported by cryptocompare
 func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
 	url := c.buildURL("data/all/coinlist")
 	response, err := c.httpClient.DoGetRequestWithCredentials(context.Background(), url, nil, c.creds)
@@ -161,6 +163,7 @@ func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.Toke
 	return tokenDetails, nil
 }
 
+// @deprecated - not in use since we've switched to fetch using token key (chain+address) which is not supported by cryptocompare
 func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
 	const maxFsymsLength = 300
 	chunkSymbolParams := utils.ChunkSymbolsParams{
@@ -205,6 +208,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 	return item, nil
 }
 
+// @deprecated - not in use since we've switched to fetch using token key (chain+address) which is not supported by cryptocompare
 func (c *Client) FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	item := []thirdparty.HistoricalPrice{}
 
@@ -232,6 +236,7 @@ func (c *Client) FetchHistoricalHourlyPrices(symbol string, currency string, lim
 	return item, nil
 }
 
+// @deprecated - not in use since we've switched to fetch using token key (chain+address) which is not supported by cryptocompare
 func (c *Client) FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	item := []thirdparty.HistoricalPrice{}
 

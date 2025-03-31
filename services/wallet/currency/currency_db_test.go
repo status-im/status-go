@@ -25,14 +25,14 @@ func TestCurrencyFormats(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, rst)
 
-	pr1 := FormatPerSymbol{
+	pr1 := Formats{
 		"A": {
-			Symbol:              "A",
+			TokenKey:            "A",
 			DisplayDecimals:     1,
 			StripTrailingZeroes: false,
 		},
 		"B": {
-			Symbol:              "B",
+			TokenKey:            "B",
 			DisplayDecimals:     2,
 			StripTrailingZeroes: true,
 		},
@@ -45,14 +45,14 @@ func TestCurrencyFormats(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, rst, pr1)
 
-	pr2 := FormatPerSymbol{
+	pr2 := Formats{
 		"B": {
-			Symbol:              "B",
+			TokenKey:            "B",
 			DisplayDecimals:     3,
 			StripTrailingZeroes: true,
 		},
 		"C": {
-			Symbol:              "C",
+			TokenKey:            "C",
 			DisplayDecimals:     4,
 			StripTrailingZeroes: false,
 		},
@@ -64,19 +64,19 @@ func TestCurrencyFormats(t *testing.T) {
 	rst, err = db.GetCachedFormats()
 	require.NoError(t, err)
 
-	expected := FormatPerSymbol{
+	expected := Formats{
 		"A": {
-			Symbol:              "A",
+			TokenKey:            "A",
 			DisplayDecimals:     1,
 			StripTrailingZeroes: false,
 		},
 		"B": {
-			Symbol:              "B",
+			TokenKey:            "B",
 			DisplayDecimals:     3,
 			StripTrailingZeroes: true,
 		},
 		"C": {
-			Symbol:              "C",
+			TokenKey:            "C",
 			DisplayDecimals:     4,
 			StripTrailingZeroes: false,
 		},

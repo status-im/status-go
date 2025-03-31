@@ -7,8 +7,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	gocommon "github.com/status-im/status-go/common"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -60,11 +62,11 @@ func (s *Service) Start(ctx context.Context) {
 	}()
 }
 
-func (s *Service) GetCachedCurrencyFormats() (FormatPerSymbol, error) {
+func (s *Service) GetCachedCurrencyFormats() (Formats, error) {
 	return s.db.GetCachedFormats()
 }
 
-func (s *Service) FetchAllCurrencyFormats() (FormatPerSymbol, error) {
+func (s *Service) FetchAllCurrencyFormats() (Formats, error) {
 	// Only token prices can change, so we fetch those
 	tokenFormats, err := s.fetchAllTokenCurrencyFormats()
 
@@ -81,33 +83,31 @@ func (s *Service) FetchAllCurrencyFormats() (FormatPerSymbol, error) {
 	return s.GetCachedCurrencyFormats()
 }
 
-func (s *Service) getAllFiatCurrencyFormats() (FormatPerSymbol, error) {
+func (s *Service) getAllFiatCurrencyFormats() (Formats, error) {
 	return GetFiatCurrencyFormats(GetAllFiatCurrencySymbols())
 }
 
-func (s *Service) fetchAllTokenCurrencyFormats() (FormatPerSymbol, error) {
+func (s *Service) fetchAllTokenCurrencyFormats() (Formats, error) {
 	tokens, err := s.tokenManager.GetAllTokens()
 	if err != nil {
 		return nil, err
 	}
 
-	tokenPerSymbolMap := make(map[string]bool)
-	tokenSymbols := make([]string, 0)
+	// Doesn't need to be unique list, cause provider handles that
+	tokenKeys := []string{
+		tokenTypes.GetEthTokenKeyForChain(walletCommon.EthereumMainnet), // Add ETH
+	}
 	for _, t := range tokens {
-		symbol := t.Symbol
-		if !tokenPerSymbolMap[symbol] {
-			tokenPerSymbolMap[symbol] = true
-			tokenSymbols = append(tokenSymbols, symbol)
-		}
+		tokenKeys = append(tokenKeys, t.TokenKey())
 	}
 
-	tokenFormats, err := s.currency.FetchTokenCurrencyFormats(tokenSymbols)
+	tokenFormats, err := s.currency.FetchTokenCurrencyFormats(tokenKeys)
 	if err != nil {
 		return nil, err
 	}
 	gweiSymbol := "Gwei"
 	tokenFormats[gweiSymbol] = Format{
-		Symbol:              gweiSymbol,
+		TokenKey:            gweiSymbol,
 		DisplayDecimals:     9,
 		StripTrailingZeroes: true,
 	}

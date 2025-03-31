@@ -17,12 +17,12 @@ const lowerTokenResolutionInUsd = 0.1
 const higherTokenResolutionInUsd = 0.01
 
 type Format struct {
-	Symbol              string `json:"symbol"`
+	TokenKey            string `json:"tokenKey"`
 	DisplayDecimals     uint   `json:"displayDecimals"`
 	StripTrailingZeroes bool   `json:"stripTrailingZeroes"`
 }
 
-type FormatPerSymbol = map[string]Format
+type Formats = map[string]Format // [tokenKey]Format
 
 type Currency struct {
 	marketManager *market.Manager
@@ -60,7 +60,7 @@ func calculateFiatCurrencyFormat(symbol string) (*Format, error) {
 	}
 
 	format := &Format{
-		Symbol:              symbol,
+		TokenKey:            symbol,
 		DisplayDecimals:     displayDecimals,
 		StripTrailingZeroes: false,
 	}
@@ -86,28 +86,28 @@ func calculateTokenDisplayDecimals(price float64) uint {
 	return uint(displayDecimals)
 }
 
-func (cm *Currency) calculateTokenCurrencyFormat(symbol string, price float64) (*Format, error) {
-	pegSymbol := token.GetTokenPegSymbol(symbol)
+func (cm *Currency) calculateTokenCurrencyFormat(tokenKey string, price float64) (*Format, error) {
+	pegSymbol := token.GetTokenPegSymbol(tokenKey)
 
 	if pegSymbol != "" {
 		var currencyFormat, err = calculateFiatCurrencyFormat(pegSymbol)
 		if err != nil {
 			return nil, err
 		}
-		currencyFormat.Symbol = symbol
+		currencyFormat.TokenKey = tokenKey
 		return currencyFormat, nil
 	}
 
 	currencyFormat := &Format{
-		Symbol:              symbol,
+		TokenKey:            tokenKey,
 		DisplayDecimals:     calculateTokenDisplayDecimals(price),
 		StripTrailingZeroes: true,
 	}
 	return currencyFormat, nil
 }
 
-func GetFiatCurrencyFormats(symbols []string) (FormatPerSymbol, error) {
-	formats := make(FormatPerSymbol)
+func GetFiatCurrencyFormats(symbols []string) (Formats, error) {
+	formats := make(Formats)
 
 	for _, symbol := range symbols {
 		format, err := calculateFiatCurrencyFormat(symbol)
@@ -122,29 +122,29 @@ func GetFiatCurrencyFormats(symbols []string) (FormatPerSymbol, error) {
 	return formats, nil
 }
 
-func (cm *Currency) FetchTokenCurrencyFormats(symbols []string) (FormatPerSymbol, error) {
-	formats := make(FormatPerSymbol)
+func (cm *Currency) FetchTokenCurrencyFormats(tokenKeys []string) (Formats, error) {
+	formats := make(Formats)
 
 	// Get latest cached price, fetch only if not available
-	prices, err := cm.marketManager.GetOrFetchPrices(symbols, []string{decimalsCalculationCurrency}, math.MaxInt64)
+	prices, err := cm.marketManager.GetOrFetchPrices(tokenKeys, []string{decimalsCalculationCurrency}, math.MaxInt64)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, symbol := range symbols {
-		priceData, ok := prices[symbol][decimalsCalculationCurrency]
+	for _, tokenKey := range tokenKeys {
+		priceData, ok := prices[tokenKey][decimalsCalculationCurrency]
 
 		if !ok {
-			return nil, errors.New("Could not get price for: " + symbol)
+			return nil, errors.New("Could not get price for: " + tokenKey)
 		}
 
-		format, err := cm.calculateTokenCurrencyFormat(symbol, priceData.Price)
+		format, err := cm.calculateTokenCurrencyFormat(tokenKey, priceData.Price)
 
 		if err != nil {
 			return nil, err
 		}
 
-		formats[symbol] = *format
+		formats[tokenKey] = *format
 	}
 
 	return formats, nil
