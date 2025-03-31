@@ -42,3 +42,8 @@ class MuteType(Enum):
     MUTE_TILL1_MIN = 6
     UNMUTED = 7
     MUTE_FOR24_HR = 8
+
+
+class ChatPreviewFilterType(Enum):
+    Community = 0
+    NonCommunity = 1

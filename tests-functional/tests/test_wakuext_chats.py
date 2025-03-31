@@ -1,7 +1,7 @@
 import pytest
 
 from datetime import datetime, timedelta
-from resources.enums import ChatType, MuteType
+from resources.enums import ChatType, ChatPreviewFilterType, MuteType
 from steps.messenger import MessengerSteps
 
 
@@ -33,6 +33,35 @@ class TestChatActions(MessengerSteps):
         chat = response.get("result", {})
         assert chat.get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chat.get("lastMessage", {}).get("text", "") == sent_texts[0]
+
+    def test_chats_preview(self):
+        # One to one
+        self.make_contacts()
+        _, _ = self.send_multiple_one_to_one_messages(1)
+        one_to_one_chat_id = self.receiver.public_key
+
+        # Group
+        private_group_chat_id = self.join_private_group()
+        self.sender.wakuext_service.send_group_chat_message(private_group_chat_id, "test_message_group")
+
+        # Community
+        self.create_community(self.sender)
+        community_chat_id = self.join_community(self.receiver)
+        self.sender.wakuext_service.send_chat_message(community_chat_id, "test_message_community")
+
+        response = self.sender.wakuext_service.chats_preview(ChatPreviewFilterType.Community.value)
+        self.sender.verify_json_schema(response, method="wakuext_chatsPreview")
+
+        chats_previews = response.get("result", [])
+        assert len(chats_previews) == 1
+        assert chats_previews[0].get("id", "") == community_chat_id
+
+        response = self.sender.wakuext_service.chats_preview(ChatPreviewFilterType.NonCommunity.value)
+        self.sender.verify_json_schema(response, method="wakuext_chatsPreview")
+        chats_previews = response.get("result", [])
+        assert len(chats_previews) == 2
+        assert chats_previews[0].get("id", "") == one_to_one_chat_id
+        assert chats_previews[1].get("id", "") == private_group_chat_id
 
     def test_active_chats(self):
         sent_texts, _ = self.send_multiple_one_to_one_messages(1)
