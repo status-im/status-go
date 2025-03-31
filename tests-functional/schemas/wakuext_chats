@@ -182,10 +182,82 @@
                         "type": "object"
                     },
                     "members": {
-                        "type": "null"
+                        "anyOf": [
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "items": {
+                                    "properties": {
+                                        "admin": {
+                                            "type": "boolean"
+                                        },
+                                        "id": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "admin",
+                                        "id"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            }
+                        ]
                     },
                     "membershipUpdateEvents": {
-                        "type": "null"
+                        "anyOf": [
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "items": {
+                                    "properties": {
+                                        "chatId": {
+                                            "type": "string"
+                                        },
+                                        "clockValue": {
+                                            "type": "integer"
+                                        },
+                                        "color": {
+                                            "type": "string"
+                                        },
+                                        "from": {
+                                            "type": "string"
+                                        },
+                                        "members": {
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "type": "array"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "rawPayload": {
+                                            "type": "string"
+                                        },
+                                        "signature": {
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "chatId",
+                                        "clockValue",
+                                        "from",
+                                        "rawPayload",
+                                        "signature",
+                                        "type"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            }
+                        ]
                     },
                     "muteTill": {
                         "type": "string"
@@ -218,7 +290,6 @@
                 "required": [
                     "ReadMessagesAtClockValue",
                     "active",
-                    "alias",
                     "chatType",
                     "color",
                     "deletedAtClockValue",
@@ -235,8 +306,6 @@
                     "muteTill",
                     "muted",
                     "name",
-                    "syncedFrom",
-                    "syncedTo",
                     "timestamp",
                     "unviewedMentionsCount",
                     "unviewedMessagesCount",
