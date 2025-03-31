@@ -64,15 +64,23 @@ class TestChatActions(MessengerSteps):
         assert chats_previews[1].get("id", "") == private_group_chat_id
 
     def test_active_chats(self):
-        sent_texts, _ = self.send_multiple_one_to_one_messages(1)
+        self.make_contacts()
+        _, _ = self.send_multiple_one_to_one_messages(1)
+        one_to_one_chat_id = self.receiver.public_key
+        private_group_chat_id = self.join_private_group()
 
         response = self.sender.wakuext_service.active_chats()
         self.sender.verify_json_schema(response, method="wakuext_chats")
+        chats = response.get("result", [])
+        assert len(chats) == 2
+
+        self.sender.wakuext_service.deactivate_chat(private_group_chat_id, False)
+
+        response = self.sender.wakuext_service.active_chats()
 
         chats = response.get("result", [])
         assert len(chats) == 1
-        assert chats[0].get("chatType", 0) == ChatType.ONE_TO_ONE.value
-        assert chats[0].get("lastMessage", {}).get("text", "") == sent_texts[0]
+        assert chats[0].get("id", 0) == one_to_one_chat_id
 
     def test_mute_chat(self):
         _, _ = self.send_multiple_one_to_one_messages(1)
