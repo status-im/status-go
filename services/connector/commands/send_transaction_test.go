@@ -84,7 +84,7 @@ func TestSendTransactionWithSignalTimout(t *testing.T) {
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
 	feeHistory := &fees.FeeHistory{}
 	percentiles := []int{fees.RewardPercentiles1, fees.RewardPercentiles2, fees.RewardPercentiles3}
-	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(300), "latest", percentiles).Times(1).Return(nil)
+	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
@@ -131,7 +131,7 @@ func TestSendTransactionWithSignalAccepted(t *testing.T) {
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
 	feeHistory := &fees.FeeHistory{}
 	percentiles := []int{fees.RewardPercentiles1, fees.RewardPercentiles2, fees.RewardPercentiles3}
-	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(300), "latest", percentiles).Times(1).Return(nil)
+	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
@@ -175,7 +175,7 @@ func TestSendTransactionWithSignalRejected(t *testing.T) {
 	mockedChainClient := mock_client.NewMockClientInterface(state.mockCtrl)
 	feeHistory := &fees.FeeHistory{}
 	percentiles := []int{fees.RewardPercentiles1, fees.RewardPercentiles2, fees.RewardPercentiles3}
-	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(300), "latest", percentiles).Times(1).Return(nil)
+	state.rpcClient.EXPECT().Call(feeHistory, uint64(1), "eth_feeHistory", uint64(10), "latest", percentiles).Times(1).Return(nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
 	mockedChainClient.EXPECT().SuggestGasPrice(state.ctx).Times(1).Return(big.NewInt(1), nil)
 	state.rpcClient.EXPECT().EthClient(uint64(1)).Times(1).Return(mockedChainClient, nil)
