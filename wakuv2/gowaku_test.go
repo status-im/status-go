@@ -8,15 +8,19 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/multiformats/go-multiaddr"
-	"github.com/stretchr/testify/require"
-	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
-	"github.com/waku-org/go-waku/waku/v2/utils"
+
 	"go.uber.org/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
+	"github.com/waku-org/go-waku/waku/v2/utils"
+
+	"github.com/ethereum/go-ethereum/p2p/enode"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestHandlePeerAddress(t *testing.T) {
@@ -41,7 +45,7 @@ func TestHandlePeerAddress(t *testing.T) {
 
 		// Call the tested function
 		err := handlePeerAddress(addr, mockHandler)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("invalid multiaddr", func(t *testing.T) {
@@ -60,7 +64,7 @@ func TestHandlePeerAddress(t *testing.T) {
 
 		// Call the tested function
 		err := handlePeerAddress(addr, mockHandler)
-		assert.ErrorContains(t, err, "invalid peer multiaddress")
+		require.ErrorContains(t, err, "invalid peer multiaddress")
 	})
 
 	t.Run("valid multiaddr", func(t *testing.T) {
@@ -93,7 +97,7 @@ func TestHandlePeerAddress(t *testing.T) {
 
 		// Call the tested function
 		err = handlePeerAddress(addr, mockHandler)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("valid enr", func(t *testing.T) {
@@ -151,6 +155,6 @@ func TestHandlePeerAddress(t *testing.T) {
 
 		// Call the tested function
 		err := handlePeerAddress(addr, mockHandler)
-		assert.ErrorContains(t, err, "unknown format of waku")
+		require.ErrorContains(t, err, "unknown format of waku")
 	})
 }
