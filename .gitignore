@@ -120,6 +120,7 @@ tests-functional/*.log
 # generated files
 mock
 mock.go
+*_mock_test.go
 *.pb.go
 bindata.go
 migrations.go
