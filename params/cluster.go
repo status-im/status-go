@@ -2,7 +2,6 @@ package params
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 
 	pkgerrors "github.com/pkg/errors"
@@ -202,9 +201,7 @@ func loadFleetsFromFile(filepath string) (FleetsMap, error) {
 		return nil, err
 	}
 
-	defer func() {
-		err = errors.Join(err, file.Close())
-	}()
+	defer file.Close()
 
 	var overrideFleets FleetsMap
 	decoder := json.NewDecoder(file)
