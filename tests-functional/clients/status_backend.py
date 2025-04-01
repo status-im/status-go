@@ -190,6 +190,7 @@ class StatusBackend(RpcClient, SignalClient):
             "logEnabled": True,
             "logLevel": "DEBUG",
             "apiLogging": True,
+            "wakuFleetsConfigFilePath": option.waku_fleets_config,
         }
         return self.api_valid_request(method, data)
 
@@ -286,7 +287,9 @@ class StatusBackend(RpcClient, SignalClient):
             # Logs config
             "logEnabled": True,
             "logLevel": "DEBUG",
+            # Waku config
             "wakuV2LightClient": kwargs.get("wakuV2LightClient", False),
+            "wakuV2Fleet": option.waku_fleet,
         }
         self._set_networks(data, **kwargs)
         data = self._set_proxy_credentials(data)

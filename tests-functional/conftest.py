@@ -41,6 +41,18 @@ def pytest_addoption(parser):
         help="When set, will automatically call Logout() before InitializeApplication()",
         default=False,
     )
+    parser.addoption(
+        "--waku-fleets-config",
+        action="store",
+        help="Path to a local JSON file with Waku fleets configuration",
+        default=None,
+    )
+    parser.addoption(
+        "--waku-fleet",
+        action="store",
+        help="Waku fleet to be used",
+        default=None,
+    )
 
 
 @dataclass
@@ -86,6 +98,13 @@ def pytest_configure(config):
 
     option.base_dir = os.path.dirname(os.path.abspath(__file__))  # schemas directory
     option.status_backend_urls = status_backend_url_generator(config)
+
+
+def pytest_report_header(config):
+    return [
+        f"waku fleets config file: {option.waku_fleets_config}",
+        f"waku fleet: {option.waku_fleet}",
+    ]
 
 
 @pytest.fixture(scope="function", autouse=True)
