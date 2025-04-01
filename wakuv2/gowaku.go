@@ -36,6 +36,8 @@ import (
 	"testing"
 	"time"
 
+	pkgerrors "github.com/pkg/errors"
+
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -88,7 +90,7 @@ import (
 
 	"github.com/status-im/status-go/waku/types"
 
-	node "github.com/waku-org/go-waku/waku/v2/node"
+	"github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 )
 
@@ -531,7 +533,21 @@ func (w *Waku) retryDnsDiscoveryWithBackoff(ctx context.Context, addr string, su
 	}
 }
 
+type peerAddressHandler interface {
+	discoverAndConnect(addr string)
+	connect(peerInfo peer.AddrInfo, node *enode.Node, origin wps.Origin)
+}
+
 func (w *Waku) discoverAndConnectPeers() {
+	for _, addrString := range w.cfg.WakuNodes {
+		err := handlePeerAddress(addrString, w)
+		if err != nil {
+			w.logger.Warn("failed to handle peer address", zap.String("addr", addrString), zap.Error(err))
+		}
+	}
+}
+
+func (w *Waku) discoverAndConnect(address string) {
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
 		defer wg.Done()
 		if len(d.PeerInfo.Addrs) != 0 {
@@ -539,60 +555,53 @@ func (w *Waku) discoverAndConnectPeers() {
 		}
 	}
 
-	for _, addrString := range w.cfg.WakuNodes {
-		if strings.HasPrefix(addrString, "enrtree://") {
-			// Use DNS Discovery
-			go func() {
-				defer gocommon.LogOnPanic()
-				if err := w.dnsDiscover(w.ctx, addrString, fnApply, false); err != nil {
-					w.logger.Error("could not obtain dns discovery peers for ClusterConfig.WakuNodes", zap.Error(err), zap.String("dnsDiscURL", addrString))
-				}
-			}()
-			continue
+	go func() {
+		defer gocommon.LogOnPanic()
+		if err := w.dnsDiscover(w.ctx, address, fnApply, false); err != nil {
+			w.logger.Error("dns discovery failed",
+				zap.String("dnsDiscURL", address),
+				zap.Error(err))
 		}
+	}()
+}
 
-		if addr, err := multiaddr.NewMultiaddr(addrString); err == nil {
-			// It is a normal multiaddress
-			peerInfo, err := peer.AddrInfoFromP2pAddr(addr)
-			if err != nil {
-				w.logger.Warn("invalid peer multiaddress", zap.Stringer("addr", addr), zap.Error(err))
-				continue
-			}
-
-			go w.connect(*peerInfo, nil, wps.Static)
-			continue
-		}
-
-		if strings.HasPrefix(addrString, "enr:") {
-			// Parse as ENR
-			node, err := enode.Parse(enode.ValidSchemes, addrString)
-			if err != nil {
-				w.logger.Warn("invalid ENR", zap.String("addr", addrString), zap.Error(err))
-				continue
-			}
-
-			id, addrs, err := enr.Multiaddress(node)
-			if err != nil {
-				w.logger.Warn("invalid peer ID", zap.Error(err))
-				continue
-			}
-
-			peerInfo := peer.AddrInfo{
-				ID:    id,
-				Addrs: addrs,
-			}
-			go w.connect(peerInfo, node, wps.Static)
-			continue
-		}
-
-		w.logger.Warn("unknown format of waku node address", zap.String("addr", addrString))
+func handlePeerAddress(addr string, handler peerAddressHandler) error {
+	if strings.HasPrefix(addr, "enrtree://") {
+		handler.discoverAndConnect(addr)
+		return nil
 	}
+
+	if node, err := enode.Parse(enode.ValidSchemes, addr); err == nil {
+		id, addrs, err := enr.Multiaddress(node)
+		if err != nil {
+			return pkgerrors.Wrap(err, "invalid enr contents")
+		}
+
+		peerInfo := peer.AddrInfo{
+			ID:    id,
+			Addrs: addrs,
+		}
+		handler.connect(peerInfo, node, wps.Static)
+		return nil
+	}
+
+	if maddr, err := multiaddr.NewMultiaddr(addr); err == nil {
+		peerInfo, err := peer.AddrInfoFromP2pAddr(maddr)
+		if err != nil {
+			return pkgerrors.Wrap(err, "invalid peer multiaddress")
+		}
+
+		handler.connect(*peerInfo, nil, wps.Static)
+		return nil
+	}
+
+	return errors.New("unknown format of waku node address")
 }
 
 func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origin) {
 	defer gocommon.LogOnPanic()
 	// Connection will be prunned eventually by the connection manager if needed
-	// The peer connector in go-waku uses Connect, so it will execute identify as part of its
+	// The peer connector in go-waku uses connect, so it will execute identify as part of its
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
 }
 
