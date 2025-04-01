@@ -164,10 +164,6 @@ func (t *Transport) FiltersByIdentities(identities []string) []*Filter {
 	return t.filters.FiltersByIdentities(identities)
 }
 
-func (t *Transport) LoadFilters(filters []*Filter) ([]*Filter, error) {
-	return t.filters.InitWithFilters(filters)
-}
-
 func (t *Transport) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
 	return t.filters.InitCommunityFilters(communityFiltersToInitialize)
 }

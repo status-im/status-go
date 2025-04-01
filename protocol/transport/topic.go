@@ -22,14 +22,6 @@ func ToTopic(s string) []byte {
 	return crypto.Keccak256([]byte(s))[:types.TopicLength]
 }
 
-func StrToPublicKey(str string) (*ecdsa.PublicKey, error) {
-	publicKeyBytes, err := hex.DecodeString(str)
-	if err != nil {
-		return nil, err
-	}
-	return crypto.UnmarshalPubkey(publicKeyBytes)
-}
-
 func PublicKeyToStr(publicKey *ecdsa.PublicKey) string {
 	return hex.EncodeToString(crypto.FromECDSAPub(publicKey))
 }

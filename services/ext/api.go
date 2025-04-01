@@ -262,16 +262,8 @@ func (api *PublicAPI) SendGroupChatInvitationRejection(ctx Context, invitationRe
 	return api.service.messenger.SendGroupChatInvitationRejection(ctx, invitationRequestID)
 }
 
-func (api *PublicAPI) LoadFilters(parent context.Context, chats []*transport.Filter) ([]*transport.Filter, error) {
-	return api.service.messenger.LoadFilters(chats)
-}
-
 func (api *PublicAPI) SaveChat(parent context.Context, chat *protocol.Chat) error {
 	return api.service.messenger.SaveChat(chat)
-}
-
-func (api *PublicAPI) SaveMessages(parent context.Context, messages []*common.Message) error {
-	return api.service.messenger.SaveMessages(messages)
 }
 
 func (api *PublicAPI) CreateOneToOneChat(parent context.Context, request *requests.CreateOneToOneChat) (*protocol.MessengerResponse, error) {
@@ -300,10 +292,6 @@ func (api *PublicAPI) Chat(parent context.Context, chatID string) *protocol.Chat
 
 func (api *PublicAPI) ActiveChats(parent context.Context) []*protocol.Chat {
 	return api.service.messenger.ActiveChats()
-}
-
-func (api *PublicAPI) DeleteChat(parent context.Context, chatID string) error {
-	return api.service.messenger.DeleteChat(chatID)
 }
 
 func (api *PublicAPI) MuteCommunityCategory(request *requests.MuteCategory) error {

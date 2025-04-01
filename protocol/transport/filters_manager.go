@@ -194,28 +194,6 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 	return filters, nil
 }
 
-// DEPRECATED
-func (f *FiltersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
-	var (
-		filtersToInit []FiltersToInitialize
-		publicKeys    []*ecdsa.PublicKey
-	)
-
-	for _, filter := range filters {
-		if filter.Identity != "" && filter.OneToOne {
-			publicKey, err := StrToPublicKey(filter.Identity)
-			if err != nil {
-				return nil, err
-			}
-			publicKeys = append(publicKeys, publicKey)
-		} else if filter.ChatID != "" {
-			filtersToInit = append(filtersToInit, FiltersToInitialize{ChatID: filter.ChatID, PubsubTopic: filter.PubsubTopic})
-		}
-	}
-
-	return f.Init(filtersToInit, publicKeys)
-}
-
 func (f *FiltersManager) Reset(ctx context.Context) error {
 	var filters []*Filter
 

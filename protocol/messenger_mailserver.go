@@ -809,10 +809,6 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 	return m.persistence.DeleteMessages(messageIDs)
 }
 
-func (m *Messenger) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
-	return m.transport.LoadFilters(filters)
-}
-
 func (m *Messenger) ToggleUseMailservers(value bool) error {
 	err := m.settings.SetUseMailservers(value)
 	if err != nil {
