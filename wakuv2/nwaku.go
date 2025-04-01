@@ -2128,8 +2128,13 @@ func (w *Waku) PerformStorenodeTask(fn func() error, opts ...history.StorenodeTa
 }
 
 func (w *Waku) DisconnectActiveStorenode(ctx context.Context, backoff time.Duration, shouldCycle bool) {
-	// TODO-nwaku
-	return
+	w.StorenodeCycle.Lock()
+	defer w.StorenodeCycle.Unlock()
+
+	w.StorenodeCycle.DisconnectActiveStorenode(backoff)
+	if shouldCycle {
+		w.StorenodeCycle.Cycle(ctx)
+	}
 }
 
 func (w *Waku) PublicWakuAPI() types.PublicWakuAPI {
