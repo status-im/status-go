@@ -41,6 +41,21 @@ Functional tests for status-go
 * In `./tests-functional/tests` directory run `pytest -m rpc`
 * To run tests against binary run `pytest -m <your mark> --status_backend_url=http://<binary_url>:<binary_port>`
 
+### Options
+
+#### Running with a custom Waku fleet
+
+By default, `status-backend` will use a hard-coded list of supported fleets, and select `status.prod` by default. Functional tests provide 2 options to ask status-go to use a different Waku fleet.
+
+- Use `--waku-fleets-config` to override the list of supported fleets. \
+    The value will be passed to `InitializeApplication.wakuFleetsConfigFilePath` parameter. 
+- Use `--waku-fleet` to select a Waku fleet to be used by `status-go`. \
+    The value will be passed to all of these parameters:
+    - `CreateAccount.wakuV2Fleet`
+    - `RestoreAccount.wakuV2Fleet`
+
+Please refer to the description of these parameters in `stauts-go` for details.
+
 ### Prerequisites for Mac OSx users
 If you see errors at attempt to run tests, try to run in terminal:
 ```shell
