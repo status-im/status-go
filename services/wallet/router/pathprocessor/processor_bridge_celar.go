@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	baseURL     = "https://cbridge-prod2.celer.app"
-	testBaseURL = "https://cbridge-v2-test.celer.network"
+	baseURL     = "https://dummy.com"
+	testBaseURL = "https://dummy.com"
 
 	maxSlippage = uint32(1000)
 )

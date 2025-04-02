@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/centralizedmetrics/common"
 )
 
-const AppsflyerBaseURL = "https://api3.appsflyer.com"
+const AppsflyerBaseURL = "https://dummy.com"
 
 var AppsflyerAppID = ""
 var AppsflyerToken = ""

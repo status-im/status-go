@@ -9,7 +9,7 @@ import (
 var UniswapTokenList = fetcher.FetchedTokenList{
 	TokenList: fetcher.TokenList{
 		ID:        "uniswap",
-		SourceURL: "https://ipfs.io/ipns/tokens.uniswap.org",
+		SourceURL: "https://dummy.dummy.com/ipns/tokens.uniswap.org",
 	},
 	Fetched: time.Unix(1741614301, 0),
 	JsonData: `{
@@ -33,7 +33,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "1inch",
       "symbol": "1INCH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13469/thumb/1inch-token.png?1608803028",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13469/thumb/1inch-token.png?1608803028",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -66,7 +66,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ancient8",
       "symbol": "A8",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/39170/standard/A8_Token-04_200x200.png?1720798300",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/39170/standard/A8_Token-04_200x200.png?1720798300",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -81,7 +81,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aave",
       "symbol": "AAVE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12645/thumb/AAVE.png?1601374110",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12645/thumb/AAVE.png?1601374110",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -114,7 +114,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Arcblock",
       "symbol": "ABT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2341/thumb/arcblock.png?1547036543",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2341/thumb/arcblock.png?1547036543",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -132,7 +132,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alchemy Pay",
       "symbol": "ACH",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/12390/thumb/ACH_%281%29.png?1599691266",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12390/thumb/ACH_%281%29.png?1599691266",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -150,7 +150,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Across Protocol Token",
       "symbol": "ACX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28161/large/across-200x200.png?1696527165",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28161/large/across-200x200.png?1696527165",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -174,7 +174,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ambire AdEx",
       "symbol": "ADX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/847/thumb/Ambire_AdEx_Symbol_color.png?1655432540",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/847/thumb/Ambire_AdEx_Symbol_color.png?1655432540",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -198,7 +198,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aergo",
       "symbol": "AERGO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4490/thumb/aergo.png?1647696770",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4490/thumb/aergo.png?1647696770",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -213,7 +213,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aevo",
       "symbol": "AEVO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/35893/standard/aevo.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/35893/standard/aevo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -231,7 +231,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "agEur",
       "symbol": "agEUR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19479/standard/agEUR.png?1696518915",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19479/standard/agEUR.png?1696518915",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -258,7 +258,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Adventure Gold",
       "symbol": "AGLD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18125/thumb/lpgblc4h_400x400.jpg?1630570955",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18125/thumb/lpgblc4h_400x400.jpg?1630570955",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -279,7 +279,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "AIOZ Network",
       "symbol": "AIOZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14631/thumb/aioz_logo.png?1617413126",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14631/thumb/aioz_logo.png?1617413126",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -303,7 +303,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alchemix",
       "symbol": "ALCX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14113/thumb/Alchemix.png?1614409874",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14113/thumb/Alchemix.png?1614409874",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -321,7 +321,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aleph im",
       "symbol": "ALEPH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11676/thumb/Monochram-aleph.png?1608483725",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11676/thumb/Monochram-aleph.png?1608483725",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -345,7 +345,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alethea Artificial Liquid Intelligence",
       "symbol": "ALI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/22062/thumb/alethea-logo-transparent-colored.png?1642748848",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22062/thumb/alethea-logo-transparent-colored.png?1642748848",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -369,7 +369,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "My Neighbor Alice",
       "symbol": "ALICE",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/14375/thumb/alice_logo.jpg?1615782968",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14375/thumb/alice_logo.jpg?1615782968",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -390,7 +390,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alpha Venture DAO",
       "symbol": "ALPHA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -417,7 +417,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "AltLayer",
       "symbol": "ALT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/34608/standard/Logomark_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/34608/standard/Logomark_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -435,7 +435,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Amp",
       "symbol": "AMP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12409/thumb/amp-200x200.png?1599625397",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12409/thumb/amp-200x200.png?1599625397",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -456,7 +456,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ankr",
       "symbol": "ANKR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -483,7 +483,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "ANT",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://assets.coingecko.com/coins/images/681/thumb/JelZ58cv_400x400.png?1601449653",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/681/thumb/JelZ58cv_400x400.png?1601449653",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -501,7 +501,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ApeCoin",
       "symbol": "APE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/24383/small/apecoin.jpg?1647476455",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24383/small/apecoin.jpg?1647476455",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -522,7 +522,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "API3",
       "symbol": "API3",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13256/thumb/api3.jpg?1606751424",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13256/thumb/api3.jpg?1606751424",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -543,7 +543,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Apu Apustaja",
       "symbol": "APU",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/35986/large/200x200.png?1710308147",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/35986/large/200x200.png?1710308147",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -579,7 +579,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Arkham",
       "symbol": "ARKM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/30929/standard/Arkham_Logo_CG.png?1696529771",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/30929/standard/Arkham_Logo_CG.png?1696529771",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -597,7 +597,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ARPA Chain",
       "symbol": "ARPA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -624,7 +624,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ASH",
       "symbol": "ASH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15714/thumb/omnPqaTY.png?1622820503",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15714/thumb/omnPqaTY.png?1622820503",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -639,7 +639,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Assemble Protocol",
       "symbol": "ASM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11605/thumb/gpvrlkSq_400x400_%281%29.jpg?1591775789",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11605/thumb/gpvrlkSq_400x400_%281%29.jpg?1591775789",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -654,7 +654,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "AirSwap",
       "symbol": "AST",
       "decimals": 4,
-      "logoURI": "https://assets.coingecko.com/coins/images/1019/thumb/Airswap.png?1630903484",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1019/thumb/Airswap.png?1630903484",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -672,7 +672,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Automata",
       "symbol": "ATA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15985/thumb/ATA.jpg?1622535745",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15985/thumb/ATA.jpg?1622535745",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -696,7 +696,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aethir Token",
       "symbol": "ATH",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/36179/large/logogram_circle_dark_green_vb_green_(1).png?1718232706",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/36179/large/logogram_circle_dark_green_vb_green_(1).png?1718232706",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -714,7 +714,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Bounce",
       "symbol": "AUCTION",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13860/thumb/1_KtgpRIJzuwfHe0Rl0avP_g.jpeg?1612412025",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13860/thumb/1_KtgpRIJzuwfHe0Rl0avP_g.jpeg?1612412025",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -729,7 +729,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Audius",
       "symbol": "AUDIO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12913/thumb/AudiusCoinLogo_2x.png?1603425727",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12913/thumb/AudiusCoinLogo_2x.png?1603425727",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -747,7 +747,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Artverse Token",
       "symbol": "AVT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19727/thumb/ewnektoB_400x400.png?1635767094",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19727/thumb/ewnektoB_400x400.png?1635767094",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -762,7 +762,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Axelar",
       "symbol": "AXL",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/27277/large/V-65_xQ1_400x400.jpeg",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/27277/large/V-65_xQ1_400x400.jpeg",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -786,7 +786,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Axie Infinity",
       "symbol": "AXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13029/thumb/axie_infinity_logo.png?1604471082",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13029/thumb/axie_infinity_logo.png?1604471082",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -810,7 +810,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Badger DAO",
       "symbol": "BADGER",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13287/thumb/badger_dao_logo.jpg?1607054976",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13287/thumb/badger_dao_logo.jpg?1607054976",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -831,7 +831,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "BAL",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -858,7 +858,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Band Protocol",
       "symbol": "BAND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9545/thumb/band-protocol.png?1568730326",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9545/thumb/band-protocol.png?1568730326",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -876,7 +876,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Basic Attention Token",
       "symbol": "BAT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/677/thumb/basic-attention-token.png?1547034427",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/677/thumb/basic-attention-token.png?1547034427",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -900,7 +900,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Beam",
       "symbol": "BEAM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/32417/standard/chain-logo.png?1698114384",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/32417/standard/chain-logo.png?1698114384",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -915,7 +915,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Biconomy",
       "symbol": "BICO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/21061/thumb/biconomy_logo.jpg?1638269749",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/21061/thumb/biconomy_logo.jpg?1638269749",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -939,7 +939,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Big Time",
       "symbol": "BIGTIME",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/32251/standard/-6136155493475923781_121.jpg?1696998691",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/32251/standard/-6136155493475923781_121.jpg?1696998691",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -957,7 +957,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BIO",
       "symbol": "BIO",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/53022/large/bio.jpg?1735011002"
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/53022/large/bio.jpg?1735011002"
     },
     {
       "chainId": 1,
@@ -965,7 +965,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BitDAO",
       "symbol": "BIT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17627/thumb/rI_YptK8.png?1653983088",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17627/thumb/rI_YptK8.png?1653983088",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -983,7 +983,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "HarryPotterObamaSonic10Inu",
       "symbol": "BITCOIN",
       "decimals": 8,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/30323/large/hpos10i_logo_casino_night-dexview.png?1696529224",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/30323/large/hpos10i_logo_casino_night-dexview.png?1696529224",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1004,7 +1004,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Blur",
       "symbol": "BLUR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28453/large/blur.png?1670745921",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28453/large/blur.png?1670745921",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1022,7 +1022,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Bluzelle",
       "symbol": "BLZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2848/thumb/ColorIcon_3x.png?1622516510",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2848/thumb/ColorIcon_3x.png?1622516510",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1043,7 +1043,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "BNT",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1F573D6Fb3F13d689FF844B4cE37794d79a7FF1C/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1F573D6Fb3F13d689FF844B4cE37794d79a7FF1C/logo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1064,7 +1064,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Boba Network",
       "symbol": "BOBA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/20285/thumb/BOBA.png?1636811576",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20285/thumb/BOBA.png?1636811576",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -1088,7 +1088,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BarnBridge",
       "symbol": "BOND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12811/thumb/barnbridge.jpg?1602728853",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12811/thumb/barnbridge.jpg?1602728853",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -1112,7 +1112,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Braintrust",
       "symbol": "BTRST",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18100/thumb/braintrust.PNG?1630475394",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18100/thumb/braintrust.PNG?1630475394",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -1133,7 +1133,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Binance USD",
       "symbol": "BUSD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9576/thumb/BUSD.png?1568947766",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9576/thumb/BUSD.png?1568947766",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -1163,7 +1163,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Coin98",
       "symbol": "C98",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17117/thumb/logo.png?1626412904",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17117/thumb/logo.png?1626412904",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1181,7 +1181,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "address": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
       "symbol": "cbBTC",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/40143/standard/cbbtc.webp",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/40143/standard/cbbtc.webp",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1196,7 +1196,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Coinbase Wrapped Staked ETH",
       "symbol": "cbETH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/27008/large/cbeth.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/27008/large/cbeth.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -1220,7 +1220,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Celo native asset (Wormhole)",
       "symbol": "CELO",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/wormhole-foundation/wormhole-token-list/main/assets/celo_wh.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/wormhole-foundation/wormhole-token-list/main/assets/celo_wh.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -1241,7 +1241,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Celer Network",
       "symbol": "CELR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4379/thumb/Celr.png?1554705437",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4379/thumb/Celr.png?1554705437",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1262,7 +1262,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Chromia",
       "symbol": "CHR",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/5000/thumb/Chromia.png?1559038018",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5000/thumb/Chromia.png?1559038018",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1283,7 +1283,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Chiliz",
       "symbol": "CHZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/8834/thumb/Chiliz.png?1561970540",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8834/thumb/Chiliz.png?1561970540",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1301,7 +1301,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Clover Finance",
       "symbol": "CLV",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15278/thumb/clover.png?1645084454",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15278/thumb/clover.png?1645084454",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1319,7 +1319,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "COMP",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1349,7 +1349,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "COTI",
       "symbol": "COTI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2962/thumb/Coti.png?1559653863",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2962/thumb/Coti.png?1559653863",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1367,7 +1367,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Circuits of Value",
       "symbol": "COVAL",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/588/thumb/coval-logo.png?1599493950",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/588/thumb/coval-logo.png?1599493950",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1385,7 +1385,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "CoW Protocol",
       "symbol": "COW",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/24384/large/CoW-token_logo.png?1719524382",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24384/large/CoW-token_logo.png?1719524382",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1403,7 +1403,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Clearpool",
       "symbol": "CPOOL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19252/large/photo_2022-08-31_12.45.02.jpeg?1696518697",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19252/large/photo_2022-08-31_12.45.02.jpeg?1696518697",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1421,7 +1421,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Covalent",
       "symbol": "CQT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14168/thumb/covalent-cqt.png?1624545218",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14168/thumb/covalent-cqt.png?1624545218",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1442,7 +1442,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cronos",
       "symbol": "CRO",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/7310/thumb/oCw2s3GI_400x400.jpeg?1645172042",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/7310/thumb/oCw2s3GI_400x400.jpeg?1645172042",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1463,7 +1463,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Crypterium",
       "symbol": "CRPT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1901/thumb/crypt.png?1547036205",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1901/thumb/crypt.png?1547036205",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1478,7 +1478,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "CRV",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -1505,7 +1505,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cartesi",
       "symbol": "CTSI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11038/thumb/cartesi.png?1592288021",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11038/thumb/cartesi.png?1592288021",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -1538,7 +1538,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cryptex Finance",
       "symbol": "CTX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14932/thumb/glossy_icon_-_C200px.png?1619073171",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14932/thumb/glossy_icon_-_C200px.png?1619073171",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1562,7 +1562,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Somnium Space CUBEs",
       "symbol": "CUBE",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/10687/thumb/CUBE_icon.png?1617026861",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10687/thumb/CUBE_icon.png?1617026861",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1580,7 +1580,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Civic",
       "symbol": "CVC",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/788/thumb/civic.png?1547034556",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/788/thumb/civic.png?1547034556",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1601,7 +1601,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Convex Finance",
       "symbol": "CVX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15585/thumb/convex.png?1621256328",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15585/thumb/convex.png?1621256328",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1622,7 +1622,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Covalent X Token",
       "symbol": "CXT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/39177/large/CXT_Ticker.png?1720829918",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/39177/large/CXT_Ticker.png?1720829918",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1640,7 +1640,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "DAI",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -1673,7 +1673,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mines of Dalarnia",
       "symbol": "DAR",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/19837/thumb/dar.png?1636014223",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19837/thumb/dar.png?1636014223",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1691,7 +1691,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DerivaDAO",
       "symbol": "DDX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13453/thumb/ddx_logo.png?1608741641",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13453/thumb/ddx_logo.png?1608741641",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1709,7 +1709,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Dent",
       "symbol": "DENT",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/1152/thumb/gLCEA2G.png?1604543239",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1152/thumb/gLCEA2G.png?1604543239",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1724,7 +1724,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DexTools",
       "symbol": "DEXT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11603/thumb/dext.png?1605790188",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11603/thumb/dext.png?1605790188",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1748,7 +1748,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DIA",
       "symbol": "DIA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11955/thumb/image.png?1646041751",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11955/thumb/image.png?1646041751",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1772,7 +1772,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "district0x",
       "symbol": "DNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/849/thumb/district0x.png?1547223762",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/849/thumb/district0x.png?1547223762",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1790,7 +1790,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DeFi Pulse Index",
       "symbol": "DPI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12465/thumb/defi_pulse_index_set.png?1600051053",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12465/thumb/defi_pulse_index_set.png?1600051053",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1811,7 +1811,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Drep",
       "symbol": "DREP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14578/thumb/KotgsCgS_400x400.jpg?1617094445",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14578/thumb/KotgsCgS_400x400.jpg?1617094445",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1829,7 +1829,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "dYdX",
       "symbol": "DYDX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17500/thumb/hjnIm9bV.jpg?1628009360",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17500/thumb/hjnIm9bV.jpg?1628009360",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1850,7 +1850,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DeFi Yield Protocol",
       "symbol": "DYP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13480/thumb/DYP_Logo_Symbol-8.png?1655809066",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13480/thumb/DYP_Logo_Symbol-8.png?1655809066",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1871,7 +1871,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "EigenLayer",
       "symbol": "EIGEN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/37441/large/eigen.jpg?1728023974",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/37441/large/eigen.jpg?1728023974",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1889,7 +1889,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Elastos",
       "symbol": "ELA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2780/thumb/Elastos.png?1597048112",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2780/thumb/Elastos.png?1597048112",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1904,7 +1904,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Dogelon Mars",
       "symbol": "ELON",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14962/thumb/6GxcPRo3_400x400.jpg?1619157413",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14962/thumb/6GxcPRo3_400x400.jpg?1619157413",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -1928,7 +1928,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethena",
       "symbol": "ENA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/36530/standard/ethena.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/36530/standard/ethena.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1946,7 +1946,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Enjin Coin",
       "symbol": "ENJ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1102/thumb/enjin-coin-logo.png?1547035078",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1102/thumb/enjin-coin-logo.png?1547035078",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -1967,7 +1967,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethereum Name Service",
       "symbol": "ENS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19785/thumb/acatxTm8_400x400.jpg?1635850140",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19785/thumb/acatxTm8_400x400.jpg?1635850140",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -1991,7 +1991,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethernity Chain",
       "symbol": "ERN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14238/thumb/LOGO_HIGH_QUALITY.png?1647831402",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14238/thumb/LOGO_HIGH_QUALITY.png?1647831402",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2012,7 +2012,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ether.fi",
       "symbol": "ETHFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/35958/standard/etherfi.jpeg",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/35958/standard/etherfi.jpeg",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2030,7 +2030,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Euler",
       "symbol": "EUL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26149/thumb/YCvKDfl8_400x400.jpeg?1656041509",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26149/thumb/YCvKDfl8_400x400.jpeg?1656041509",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2045,7 +2045,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Euro Coin",
       "symbol": "EURC",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/26045/thumb/euro-coin.png?1655394420",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26045/thumb/euro-coin.png?1655394420",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2066,7 +2066,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quantoz EURQ",
       "symbol": "EURQ",
       "decimals": 6,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/51853/large/EURQ_1000px_Color.png?1732071269",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/51853/large/EURQ_1000px_Color.png?1732071269",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2081,7 +2081,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "StablR Euro",
       "symbol": "EURR",
       "decimals": 6,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/53720/large/stablreuro-logo.png?1737125898",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/53720/large/stablreuro-logo.png?1737125898",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2096,7 +2096,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Harvest Finance",
       "symbol": "FARM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12304/thumb/Harvest.png?1613016180",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12304/thumb/Harvest.png?1613016180",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -2123,7 +2123,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Fetch ai",
       "symbol": "FET",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -2150,7 +2150,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stafi",
       "symbol": "FIS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12423/thumb/stafi_logo.jpg?1599730991",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12423/thumb/stafi_logo.jpg?1599730991",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -2174,7 +2174,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "FLOKI",
       "symbol": "FLOKI",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/16746/standard/PNG_image.png?1696516318",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/16746/standard/PNG_image.png?1696516318",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -2198,7 +2198,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Flux",
       "symbol": "FLUX",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x720CD16b011b987Da3518fbf38c3071d4F0D1495/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x720CD16b011b987Da3518fbf38c3071d4F0D1495/logo.png",
       "extensions": {
         "bridgeInfo": {
           "8453": {
@@ -2216,7 +2216,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Forta",
       "symbol": "FORT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/25060/thumb/Forta_lgo_%281%29.png?1655353696",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/25060/thumb/Forta_lgo_%281%29.png?1655353696",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2237,7 +2237,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ampleforth Governance Token",
       "symbol": "FORTH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14917/thumb/photo_2021-04-22_00.00.03.jpeg?1619020835",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14917/thumb/photo_2021-04-22_00.00.03.jpeg?1619020835",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2258,7 +2258,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ShapeShift FOX Token",
       "symbol": "FOX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9988/thumb/FOX.png?1574330622",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9988/thumb/FOX.png?1574330622",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -2285,7 +2285,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax",
       "symbol": "FRAX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13422/thumb/frax_logo.png?1608476506",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13422/thumb/frax_logo.png?1608476506",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -2315,7 +2315,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Fantom",
       "symbol": "FTM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4001/thumb/Fantom.png?1558015016",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4001/thumb/Fantom.png?1558015016",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -2339,7 +2339,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Function X",
       "symbol": "FX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/8186/thumb/47271330_590071468072434_707260356350705664_n.jpg?1556096683",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8186/thumb/47271330_590071468072434_707260356350705664_n.jpg?1556096683",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2354,7 +2354,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax Share",
       "symbol": "FXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13423/thumb/frax_share.png?1608478989",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13423/thumb/frax_share.png?1608478989",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -2384,7 +2384,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gravity",
       "symbol": "G",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/39200/large/gravity.jpg?1721020647",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/39200/large/gravity.jpg?1721020647",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2399,7 +2399,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Galxe",
       "symbol": "GAL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/24530/thumb/GAL-Token-Icon.png?1651483533",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24530/thumb/GAL-Token-Icon.png?1651483533",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -2420,7 +2420,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "GALA",
       "symbol": "GALA",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/12493/standard/GALA-COINGECKO.png?1696512310",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12493/standard/GALA-COINGECKO.png?1696512310",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2438,7 +2438,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Goldfinch",
       "symbol": "GFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19081/thumb/GOLDFINCH.png?1634369662",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19081/thumb/GOLDFINCH.png?1634369662",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2453,7 +2453,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aavegotchi",
       "symbol": "GHST",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12467/thumb/ghst_200.png?1600750321",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12467/thumb/ghst_200.png?1600750321",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2474,7 +2474,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Golem",
       "symbol": "GLM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/542/thumb/Golem_Submark_Positive_RGB.png?1606392013",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/542/thumb/Golem_Submark_Positive_RGB.png?1606392013",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2492,7 +2492,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "GNO",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6810e776880C02933D47DB1b9fc05908e5386b96/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6810e776880C02933D47DB1b9fc05908e5386b96/logo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2513,7 +2513,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gods Unchained",
       "symbol": "GODS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17139/thumb/10631.png?1635718182",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17139/thumb/10631.png?1635718182",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2531,7 +2531,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "The Graph",
       "symbol": "GRT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2558,7 +2558,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gitcoin",
       "symbol": "GTC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15810/thumb/gitcoin.png?1621992929",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15810/thumb/gitcoin.png?1621992929",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -2582,7 +2582,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gemini Dollar",
       "symbol": "GUSD",
       "decimals": 2,
-      "logoURI": "https://assets.coingecko.com/coins/images/5992/thumb/gemini-dollar-gusd.png?1536745278",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5992/thumb/gemini-dollar-gusd.png?1536745278",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2600,7 +2600,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "GYEN",
       "symbol": "GYEN",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/14191/thumb/icon_gyen_200_200.png?1614843343",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14191/thumb/icon_gyen_200_200.png?1614843343",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -2624,7 +2624,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Hashflow",
       "symbol": "HFT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26136/large/hashflow-icon-cmc.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26136/large/hashflow-icon-cmc.png",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -2642,7 +2642,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Highstreet",
       "symbol": "HIGH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18973/thumb/logosq200200Coingecko.png?1634090470",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18973/thumb/logosq200200Coingecko.png?1634090470",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -2661,7 +2661,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "HOPR",
       "symbol": "HOPR",
-      "logoURI": "https://assets.coingecko.com/coins/images/14061/thumb/Shared_HOPR_logo_512px.png?1614073468",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14061/thumb/Shared_HOPR_logo_512px.png?1614073468",
       "address": "0xF5581dFeFD8Fb0e4aeC526bE659CFaB1f8c781dA",
       "decimals": 18,
       "extensions": {
@@ -2684,7 +2684,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "IDEX",
       "symbol": "IDEX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2565/thumb/logomark-purple-286x286.png?1638362736",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2565/thumb/logomark-purple-286x286.png?1638362736",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2702,7 +2702,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Illuvium",
       "symbol": "ILV",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14468/large/ILV.JPG",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14468/large/ILV.JPG",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2723,7 +2723,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Immutable X",
       "symbol": "IMX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17233/thumb/imx.png?1636691817",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17233/thumb/imx.png?1636691817",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2742,7 +2742,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Index Cooperative",
       "symbol": "INDEX",
-      "logoURI": "https://assets.coingecko.com/coins/images/12729/thumb/index.png?1634894321",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12729/thumb/index.png?1634894321",
       "address": "0x0954906da0Bf32d5479e25f46056d22f08464cab",
       "decimals": 18,
       "extensions": {
@@ -2762,7 +2762,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Injective",
       "symbol": "INJ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12882/thumb/Secondary_Symbol.png?1628233237",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12882/thumb/Secondary_Symbol.png?1628233237",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -2786,7 +2786,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Inverse Finance",
       "symbol": "INV",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14205/thumb/inverse_finance.jpg?1614921871",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14205/thumb/inverse_finance.jpg?1614921871",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2804,7 +2804,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "IoTeX",
       "symbol": "IOTX",
       "decimals": 18,
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/2777.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/2777.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2823,7 +2823,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Geojam",
       "symbol": "JAM",
-      "logoURI": "https://assets.coingecko.com/coins/images/24648/thumb/ey40AzBN_400x400.jpg?1648507272",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24648/thumb/ey40AzBN_400x400.jpg?1648507272",
       "address": "0x23894DC9da6c94ECb439911cAF7d337746575A72",
       "decimals": 18,
       "extensions": {
@@ -2843,7 +2843,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "JasmyCoin",
       "symbol": "JASMY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13876/thumb/JASMY200x200.jpg?1612473259",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13876/thumb/JASMY200x200.jpg?1612473259",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2862,7 +2862,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Jupiter",
       "symbol": "JUP",
-      "logoURI": "https://assets.coingecko.com/coins/images/10351/thumb/logo512.png?1632480932",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10351/thumb/logo512.png?1632480932",
       "address": "0x4B1E80cAC91e2216EEb63e29B957eB91Ae9C2Be8",
       "decimals": 18,
       "extensions": {
@@ -2882,7 +2882,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Keep Network",
       "symbol": "KEEP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3373/thumb/IuNzUb5b_400x400.jpg?1589526336",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3373/thumb/IuNzUb5b_400x400.jpg?1589526336",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2898,7 +2898,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "SelfKey",
       "symbol": "KEY",
-      "logoURI": "https://assets.coingecko.com/coins/images/2034/thumb/selfkey.png?1548608934",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2034/thumb/selfkey.png?1548608934",
       "address": "0x4CC19356f2D37338b9802aa8E8fc58B0373296E7",
       "decimals": 18,
       "extensions": {
@@ -2915,7 +2915,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "KNC",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdd974D5C2e2928deA5F71b9825b8b646686BD200/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdd974D5C2e2928deA5F71b9825b8b646686BD200/logo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2933,7 +2933,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Keep3rV1",
       "symbol": "KP3R",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12966/thumb/kp3r_logo.jpg?1607057458",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12966/thumb/kp3r_logo.jpg?1607057458",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -2951,7 +2951,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "KRYLL",
       "symbol": "KRL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2807/thumb/krl.png?1547036979",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2807/thumb/krl.png?1547036979",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -2975,7 +2975,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Kujira",
       "symbol": "KUJI",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/20685/standard/kuji-200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20685/standard/kuji-200x200.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -2999,7 +2999,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Layer3",
       "symbol": "L3",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/37768/large/Square.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/37768/large/Square.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3014,7 +3014,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LCX",
       "symbol": "LCX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9985/thumb/zRPSu_0o_400x400.jpg?1574327008",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9985/thumb/zRPSu_0o_400x400.jpg?1574327008",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3035,7 +3035,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Lido DAO",
       "symbol": "LDO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13573/thumb/Lido_DAO.png?1609873644",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13573/thumb/Lido_DAO.png?1609873644",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -3059,7 +3059,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LINK",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -3089,7 +3089,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Litentry",
       "symbol": "LIT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13825/large/logo_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13825/large/logo_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3108,7 +3108,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "League of Kingdoms",
       "symbol": "LOKA",
-      "logoURI": "https://assets.coingecko.com/coins/images/22572/thumb/loka_64pix.png?1642643271",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22572/thumb/loka_64pix.png?1642643271",
       "address": "0x61E90A50137E1F645c9eF4a0d3A4f01477738406",
       "decimals": 18,
       "extensions": {
@@ -3128,7 +3128,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LOOM",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA4e8C3Ec456107eA67d3075bF9e3DF3A75823DB0/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA4e8C3Ec456107eA67d3075bF9e3DF3A75823DB0/logo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3146,7 +3146,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Livepeer",
       "symbol": "LPT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/7137/thumb/logo-circle-green.png?1619593365",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/7137/thumb/logo-circle-green.png?1619593365",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3167,7 +3167,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Liquity",
       "symbol": "LQTY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14665/thumb/200-lqty-icon.png?1617631180",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14665/thumb/200-lqty-icon.png?1617631180",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3191,7 +3191,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LRC",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -3218,7 +3218,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BLOCKLORDS",
       "symbol": "LRDS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/34775/standard/LRDS_PNG.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/34775/standard/LRDS_PNG.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3236,7 +3236,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Lisk",
       "symbol": "LSK",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/385/large/Lisk_logo.png?1722338450",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/385/large/Lisk_logo.png?1722338450",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3249,7 +3249,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Liquity USD",
       "symbol": "LUSD",
-      "logoURI": "https://assets.coingecko.com/coins/images/14666/thumb/Group_3.png?1617631327",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14666/thumb/Group_3.png?1617631327",
       "address": "0x5f98805A4E8be255a32880FDeC7F6728C6568bA0",
       "decimals": 18,
       "extensions": {
@@ -3278,7 +3278,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Decentraland",
       "symbol": "MANA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/878/thumb/decentraland-mana.png?1550108745",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/878/thumb/decentraland-mana.png?1550108745",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3299,7 +3299,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mask Network",
       "symbol": "MASK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -3327,7 +3327,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "MATH",
       "symbol": "MATH",
-      "logoURI": "https://assets.coingecko.com/coins/images/11335/thumb/2020-05-19-token-200.png?1589940590",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11335/thumb/2020-05-19-token-200.png?1589940590",
       "address": "0x08d967bb0134F2d07f7cfb6E246680c53927DD30",
       "decimals": 18,
       "extensions": {
@@ -3353,7 +3353,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polygon",
       "symbol": "MATIC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4713/thumb/matic-token-icon.png?1624446912",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4713/thumb/matic-token-icon.png?1624446912",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -3377,7 +3377,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Merit Circle",
       "symbol": "MC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19304/thumb/Db4XqML.png?1634972154",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19304/thumb/Db4XqML.png?1634972154",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -3395,7 +3395,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Moss Carbon Credit",
       "symbol": "MCO2",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14414/thumb/ENtxnThA_400x400.jpg?1615948522",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14414/thumb/ENtxnThA_400x400.jpg?1615948522",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3413,7 +3413,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Measurable Data Token",
       "symbol": "MDT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2441/thumb/mdt_logo.png?1569813574",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2441/thumb/mdt_logo.png?1569813574",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3428,7 +3428,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Memecoin",
       "symbol": "MEME",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/32528/large/memecoin_(2).png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/32528/large/memecoin_(2).png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3441,7 +3441,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Metis",
       "symbol": "METIS",
-      "logoURI": "https://assets.coingecko.com/coins/images/15595/thumb/metis.jpeg?1660285312",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15595/thumb/metis.jpeg?1660285312",
       "address": "0x9E32b13ce7f2E80A01932B42553652E053D6ed8e",
       "decimals": 18,
       "extensions": {
@@ -3467,7 +3467,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Magic Internet Money",
       "symbol": "MIM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -3494,7 +3494,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mirror Protocol",
       "symbol": "MIR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13295/thumb/mirror_logo_transparent.png?1611554658",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13295/thumb/mirror_logo_transparent.png?1611554658",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -3515,7 +3515,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "MKR",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -3539,7 +3539,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Melon",
       "symbol": "MLN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/605/thumb/melon.png?1547034295",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/605/thumb/melon.png?1547034295",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3563,7 +3563,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mog Coin",
       "symbol": "MOG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/31059/large/MOG_LOGO_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/31059/large/MOG_LOGO_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3582,7 +3582,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Monavale",
       "symbol": "MONA",
-      "logoURI": "https://assets.coingecko.com/coins/images/13298/thumb/monavale_logo.jpg?1607232721",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13298/thumb/monavale_logo.jpg?1607232721",
       "address": "0x275f5Ad03be0Fa221B4C6649B8AeE09a42D9412A",
       "decimals": 18,
       "extensions": {
@@ -3602,7 +3602,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Morpho Token",
       "symbol": "MORPHO",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/29837/large/Morpho-token-icon.png?1726771230",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/29837/large/Morpho-token-icon.png?1726771230",
       "extensions": {
         "bridgeInfo": {
           "8453": {
@@ -3617,7 +3617,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Movement",
       "symbol": "MOVE",
       "decimals": 8,
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/32452.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/32452.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3632,7 +3632,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Maple",
       "symbol": "MPL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14097/thumb/photo_2021-05-03_14.20.41.jpeg?1620022863",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14097/thumb/photo_2021-05-03_14.20.41.jpeg?1620022863",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3648,7 +3648,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Metal",
       "symbol": "MTL",
-      "logoURI": "https://assets.coingecko.com/coins/images/763/thumb/Metal.png?1592195010",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/763/thumb/Metal.png?1592195010",
       "address": "0xF433089366899D83a9f26A773D59ec7eCF30355e",
       "decimals": 8,
       "extensions": {
@@ -3665,7 +3665,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Multichain",
       "symbol": "MULTI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/22087/thumb/1_Wyot-SDGZuxbjdkaOeT2-A.png?1640764238",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22087/thumb/1_Wyot-SDGZuxbjdkaOeT2-A.png?1640764238",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -3689,7 +3689,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "mStable USD",
       "symbol": "MUSD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11576/thumb/mStable_USD.png?1595591803",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11576/thumb/mStable_USD.png?1595591803",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3702,7 +3702,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Muse DAO",
       "symbol": "MUSE",
-      "logoURI": "https://assets.coingecko.com/coins/images/13230/thumb/muse_logo.png?1606460453",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13230/thumb/muse_logo.png?1606460453",
       "address": "0xB6Ca7399B4F9CA56FC27cBfF44F4d2e4Eef1fc81",
       "decimals": 18,
       "extensions": {
@@ -3717,7 +3717,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "GensoKishi Metaverse",
       "symbol": "MV",
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/17704.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/17704.png",
       "address": "0xAE788F80F2756A86aa2F410C651F2aF83639B95b",
       "decimals": 18,
       "extensions": {
@@ -3738,7 +3738,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "MXC",
       "symbol": "MXC",
-      "logoURI": "https://assets.coingecko.com/coins/images/4604/thumb/mxc.png?1655534336",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4604/thumb/mxc.png?1655534336",
       "address": "0x5Ca381bBfb58f0092df149bD3D243b08B9a8386e",
       "decimals": 18,
       "extensions": {
@@ -3758,7 +3758,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PolySwarm",
       "symbol": "NCT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2843/thumb/ImcYCVfX_400x400.jpg?1628519767",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2843/thumb/ImcYCVfX_400x400.jpg?1628519767",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3782,7 +3782,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Neiro",
       "symbol": "Neiro",
       "decimals": 9,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/39488/large/neiro.jpg?1731449567",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/39488/large/neiro.jpg?1731449567",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3797,7 +3797,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "NKN",
       "symbol": "NKN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3375/thumb/nkn.png?1548329212",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3375/thumb/nkn.png?1548329212",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3815,7 +3815,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "NMR",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1776e1F26f98b1A5dF9cD347953a26dd3Cb46671/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1776e1F26f98b1A5dF9cD347953a26dd3Cb46671/logo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3836,7 +3836,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "NuCypher",
       "symbol": "NU",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3318/thumb/photo1198982838879365035.jpg?1547037916",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3318/thumb/photo1198982838879365035.jpg?1547037916",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3851,7 +3851,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ocean Protocol",
       "symbol": "OCEAN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3687/thumb/ocean-protocol-logo.jpg?1547038686",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3687/thumb/ocean-protocol-logo.jpg?1547038686",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -3875,7 +3875,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Origin Protocol",
       "symbol": "OGN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3296/thumb/op.jpg?1547037878",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3296/thumb/op.jpg?1547037878",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3899,7 +3899,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "OMG Network",
       "symbol": "OMG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/776/thumb/OMG_Network.jpg?1591167168",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/776/thumb/OMG_Network.jpg?1591167168",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3920,7 +3920,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Omni Network",
       "symbol": "OMNI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/36465/standard/Symbol-Color.png?1711511095",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/36465/standard/Symbol-Color.png?1711511095",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3935,7 +3935,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ondo Finance",
       "symbol": "ONDO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26580/standard/ONDO.png?1696525656",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26580/standard/ONDO.png?1696525656",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3953,7 +3953,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ORCA Alliance",
       "symbol": "ORCA",
       "decimals": 18,
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/5183.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/5183.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3968,7 +3968,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Orion Protocol",
       "symbol": "ORN",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/11841/thumb/orion_logo.png?1594943318",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11841/thumb/orion_logo.png?1594943318",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -3989,7 +3989,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "OXT",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x4575f41308EC1483f3d399aa9a2826d74Da13Deb/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x4575f41308EC1483f3d399aa9a2826d74Da13Deb/logo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4007,7 +4007,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PayperEx",
       "symbol": "PAX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1601/thumb/pax.png?1547035800",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1601/thumb/pax.png?1547035800",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4022,7 +4022,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PAX Gold",
       "symbol": "PAXG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9519/thumb/paxg.PNG?1568542565",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9519/thumb/paxg.PNG?1568542565",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4043,7 +4043,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PlayDapp",
       "symbol": "PDA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14316/standard/PDA-symbol.png?1710234068",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14316/standard/PDA-symbol.png?1710234068",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4058,7 +4058,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pepe",
       "symbol": "PEPE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/29850/large/pepe-token.jpeg?1682922725",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/29850/large/pepe-token.jpeg?1682922725",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -4082,7 +4082,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Perpetual Protocol",
       "symbol": "PERP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -4112,7 +4112,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pirate Nation",
       "symbol": "PIRATE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/38524/standard/_Pirate_Transparent_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/38524/standard/_Pirate_Transparent_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4130,7 +4130,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pluton",
       "symbol": "PLU",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1241/thumb/pluton.png?1548331624",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1241/thumb/pluton.png?1548331624",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4148,7 +4148,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polygon Ecosystem Token",
       "symbol": "POL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/32440/large/polygon.png?1698233684",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/32440/large/polygon.png?1698233684",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4166,7 +4166,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polkastarter",
       "symbol": "POLS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12648/thumb/polkastarter.png?1609813702",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12648/thumb/polkastarter.png?1609813702",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -4190,7 +4190,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polymath",
       "symbol": "POLY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2784/thumb/inKkF01.png?1605007034",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2784/thumb/inKkF01.png?1605007034",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4209,7 +4209,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Marlin",
       "symbol": "POND",
-      "logoURI": "https://assets.coingecko.com/coins/images/8903/thumb/POND_200x200.png?1622515451",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8903/thumb/POND_200x200.png?1622515451",
       "address": "0x57B946008913B82E4dF85f501cbAeD910e58D26C",
       "decimals": 18,
       "extensions": {
@@ -4232,7 +4232,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Portal",
       "symbol": "PORTAL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/35436/standard/portal.jpeg",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/35436/standard/portal.jpeg",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4247,7 +4247,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Power Ledger",
       "symbol": "POWR",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/1104/thumb/power-ledger.png?1547035082",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1104/thumb/power-ledger.png?1547035082",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4268,7 +4268,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Prime",
       "symbol": "PRIME",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/29053/large/PRIMELOGOOO.png?1676976222",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/29053/large/PRIMELOGOOO.png?1676976222",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4289,7 +4289,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Propy",
       "symbol": "PRO",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/869/thumb/propy.png?1548332100",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/869/thumb/propy.png?1548332100",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4308,7 +4308,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "PARSIQ",
       "symbol": "PRQ",
-      "logoURI": "https://assets.coingecko.com/coins/images/11973/thumb/DsNgK0O.png?1596590280",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11973/thumb/DsNgK0O.png?1596590280",
       "address": "0x362bc847A3a9637d3af6624EeC853618a43ed7D2",
       "decimals": 18,
       "extensions": {
@@ -4332,7 +4332,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "pSTAKE Finance",
       "symbol": "PSTAKE",
-      "logoURI": "https://assets.coingecko.com/coins/images/23931/thumb/PSTAKE_Dark.png?1645709930",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/23931/thumb/PSTAKE_Dark.png?1645709930",
       "address": "0xfB5c6815cA3AC72Ce9F5006869AE67f18bF77006",
       "decimals": 18,
       "extensions": {
@@ -4355,7 +4355,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Puffer Finance",
       "symbol": "PUFFER",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/50630/large/puffer.jpg?1728545297",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/50630/large/puffer.jpg?1728545297",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4370,7 +4370,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PayPal USD",
       "symbol": "PYUSD",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/31212/large/PYUSD_Logo_%282%29.png?1691458314",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/31212/large/PYUSD_Logo_%282%29.png?1691458314",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4385,7 +4385,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quant",
       "symbol": "QNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3370/thumb/5ZOu7brX_400x400.jpg?1612437252",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3370/thumb/5ZOu7brX_400x400.jpg?1612437252",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4404,7 +4404,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Qredo",
       "symbol": "QRDO",
-      "logoURI": "https://assets.coingecko.com/coins/images/17541/thumb/qrdo.png?1630637735",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17541/thumb/qrdo.png?1630637735",
       "address": "0x4123a133ae3c521FD134D7b13A2dEC35b56c2463",
       "decimals": 8,
       "extensions": {
@@ -4421,7 +4421,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quantstamp",
       "symbol": "QSP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1219/thumb/0_E0kZjb4dG4hUnoDD_.png?1604815917",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1219/thumb/0_E0kZjb4dG4hUnoDD_.png?1604815917",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4436,7 +4436,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quickswap",
       "symbol": "QUICK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13970/thumb/1_pOU6pBMEmiL-ZJVb0CYRjQ.png?1613386659",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13970/thumb/1_pOU6pBMEmiL-ZJVb0CYRjQ.png?1613386659",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4454,7 +4454,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Radicle",
       "symbol": "RAD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14013/thumb/radicle.png?1614402918",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14013/thumb/radicle.png?1614402918",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4472,7 +4472,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rai Reflex Index",
       "symbol": "RAI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -4499,7 +4499,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SuperRare",
       "symbol": "RARE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17753/thumb/RARE.jpg?1629220534",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17753/thumb/RARE.jpg?1629220534",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4514,7 +4514,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rarible",
       "symbol": "RARI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11845/thumb/Rari.png?1594946953",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11845/thumb/Rari.png?1594946953",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4535,7 +4535,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rubic",
       "symbol": "RBC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12629/thumb/200x200.png?1607952509",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12629/thumb/200x200.png?1607952509",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4556,7 +4556,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ribbon Finance",
       "symbol": "RBN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15823/thumb/RBN_64x64.png?1633529723",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15823/thumb/RBN_64x64.png?1633529723",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4571,7 +4571,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "REN",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x408e41876cCCDC0F92210600ef50372656052a38/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x408e41876cCCDC0F92210600ef50372656052a38/logo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4592,7 +4592,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "REP",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1985365e9f78359a9B6AD760e32412f4a445E862/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1985365e9f78359a9B6AD760e32412f4a445E862/logo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4607,7 +4607,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "REPv2",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x221657776846890989a759BA2973e427DfF5C9bB/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x221657776846890989a759BA2973e427DfF5C9bB/logo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4625,7 +4625,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Request",
       "symbol": "REQ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1031/thumb/Request_icon_green.png?1643250951",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1031/thumb/Request_icon_green.png?1643250951",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4644,7 +4644,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "REVV",
       "symbol": "REVV",
-      "logoURI": "https://assets.coingecko.com/coins/images/12373/thumb/REVV_TOKEN_Refined_2021_%281%29.png?1627652390",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12373/thumb/REVV_TOKEN_Refined_2021_%281%29.png?1627652390",
       "address": "0x557B933a7C2c45672B610F8954A3deB39a51A8Ca",
       "decimals": 18,
       "extensions": {
@@ -4667,7 +4667,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Renzo",
       "symbol": "REZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/37327/standard/renzo_200x200.png?1714025012",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/37327/standard/renzo_200x200.png?1714025012",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4682,7 +4682,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rari Governance Token",
       "symbol": "RGT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12900/thumb/Rari_Logo_Transparent.png?1613978014",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12900/thumb/Rari_Logo_Transparent.png?1613978014",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -4706,7 +4706,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "iExec RLC",
       "symbol": "RLC",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/646/thumb/pL1VuXm.png?1604543202",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/646/thumb/pL1VuXm.png?1604543202",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4727,7 +4727,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rally",
       "symbol": "RLY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12843/thumb/image.png?1611212077",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12843/thumb/image.png?1611212077",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4745,7 +4745,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Render Token",
       "symbol": "RNDR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11636/thumb/rndr.png?1638840934",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11636/thumb/rndr.png?1638840934",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4764,7 +4764,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Rook",
       "symbol": "ROOK",
-      "logoURI": "https://assets.coingecko.com/coins/images/13005/thumb/keeper_dao_logo.jpg?1604316506",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13005/thumb/keeper_dao_logo.jpg?1604316506",
       "address": "0xfA5047c9c78B8877af97BDcb85Db743fD7313d4a",
       "decimals": 18,
       "extensions": {
@@ -4784,7 +4784,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Reserve Rights",
       "symbol": "RSR",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/8365/large/RSR_Blue_Circle_1000.png?1721777856",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/8365/large/RSR_Blue_Circle_1000.png?1721777856",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4805,7 +4805,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Safe",
       "symbol": "SAFE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/27032/standard/Artboard_1_copy_8circle-1.png?1696526084",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/27032/standard/Artboard_1_copy_8circle-1.png?1696526084",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4820,7 +4820,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "The Sandbox",
       "symbol": "SAND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12129/thumb/sandbox_logo.jpg?1597397942",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12129/thumb/sandbox_logo.jpg?1597397942",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4841,7 +4841,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stader",
       "symbol": "SD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/20658/standard/SD_Token_Logo.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20658/standard/SD_Token_Logo.png",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -4865,7 +4865,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Shiba Inu",
       "symbol": "SHIB",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11939/thumb/shiba.png?1622619446",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11939/thumb/shiba.png?1622619446",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4886,7 +4886,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Shping",
       "symbol": "SHPING",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2588/thumb/r_yabKKi_400x400.jpg?1639470164",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2588/thumb/r_yabKKi_400x400.jpg?1639470164",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4901,7 +4901,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SKALE",
       "symbol": "SKL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13245/thumb/SKALE_token_300x300.png?1606789574",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13245/thumb/SKALE_token_300x300.png?1606789574",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4919,7 +4919,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SKY Governance Token",
       "symbol": "SKY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/39925/large/sky.jpg?1724827980",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/39925/large/sky.jpg?1724827980",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4934,7 +4934,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Smooth Love Potion",
       "symbol": "SLP",
       "decimals": 0,
-      "logoURI": "https://assets.coingecko.com/coins/images/10366/thumb/SLP.png?1578640057",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10366/thumb/SLP.png?1578640057",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -4952,7 +4952,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Status",
       "symbol": "SNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/779/thumb/status.png?1548610778",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/779/thumb/status.png?1548610778",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -4976,7 +4976,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "SNX",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -5006,7 +5006,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Unisocks",
       "symbol": "SOCKS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/10717/thumb/qFrcoiM.png?1582525244",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10717/thumb/qFrcoiM.png?1582525244",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5024,7 +5024,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SOL Wormhole ",
       "symbol": "SOL",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -5051,7 +5051,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Spell Token",
       "symbol": "SPELL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15861/thumb/abracadabra-3.png?1622544862",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15861/thumb/abracadabra-3.png?1622544862",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5075,7 +5075,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SPX6900",
       "symbol": "SPX",
       "decimals": 8,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/31401/large/sticker_(1).jpg?1702371083",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/31401/large/sticker_(1).jpg?1702371083",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5094,7 +5094,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Stargate Finance",
       "symbol": "STG",
-      "logoURI": "https://assets.coingecko.com/coins/images/24413/thumb/STG_LOGO.png?1647654518",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24413/thumb/STG_LOGO.png?1647654518",
       "address": "0xAf5191B0De278C7286d6C7CC6ab6BB8A73bA2Cd6",
       "decimals": 18,
       "extensions": {
@@ -5120,7 +5120,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "STORJ",
       "decimals": 8,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xB64ef51C888972c908CFacf59B47C1AfBC0Ab8aC/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xB64ef51C888972c908CFacf59B47C1AfBC0Ab8aC/logo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5141,7 +5141,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Starknet",
       "symbol": "STRK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26433/standard/starknet.png?1696525507",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26433/standard/starknet.png?1696525507",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5156,7 +5156,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stox",
       "symbol": "STX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1230/thumb/stox-token.png?1547035256",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1230/thumb/stox-token.png?1547035256",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5174,7 +5174,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SUKU",
       "symbol": "SUKU",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11969/thumb/UmfW5S6f_400x400.jpg?1596602238",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11969/thumb/UmfW5S6f_400x400.jpg?1596602238",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -5195,7 +5195,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SuperFarm",
       "symbol": "SUPER",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14040/thumb/6YPdWn6.png?1613975899",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14040/thumb/6YPdWn6.png?1613975899",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -5219,7 +5219,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "sUSD",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://assets.coingecko.com/coins/images/5013/thumb/sUSD.png?1616150765",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5013/thumb/sUSD.png?1616150765",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -5243,7 +5243,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Sushi",
       "symbol": "SUSHI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -5276,7 +5276,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Swell",
       "symbol": "SWELL",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/28777/large/swell1.png?1727899715",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/28777/large/swell1.png?1727899715",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5292,7 +5292,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "SWFTCOIN",
       "symbol": "SWFTC",
-      "logoURI": "https://assets.coingecko.com/coins/images/2346/thumb/SWFTCoin.jpg?1618392022",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2346/thumb/SWFTCoin.jpg?1618392022",
       "address": "0x0bb217E40F8a5Cb79Adf04E1aAb60E5abd0dfC1e",
       "decimals": 8,
       "extensions": {
@@ -5310,7 +5310,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Swipe",
       "symbol": "SXP",
-      "logoURI": "https://assets.coingecko.com/coins/images/9368/thumb/swipe.png?1566792311",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9368/thumb/swipe.png?1566792311",
       "address": "0x8CE9137d39326AD0cD6491fb5CC0CbA0e089b6A9",
       "decimals": 18,
       "extensions": {
@@ -5331,7 +5331,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Sylo",
       "symbol": "SYLO",
-      "logoURI": "https://assets.coingecko.com/coins/images/6430/thumb/SYLO.svg?1589527756",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/6430/thumb/SYLO.svg?1589527756",
       "address": "0xf293d23BF2CDc05411Ca0edDD588eb1977e8dcd4",
       "decimals": 18,
       "extensions": {
@@ -5348,7 +5348,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Synapse",
       "symbol": "SYN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18024/thumb/syn.png?1635002049",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18024/thumb/syn.png?1635002049",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -5372,7 +5372,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Syrup Token",
       "symbol": "SYRUP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/51232/standard/IMG_7420.png?1730831572",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/51232/standard/IMG_7420.png?1730831572",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5385,7 +5385,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Threshold Network",
       "symbol": "T",
-      "logoURI": "https://assets.coingecko.com/coins/images/22228/thumb/nFPNiSbL_400x400.jpg?1641220340",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22228/thumb/nFPNiSbL_400x400.jpg?1641220340",
       "address": "0xCdF7028ceAB81fA0C6971208e83fa7872994beE5",
       "decimals": 18,
       "extensions": {
@@ -5408,7 +5408,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "tBTC",
       "symbol": "tBTC",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/uniswap/assets/master/blockchains/ethereum/assets/0x18084fbA666a33d37592fA2633fD49a74DD93a88/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/uniswap/assets/master/blockchains/ethereum/assets/0x18084fbA666a33d37592fA2633fD49a74DD93a88/logo.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5427,7 +5427,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "ChronoTech",
       "symbol": "TIME",
-      "logoURI": "https://assets.coingecko.com/coins/images/604/thumb/time-32x32.png?1627130666",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/604/thumb/time-32x32.png?1627130666",
       "address": "0x485d17A6f1B8780392d53D64751824253011A260",
       "decimals": 8,
       "extensions": {
@@ -5445,7 +5445,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Alien Worlds",
       "symbol": "TLM",
-      "logoURI": "https://assets.coingecko.com/coins/images/14676/thumb/kY-C4o7RThfWrDQsLCAG4q4clZhBDDfJQVhWUEKxXAzyQYMj4Jmq1zmFwpRqxhAJFPOa0AsW_PTSshoPuMnXNwq3rU7Imp15QimXTjlXMx0nC088mt1rIwRs75GnLLugWjSllxgzvQ9YrP4tBgclK4_rb17hjnusGj_c0u2fx0AvVokjSNB-v2poTj0xT9BZRCbzRE3-lF1.jpg?1617700061",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14676/thumb/kY-C4o7RThfWrDQsLCAG4q4clZhBDDfJQVhWUEKxXAzyQYMj4Jmq1zmFwpRqxhAJFPOa0AsW_PTSshoPuMnXNwq3rU7Imp15QimXTjlXMx0nC088mt1rIwRs75GnLLugWjSllxgzvQ9YrP4tBgclK4_rb17hjnusGj_c0u2fx0AvVokjSNB-v2poTj0xT9BZRCbzRE3-lF1.jpg?1617700061",
       "address": "0x888888848B652B3E3a0f34c96E00EEC0F3a23F72",
       "decimals": 4,
       "extensions": {
@@ -5465,7 +5465,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tokemak",
       "symbol": "TOKE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17495/thumb/tokemak-avatar-200px-black.png?1628131614",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17495/thumb/tokemak-avatar-200px-black.png?1628131614",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5481,7 +5481,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "TE FOOD",
       "symbol": "TONE",
-      "logoURI": "https://assets.coingecko.com/coins/images/2325/thumb/tec.png?1547036538",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2325/thumb/tec.png?1547036538",
       "address": "0x2Ab6Bb8408ca3199B8Fa6C92d5b455F820Af03c4",
       "decimals": 18,
       "extensions": {
@@ -5498,7 +5498,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "OriginTrail",
       "symbol": "TRAC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1877/thumb/TRAC.jpg?1635134367",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1877/thumb/TRAC.jpg?1635134367",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5519,7 +5519,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tellor",
       "symbol": "TRB",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -5546,7 +5546,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tribe",
       "symbol": "TRIBE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14575/thumb/tribe.PNG?1617487954",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14575/thumb/tribe.PNG?1617487954",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5567,7 +5567,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "TrueFi",
       "symbol": "TRU",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/13180/thumb/truefi_glyph_color.png?1617610941",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13180/thumb/truefi_glyph_color.png?1617610941",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5585,7 +5585,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Turbo",
       "symbol": "TURBO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/30117/large/TurboMark-QL_200.png?1708079597",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/30117/large/TurboMark-QL_200.png?1708079597",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5601,7 +5601,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "The Virtua Kolect",
       "symbol": "TVK",
-      "logoURI": "https://assets.coingecko.com/coins/images/13330/thumb/virtua_original.png?1656043619",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13330/thumb/virtua_original.png?1656043619",
       "address": "0xd084B83C305daFD76AE3E1b4E1F1fe2eCcCb3988",
       "decimals": 18,
       "extensions": {
@@ -5621,7 +5621,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "UMA",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -5648,7 +5648,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Unifi Protocol DAO",
       "symbol": "UNFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13152/thumb/logo-2.png?1605748967",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13152/thumb/logo-2.png?1605748967",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -5699,7 +5699,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pawtocol",
       "symbol": "UPI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12186/thumb/pawtocol.jpg?1597962008",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12186/thumb/pawtocol.jpg?1597962008",
       "extensions": {
         "bridgeInfo": {
           "56": {
@@ -5717,7 +5717,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDC",
       "decimals": 6,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -5753,7 +5753,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Global Dollar",
       "symbol": "USDG",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/51281/large/GDN_USDG_Token_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/51281/large/GDN_USDG_Token_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5768,7 +5768,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pax Dollar",
       "symbol": "USDP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/6013/standard/Pax_Dollar.png?1696506427",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/6013/standard/Pax_Dollar.png?1696506427",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5789,7 +5789,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quantoz USDQ",
       "symbol": "USDQ",
       "decimals": 6,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/51852/large/USDQ_1000px_Color.png?1732071232",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/51852/large/USDQ_1000px_Color.png?1732071232",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5804,7 +5804,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "StablR USD",
       "symbol": "USDR",
       "decimals": 6,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/53721/large/stablrusd-logo.png?1737126629",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/53721/large/stablrusd-logo.png?1737126629",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5819,7 +5819,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "USDS Stablecoin",
       "symbol": "USDS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/39926/large/usds.webp?1726666683",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/39926/large/usds.webp?1726666683",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5834,7 +5834,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDT",
       "decimals": 6,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -5870,7 +5870,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "USUAL",
       "symbol": "USUAL",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/51091/large/USUAL.jpg?1730035787",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/51091/large/USUAL.jpg?1730035787",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5888,7 +5888,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "VANRY",
       "symbol": "VANRY",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/33466/large/apple-touch-icon.png?1701942541",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/33466/large/apple-touch-icon.png?1701942541",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5903,7 +5903,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Voyager Token",
       "symbol": "VGX",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/794/thumb/Voyager-vgx.png?1575693595",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/794/thumb/Voyager-vgx.png?1575693595",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -5916,7 +5916,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Wrapped Ampleforth",
       "symbol": "WAMPL",
-      "logoURI": "https://assets.coingecko.com/coins/images/20825/thumb/photo_2021-11-25_02-05-11.jpg?1637811951",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20825/thumb/photo_2021-11-25_02-05-11.jpg?1637811951",
       "address": "0xEDB171C18cE90B633DB442f2A6F72874093b49Ef",
       "decimals": 18,
       "extensions": {
@@ -5939,7 +5939,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Wrapped Analog One Token",
       "symbol": "WANLOG",
       "decimals": 12,
-      "logoURI": "https://assets.kraken.com/marketing/web/icons-uni-webp/s_anlog.webp?i=kds"
+      "logoURI": "https://assets.kraken.dummy.com/marketing/web/icons-uni-webp/s_anlog.webp?i=kds"
     },
     {
       "name": "Wrapped BTC",
@@ -5947,7 +5947,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WBTC",
       "decimals": 8,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -5972,7 +5972,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Wrapped Centrifuge",
       "symbol": "WCFG",
-      "logoURI": "https://assets.coingecko.com/coins/images/17106/thumb/WCFG.jpg?1626266462",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17106/thumb/WCFG.jpg?1626266462",
       "address": "0xc221b7E65FfC80DE234bbB6667aBDd46593D34F0",
       "decimals": 18,
       "extensions": {
@@ -5992,7 +5992,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -6023,7 +6023,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "WOO Network",
       "symbol": "WOO",
-      "logoURI": "https://assets.coingecko.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
       "address": "0x4691937a7508860F876c9c0a2a617E7d9E945D4B",
       "decimals": 18,
       "extensions": {
@@ -6053,7 +6053,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Chain",
       "symbol": "XCN",
-      "logoURI": "https://assets.coingecko.com/coins/images/24210/thumb/Chain_icon_200x200.png?1646895054",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24210/thumb/Chain_icon_200x200.png?1646895054",
       "address": "0xA2cd3D43c775978A96BdBf12d733D5A1ED94fb18",
       "decimals": 18,
       "extensions": {
@@ -6076,7 +6076,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "XSGD",
       "symbol": "XSGD",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/12832/standard/StraitsX_Singapore_Dollar_%28XSGD%29_Token_Logo.png?1696512623",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12832/standard/StraitsX_Singapore_Dollar_%28XSGD%29_Token_Logo.png?1696512623",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -6097,7 +6097,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "XYO Network",
       "symbol": "XYO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4519/thumb/XYO_Network-logo.png?1547039819",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4519/thumb/XYO_Network-logo.png?1547039819",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -6121,7 +6121,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "yearn finance",
       "symbol": "YFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -6151,7 +6151,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DFI money",
       "symbol": "YFII",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11902/thumb/YFII-logo.78631676.png?1598677348",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11902/thumb/YFII-logo.78631676.png?1598677348",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -6167,7 +6167,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 1,
       "name": "Yield Guild Games",
       "symbol": "YGG",
-      "logoURI": "https://assets.coingecko.com/coins/images/17358/thumb/le1nzlO6_400x400.jpg?1632465691",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17358/thumb/le1nzlO6_400x400.jpg?1632465691",
       "address": "0x25f8087EAD173b73D6e8B84329989A8eEA16CF73",
       "decimals": 18,
       "extensions": {
@@ -6190,7 +6190,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Zetachain",
       "symbol": "Zeta",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26718/standard/Twitter_icon.png?1696525788",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26718/standard/Twitter_icon.png?1696525788",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -6208,7 +6208,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LayerZero",
       "symbol": "ZRO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208",
       "extensions": {
         "bridgeInfo": {
           "130": {
@@ -6226,7 +6226,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "ZRX",
       "decimals": 18,
       "chainId": 1,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
       "extensions": {
         "bridgeInfo": {
           "10": {
@@ -6256,7 +6256,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "DAI",
       "decimals": 18,
       "chainId": 3,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xaD6D458402F60fD3Bd25163575031ACDce07538D/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xaD6D458402F60fD3Bd25163575031ACDce07538D/logo.png"
     },
     {
       "name": "Uniswap",
@@ -6272,7 +6272,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 3,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc778417E063141139Fce010982780140Aa0cD5Ab/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc778417E063141139Fce010982780140Aa0cD5Ab/logo.png"
     },
     {
       "name": "Dai Stablecoin",
@@ -6280,7 +6280,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "DAI",
       "decimals": 18,
       "chainId": 4,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc7AD46e0b8a400Bb3C915120d284AafbA8fc4735/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc7AD46e0b8a400Bb3C915120d284AafbA8fc4735/logo.png"
     },
     {
       "name": "Maker",
@@ -6288,7 +6288,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "MKR",
       "decimals": 18,
       "chainId": 4,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xF9bA5210F91D0474bd1e1DcDAeC4C58E359AaD85/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xF9bA5210F91D0474bd1e1DcDAeC4C58E359AaD85/logo.png"
     },
     {
       "name": "Uniswap",
@@ -6304,7 +6304,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 4,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc778417E063141139Fce010982780140Aa0cD5Ab/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc778417E063141139Fce010982780140Aa0cD5Ab/logo.png"
     },
     {
       "name": "Uniswap",
@@ -6320,7 +6320,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 5,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6/logo.png"
     },
     {
       "chainId": 10,
@@ -6328,7 +6328,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "1inch",
       "symbol": "1INCH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13469/thumb/1inch-token.png?1608803028",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13469/thumb/1inch-token.png?1608803028",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6343,7 +6343,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aave",
       "symbol": "AAVE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12645/thumb/AAVE.png?1601374110",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12645/thumb/AAVE.png?1601374110",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6358,7 +6358,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Across Protocol Token",
       "symbol": "ACX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28161/large/across-200x200.png?1696527165",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28161/large/across-200x200.png?1696527165",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6373,7 +6373,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ARPA Chain",
       "symbol": "ARPA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6388,7 +6388,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "BAL",
       "decimals": 18,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6403,7 +6403,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Boba Network",
       "symbol": "BOBA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/20285/thumb/BOBA.png?1636811576",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20285/thumb/BOBA.png?1636811576",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6418,7 +6418,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BarnBridge",
       "symbol": "BOND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12811/thumb/barnbridge.jpg?1602728853",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12811/thumb/barnbridge.jpg?1602728853",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6433,7 +6433,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Braintrust",
       "symbol": "BTRST",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18100/thumb/braintrust.PNG?1630475394",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18100/thumb/braintrust.PNG?1630475394",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6448,7 +6448,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Binance USD",
       "symbol": "BUSD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9576/thumb/BUSD.png?1568947766",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9576/thumb/BUSD.png?1568947766",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6463,7 +6463,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Coinbase Wrapped Staked ETH",
       "symbol": "cbETH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/27008/large/cbeth.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/27008/large/cbeth.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6478,7 +6478,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Celo native asset (Wormhole)",
       "symbol": "CELO",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/wormhole-foundation/wormhole-token-list/main/assets/celo_wh.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/wormhole-foundation/wormhole-token-list/main/assets/celo_wh.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6493,7 +6493,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "CRV",
       "decimals": 18,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6508,7 +6508,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cartesi",
       "symbol": "CTSI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11038/thumb/cartesi.png?1592288021",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11038/thumb/cartesi.png?1592288021",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6523,7 +6523,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "CYBER",
       "symbol": "CYBER",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/31274/large/token.png?1715826754"
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/31274/large/token.png?1715826754"
     },
     {
       "name": "Dai Stablecoin",
@@ -6531,7 +6531,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "DAI",
       "decimals": 18,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6546,7 +6546,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethereum Name Service",
       "symbol": "ENS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19785/thumb/acatxTm8_400x400.jpg?1635850140",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19785/thumb/acatxTm8_400x400.jpg?1635850140",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6561,7 +6561,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stafi",
       "symbol": "FIS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12423/thumb/stafi_logo.jpg?1599730991",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12423/thumb/stafi_logo.jpg?1599730991",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6576,7 +6576,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ShapeShift FOX Token",
       "symbol": "FOX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9988/thumb/FOX.png?1574330622",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9988/thumb/FOX.png?1574330622",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6591,7 +6591,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax",
       "symbol": "FRAX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13422/thumb/frax_logo.png?1608476506",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13422/thumb/frax_logo.png?1608476506",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6606,7 +6606,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax Share",
       "symbol": "FXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13423/thumb/frax_share.png?1608478989",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13423/thumb/frax_share.png?1608478989",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6621,7 +6621,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gitcoin",
       "symbol": "GTC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15810/thumb/gitcoin.png?1621992929",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15810/thumb/gitcoin.png?1621992929",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6636,7 +6636,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "GYEN",
       "symbol": "GYEN",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/14191/thumb/icon_gyen_200_200.png?1614843343",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14191/thumb/icon_gyen_200_200.png?1614843343",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6651,7 +6651,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "KRYLL",
       "symbol": "KRL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2807/thumb/krl.png?1547036979",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2807/thumb/krl.png?1547036979",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6666,7 +6666,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Kujira",
       "symbol": "KUJI",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/20685/standard/kuji-200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20685/standard/kuji-200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6681,7 +6681,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Lido DAO",
       "symbol": "LDO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13573/thumb/Lido_DAO.png?1609873644",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13573/thumb/Lido_DAO.png?1609873644",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6696,7 +6696,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LINK",
       "decimals": 18,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6711,7 +6711,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LRC",
       "decimals": 18,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6724,7 +6724,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 10,
       "name": "Liquity USD",
       "symbol": "LUSD",
-      "logoURI": "https://assets.coingecko.com/coins/images/14666/thumb/Group_3.png?1617631327",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14666/thumb/Group_3.png?1617631327",
       "address": "0xc40F949F8a4e094D1b49a23ea9241D289B7b2819",
       "decimals": 18,
       "extensions": {
@@ -6741,7 +6741,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mask Network",
       "symbol": "MASK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6756,7 +6756,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "MKR",
       "decimals": 18,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6771,7 +6771,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ocean Protocol",
       "symbol": "OCEAN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3687/thumb/ocean-protocol-logo.jpg?1547038686",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3687/thumb/ocean-protocol-logo.jpg?1547038686",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6794,7 +6794,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pepe",
       "symbol": "PEPE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/29850/large/pepe-token.jpeg?1682922725",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/29850/large/pepe-token.jpeg?1682922725",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6809,7 +6809,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Perpetual Protocol",
       "symbol": "PERP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6824,7 +6824,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rai Reflex Index",
       "symbol": "RAI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6839,7 +6839,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rari Governance Token",
       "symbol": "RGT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12900/thumb/Rari_Logo_Transparent.png?1613978014",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12900/thumb/Rari_Logo_Transparent.png?1613978014",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6854,7 +6854,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Status",
       "symbol": "SNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/779/thumb/status.png?1548610778",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/779/thumb/status.png?1548610778",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6869,7 +6869,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "SNX",
       "decimals": 18,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6884,7 +6884,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SOL Wormhole ",
       "symbol": "SOL",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6899,7 +6899,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SUKU",
       "symbol": "SUKU",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11969/thumb/UmfW5S6f_400x400.jpg?1596602238",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11969/thumb/UmfW5S6f_400x400.jpg?1596602238",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6914,7 +6914,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "sUSD",
       "decimals": 18,
       "chainId": 10,
-      "logoURI": "https://assets.coingecko.com/coins/images/5013/thumb/sUSD.png?1616150765",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5013/thumb/sUSD.png?1616150765",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6929,7 +6929,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Sushi",
       "symbol": "SUSHI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6942,7 +6942,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 10,
       "name": "Threshold Network",
       "symbol": "T",
-      "logoURI": "https://assets.coingecko.com/coins/images/22228/thumb/nFPNiSbL_400x400.jpg?1641220340",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22228/thumb/nFPNiSbL_400x400.jpg?1641220340",
       "address": "0x747e42Eb0591547a0ab429B3627816208c734EA7",
       "decimals": 18,
       "extensions": {
@@ -6959,7 +6959,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tellor",
       "symbol": "TRB",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -6974,7 +6974,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "UMA",
       "decimals": 18,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7027,7 +7027,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDT",
       "decimals": 6,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7042,7 +7042,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Velodrome Finance",
       "symbol": "VELO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12538/standard/Logo_200x_200.png?1696512350"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12538/standard/Logo_200x_200.png?1696512350"
     },
     {
       "name": "Wrapped BTC",
@@ -7050,7 +7050,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WBTC",
       "decimals": 8,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7065,7 +7065,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7078,7 +7078,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 10,
       "name": "WOO Network",
       "symbol": "WOO",
-      "logoURI": "https://assets.coingecko.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
       "address": "0x871f2F2ff935FD1eD867842FF2a7bfD051A5E527",
       "decimals": 18,
       "extensions": {
@@ -7095,7 +7095,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "XYO Network",
       "symbol": "XYO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4519/thumb/XYO_Network-logo.png?1547039819",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4519/thumb/XYO_Network-logo.png?1547039819",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7110,7 +7110,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "yearn finance",
       "symbol": "YFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7125,7 +7125,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LayerZero",
       "symbol": "ZRO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208"
     },
     {
       "name": "0x Protocol Token",
@@ -7133,7 +7133,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "ZRX",
       "decimals": 18,
       "chainId": 10,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7148,7 +7148,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "DAI",
       "decimals": 18,
       "chainId": 42,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa/logo.png"
     },
     {
       "name": "Maker",
@@ -7156,7 +7156,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "MKR",
       "decimals": 18,
       "chainId": 42,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xAaF64BFCC32d0F15873a02163e7E500671a4ffcD/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xAaF64BFCC32d0F15873a02163e7E500671a4ffcD/logo.png"
     },
     {
       "name": "Uniswap",
@@ -7172,7 +7172,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 42,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xd0A1E359811322d97991E03f863a0C30C2cF029C/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xd0A1E359811322d97991E03f863a0C30C2cF029C/logo.png"
     },
     {
       "chainId": 56,
@@ -7180,7 +7180,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "1inch",
       "symbol": "1INCH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13469/thumb/1inch-token.png?1608803028",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13469/thumb/1inch-token.png?1608803028",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7195,7 +7195,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aave",
       "symbol": "AAVE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12645/thumb/AAVE.png?1601374110",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12645/thumb/AAVE.png?1601374110",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7210,7 +7210,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alchemy Pay",
       "symbol": "ACH",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/12390/thumb/ACH_%281%29.png?1599691266",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12390/thumb/ACH_%281%29.png?1599691266",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7225,7 +7225,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ambire AdEx",
       "symbol": "ADX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/847/thumb/Ambire_AdEx_Symbol_color.png?1655432540",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/847/thumb/Ambire_AdEx_Symbol_color.png?1655432540",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7240,7 +7240,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "agEur",
       "symbol": "agEUR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19479/standard/agEUR.png?1696518915",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19479/standard/agEUR.png?1696518915",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7255,7 +7255,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "AIOZ Network",
       "symbol": "AIOZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14631/thumb/aioz_logo.png?1617413126",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14631/thumb/aioz_logo.png?1617413126",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7270,7 +7270,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aleph im",
       "symbol": "ALEPH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11676/thumb/Monochram-aleph.png?1608483725",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11676/thumb/Monochram-aleph.png?1608483725",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7285,7 +7285,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "My Neighbor Alice",
       "symbol": "ALICE",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/14375/thumb/alice_logo.jpg?1615782968",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14375/thumb/alice_logo.jpg?1615782968",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7300,7 +7300,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alpha Venture DAO",
       "symbol": "ALPHA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7315,7 +7315,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ankr",
       "symbol": "ANKR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7330,7 +7330,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ARPA Chain",
       "symbol": "ARPA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7345,7 +7345,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Automata",
       "symbol": "ATA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15985/thumb/ATA.jpg?1622535745",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15985/thumb/ATA.jpg?1622535745",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7360,7 +7360,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Axelar",
       "symbol": "AXL",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/27277/large/V-65_xQ1_400x400.jpeg",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/27277/large/V-65_xQ1_400x400.jpeg",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7375,7 +7375,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Axie Infinity",
       "symbol": "AXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13029/thumb/axie_infinity_logo.png?1604471082",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13029/thumb/axie_infinity_logo.png?1604471082",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7390,7 +7390,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Bluzelle",
       "symbol": "BLZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2848/thumb/ColorIcon_3x.png?1622516510",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2848/thumb/ColorIcon_3x.png?1622516510",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7405,7 +7405,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Binance USD",
       "symbol": "BUSD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9576/thumb/BUSD.png?1568947766",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9576/thumb/BUSD.png?1568947766",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7420,7 +7420,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Coin98",
       "symbol": "C98",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17117/thumb/logo.png?1626412904",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17117/thumb/logo.png?1626412904",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7435,7 +7435,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Chromia",
       "symbol": "CHR",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/5000/thumb/Chromia.png?1559038018",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5000/thumb/Chromia.png?1559038018",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7450,7 +7450,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Clover Finance",
       "symbol": "CLV",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15278/thumb/clover.png?1645084454",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15278/thumb/clover.png?1645084454",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7465,7 +7465,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "COMP",
       "decimals": 18,
       "chainId": 56,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7480,7 +7480,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Circuits of Value",
       "symbol": "COVAL",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/588/thumb/coval-logo.png?1599493950",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/588/thumb/coval-logo.png?1599493950",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7495,7 +7495,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cartesi",
       "symbol": "CTSI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11038/thumb/cartesi.png?1592288021",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11038/thumb/cartesi.png?1592288021",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7510,7 +7510,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "DAI",
       "decimals": 18,
       "chainId": 56,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7525,7 +7525,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mines of Dalarnia",
       "symbol": "DAR",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/19837/thumb/dar.png?1636014223",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19837/thumb/dar.png?1636014223",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7540,7 +7540,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DexTools",
       "symbol": "DEXT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11603/thumb/dext.png?1605790188",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11603/thumb/dext.png?1605790188",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7555,7 +7555,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DIA",
       "symbol": "DIA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11955/thumb/image.png?1646041751",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11955/thumb/image.png?1646041751",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7570,7 +7570,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Drep",
       "symbol": "DREP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14578/thumb/KotgsCgS_400x400.jpg?1617094445",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14578/thumb/KotgsCgS_400x400.jpg?1617094445",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7585,7 +7585,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DeFi Yield Protocol",
       "symbol": "DYP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13480/thumb/DYP_Logo_Symbol-8.png?1655809066",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13480/thumb/DYP_Logo_Symbol-8.png?1655809066",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7600,7 +7600,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Dogelon Mars",
       "symbol": "ELON",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14962/thumb/6GxcPRo3_400x400.jpg?1619157413",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14962/thumb/6GxcPRo3_400x400.jpg?1619157413",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7615,7 +7615,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Harvest Finance",
       "symbol": "FARM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12304/thumb/Harvest.png?1613016180",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12304/thumb/Harvest.png?1613016180",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7630,7 +7630,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Fetch ai",
       "symbol": "FET",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7645,7 +7645,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "FLOKI",
       "symbol": "FLOKI",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/16746/standard/PNG_image.png?1696516318",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/16746/standard/PNG_image.png?1696516318",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7660,7 +7660,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax",
       "symbol": "FRAX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13422/thumb/frax_logo.png?1608476506",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13422/thumb/frax_logo.png?1608476506",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7675,7 +7675,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Fantom",
       "symbol": "FTM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4001/thumb/Fantom.png?1558015016",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4001/thumb/Fantom.png?1558015016",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7690,7 +7690,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax Share",
       "symbol": "FXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13423/thumb/frax_share.png?1608478989",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13423/thumb/frax_share.png?1608478989",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7705,7 +7705,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Galxe",
       "symbol": "GAL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/24530/thumb/GAL-Token-Icon.png?1651483533",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24530/thumb/GAL-Token-Icon.png?1651483533",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7720,7 +7720,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Hashflow",
       "symbol": "HFT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26136/large/hashflow-icon-cmc.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26136/large/hashflow-icon-cmc.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7735,7 +7735,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Highstreet",
       "symbol": "HIGH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18973/thumb/logosq200200Coingecko.png?1634090470",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18973/thumb/logosq200200Coingecko.png?1634090470",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7750,7 +7750,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Injective",
       "symbol": "INJ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12882/thumb/Secondary_Symbol.png?1628233237",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12882/thumb/Secondary_Symbol.png?1628233237",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7763,7 +7763,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "Jupiter",
       "symbol": "JUP",
-      "logoURI": "https://assets.coingecko.com/coins/images/10351/thumb/logo512.png?1632480932",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10351/thumb/logo512.png?1632480932",
       "address": "0x0231f91e02DebD20345Ae8AB7D71A41f8E140cE7",
       "decimals": 18,
       "extensions": {
@@ -7780,7 +7780,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Kujira",
       "symbol": "KUJI",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/20685/standard/kuji-200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20685/standard/kuji-200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7795,7 +7795,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LINK",
       "decimals": 18,
       "chainId": 56,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7810,7 +7810,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mask Network",
       "symbol": "MASK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7823,7 +7823,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "MATH",
       "symbol": "MATH",
-      "logoURI": "https://assets.coingecko.com/coins/images/11335/thumb/2020-05-19-token-200.png?1589940590",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11335/thumb/2020-05-19-token-200.png?1589940590",
       "address": "0xF218184Af829Cf2b0019F8E6F0b2423498a36983",
       "decimals": 18,
       "extensions": {
@@ -7840,7 +7840,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polygon",
       "symbol": "MATIC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4713/thumb/matic-token-icon.png?1624446912",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4713/thumb/matic-token-icon.png?1624446912",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7855,7 +7855,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Merit Circle",
       "symbol": "MC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19304/thumb/Db4XqML.png?1634972154",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19304/thumb/Db4XqML.png?1634972154",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7868,7 +7868,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "Metis",
       "symbol": "METIS",
-      "logoURI": "https://assets.coingecko.com/coins/images/15595/thumb/metis.jpeg?1660285312",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15595/thumb/metis.jpeg?1660285312",
       "address": "0xe552Fb52a4F19e44ef5A967632DBc320B0820639",
       "decimals": 18,
       "extensions": {
@@ -7885,7 +7885,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Magic Internet Money",
       "symbol": "MIM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7900,7 +7900,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mirror Protocol",
       "symbol": "MIR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13295/thumb/mirror_logo_transparent.png?1611554658",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13295/thumb/mirror_logo_transparent.png?1611554658",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7915,7 +7915,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Multichain",
       "symbol": "MULTI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/22087/thumb/1_Wyot-SDGZuxbjdkaOeT2-A.png?1640764238",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22087/thumb/1_Wyot-SDGZuxbjdkaOeT2-A.png?1640764238",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7930,7 +7930,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Perpetual Protocol",
       "symbol": "PERP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7945,7 +7945,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polkastarter",
       "symbol": "POLS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12648/thumb/polkastarter.png?1609813702",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12648/thumb/polkastarter.png?1609813702",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -7958,7 +7958,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "PARSIQ",
       "symbol": "PRQ",
-      "logoURI": "https://assets.coingecko.com/coins/images/11973/thumb/DsNgK0O.png?1596590280",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11973/thumb/DsNgK0O.png?1596590280",
       "address": "0xd21d29B38374528675C34936bf7d5Dd693D2a577",
       "decimals": 18,
       "extensions": {
@@ -7973,7 +7973,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "pSTAKE Finance",
       "symbol": "PSTAKE",
-      "logoURI": "https://assets.coingecko.com/coins/images/23931/thumb/PSTAKE_Dark.png?1645709930",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/23931/thumb/PSTAKE_Dark.png?1645709930",
       "address": "0x4C882ec256823eE773B25b414d36F92ef58a7c0C",
       "decimals": 18,
       "extensions": {
@@ -7988,7 +7988,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "REVV",
       "symbol": "REVV",
-      "logoURI": "https://assets.coingecko.com/coins/images/12373/thumb/REVV_TOKEN_Refined_2021_%281%29.png?1627652390",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12373/thumb/REVV_TOKEN_Refined_2021_%281%29.png?1627652390",
       "address": "0x833F307aC507D47309fD8CDD1F835BeF8D702a93",
       "decimals": 18,
       "extensions": {
@@ -8005,7 +8005,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stader",
       "symbol": "SD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/20658/standard/SD_Token_Logo.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20658/standard/SD_Token_Logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8020,7 +8020,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SOL Wormhole ",
       "symbol": "SOL",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8033,7 +8033,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "Stargate Finance",
       "symbol": "STG",
-      "logoURI": "https://assets.coingecko.com/coins/images/24413/thumb/STG_LOGO.png?1647654518",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24413/thumb/STG_LOGO.png?1647654518",
       "address": "0xB0D502E938ed5f4df2E681fE6E419ff29631d62b",
       "decimals": 18,
       "extensions": {
@@ -8050,7 +8050,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SuperFarm",
       "symbol": "SUPER",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14040/thumb/6YPdWn6.png?1613975899",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14040/thumb/6YPdWn6.png?1613975899",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8065,7 +8065,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Sushi",
       "symbol": "SUSHI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8078,7 +8078,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "SWFTCOIN",
       "symbol": "SWFTC",
-      "logoURI": "https://assets.coingecko.com/coins/images/2346/thumb/SWFTCoin.jpg?1618392022",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2346/thumb/SWFTCoin.jpg?1618392022",
       "address": "0xE64E30276C2F826FEbd3784958d6Da7B55DfbaD3",
       "decimals": 18,
       "extensions": {
@@ -8093,7 +8093,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "Swipe",
       "symbol": "SXP",
-      "logoURI": "https://assets.coingecko.com/coins/images/9368/thumb/swipe.png?1566792311",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9368/thumb/swipe.png?1566792311",
       "address": "0x47BEAd2563dCBf3bF2c9407fEa4dC236fAbA485A",
       "decimals": 18,
       "extensions": {
@@ -8110,7 +8110,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Synapse",
       "symbol": "SYN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18024/thumb/syn.png?1635002049",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18024/thumb/syn.png?1635002049",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8123,7 +8123,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "ChronoTech",
       "symbol": "TIME",
-      "logoURI": "https://assets.coingecko.com/coins/images/604/thumb/time-32x32.png?1627130666",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/604/thumb/time-32x32.png?1627130666",
       "address": "0x3b198e26E473b8faB2085b37978e36c9DE5D7f68",
       "decimals": 8,
       "extensions": {
@@ -8138,7 +8138,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "Alien Worlds",
       "symbol": "TLM",
-      "logoURI": "https://assets.coingecko.com/coins/images/14676/thumb/kY-C4o7RThfWrDQsLCAG4q4clZhBDDfJQVhWUEKxXAzyQYMj4Jmq1zmFwpRqxhAJFPOa0AsW_PTSshoPuMnXNwq3rU7Imp15QimXTjlXMx0nC088mt1rIwRs75GnLLugWjSllxgzvQ9YrP4tBgclK4_rb17hjnusGj_c0u2fx0AvVokjSNB-v2poTj0xT9BZRCbzRE3-lF1.jpg?1617700061",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14676/thumb/kY-C4o7RThfWrDQsLCAG4q4clZhBDDfJQVhWUEKxXAzyQYMj4Jmq1zmFwpRqxhAJFPOa0AsW_PTSshoPuMnXNwq3rU7Imp15QimXTjlXMx0nC088mt1rIwRs75GnLLugWjSllxgzvQ9YrP4tBgclK4_rb17hjnusGj_c0u2fx0AvVokjSNB-v2poTj0xT9BZRCbzRE3-lF1.jpg?1617700061",
       "address": "0x2222227E22102Fe3322098e4CBfE18cFebD57c95",
       "decimals": 4,
       "extensions": {
@@ -8155,7 +8155,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Unifi Protocol DAO",
       "symbol": "UNFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13152/thumb/logo-2.png?1605748967",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13152/thumb/logo-2.png?1605748967",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8185,7 +8185,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pawtocol",
       "symbol": "UPI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12186/thumb/pawtocol.jpg?1597962008",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12186/thumb/pawtocol.jpg?1597962008",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8200,7 +8200,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDC",
       "decimals": 18,
       "chainId": 56,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8215,7 +8215,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDT",
       "decimals": 18,
       "chainId": 56,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8230,7 +8230,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Wrapped BNB",
       "symbol": "WBNB",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/Uniswap/assets/master/blockchains/smartchain/assets/0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/Uniswap/assets/master/blockchains/smartchain/assets/0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c/logo.png"
     },
     {
       "name": "Wrapped Ether",
@@ -8238,7 +8238,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 56,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8251,7 +8251,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "WOO Network",
       "symbol": "WOO",
-      "logoURI": "https://assets.coingecko.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
       "address": "0x4691937a7508860F876c9c0a2a617E7d9E945D4B",
       "decimals": 18,
       "extensions": {
@@ -8266,7 +8266,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 56,
       "name": "Chain",
       "symbol": "XCN",
-      "logoURI": "https://assets.coingecko.com/coins/images/24210/thumb/Chain_icon_200x200.png?1646895054",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24210/thumb/Chain_icon_200x200.png?1646895054",
       "address": "0x7324c7C0d95CEBC73eEa7E85CbAac0dBdf88a05b",
       "decimals": 18,
       "extensions": {
@@ -8283,7 +8283,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LayerZero",
       "symbol": "ZRO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208"
     },
     {
       "chainId": 130,
@@ -8291,7 +8291,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "1inch",
       "symbol": "1INCH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13469/thumb/1inch-token.png?1608803028",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13469/thumb/1inch-token.png?1608803028",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8306,7 +8306,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ancient8",
       "symbol": "A8",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/39170/standard/A8_Token-04_200x200.png?1720798300",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/39170/standard/A8_Token-04_200x200.png?1720798300",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8321,7 +8321,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aave",
       "symbol": "AAVE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12645/thumb/AAVE.png?1601374110",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12645/thumb/AAVE.png?1601374110",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8336,7 +8336,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Arcblock",
       "symbol": "ABT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2341/thumb/arcblock.png?1547036543",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2341/thumb/arcblock.png?1547036543",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8351,7 +8351,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alchemy Pay",
       "symbol": "ACH",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/12390/thumb/ACH_%281%29.png?1599691266",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12390/thumb/ACH_%281%29.png?1599691266",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8366,7 +8366,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Across Protocol Token",
       "symbol": "ACX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28161/large/across-200x200.png?1696527165",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28161/large/across-200x200.png?1696527165",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8381,7 +8381,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ambire AdEx",
       "symbol": "ADX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/847/thumb/Ambire_AdEx_Symbol_color.png?1655432540",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/847/thumb/Ambire_AdEx_Symbol_color.png?1655432540",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8396,7 +8396,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aergo",
       "symbol": "AERGO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4490/thumb/aergo.png?1647696770",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4490/thumb/aergo.png?1647696770",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8411,7 +8411,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aevo",
       "symbol": "AEVO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/35893/standard/aevo.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/35893/standard/aevo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8426,7 +8426,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "agEur",
       "symbol": "agEUR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19479/standard/agEUR.png?1696518915",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19479/standard/agEUR.png?1696518915",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8441,7 +8441,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Adventure Gold",
       "symbol": "AGLD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18125/thumb/lpgblc4h_400x400.jpg?1630570955",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18125/thumb/lpgblc4h_400x400.jpg?1630570955",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8456,7 +8456,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "AIOZ Network",
       "symbol": "AIOZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14631/thumb/aioz_logo.png?1617413126",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14631/thumb/aioz_logo.png?1617413126",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8471,7 +8471,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alchemix",
       "symbol": "ALCX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14113/thumb/Alchemix.png?1614409874",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14113/thumb/Alchemix.png?1614409874",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8486,7 +8486,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aleph im",
       "symbol": "ALEPH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11676/thumb/Monochram-aleph.png?1608483725",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11676/thumb/Monochram-aleph.png?1608483725",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8501,7 +8501,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alethea Artificial Liquid Intelligence",
       "symbol": "ALI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/22062/thumb/alethea-logo-transparent-colored.png?1642748848",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22062/thumb/alethea-logo-transparent-colored.png?1642748848",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8516,7 +8516,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "My Neighbor Alice",
       "symbol": "ALICE",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/14375/thumb/alice_logo.jpg?1615782968",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14375/thumb/alice_logo.jpg?1615782968",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8531,7 +8531,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alpha Venture DAO",
       "symbol": "ALPHA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8546,7 +8546,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "AltLayer",
       "symbol": "ALT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/34608/standard/Logomark_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/34608/standard/Logomark_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8561,7 +8561,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Amp",
       "symbol": "AMP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12409/thumb/amp-200x200.png?1599625397",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12409/thumb/amp-200x200.png?1599625397",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8576,7 +8576,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ankr",
       "symbol": "ANKR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8591,7 +8591,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "ANT",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://assets.coingecko.com/coins/images/681/thumb/JelZ58cv_400x400.png?1601449653",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/681/thumb/JelZ58cv_400x400.png?1601449653",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8606,7 +8606,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ApeCoin",
       "symbol": "APE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/24383/small/apecoin.jpg?1647476455",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24383/small/apecoin.jpg?1647476455",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8621,7 +8621,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "API3",
       "symbol": "API3",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13256/thumb/api3.jpg?1606751424",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13256/thumb/api3.jpg?1606751424",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8636,7 +8636,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Apu Apustaja",
       "symbol": "APU",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/35986/large/200x200.png?1710308147",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/35986/large/200x200.png?1710308147",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8666,7 +8666,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Arkham",
       "symbol": "ARKM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/30929/standard/Arkham_Logo_CG.png?1696529771",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/30929/standard/Arkham_Logo_CG.png?1696529771",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8681,7 +8681,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ARPA Chain",
       "symbol": "ARPA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8696,7 +8696,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ASH",
       "symbol": "ASH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15714/thumb/omnPqaTY.png?1622820503",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15714/thumb/omnPqaTY.png?1622820503",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8711,7 +8711,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Assemble Protocol",
       "symbol": "ASM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11605/thumb/gpvrlkSq_400x400_%281%29.jpg?1591775789",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11605/thumb/gpvrlkSq_400x400_%281%29.jpg?1591775789",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8726,7 +8726,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "AirSwap",
       "symbol": "AST",
       "decimals": 4,
-      "logoURI": "https://assets.coingecko.com/coins/images/1019/thumb/Airswap.png?1630903484",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1019/thumb/Airswap.png?1630903484",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8741,7 +8741,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Automata",
       "symbol": "ATA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15985/thumb/ATA.jpg?1622535745",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15985/thumb/ATA.jpg?1622535745",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8756,7 +8756,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aethir Token",
       "symbol": "ATH",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/36179/large/logogram_circle_dark_green_vb_green_(1).png?1718232706",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/36179/large/logogram_circle_dark_green_vb_green_(1).png?1718232706",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8771,7 +8771,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Bounce",
       "symbol": "AUCTION",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13860/thumb/1_KtgpRIJzuwfHe0Rl0avP_g.jpeg?1612412025",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13860/thumb/1_KtgpRIJzuwfHe0Rl0avP_g.jpeg?1612412025",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8786,7 +8786,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Audius",
       "symbol": "AUDIO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12913/thumb/AudiusCoinLogo_2x.png?1603425727",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12913/thumb/AudiusCoinLogo_2x.png?1603425727",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8801,7 +8801,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Artverse Token",
       "symbol": "AVT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19727/thumb/ewnektoB_400x400.png?1635767094",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19727/thumb/ewnektoB_400x400.png?1635767094",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8816,7 +8816,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Axelar",
       "symbol": "AXL",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/27277/large/V-65_xQ1_400x400.jpeg",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/27277/large/V-65_xQ1_400x400.jpeg",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8831,7 +8831,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Axie Infinity",
       "symbol": "AXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13029/thumb/axie_infinity_logo.png?1604471082",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13029/thumb/axie_infinity_logo.png?1604471082",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8846,7 +8846,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Badger DAO",
       "symbol": "BADGER",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13287/thumb/badger_dao_logo.jpg?1607054976",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13287/thumb/badger_dao_logo.jpg?1607054976",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8861,7 +8861,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "BAL",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8876,7 +8876,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Band Protocol",
       "symbol": "BAND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9545/thumb/band-protocol.png?1568730326",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9545/thumb/band-protocol.png?1568730326",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8891,7 +8891,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Basic Attention Token",
       "symbol": "BAT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/677/thumb/basic-attention-token.png?1547034427",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/677/thumb/basic-attention-token.png?1547034427",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8906,7 +8906,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Beam",
       "symbol": "BEAM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/32417/standard/chain-logo.png?1698114384",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/32417/standard/chain-logo.png?1698114384",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8921,7 +8921,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Biconomy",
       "symbol": "BICO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/21061/thumb/biconomy_logo.jpg?1638269749",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/21061/thumb/biconomy_logo.jpg?1638269749",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8936,7 +8936,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Big Time",
       "symbol": "BIGTIME",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/32251/standard/-6136155493475923781_121.jpg?1696998691",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/32251/standard/-6136155493475923781_121.jpg?1696998691",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8951,7 +8951,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BitDAO",
       "symbol": "BIT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17627/thumb/rI_YptK8.png?1653983088",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17627/thumb/rI_YptK8.png?1653983088",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8966,7 +8966,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "HarryPotterObamaSonic10Inu",
       "symbol": "BITCOIN",
       "decimals": 8,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/30323/large/hpos10i_logo_casino_night-dexview.png?1696529224",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/30323/large/hpos10i_logo_casino_night-dexview.png?1696529224",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8981,7 +8981,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Blur",
       "symbol": "BLUR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28453/large/blur.png?1670745921",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28453/large/blur.png?1670745921",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -8996,7 +8996,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Bluzelle",
       "symbol": "BLZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2848/thumb/ColorIcon_3x.png?1622516510",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2848/thumb/ColorIcon_3x.png?1622516510",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9011,7 +9011,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "BNT",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1F573D6Fb3F13d689FF844B4cE37794d79a7FF1C/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1F573D6Fb3F13d689FF844B4cE37794d79a7FF1C/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9026,7 +9026,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Boba Network",
       "symbol": "BOBA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/20285/thumb/BOBA.png?1636811576",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20285/thumb/BOBA.png?1636811576",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9041,7 +9041,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BarnBridge",
       "symbol": "BOND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12811/thumb/barnbridge.jpg?1602728853",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12811/thumb/barnbridge.jpg?1602728853",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9056,7 +9056,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Braintrust",
       "symbol": "BTRST",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18100/thumb/braintrust.PNG?1630475394",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18100/thumb/braintrust.PNG?1630475394",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9071,7 +9071,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Binance USD",
       "symbol": "BUSD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9576/thumb/BUSD.png?1568947766",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9576/thumb/BUSD.png?1568947766",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9086,7 +9086,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Coin98",
       "symbol": "C98",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17117/thumb/logo.png?1626412904",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17117/thumb/logo.png?1626412904",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9101,7 +9101,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "address": "0xb6A3E8e5715fd4c99EcEDaaAe121bDe4Ab6a1Ef1",
       "symbol": "cbBTC",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/40143/standard/cbbtc.webp",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/40143/standard/cbbtc.webp",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9116,7 +9116,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Coinbase Wrapped Staked ETH",
       "symbol": "cbETH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/27008/large/cbeth.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/27008/large/cbeth.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9131,7 +9131,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Celo native asset (Wormhole)",
       "symbol": "CELO",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/wormhole-foundation/wormhole-token-list/main/assets/celo_wh.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/wormhole-foundation/wormhole-token-list/main/assets/celo_wh.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9146,7 +9146,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Celer Network",
       "symbol": "CELR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4379/thumb/Celr.png?1554705437",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4379/thumb/Celr.png?1554705437",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9161,7 +9161,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Chromia",
       "symbol": "CHR",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/5000/thumb/Chromia.png?1559038018",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5000/thumb/Chromia.png?1559038018",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9176,7 +9176,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Chiliz",
       "symbol": "CHZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/8834/thumb/Chiliz.png?1561970540",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8834/thumb/Chiliz.png?1561970540",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9191,7 +9191,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Clover Finance",
       "symbol": "CLV",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15278/thumb/clover.png?1645084454",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15278/thumb/clover.png?1645084454",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9206,7 +9206,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "COMP",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9221,7 +9221,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "COTI",
       "symbol": "COTI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2962/thumb/Coti.png?1559653863",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2962/thumb/Coti.png?1559653863",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9236,7 +9236,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Circuits of Value",
       "symbol": "COVAL",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/588/thumb/coval-logo.png?1599493950",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/588/thumb/coval-logo.png?1599493950",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9251,7 +9251,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "CoW Protocol",
       "symbol": "COW",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/24384/large/CoW-token_logo.png?1719524382",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24384/large/CoW-token_logo.png?1719524382",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9266,7 +9266,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Clearpool",
       "symbol": "CPOOL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19252/large/photo_2022-08-31_12.45.02.jpeg?1696518697",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19252/large/photo_2022-08-31_12.45.02.jpeg?1696518697",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9281,7 +9281,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Covalent",
       "symbol": "CQT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14168/thumb/covalent-cqt.png?1624545218",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14168/thumb/covalent-cqt.png?1624545218",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9296,7 +9296,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cronos",
       "symbol": "CRO",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/7310/thumb/oCw2s3GI_400x400.jpeg?1645172042",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/7310/thumb/oCw2s3GI_400x400.jpeg?1645172042",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9311,7 +9311,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Crypterium",
       "symbol": "CRPT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1901/thumb/crypt.png?1547036205",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1901/thumb/crypt.png?1547036205",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9326,7 +9326,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "CRV",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9341,7 +9341,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cartesi",
       "symbol": "CTSI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11038/thumb/cartesi.png?1592288021",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11038/thumb/cartesi.png?1592288021",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9356,7 +9356,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cryptex Finance",
       "symbol": "CTX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14932/thumb/glossy_icon_-_C200px.png?1619073171",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14932/thumb/glossy_icon_-_C200px.png?1619073171",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9371,7 +9371,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Somnium Space CUBEs",
       "symbol": "CUBE",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/10687/thumb/CUBE_icon.png?1617026861",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10687/thumb/CUBE_icon.png?1617026861",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9386,7 +9386,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Civic",
       "symbol": "CVC",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/788/thumb/civic.png?1547034556",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/788/thumb/civic.png?1547034556",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9401,7 +9401,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Convex Finance",
       "symbol": "CVX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15585/thumb/convex.png?1621256328",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15585/thumb/convex.png?1621256328",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9416,7 +9416,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Covalent X Token",
       "symbol": "CXT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/39177/large/CXT_Ticker.png?1720829918",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/39177/large/CXT_Ticker.png?1720829918",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9431,7 +9431,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "DAI",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9446,7 +9446,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mines of Dalarnia",
       "symbol": "DAR",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/19837/thumb/dar.png?1636014223",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19837/thumb/dar.png?1636014223",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9461,7 +9461,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DerivaDAO",
       "symbol": "DDX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13453/thumb/ddx_logo.png?1608741641",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13453/thumb/ddx_logo.png?1608741641",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9476,7 +9476,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Dent",
       "symbol": "DENT",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/1152/thumb/gLCEA2G.png?1604543239",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1152/thumb/gLCEA2G.png?1604543239",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9491,7 +9491,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DexTools",
       "symbol": "DEXT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11603/thumb/dext.png?1605790188",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11603/thumb/dext.png?1605790188",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9506,7 +9506,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DIA",
       "symbol": "DIA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11955/thumb/image.png?1646041751",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11955/thumb/image.png?1646041751",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9521,7 +9521,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "district0x",
       "symbol": "DNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/849/thumb/district0x.png?1547223762",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/849/thumb/district0x.png?1547223762",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9536,7 +9536,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DeFi Pulse Index",
       "symbol": "DPI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12465/thumb/defi_pulse_index_set.png?1600051053",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12465/thumb/defi_pulse_index_set.png?1600051053",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9551,7 +9551,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Drep",
       "symbol": "DREP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14578/thumb/KotgsCgS_400x400.jpg?1617094445",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14578/thumb/KotgsCgS_400x400.jpg?1617094445",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9566,7 +9566,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "dYdX",
       "symbol": "DYDX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17500/thumb/hjnIm9bV.jpg?1628009360",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17500/thumb/hjnIm9bV.jpg?1628009360",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9581,7 +9581,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DeFi Yield Protocol",
       "symbol": "DYP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13480/thumb/DYP_Logo_Symbol-8.png?1655809066",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13480/thumb/DYP_Logo_Symbol-8.png?1655809066",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9596,7 +9596,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "EigenLayer",
       "symbol": "EIGEN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/37441/large/eigen.jpg?1728023974",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/37441/large/eigen.jpg?1728023974",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9611,7 +9611,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Elastos",
       "symbol": "ELA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2780/thumb/Elastos.png?1597048112",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2780/thumb/Elastos.png?1597048112",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9626,7 +9626,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Dogelon Mars",
       "symbol": "ELON",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14962/thumb/6GxcPRo3_400x400.jpg?1619157413",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14962/thumb/6GxcPRo3_400x400.jpg?1619157413",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9641,7 +9641,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethena",
       "symbol": "ENA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/36530/standard/ethena.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/36530/standard/ethena.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9656,7 +9656,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Enjin Coin",
       "symbol": "ENJ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1102/thumb/enjin-coin-logo.png?1547035078",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1102/thumb/enjin-coin-logo.png?1547035078",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9671,7 +9671,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethereum Name Service",
       "symbol": "ENS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19785/thumb/acatxTm8_400x400.jpg?1635850140",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19785/thumb/acatxTm8_400x400.jpg?1635850140",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9686,7 +9686,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethernity Chain",
       "symbol": "ERN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14238/thumb/LOGO_HIGH_QUALITY.png?1647831402",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14238/thumb/LOGO_HIGH_QUALITY.png?1647831402",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9701,7 +9701,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ether.fi",
       "symbol": "ETHFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/35958/standard/etherfi.jpeg",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/35958/standard/etherfi.jpeg",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9716,7 +9716,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Euler",
       "symbol": "EUL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26149/thumb/YCvKDfl8_400x400.jpeg?1656041509",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26149/thumb/YCvKDfl8_400x400.jpeg?1656041509",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9731,7 +9731,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Euro Coin",
       "symbol": "EURC",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/26045/thumb/euro-coin.png?1655394420",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26045/thumb/euro-coin.png?1655394420",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9746,7 +9746,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quantoz EURQ",
       "symbol": "EURQ",
       "decimals": 6,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/51853/large/EURQ_1000px_Color.png?1732071269",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/51853/large/EURQ_1000px_Color.png?1732071269",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9761,7 +9761,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "StablR Euro",
       "symbol": "EURR",
       "decimals": 6,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/53720/large/stablreuro-logo.png?1737125898",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/53720/large/stablreuro-logo.png?1737125898",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9776,7 +9776,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Harvest Finance",
       "symbol": "FARM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12304/thumb/Harvest.png?1613016180",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12304/thumb/Harvest.png?1613016180",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9791,7 +9791,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Fetch ai",
       "symbol": "FET",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9806,7 +9806,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stafi",
       "symbol": "FIS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12423/thumb/stafi_logo.jpg?1599730991",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12423/thumb/stafi_logo.jpg?1599730991",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9821,7 +9821,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "FLOKI",
       "symbol": "FLOKI",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/16746/standard/PNG_image.png?1696516318",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/16746/standard/PNG_image.png?1696516318",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9836,7 +9836,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Forta",
       "symbol": "FORT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/25060/thumb/Forta_lgo_%281%29.png?1655353696",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/25060/thumb/Forta_lgo_%281%29.png?1655353696",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9851,7 +9851,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ampleforth Governance Token",
       "symbol": "FORTH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14917/thumb/photo_2021-04-22_00.00.03.jpeg?1619020835",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14917/thumb/photo_2021-04-22_00.00.03.jpeg?1619020835",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9866,7 +9866,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ShapeShift FOX Token",
       "symbol": "FOX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9988/thumb/FOX.png?1574330622",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9988/thumb/FOX.png?1574330622",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9881,7 +9881,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax",
       "symbol": "FRAX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13422/thumb/frax_logo.png?1608476506",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13422/thumb/frax_logo.png?1608476506",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9896,7 +9896,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Fantom",
       "symbol": "FTM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4001/thumb/Fantom.png?1558015016",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4001/thumb/Fantom.png?1558015016",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9911,7 +9911,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Function X",
       "symbol": "FX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/8186/thumb/47271330_590071468072434_707260356350705664_n.jpg?1556096683",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8186/thumb/47271330_590071468072434_707260356350705664_n.jpg?1556096683",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9926,7 +9926,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax Share",
       "symbol": "FXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13423/thumb/frax_share.png?1608478989",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13423/thumb/frax_share.png?1608478989",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9941,7 +9941,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gravity",
       "symbol": "G",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/39200/large/gravity.jpg?1721020647",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/39200/large/gravity.jpg?1721020647",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9956,7 +9956,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Galxe",
       "symbol": "GAL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/24530/thumb/GAL-Token-Icon.png?1651483533",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24530/thumb/GAL-Token-Icon.png?1651483533",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9971,7 +9971,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "GALA",
       "symbol": "GALA",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/12493/standard/GALA-COINGECKO.png?1696512310",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12493/standard/GALA-COINGECKO.png?1696512310",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -9986,7 +9986,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Goldfinch",
       "symbol": "GFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19081/thumb/GOLDFINCH.png?1634369662",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19081/thumb/GOLDFINCH.png?1634369662",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10001,7 +10001,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aavegotchi",
       "symbol": "GHST",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12467/thumb/ghst_200.png?1600750321",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12467/thumb/ghst_200.png?1600750321",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10016,7 +10016,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Golem",
       "symbol": "GLM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/542/thumb/Golem_Submark_Positive_RGB.png?1606392013",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/542/thumb/Golem_Submark_Positive_RGB.png?1606392013",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10031,7 +10031,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "GNO",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6810e776880C02933D47DB1b9fc05908e5386b96/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6810e776880C02933D47DB1b9fc05908e5386b96/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10046,7 +10046,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gods Unchained",
       "symbol": "GODS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17139/thumb/10631.png?1635718182",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17139/thumb/10631.png?1635718182",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10061,7 +10061,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "The Graph",
       "symbol": "GRT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10076,7 +10076,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gitcoin",
       "symbol": "GTC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15810/thumb/gitcoin.png?1621992929",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15810/thumb/gitcoin.png?1621992929",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10091,7 +10091,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gemini Dollar",
       "symbol": "GUSD",
       "decimals": 2,
-      "logoURI": "https://assets.coingecko.com/coins/images/5992/thumb/gemini-dollar-gusd.png?1536745278",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5992/thumb/gemini-dollar-gusd.png?1536745278",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10106,7 +10106,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "GYEN",
       "symbol": "GYEN",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/14191/thumb/icon_gyen_200_200.png?1614843343",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14191/thumb/icon_gyen_200_200.png?1614843343",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10121,7 +10121,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Hashflow",
       "symbol": "HFT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26136/large/hashflow-icon-cmc.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26136/large/hashflow-icon-cmc.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10136,7 +10136,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Highstreet",
       "symbol": "HIGH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18973/thumb/logosq200200Coingecko.png?1634090470",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18973/thumb/logosq200200Coingecko.png?1634090470",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10149,7 +10149,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "HOPR",
       "symbol": "HOPR",
-      "logoURI": "https://assets.coingecko.com/coins/images/14061/thumb/Shared_HOPR_logo_512px.png?1614073468",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14061/thumb/Shared_HOPR_logo_512px.png?1614073468",
       "address": "0xc32C0c5a52F36D244C552E45C485cBceaf385B36",
       "decimals": 18,
       "extensions": {
@@ -10166,7 +10166,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "IDEX",
       "symbol": "IDEX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2565/thumb/logomark-purple-286x286.png?1638362736",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2565/thumb/logomark-purple-286x286.png?1638362736",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10181,7 +10181,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Illuvium",
       "symbol": "ILV",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14468/large/ILV.JPG",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14468/large/ILV.JPG",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10196,7 +10196,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Immutable X",
       "symbol": "IMX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17233/thumb/imx.png?1636691817",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17233/thumb/imx.png?1636691817",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10209,7 +10209,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Index Cooperative",
       "symbol": "INDEX",
-      "logoURI": "https://assets.coingecko.com/coins/images/12729/thumb/index.png?1634894321",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12729/thumb/index.png?1634894321",
       "address": "0xa5Afe7646f07d2C41AA82Bb6AE09e99E121e39B7",
       "decimals": 18,
       "extensions": {
@@ -10226,7 +10226,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Injective",
       "symbol": "INJ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12882/thumb/Secondary_Symbol.png?1628233237",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12882/thumb/Secondary_Symbol.png?1628233237",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10241,7 +10241,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Inverse Finance",
       "symbol": "INV",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14205/thumb/inverse_finance.jpg?1614921871",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14205/thumb/inverse_finance.jpg?1614921871",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10256,7 +10256,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "IoTeX",
       "symbol": "IOTX",
       "decimals": 18,
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/2777.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/2777.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10269,7 +10269,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Geojam",
       "symbol": "JAM",
-      "logoURI": "https://assets.coingecko.com/coins/images/24648/thumb/ey40AzBN_400x400.jpg?1648507272",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24648/thumb/ey40AzBN_400x400.jpg?1648507272",
       "address": "0x428c2B7Fa7a7821891fb529BAE4d80a71d5c61A8",
       "decimals": 18,
       "extensions": {
@@ -10286,7 +10286,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "JasmyCoin",
       "symbol": "JASMY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13876/thumb/JASMY200x200.jpg?1612473259",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13876/thumb/JASMY200x200.jpg?1612473259",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10299,7 +10299,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Jupiter",
       "symbol": "JUP",
-      "logoURI": "https://assets.coingecko.com/coins/images/10351/thumb/logo512.png?1632480932",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10351/thumb/logo512.png?1632480932",
       "address": "0x781CC305fCBFe7cde376C9Ef5469d5a7E5CaB8b2",
       "decimals": 18,
       "extensions": {
@@ -10316,7 +10316,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Keep Network",
       "symbol": "KEEP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3373/thumb/IuNzUb5b_400x400.jpg?1589526336",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3373/thumb/IuNzUb5b_400x400.jpg?1589526336",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10329,7 +10329,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "SelfKey",
       "symbol": "KEY",
-      "logoURI": "https://assets.coingecko.com/coins/images/2034/thumb/selfkey.png?1548608934",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2034/thumb/selfkey.png?1548608934",
       "address": "0x68Cea24F675e4F25584607F6c9feFb353f1bBfDc",
       "decimals": 18,
       "extensions": {
@@ -10346,7 +10346,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "KNC",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdd974D5C2e2928deA5F71b9825b8b646686BD200/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdd974D5C2e2928deA5F71b9825b8b646686BD200/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10361,7 +10361,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Keep3rV1",
       "symbol": "KP3R",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12966/thumb/kp3r_logo.jpg?1607057458",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12966/thumb/kp3r_logo.jpg?1607057458",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10376,7 +10376,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "KRYLL",
       "symbol": "KRL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2807/thumb/krl.png?1547036979",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2807/thumb/krl.png?1547036979",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10391,7 +10391,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Kujira",
       "symbol": "KUJI",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/20685/standard/kuji-200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20685/standard/kuji-200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10406,7 +10406,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Layer3",
       "symbol": "L3",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/37768/large/Square.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/37768/large/Square.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10421,7 +10421,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LCX",
       "symbol": "LCX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9985/thumb/zRPSu_0o_400x400.jpg?1574327008",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9985/thumb/zRPSu_0o_400x400.jpg?1574327008",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10436,7 +10436,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Lido DAO",
       "symbol": "LDO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13573/thumb/Lido_DAO.png?1609873644",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13573/thumb/Lido_DAO.png?1609873644",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10451,7 +10451,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LINK",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10466,7 +10466,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Litentry",
       "symbol": "LIT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13825/large/logo_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13825/large/logo_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10479,7 +10479,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "League of Kingdoms",
       "symbol": "LOKA",
-      "logoURI": "https://assets.coingecko.com/coins/images/22572/thumb/loka_64pix.png?1642643271",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22572/thumb/loka_64pix.png?1642643271",
       "address": "0x1D1BFCFC6ae6FE045f151C7e589fB241AAC89733",
       "decimals": 18,
       "extensions": {
@@ -10496,7 +10496,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LOOM",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA4e8C3Ec456107eA67d3075bF9e3DF3A75823DB0/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA4e8C3Ec456107eA67d3075bF9e3DF3A75823DB0/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10511,7 +10511,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Livepeer",
       "symbol": "LPT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/7137/thumb/logo-circle-green.png?1619593365",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/7137/thumb/logo-circle-green.png?1619593365",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10526,7 +10526,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Liquity",
       "symbol": "LQTY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14665/thumb/200-lqty-icon.png?1617631180",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14665/thumb/200-lqty-icon.png?1617631180",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10541,7 +10541,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LRC",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10556,7 +10556,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BLOCKLORDS",
       "symbol": "LRDS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/34775/standard/LRDS_PNG.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/34775/standard/LRDS_PNG.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10571,7 +10571,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Lisk",
       "symbol": "LSK",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/385/large/Lisk_logo.png?1722338450",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/385/large/Lisk_logo.png?1722338450",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10584,7 +10584,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Liquity USD",
       "symbol": "LUSD",
-      "logoURI": "https://assets.coingecko.com/coins/images/14666/thumb/Group_3.png?1617631327",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14666/thumb/Group_3.png?1617631327",
       "address": "0xf81B7485B4cB59645F74528D702c7f8CD72577FB",
       "decimals": 18,
       "extensions": {
@@ -10601,7 +10601,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Decentraland",
       "symbol": "MANA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/878/thumb/decentraland-mana.png?1550108745",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/878/thumb/decentraland-mana.png?1550108745",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10616,7 +10616,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mask Network",
       "symbol": "MASK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10629,7 +10629,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "MATH",
       "symbol": "MATH",
-      "logoURI": "https://assets.coingecko.com/coins/images/11335/thumb/2020-05-19-token-200.png?1589940590",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11335/thumb/2020-05-19-token-200.png?1589940590",
       "address": "0xB999b66186d7a48BF0Eb5d22f4E7053A99eD2C97",
       "decimals": 18,
       "extensions": {
@@ -10646,7 +10646,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polygon",
       "symbol": "MATIC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4713/thumb/matic-token-icon.png?1624446912",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4713/thumb/matic-token-icon.png?1624446912",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10661,7 +10661,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Merit Circle",
       "symbol": "MC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19304/thumb/Db4XqML.png?1634972154",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19304/thumb/Db4XqML.png?1634972154",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10676,7 +10676,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Moss Carbon Credit",
       "symbol": "MCO2",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14414/thumb/ENtxnThA_400x400.jpg?1615948522",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14414/thumb/ENtxnThA_400x400.jpg?1615948522",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10691,7 +10691,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Measurable Data Token",
       "symbol": "MDT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2441/thumb/mdt_logo.png?1569813574",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2441/thumb/mdt_logo.png?1569813574",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10706,7 +10706,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Memecoin",
       "symbol": "MEME",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/32528/large/memecoin_(2).png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/32528/large/memecoin_(2).png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10719,7 +10719,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Metis",
       "symbol": "METIS",
-      "logoURI": "https://assets.coingecko.com/coins/images/15595/thumb/metis.jpeg?1660285312",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15595/thumb/metis.jpeg?1660285312",
       "address": "0xBfBa2A8745e5C85544DB7C8824C6962aB3A8f102",
       "decimals": 18,
       "extensions": {
@@ -10736,7 +10736,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Magic Internet Money",
       "symbol": "MIM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10751,7 +10751,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mirror Protocol",
       "symbol": "MIR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13295/thumb/mirror_logo_transparent.png?1611554658",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13295/thumb/mirror_logo_transparent.png?1611554658",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10766,7 +10766,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Melon",
       "symbol": "MLN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/605/thumb/melon.png?1547034295",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/605/thumb/melon.png?1547034295",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10781,7 +10781,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mog Coin",
       "symbol": "MOG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/31059/large/MOG_LOGO_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/31059/large/MOG_LOGO_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10794,7 +10794,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Monavale",
       "symbol": "MONA",
-      "logoURI": "https://assets.coingecko.com/coins/images/13298/thumb/monavale_logo.jpg?1607232721",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13298/thumb/monavale_logo.jpg?1607232721",
       "address": "0xAe6065FB0244A68036C82deC9a8dE5501c7A1087",
       "decimals": 18,
       "extensions": {
@@ -10811,7 +10811,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Movement",
       "symbol": "MOVE",
       "decimals": 8,
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/32452.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/32452.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10826,7 +10826,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Maple",
       "symbol": "MPL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14097/thumb/photo_2021-05-03_14.20.41.jpeg?1620022863",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14097/thumb/photo_2021-05-03_14.20.41.jpeg?1620022863",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10839,7 +10839,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Metal",
       "symbol": "MTL",
-      "logoURI": "https://assets.coingecko.com/coins/images/763/thumb/Metal.png?1592195010",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/763/thumb/Metal.png?1592195010",
       "address": "0x71d69d07914d087f1C3536F7A5006a256CfAd9Ea",
       "decimals": 8,
       "extensions": {
@@ -10856,7 +10856,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Multichain",
       "symbol": "MULTI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/22087/thumb/1_Wyot-SDGZuxbjdkaOeT2-A.png?1640764238",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22087/thumb/1_Wyot-SDGZuxbjdkaOeT2-A.png?1640764238",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10871,7 +10871,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "mStable USD",
       "symbol": "MUSD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11576/thumb/mStable_USD.png?1595591803",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11576/thumb/mStable_USD.png?1595591803",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10884,7 +10884,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Muse DAO",
       "symbol": "MUSE",
-      "logoURI": "https://assets.coingecko.com/coins/images/13230/thumb/muse_logo.png?1606460453",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13230/thumb/muse_logo.png?1606460453",
       "address": "0xe3d92FB06a4EEbaC5879D3C1073e0eAB81D5f345",
       "decimals": 18,
       "extensions": {
@@ -10899,7 +10899,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "GensoKishi Metaverse",
       "symbol": "MV",
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/17704.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/17704.png",
       "address": "0xD6ec6A24d5365A1811B05099f8D353c0Ff182974",
       "decimals": 18,
       "extensions": {
@@ -10914,7 +10914,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "MXC",
       "symbol": "MXC",
-      "logoURI": "https://assets.coingecko.com/coins/images/4604/thumb/mxc.png?1655534336",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4604/thumb/mxc.png?1655534336",
       "address": "0xCF7c45Ccc1327ac1E9Cb9E098898c59402727794",
       "decimals": 18,
       "extensions": {
@@ -10931,7 +10931,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PolySwarm",
       "symbol": "NCT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2843/thumb/ImcYCVfX_400x400.jpg?1628519767",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2843/thumb/ImcYCVfX_400x400.jpg?1628519767",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10946,7 +10946,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Neiro",
       "symbol": "Neiro",
       "decimals": 9,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/39488/large/neiro.jpg?1731449567",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/39488/large/neiro.jpg?1731449567",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10961,7 +10961,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "NKN",
       "symbol": "NKN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3375/thumb/nkn.png?1548329212",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3375/thumb/nkn.png?1548329212",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10976,7 +10976,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "NMR",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1776e1F26f98b1A5dF9cD347953a26dd3Cb46671/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1776e1F26f98b1A5dF9cD347953a26dd3Cb46671/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -10991,7 +10991,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "NuCypher",
       "symbol": "NU",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3318/thumb/photo1198982838879365035.jpg?1547037916",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3318/thumb/photo1198982838879365035.jpg?1547037916",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11006,7 +11006,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ocean Protocol",
       "symbol": "OCEAN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3687/thumb/ocean-protocol-logo.jpg?1547038686",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3687/thumb/ocean-protocol-logo.jpg?1547038686",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11021,7 +11021,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Origin Protocol",
       "symbol": "OGN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3296/thumb/op.jpg?1547037878",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3296/thumb/op.jpg?1547037878",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11036,7 +11036,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "OMG Network",
       "symbol": "OMG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/776/thumb/OMG_Network.jpg?1591167168",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/776/thumb/OMG_Network.jpg?1591167168",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11051,7 +11051,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Omni Network",
       "symbol": "OMNI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/36465/standard/Symbol-Color.png?1711511095",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/36465/standard/Symbol-Color.png?1711511095",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11066,7 +11066,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ondo Finance",
       "symbol": "ONDO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26580/standard/ONDO.png?1696525656",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26580/standard/ONDO.png?1696525656",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11081,7 +11081,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ORCA Alliance",
       "symbol": "ORCA",
       "decimals": 18,
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/5183.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/5183.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11096,7 +11096,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Orion Protocol",
       "symbol": "ORN",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/11841/thumb/orion_logo.png?1594943318",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11841/thumb/orion_logo.png?1594943318",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11111,7 +11111,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "OXT",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x4575f41308EC1483f3d399aa9a2826d74Da13Deb/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x4575f41308EC1483f3d399aa9a2826d74Da13Deb/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11126,7 +11126,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PayperEx",
       "symbol": "PAX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1601/thumb/pax.png?1547035800",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1601/thumb/pax.png?1547035800",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11141,7 +11141,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PAX Gold",
       "symbol": "PAXG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9519/thumb/paxg.PNG?1568542565",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9519/thumb/paxg.PNG?1568542565",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11156,7 +11156,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PlayDapp",
       "symbol": "PDA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14316/standard/PDA-symbol.png?1710234068",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14316/standard/PDA-symbol.png?1710234068",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11171,7 +11171,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pepe",
       "symbol": "PEPE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/29850/large/pepe-token.jpeg?1682922725",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/29850/large/pepe-token.jpeg?1682922725",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11186,7 +11186,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Perpetual Protocol",
       "symbol": "PERP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11201,7 +11201,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pirate Nation",
       "symbol": "PIRATE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/38524/standard/_Pirate_Transparent_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/38524/standard/_Pirate_Transparent_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11216,7 +11216,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pluton",
       "symbol": "PLU",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1241/thumb/pluton.png?1548331624",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1241/thumb/pluton.png?1548331624",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11231,7 +11231,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polygon Ecosystem Token",
       "symbol": "POL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/32440/large/polygon.png?1698233684",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/32440/large/polygon.png?1698233684",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11246,7 +11246,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polkastarter",
       "symbol": "POLS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12648/thumb/polkastarter.png?1609813702",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12648/thumb/polkastarter.png?1609813702",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11261,7 +11261,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polymath",
       "symbol": "POLY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2784/thumb/inKkF01.png?1605007034",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2784/thumb/inKkF01.png?1605007034",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11274,7 +11274,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Marlin",
       "symbol": "POND",
-      "logoURI": "https://assets.coingecko.com/coins/images/8903/thumb/POND_200x200.png?1622515451",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8903/thumb/POND_200x200.png?1622515451",
       "address": "0xA2a36541c5a54bd2815985418105091B4D4782d5",
       "decimals": 18,
       "extensions": {
@@ -11291,7 +11291,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Portal",
       "symbol": "PORTAL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/35436/standard/portal.jpeg",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/35436/standard/portal.jpeg",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11306,7 +11306,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Power Ledger",
       "symbol": "POWR",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/1104/thumb/power-ledger.png?1547035082",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1104/thumb/power-ledger.png?1547035082",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11321,7 +11321,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Prime",
       "symbol": "PRIME",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/29053/large/PRIMELOGOOO.png?1676976222",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/29053/large/PRIMELOGOOO.png?1676976222",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11336,7 +11336,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Propy",
       "symbol": "PRO",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/869/thumb/propy.png?1548332100",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/869/thumb/propy.png?1548332100",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11349,7 +11349,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "PARSIQ",
       "symbol": "PRQ",
-      "logoURI": "https://assets.coingecko.com/coins/images/11973/thumb/DsNgK0O.png?1596590280",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11973/thumb/DsNgK0O.png?1596590280",
       "address": "0xc7B7dcF3c6CAcAAc13F92c9173f9A0060ABf3def",
       "decimals": 18,
       "extensions": {
@@ -11364,7 +11364,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "pSTAKE Finance",
       "symbol": "PSTAKE",
-      "logoURI": "https://assets.coingecko.com/coins/images/23931/thumb/PSTAKE_Dark.png?1645709930",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/23931/thumb/PSTAKE_Dark.png?1645709930",
       "address": "0x13FE2c4504f3AA18708561250e2F20E4E7D7CAa2",
       "decimals": 18,
       "extensions": {
@@ -11381,7 +11381,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Puffer Finance",
       "symbol": "PUFFER",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/50630/large/puffer.jpg?1728545297",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/50630/large/puffer.jpg?1728545297",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11396,7 +11396,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PayPal USD",
       "symbol": "PYUSD",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/31212/large/PYUSD_Logo_%282%29.png?1691458314",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/31212/large/PYUSD_Logo_%282%29.png?1691458314",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11411,7 +11411,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quant",
       "symbol": "QNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3370/thumb/5ZOu7brX_400x400.jpg?1612437252",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3370/thumb/5ZOu7brX_400x400.jpg?1612437252",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11424,7 +11424,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Qredo",
       "symbol": "QRDO",
-      "logoURI": "https://assets.coingecko.com/coins/images/17541/thumb/qrdo.png?1630637735",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17541/thumb/qrdo.png?1630637735",
       "address": "0x006254C4664C678e64c3265da28304cc8c1068b8",
       "decimals": 8,
       "extensions": {
@@ -11441,7 +11441,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quantstamp",
       "symbol": "QSP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1219/thumb/0_E0kZjb4dG4hUnoDD_.png?1604815917",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1219/thumb/0_E0kZjb4dG4hUnoDD_.png?1604815917",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11456,7 +11456,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quickswap",
       "symbol": "QUICK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13970/thumb/1_pOU6pBMEmiL-ZJVb0CYRjQ.png?1613386659",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13970/thumb/1_pOU6pBMEmiL-ZJVb0CYRjQ.png?1613386659",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11471,7 +11471,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Radicle",
       "symbol": "RAD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14013/thumb/radicle.png?1614402918",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14013/thumb/radicle.png?1614402918",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11486,7 +11486,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rai Reflex Index",
       "symbol": "RAI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11501,7 +11501,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SuperRare",
       "symbol": "RARE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17753/thumb/RARE.jpg?1629220534",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17753/thumb/RARE.jpg?1629220534",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11516,7 +11516,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rarible",
       "symbol": "RARI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11845/thumb/Rari.png?1594946953",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11845/thumb/Rari.png?1594946953",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11531,7 +11531,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rubic",
       "symbol": "RBC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12629/thumb/200x200.png?1607952509",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12629/thumb/200x200.png?1607952509",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11546,7 +11546,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ribbon Finance",
       "symbol": "RBN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15823/thumb/RBN_64x64.png?1633529723",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15823/thumb/RBN_64x64.png?1633529723",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11561,7 +11561,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "REN",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x408e41876cCCDC0F92210600ef50372656052a38/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x408e41876cCCDC0F92210600ef50372656052a38/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11576,7 +11576,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "REP",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1985365e9f78359a9B6AD760e32412f4a445E862/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1985365e9f78359a9B6AD760e32412f4a445E862/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11591,7 +11591,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "REPv2",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x221657776846890989a759BA2973e427DfF5C9bB/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x221657776846890989a759BA2973e427DfF5C9bB/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11606,7 +11606,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Request",
       "symbol": "REQ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1031/thumb/Request_icon_green.png?1643250951",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1031/thumb/Request_icon_green.png?1643250951",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11619,7 +11619,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "REVV",
       "symbol": "REVV",
-      "logoURI": "https://assets.coingecko.com/coins/images/12373/thumb/REVV_TOKEN_Refined_2021_%281%29.png?1627652390",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12373/thumb/REVV_TOKEN_Refined_2021_%281%29.png?1627652390",
       "address": "0xc14a68015fA6396eF97B57839da544910f9Ca657",
       "decimals": 18,
       "extensions": {
@@ -11636,7 +11636,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Renzo",
       "symbol": "REZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/37327/standard/renzo_200x200.png?1714025012",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/37327/standard/renzo_200x200.png?1714025012",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11651,7 +11651,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rari Governance Token",
       "symbol": "RGT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12900/thumb/Rari_Logo_Transparent.png?1613978014",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12900/thumb/Rari_Logo_Transparent.png?1613978014",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11666,7 +11666,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "iExec RLC",
       "symbol": "RLC",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/646/thumb/pL1VuXm.png?1604543202",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/646/thumb/pL1VuXm.png?1604543202",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11681,7 +11681,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rally",
       "symbol": "RLY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12843/thumb/image.png?1611212077",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12843/thumb/image.png?1611212077",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11696,7 +11696,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Render Token",
       "symbol": "RNDR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11636/thumb/rndr.png?1638840934",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11636/thumb/rndr.png?1638840934",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11709,7 +11709,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Rook",
       "symbol": "ROOK",
-      "logoURI": "https://assets.coingecko.com/coins/images/13005/thumb/keeper_dao_logo.jpg?1604316506",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13005/thumb/keeper_dao_logo.jpg?1604316506",
       "address": "0x682B2f07e61022A80Ac2753448f7D95E9de41D99",
       "decimals": 18,
       "extensions": {
@@ -11726,7 +11726,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Reserve Rights",
       "symbol": "RSR",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/8365/large/RSR_Blue_Circle_1000.png?1721777856",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/8365/large/RSR_Blue_Circle_1000.png?1721777856",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11741,7 +11741,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Safe",
       "symbol": "SAFE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/27032/standard/Artboard_1_copy_8circle-1.png?1696526084",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/27032/standard/Artboard_1_copy_8circle-1.png?1696526084",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11756,7 +11756,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "The Sandbox",
       "symbol": "SAND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12129/thumb/sandbox_logo.jpg?1597397942",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12129/thumb/sandbox_logo.jpg?1597397942",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11771,7 +11771,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stader",
       "symbol": "SD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/20658/standard/SD_Token_Logo.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20658/standard/SD_Token_Logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11786,7 +11786,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Shiba Inu",
       "symbol": "SHIB",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11939/thumb/shiba.png?1622619446",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11939/thumb/shiba.png?1622619446",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11801,7 +11801,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Shping",
       "symbol": "SHPING",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2588/thumb/r_yabKKi_400x400.jpg?1639470164",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2588/thumb/r_yabKKi_400x400.jpg?1639470164",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11816,7 +11816,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SKALE",
       "symbol": "SKL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13245/thumb/SKALE_token_300x300.png?1606789574",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13245/thumb/SKALE_token_300x300.png?1606789574",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11831,7 +11831,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SKY Governance Token",
       "symbol": "SKY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/39925/large/sky.jpg?1724827980",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/39925/large/sky.jpg?1724827980",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11846,7 +11846,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Smooth Love Potion",
       "symbol": "SLP",
       "decimals": 0,
-      "logoURI": "https://assets.coingecko.com/coins/images/10366/thumb/SLP.png?1578640057",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10366/thumb/SLP.png?1578640057",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11861,7 +11861,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Status",
       "symbol": "SNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/779/thumb/status.png?1548610778",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/779/thumb/status.png?1548610778",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11876,7 +11876,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "SNX",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11891,7 +11891,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Unisocks",
       "symbol": "SOCKS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/10717/thumb/qFrcoiM.png?1582525244",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10717/thumb/qFrcoiM.png?1582525244",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11906,7 +11906,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SOL Wormhole ",
       "symbol": "SOL",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11921,7 +11921,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Spell Token",
       "symbol": "SPELL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15861/thumb/abracadabra-3.png?1622544862",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15861/thumb/abracadabra-3.png?1622544862",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11936,7 +11936,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SPX6900",
       "symbol": "SPX",
       "decimals": 8,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/31401/large/sticker_(1).jpg?1702371083",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/31401/large/sticker_(1).jpg?1702371083",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11949,7 +11949,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Stargate Finance",
       "symbol": "STG",
-      "logoURI": "https://assets.coingecko.com/coins/images/24413/thumb/STG_LOGO.png?1647654518",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24413/thumb/STG_LOGO.png?1647654518",
       "address": "0x77c8A8E1dd3b5270d3Ab589543e9A83319373135",
       "decimals": 18,
       "extensions": {
@@ -11966,7 +11966,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "STORJ",
       "decimals": 8,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xB64ef51C888972c908CFacf59B47C1AfBC0Ab8aC/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xB64ef51C888972c908CFacf59B47C1AfBC0Ab8aC/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11981,7 +11981,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Starknet",
       "symbol": "STRK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26433/standard/starknet.png?1696525507",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26433/standard/starknet.png?1696525507",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -11996,7 +11996,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stox",
       "symbol": "STX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1230/thumb/stox-token.png?1547035256",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1230/thumb/stox-token.png?1547035256",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12011,7 +12011,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SUKU",
       "symbol": "SUKU",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11969/thumb/UmfW5S6f_400x400.jpg?1596602238",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11969/thumb/UmfW5S6f_400x400.jpg?1596602238",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12026,7 +12026,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SuperFarm",
       "symbol": "SUPER",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14040/thumb/6YPdWn6.png?1613975899",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14040/thumb/6YPdWn6.png?1613975899",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12041,7 +12041,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "sUSD",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://assets.coingecko.com/coins/images/5013/thumb/sUSD.png?1616150765",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5013/thumb/sUSD.png?1616150765",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12056,7 +12056,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Sushi",
       "symbol": "SUSHI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12071,7 +12071,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Swell",
       "symbol": "SWELL",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/28777/large/swell1.png?1727899715",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/28777/large/swell1.png?1727899715",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12084,7 +12084,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "SWFTCOIN",
       "symbol": "SWFTC",
-      "logoURI": "https://assets.coingecko.com/coins/images/2346/thumb/SWFTCoin.jpg?1618392022",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2346/thumb/SWFTCoin.jpg?1618392022",
       "address": "0x0610cDF9856b8825213672981056CD4945Af1616",
       "decimals": 8,
       "extensions": {
@@ -12099,7 +12099,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Swipe",
       "symbol": "SXP",
-      "logoURI": "https://assets.coingecko.com/coins/images/9368/thumb/swipe.png?1566792311",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9368/thumb/swipe.png?1566792311",
       "address": "0xDcA295E850666753c6332D6B0E0445B09785c2E1",
       "decimals": 18,
       "extensions": {
@@ -12114,7 +12114,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Sylo",
       "symbol": "SYLO",
-      "logoURI": "https://assets.coingecko.com/coins/images/6430/thumb/SYLO.svg?1589527756",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/6430/thumb/SYLO.svg?1589527756",
       "address": "0x1BAAc1979527A38F367c6f89bE081aBfcFFCF85E",
       "decimals": 18,
       "extensions": {
@@ -12131,7 +12131,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Synapse",
       "symbol": "SYN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18024/thumb/syn.png?1635002049",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18024/thumb/syn.png?1635002049",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12146,7 +12146,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Syrup Token",
       "symbol": "SYRUP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/51232/standard/IMG_7420.png?1730831572",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/51232/standard/IMG_7420.png?1730831572",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12159,7 +12159,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Threshold Network",
       "symbol": "T",
-      "logoURI": "https://assets.coingecko.com/coins/images/22228/thumb/nFPNiSbL_400x400.jpg?1641220340",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22228/thumb/nFPNiSbL_400x400.jpg?1641220340",
       "address": "0x8F43Ab8648F1a3BAEea3782Ba5f562a148f2Ad54",
       "decimals": 18,
       "extensions": {
@@ -12176,7 +12176,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "tBTC",
       "symbol": "tBTC",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/uniswap/assets/master/blockchains/ethereum/assets/0x18084fbA666a33d37592fA2633fD49a74DD93a88/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/uniswap/assets/master/blockchains/ethereum/assets/0x18084fbA666a33d37592fA2633fD49a74DD93a88/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12189,7 +12189,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "ChronoTech",
       "symbol": "TIME",
-      "logoURI": "https://assets.coingecko.com/coins/images/604/thumb/time-32x32.png?1627130666",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/604/thumb/time-32x32.png?1627130666",
       "address": "0xD9Cbd701bbEA8e9Aaee7d82aa60748451eDa749c",
       "decimals": 8,
       "extensions": {
@@ -12204,7 +12204,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Alien Worlds",
       "symbol": "TLM",
-      "logoURI": "https://assets.coingecko.com/coins/images/14676/thumb/kY-C4o7RThfWrDQsLCAG4q4clZhBDDfJQVhWUEKxXAzyQYMj4Jmq1zmFwpRqxhAJFPOa0AsW_PTSshoPuMnXNwq3rU7Imp15QimXTjlXMx0nC088mt1rIwRs75GnLLugWjSllxgzvQ9YrP4tBgclK4_rb17hjnusGj_c0u2fx0AvVokjSNB-v2poTj0xT9BZRCbzRE3-lF1.jpg?1617700061",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14676/thumb/kY-C4o7RThfWrDQsLCAG4q4clZhBDDfJQVhWUEKxXAzyQYMj4Jmq1zmFwpRqxhAJFPOa0AsW_PTSshoPuMnXNwq3rU7Imp15QimXTjlXMx0nC088mt1rIwRs75GnLLugWjSllxgzvQ9YrP4tBgclK4_rb17hjnusGj_c0u2fx0AvVokjSNB-v2poTj0xT9BZRCbzRE3-lF1.jpg?1617700061",
       "address": "0xd649b9AD2104418B5b032a5899fBcd54a9a46c68",
       "decimals": 4,
       "extensions": {
@@ -12221,7 +12221,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tokemak",
       "symbol": "TOKE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17495/thumb/tokemak-avatar-200px-black.png?1628131614",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17495/thumb/tokemak-avatar-200px-black.png?1628131614",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12234,7 +12234,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "TE FOOD",
       "symbol": "TONE",
-      "logoURI": "https://assets.coingecko.com/coins/images/2325/thumb/tec.png?1547036538",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2325/thumb/tec.png?1547036538",
       "address": "0x502865ECDd2a2929Aa9418297bE7d3C4a7BD5Ac6",
       "decimals": 18,
       "extensions": {
@@ -12251,7 +12251,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "OriginTrail",
       "symbol": "TRAC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1877/thumb/TRAC.jpg?1635134367",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1877/thumb/TRAC.jpg?1635134367",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12266,7 +12266,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tellor",
       "symbol": "TRB",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12281,7 +12281,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tribe",
       "symbol": "TRIBE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14575/thumb/tribe.PNG?1617487954",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14575/thumb/tribe.PNG?1617487954",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12296,7 +12296,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "TrueFi",
       "symbol": "TRU",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/13180/thumb/truefi_glyph_color.png?1617610941",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13180/thumb/truefi_glyph_color.png?1617610941",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12311,7 +12311,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Turbo",
       "symbol": "TURBO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/30117/large/TurboMark-QL_200.png?1708079597",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/30117/large/TurboMark-QL_200.png?1708079597",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12324,7 +12324,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "The Virtua Kolect",
       "symbol": "TVK",
-      "logoURI": "https://assets.coingecko.com/coins/images/13330/thumb/virtua_original.png?1656043619",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13330/thumb/virtua_original.png?1656043619",
       "address": "0x756fb781389DCaF9D3BC5468927F06A913bD9D5D",
       "decimals": 18,
       "extensions": {
@@ -12341,7 +12341,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "UMA",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12356,7 +12356,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Unifi Protocol DAO",
       "symbol": "UNFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13152/thumb/logo-2.png?1605748967",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13152/thumb/logo-2.png?1605748967",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12386,7 +12386,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pawtocol",
       "symbol": "UPI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12186/thumb/pawtocol.jpg?1597962008",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12186/thumb/pawtocol.jpg?1597962008",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12401,7 +12401,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDC",
       "decimals": 6,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12416,7 +12416,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Global Dollar",
       "symbol": "USDG",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/51281/large/GDN_USDG_Token_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/51281/large/GDN_USDG_Token_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12431,7 +12431,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pax Dollar",
       "symbol": "USDP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/6013/standard/Pax_Dollar.png?1696506427",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/6013/standard/Pax_Dollar.png?1696506427",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12446,7 +12446,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quantoz USDQ",
       "symbol": "USDQ",
       "decimals": 6,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/51852/large/USDQ_1000px_Color.png?1732071232",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/51852/large/USDQ_1000px_Color.png?1732071232",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12461,7 +12461,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "StablR USD",
       "symbol": "USDR",
       "decimals": 6,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/53721/large/stablrusd-logo.png?1737126629",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/53721/large/stablrusd-logo.png?1737126629",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12476,7 +12476,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "USDS Stablecoin",
       "symbol": "USDS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/39926/large/usds.webp?1726666683",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/39926/large/usds.webp?1726666683",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12491,7 +12491,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDT",
       "decimals": 6,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12506,7 +12506,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "USUAL",
       "symbol": "USUAL",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/51091/large/USUAL.jpg?1730035787",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/51091/large/USUAL.jpg?1730035787",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12521,7 +12521,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "VANRY",
       "symbol": "VANRY",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/33466/large/apple-touch-icon.png?1701942541",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/33466/large/apple-touch-icon.png?1701942541",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12536,7 +12536,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Voyager Token",
       "symbol": "VGX",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/794/thumb/Voyager-vgx.png?1575693595",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/794/thumb/Voyager-vgx.png?1575693595",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12549,7 +12549,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Wrapped Ampleforth",
       "symbol": "WAMPL",
-      "logoURI": "https://assets.coingecko.com/coins/images/20825/thumb/photo_2021-11-25_02-05-11.jpg?1637811951",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20825/thumb/photo_2021-11-25_02-05-11.jpg?1637811951",
       "address": "0xb86a08ec917EeF9f835aC2B26c3a506c06364A49",
       "decimals": 18,
       "extensions": {
@@ -12566,7 +12566,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WBTC",
       "decimals": 8,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12579,7 +12579,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Wrapped Centrifuge",
       "symbol": "WCFG",
-      "logoURI": "https://assets.coingecko.com/coins/images/17106/thumb/WCFG.jpg?1626266462",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17106/thumb/WCFG.jpg?1626266462",
       "address": "0xaE87B8eb5E313AC72B306CbA7c1E3f23D72e82C4",
       "decimals": 18,
       "extensions": {
@@ -12594,7 +12594,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "WOO Network",
       "symbol": "WOO",
-      "logoURI": "https://assets.coingecko.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
       "address": "0xef22b9df2dDf4246A827575C4Aa46BDaeFd89E62",
       "decimals": 18,
       "extensions": {
@@ -12609,7 +12609,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Chain",
       "symbol": "XCN",
-      "logoURI": "https://assets.coingecko.com/coins/images/24210/thumb/Chain_icon_200x200.png?1646895054",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24210/thumb/Chain_icon_200x200.png?1646895054",
       "address": "0x15261eEb999eD3C3ae3c5319E0035940dc06a12f",
       "decimals": 18,
       "extensions": {
@@ -12626,7 +12626,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "XSGD",
       "symbol": "XSGD",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/12832/standard/StraitsX_Singapore_Dollar_%28XSGD%29_Token_Logo.png?1696512623",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12832/standard/StraitsX_Singapore_Dollar_%28XSGD%29_Token_Logo.png?1696512623",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12641,7 +12641,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "XYO Network",
       "symbol": "XYO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4519/thumb/XYO_Network-logo.png?1547039819",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4519/thumb/XYO_Network-logo.png?1547039819",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12656,7 +12656,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "yearn finance",
       "symbol": "YFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12671,7 +12671,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DFI money",
       "symbol": "YFII",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11902/thumb/YFII-logo.78631676.png?1598677348",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11902/thumb/YFII-logo.78631676.png?1598677348",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12684,7 +12684,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 130,
       "name": "Yield Guild Games",
       "symbol": "YGG",
-      "logoURI": "https://assets.coingecko.com/coins/images/17358/thumb/le1nzlO6_400x400.jpg?1632465691",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17358/thumb/le1nzlO6_400x400.jpg?1632465691",
       "address": "0xeA20C2Cf22acBbF3d8311D15bC73FD7076E36f4B",
       "decimals": 18,
       "extensions": {
@@ -12701,7 +12701,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Zetachain",
       "symbol": "Zeta",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26718/standard/Twitter_icon.png?1696525788",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26718/standard/Twitter_icon.png?1696525788",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12716,7 +12716,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LayerZero",
       "symbol": "ZRO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12731,7 +12731,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "ZRX",
       "decimals": 18,
       "chainId": 130,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12746,7 +12746,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "1inch",
       "symbol": "1INCH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13469/thumb/1inch-token.png?1608803028",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13469/thumb/1inch-token.png?1608803028",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12761,7 +12761,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aave",
       "symbol": "AAVE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12645/thumb/AAVE.png?1601374110",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12645/thumb/AAVE.png?1601374110",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12776,7 +12776,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Across Protocol Token",
       "symbol": "ACX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28161/large/across-200x200.png?1696527165",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28161/large/across-200x200.png?1696527165",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12791,7 +12791,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ambire AdEx",
       "symbol": "ADX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/847/thumb/Ambire_AdEx_Symbol_color.png?1655432540",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/847/thumb/Ambire_AdEx_Symbol_color.png?1655432540",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12806,7 +12806,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "agEur",
       "symbol": "agEUR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19479/standard/agEUR.png?1696518915",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19479/standard/agEUR.png?1696518915",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12821,7 +12821,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Adventure Gold",
       "symbol": "AGLD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18125/thumb/lpgblc4h_400x400.jpg?1630570955",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18125/thumb/lpgblc4h_400x400.jpg?1630570955",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12836,7 +12836,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "AIOZ Network",
       "symbol": "AIOZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14631/thumb/aioz_logo.png?1617413126",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14631/thumb/aioz_logo.png?1617413126",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12851,7 +12851,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alchemix",
       "symbol": "ALCX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14113/thumb/Alchemix.png?1614409874",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14113/thumb/Alchemix.png?1614409874",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12866,7 +12866,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aleph im",
       "symbol": "ALEPH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11676/thumb/Monochram-aleph.png?1608483725",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11676/thumb/Monochram-aleph.png?1608483725",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12881,7 +12881,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alethea Artificial Liquid Intelligence",
       "symbol": "ALI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/22062/thumb/alethea-logo-transparent-colored.png?1642748848",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22062/thumb/alethea-logo-transparent-colored.png?1642748848",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12896,7 +12896,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "My Neighbor Alice",
       "symbol": "ALICE",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/14375/thumb/alice_logo.jpg?1615782968",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14375/thumb/alice_logo.jpg?1615782968",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12911,7 +12911,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alpha Venture DAO",
       "symbol": "ALPHA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12926,7 +12926,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Amp",
       "symbol": "AMP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12409/thumb/amp-200x200.png?1599625397",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12409/thumb/amp-200x200.png?1599625397",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12941,7 +12941,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ankr",
       "symbol": "ANKR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12956,7 +12956,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "ANT",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://assets.coingecko.com/coins/images/681/thumb/JelZ58cv_400x400.png?1601449653",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/681/thumb/JelZ58cv_400x400.png?1601449653",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12971,7 +12971,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ApeCoin",
       "symbol": "APE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/24383/small/apecoin.jpg?1647476455",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24383/small/apecoin.jpg?1647476455",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -12986,7 +12986,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "API3",
       "symbol": "API3",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13256/thumb/api3.jpg?1606751424",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13256/thumb/api3.jpg?1606751424",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13001,7 +13001,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ARPA Chain",
       "symbol": "ARPA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13016,7 +13016,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "AirSwap",
       "symbol": "AST",
       "decimals": 4,
-      "logoURI": "https://assets.coingecko.com/coins/images/1019/thumb/Airswap.png?1630903484",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1019/thumb/Airswap.png?1630903484",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13031,7 +13031,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Automata",
       "symbol": "ATA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15985/thumb/ATA.jpg?1622535745",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15985/thumb/ATA.jpg?1622535745",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13046,7 +13046,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Audius",
       "symbol": "AUDIO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12913/thumb/AudiusCoinLogo_2x.png?1603425727",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12913/thumb/AudiusCoinLogo_2x.png?1603425727",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13061,7 +13061,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Axie Infinity",
       "symbol": "AXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13029/thumb/axie_infinity_logo.png?1604471082",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13029/thumb/axie_infinity_logo.png?1604471082",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13076,7 +13076,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Badger DAO",
       "symbol": "BADGER",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13287/thumb/badger_dao_logo.jpg?1607054976",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13287/thumb/badger_dao_logo.jpg?1607054976",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13091,7 +13091,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "BAL",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13106,7 +13106,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Band Protocol",
       "symbol": "BAND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9545/thumb/band-protocol.png?1568730326",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9545/thumb/band-protocol.png?1568730326",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13121,7 +13121,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Basic Attention Token",
       "symbol": "BAT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/677/thumb/basic-attention-token.png?1547034427",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/677/thumb/basic-attention-token.png?1547034427",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13136,7 +13136,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Biconomy",
       "symbol": "BICO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/21061/thumb/biconomy_logo.jpg?1638269749",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/21061/thumb/biconomy_logo.jpg?1638269749",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13151,7 +13151,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Big Time",
       "symbol": "BIGTIME",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/32251/standard/-6136155493475923781_121.jpg?1696998691",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/32251/standard/-6136155493475923781_121.jpg?1696998691",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13166,7 +13166,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Bluzelle",
       "symbol": "BLZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2848/thumb/ColorIcon_3x.png?1622516510",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2848/thumb/ColorIcon_3x.png?1622516510",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13181,7 +13181,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "BNT",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1F573D6Fb3F13d689FF844B4cE37794d79a7FF1C/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1F573D6Fb3F13d689FF844B4cE37794d79a7FF1C/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13196,7 +13196,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Boba Network",
       "symbol": "BOBA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/20285/thumb/BOBA.png?1636811576",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20285/thumb/BOBA.png?1636811576",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13211,7 +13211,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BarnBridge",
       "symbol": "BOND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12811/thumb/barnbridge.jpg?1602728853",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12811/thumb/barnbridge.jpg?1602728853",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13226,7 +13226,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Binance USD",
       "symbol": "BUSD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9576/thumb/BUSD.png?1568947766",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9576/thumb/BUSD.png?1568947766",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13241,7 +13241,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Celer Network",
       "symbol": "CELR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4379/thumb/Celr.png?1554705437",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4379/thumb/Celr.png?1554705437",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13256,7 +13256,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Chromia",
       "symbol": "CHR",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/5000/thumb/Chromia.png?1559038018",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5000/thumb/Chromia.png?1559038018",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13271,7 +13271,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Chiliz",
       "symbol": "CHZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/8834/thumb/Chiliz.png?1561970540",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8834/thumb/Chiliz.png?1561970540",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13286,7 +13286,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "COMP",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13301,7 +13301,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Clearpool",
       "symbol": "CPOOL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19252/large/photo_2022-08-31_12.45.02.jpeg?1696518697",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19252/large/photo_2022-08-31_12.45.02.jpeg?1696518697",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13316,7 +13316,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Covalent",
       "symbol": "CQT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14168/thumb/covalent-cqt.png?1624545218",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14168/thumb/covalent-cqt.png?1624545218",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13331,7 +13331,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cronos",
       "symbol": "CRO",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/7310/thumb/oCw2s3GI_400x400.jpeg?1645172042",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/7310/thumb/oCw2s3GI_400x400.jpeg?1645172042",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13346,7 +13346,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "CRV",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13361,7 +13361,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cartesi",
       "symbol": "CTSI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11038/thumb/cartesi.png?1592288021",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11038/thumb/cartesi.png?1592288021",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13376,7 +13376,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cryptex Finance",
       "symbol": "CTX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14932/thumb/glossy_icon_-_C200px.png?1619073171",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14932/thumb/glossy_icon_-_C200px.png?1619073171",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13391,7 +13391,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Somnium Space CUBEs",
       "symbol": "CUBE",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/10687/thumb/CUBE_icon.png?1617026861",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10687/thumb/CUBE_icon.png?1617026861",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13406,7 +13406,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Civic",
       "symbol": "CVC",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/788/thumb/civic.png?1547034556",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/788/thumb/civic.png?1547034556",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13421,7 +13421,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Convex Finance",
       "symbol": "CVX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15585/thumb/convex.png?1621256328",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15585/thumb/convex.png?1621256328",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13436,7 +13436,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "DAI",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13451,7 +13451,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DerivaDAO",
       "symbol": "DDX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13453/thumb/ddx_logo.png?1608741641",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13453/thumb/ddx_logo.png?1608741641",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13466,7 +13466,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DexTools",
       "symbol": "DEXT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11603/thumb/dext.png?1605790188",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11603/thumb/dext.png?1605790188",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13481,7 +13481,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DIA",
       "symbol": "DIA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11955/thumb/image.png?1646041751",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11955/thumb/image.png?1646041751",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13496,7 +13496,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DeFi Pulse Index",
       "symbol": "DPI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12465/thumb/defi_pulse_index_set.png?1600051053",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12465/thumb/defi_pulse_index_set.png?1600051053",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13511,7 +13511,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "dYdX",
       "symbol": "DYDX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17500/thumb/hjnIm9bV.jpg?1628009360",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17500/thumb/hjnIm9bV.jpg?1628009360",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13526,7 +13526,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Dogelon Mars",
       "symbol": "ELON",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14962/thumb/6GxcPRo3_400x400.jpg?1619157413",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14962/thumb/6GxcPRo3_400x400.jpg?1619157413",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13541,7 +13541,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Enjin Coin",
       "symbol": "ENJ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1102/thumb/enjin-coin-logo.png?1547035078",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1102/thumb/enjin-coin-logo.png?1547035078",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13556,7 +13556,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethereum Name Service",
       "symbol": "ENS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19785/thumb/acatxTm8_400x400.jpg?1635850140",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19785/thumb/acatxTm8_400x400.jpg?1635850140",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13571,7 +13571,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethernity Chain",
       "symbol": "ERN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14238/thumb/LOGO_HIGH_QUALITY.png?1647831402",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14238/thumb/LOGO_HIGH_QUALITY.png?1647831402",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13586,7 +13586,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Euro Coin",
       "symbol": "EURC",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/26045/thumb/euro-coin.png?1655394420",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26045/thumb/euro-coin.png?1655394420",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13601,7 +13601,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Harvest Finance",
       "symbol": "FARM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12304/thumb/Harvest.png?1613016180",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12304/thumb/Harvest.png?1613016180",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13616,7 +13616,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Fetch ai",
       "symbol": "FET",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13631,7 +13631,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stafi",
       "symbol": "FIS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12423/thumb/stafi_logo.jpg?1599730991",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12423/thumb/stafi_logo.jpg?1599730991",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13646,7 +13646,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "FLOKI",
       "symbol": "FLOKI",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/16746/standard/PNG_image.png?1696516318",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/16746/standard/PNG_image.png?1696516318",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13661,7 +13661,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Forta",
       "symbol": "FORT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/25060/thumb/Forta_lgo_%281%29.png?1655353696",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/25060/thumb/Forta_lgo_%281%29.png?1655353696",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13676,7 +13676,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ampleforth Governance Token",
       "symbol": "FORTH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14917/thumb/photo_2021-04-22_00.00.03.jpeg?1619020835",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14917/thumb/photo_2021-04-22_00.00.03.jpeg?1619020835",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13691,7 +13691,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ShapeShift FOX Token",
       "symbol": "FOX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9988/thumb/FOX.png?1574330622",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9988/thumb/FOX.png?1574330622",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13706,7 +13706,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax",
       "symbol": "FRAX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13422/thumb/frax_logo.png?1608476506",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13422/thumb/frax_logo.png?1608476506",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13721,7 +13721,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Fantom",
       "symbol": "FTM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4001/thumb/Fantom.png?1558015016",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4001/thumb/Fantom.png?1558015016",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13736,7 +13736,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax Share",
       "symbol": "FXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13423/thumb/frax_share.png?1608478989",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13423/thumb/frax_share.png?1608478989",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13751,7 +13751,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aavegotchi",
       "symbol": "GHST",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12467/thumb/ghst_200.png?1600750321",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12467/thumb/ghst_200.png?1600750321",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13766,7 +13766,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Golem",
       "symbol": "GLM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/542/thumb/Golem_Submark_Positive_RGB.png?1606392013",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/542/thumb/Golem_Submark_Positive_RGB.png?1606392013",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13781,7 +13781,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "GNO",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6810e776880C02933D47DB1b9fc05908e5386b96/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6810e776880C02933D47DB1b9fc05908e5386b96/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13796,7 +13796,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gods Unchained",
       "symbol": "GODS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17139/thumb/10631.png?1635718182",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17139/thumb/10631.png?1635718182",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13811,7 +13811,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "The Graph",
       "symbol": "GRT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13826,7 +13826,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gitcoin",
       "symbol": "GTC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15810/thumb/gitcoin.png?1621992929",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15810/thumb/gitcoin.png?1621992929",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13841,7 +13841,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gemini Dollar",
       "symbol": "GUSD",
       "decimals": 2,
-      "logoURI": "https://assets.coingecko.com/coins/images/5992/thumb/gemini-dollar-gusd.png?1536745278",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5992/thumb/gemini-dollar-gusd.png?1536745278",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13856,7 +13856,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "GYEN",
       "symbol": "GYEN",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/14191/thumb/icon_gyen_200_200.png?1614843343",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14191/thumb/icon_gyen_200_200.png?1614843343",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13869,7 +13869,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "HOPR",
       "symbol": "HOPR",
-      "logoURI": "https://assets.coingecko.com/coins/images/14061/thumb/Shared_HOPR_logo_512px.png?1614073468",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14061/thumb/Shared_HOPR_logo_512px.png?1614073468",
       "address": "0x6cCBF3627b2C83AFEF05bf2F035E7f7B210Fe30D",
       "decimals": 18,
       "extensions": {
@@ -13886,7 +13886,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "IDEX",
       "symbol": "IDEX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2565/thumb/logomark-purple-286x286.png?1638362736",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2565/thumb/logomark-purple-286x286.png?1638362736",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13901,7 +13901,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Illuvium",
       "symbol": "ILV",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14468/large/ILV.JPG",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14468/large/ILV.JPG",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13916,7 +13916,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Immutable X",
       "symbol": "IMX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17233/thumb/imx.png?1636691817",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17233/thumb/imx.png?1636691817",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13929,7 +13929,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "Index Cooperative",
       "symbol": "INDEX",
-      "logoURI": "https://assets.coingecko.com/coins/images/12729/thumb/index.png?1634894321",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12729/thumb/index.png?1634894321",
       "address": "0xfBd8A3b908e764dBcD51e27992464B4432A1132b",
       "decimals": 18,
       "extensions": {
@@ -13946,7 +13946,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Injective",
       "symbol": "INJ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12882/thumb/Secondary_Symbol.png?1628233237",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12882/thumb/Secondary_Symbol.png?1628233237",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13961,7 +13961,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Inverse Finance",
       "symbol": "INV",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14205/thumb/inverse_finance.jpg?1614921871",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14205/thumb/inverse_finance.jpg?1614921871",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13976,7 +13976,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "IoTeX",
       "symbol": "IOTX",
       "decimals": 18,
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/2777.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/2777.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -13991,7 +13991,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "JasmyCoin",
       "symbol": "JASMY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13876/thumb/JASMY200x200.jpg?1612473259",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13876/thumb/JASMY200x200.jpg?1612473259",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14006,7 +14006,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Keep Network",
       "symbol": "KEEP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3373/thumb/IuNzUb5b_400x400.jpg?1589526336",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3373/thumb/IuNzUb5b_400x400.jpg?1589526336",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14021,7 +14021,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "KNC",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdd974D5C2e2928deA5F71b9825b8b646686BD200/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdd974D5C2e2928deA5F71b9825b8b646686BD200/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14036,7 +14036,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Keep3rV1",
       "symbol": "KP3R",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12966/thumb/kp3r_logo.jpg?1607057458",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12966/thumb/kp3r_logo.jpg?1607057458",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14051,7 +14051,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LCX",
       "symbol": "LCX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9985/thumb/zRPSu_0o_400x400.jpg?1574327008",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9985/thumb/zRPSu_0o_400x400.jpg?1574327008",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14066,7 +14066,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Lido DAO",
       "symbol": "LDO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13573/thumb/Lido_DAO.png?1609873644",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13573/thumb/Lido_DAO.png?1609873644",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14081,7 +14081,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LINK",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14096,7 +14096,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Litentry",
       "symbol": "LIT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13825/large/logo_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13825/large/logo_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14109,7 +14109,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "League of Kingdoms",
       "symbol": "LOKA",
-      "logoURI": "https://assets.coingecko.com/coins/images/22572/thumb/loka_64pix.png?1642643271",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22572/thumb/loka_64pix.png?1642643271",
       "address": "0x465b67CB20A7E8bC4c51b4C7DA591C1945b41427",
       "decimals": 18,
       "extensions": {
@@ -14126,7 +14126,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LOOM",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA4e8C3Ec456107eA67d3075bF9e3DF3A75823DB0/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA4e8C3Ec456107eA67d3075bF9e3DF3A75823DB0/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14141,7 +14141,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Livepeer",
       "symbol": "LPT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/7137/thumb/logo-circle-green.png?1619593365",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/7137/thumb/logo-circle-green.png?1619593365",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14156,7 +14156,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Liquity",
       "symbol": "LQTY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14665/thumb/200-lqty-icon.png?1617631180",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14665/thumb/200-lqty-icon.png?1617631180",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14171,7 +14171,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LRC",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14184,7 +14184,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "Liquity USD",
       "symbol": "LUSD",
-      "logoURI": "https://assets.coingecko.com/coins/images/14666/thumb/Group_3.png?1617631327",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14666/thumb/Group_3.png?1617631327",
       "address": "0x23001f892c0C82b79303EDC9B9033cD190BB21c7",
       "decimals": 18,
       "extensions": {
@@ -14201,7 +14201,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Decentraland",
       "symbol": "MANA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/878/thumb/decentraland-mana.png?1550108745",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/878/thumb/decentraland-mana.png?1550108745",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14216,7 +14216,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mask Network",
       "symbol": "MASK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14229,7 +14229,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "MATH",
       "symbol": "MATH",
-      "logoURI": "https://assets.coingecko.com/coins/images/11335/thumb/2020-05-19-token-200.png?1589940590",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11335/thumb/2020-05-19-token-200.png?1589940590",
       "address": "0x347ACCAFdA7F8c5BdeC57fa34a5b663CBd1aeca7",
       "decimals": 18,
       "extensions": {
@@ -14246,7 +14246,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polygon",
       "symbol": "MATIC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4713/thumb/matic-token-icon.png?1624446912",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4713/thumb/matic-token-icon.png?1624446912",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14261,7 +14261,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Moss Carbon Credit",
       "symbol": "MCO2",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14414/thumb/ENtxnThA_400x400.jpg?1615948522",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14414/thumb/ENtxnThA_400x400.jpg?1615948522",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14274,7 +14274,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "Metis",
       "symbol": "METIS",
-      "logoURI": "https://assets.coingecko.com/coins/images/15595/thumb/metis.jpeg?1660285312",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15595/thumb/metis.jpeg?1660285312",
       "address": "0x1B9D40715E757Bdb9bdEC3215B898E46d8a3b71a",
       "decimals": 18,
       "extensions": {
@@ -14291,7 +14291,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Magic Internet Money",
       "symbol": "MIM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14306,7 +14306,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mirror Protocol",
       "symbol": "MIR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13295/thumb/mirror_logo_transparent.png?1611554658",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13295/thumb/mirror_logo_transparent.png?1611554658",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14321,7 +14321,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "MKR",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14336,7 +14336,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Melon",
       "symbol": "MLN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/605/thumb/melon.png?1547034295",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/605/thumb/melon.png?1547034295",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14349,7 +14349,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "Monavale",
       "symbol": "MONA",
-      "logoURI": "https://assets.coingecko.com/coins/images/13298/thumb/monavale_logo.jpg?1607232721",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13298/thumb/monavale_logo.jpg?1607232721",
       "address": "0x6968105460f67c3BF751bE7C15f92F5286Fd0CE5",
       "decimals": 18,
       "extensions": {
@@ -14364,7 +14364,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "GensoKishi Metaverse",
       "symbol": "MV",
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/17704.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/17704.png",
       "address": "0xA3c322Ad15218fBFAEd26bA7f616249f7705D945",
       "decimals": 18,
       "extensions": {
@@ -14381,7 +14381,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PolySwarm",
       "symbol": "NCT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2843/thumb/ImcYCVfX_400x400.jpg?1628519767",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2843/thumb/ImcYCVfX_400x400.jpg?1628519767",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14396,7 +14396,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "NMR",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1776e1F26f98b1A5dF9cD347953a26dd3Cb46671/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1776e1F26f98b1A5dF9cD347953a26dd3Cb46671/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14411,7 +14411,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ocean Protocol",
       "symbol": "OCEAN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3687/thumb/ocean-protocol-logo.jpg?1547038686",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3687/thumb/ocean-protocol-logo.jpg?1547038686",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14426,7 +14426,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Origin Protocol",
       "symbol": "OGN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3296/thumb/op.jpg?1547037878",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3296/thumb/op.jpg?1547037878",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14441,7 +14441,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "OMG Network",
       "symbol": "OMG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/776/thumb/OMG_Network.jpg?1591167168",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/776/thumb/OMG_Network.jpg?1591167168",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14456,7 +14456,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Orion Protocol",
       "symbol": "ORN",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/11841/thumb/orion_logo.png?1594943318",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11841/thumb/orion_logo.png?1594943318",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14471,7 +14471,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "OXT",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x4575f41308EC1483f3d399aa9a2826d74Da13Deb/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x4575f41308EC1483f3d399aa9a2826d74Da13Deb/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14486,7 +14486,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PAX Gold",
       "symbol": "PAXG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9519/thumb/paxg.PNG?1568542565",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9519/thumb/paxg.PNG?1568542565",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14501,7 +14501,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Perpetual Protocol",
       "symbol": "PERP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14516,7 +14516,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pluton",
       "symbol": "PLU",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1241/thumb/pluton.png?1548331624",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1241/thumb/pluton.png?1548331624",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14531,7 +14531,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polkastarter",
       "symbol": "POLS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12648/thumb/polkastarter.png?1609813702",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12648/thumb/polkastarter.png?1609813702",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14546,7 +14546,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polymath",
       "symbol": "POLY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2784/thumb/inKkF01.png?1605007034",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2784/thumb/inKkF01.png?1605007034",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14559,7 +14559,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "Marlin",
       "symbol": "POND",
-      "logoURI": "https://assets.coingecko.com/coins/images/8903/thumb/POND_200x200.png?1622515451",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8903/thumb/POND_200x200.png?1622515451",
       "address": "0x73580A2416A57f1C4b6391DBA688A9e4f7DBECE0",
       "decimals": 18,
       "extensions": {
@@ -14576,7 +14576,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Power Ledger",
       "symbol": "POWR",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/1104/thumb/power-ledger.png?1547035082",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1104/thumb/power-ledger.png?1547035082",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14591,7 +14591,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Propy",
       "symbol": "PRO",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/869/thumb/propy.png?1548332100",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/869/thumb/propy.png?1548332100",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14604,7 +14604,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "PARSIQ",
       "symbol": "PRQ",
-      "logoURI": "https://assets.coingecko.com/coins/images/11973/thumb/DsNgK0O.png?1596590280",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11973/thumb/DsNgK0O.png?1596590280",
       "address": "0x9377Eeb7419486FD4D485671d50baa4BF77c2222",
       "decimals": 18,
       "extensions": {
@@ -14621,7 +14621,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quant",
       "symbol": "QNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3370/thumb/5ZOu7brX_400x400.jpg?1612437252",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3370/thumb/5ZOu7brX_400x400.jpg?1612437252",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14636,7 +14636,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quickswap",
       "symbol": "QUICK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13970/thumb/1_pOU6pBMEmiL-ZJVb0CYRjQ.png?1613386659",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13970/thumb/1_pOU6pBMEmiL-ZJVb0CYRjQ.png?1613386659",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14651,7 +14651,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Radicle",
       "symbol": "RAD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14013/thumb/radicle.png?1614402918",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14013/thumb/radicle.png?1614402918",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14666,7 +14666,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rai Reflex Index",
       "symbol": "RAI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14681,7 +14681,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rarible",
       "symbol": "RARI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11845/thumb/Rari.png?1594946953",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11845/thumb/Rari.png?1594946953",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14696,7 +14696,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rubic",
       "symbol": "RBC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12629/thumb/200x200.png?1607952509",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12629/thumb/200x200.png?1607952509",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14711,7 +14711,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "REN",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x408e41876cCCDC0F92210600ef50372656052a38/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x408e41876cCCDC0F92210600ef50372656052a38/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14726,7 +14726,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "REPv2",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x221657776846890989a759BA2973e427DfF5C9bB/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x221657776846890989a759BA2973e427DfF5C9bB/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14741,7 +14741,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Request",
       "symbol": "REQ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1031/thumb/Request_icon_green.png?1643250951",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1031/thumb/Request_icon_green.png?1643250951",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14754,7 +14754,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "REVV",
       "symbol": "REVV",
-      "logoURI": "https://assets.coingecko.com/coins/images/12373/thumb/REVV_TOKEN_Refined_2021_%281%29.png?1627652390",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12373/thumb/REVV_TOKEN_Refined_2021_%281%29.png?1627652390",
       "address": "0x70c006878a5A50Ed185ac4C87d837633923De296",
       "decimals": 18,
       "extensions": {
@@ -14771,7 +14771,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rari Governance Token",
       "symbol": "RGT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12900/thumb/Rari_Logo_Transparent.png?1613978014",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12900/thumb/Rari_Logo_Transparent.png?1613978014",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14786,7 +14786,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "iExec RLC",
       "symbol": "RLC",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/646/thumb/pL1VuXm.png?1604543202",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/646/thumb/pL1VuXm.png?1604543202",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14801,7 +14801,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rally",
       "symbol": "RLY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12843/thumb/image.png?1611212077",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12843/thumb/image.png?1611212077",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14816,7 +14816,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Render Token",
       "symbol": "RNDR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11636/thumb/rndr.png?1638840934",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11636/thumb/rndr.png?1638840934",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14829,7 +14829,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "Rook",
       "symbol": "ROOK",
-      "logoURI": "https://assets.coingecko.com/coins/images/13005/thumb/keeper_dao_logo.jpg?1604316506",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13005/thumb/keeper_dao_logo.jpg?1604316506",
       "address": "0xF92501c8213da1D6C74A76372CCc720Dc8818407",
       "decimals": 18,
       "extensions": {
@@ -14846,7 +14846,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "The Sandbox",
       "symbol": "SAND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12129/thumb/sandbox_logo.jpg?1597397942",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12129/thumb/sandbox_logo.jpg?1597397942",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14861,7 +14861,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stader",
       "symbol": "SD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/20658/standard/SD_Token_Logo.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20658/standard/SD_Token_Logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14876,7 +14876,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Shiba Inu",
       "symbol": "SHIB",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11939/thumb/shiba.png?1622619446",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11939/thumb/shiba.png?1622619446",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14891,7 +14891,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Smooth Love Potion",
       "symbol": "SLP",
       "decimals": 0,
-      "logoURI": "https://assets.coingecko.com/coins/images/10366/thumb/SLP.png?1578640057",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10366/thumb/SLP.png?1578640057",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14906,7 +14906,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "SNX",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14921,7 +14921,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Spell Token",
       "symbol": "SPELL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15861/thumb/abracadabra-3.png?1622544862",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15861/thumb/abracadabra-3.png?1622544862",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14936,7 +14936,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "STORJ",
       "decimals": 8,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xB64ef51C888972c908CFacf59B47C1AfBC0Ab8aC/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xB64ef51C888972c908CFacf59B47C1AfBC0Ab8aC/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14951,7 +14951,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stox",
       "symbol": "STX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1230/thumb/stox-token.png?1547035256",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1230/thumb/stox-token.png?1547035256",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14966,7 +14966,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SUKU",
       "symbol": "SUKU",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11969/thumb/UmfW5S6f_400x400.jpg?1596602238",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11969/thumb/UmfW5S6f_400x400.jpg?1596602238",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14981,7 +14981,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SuperFarm",
       "symbol": "SUPER",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14040/thumb/6YPdWn6.png?1613975899",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14040/thumb/6YPdWn6.png?1613975899",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -14996,7 +14996,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "sUSD",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://assets.coingecko.com/coins/images/5013/thumb/sUSD.png?1616150765",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5013/thumb/sUSD.png?1616150765",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15011,7 +15011,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Sushi",
       "symbol": "SUSHI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15024,7 +15024,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "Swipe",
       "symbol": "SXP",
-      "logoURI": "https://assets.coingecko.com/coins/images/9368/thumb/swipe.png?1566792311",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9368/thumb/swipe.png?1566792311",
       "address": "0x6aBB753C1893194DE4a83c6e8B4EadFc105Fd5f5",
       "decimals": 18,
       "extensions": {
@@ -15041,7 +15041,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tokemak",
       "symbol": "TOKE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17495/thumb/tokemak-avatar-200px-black.png?1628131614",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17495/thumb/tokemak-avatar-200px-black.png?1628131614",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15056,7 +15056,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "OriginTrail",
       "symbol": "TRAC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1877/thumb/TRAC.jpg?1635134367",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1877/thumb/TRAC.jpg?1635134367",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15071,7 +15071,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tellor",
       "symbol": "TRB",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15086,7 +15086,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tribe",
       "symbol": "TRIBE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14575/thumb/tribe.PNG?1617487954",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14575/thumb/tribe.PNG?1617487954",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15101,7 +15101,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "TrueFi",
       "symbol": "TRU",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/13180/thumb/truefi_glyph_color.png?1617610941",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13180/thumb/truefi_glyph_color.png?1617610941",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15114,7 +15114,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "The Virtua Kolect",
       "symbol": "TVK",
-      "logoURI": "https://assets.coingecko.com/coins/images/13330/thumb/virtua_original.png?1656043619",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13330/thumb/virtua_original.png?1656043619",
       "address": "0x5667dcC0ab74D1b1355C3b2061893399331B57e2",
       "decimals": 18,
       "extensions": {
@@ -15131,7 +15131,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "UMA",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15161,7 +15161,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDC",
       "decimals": 6,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png"
     },
     {
       "name": "USDCoin (PoS)",
@@ -15169,7 +15169,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDC.e",
       "decimals": 6,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15184,7 +15184,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pax Dollar",
       "symbol": "USDP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/6013/standard/Pax_Dollar.png?1696506427",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/6013/standard/Pax_Dollar.png?1696506427",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15199,7 +15199,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDT",
       "decimals": 6,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15214,7 +15214,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Vanar Chain",
       "symbol": "VANRY",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/33466/large/apple-touch-icon.png?1701942541"
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/33466/large/apple-touch-icon.png?1701942541"
     },
     {
       "chainId": 137,
@@ -15222,7 +15222,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Voxies",
       "symbol": "VOXEL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/21260/large/voxies.png"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/21260/large/voxies.png"
     },
     {
       "name": "Wrapped BTC",
@@ -15230,7 +15230,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WBTC",
       "decimals": 8,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15243,7 +15243,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "Wrapped Centrifuge",
       "symbol": "WCFG",
-      "logoURI": "https://assets.coingecko.com/coins/images/17106/thumb/WCFG.jpg?1626266462",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17106/thumb/WCFG.jpg?1626266462",
       "address": "0x90bb6fEB70A9a43CfAaA615F856BA309FD759A90",
       "decimals": 18,
       "extensions": {
@@ -15260,7 +15260,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15275,13 +15275,13 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WMATIC",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://assets.coingecko.com/coins/images/4713/thumb/matic-token-icon.png?1624446912"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4713/thumb/matic-token-icon.png?1624446912"
     },
     {
       "chainId": 137,
       "name": "WOO Network",
       "symbol": "WOO",
-      "logoURI": "https://assets.coingecko.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
       "address": "0x1B815d120B3eF02039Ee11dC2d33DE7aA4a8C603",
       "decimals": 18,
       "extensions": {
@@ -15298,7 +15298,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "XSGD",
       "symbol": "XSGD",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/12832/standard/StraitsX_Singapore_Dollar_%28XSGD%29_Token_Logo.png?1696512623",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12832/standard/StraitsX_Singapore_Dollar_%28XSGD%29_Token_Logo.png?1696512623",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15313,7 +15313,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "XYO Network",
       "symbol": "XYO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4519/thumb/XYO_Network-logo.png?1547039819",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4519/thumb/XYO_Network-logo.png?1547039819",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15328,7 +15328,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "yearn finance",
       "symbol": "YFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15343,7 +15343,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DFI money",
       "symbol": "YFII",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11902/thumb/YFII-logo.78631676.png?1598677348",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11902/thumb/YFII-logo.78631676.png?1598677348",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15356,7 +15356,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 137,
       "name": "Yield Guild Games",
       "symbol": "YGG",
-      "logoURI": "https://assets.coingecko.com/coins/images/17358/thumb/le1nzlO6_400x400.jpg?1632465691",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17358/thumb/le1nzlO6_400x400.jpg?1632465691",
       "address": "0x82617aA52dddf5Ed9Bb7B370ED777b3182A30fd1",
       "decimals": 18,
       "extensions": {
@@ -15373,7 +15373,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LayerZero",
       "symbol": "ZRO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208"
     },
     {
       "name": "0x Protocol Token",
@@ -15381,7 +15381,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "ZRX",
       "decimals": 18,
       "chainId": 137,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15396,7 +15396,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ZKsync",
       "symbol": "ZK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/38043/large/ZKTokenBlack.png?17186145029"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/38043/large/ZKTokenBlack.png?17186145029"
     },
     {
       "chainId": 480,
@@ -15404,7 +15404,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Bridged USDC",
       "symbol": "USDC.e",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/35218/large/USDC_Icon.png?1707908537"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/35218/large/USDC_Icon.png?1707908537"
     },
     {
       "chainId": 480,
@@ -15412,7 +15412,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Wrapped BTC",
       "symbol": "WBTC",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/7598/large/wrapped_bitcoin_wbtc.png?1696507857"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/7598/large/wrapped_bitcoin_wbtc.png?1696507857"
     },
     {
       "chainId": 480,
@@ -15420,7 +15420,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Wrapped Ether",
       "symbol": "WETH",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png"
     },
     {
       "chainId": 8453,
@@ -15428,7 +15428,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "1inch",
       "symbol": "1INCH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13469/thumb/1inch-token.png?1608803028",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13469/thumb/1inch-token.png?1608803028",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15443,7 +15443,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aave",
       "symbol": "AAVE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12645/thumb/AAVE.png?1601374110",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12645/thumb/AAVE.png?1601374110",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15458,7 +15458,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Arcblock",
       "symbol": "ABT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2341/thumb/arcblock.png?1547036543",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2341/thumb/arcblock.png?1547036543",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15473,7 +15473,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ambire AdEx",
       "symbol": "ADX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/847/thumb/Ambire_AdEx_Symbol_color.png?1655432540",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/847/thumb/Ambire_AdEx_Symbol_color.png?1655432540",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15496,7 +15496,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "aixbt by Virtuals",
       "symbol": "AIXBT",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/51784/large/3.png?1731981138"
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/51784/large/3.png?1731981138"
     },
     {
       "chainId": 8453,
@@ -15504,7 +15504,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alethea Artificial Liquid Intelligence",
       "symbol": "ALI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/22062/thumb/alethea-logo-transparent-colored.png?1642748848",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22062/thumb/alethea-logo-transparent-colored.png?1642748848",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15519,7 +15519,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "AltLayer",
       "symbol": "ALT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/34608/standard/Logomark_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/34608/standard/Logomark_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15534,7 +15534,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Amp",
       "symbol": "AMP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12409/thumb/amp-200x200.png?1599625397",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12409/thumb/amp-200x200.png?1599625397",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15549,7 +15549,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Apu Apustaja",
       "symbol": "APU",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/35986/large/200x200.png?1710308147",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/35986/large/200x200.png?1710308147",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15564,7 +15564,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ARPA Chain",
       "symbol": "ARPA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8506/thumb/9u0a23XY_400x400.jpg?1559027357",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15579,7 +15579,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "B3",
       "symbol": "B3",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/54287/large/B3.png?1739001374"
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/54287/large/B3.png?1739001374"
     },
     {
       "name": "Balancer",
@@ -15587,7 +15587,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "BAL",
       "decimals": 18,
       "chainId": 8453,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15602,7 +15602,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Biconomy",
       "symbol": "BICO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/21061/thumb/biconomy_logo.jpg?1638269749",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/21061/thumb/biconomy_logo.jpg?1638269749",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15617,7 +15617,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "HarryPotterObamaSonic10Inu",
       "symbol": "BITCOIN",
       "decimals": 8,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/30323/large/hpos10i_logo_casino_night-dexview.png?1696529224",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/30323/large/hpos10i_logo_casino_night-dexview.png?1696529224",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15632,7 +15632,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Boba Network",
       "symbol": "BOBA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/20285/thumb/BOBA.png?1636811576",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20285/thumb/BOBA.png?1636811576",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15647,7 +15647,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Braintrust",
       "symbol": "BTRST",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18100/thumb/braintrust.PNG?1630475394",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18100/thumb/braintrust.PNG?1630475394",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15662,7 +15662,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "address": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
       "symbol": "cbBTC",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/40143/standard/cbbtc.webp"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/40143/standard/cbbtc.webp"
     },
     {
       "chainId": 8453,
@@ -15700,7 +15700,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "CRV",
       "decimals": 18,
       "chainId": 8453,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15715,7 +15715,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cartesi",
       "symbol": "CTSI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11038/thumb/cartesi.png?1592288021",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11038/thumb/cartesi.png?1592288021",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15730,7 +15730,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cryptex Finance",
       "symbol": "CTX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14932/thumb/glossy_icon_-_C200px.png?1619073171",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14932/thumb/glossy_icon_-_C200px.png?1619073171",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15745,7 +15745,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Covalent X Token",
       "symbol": "CXT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/39177/large/CXT_Ticker.png?1720829918",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/39177/large/CXT_Ticker.png?1720829918",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15775,7 +15775,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Degen",
       "symbol": "DEGEN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/34515/large/android-chrome-512x512.png?1706198225"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/34515/large/android-chrome-512x512.png?1706198225"
     },
     {
       "chainId": 8453,
@@ -15783,7 +15783,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "EURC",
       "symbol": "EURC",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/26045/standard/euro.png"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26045/standard/euro.png"
     },
     {
       "chainId": 8453,
@@ -15791,7 +15791,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Harvest Finance",
       "symbol": "FARM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12304/thumb/Harvest.png?1613016180",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12304/thumb/Harvest.png?1613016180",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15806,7 +15806,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Fetch ai",
       "symbol": "FET",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15821,7 +15821,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Flux",
       "symbol": "FLUX",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x720CD16b011b987Da3518fbf38c3071d4F0D1495/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x720CD16b011b987Da3518fbf38c3071d4F0D1495/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15836,7 +15836,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ampleforth Governance Token",
       "symbol": "FORTH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14917/thumb/photo_2021-04-22_00.00.03.jpeg?1619020835",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14917/thumb/photo_2021-04-22_00.00.03.jpeg?1619020835",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15851,7 +15851,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ShapeShift FOX Token",
       "symbol": "FOX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9988/thumb/FOX.png?1574330622",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9988/thumb/FOX.png?1574330622",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15866,7 +15866,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aavegotchi",
       "symbol": "GHST",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12467/thumb/ghst_200.png?1600750321",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12467/thumb/ghst_200.png?1600750321",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15881,7 +15881,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "The Graph",
       "symbol": "GRT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15896,7 +15896,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "IoTeX",
       "symbol": "IOTX",
       "decimals": 18,
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/2777.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/2777.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15909,7 +15909,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 8453,
       "name": "Geojam",
       "symbol": "JAM",
-      "logoURI": "https://assets.coingecko.com/coins/images/24648/thumb/ey40AzBN_400x400.jpg?1648507272",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24648/thumb/ey40AzBN_400x400.jpg?1648507272",
       "address": "0xFf9957816c813C5Ad0b9881A8990Df1E3AA2a057",
       "decimals": 18,
       "extensions": {
@@ -15926,7 +15926,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "KAITO",
       "symbol": "KAITO",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/54411/large/Qm4DW488_400x400.jpg?1739552780"
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/54411/large/Qm4DW488_400x400.jpg?1739552780"
     },
     {
       "chainId": 8453,
@@ -15934,7 +15934,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "KRYLL",
       "symbol": "KRL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2807/thumb/krl.png?1547036979",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2807/thumb/krl.png?1547036979",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15949,7 +15949,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LCX",
       "symbol": "LCX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9985/thumb/zRPSu_0o_400x400.jpg?1574327008",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9985/thumb/zRPSu_0o_400x400.jpg?1574327008",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15964,7 +15964,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Liquity",
       "symbol": "LQTY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14665/thumb/200-lqty-icon.png?1617631180",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14665/thumb/200-lqty-icon.png?1617631180",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15979,7 +15979,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LRC",
       "decimals": 18,
       "chainId": 8453,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -15994,7 +15994,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BLOCKLORDS",
       "symbol": "LRDS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/34775/standard/LRDS_PNG.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/34775/standard/LRDS_PNG.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16007,7 +16007,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 8453,
       "name": "Liquity USD",
       "symbol": "LUSD",
-      "logoURI": "https://assets.coingecko.com/coins/images/14666/thumb/Group_3.png?1617631327",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14666/thumb/Group_3.png?1617631327",
       "address": "0x368181499736d0c0CC614DBB145E2EC1AC86b8c6",
       "decimals": 18,
       "extensions": {
@@ -16024,7 +16024,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mask Network",
       "symbol": "MASK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16039,7 +16039,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Melon",
       "symbol": "MLN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/605/thumb/melon.png?1547034295",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/605/thumb/melon.png?1547034295",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16054,7 +16054,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mog Coin",
       "symbol": "MOG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/31059/large/MOG_LOGO_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/31059/large/MOG_LOGO_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16069,7 +16069,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Morpho Token",
       "symbol": "MORPHO",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/29837/large/Morpho-token-icon.png?1726771230",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/29837/large/Morpho-token-icon.png?1726771230",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16084,7 +16084,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PolySwarm",
       "symbol": "NCT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2843/thumb/ImcYCVfX_400x400.jpg?1628519767",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2843/thumb/ImcYCVfX_400x400.jpg?1628519767",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16099,7 +16099,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Odos Token",
       "symbol": "ODOS",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/52914/large/odos.jpg?1734678948"
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/52914/large/odos.jpg?1734678948"
     },
     {
       "chainId": 8453,
@@ -16107,7 +16107,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Origin Protocol",
       "symbol": "OGN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3296/thumb/op.jpg?1547037878",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3296/thumb/op.jpg?1547037878",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16122,7 +16122,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pepe",
       "symbol": "PEPE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/29850/large/pepe-token.jpeg?1682922725",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/29850/large/pepe-token.jpeg?1682922725",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16137,7 +16137,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Perpetual Protocol",
       "symbol": "PERP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16152,7 +16152,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Prime",
       "symbol": "PRIME",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/29053/large/PRIMELOGOOO.png?1676976222",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/29053/large/PRIMELOGOOO.png?1676976222",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16167,7 +16167,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Propy",
       "symbol": "PRO",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/869/thumb/propy.png?1548332100",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/869/thumb/propy.png?1548332100",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16180,7 +16180,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 8453,
       "name": "pSTAKE Finance",
       "symbol": "PSTAKE",
-      "logoURI": "https://assets.coingecko.com/coins/images/23931/thumb/PSTAKE_Dark.png?1645709930",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/23931/thumb/PSTAKE_Dark.png?1645709930",
       "address": "0x38815A4455921667d673B4cb3d48F0383eE93400",
       "decimals": 18,
       "extensions": {
@@ -16197,7 +16197,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Reserve Rights",
       "symbol": "RSR",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/8365/large/RSR_Blue_Circle_1000.png?1721777856",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/8365/large/RSR_Blue_Circle_1000.png?1721777856",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16220,7 +16220,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Status",
       "symbol": "SNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/779/thumb/status.png?1548610778",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/779/thumb/status.png?1548610778",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16235,7 +16235,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "SNX",
       "decimals": 18,
       "chainId": 8453,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16250,7 +16250,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SPX6900",
       "symbol": "SPX",
       "decimals": 8,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/31401/large/sticker_(1).jpg?1702371083",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/31401/large/sticker_(1).jpg?1702371083",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16265,7 +16265,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Sushi",
       "symbol": "SUSHI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16280,7 +16280,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "tBTC",
       "symbol": "tBTC",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/uniswap/assets/master/blockchains/ethereum/assets/0x18084fbA666a33d37592fA2633fD49a74DD93a88/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/uniswap/assets/master/blockchains/ethereum/assets/0x18084fbA666a33d37592fA2633fD49a74DD93a88/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16295,7 +16295,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Toshi",
       "symbol": "TOSHI",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/31126/large/Toshi_Logo_-_Circular.png?1721677476"
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/31126/large/Toshi_Logo_-_Circular.png?1721677476"
     },
     {
       "chainId": 8453,
@@ -16303,7 +16303,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "OriginTrail",
       "symbol": "TRAC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1877/thumb/TRAC.jpg?1635134367",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1877/thumb/TRAC.jpg?1635134367",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16318,7 +16318,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tellor",
       "symbol": "TRB",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16371,7 +16371,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDT",
       "decimals": 6,
       "chainId": 8453,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16386,13 +16386,13 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Venice Token",
       "symbol": "VVV",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/54023/standard/Venice_Token_(1).png?1738017546"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/54023/standard/Venice_Token_(1).png?1738017546"
     },
     {
       "chainId": 8453,
       "name": "Wrapped Ampleforth",
       "symbol": "WAMPL",
-      "logoURI": "https://assets.coingecko.com/coins/images/20825/thumb/photo_2021-11-25_02-05-11.jpg?1637811951",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20825/thumb/photo_2021-11-25_02-05-11.jpg?1637811951",
       "address": "0x489fe42C267fe0366B16b0c39e7AEEf977E841eF",
       "decimals": 18,
       "extensions": {
@@ -16409,7 +16409,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Moonwell",
       "symbol": "WELL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26133/large/WELL.png?1696525221"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26133/large/WELL.png?1696525221"
     },
     {
       "name": "Wrapped Ether",
@@ -16432,7 +16432,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "XYO Network",
       "symbol": "XYO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4519/thumb/XYO_Network-logo.png?1547039819",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4519/thumb/XYO_Network-logo.png?1547039819",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16447,7 +16447,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "yearn finance",
       "symbol": "YFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16460,7 +16460,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 8453,
       "name": "Yield Guild Games",
       "symbol": "YGG",
-      "logoURI": "https://assets.coingecko.com/coins/images/17358/thumb/le1nzlO6_400x400.jpg?1632465691",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17358/thumb/le1nzlO6_400x400.jpg?1632465691",
       "address": "0xaAC78d1219c08AecC8e37e03858FE885f5EF1799",
       "decimals": 18,
       "extensions": {
@@ -16477,7 +16477,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LayerZero",
       "symbol": "ZRO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208"
     },
     {
       "name": "0x Protocol Token",
@@ -16500,7 +16500,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "1inch",
       "symbol": "1INCH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13469/thumb/1inch-token.png?1608803028",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13469/thumb/1inch-token.png?1608803028",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16515,7 +16515,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aave",
       "symbol": "AAVE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12645/thumb/AAVE.png?1601374110",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12645/thumb/AAVE.png?1601374110",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16530,7 +16530,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Across Protocol Token",
       "symbol": "ACX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28161/large/across-200x200.png?1696527165",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28161/large/across-200x200.png?1696527165",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16545,7 +16545,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aevo",
       "symbol": "AEVO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/35893/standard/aevo.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/35893/standard/aevo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16560,7 +16560,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "agEur",
       "symbol": "agEUR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19479/standard/agEUR.png?1696518915",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19479/standard/agEUR.png?1696518915",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16575,7 +16575,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Adventure Gold",
       "symbol": "AGLD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18125/thumb/lpgblc4h_400x400.jpg?1630570955",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18125/thumb/lpgblc4h_400x400.jpg?1630570955",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16590,7 +16590,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "AIOZ Network",
       "symbol": "AIOZ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14631/thumb/aioz_logo.png?1617413126",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14631/thumb/aioz_logo.png?1617413126",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16605,7 +16605,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aleph im",
       "symbol": "ALEPH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11676/thumb/Monochram-aleph.png?1608483725",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11676/thumb/Monochram-aleph.png?1608483725",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16620,7 +16620,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alethea Artificial Liquid Intelligence",
       "symbol": "ALI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/22062/thumb/alethea-logo-transparent-colored.png?1642748848",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22062/thumb/alethea-logo-transparent-colored.png?1642748848",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16635,7 +16635,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alpha Venture DAO",
       "symbol": "ALPHA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16650,7 +16650,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ankr",
       "symbol": "ANKR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16665,7 +16665,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ApeCoin",
       "symbol": "APE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/24383/small/apecoin.jpg?1647476455",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24383/small/apecoin.jpg?1647476455",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16680,7 +16680,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "API3",
       "symbol": "API3",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13256/thumb/api3.jpg?1606751424",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13256/thumb/api3.jpg?1606751424",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16710,7 +16710,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Arkham",
       "symbol": "ARKM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/30929/standard/Arkham_Logo_CG.png?1696529771",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/30929/standard/Arkham_Logo_CG.png?1696529771",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16725,7 +16725,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Automata",
       "symbol": "ATA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15985/thumb/ATA.jpg?1622535745",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15985/thumb/ATA.jpg?1622535745",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16740,7 +16740,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aethir Token",
       "symbol": "ATH",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/36179/large/logogram_circle_dark_green_vb_green_(1).png?1718232706",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/36179/large/logogram_circle_dark_green_vb_green_(1).png?1718232706",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16755,7 +16755,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Axelar",
       "symbol": "AXL",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/27277/large/V-65_xQ1_400x400.jpeg",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/27277/large/V-65_xQ1_400x400.jpeg",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16770,7 +16770,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Axie Infinity",
       "symbol": "AXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13029/thumb/axie_infinity_logo.png?1604471082",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13029/thumb/axie_infinity_logo.png?1604471082",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16785,7 +16785,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Badger DAO",
       "symbol": "BADGER",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13287/thumb/badger_dao_logo.jpg?1607054976",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13287/thumb/badger_dao_logo.jpg?1607054976",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16800,7 +16800,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "BAL",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xba100000625a3754423978a60c9317c58a424e3D/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16815,7 +16815,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Basic Attention Token",
       "symbol": "BAT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/677/thumb/basic-attention-token.png?1547034427",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/677/thumb/basic-attention-token.png?1547034427",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16830,7 +16830,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Biconomy",
       "symbol": "BICO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/21061/thumb/biconomy_logo.jpg?1638269749",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/21061/thumb/biconomy_logo.jpg?1638269749",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16845,7 +16845,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BitDAO",
       "symbol": "BIT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17627/thumb/rI_YptK8.png?1653983088",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17627/thumb/rI_YptK8.png?1653983088",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16860,7 +16860,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "HarryPotterObamaSonic10Inu",
       "symbol": "BITCOIN",
       "decimals": 8,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/30323/large/hpos10i_logo_casino_night-dexview.png?1696529224",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/30323/large/hpos10i_logo_casino_night-dexview.png?1696529224",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16875,7 +16875,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Blur",
       "symbol": "BLUR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28453/large/blur.png?1670745921",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28453/large/blur.png?1670745921",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16890,7 +16890,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "BNT",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1F573D6Fb3F13d689FF844B4cE37794d79a7FF1C/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1F573D6Fb3F13d689FF844B4cE37794d79a7FF1C/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16905,7 +16905,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "BarnBridge",
       "symbol": "BOND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12811/thumb/barnbridge.jpg?1602728853",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12811/thumb/barnbridge.jpg?1602728853",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16920,7 +16920,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Binance USD",
       "symbol": "BUSD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9576/thumb/BUSD.png?1568947766",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9576/thumb/BUSD.png?1568947766",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16935,7 +16935,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "address": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
       "symbol": "cbBTC",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/40143/large/cbbtc.webp"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/40143/large/cbbtc.webp"
     },
     {
       "chainId": 42161,
@@ -16943,7 +16943,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Coinbase Wrapped Staked ETH",
       "symbol": "cbETH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/27008/large/cbeth.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/27008/large/cbeth.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16958,7 +16958,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Celo native asset (Wormhole)",
       "symbol": "CELO",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/wormhole-foundation/wormhole-token-list/main/assets/celo_wh.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/wormhole-foundation/wormhole-token-list/main/assets/celo_wh.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16973,7 +16973,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Celer Network",
       "symbol": "CELR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4379/thumb/Celr.png?1554705437",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4379/thumb/Celr.png?1554705437",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -16988,7 +16988,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "COMP",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17003,7 +17003,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "COTI",
       "symbol": "COTI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2962/thumb/Coti.png?1559653863",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2962/thumb/Coti.png?1559653863",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17018,7 +17018,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "CoW Protocol",
       "symbol": "COW",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/24384/large/CoW-token_logo.png?1719524382",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24384/large/CoW-token_logo.png?1719524382",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17033,7 +17033,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Covalent",
       "symbol": "CQT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14168/thumb/covalent-cqt.png?1624545218",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14168/thumb/covalent-cqt.png?1624545218",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17048,7 +17048,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cronos",
       "symbol": "CRO",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/7310/thumb/oCw2s3GI_400x400.jpeg?1645172042",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/7310/thumb/oCw2s3GI_400x400.jpeg?1645172042",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17063,7 +17063,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "CRV",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xD533a949740bb3306d119CC777fa900bA034cd52/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17078,7 +17078,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cartesi",
       "symbol": "CTSI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11038/thumb/cartesi.png?1592288021",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11038/thumb/cartesi.png?1592288021",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17093,7 +17093,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cryptex Finance",
       "symbol": "CTX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14932/thumb/glossy_icon_-_C200px.png?1619073171",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14932/thumb/glossy_icon_-_C200px.png?1619073171",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17108,7 +17108,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Civic",
       "symbol": "CVC",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/788/thumb/civic.png?1547034556",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/788/thumb/civic.png?1547034556",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17123,7 +17123,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Convex Finance",
       "symbol": "CVX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15585/thumb/convex.png?1621256328",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15585/thumb/convex.png?1621256328",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17138,7 +17138,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "DAI",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6B175474E89094C44Da98b954EedeAC495271d0F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17153,7 +17153,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DexTools",
       "symbol": "DEXT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11603/thumb/dext.png?1605790188",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11603/thumb/dext.png?1605790188",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17168,7 +17168,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DIA",
       "symbol": "DIA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11955/thumb/image.png?1646041751",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11955/thumb/image.png?1646041751",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17183,7 +17183,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "district0x",
       "symbol": "DNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/849/thumb/district0x.png?1547223762",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/849/thumb/district0x.png?1547223762",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17198,7 +17198,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DeFi Pulse Index",
       "symbol": "DPI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12465/thumb/defi_pulse_index_set.png?1600051053",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12465/thumb/defi_pulse_index_set.png?1600051053",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17213,7 +17213,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "dYdX",
       "symbol": "DYDX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17500/thumb/hjnIm9bV.jpg?1628009360",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17500/thumb/hjnIm9bV.jpg?1628009360",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17228,7 +17228,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "EigenLayer",
       "symbol": "EIGEN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/37441/large/eigen.jpg?1728023974",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/37441/large/eigen.jpg?1728023974",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17243,7 +17243,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Dogelon Mars",
       "symbol": "ELON",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14962/thumb/6GxcPRo3_400x400.jpg?1619157413",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14962/thumb/6GxcPRo3_400x400.jpg?1619157413",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17258,7 +17258,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethena",
       "symbol": "ENA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/36530/standard/ethena.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/36530/standard/ethena.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17273,7 +17273,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Enjin Coin",
       "symbol": "ENJ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1102/thumb/enjin-coin-logo.png?1547035078",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1102/thumb/enjin-coin-logo.png?1547035078",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17288,7 +17288,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethereum Name Service",
       "symbol": "ENS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19785/thumb/acatxTm8_400x400.jpg?1635850140",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19785/thumb/acatxTm8_400x400.jpg?1635850140",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17303,7 +17303,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ethernity Chain",
       "symbol": "ERN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14238/thumb/LOGO_HIGH_QUALITY.png?1647831402",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14238/thumb/LOGO_HIGH_QUALITY.png?1647831402",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17318,7 +17318,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ether.fi",
       "symbol": "ETHFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/35958/standard/etherfi.jpeg",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/35958/standard/etherfi.jpeg",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17333,7 +17333,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Euro Coin",
       "symbol": "EURC",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/26045/thumb/euro-coin.png?1655394420",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26045/thumb/euro-coin.png?1655394420",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17348,7 +17348,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Harvest Finance",
       "symbol": "FARM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12304/thumb/Harvest.png?1613016180",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12304/thumb/Harvest.png?1613016180",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17363,7 +17363,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Fetch ai",
       "symbol": "FET",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5681/thumb/Fetch.jpg?1572098136",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17378,7 +17378,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stafi",
       "symbol": "FIS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12423/thumb/stafi_logo.jpg?1599730991",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12423/thumb/stafi_logo.jpg?1599730991",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17393,7 +17393,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "FLOKI",
       "symbol": "FLOKI",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/16746/standard/PNG_image.png?1696516318",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/16746/standard/PNG_image.png?1696516318",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17408,7 +17408,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Flux",
       "symbol": "FLUX",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x720CD16b011b987Da3518fbf38c3071d4F0D1495/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x720CD16b011b987Da3518fbf38c3071d4F0D1495/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17423,7 +17423,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Forta",
       "symbol": "FORT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/25060/thumb/Forta_lgo_%281%29.png?1655353696",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/25060/thumb/Forta_lgo_%281%29.png?1655353696",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17438,7 +17438,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "ShapeShift FOX Token",
       "symbol": "FOX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9988/thumb/FOX.png?1574330622",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9988/thumb/FOX.png?1574330622",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17453,7 +17453,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax",
       "symbol": "FRAX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13422/thumb/frax_logo.png?1608476506",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13422/thumb/frax_logo.png?1608476506",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17468,7 +17468,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Fantom",
       "symbol": "FTM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4001/thumb/Fantom.png?1558015016",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4001/thumb/Fantom.png?1558015016",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17483,7 +17483,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax Share",
       "symbol": "FXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13423/thumb/frax_share.png?1608478989",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13423/thumb/frax_share.png?1608478989",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17498,7 +17498,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Galxe",
       "symbol": "GAL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/24530/thumb/GAL-Token-Icon.png?1651483533",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24530/thumb/GAL-Token-Icon.png?1651483533",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17513,7 +17513,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "GALA",
       "symbol": "GALA",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/12493/standard/GALA-COINGECKO.png?1696512310",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12493/standard/GALA-COINGECKO.png?1696512310",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17528,7 +17528,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "GMX",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://assets.coingecko.com/coins/images/18323/large/arbit.png?1631532468"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18323/large/arbit.png?1631532468"
     },
     {
       "name": "Gnosis Token",
@@ -17536,7 +17536,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "GNO",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6810e776880C02933D47DB1b9fc05908e5386b96/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x6810e776880C02933D47DB1b9fc05908e5386b96/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17551,7 +17551,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "The Graph",
       "symbol": "GRT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17566,7 +17566,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Gitcoin",
       "symbol": "GTC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15810/thumb/gitcoin.png?1621992929",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15810/thumb/gitcoin.png?1621992929",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17581,7 +17581,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "GYEN",
       "symbol": "GYEN",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/14191/thumb/icon_gyen_200_200.png?1614843343",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14191/thumb/icon_gyen_200_200.png?1614843343",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17596,7 +17596,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Highstreet",
       "symbol": "HIGH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18973/thumb/logosq200200Coingecko.png?1634090470",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18973/thumb/logosq200200Coingecko.png?1634090470",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17609,7 +17609,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "HOPR",
       "symbol": "HOPR",
-      "logoURI": "https://assets.coingecko.com/coins/images/14061/thumb/Shared_HOPR_logo_512px.png?1614073468",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14061/thumb/Shared_HOPR_logo_512px.png?1614073468",
       "address": "0x177F394A3eD18FAa85c1462Ae626438a70294EF7",
       "decimals": 18,
       "extensions": {
@@ -17626,7 +17626,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Illuvium",
       "symbol": "ILV",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14468/large/ILV.JPG",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14468/large/ILV.JPG",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17641,7 +17641,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Immutable X",
       "symbol": "IMX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/17233/thumb/imx.png?1636691817",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/17233/thumb/imx.png?1636691817",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17656,7 +17656,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Injective",
       "symbol": "INJ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12882/thumb/Secondary_Symbol.png?1628233237",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12882/thumb/Secondary_Symbol.png?1628233237",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17671,7 +17671,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "JasmyCoin",
       "symbol": "JASMY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13876/thumb/JASMY200x200.jpg?1612473259",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13876/thumb/JASMY200x200.jpg?1612473259",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17686,7 +17686,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "KRYLL",
       "symbol": "KRL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2807/thumb/krl.png?1547036979",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2807/thumb/krl.png?1547036979",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17701,7 +17701,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Kujira",
       "symbol": "KUJI",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/20685/standard/kuji-200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20685/standard/kuji-200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17716,7 +17716,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Lido DAO",
       "symbol": "LDO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13573/thumb/Lido_DAO.png?1609873644",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13573/thumb/Lido_DAO.png?1609873644",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17731,7 +17731,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LINK",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17746,7 +17746,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Litentry",
       "symbol": "LIT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13825/large/logo_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13825/large/logo_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17761,7 +17761,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Livepeer",
       "symbol": "LPT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/7137/thumb/logo-circle-green.png?1619593365",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/7137/thumb/logo-circle-green.png?1619593365",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17776,7 +17776,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Liquity",
       "symbol": "LQTY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14665/thumb/200-lqty-icon.png?1617631180",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14665/thumb/200-lqty-icon.png?1617631180",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17791,7 +17791,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LRC",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17804,7 +17804,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "Liquity USD",
       "symbol": "LUSD",
-      "logoURI": "https://assets.coingecko.com/coins/images/14666/thumb/Group_3.png?1617631327",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14666/thumb/Group_3.png?1617631327",
       "address": "0x93b346b6BC2548dA6A1E7d98E9a421B42541425b",
       "decimals": 18,
       "extensions": {
@@ -17821,7 +17821,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "MAGIC",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://dynamic-assets.coinbase.com/30320a63f6038b944c9c0202fcb2392e6a1bd333814f74b4674774dd87f2d06d64fdd74c2f1ab4639917c75b749c323450408bec7a2737af8ae0c17871aa90de/asset_icons/98d278cda11639ed7449a0a3086cd2c83937ce71baf4ee43bb5b777423c00a75.png"
+      "logoURI": "https://dynamic-assets.coinbase.dummy.com/30320a63f6038b944c9c0202fcb2392e6a1bd333814f74b4674774dd87f2d06d64fdd74c2f1ab4639917c75b749c323450408bec7a2737af8ae0c17871aa90de/asset_icons/98d278cda11639ed7449a0a3086cd2c83937ce71baf4ee43bb5b777423c00a75.png"
     },
     {
       "chainId": 42161,
@@ -17829,7 +17829,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Decentraland",
       "symbol": "MANA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/878/thumb/decentraland-mana.png?1550108745",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/878/thumb/decentraland-mana.png?1550108745",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17844,7 +17844,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mask Network",
       "symbol": "MASK",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14051/thumb/Mask_Network.jpg?1614050316",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17857,7 +17857,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "MATH",
       "symbol": "MATH",
-      "logoURI": "https://assets.coingecko.com/coins/images/11335/thumb/2020-05-19-token-200.png?1589940590",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11335/thumb/2020-05-19-token-200.png?1589940590",
       "address": "0x99F40b01BA9C469193B360f72740E416B17Ac332",
       "decimals": 18,
       "extensions": {
@@ -17874,7 +17874,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polygon",
       "symbol": "MATIC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4713/thumb/matic-token-icon.png?1624446912",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4713/thumb/matic-token-icon.png?1624446912",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17887,7 +17887,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "Metis",
       "symbol": "METIS",
-      "logoURI": "https://assets.coingecko.com/coins/images/15595/thumb/metis.jpeg?1660285312",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15595/thumb/metis.jpeg?1660285312",
       "address": "0x7F728F3595db17B0B359f4FC47aE80FAd2e33769",
       "decimals": 18,
       "extensions": {
@@ -17904,7 +17904,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Magic Internet Money",
       "symbol": "MIM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17919,7 +17919,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "MKR",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17934,7 +17934,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Melon",
       "symbol": "MLN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/605/thumb/melon.png?1547034295",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/605/thumb/melon.png?1547034295",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17949,7 +17949,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Mog Coin",
       "symbol": "MOG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/31059/large/MOG_LOGO_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/31059/large/MOG_LOGO_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17964,7 +17964,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Maple",
       "symbol": "MPL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14097/thumb/photo_2021-05-03_14.20.41.jpeg?1620022863",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14097/thumb/photo_2021-05-03_14.20.41.jpeg?1620022863",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17979,7 +17979,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Multichain",
       "symbol": "MULTI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/22087/thumb/1_Wyot-SDGZuxbjdkaOeT2-A.png?1640764238",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22087/thumb/1_Wyot-SDGZuxbjdkaOeT2-A.png?1640764238",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -17992,7 +17992,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "GensoKishi Metaverse",
       "symbol": "MV",
-      "logoURI": "https://s2.coinmarketcap.com/static/img/coins/64x64/17704.png",
+      "logoURI": "https://s2.coinmarketcap.dummy.com/static/img/coins/64x64/17704.png",
       "address": "0x5445972E76c5e4CEdD12B6e2BceF69133E15992F",
       "decimals": 18,
       "extensions": {
@@ -18007,7 +18007,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "MXC",
       "symbol": "MXC",
-      "logoURI": "https://assets.coingecko.com/coins/images/4604/thumb/mxc.png?1655534336",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4604/thumb/mxc.png?1655534336",
       "address": "0x91b468Fe3dce581D7a6cFE34189F1314b6862eD6",
       "decimals": 18,
       "extensions": {
@@ -18024,7 +18024,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PolySwarm",
       "symbol": "NCT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2843/thumb/ImcYCVfX_400x400.jpg?1628519767",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2843/thumb/ImcYCVfX_400x400.jpg?1628519767",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18039,7 +18039,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "NKN",
       "symbol": "NKN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3375/thumb/nkn.png?1548329212",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3375/thumb/nkn.png?1548329212",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18054,7 +18054,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "NMR",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1776e1F26f98b1A5dF9cD347953a26dd3Cb46671/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x1776e1F26f98b1A5dF9cD347953a26dd3Cb46671/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18069,7 +18069,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ocean Protocol",
       "symbol": "OCEAN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3687/thumb/ocean-protocol-logo.jpg?1547038686",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3687/thumb/ocean-protocol-logo.jpg?1547038686",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18084,7 +18084,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Origin Protocol",
       "symbol": "OGN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3296/thumb/op.jpg?1547037878",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3296/thumb/op.jpg?1547037878",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18099,7 +18099,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "OMG Network",
       "symbol": "OMG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/776/thumb/OMG_Network.jpg?1591167168",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/776/thumb/OMG_Network.jpg?1591167168",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18114,7 +18114,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ondo Finance",
       "symbol": "ONDO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26580/standard/ONDO.png?1696525656",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26580/standard/ONDO.png?1696525656",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18129,7 +18129,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Orion Protocol",
       "symbol": "ORN",
       "decimals": 8,
-      "logoURI": "https://assets.coingecko.com/coins/images/11841/thumb/orion_logo.png?1594943318",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11841/thumb/orion_logo.png?1594943318",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18144,7 +18144,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "PAX Gold",
       "symbol": "PAXG",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9519/thumb/paxg.PNG?1568542565",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9519/thumb/paxg.PNG?1568542565",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18159,7 +18159,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pepe",
       "symbol": "PEPE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/29850/large/pepe-token.jpeg?1682922725",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/29850/large/pepe-token.jpeg?1682922725",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18174,7 +18174,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Perpetual Protocol",
       "symbol": "PERP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12381/thumb/60d18e06844a844ad75901a9_mark_only_03.png?1628674771",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18189,7 +18189,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pirate Nation",
       "symbol": "PIRATE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/38524/standard/_Pirate_Transparent_200x200.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/38524/standard/_Pirate_Transparent_200x200.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18204,7 +18204,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polygon Ecosystem Token",
       "symbol": "POL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/32440/large/polygon.png?1698233684",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/32440/large/polygon.png?1698233684",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18219,7 +18219,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polkastarter",
       "symbol": "POLS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12648/thumb/polkastarter.png?1609813702",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12648/thumb/polkastarter.png?1609813702",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18234,7 +18234,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Polymath",
       "symbol": "POLY",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/2784/thumb/inKkF01.png?1605007034",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/2784/thumb/inKkF01.png?1605007034",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18247,7 +18247,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "Marlin",
       "symbol": "POND",
-      "logoURI": "https://assets.coingecko.com/coins/images/8903/thumb/POND_200x200.png?1622515451",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/8903/thumb/POND_200x200.png?1622515451",
       "address": "0xdA0a57B710768ae17941a9Fa33f8B720c8bD9ddD",
       "decimals": 18,
       "extensions": {
@@ -18264,7 +18264,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Power Ledger",
       "symbol": "POWR",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/1104/thumb/power-ledger.png?1547035082",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1104/thumb/power-ledger.png?1547035082",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18279,7 +18279,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Prime",
       "symbol": "PRIME",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/29053/large/PRIMELOGOOO.png?1676976222",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/29053/large/PRIMELOGOOO.png?1676976222",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18292,7 +18292,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "PARSIQ",
       "symbol": "PRQ",
-      "logoURI": "https://assets.coingecko.com/coins/images/11973/thumb/DsNgK0O.png?1596590280",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11973/thumb/DsNgK0O.png?1596590280",
       "address": "0x82164a8B646401a8776F9dC5c8Cba35DcAf60Cd2",
       "decimals": 18,
       "extensions": {
@@ -18309,7 +18309,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Quant",
       "symbol": "QNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/3370/thumb/5ZOu7brX_400x400.jpg?1612437252",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/3370/thumb/5ZOu7brX_400x400.jpg?1612437252",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18324,7 +18324,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rai Reflex Index",
       "symbol": "RAI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18339,7 +18339,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rarible",
       "symbol": "RARI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11845/thumb/Rari.png?1594946953",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11845/thumb/Rari.png?1594946953",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18354,7 +18354,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rubic",
       "symbol": "RBC",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12629/thumb/200x200.png?1607952509",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12629/thumb/200x200.png?1607952509",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18369,7 +18369,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "REN",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x408e41876cCCDC0F92210600ef50372656052a38/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x408e41876cCCDC0F92210600ef50372656052a38/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18384,7 +18384,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Request",
       "symbol": "REQ",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/1031/thumb/Request_icon_green.png?1643250951",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/1031/thumb/Request_icon_green.png?1643250951",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18399,7 +18399,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rari Governance Token",
       "symbol": "RGT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12900/thumb/Rari_Logo_Transparent.png?1613978014",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12900/thumb/Rari_Logo_Transparent.png?1613978014",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18414,7 +18414,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "iExec RLC",
       "symbol": "RLC",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/646/thumb/pL1VuXm.png?1604543202",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/646/thumb/pL1VuXm.png?1604543202",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18429,7 +18429,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Render Token",
       "symbol": "RNDR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11636/thumb/rndr.png?1638840934",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11636/thumb/rndr.png?1638840934",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18444,7 +18444,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Reserve Rights",
       "symbol": "RSR",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/8365/large/RSR_Blue_Circle_1000.png?1721777856",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/8365/large/RSR_Blue_Circle_1000.png?1721777856",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18459,7 +18459,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "The Sandbox",
       "symbol": "SAND",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12129/thumb/sandbox_logo.jpg?1597397942",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12129/thumb/sandbox_logo.jpg?1597397942",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18474,7 +18474,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Stader",
       "symbol": "SD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/20658/standard/SD_Token_Logo.png",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20658/standard/SD_Token_Logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18489,7 +18489,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Shiba Inu",
       "symbol": "SHIB",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11939/thumb/shiba.png?1622619446",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11939/thumb/shiba.png?1622619446",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18504,7 +18504,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SKALE",
       "symbol": "SKL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13245/thumb/SKALE_token_300x300.png?1606789574",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13245/thumb/SKALE_token_300x300.png?1606789574",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18519,7 +18519,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Status",
       "symbol": "SNT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/779/thumb/status.png?1548610778",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/779/thumb/status.png?1548610778",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18534,7 +18534,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "SNX",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18549,7 +18549,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Unisocks",
       "symbol": "SOCKS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/10717/thumb/qFrcoiM.png?1582525244",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/10717/thumb/qFrcoiM.png?1582525244",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18564,7 +18564,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SOL Wormhole ",
       "symbol": "SOL",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18579,7 +18579,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Spell Token",
       "symbol": "SPELL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15861/thumb/abracadabra-3.png?1622544862",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15861/thumb/abracadabra-3.png?1622544862",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18594,7 +18594,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SPX6900",
       "symbol": "SPX",
       "decimals": 8,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/31401/large/sticker_(1).jpg?1702371083",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/31401/large/sticker_(1).jpg?1702371083",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18607,7 +18607,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "Stargate Finance",
       "symbol": "STG",
-      "logoURI": "https://assets.coingecko.com/coins/images/24413/thumb/STG_LOGO.png?1647654518",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24413/thumb/STG_LOGO.png?1647654518",
       "address": "0xe018C7a3d175Fb0fE15D70Da2c874d3CA16313EC",
       "decimals": 18,
       "extensions": {
@@ -18624,7 +18624,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "STORJ",
       "decimals": 8,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xB64ef51C888972c908CFacf59B47C1AfBC0Ab8aC/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xB64ef51C888972c908CFacf59B47C1AfBC0Ab8aC/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18639,7 +18639,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SuperFarm",
       "symbol": "SUPER",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14040/thumb/6YPdWn6.png?1613975899",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14040/thumb/6YPdWn6.png?1613975899",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18654,7 +18654,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "sUSD",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://assets.coingecko.com/coins/images/5013/thumb/sUSD.png?1616150765",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/5013/thumb/sUSD.png?1616150765",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18669,7 +18669,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Sushi",
       "symbol": "SUSHI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18684,7 +18684,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Swell",
       "symbol": "SWELL",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/28777/large/swell1.png?1727899715",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/28777/large/swell1.png?1727899715",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18699,7 +18699,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Synapse",
       "symbol": "SYN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18024/thumb/syn.png?1635002049",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18024/thumb/syn.png?1635002049",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18712,7 +18712,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "Threshold Network",
       "symbol": "T",
-      "logoURI": "https://assets.coingecko.com/coins/images/22228/thumb/nFPNiSbL_400x400.jpg?1641220340",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22228/thumb/nFPNiSbL_400x400.jpg?1641220340",
       "address": "0x0945Cae3ae47cb384b2d47BC448Dc6A9dEC21F55",
       "decimals": 18,
       "extensions": {
@@ -18729,7 +18729,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "tBTC",
       "symbol": "tBTC",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/uniswap/assets/master/blockchains/ethereum/assets/0x18084fbA666a33d37592fA2633fD49a74DD93a88/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/uniswap/assets/master/blockchains/ethereum/assets/0x18084fbA666a33d37592fA2633fD49a74DD93a88/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18744,7 +18744,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tellor",
       "symbol": "TRB",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9644/thumb/Blk_icon_current.png?1584980686",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18759,7 +18759,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Tribe",
       "symbol": "TRIBE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14575/thumb/tribe.PNG?1617487954",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14575/thumb/tribe.PNG?1617487954",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18774,7 +18774,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Turbo",
       "symbol": "TURBO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/30117/large/TurboMark-QL_200.png?1708079597",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/30117/large/TurboMark-QL_200.png?1708079597",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18789,7 +18789,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "UMA",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18819,7 +18819,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDC",
       "decimals": 6,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18834,7 +18834,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDC.e",
       "decimals": 6,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png"
     },
     {
       "chainId": 42161,
@@ -18842,7 +18842,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Pax Dollar",
       "symbol": "USDP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/6013/standard/Pax_Dollar.png?1696506427",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/6013/standard/Pax_Dollar.png?1696506427",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18857,7 +18857,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDT",
       "decimals": 6,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18872,7 +18872,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "USUAL",
       "symbol": "USUAL",
       "decimals": 18,
-      "logoURI": "https://coin-images.coingecko.com/coins/images/51091/large/USUAL.jpg?1730035787",
+      "logoURI": "https://coin-images.coingecko.dummy.com/coins/images/51091/large/USUAL.jpg?1730035787",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18885,7 +18885,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "Wrapped Ampleforth",
       "symbol": "WAMPL",
-      "logoURI": "https://assets.coingecko.com/coins/images/20825/thumb/photo_2021-11-25_02-05-11.jpg?1637811951",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/20825/thumb/photo_2021-11-25_02-05-11.jpg?1637811951",
       "address": "0x1c8Ec4DE3c2BFD3050695D89853EC6d78AE650bb",
       "decimals": 18,
       "extensions": {
@@ -18902,7 +18902,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WBTC",
       "decimals": 8,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18917,7 +18917,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18930,7 +18930,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "WOO Network",
       "symbol": "WOO",
-      "logoURI": "https://assets.coingecko.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
       "address": "0xcAFcD85D8ca7Ad1e1C6F82F651fA15E33AEfD07b",
       "decimals": 18,
       "extensions": {
@@ -18945,7 +18945,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 42161,
       "name": "Chain",
       "symbol": "XCN",
-      "logoURI": "https://assets.coingecko.com/coins/images/24210/thumb/Chain_icon_200x200.png?1646895054",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24210/thumb/Chain_icon_200x200.png?1646895054",
       "address": "0x58BbC087e36Db40a84b22c1B93a042294deEAFEd",
       "decimals": 18,
       "extensions": {
@@ -18962,7 +18962,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "XSGD",
       "symbol": "XSGD",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/12832/standard/StraitsX_Singapore_Dollar_%28XSGD%29_Token_Logo.png?1696512623",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12832/standard/StraitsX_Singapore_Dollar_%28XSGD%29_Token_Logo.png?1696512623",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18977,7 +18977,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "yearn finance",
       "symbol": "YFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -18992,7 +18992,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Zetachain",
       "symbol": "Zeta",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/26718/standard/Twitter_icon.png?1696525788",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26718/standard/Twitter_icon.png?1696525788",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19007,7 +19007,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LayerZero",
       "symbol": "ZRO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19022,7 +19022,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "ZRX",
       "decimals": 18,
       "chainId": 42161,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19037,7 +19037,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Wrapped Bitcoin",
       "symbol": "BTC",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/ubeswap/default-token-list/master/assets/asset_WBTC.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/ubeswap/default-token-list/master/assets/asset_WBTC.png"
     },
     {
       "chainId": 42220,
@@ -19045,7 +19045,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Celo",
       "symbol": "CELO",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/ubeswap/default-token-list/master/assets/asset_CELO.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/ubeswap/default-token-list/master/assets/asset_CELO.png"
     },
     {
       "name": "USDCoin",
@@ -19053,7 +19053,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDC",
       "decimals": 6,
       "chainId": 42220,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19068,7 +19068,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDT",
       "decimals": 6,
       "chainId": 42220,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19083,7 +19083,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 42220,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19098,7 +19098,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "1inch",
       "symbol": "1INCH",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13469/thumb/1inch-token.png?1608803028",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13469/thumb/1inch-token.png?1608803028",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19113,7 +19113,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Aave",
       "symbol": "AAVE",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12645/thumb/AAVE.png?1601374110",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12645/thumb/AAVE.png?1601374110",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19128,7 +19128,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "agEur",
       "symbol": "agEUR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/19479/standard/agEUR.png?1696518915",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/19479/standard/agEUR.png?1696518915",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19143,7 +19143,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Alpha Venture DAO",
       "symbol": "ALPHA",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12738/thumb/AlphaToken_256x256.png?1617160876",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19158,7 +19158,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Ankr",
       "symbol": "ANKR",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4324/thumb/U85xTl2.png?1608111978",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19173,7 +19173,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Axelar",
       "symbol": "AXL",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/27277/large/V-65_xQ1_400x400.jpeg",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/27277/large/V-65_xQ1_400x400.jpeg",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19188,7 +19188,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Basic Attention Token",
       "symbol": "BAT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/677/thumb/basic-attention-token.png?1547034427",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/677/thumb/basic-attention-token.png?1547034427",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19203,7 +19203,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Binance USD",
       "symbol": "BUSD",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/9576/thumb/BUSD.png?1568947766",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/9576/thumb/BUSD.png?1568947766",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19218,7 +19218,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "COMP",
       "decimals": 18,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xc00e94Cb662C3520282E6f5717214004A7f26888/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19233,7 +19233,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Cartesi",
       "symbol": "CTSI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11038/thumb/cartesi.png?1592288021",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11038/thumb/cartesi.png?1592288021",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19248,7 +19248,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "DAI.e",
       "decimals": 18,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/Uniswap/assets/master/blockchains/avalanchec/assets/0xd586E7F844cEa2F87f50152665BCbc2C279D8d70/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/Uniswap/assets/master/blockchains/avalanchec/assets/0xd586E7F844cEa2F87f50152665BCbc2C279D8d70/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19263,7 +19263,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "DeFi Yield Protocol",
       "symbol": "DYP",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13480/thumb/DYP_Logo_Symbol-8.png?1655809066",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13480/thumb/DYP_Logo_Symbol-8.png?1655809066",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19278,7 +19278,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Euro Coin",
       "symbol": "EURC",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/26045/standard/euro.png?1696525125"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/26045/standard/euro.png?1696525125"
     },
     {
       "chainId": 43114,
@@ -19286,7 +19286,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Flux",
       "symbol": "FLUX",
       "decimals": 8,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x720CD16b011b987Da3518fbf38c3071d4F0D1495/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x720CD16b011b987Da3518fbf38c3071d4F0D1495/logo.png"
     },
     {
       "chainId": 43114,
@@ -19294,7 +19294,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax",
       "symbol": "FRAX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13422/thumb/frax_logo.png?1608476506",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13422/thumb/frax_logo.png?1608476506",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19309,7 +19309,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Frax Share",
       "symbol": "FXS",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13423/thumb/frax_share.png?1608478989",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13423/thumb/frax_share.png?1608478989",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19324,7 +19324,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "GMX",
       "symbol": "GMX",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18323/large/arbit.png?1631532468"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18323/large/arbit.png?1631532468"
     },
     {
       "chainId": 43114,
@@ -19332,7 +19332,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "The Graph",
       "symbol": "GRT",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/13397/thumb/Graph_Token.png?1608145566",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19347,7 +19347,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "LINK",
       "decimals": 18,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x514910771AF9Ca656af840dff83E8264EcF986CA/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19362,7 +19362,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Magic Internet Money",
       "symbol": "MIM",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/16786/thumb/mimlogopng.png?1624979612",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19377,7 +19377,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "MKR",
       "decimals": 18,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19392,7 +19392,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Multichain",
       "symbol": "MULTI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/22087/thumb/1_Wyot-SDGZuxbjdkaOeT2-A.png?1640764238",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22087/thumb/1_Wyot-SDGZuxbjdkaOeT2-A.png?1640764238",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19407,7 +19407,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Rai Reflex Index",
       "symbol": "RAI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/14004/thumb/RAI-logo-coin.png?1613592334",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19422,7 +19422,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "SNX",
       "decimals": 18,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19437,7 +19437,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "SOL Wormhole ",
       "symbol": "SOL",
       "decimals": 9,
-      "logoURI": "https://assets.coingecko.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/22876/thumb/SOL_wh_small.png?1644224316",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19452,7 +19452,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Spell Token",
       "symbol": "SPELL",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/15861/thumb/abracadabra-3.png?1622544862",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/15861/thumb/abracadabra-3.png?1622544862",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19465,7 +19465,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 43114,
       "name": "Stargate Finance",
       "symbol": "STG",
-      "logoURI": "https://assets.coingecko.com/coins/images/24413/thumb/STG_LOGO.png?1647654518",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/24413/thumb/STG_LOGO.png?1647654518",
       "address": "0x2F6F07CDcf3588944Bf4C42aC74ff24bF56e7590",
       "decimals": 18,
       "extensions": {
@@ -19482,7 +19482,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Sushi",
       "symbol": "SUSHI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12271/thumb/512x512_Logo_no_chop.png?1606986688",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19497,7 +19497,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Synapse",
       "symbol": "SYN",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/18024/thumb/syn.png?1635002049",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/18024/thumb/syn.png?1635002049",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19512,7 +19512,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "UMA",
       "decimals": 18,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19527,7 +19527,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "UNI.e",
       "decimals": 18,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/Uniswap/assets/master/blockchains/avalanchec/assets/0x8eBAf22B6F053dFFeaf46f4Dd9eFA95D89ba8580/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/Uniswap/assets/master/blockchains/avalanchec/assets/0x8eBAf22B6F053dFFeaf46f4Dd9eFA95D89ba8580/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19542,7 +19542,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDC",
       "decimals": 6,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/Uniswap/assets/master/blockchains/avalanchec/assets/0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/Uniswap/assets/master/blockchains/avalanchec/assets/0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19557,7 +19557,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "USDT",
       "decimals": 6,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19572,7 +19572,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Wrapped AVAX",
       "symbol": "WAVAX",
       "decimals": 18,
-      "logoURI": "https://raw.githubusercontent.com/Uniswap/assets/master/blockchains/avalanchec/assets/0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/Uniswap/assets/master/blockchains/avalanchec/assets/0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7/logo.png"
     },
     {
       "name": "Wrapped BTC",
@@ -19580,7 +19580,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WBTC",
       "decimals": 8,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19595,7 +19595,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19608,7 +19608,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "chainId": 43114,
       "name": "WOO Network",
       "symbol": "WOO",
-      "logoURI": "https://assets.coingecko.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/12921/thumb/w2UiemF__400x400.jpg?1603670367",
       "address": "0xaBC9547B534519fF73921b1FBA6E672b5f58D083",
       "decimals": 18,
       "extensions": {
@@ -19625,7 +19625,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "yearn finance",
       "symbol": "YFI",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/11849/thumb/yfi-192x192.png?1598325330",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19640,7 +19640,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "LayerZero",
       "symbol": "ZRO",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/28206/standard/ftxG9_TJ_400x400.jpeg?1696527208"
     },
     {
       "name": "0x Protocol Token",
@@ -19648,7 +19648,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "ZRX",
       "decimals": 18,
       "chainId": 43114,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xE41d2489571d322189246DaFA5ebDe1F4699F498/logo.png",
       "extensions": {
         "bridgeInfo": {
           "1": {
@@ -19663,7 +19663,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 80001,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png"
     },
     {
       "name": "Wrapped Matic",
@@ -19671,7 +19671,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WMATIC",
       "decimals": 18,
       "chainId": 80001,
-      "logoURI": "https://assets.coingecko.com/coins/images/4713/thumb/matic-token-icon.png?1624446912"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/4713/thumb/matic-token-icon.png?1624446912"
     },
     {
       "chainId": 81457,
@@ -19679,7 +19679,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "Blast",
       "symbol": "BLAST",
       "decimals": 18,
-      "logoURI": "https://assets.coingecko.com/coins/images/35494/standard/Blast.jpg?1719385662"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/35494/standard/Blast.jpg?1719385662"
     },
     {
       "chainId": 7777777,
@@ -19687,7 +19687,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "name": "USD Coin (Bridged from Ethereum)",
       "symbol": "USDzC",
       "decimals": 6,
-      "logoURI": "https://assets.coingecko.com/coins/images/35218/large/USDC_Icon.png?1707908537"
+      "logoURI": "https://assets.coingecko.dummy.com/coins/images/35218/large/USDC_Icon.png?1707908537"
     },
     {
       "name": "Uniswap",
@@ -19703,7 +19703,7 @@ var UniswapTokenList = fetcher.FetchedTokenList{
       "symbol": "WETH",
       "decimals": 18,
       "chainId": 11155111,
-      "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png"
+      "logoURI": "https://raw.githubusercontent.dummy.com/trustwallet/assets/master/blockchains/ethereum/assets/0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2/logo.png"
     }
   ]
 }

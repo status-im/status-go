@@ -58,10 +58,10 @@ const (
 
 	// MainnetEthereumNetworkURL is URL where the upstream ethereum network is loaded to
 	// allow us avoid syncing node.
-	MainnetEthereumNetworkURL = "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
+	MainnetEthereumNetworkURL = "https://dummy.com/"
 
 	// SepoliaEthereumNetworkURL is an open RPC endpoint to Sepolia network
-	SepoliaEthereumNetworkURL = "https://sepolia.etherscan.io/"
+	SepoliaEthereumNetworkURL = "https://dummy.com/"
 
 	// MainNetworkID is id of the main network
 	MainNetworkID = 1
@@ -82,7 +82,7 @@ const (
 	LESDiscoveryIdentifier = "LES2@"
 
 	// IpfsGatewayURL is the Gateway URL to use for IPFS
-	IpfsGatewayURL = "https://ipfs.status.im/"
+	IpfsGatewayURL = "https://dummy.com/"
 
 	DefaultPreLoginLogFile  = "pre_login.log"
 	DefaultPreLoginLogLevel = "ERROR"

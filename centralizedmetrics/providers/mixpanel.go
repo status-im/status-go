@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/centralizedmetrics/common"
 )
 
-const MixpanelBaseURL = "https://api.mixpanel.com"
+const MixpanelBaseURL = "https://dummy.com"
 
 var MixpanelToken = ""
 var MixpanelAppID = ""

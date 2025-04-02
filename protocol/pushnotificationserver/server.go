@@ -19,7 +19,7 @@ import (
 )
 
 const encryptedPayloadKeyLength = 16
-const defaultGorushURL = "https://gorush.infra.status.im/"
+const defaultGorushURL = "https://dummy.com/"
 
 var errUnhandledPushNotificationType = errors.New("unhandled push notification type")
 

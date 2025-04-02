@@ -35,16 +35,11 @@ type Client struct {
 }
 
 func NewClient() *Client {
-	return &Client{Client: &http.Client{Timeout: time.Minute}, URL: "https://raw.githubusercontent.com"}
+	return &Client{Client: &http.Client{Timeout: time.Minute}, URL: "https://dummy.com"}
 }
 
 func (c *Client) DoQuery(url string) (*http.Response, error) {
-	resp, err := c.Client.Get(url)
-
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return nil, thirdparty.ErrEndpointNotSupported
 }
 
 func (c *Client) Run(data string) (*thirdparty.DataParsed, error) {

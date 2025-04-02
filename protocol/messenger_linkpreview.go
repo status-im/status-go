@@ -66,7 +66,7 @@ func (m *Messenger) newURLUnfurler(httpClient *http.Client, url *neturl.URL) Unf
 	switch normalizeHostname(url.Hostname()) {
 	case "reddit.com":
 		return NewOEmbedUnfurler(
-			"https://www.reddit.com/oembed",
+			"https://dummy.com/oembed",
 			url,
 			m.logger,
 			httpClient)

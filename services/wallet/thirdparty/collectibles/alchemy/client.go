@@ -25,25 +25,6 @@ const nftMetadataBatchLimit = 100
 const contractMetadataBatchLimit = 100
 
 func getBaseURL(chainID walletCommon.ChainID) (string, error) {
-	switch uint64(chainID) {
-	case walletCommon.EthereumMainnet:
-		return "https://eth-mainnet.g.alchemy.com", nil
-	case walletCommon.EthereumSepolia:
-		return "https://eth-sepolia.g.alchemy.com", nil
-	case walletCommon.OptimismMainnet:
-		return "https://opt-mainnet.g.alchemy.com", nil
-	case walletCommon.OptimismSepolia:
-		return "https://opt-sepolia.g.alchemy.com", nil
-	case walletCommon.ArbitrumMainnet:
-		return "https://arb-mainnet.g.alchemy.com", nil
-	case walletCommon.ArbitrumSepolia:
-		return "https://arb-sepolia.g.alchemy.com", nil
-	case walletCommon.BaseMainnet:
-		return "https://base-mainnet.g.alchemy.com", nil
-	case walletCommon.BaseSepolia:
-		return "https://base-sepolia.g.alchemy.com", nil
-	}
-
 	return "", thirdparty.ErrChainIDNotSupported
 }
 

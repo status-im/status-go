@@ -18,7 +18,7 @@ import (
 )
 
 const mercuryoID = "mercuryo"
-const mercuryioNoFeesBaseURL = "https://exchange.mercuryo.io/?type=buy&networks=ETHEREUM,ARBITRUM,OPTIMISM,BASE&currency=ETH"
+const mercuryioNoFeesBaseURL = "https://dummy.com"
 const supportedAssetsUpdateInterval = 24 * time.Hour
 
 type MercuryoProvider struct {
@@ -118,7 +118,7 @@ func getMercuryoCurrency(symbol string) string {
 
 func (p *MercuryoProvider) GetURL(ctx context.Context, parameters Parameters) (string, error) {
 	const (
-		baseURL      = "https://exchange.mercuryo.io/?type=buy"
+		baseURL      = "https://dummy.com"
 		widgetID     = "6a7eb330-2b09-49b7-8fd3-1c77cfb6cd47"
 		widgetSecret = "AZ5fmxmrgyrXH3zre6yHU2Vw9fPqEw82" // #nosec G101
 	)

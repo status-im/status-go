@@ -8,7 +8,7 @@ import (
 )
 
 const moonpayID = "moonpay"
-const moonpayURL = "https://buy.moonpay.com/?apiKey=pk_live_YQC6CQPA5qqDu0unEwHJyAYQyeIqFGR"
+const moonpayURL = "https://dummy.com"
 
 type MoonPayProvider struct{}
 

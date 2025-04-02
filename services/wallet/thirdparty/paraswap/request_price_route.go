@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
-const pricesURL = "https://api.paraswap.io/prices"
+const pricesURL = "https://dummy.com/prices"
 
 type Route struct {
 	GasCost            *bigint.BigInt  `json:"gasCost"`

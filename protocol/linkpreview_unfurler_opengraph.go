@@ -81,6 +81,7 @@ func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
 	preview.Type = protobuf.UnfurledLink_LINK
 
+	return preview, fmt.Errorf("failed to parse OpenGraph data")
 	headers := map[string]string{
 		"accept":          headerAcceptText,
 		"accept-language": headerAcceptLanguage,

@@ -9,12 +9,12 @@ import (
 var AaveTokenList = fetcher.FetchedTokenList{
 	TokenList: fetcher.TokenList{
 		ID:        "aave",
-		SourceURL: "https://raw.githubusercontent.com/bgd-labs/aave-address-book/main/tokenlist.json",
+		SourceURL: "https://dummy.com/tokenlist.json",
 	},
 	Fetched: time.Unix(1741614301, 0),
 	JsonData: `{
   "name": "Aave token list",
-  "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aave.svg",
+  "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aave.svg",
   "keywords": ["audited", "verified", "aave"],
   "tags": {
     "underlying": {
@@ -48,7 +48,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 1,
@@ -57,7 +57,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
@@ -70,7 +70,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "DAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
     },
     {
       "chainId": 1,
@@ -79,7 +79,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmDAI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0x6B175474E89094C44Da98b954EedeAC495271d0F"
@@ -92,7 +92,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 1,
@@ -101,7 +101,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aAmmUSDC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -114,7 +114,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDT",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
     },
     {
       "chainId": 1,
@@ -123,7 +123,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aAmmUSDT",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
@@ -136,7 +136,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "WBTC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
     },
     {
       "chainId": 1,
@@ -145,7 +145,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aAmmWBTC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
@@ -158,7 +158,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_DAI_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -167,7 +167,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniDAIWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11"
@@ -180,7 +180,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_WBTC_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -189,7 +189,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniWBTCWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xBb2b8038a1640196FbE3e38816F3e67Cba72D940"
@@ -202,7 +202,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_AAVE_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -211,7 +211,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniAAVEWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xDFC14d2Af169B0D36C4EFF567Ada9b2E0CAE044f"
@@ -224,7 +224,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_BAT_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -233,7 +233,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniBATWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xB6909B960DbbE7392D405429eB2b3649752b4838"
@@ -246,7 +246,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_DAI_USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -255,7 +255,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniDAIUSDC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xAE461cA67B15dc8dc81CE7615e0320dA1A9aB8D5"
@@ -268,7 +268,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_CRV_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -277,7 +277,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniCRVWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0x3dA1313aE46132A397D90d95B1424A9A7e3e0fCE"
@@ -290,7 +290,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_LINK_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -299,7 +299,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniLINKWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xa2107FA5B38d9bbd2C461D6EDf11B11A50F6b974"
@@ -312,7 +312,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_MKR_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -321,7 +321,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniMKRWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xC2aDdA861F89bBB333c90c492cB837741916A225"
@@ -334,7 +334,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_REN_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -343,7 +343,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniRENWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0x8Bd1661Da98EBDd3BD080F0bE4e6d9bE8cE9858c"
@@ -356,7 +356,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_SNX_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -365,7 +365,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniSNXWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0x43AE24960e5534731Fc831386c07755A2dc33D47"
@@ -378,7 +378,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_UNI_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -387,7 +387,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniUNIWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xd3d2E2692501A5c9Ca623199D38826e513033a17"
@@ -400,7 +400,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_USDC_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -409,7 +409,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniUSDCWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc"
@@ -422,7 +422,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_WBTC_USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -431,7 +431,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniWBTCUSDC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0x004375Dff511095CC5A197A54140a24eFEF3A416"
@@ -444,7 +444,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI_YFI_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -453,7 +453,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmUniYFIWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0x2fDbAdf3C4D5A8666Bc06645B8358ab803996E28"
@@ -466,7 +466,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "BPT_WBTC_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/bpt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/bpt.svg"
     },
     {
       "chainId": 1,
@@ -475,7 +475,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmBptWBTCWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/abpt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/abpt.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0x1efF8aF5D577060BA4ac8A29A13525bb0Ee2A3D5"
@@ -488,7 +488,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "BPT_BAL_WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/bpt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/bpt.svg"
     },
     {
       "chainId": 1,
@@ -497,7 +497,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmBptBALWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/abpt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/abpt.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0x59A19D8c652FA0284f44113D0ff9aBa70bd46fB4"
@@ -510,7 +510,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "GUNI_DAI_USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/guni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/guni.svg"
     },
     {
       "chainId": 1,
@@ -519,7 +519,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmGUniDAIUSDC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aguni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aguni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0x50379f632ca68D36E50cfBC8F78fe16bd1499d1e"
@@ -532,7 +532,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "GUNI_USDC_USDT",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/guni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/guni.svg"
     },
     {
       "chainId": 1,
@@ -541,7 +541,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAmmGUniUSDCUSDT",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aguni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aguni.svg",
       "extensions": {
         "pool": "0x7937D4799803FbBe595ed57278Bc4cA21f3bFfCB",
         "underlying": "0xD2eeC91055F07fE24C9cCB25828ecfEFd4be0c41"
@@ -554,7 +554,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aUSDC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x37D7306019a38Af123e4b245Eb6C28AF552e0bB0",
         "underlying": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -567,7 +567,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aWBTC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0x37D7306019a38Af123e4b245Eb6C28AF552e0bB0",
         "underlying": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
@@ -580,7 +580,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x37D7306019a38Af123e4b245Eb6C28AF552e0bB0",
         "underlying": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
@@ -593,7 +593,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "AAVE",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
     },
     {
       "chainId": 1,
@@ -602,7 +602,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAAVE",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
       "extensions": {
         "pool": "0x37D7306019a38Af123e4b245Eb6C28AF552e0bB0",
         "underlying": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9"
@@ -615,7 +615,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aUSDT",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
@@ -628,7 +628,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aWBTC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
@@ -641,7 +641,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
@@ -654,7 +654,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "YFI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/yfi.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/yfi.svg"
     },
     {
       "chainId": 1,
@@ -663,7 +663,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aYFI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ayfi.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ayfi.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e"
@@ -676,7 +676,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ZRX",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/zrx.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/zrx.svg"
     },
     {
       "chainId": 1,
@@ -685,7 +685,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aZRX",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/azrx.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/azrx.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xE41d2489571d322189246DaFA5ebDe1F4699F498"
@@ -698,7 +698,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "UNI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/uni.svg"
     },
     {
       "chainId": 1,
@@ -707,7 +707,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aUNI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
@@ -720,7 +720,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAAVE",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9"
@@ -733,7 +733,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "BAT",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/bat.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/bat.svg"
     },
     {
       "chainId": 1,
@@ -742,7 +742,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBAT",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/abat.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/abat.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x0D8775F648430679A709E98d2b0Cb6250d2887EF"
@@ -755,7 +755,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "BUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/busd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/busd.svg"
     },
     {
       "chainId": 1,
@@ -764,7 +764,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBUSD",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/abusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/abusd.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x4Fabb145d64652a948d72533023f6E7A623C7C53"
@@ -777,7 +777,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aDAI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x6B175474E89094C44Da98b954EedeAC495271d0F"
@@ -790,7 +790,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ENJ",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/enj.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/enj.svg"
     },
     {
       "chainId": 1,
@@ -799,7 +799,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aENJ",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aenj.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aenj.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xF629cBd94d3791C9250152BD8dfBDF380E2a3B9c"
@@ -812,7 +812,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "KNC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/knc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/knc.svg"
     },
     {
       "chainId": 1,
@@ -821,7 +821,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aKNC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aknc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aknc.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xdd974D5C2e2928deA5F71b9825b8b646686BD200"
@@ -834,7 +834,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "LINK",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/link.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/link.svg"
     },
     {
       "chainId": 1,
@@ -843,7 +843,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aLINK",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x514910771AF9Ca656af840dff83E8264EcF986CA"
@@ -856,7 +856,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "MANA",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/mana.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/mana.svg"
     },
     {
       "chainId": 1,
@@ -865,7 +865,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aMANA",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/amana.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/amana.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x0F5D2fB29fb7d3CFeE444a200298f468908cC942"
@@ -878,7 +878,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "MKR",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/mkr.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/mkr.svg"
     },
     {
       "chainId": 1,
@@ -887,7 +887,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aMKR",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/amkr.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/amkr.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2"
@@ -900,7 +900,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "REN",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ren.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ren.svg"
     },
     {
       "chainId": 1,
@@ -909,7 +909,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aREN",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aren.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aren.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x408e41876cCCDC0F92210600ef50372656052a38"
@@ -922,7 +922,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "SNX",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/snx.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/snx.svg"
     },
     {
       "chainId": 1,
@@ -931,7 +931,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aSNX",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asnx.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asnx.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F"
@@ -944,7 +944,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "sUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/susd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/susd.svg"
     },
     {
       "chainId": 1,
@@ -953,7 +953,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aSUSD",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asusd.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51"
@@ -966,7 +966,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "TUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/tusd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/tusd.svg"
     },
     {
       "chainId": 1,
@@ -975,7 +975,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aTUSD",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/atusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/atusd.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x0000000000085d4780B73119b644AE5ecd22b376"
@@ -988,7 +988,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aUSDC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -1001,7 +1001,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "CRV",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/crv.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/crv.svg"
     },
     {
       "chainId": 1,
@@ -1010,7 +1010,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aCRV",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acrv.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acrv.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xD533a949740bb3306d119CC777fa900bA034cd52"
@@ -1023,7 +1023,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 2,
       "symbol": "GUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/gusd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/gusd.svg"
     },
     {
       "chainId": 1,
@@ -1032,7 +1032,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 2,
       "symbol": "aGUSD",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/agusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/agusd.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x056Fd409E1d7A124BD7017459dFEa2F387b6d5Cd"
@@ -1045,7 +1045,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "BAL",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/bal.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/bal.svg"
     },
     {
       "chainId": 1,
@@ -1054,7 +1054,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBAL",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/abal.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/abal.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xba100000625a3754423978a60c9317c58a424e3D"
@@ -1067,7 +1067,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "xSUSHI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/xsushi.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/xsushi.svg"
     },
     {
       "chainId": 1,
@@ -1076,7 +1076,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aXSUSHI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/axsushi.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/axsushi.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x8798249c2E607446EfB7Ad49eC89dD1865Ff4272"
@@ -1089,7 +1089,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "renFIL",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/renfil.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/renfil.svg"
     },
     {
       "chainId": 1,
@@ -1098,7 +1098,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aRENFIL",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/arenfil.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/arenfil.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xD5147bc8e386d91Cc5DBE72099DAC6C9b99276F5"
@@ -1111,7 +1111,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "RAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/rai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/rai.svg"
     },
     {
       "chainId": 1,
@@ -1120,7 +1120,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aRAI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/arai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/arai.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x03ab458634910AaD20eF5f1C8ee96F1D6ac54919"
@@ -1133,7 +1133,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 9,
       "symbol": "AMPL",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ampl.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ampl.svg"
     },
     {
       "chainId": 1,
@@ -1142,7 +1142,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 9,
       "symbol": "aAMPL",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aampl.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aampl.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xD46bA6D942050d489DBd938a2C909A5d5039A161"
@@ -1155,7 +1155,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "USDP",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdp.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdp.svg"
     },
     {
       "chainId": 1,
@@ -1164,7 +1164,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aUSDP",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdp.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdp.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x8E870D67F660D95d5be530380D0eC0bd388289E1"
@@ -1177,7 +1177,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "DPI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/dpi.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/dpi.svg"
     },
     {
       "chainId": 1,
@@ -1186,7 +1186,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aDPI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adpi.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adpi.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x1494CA1F11D487c2bBe4543E90080AeBa4BA3C2b"
@@ -1199,7 +1199,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "FRAX",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/frax.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/frax.svg"
     },
     {
       "chainId": 1,
@@ -1208,7 +1208,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aFRAX",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/afrax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/afrax.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x853d955aCEf822Db058eb8505911ED77F175b99e"
@@ -1221,7 +1221,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "FEI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/fei.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/fei.svg"
     },
     {
       "chainId": 1,
@@ -1230,7 +1230,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aFEI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/afei.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/afei.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x956F47F50A910163D8BF957Cf5846D573E7f87CA"
@@ -1243,7 +1243,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/steth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/steth.svg"
     },
     {
       "chainId": 1,
@@ -1252,7 +1252,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aSTETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asteth.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84"
@@ -1265,7 +1265,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ENS",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ens.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ens.svg"
     },
     {
       "chainId": 1,
@@ -1274,7 +1274,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aENS",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aens.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aens.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xC18360217D8F7Ab5e7c516566761Ea12Ce7F9D72"
@@ -1287,7 +1287,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "UST",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ust.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ust.svg"
     },
     {
       "chainId": 1,
@@ -1296,7 +1296,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aUST",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aust.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aust.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0xa693B19d2931d498c5B318dF961919BB4aee87a5"
@@ -1309,7 +1309,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "CVX",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/cvx.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/cvx.svg"
     },
     {
       "chainId": 1,
@@ -1318,7 +1318,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aCVX",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acvx.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acvx.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B"
@@ -1331,7 +1331,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ONE_INCH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/1inch.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/1inch.svg"
     },
     {
       "chainId": 1,
@@ -1340,7 +1340,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aONE_INCH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/a1inch.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/a1inch.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x111111111117dC0aa78b770fA6A738034120C302"
@@ -1353,7 +1353,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "LUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/lusd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/lusd.svg"
     },
     {
       "chainId": 1,
@@ -1362,7 +1362,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aLUSD",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alusd.svg",
       "extensions": {
         "pool": "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9",
         "underlying": "0x5f98805A4E8be255a32880FDeC7F6728C6568bA0"
@@ -1375,7 +1375,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "DAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
     },
     {
       "chainId": 137,
@@ -1384,7 +1384,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "amDAI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063"
@@ -1397,7 +1397,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 137,
@@ -1406,7 +1406,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "amUSDC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
@@ -1419,7 +1419,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDT",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
     },
     {
       "chainId": 137,
@@ -1428,7 +1428,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "amUSDT",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
@@ -1441,7 +1441,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "WBTC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
     },
     {
       "chainId": 137,
@@ -1450,7 +1450,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "amWBTC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6"
@@ -1463,7 +1463,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 137,
@@ -1472,7 +1472,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "amWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"
@@ -1485,7 +1485,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WMATIC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wmatic.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wmatic.svg"
     },
     {
       "chainId": 137,
@@ -1494,7 +1494,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "amWMATIC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awmatic.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awmatic.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
@@ -1507,7 +1507,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "AAVE",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
     },
     {
       "chainId": 137,
@@ -1516,7 +1516,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "amAAVE",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0xD6DF932A45C0f255f85145f286eA0b292B21C90B"
@@ -1529,7 +1529,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "GHST",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ghst.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ghst.svg"
     },
     {
       "chainId": 137,
@@ -1538,7 +1538,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "amGHST",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aghst.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aghst.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7"
@@ -1551,7 +1551,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "BAL",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/bal.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/bal.svg"
     },
     {
       "chainId": 137,
@@ -1560,7 +1560,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "amBAL",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/abal.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/abal.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0x9a71012B13CA4d3D0Cdc72A177DF3ef03b0E76A3"
@@ -1573,7 +1573,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "DPI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/dpi.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/dpi.svg"
     },
     {
       "chainId": 137,
@@ -1582,7 +1582,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "amDPI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adpi.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adpi.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0x85955046DF4668e1DD369D2DE9f3AEB98DD2A369"
@@ -1595,7 +1595,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "CRV",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/crv.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/crv.svg"
     },
     {
       "chainId": 137,
@@ -1604,7 +1604,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "amCRV",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acrv.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acrv.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0x172370d5Cd63279eFa6d502DAB29171933a610AF"
@@ -1617,7 +1617,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "SUSHI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/sushi.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/sushi.svg"
     },
     {
       "chainId": 137,
@@ -1626,7 +1626,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "amSUSHI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asushi.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asushi.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a"
@@ -1639,7 +1639,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "LINK",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/link.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/link.svg"
     },
     {
       "chainId": 137,
@@ -1648,7 +1648,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "amLINK",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
       "extensions": {
         "pool": "0x8dFf5E27EA6b7AC08EbFdf9eB090F32ee9a30fcf",
         "underlying": "0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39"
@@ -1661,7 +1661,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETHe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 43114,
@@ -1670,7 +1670,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "avWETH",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x4F01AeD16D97E3aB5ab2B501154DC9bb0F1A5A2C",
         "underlying": "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB"
@@ -1683,7 +1683,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "DAIe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
     },
     {
       "chainId": 43114,
@@ -1692,7 +1692,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "avDAI",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x4F01AeD16D97E3aB5ab2B501154DC9bb0F1A5A2C",
         "underlying": "0xd586E7F844cEa2F87f50152665BCbc2C279D8d70"
@@ -1705,7 +1705,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDTe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
     },
     {
       "chainId": 43114,
@@ -1714,7 +1714,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "avUSDT",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x4F01AeD16D97E3aB5ab2B501154DC9bb0F1A5A2C",
         "underlying": "0xc7198437980c041c805A1EDcbA50c1Ce5db95118"
@@ -1727,7 +1727,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDCe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 43114,
@@ -1736,7 +1736,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "avUSDC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x4F01AeD16D97E3aB5ab2B501154DC9bb0F1A5A2C",
         "underlying": "0xA7D7079b0FEaD91F3e65f86E8915Cb59c1a4C664"
@@ -1749,7 +1749,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "AAVEe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
     },
     {
       "chainId": 43114,
@@ -1758,7 +1758,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "avAAVE",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
       "extensions": {
         "pool": "0x4F01AeD16D97E3aB5ab2B501154DC9bb0F1A5A2C",
         "underlying": "0x63a72806098Bd3D9520cC43356dD78afe5D386D9"
@@ -1771,7 +1771,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "WBTCe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
     },
     {
       "chainId": 43114,
@@ -1780,7 +1780,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "avWBTC",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0x4F01AeD16D97E3aB5ab2B501154DC9bb0F1A5A2C",
         "underlying": "0x50b7545627a5162F82A992c33b87aDc75187B218"
@@ -1793,7 +1793,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WAVAX",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wavax.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wavax.svg"
     },
     {
       "chainId": 43114,
@@ -1802,7 +1802,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "avWAVAX",
       "tags": ["aTokenV2", "aaveV2"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awavax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awavax.svg",
       "extensions": {
         "pool": "0x4F01AeD16D97E3aB5ab2B501154DC9bb0F1A5A2C",
         "underlying": "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7"
@@ -1815,7 +1815,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
@@ -1828,7 +1828,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthWETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
@@ -1842,7 +1842,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waEthWETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
@@ -1856,7 +1856,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "wstETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
     },
     {
       "chainId": 1,
@@ -1865,7 +1865,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthwstETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
@@ -1878,7 +1878,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthwstETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
@@ -1892,7 +1892,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aEthWBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
@@ -1905,7 +1905,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "stataEthWBTC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
@@ -1919,7 +1919,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aEthUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -1932,7 +1932,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataEthUSDC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
@@ -1946,7 +1946,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "waEthUSDC",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
@@ -1960,7 +1960,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthDAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x6B175474E89094C44Da98b954EedeAC495271d0F"
@@ -1973,7 +1973,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthDAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
@@ -1987,7 +1987,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthLINK",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x514910771AF9Ca656af840dff83E8264EcF986CA"
@@ -2000,7 +2000,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthLINK",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
@@ -2014,7 +2014,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthAAVE",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9"
@@ -2027,7 +2027,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthAAVE",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataaave.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
@@ -2041,7 +2041,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "cbETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/cbeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/cbeth.svg"
     },
     {
       "chainId": 1,
@@ -2050,7 +2050,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthcbETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acbeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acbeth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xBe9895146f7AF43049ca1c1AE358B0541Ea49704"
@@ -2063,7 +2063,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthcbETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statacbeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statacbeth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xBe9895146f7AF43049ca1c1AE358B0541Ea49704",
@@ -2077,7 +2077,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aEthUSDT",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
@@ -2090,7 +2090,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataEthUSDT",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
@@ -2104,7 +2104,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "waEthUSDT",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
@@ -2118,7 +2118,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "rETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/reth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/reth.svg"
     },
     {
       "chainId": 1,
@@ -2127,7 +2127,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthrETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/areth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/areth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xae78736Cd615f374D3085123A210448E74Fc6393"
@@ -2140,7 +2140,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthrETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statareth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statareth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xae78736Cd615f374D3085123A210448E74Fc6393",
@@ -2154,7 +2154,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthLUSD",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alusd.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x5f98805A4E8be255a32880FDeC7F6728C6568bA0"
@@ -2167,7 +2167,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthLUSD",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statalusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statalusd.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x5f98805A4E8be255a32880FDeC7F6728C6568bA0",
@@ -2181,7 +2181,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthCRV",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acrv.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acrv.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xD533a949740bb3306d119CC777fa900bA034cd52"
@@ -2194,7 +2194,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthCRV",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statacrv.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statacrv.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xD533a949740bb3306d119CC777fa900bA034cd52",
@@ -2208,7 +2208,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthMKR",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/amkr.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/amkr.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2"
@@ -2221,7 +2221,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthSNX",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asnx.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asnx.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F"
@@ -2234,7 +2234,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthSNX",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statasnx.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statasnx.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F",
@@ -2248,7 +2248,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthBAL",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/abal.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/abal.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xba100000625a3754423978a60c9317c58a424e3D"
@@ -2261,7 +2261,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthUNI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/auni.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
@@ -2274,7 +2274,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthUNI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statauni.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statauni.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
@@ -2288,7 +2288,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "LDO",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ldo.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ldo.svg"
     },
     {
       "chainId": 1,
@@ -2297,7 +2297,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthLDO",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aldo.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aldo.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32"
@@ -2310,7 +2310,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthLDO",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataldo.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataldo.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32",
@@ -2324,7 +2324,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthENS",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aens.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aens.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xC18360217D8F7Ab5e7c516566761Ea12Ce7F9D72"
@@ -2337,7 +2337,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthENS",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataens.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataens.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xC18360217D8F7Ab5e7c516566761Ea12Ce7F9D72",
@@ -2351,7 +2351,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthONE_INCH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/a1inch.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/a1inch.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x111111111117dC0aa78b770fA6A738034120C302"
@@ -2364,7 +2364,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthONE_INCH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stata1inch.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stata1inch.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x111111111117dC0aa78b770fA6A738034120C302",
@@ -2378,7 +2378,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthFRAX",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/afrax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/afrax.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x853d955aCEf822Db058eb8505911ED77F175b99e"
@@ -2391,7 +2391,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthFRAX",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statafrax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statafrax.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x853d955aCEf822Db058eb8505911ED77F175b99e",
@@ -2405,7 +2405,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "GHO",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/gho.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/gho.svg"
     },
     {
       "chainId": 1,
@@ -2414,7 +2414,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthGHO",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/agho.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/agho.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f"
@@ -2427,7 +2427,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthGHO",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statagho.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statagho.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
@@ -2441,7 +2441,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "RPL",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/rpl.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/rpl.svg"
     },
     {
       "chainId": 1,
@@ -2450,7 +2450,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthRPL",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/arpl.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/arpl.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xD33526068D116cE69F19A9ee46F0bd304F21A51f"
@@ -2463,7 +2463,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthRPL",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statarpl.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statarpl.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xD33526068D116cE69F19A9ee46F0bd304F21A51f",
@@ -2477,7 +2477,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "sDAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/sdai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/sdai.svg"
     },
     {
       "chainId": 1,
@@ -2486,7 +2486,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthsDAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asdai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asdai.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x83F20F44975D03b1b09e64809B757c47f942BEeA"
@@ -2499,7 +2499,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthsDAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statasdai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statasdai.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x83F20F44975D03b1b09e64809B757c47f942BEeA",
@@ -2513,7 +2513,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "STG",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stg.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stg.svg"
     },
     {
       "chainId": 1,
@@ -2522,7 +2522,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthSTG",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/astg.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/astg.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xAf5191B0De278C7286d6C7CC6ab6BB8A73bA2Cd6"
@@ -2535,7 +2535,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "KNC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/knc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/knc.svg"
     },
     {
       "chainId": 1,
@@ -2544,7 +2544,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthKNC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aknc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aknc.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xdeFA4e8a7bcBA345F687a2f1456F5Edd9CE97202"
@@ -2557,7 +2557,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "FXS",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/fxs.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/fxs.svg"
     },
     {
       "chainId": 1,
@@ -2566,7 +2566,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthFXS",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/afxs.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/afxs.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0"
@@ -2579,7 +2579,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "crvUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/crvusd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/crvusd.svg"
     },
     {
       "chainId": 1,
@@ -2588,7 +2588,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthcrvUSD",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acrvusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acrvusd.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E"
@@ -2601,7 +2601,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthcrvUSD",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statacrvusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statacrvusd.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E",
@@ -2615,7 +2615,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "PYUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/pyusd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/pyusd.svg"
     },
     {
       "chainId": 1,
@@ -2624,7 +2624,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aEthPYUSD",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/apyusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/apyusd.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8"
@@ -2637,7 +2637,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataEthPYUSD",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statapyusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statapyusd.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8",
@@ -2651,7 +2651,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "waEthPYUSD",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statapyusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statapyusd.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8",
@@ -2665,7 +2665,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "weETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
     },
     {
       "chainId": 1,
@@ -2674,7 +2674,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthweETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee"
@@ -2687,7 +2687,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthweETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweeth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee",
@@ -2701,7 +2701,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "osETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/oseth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/oseth.svg"
     },
     {
       "chainId": 1,
@@ -2710,7 +2710,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthosETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aoseth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aoseth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38"
@@ -2723,7 +2723,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthosETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataoseth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataoseth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38",
@@ -2737,7 +2737,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "USDe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usde.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usde.svg"
     },
     {
       "chainId": 1,
@@ -2746,7 +2746,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthUSDe",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausde.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausde.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3"
@@ -2759,7 +2759,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthUSDe",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausde.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausde.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3",
@@ -2773,7 +2773,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waEthUSDe",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausde.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausde.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3",
@@ -2787,7 +2787,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ETHx",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ethx.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ethx.svg"
     },
     {
       "chainId": 1,
@@ -2796,7 +2796,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthETHx",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aethx.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aethx.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xA35b1B31Ce002FBF2058D22F30f95D405200A15b"
@@ -2809,7 +2809,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthETHx",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataethx.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataethx.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xA35b1B31Ce002FBF2058D22F30f95D405200A15b",
@@ -2823,7 +2823,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "sUSDe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/susde.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/susde.svg"
     },
     {
       "chainId": 1,
@@ -2832,7 +2832,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthsUSDe",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asusde.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asusde.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497"
@@ -2845,7 +2845,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataEthsUSDe",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statasusde.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statasusde.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497",
@@ -2859,7 +2859,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "tBTC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/tbtc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/tbtc.svg"
     },
     {
       "chainId": 1,
@@ -2868,7 +2868,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthtBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/atbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/atbtc.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x18084fbA666a33d37592fA2633fD49a74DD93a88"
@@ -2881,7 +2881,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "cbBTC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/cbbtc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/cbbtc.svg"
     },
     {
       "chainId": 1,
@@ -2890,7 +2890,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aEthcbBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acbbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acbbtc.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
@@ -2903,7 +2903,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "USDS",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usds.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usds.svg"
     },
     {
       "chainId": 1,
@@ -2912,7 +2912,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthUSDS",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausds.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausds.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xdC035D45d973E3EC169d2276DDab16f1e407384F"
@@ -2925,7 +2925,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waEthUSDS",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausds.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausds.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
@@ -2939,7 +2939,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "rsETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/rseth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/rseth.svg"
     },
     {
       "chainId": 1,
@@ -2948,7 +2948,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthrsETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/arseth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/arseth.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0xA1290d69c65A6Fe4DF752f95823fae25cB99e5A7"
@@ -2961,7 +2961,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "LBTC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/lbtc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/lbtc.svg"
     },
     {
       "chainId": 1,
@@ -2970,7 +2970,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aEthLBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/albtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/albtc.svg",
       "extensions": {
         "pool": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
         "underlying": "0x8236a87084f8B84306f72007F36F2618A5634494"
@@ -2983,7 +2983,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolDAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063"
@@ -2996,7 +2996,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolDAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063",
@@ -3010,7 +3010,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolLINK",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39"
@@ -3023,7 +3023,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolLINK",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39",
@@ -3037,7 +3037,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aPolUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
@@ -3050,7 +3050,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataPolUSDC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
@@ -3064,7 +3064,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aPolWBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6"
@@ -3077,7 +3077,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "stataPolWBTC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6",
@@ -3091,7 +3091,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"
@@ -3104,7 +3104,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolWETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
@@ -3118,7 +3118,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aPolUSDT",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
@@ -3131,7 +3131,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataPolUSDT",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
@@ -3145,7 +3145,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolAAVE",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xD6DF932A45C0f255f85145f286eA0b292B21C90B"
@@ -3158,7 +3158,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolAAVE",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataaave.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xD6DF932A45C0f255f85145f286eA0b292B21C90B",
@@ -3172,7 +3172,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolWMATIC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awmatic.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awmatic.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
@@ -3185,7 +3185,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolWMATIC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawmatic.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawmatic.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
@@ -3199,7 +3199,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolCRV",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acrv.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acrv.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x172370d5Cd63279eFa6d502DAB29171933a610AF"
@@ -3212,7 +3212,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolCRV",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statacrv.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statacrv.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x172370d5Cd63279eFa6d502DAB29171933a610AF",
@@ -3226,7 +3226,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolSUSHI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asushi.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asushi.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a"
@@ -3239,7 +3239,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolSUSHI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statasushi.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statasushi.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a",
@@ -3253,7 +3253,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolGHST",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aghst.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aghst.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7"
@@ -3266,7 +3266,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolGHST",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataghst.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataghst.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7",
@@ -3280,7 +3280,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolBAL",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/abal.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/abal.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x9a71012B13CA4d3D0Cdc72A177DF3ef03b0E76A3"
@@ -3293,7 +3293,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolBAL",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statabal.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statabal.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x9a71012B13CA4d3D0Cdc72A177DF3ef03b0E76A3",
@@ -3307,7 +3307,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolDPI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adpi.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adpi.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x85955046DF4668e1DD369D2DE9f3AEB98DD2A369"
@@ -3320,7 +3320,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolDPI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statadpi.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statadpi.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x85955046DF4668e1DD369D2DE9f3AEB98DD2A369",
@@ -3334,7 +3334,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 2,
       "symbol": "EURS",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/eurs.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/eurs.svg"
     },
     {
       "chainId": 137,
@@ -3343,7 +3343,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 2,
       "symbol": "aPolEURS",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aeurs.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aeurs.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xE111178A87A3BFf0c8d18DECBa5798827539Ae99"
@@ -3356,7 +3356,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 2,
       "symbol": "stataPolEURS",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataeurs.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataeurs.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xE111178A87A3BFf0c8d18DECBa5798827539Ae99",
@@ -3370,7 +3370,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "jEUR",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/jeur.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/jeur.svg"
     },
     {
       "chainId": 137,
@@ -3379,7 +3379,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolJEUR",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ajeur.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ajeur.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c"
@@ -3392,7 +3392,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolJEUR",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statajeur.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statajeur.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c",
@@ -3406,7 +3406,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "EURA",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/eura.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/eura.svg"
     },
     {
       "chainId": 137,
@@ -3415,7 +3415,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolAGEUR",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aeura.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aeura.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xE0B52e49357Fd4DAf2c15e02058DCE6BC0057db4"
@@ -3428,7 +3428,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolAGEUR",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataeura.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataeura.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xE0B52e49357Fd4DAf2c15e02058DCE6BC0057db4",
@@ -3442,7 +3442,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "miMATIC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/mai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/mai.svg"
     },
     {
       "chainId": 137,
@@ -3451,7 +3451,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolMIMATIC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/amai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/amai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xa3Fa99A148fA48D14Ed51d610c367C61876997F1"
@@ -3464,7 +3464,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolMIMATIC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statamai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statamai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xa3Fa99A148fA48D14Ed51d610c367C61876997F1",
@@ -3478,7 +3478,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stMATIC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stmatic.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stmatic.svg"
     },
     {
       "chainId": 137,
@@ -3487,7 +3487,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolSTMATIC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/astmatic.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/astmatic.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x3A58a54C066FdC0f2D55FC9C89F0415C92eBf3C4"
@@ -3500,7 +3500,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolSTMATIC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statastmatic.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statastmatic.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x3A58a54C066FdC0f2D55FC9C89F0415C92eBf3C4",
@@ -3514,7 +3514,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "MaticX",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/maticx.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/maticx.svg"
     },
     {
       "chainId": 137,
@@ -3523,7 +3523,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolMATICX",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/amaticx.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/amaticx.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xfa68FB4628DFF1028CFEc22b4162FCcd0d45efb6"
@@ -3536,7 +3536,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolMATICX",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statamaticx.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statamaticx.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xfa68FB4628DFF1028CFEc22b4162FCcd0d45efb6",
@@ -3550,7 +3550,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "wstETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
     },
     {
       "chainId": 137,
@@ -3559,7 +3559,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aPolwstETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x03b54A6e9a984069379fae1a4fC4dBAE93B3bCCD"
@@ -3572,7 +3572,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataPolwstETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x03b54A6e9a984069379fae1a4fC4dBAE93B3bCCD",
@@ -3586,7 +3586,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDCn",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 137,
@@ -3595,7 +3595,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aPolUSDCn",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
@@ -3608,7 +3608,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataPolUSDCn",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
@@ -3622,7 +3622,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAvaDAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xd586E7F844cEa2F87f50152665BCbc2C279D8d70"
@@ -3635,7 +3635,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataAvaDAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xd586E7F844cEa2F87f50152665BCbc2C279D8d70",
@@ -3649,7 +3649,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "LINKe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/link.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/link.svg"
     },
     {
       "chainId": 43114,
@@ -3658,7 +3658,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAvaLINK",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x5947BB275c521040051D82396192181b413227A3"
@@ -3671,7 +3671,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataAvaLINK",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x5947BB275c521040051D82396192181b413227A3",
@@ -3685,7 +3685,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 43114,
@@ -3694,7 +3694,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aAvaUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"
@@ -3707,7 +3707,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataAvaUSDC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
@@ -3721,7 +3721,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aAvaWBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x50b7545627a5162F82A992c33b87aDc75187B218"
@@ -3734,7 +3734,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "stataAvaWBTC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x50b7545627a5162F82A992c33b87aDc75187B218",
@@ -3748,7 +3748,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAvaWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB"
@@ -3761,7 +3761,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataAvaWETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB",
@@ -3775,7 +3775,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDt",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
     },
     {
       "chainId": 43114,
@@ -3784,7 +3784,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aAvaUSDT",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7"
@@ -3797,7 +3797,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataAvaUSDT",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7",
@@ -3811,7 +3811,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAvaAAVE",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x63a72806098Bd3D9520cC43356dD78afe5D386D9"
@@ -3824,7 +3824,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataAvaAAVE",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataaave.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x63a72806098Bd3D9520cC43356dD78afe5D386D9",
@@ -3838,7 +3838,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAvaWAVAX",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awavax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awavax.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7"
@@ -3851,7 +3851,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataAvaWAVAX",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawavax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawavax.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7",
@@ -3865,7 +3865,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "sAVAX",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/savax.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/savax.svg"
     },
     {
       "chainId": 43114,
@@ -3874,7 +3874,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAvaSAVAX",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asavax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asavax.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x2b2C81e08f1Af8835a78Bb2A90AE924ACE0eA4bE"
@@ -3887,7 +3887,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataAvaSAVAX",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statasavax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statasavax.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x2b2C81e08f1Af8835a78Bb2A90AE924ACE0eA4bE",
@@ -3901,7 +3901,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "FRAX",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/frax.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/frax.svg"
     },
     {
       "chainId": 43114,
@@ -3910,7 +3910,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAvaFRAX",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/afrax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/afrax.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xD24C2Ad096400B6FBcd2ad8B24E7acBc21A1da64"
@@ -3923,7 +3923,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataAvaFRAX",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statafrax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statafrax.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xD24C2Ad096400B6FBcd2ad8B24E7acBc21A1da64",
@@ -3937,7 +3937,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "MAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/mai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/mai.svg"
     },
     {
       "chainId": 43114,
@@ -3946,7 +3946,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aAvaMAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/amai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/amai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x5c49b268c9841AFF1Cc3B0a418ff5c3442eE3F3b"
@@ -3959,7 +3959,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataAvaMAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statamai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statamai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x5c49b268c9841AFF1Cc3B0a418ff5c3442eE3F3b",
@@ -3973,7 +3973,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "BTCb",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/btc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/btc.svg"
     },
     {
       "chainId": 43114,
@@ -3982,7 +3982,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aAvaBTCb",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/abtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/abtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x152b9d0FdC40C096757F570A51E494bd4b943E50"
@@ -3995,7 +3995,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "stataAvaBTCb",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statabtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statabtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x152b9d0FdC40C096757F570A51E494bd4b943E50",
@@ -4009,7 +4009,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "AUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausd.svg"
     },
     {
       "chainId": 43114,
@@ -4018,7 +4018,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aAvaAUSD",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aausd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aausd.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x00000000eFE302BEAA2b3e6e1b18d08D69a9012a"
@@ -4031,7 +4031,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 8453,
@@ -4040,7 +4040,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBasWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x4200000000000000000000000000000000000006"
@@ -4053,7 +4053,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataBasWETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x4200000000000000000000000000000000000006",
@@ -4067,7 +4067,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waBasWETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x4200000000000000000000000000000000000006",
@@ -4081,7 +4081,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "cbETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/cbeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/cbeth.svg"
     },
     {
       "chainId": 8453,
@@ -4090,7 +4090,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBascbETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acbeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acbeth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22"
@@ -4103,7 +4103,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataBascbETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statacbeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statacbeth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22",
@@ -4117,7 +4117,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waBascbETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statacbeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statacbeth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22",
@@ -4131,7 +4131,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDbC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdbc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdbc.svg"
     },
     {
       "chainId": 8453,
@@ -4140,7 +4140,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aBasUSDbC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdbc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdbc.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA"
@@ -4153,7 +4153,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataBasUSDbC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdbc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdbc.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA",
@@ -4167,7 +4167,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "waBasUSDbC",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdbc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdbc.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA",
@@ -4181,7 +4181,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "wstETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
     },
     {
       "chainId": 8453,
@@ -4190,7 +4190,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBaswstETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452"
@@ -4203,7 +4203,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataBaswstETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
@@ -4217,7 +4217,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waBaswstETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
@@ -4231,7 +4231,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 8453,
@@ -4240,7 +4240,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aBasUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
@@ -4253,7 +4253,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataBasUSDC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -4267,7 +4267,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "waBasUSDC",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -4281,7 +4281,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "weETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
     },
     {
       "chainId": 8453,
@@ -4290,7 +4290,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBasweETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x04C0599Ae5A44757c0af6F9eC3b93da8976c150A"
@@ -4303,7 +4303,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataBasweETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweeth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x04C0599Ae5A44757c0af6F9eC3b93da8976c150A",
@@ -4317,7 +4317,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waBasweETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweeth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x04C0599Ae5A44757c0af6F9eC3b93da8976c150A",
@@ -4331,7 +4331,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "cbBTC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/cbbtc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/cbbtc.svg"
     },
     {
       "chainId": 8453,
@@ -4340,7 +4340,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aBascbBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acbbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acbbtc.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf"
@@ -4353,7 +4353,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "stataBascbBTC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statacbbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statacbbtc.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
@@ -4367,7 +4367,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "waBascbBTC",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statacbbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statacbbtc.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
@@ -4381,7 +4381,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ezETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ezeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ezeth.svg"
     },
     {
       "chainId": 8453,
@@ -4390,7 +4390,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBasezETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aezeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aezeth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x2416092f143378750bb29b79eD961ab195CcEea5"
@@ -4403,7 +4403,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waBasezETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataezeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataezeth.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x2416092f143378750bb29b79eD961ab195CcEea5",
@@ -4417,7 +4417,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "GHO",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/gho.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/gho.svg"
     },
     {
       "chainId": 8453,
@@ -4426,7 +4426,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBasGHO",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/agho.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/agho.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x6Bb7a212910682DCFdbd5BCBb3e28FB4E8da10Ee"
@@ -4439,7 +4439,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waBasGHO",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statagho.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statagho.svg",
       "extensions": {
         "pool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
         "underlying": "0x6Bb7a212910682DCFdbd5BCBb3e28FB4E8da10Ee",
@@ -4453,7 +4453,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "mDAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
     },
     {
       "chainId": 1088,
@@ -4462,7 +4462,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aMetmDAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x90df02551bB792286e8D4f13E0e357b4Bf1D6a57",
         "underlying": "0x4c078361FC9BbB78DF910800A991C7c3DD2F6ce0"
@@ -4475,7 +4475,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataMetmDAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
       "extensions": {
         "pool": "0x90df02551bB792286e8D4f13E0e357b4Bf1D6a57",
         "underlying": "0x4c078361FC9BbB78DF910800A991C7c3DD2F6ce0",
@@ -4489,7 +4489,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "Metis",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/metis.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/metis.svg"
     },
     {
       "chainId": 1088,
@@ -4498,7 +4498,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aMetMETIS",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ametis.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ametis.svg",
       "extensions": {
         "pool": "0x90df02551bB792286e8D4f13E0e357b4Bf1D6a57",
         "underlying": "0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000"
@@ -4511,7 +4511,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataMetMETIS",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statametis.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statametis.svg",
       "extensions": {
         "pool": "0x90df02551bB792286e8D4f13E0e357b4Bf1D6a57",
         "underlying": "0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000",
@@ -4525,7 +4525,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "mUSDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 1088,
@@ -4534,7 +4534,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aMetmUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x90df02551bB792286e8D4f13E0e357b4Bf1D6a57",
         "underlying": "0xEA32A96608495e54156Ae48931A7c20f0dcc1a21"
@@ -4547,7 +4547,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataMetmUSDC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x90df02551bB792286e8D4f13E0e357b4Bf1D6a57",
         "underlying": "0xEA32A96608495e54156Ae48931A7c20f0dcc1a21",
@@ -4561,7 +4561,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "mUSDT",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
     },
     {
       "chainId": 1088,
@@ -4570,7 +4570,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aMetmUSDT",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x90df02551bB792286e8D4f13E0e357b4Bf1D6a57",
         "underlying": "0xbB06DCA3AE6887fAbF931640f67cab3e3a16F4dC"
@@ -4583,7 +4583,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataMetmUSDT",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
       "extensions": {
         "pool": "0x90df02551bB792286e8D4f13E0e357b4Bf1D6a57",
         "underlying": "0xbB06DCA3AE6887fAbF931640f67cab3e3a16F4dC",
@@ -4597,7 +4597,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 1088,
@@ -4606,7 +4606,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aMetWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x90df02551bB792286e8D4f13E0e357b4Bf1D6a57",
         "underlying": "0x420000000000000000000000000000000000000A"
@@ -4619,7 +4619,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataMetWETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0x90df02551bB792286e8D4f13E0e357b4Bf1D6a57",
         "underlying": "0x420000000000000000000000000000000000000A",
@@ -4633,7 +4633,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 100,
@@ -4642,7 +4642,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aGnoWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x6A023CCd1ff6F2045C3309768eAd9E68F978f6e1"
@@ -4655,7 +4655,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataGnoWETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x6A023CCd1ff6F2045C3309768eAd9E68F978f6e1",
@@ -4669,7 +4669,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waGnoWETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x6A023CCd1ff6F2045C3309768eAd9E68F978f6e1",
@@ -4683,7 +4683,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "wstETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
     },
     {
       "chainId": 100,
@@ -4692,7 +4692,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aGnowstETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x6C76971f98945AE98dD7d4DFcA8711ebea946eA6"
@@ -4705,7 +4705,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataGnowstETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x6C76971f98945AE98dD7d4DFcA8711ebea946eA6",
@@ -4719,7 +4719,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waGnowstETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x6C76971f98945AE98dD7d4DFcA8711ebea946eA6",
@@ -4733,7 +4733,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "GNO",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/gno.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/gno.svg"
     },
     {
       "chainId": 100,
@@ -4742,7 +4742,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aGnoGNO",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/agno.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/agno.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb"
@@ -4755,7 +4755,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataGnoGNO",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statagno.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statagno.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb",
@@ -4769,7 +4769,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waGnoGNO",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statagno.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statagno.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb",
@@ -4783,7 +4783,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 100,
@@ -4792,7 +4792,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aGnoUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0xDDAfbb505ad214D7b80b1f830fcCc89B60fb7A83"
@@ -4805,7 +4805,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataGnoUSDC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0xDDAfbb505ad214D7b80b1f830fcCc89B60fb7A83",
@@ -4819,7 +4819,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WXDAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wxdai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wxdai.svg"
     },
     {
       "chainId": 100,
@@ -4828,7 +4828,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aGnoWXDAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awxdai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awxdai.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d"
@@ -4841,7 +4841,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataGnoWXDAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawxdai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawxdai.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",
@@ -4855,7 +4855,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "EURe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/eure.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/eure.svg"
     },
     {
       "chainId": 100,
@@ -4864,7 +4864,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aGnoEURe",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aeure.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aeure.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0xcB444e90D8198415266c6a2724b7900fb12FC56E"
@@ -4877,7 +4877,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataGnoEURe",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataeure.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataeure.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0xcB444e90D8198415266c6a2724b7900fb12FC56E",
@@ -4891,7 +4891,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "sDAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/sdai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/sdai.svg"
     },
     {
       "chainId": 100,
@@ -4900,7 +4900,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aGnosDAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asdai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asdai.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0xaf204776c7245bF4147c2612BF6e5972Ee483701"
@@ -4913,7 +4913,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataGnosDAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statasdai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statasdai.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0xaf204776c7245bF4147c2612BF6e5972Ee483701",
@@ -4927,7 +4927,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDCe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 100,
@@ -4936,7 +4936,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aGnoUSDCe",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x2a22f9c3b484c3629090FeED35F17Ff8F88f76F0"
@@ -4949,7 +4949,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataGnoUSDCe",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x2a22f9c3b484c3629090FeED35F17Ff8F88f76F0",
@@ -4963,7 +4963,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "waGnoUSDCe",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0xb50201558B00496A145fE76f7424749556E326D8",
         "underlying": "0x2a22f9c3b484c3629090FeED35F17Ff8F88f76F0",
@@ -4977,7 +4977,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "Cake",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/cake.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/cake.svg"
     },
     {
       "chainId": 56,
@@ -4986,7 +4986,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBnbCAKE",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acake.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acake.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82"
@@ -4999,7 +4999,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataBnbCAKE",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statacake.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statacake.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82",
@@ -5013,7 +5013,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WBNB",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wbnb.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wbnb.svg"
     },
     {
       "chainId": 56,
@@ -5022,7 +5022,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBnbWBNB",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbnb.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbnb.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
@@ -5035,7 +5035,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataBnbWBNB",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawbnb.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawbnb.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
@@ -5049,7 +5049,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "BTCB",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/btc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/btc.svg"
     },
     {
       "chainId": 56,
@@ -5058,7 +5058,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBnbBTCB",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/abtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/abtc.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c"
@@ -5071,7 +5071,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataBnbBTCB",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statabtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statabtc.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
@@ -5085,7 +5085,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/eth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/eth.svg"
     },
     {
       "chainId": 56,
@@ -5094,7 +5094,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBnbETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aeth.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0x2170Ed0880ac9A755fd29B2688956BD959F933F8"
@@ -5107,7 +5107,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataBnbETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataeth.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
@@ -5121,7 +5121,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 56,
@@ -5130,7 +5130,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBnbUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
@@ -5143,7 +5143,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataBnbUSDC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
@@ -5157,7 +5157,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "USDT",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
     },
     {
       "chainId": 56,
@@ -5166,7 +5166,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBnbUSDT",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0x55d398326f99059fF775485246999027B3197955"
@@ -5179,7 +5179,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataBnbUSDT",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0x55d398326f99059fF775485246999027B3197955",
@@ -5193,7 +5193,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "FDUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/fdusd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/fdusd.svg"
     },
     {
       "chainId": 56,
@@ -5202,7 +5202,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBnbFDUSD",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/afdusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/afdusd.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0xc5f0f7b66764F6ec8C8Dff7BA683102295E16409"
@@ -5215,7 +5215,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataBnbFDUSD",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statafdusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statafdusd.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0xc5f0f7b66764F6ec8C8Dff7BA683102295E16409",
@@ -5229,7 +5229,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "wstETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
     },
     {
       "chainId": 56,
@@ -5238,7 +5238,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aBnbwstETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
       "extensions": {
         "pool": "0x6807dc923806fE8Fd134338EABCA509979a7e0cB",
         "underlying": "0x26c5e01524d2E6280A48F2c50fF6De7e52E9611C"
@@ -5251,7 +5251,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "DAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
     },
     {
       "chainId": 42161,
@@ -5260,7 +5260,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbDAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1"
@@ -5273,7 +5273,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataArbDAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
@@ -5287,7 +5287,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waArbDAI",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
@@ -5301,7 +5301,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "LINK",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/link.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/link.svg"
     },
     {
       "chainId": 42161,
@@ -5310,7 +5310,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbLINK",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"
@@ -5323,7 +5323,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataArbLINK",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
@@ -5337,7 +5337,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waArbLINK",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
@@ -5351,7 +5351,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 42161,
@@ -5360,7 +5360,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aArbUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"
@@ -5373,7 +5373,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataArbUSDC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
@@ -5387,7 +5387,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "waArbUSDC",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
@@ -5401,7 +5401,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "WBTC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
     },
     {
       "chainId": 42161,
@@ -5410,7 +5410,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aArbWBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f"
@@ -5423,7 +5423,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "stataArbWBTC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
@@ -5437,7 +5437,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "waArbWBTC",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f",
@@ -5451,7 +5451,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 42161,
@@ -5460,7 +5460,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
@@ -5473,7 +5473,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataArbWETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
@@ -5487,7 +5487,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waArbWETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
@@ -5547,7 +5547,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "AAVE",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
     },
     {
       "chainId": 42161,
@@ -5556,7 +5556,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbAAVE",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xba5DdD1f9d7F570dc94a51479a000E3BCE967196"
@@ -5569,7 +5569,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataArbAAVE",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataaave.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xba5DdD1f9d7F570dc94a51479a000E3BCE967196",
@@ -5583,7 +5583,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 2,
       "symbol": "EURS",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/eurs.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/eurs.svg"
     },
     {
       "chainId": 42161,
@@ -5592,7 +5592,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 2,
       "symbol": "aArbEURS",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aeurs.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aeurs.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xD22a58f79e9481D1a88e00c343885A588b34b68B"
@@ -5605,7 +5605,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 2,
       "symbol": "stataArbEURS",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataeurs.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataeurs.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xD22a58f79e9481D1a88e00c343885A588b34b68B",
@@ -5619,7 +5619,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "wstETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
     },
     {
       "chainId": 42161,
@@ -5628,7 +5628,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbwstETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x5979D7b546E38E414F7E9822514be443A4800529"
@@ -5641,7 +5641,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataArbwstETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x5979D7b546E38E414F7E9822514be443A4800529",
@@ -5655,7 +5655,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waArbwstETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x5979D7b546E38E414F7E9822514be443A4800529",
@@ -5669,7 +5669,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "MAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/mai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/mai.svg"
     },
     {
       "chainId": 42161,
@@ -5678,7 +5678,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbMAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/amai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/amai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x3F56e0c36d275367b8C502090EDF38289b3dEa0d"
@@ -5691,7 +5691,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataArbMAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statamai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statamai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x3F56e0c36d275367b8C502090EDF38289b3dEa0d",
@@ -5705,7 +5705,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "rETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/reth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/reth.svg"
     },
     {
       "chainId": 42161,
@@ -5714,7 +5714,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbrETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/areth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/areth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xEC70Dcb4A1EFa46b8F2D97C310C9c4790ba5ffA8"
@@ -5727,7 +5727,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataArbrETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statareth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statareth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xEC70Dcb4A1EFa46b8F2D97C310C9c4790ba5ffA8",
@@ -5741,7 +5741,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waArbrETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statareth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statareth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xEC70Dcb4A1EFa46b8F2D97C310C9c4790ba5ffA8",
@@ -5755,7 +5755,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "LUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/lusd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/lusd.svg"
     },
     {
       "chainId": 42161,
@@ -5764,7 +5764,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbLUSD",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alusd.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x93b346b6BC2548dA6A1E7d98E9a421B42541425b"
@@ -5777,7 +5777,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataArbLUSD",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statalusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statalusd.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x93b346b6BC2548dA6A1E7d98E9a421B42541425b",
@@ -5791,7 +5791,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDCn",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 42161,
@@ -5800,7 +5800,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aArbUSDCn",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
@@ -5813,7 +5813,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataArbUSDCn",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
@@ -5827,7 +5827,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "waArbUSDCn",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
@@ -5841,7 +5841,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "FRAX",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/frax.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/frax.svg"
     },
     {
       "chainId": 42161,
@@ -5850,7 +5850,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbFRAX",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/afrax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/afrax.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F"
@@ -5863,7 +5863,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataArbFRAX",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statafrax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statafrax.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F",
@@ -5877,7 +5877,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ARB",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/arb.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/arb.svg"
     },
     {
       "chainId": 42161,
@@ -5886,7 +5886,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbARB",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aarb.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aarb.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x912CE59144191C1204E64559FE8253a0e49E6548"
@@ -5899,7 +5899,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataArbARB",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataarb.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataarb.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x912CE59144191C1204E64559FE8253a0e49E6548",
@@ -5913,7 +5913,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waArbARB",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataarb.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataarb.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x912CE59144191C1204E64559FE8253a0e49E6548",
@@ -5927,7 +5927,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "weETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
     },
     {
       "chainId": 42161,
@@ -5936,7 +5936,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbweETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x35751007a407ca6FEFfE80b3cB397736D2cf4dbe"
@@ -5949,7 +5949,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waArbweETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweeth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x35751007a407ca6FEFfE80b3cB397736D2cf4dbe",
@@ -5963,7 +5963,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "GHO",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/gho.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/gho.svg"
     },
     {
       "chainId": 42161,
@@ -5972,7 +5972,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbGHO",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/agho.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/agho.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33"
@@ -5985,7 +5985,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataArbGHO",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statagho.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statagho.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33",
@@ -5999,7 +5999,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waArbGHO",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statagho.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statagho.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33",
@@ -6013,7 +6013,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ezETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ezeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ezeth.svg"
     },
     {
       "chainId": 42161,
@@ -6022,7 +6022,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aArbezETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aezeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aezeth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x2416092f143378750bb29b79eD961ab195CcEea5"
@@ -6035,7 +6035,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waArbezETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataezeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataezeth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x2416092f143378750bb29b79eD961ab195CcEea5",
@@ -6049,7 +6049,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "DAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
     },
     {
       "chainId": 10,
@@ -6058,7 +6058,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aOptDAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1"
@@ -6071,7 +6071,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataOptDAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statadai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
@@ -6085,7 +6085,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "LINK",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/link.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/link.svg"
     },
     {
       "chainId": 10,
@@ -6094,7 +6094,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aOptLINK",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6"
@@ -6107,7 +6107,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataOptLINK",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statalink.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6",
@@ -6121,7 +6121,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 10,
@@ -6130,7 +6130,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aOptUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x7F5c764cBc14f9669B88837ca1490cCa17c31607"
@@ -6143,7 +6143,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataOptUSDC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
@@ -6157,7 +6157,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "WBTC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
     },
     {
       "chainId": 10,
@@ -6166,7 +6166,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aOptWBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x68f180fcCe6836688e9084f035309E29Bf0A2095"
@@ -6179,7 +6179,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "stataOptWBTC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawbtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x68f180fcCe6836688e9084f035309E29Bf0A2095",
@@ -6193,7 +6193,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 10,
@@ -6202,7 +6202,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aOptWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x4200000000000000000000000000000000000006"
@@ -6215,7 +6215,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataOptWETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x4200000000000000000000000000000000000006",
@@ -6229,7 +6229,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDT",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
     },
     {
       "chainId": 10,
@@ -6238,7 +6238,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aOptUSDT",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58"
@@ -6251,7 +6251,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataOptUSDT",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdt.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
@@ -6265,7 +6265,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "AAVE",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
     },
     {
       "chainId": 10,
@@ -6274,7 +6274,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aOptAAVE",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x76FB31fb4af56892A25e32cFC43De717950c9278"
@@ -6287,7 +6287,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataOptAAVE",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataaave.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x76FB31fb4af56892A25e32cFC43De717950c9278",
@@ -6301,7 +6301,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "sUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/susd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/susd.svg"
     },
     {
       "chainId": 10,
@@ -6310,7 +6310,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aOptSUSD",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asusd.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9"
@@ -6323,7 +6323,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataOptSUSD",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statasusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statasusd.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9",
@@ -6337,7 +6337,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "OP",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/op.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/op.svg"
     },
     {
       "chainId": 10,
@@ -6346,7 +6346,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aOptOP",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aop.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aop.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x4200000000000000000000000000000000000042"
@@ -6359,7 +6359,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataOptOP",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataop.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataop.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x4200000000000000000000000000000000000042",
@@ -6373,7 +6373,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "wstETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
     },
     {
       "chainId": 10,
@@ -6382,7 +6382,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aOptwstETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb"
@@ -6395,7 +6395,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataOptwstETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb",
@@ -6409,7 +6409,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "LUSD",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/lusd.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/lusd.svg"
     },
     {
       "chainId": 10,
@@ -6418,7 +6418,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aOptLUSD",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alusd.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xc40F949F8a4e094D1b49a23ea9241D289B7b2819"
@@ -6431,7 +6431,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataOptLUSD",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statalusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statalusd.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xc40F949F8a4e094D1b49a23ea9241D289B7b2819",
@@ -6445,7 +6445,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "MAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/mai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/mai.svg"
     },
     {
       "chainId": 10,
@@ -6454,7 +6454,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aOptMAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/amai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/amai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xdFA46478F9e5EA86d57387849598dbFB2e964b02"
@@ -6467,7 +6467,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataOptMAI",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statamai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statamai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xdFA46478F9e5EA86d57387849598dbFB2e964b02",
@@ -6481,7 +6481,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "rETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/reth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/reth.svg"
     },
     {
       "chainId": 10,
@@ -6490,7 +6490,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aOptrETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/areth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/areth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x9Bcef72be871e61ED4fBbc7630889beE758eb81D"
@@ -6503,7 +6503,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataOptrETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statareth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statareth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x9Bcef72be871e61ED4fBbc7630889beE758eb81D",
@@ -6517,7 +6517,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDCn",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 10,
@@ -6526,7 +6526,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aOptUSDCn",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85"
@@ -6539,7 +6539,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataOptUSDCn",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
@@ -6553,7 +6553,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "waOptUSDCn",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
@@ -6567,7 +6567,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 534352,
@@ -6576,7 +6576,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aScrWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x11fCfe756c05AD438e312a7fd934381537D3cFfe",
         "underlying": "0x5300000000000000000000000000000000000004"
@@ -6589,7 +6589,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataScrWETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0x11fCfe756c05AD438e312a7fd934381537D3cFfe",
         "underlying": "0x5300000000000000000000000000000000000004",
@@ -6603,7 +6603,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 534352,
@@ -6612,7 +6612,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aScrUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x11fCfe756c05AD438e312a7fd934381537D3cFfe",
         "underlying": "0x06eFdBFf2a14a7c8E15944D1F4A48F9F95F663A4"
@@ -6625,7 +6625,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "stataScrUSDC",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x11fCfe756c05AD438e312a7fd934381537D3cFfe",
         "underlying": "0x06eFdBFf2a14a7c8E15944D1F4A48F9F95F663A4",
@@ -6639,7 +6639,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "wstETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
     },
     {
       "chainId": 534352,
@@ -6648,7 +6648,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aScrwstETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
       "extensions": {
         "pool": "0x11fCfe756c05AD438e312a7fd934381537D3cFfe",
         "underlying": "0xf610A9dfB7C89644979b4A0f27063E9e7d7Cda32"
@@ -6661,7 +6661,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "stataScrwstETH",
       "tags": ["aaveV3", "staticAT"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
       "extensions": {
         "pool": "0x11fCfe756c05AD438e312a7fd934381537D3cFfe",
         "underlying": "0xf610A9dfB7C89644979b4A0f27063E9e7d7Cda32",
@@ -6675,7 +6675,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "weETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
     },
     {
       "chainId": 534352,
@@ -6684,7 +6684,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aScrweETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
       "extensions": {
         "pool": "0x11fCfe756c05AD438e312a7fd934381537D3cFfe",
         "underlying": "0x01f0a31698C4d065659b9bdC21B3610292a1c506"
@@ -6697,7 +6697,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "SCR",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/scr.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/scr.svg"
     },
     {
       "chainId": 534352,
@@ -6706,7 +6706,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aScrSCR",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ascr.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ascr.svg",
       "extensions": {
         "pool": "0x11fCfe756c05AD438e312a7fd934381537D3cFfe",
         "underlying": "0xd29687c813D741E2F938F4aC377128810E217b1b"
@@ -6719,7 +6719,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 324,
@@ -6728,7 +6728,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aZksUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x78e30497a3c7527d953c6B1E3541b021A98Ac43c",
         "underlying": "0x1d17CBcF0D6D143135aE902365D2E5e2A16538D4"
@@ -6741,7 +6741,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDT",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
     },
     {
       "chainId": 324,
@@ -6750,7 +6750,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aZksUSDT",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x78e30497a3c7527d953c6B1E3541b021A98Ac43c",
         "underlying": "0x493257fD37EDB34451f62EDf8D2a0C418852bA4C"
@@ -6763,7 +6763,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 324,
@@ -6772,7 +6772,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aZksWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x78e30497a3c7527d953c6B1E3541b021A98Ac43c",
         "underlying": "0x5AEa5775959fBC2557Cc8789bC1bf90A239D9a91"
@@ -6785,7 +6785,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "wstETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
     },
     {
       "chainId": 324,
@@ -6794,7 +6794,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aZkswstETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
       "extensions": {
         "pool": "0x78e30497a3c7527d953c6B1E3541b021A98Ac43c",
         "underlying": "0x703b52F2b28fEbcB60E1372858AF5b18849FE867"
@@ -6807,7 +6807,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ZK",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/zk.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/zk.svg"
     },
     {
       "chainId": 324,
@@ -6816,7 +6816,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aZksZK",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/azk.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/azk.svg",
       "extensions": {
         "pool": "0x78e30497a3c7527d953c6B1E3541b021A98Ac43c",
         "underlying": "0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E"
@@ -6829,7 +6829,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "weETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
     },
     {
       "chainId": 324,
@@ -6838,7 +6838,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aZksweETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
       "extensions": {
         "pool": "0x78e30497a3c7527d953c6B1E3541b021A98Ac43c",
         "underlying": "0xc1Fa6E2E8667d9bE0Ca938a54c7E0285E9Df924a"
@@ -6851,7 +6851,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "sUSDe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/susde.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/susde.svg"
     },
     {
       "chainId": 324,
@@ -6860,7 +6860,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aZkssUSDe",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asusde.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asusde.svg",
       "extensions": {
         "pool": "0x78e30497a3c7527d953c6B1E3541b021A98Ac43c",
         "underlying": "0xAD17Da2f6Ac76746EF261E835C50b2651ce36DA8"
@@ -6873,7 +6873,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "DAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
     },
     {
       "chainId": 250,
@@ -6882,7 +6882,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aFanDAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x8D11eC38a3EB5E956B052f67Da8Bdc9bef8Abf3E"
@@ -6895,7 +6895,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "LINK",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/link.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/link.svg"
     },
     {
       "chainId": 250,
@@ -6904,7 +6904,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aFanLINK",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xb3654dc3D10Ea7645f8319668E8F54d2574FBdC8"
@@ -6917,7 +6917,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 250,
@@ -6926,7 +6926,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aFanUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x04068DA6C83AFCFA0e13ba15A6696662335D5B75"
@@ -6939,7 +6939,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "BTC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/btc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/btc.svg"
     },
     {
       "chainId": 250,
@@ -6948,7 +6948,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aFanWBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/abtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/abtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x321162Cd933E2Be498Cd2267a90534A804051b11"
@@ -6961,7 +6961,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/eth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/eth.svg"
     },
     {
       "chainId": 250,
@@ -6970,7 +6970,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aFanWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aeth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x74b23882a30290451A17c44f4F05243b6b58C76d"
@@ -7003,7 +7003,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "AAVE",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
     },
     {
       "chainId": 250,
@@ -7012,7 +7012,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aFanAAVE",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x6a07A792ab2965C72a5B8088d3a069A7aC3a993B"
@@ -7025,7 +7025,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WFTM",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wftm.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wftm.svg"
     },
     {
       "chainId": 250,
@@ -7034,7 +7034,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aFanWFTM",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awftm.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awftm.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83"
@@ -7047,7 +7047,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "CRV",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/crv.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/crv.svg"
     },
     {
       "chainId": 250,
@@ -7056,7 +7056,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aFanCRV",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/acrv.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/acrv.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x1E4F97b9f9F913c46F1632781732927B9019C68b"
@@ -7069,7 +7069,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "SUSHI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/sushi.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/sushi.svg"
     },
     {
       "chainId": 250,
@@ -7078,7 +7078,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aFanSUSHI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asushi.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asushi.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xae75A438b2E0cB8Bb01Ec1E1e376De11D44477CC"
@@ -7091,7 +7091,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ONE_DAI",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/dai.svg"
     },
     {
       "chainId": 1666600000,
@@ -7100,7 +7100,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aHarDAI",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/adai.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xEf977d2f931C1978Db5F6747666fa1eACB0d0339"
@@ -7113,7 +7113,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "LINK",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/link.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/link.svg"
     },
     {
       "chainId": 1666600000,
@@ -7122,7 +7122,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aHarLINK",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/alink.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x218532a12a389a4a92fC0C5Fb22901D1c19198aA"
@@ -7135,7 +7135,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "ONE_USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 1666600000,
@@ -7144,7 +7144,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aHarUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x985458E523dB3d53125813eD68c274899e9DfAb4"
@@ -7157,7 +7157,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "ONE_WBTC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
     },
     {
       "chainId": 1666600000,
@@ -7166,7 +7166,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aHarWBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x3095c7557bCb296ccc6e363DE01b760bA031F2d9"
@@ -7179,7 +7179,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ONE_ETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/eth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/eth.svg"
     },
     {
       "chainId": 1666600000,
@@ -7188,7 +7188,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aHarWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aeth.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x6983D1E6DEf3690C4d616b13597A09e6193EA013"
@@ -7201,7 +7201,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "ONE_USDT",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
     },
     {
       "chainId": 1666600000,
@@ -7210,7 +7210,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aHarUSDT",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0x3C2B8Be99c50593081EAA2A724F0B8285F5aba8f"
@@ -7223,7 +7223,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ONE_AAVE",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aave.svg"
     },
     {
       "chainId": 1666600000,
@@ -7232,7 +7232,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aHarAAVE",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aaave.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xcF323Aad9E522B93F11c352CaA519Ad0E14eB40F"
@@ -7245,7 +7245,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WONE",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wone.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wone.svg"
     },
     {
       "chainId": 1666600000,
@@ -7254,7 +7254,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aHarWONE",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awone.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awone.svg",
       "extensions": {
         "pool": "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
         "underlying": "0xcF664087a5bB0237a0BAd6742852ec6c8d69A27a"
@@ -7267,7 +7267,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthLidowstETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
       "extensions": {
         "pool": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
         "underlying": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
@@ -7280,7 +7280,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waEthLidowstETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statawsteth.svg",
       "extensions": {
         "pool": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
         "underlying": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
@@ -7294,7 +7294,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthLidoWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
         "underlying": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
@@ -7307,7 +7307,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waEthLidoWETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
         "underlying": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
@@ -7321,7 +7321,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthLidoUSDS",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausds.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausds.svg",
       "extensions": {
         "pool": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
         "underlying": "0xdC035D45d973E3EC169d2276DDab16f1e407384F"
@@ -7334,7 +7334,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aEthLidoUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
         "underlying": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -7347,7 +7347,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ezETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ezeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ezeth.svg"
     },
     {
       "chainId": 1,
@@ -7356,7 +7356,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthLidoezETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aezeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aezeth.svg",
       "extensions": {
         "pool": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
         "underlying": "0xbf5495Efe5DB9ce00f80364C8B423567e58d2110"
@@ -7369,7 +7369,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthLidosUSDe",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/asusde.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/asusde.svg",
       "extensions": {
         "pool": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
         "underlying": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497"
@@ -7382,7 +7382,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthLidoGHO",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/agho.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/agho.svg",
       "extensions": {
         "pool": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
         "underlying": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f"
@@ -7395,7 +7395,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waEthLidoGHO",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statagho.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statagho.svg",
       "extensions": {
         "pool": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
         "underlying": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
@@ -7409,7 +7409,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthLidorsETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/arseth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/arseth.svg",
       "extensions": {
         "pool": "0x4e033931ad43597d96D6bcc25c280717730B58B1",
         "underlying": "0xA1290d69c65A6Fe4DF752f95823fae25cB99e5A7"
@@ -7422,7 +7422,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthEtherFiweETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
       "extensions": {
         "pool": "0x0AA97c284e98396202b6A04024F5E2c65026F3c0",
         "underlying": "0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee"
@@ -7435,7 +7435,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aEthEtherFiUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x0AA97c284e98396202b6A04024F5E2c65026F3c0",
         "underlying": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -7448,7 +7448,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aEthEtherFiPYUSD",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/apyusd.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/apyusd.svg",
       "extensions": {
         "pool": "0x0AA97c284e98396202b6A04024F5E2c65026F3c0",
         "underlying": "0x6c3ea9036406852006290770BEdFcAbA0e23A0e8"
@@ -7461,7 +7461,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aEthEtherFiFRAX",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/afrax.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/afrax.svg",
       "extensions": {
         "pool": "0x0AA97c284e98396202b6A04024F5E2c65026F3c0",
         "underlying": "0x853d955aCEf822Db058eb8505911ED77F175b99e"
@@ -7474,7 +7474,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 59144,
@@ -7483,7 +7483,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aLinWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0xc47b8C00b0f69a36fa203Ffeac0334874574a8Ac",
         "underlying": "0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f"
@@ -7496,7 +7496,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "WBTC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wbtc.svg"
     },
     {
       "chainId": 59144,
@@ -7505,7 +7505,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 8,
       "symbol": "aLinWBTC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awbtc.svg",
       "extensions": {
         "pool": "0xc47b8C00b0f69a36fa203Ffeac0334874574a8Ac",
         "underlying": "0x3aAB2285ddcDdaD8edf438C1bAB47e1a9D05a9b4"
@@ -7518,7 +7518,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDC",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 59144,
@@ -7527,7 +7527,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aLinUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0xc47b8C00b0f69a36fa203Ffeac0334874574a8Ac",
         "underlying": "0x176211869cA2b568f2A7D4EE941E073a821EE1ff"
@@ -7540,7 +7540,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDT",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdt.svg"
     },
     {
       "chainId": 59144,
@@ -7549,7 +7549,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aLinUSDT",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdt.svg",
       "extensions": {
         "pool": "0xc47b8C00b0f69a36fa203Ffeac0334874574a8Ac",
         "underlying": "0xA219439258ca9da29E9Cc4cE5596924745e12B93"
@@ -7562,7 +7562,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "wstETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/wsteth.svg"
     },
     {
       "chainId": 59144,
@@ -7571,7 +7571,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aLinwstETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/awsteth.svg",
       "extensions": {
         "pool": "0xc47b8C00b0f69a36fa203Ffeac0334874574a8Ac",
         "underlying": "0xB5beDd42000b71FddE22D3eE8a79Bd49A568fC8F"
@@ -7584,7 +7584,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "ezETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ezeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ezeth.svg"
     },
     {
       "chainId": 59144,
@@ -7593,7 +7593,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aLinezETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aezeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aezeth.svg",
       "extensions": {
         "pool": "0xc47b8C00b0f69a36fa203Ffeac0334874574a8Ac",
         "underlying": "0x2416092f143378750bb29b79eD961ab195CcEea5"
@@ -7606,7 +7606,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "weETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weeth.svg"
     },
     {
       "chainId": 59144,
@@ -7615,7 +7615,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aLinweETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweeth.svg",
       "extensions": {
         "pool": "0xc47b8C00b0f69a36fa203Ffeac0334874574a8Ac",
         "underlying": "0x1Bf74C010E6320bab11e2e5A532b5AC15e0b8aA6"
@@ -7628,7 +7628,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "WETH",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/weth.svg"
     },
     {
       "chainId": 146,
@@ -7637,7 +7637,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "aSonWETH",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/aweth.svg",
       "extensions": {
         "pool": "0x5362dBb1e601abF3a4c14c22ffEdA64042E5eAA3",
         "underlying": "0x50c42dEAcD8Fc9773493ED674b675bE577f2634b"
@@ -7650,7 +7650,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 18,
       "symbol": "waSonWETH",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/stataweth.svg",
       "extensions": {
         "pool": "0x5362dBb1e601abF3a4c14c22ffEdA64042E5eAA3",
         "underlying": "0x50c42dEAcD8Fc9773493ED674b675bE577f2634b",
@@ -7664,7 +7664,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "USDCe",
       "tags": ["underlying"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/usdc.svg"
     },
     {
       "chainId": 146,
@@ -7673,7 +7673,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "aSonUSDC",
       "tags": ["aTokenV3", "aaveV3"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/ausdc.svg",
       "extensions": {
         "pool": "0x5362dBb1e601abF3a4c14c22ffEdA64042E5eAA3",
         "underlying": "0x29219dd400f2Bf60E5a23d13Be72B486D4038894"
@@ -7686,7 +7686,7 @@ var AaveTokenList = fetcher.FetchedTokenList{
       "decimals": 6,
       "symbol": "waSonUSDC",
       "tags": ["aaveV3", "stataToken"],
-      "logoURI": "https://raw.githubusercontent.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
+      "logoURI": "https://dummy.com/bgd-labs/web3-icons/main/icons/full/statausdc.svg",
       "extensions": {
         "pool": "0x5362dBb1e601abF3a4c14c22ffEdA64042E5eAA3",
         "underlying": "0x29219dd400f2Bf60E5a23d13Be72B486D4038894",

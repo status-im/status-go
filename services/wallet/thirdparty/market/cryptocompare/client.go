@@ -14,7 +14,7 @@ import (
 
 const baseID = "cryptocompare"
 const extraParamStatus = "Status.im"
-const baseURL = "https://min-api.cryptocompare.com"
+const baseURL = "https://dummy.com"
 
 type HistoricalPricesContainer struct {
 	Aggregated     bool                         `json:"Aggregated"`

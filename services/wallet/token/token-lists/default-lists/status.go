@@ -9,7 +9,7 @@ import (
 var StatusTokenList = fetcher.FetchedTokenList{
 	TokenList: fetcher.TokenList{
 		ID:        "status",
-		SourceURL: "https://github.com/status-im/status-go/blob/develop/services/wallet/token/token-lists/default-lists/status.go",
+		SourceURL: "https://dummy.com/status-im/status-go/blob/develop/services/wallet/token/token-lists/default-lists/status.go",
 	},
 	Fetched: time.Unix(1742471186, 0),
 	JsonData: `

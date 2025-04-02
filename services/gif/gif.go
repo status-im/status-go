@@ -31,7 +31,7 @@ var tenorAPIKey = ""
 var defaultParams = "&media_filter=minimal&limit=50&key="
 
 const maxRetry = 3
-const baseURL = "https://g.tenor.com/v1/"
+const baseURL = "https://dummy.com/"
 
 func NewGifAPI(db *accounts.Database) *API {
 	return &API{db}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -136,13 +135,7 @@ func NewService(
 
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
-	cryptoCompareProxy := cryptocompare.NewClientWithParams(cryptocompare.Params{
-		ID:       fmt.Sprintf("%s-proxy", cryptoCompare.ID()),
-		URL:      fmt.Sprintf("https://%s.api.status.im/cryptocompare/", statusProxyStageName),
-		User:     config.WalletConfig.StatusProxyMarketUser,
-		Password: config.WalletConfig.StatusProxyMarketPassword,
-	})
-	marketManager := market.NewManager([]thirdparty.MarketDataProvider{cryptoCompare, coingecko, cryptoCompareProxy}, feed)
+	marketManager := market.NewManager([]thirdparty.MarketDataProvider{cryptoCompare, coingecko}, feed)
 	reader := NewReader(tokenManager, marketManager, token.NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, accountFeed, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)

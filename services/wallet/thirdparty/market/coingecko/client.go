@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
 )
 
-const baseURL = "https://api.coingecko.com/api/v3"
+const baseURL = "https://dummy.com"
 
 var coinGeckoMapping = map[string]string{
 	"STT":   "status",
