@@ -32,6 +32,7 @@ import (
 	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
+	"github.com/status-im/status-go/services/wallet/leaderboard"
 	"github.com/status-im/status-go/services/wallet/onramp"
 	"github.com/status-im/status-go/services/wallet/requests"
 	"github.com/status-im/status-go/services/wallet/router"
@@ -927,4 +928,13 @@ func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
 func (api *API) IsChecksumValidForAddress(address string) (bool, error) {
 	logutils.ZapLogger().Debug("wallet.api.isChecksumValidForAddress", zap.String("address", address))
 	return abi_spec.CheckAddressChecksum(address)
+}
+
+// GetLeaderboardData returns cryptocurrency data with updated price information
+func (api *API) GetLeaderboardData(ctx context.Context) ([]leaderboard.Cryptocurrency, error) {
+	logutils.ZapLogger().Debug("call to GetLeaderboardData")
+	if api.s.leaderboardService == nil {
+		return nil, errors.New("leaderboard service not initialized")
+	}
+	return api.s.leaderboardService.GetCombinedData(), nil
 }

@@ -1,4 +1,7 @@
-package service
+//go:build gowaku_no_rln
+// +build gowaku_no_rln
+
+package leaderboard
 
 import (
 	"context"
