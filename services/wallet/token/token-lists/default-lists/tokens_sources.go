@@ -1,8 +1,7 @@
 package defaulttokenlists
 
 const (
-	UniswapTokenListID = "uniswap"
-	AaveTokenListID    = "aave"
+	Coingecko = "coingecko"
 )
 
 type TokensSource struct {
@@ -12,16 +11,11 @@ type TokensSource struct {
 	OutputFile string
 }
 
+// When updating token sources, make sure that it follows `defaultListOfTokenLists` form the fetcher package, constatnts.go file.
 var TokensSources = map[string]TokensSource{
-	UniswapTokenListID: {
-		Name:       "Uniswap Labs Default Token List",
-		SourceURL:  "https://ipfs.io/ipns/tokens.uniswap.org",
-		Schema:     "https://uniswap.org/tokenlist.schema.json",
-		OutputFile: "services/wallet/token/token-lists/default-lists/uniswap.go",
-	},
-	AaveTokenListID: {
-		Name:       "Aave Token List",
-		SourceURL:  "https://raw.githubusercontent.com/bgd-labs/aave-address-book/main/tokenlist.json",
-		OutputFile: "services/wallet/token/token-lists/default-lists/aave.go",
+	Coingecko: {
+		Name:       "CoinGecko",
+		SourceURL:  "https://api.coingecko.com/api/v3/coins/list?include_platform=true",
+		OutputFile: "services/wallet/token/token-lists/default-lists/coingecko.go",
 	},
 }

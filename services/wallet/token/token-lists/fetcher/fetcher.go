@@ -28,9 +28,10 @@ type TokenList struct {
 
 type FetchedTokenList struct {
 	TokenList
-	Etag     string
-	Fetched  time.Time
-	JsonData string
+	Etag          string
+	Fetched       time.Time
+	JsonData      string
+	JsonDataBytes []byte
 }
 
 type TokenListsFetcher struct {
@@ -91,7 +92,11 @@ func (t *TokenListsFetcher) FetchAndStore(ctx context.Context) (int, error) {
 
 	var successfullyFetchedListsCount int
 	for fetchedList := range tokenChannel {
-		if err := t.StoreTokenList(fetchedList.ID, fetchedList.Etag, fetchedList.JsonData); err != nil {
+		dataToStore := fetchedList.JsonData
+		if len(dataToStore) == 0 {
+			dataToStore = string(fetchedList.JsonDataBytes)
+		}
+		if err := t.StoreTokenList(fetchedList.ID, fetchedList.Etag, dataToStore); err != nil {
 			logutils.ZapLogger().Error("Failed to store token list", zap.Error(err))
 		} else {
 			successfullyFetchedListsCount++

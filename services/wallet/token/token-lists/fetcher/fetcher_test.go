@@ -23,5 +23,5 @@ func TestFetcher(t *testing.T) {
 
 	storedListsCount, err := tokenListsFetcher.FetchAndStore(ctx)
 	require.NoError(t, err)
-	require.Equal(t, 2, storedListsCount)
+	require.Equal(t, 3, storedListsCount)
 }
