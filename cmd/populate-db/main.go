@@ -215,7 +215,7 @@ func main() {
 		}
 
 		if len(messages) > 0 {
-			if err := wakuext.SaveMessages(context.Background(), messages); err != nil {
+			if err := wakuext.Messenger().SaveMessages(messages); err != nil {
 				return
 			}
 		}
@@ -261,7 +261,7 @@ func main() {
 		}
 
 		if len(messages) > 0 {
-			if err := wakuext.SaveMessages(context.Background(), messages); err != nil {
+			if err := wakuext.Messenger().SaveMessages(messages); err != nil {
 				return
 			}
 		}
