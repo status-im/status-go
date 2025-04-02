@@ -19,10 +19,10 @@ func TestFetchingTokensList(t *testing.T) {
 	ctx := context.TODO()
 
 	// Copy the token list to avoid modifying the original
-	tokenList0 := listOfTokenLists[0]
+	tokenListCopy := listOfTokenLists[1]
 	tokenList := TokenList{
-		ID:        tokenList0.ID,
-		SourceURL: strings.ReplaceAll(tokenList0.SourceURL, serverURLPlaceholder, server.URL),
+		ID:        tokenListCopy.ID,
+		SourceURL: strings.ReplaceAll(tokenListCopy.SourceURL, serverURLPlaceholder, server.URL),
 	}
 
 	tokenChannel := make(chan FetchedTokenList, 1)

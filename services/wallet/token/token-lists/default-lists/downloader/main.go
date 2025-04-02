@@ -29,7 +29,10 @@ var {{ .TokenListName }} = fetcher.FetchedTokenList{
 		SourceURL: "{{ .TokenListSource }}",
 	},
 	Fetched: time.Unix({{ .FetchedTimestamp }}, 0),
+
 	JsonData: {{ .JsonData }},
+
+	JsonDataBytes: {{ .JsonDataBytes }},
 }
 `
 
@@ -39,6 +42,7 @@ type templateData struct {
 	TokenListSource     string
 	FetchedTimestamp    int64
 	JsonData            string
+	JsonDataBytes       string
 }
 
 func validateDocument(doc string, schemaURL string) (bool, error) {
@@ -93,12 +97,27 @@ func downloadTokens(client *http.Client, key string, source defaulttokenlists.To
 		}
 		return fmt.Sprintf("%s%s", strings.ToUpper(string(s[0])), s[1:])
 	}
+
+	bodyAsString := "``"
+	bodyBytesAsString := "[]byte{}"
+
+	if key == defaulttokenlists.Coingecko {
+		byteArrAsString := make([]string, len(body))
+		for i, b := range body {
+			byteArrAsString[i] = fmt.Sprintf("%d", b)
+		}
+		bodyBytesAsString = fmt.Sprintf("[]byte{%s}", strings.Join(byteArrAsString, ", "))
+	} else {
+		bodyAsString = fmt.Sprintf("`%s`", body)
+	}
+
 	data := templateData{
 		TokenListName:       capitalizedFirstLetter(fmt.Sprintf("%sTokenList", key)),
 		TokenListIdentifier: key,
 		TokenListSource:     source.SourceURL,
 		FetchedTimestamp:    time.Now().Unix(),
-		JsonData:            fmt.Sprintf("`%s`", body),
+		JsonData:            bodyAsString,
+		JsonDataBytes:       bodyBytesAsString,
 	}
 
 	tmpl := template.Must(template.New("tokenList").Parse(templateText))

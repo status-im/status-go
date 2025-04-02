@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	CoingeckoEtag  = "coingeckoEtag"
 	UniswapEtag    = "uniswapEtag"
 	UniswapNewEtag = "uniswapNewEtag"
 	AaveEtag       = "aaveEtag"
@@ -34,6 +35,22 @@ func GetTestServer() (server *httptest.Server, close func()) {
 		w.WriteHeader(http.StatusOK)
 		resp := strings.ReplaceAll(listOfTokenListsJsonResponse, serverURLPlaceholder, server.URL)
 		if _, err := w.Write([]byte(resp)); err != nil {
+			log.Println(err.Error())
+		}
+	})
+
+	mux.HandleFunc("/coingecko-list", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", CoingeckoEtag)
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(coingeckoTokenListJsonResponse)); err != nil {
+			log.Println(err.Error())
+		}
+	})
+
+	mux.HandleFunc("/coingecko-list-same-etag", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", CoingeckoEtag)
+		w.WriteHeader(http.StatusNotModified)
+		if _, err := w.Write([]byte(coingeckoTokenListJsonResponse)); err != nil {
 			log.Println(err.Error())
 		}
 	})

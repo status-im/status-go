@@ -8,13 +8,8 @@ package fetcher
 // #nosec G101
 const defaultListOfTokenLists = `[
   {
-    "id": "uniswap",
-    "sourceUrl": "https://ipfs.io/ipns/tokens.uniswap.org",
-    "schema": "https://uniswap.org/tokenlist.schema.json"
-  },
-  {
-    "id": "aave",
-    "sourceUrl": "https://raw.githubusercontent.com/bgd-labs/aave-address-book/main/tokenlist.json"
+    "id": "coingecko",
+    "sourceUrl":  "https://api.coingecko.com/api/v3/coins/list?include_platform=true"
   }
 ]`
 

@@ -4,6 +4,10 @@ import "fmt"
 
 const serverURLPlaceholder = "SERVER-URL"
 
+const UsdcID = "usd-coin"
+const UsdcEthereumAddress = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+const UsdcEthereumSepoliaAddress = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+
 const UniswapTokensListVersion = "100.101.102"
 const UniswapSpecialTokenName = "TEST UNISWAP TOKEN" // #nosec
 const UniswapSpecialTokenSymbol = "TUT"
@@ -14,6 +18,10 @@ const AaveSpecialTokenSymbol = "TAT"
 
 // #nosec G101
 const listOfTokenListsJsonResponse = `[
+  {
+    "id": "coingecko",
+    "sourceUrl": "SERVER-URL/coingecko-list"
+  },
   {
     "id": "uniswap",
     "sourceUrl": "SERVER-URL/uniswap.json"
@@ -26,6 +34,10 @@ const listOfTokenListsJsonResponse = `[
 
 var listOfTokenLists = []TokenList{
 	{
+		ID:        "coingecko",
+		SourceURL: fmt.Sprintf("%s/coingecko-list", serverURLPlaceholder),
+	},
+	{
 		ID:        "uniswap",
 		SourceURL: fmt.Sprintf("%s/uniswap.json", serverURLPlaceholder),
 	},
@@ -37,15 +49,134 @@ var listOfTokenLists = []TokenList{
 
 var defaultTokensList = []TokenList{
 	{
-		ID:        "uniswap",
-		SourceURL: "https://ipfs.io/ipns/tokens.uniswap.org",
-		Schema:    "https://uniswap.org/tokenlist.schema.json",
-	},
-	{
-		ID:        "aave",
-		SourceURL: "https://raw.githubusercontent.com/bgd-labs/aave-address-book/main/tokenlist.json",
+		ID:        "coingecko",
+		SourceURL: "https://api.coingecko.com/api/v3/coins/list?include_platform=true",
 	},
 }
+
+var FetchedTokensList = []FetchedTokenList{
+	{
+		TokenList: TokenList{
+			ID:        "uniswap",
+			SourceURL: "uniswap.json",
+		},
+		JsonData: uniswapTokenListJsonResponse,
+	},
+	{
+		TokenList: TokenList{
+			ID:        "aave",
+			SourceURL: "aave.json",
+		},
+		JsonData: aaveTokenListJsonResponse,
+	},
+	{
+		TokenList: TokenList{
+			ID:        "coingecko",
+			SourceURL: "coingecko-list",
+		},
+		JsonData: coingeckoTokenListJsonResponse,
+	},
+}
+
+// #nosec G101
+const coingeckoTokenListJsonResponse = `[
+  {
+    "id": "ethereum",
+    "symbol": "eth",
+    "name": "Ethereum",
+    "platforms": {}
+  },
+  {
+    "id": "ethereum-classic",
+    "symbol": "etc",
+    "name": "Ethereum Classic",
+    "platforms": {}
+  },
+  {
+    "id": "usd-coin",
+    "symbol": "usdc",
+    "name": "USDC",
+    "platforms": {
+      "ethereum": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "unichain": "0x078d782b760474a361dda0af3839290b0ef57ad6",
+      "zksync": "0x1d17cbcf0d6d143135ae902365d2e5e2a16538d4",
+      "optimistic-ethereum": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+      "polkadot": "1337",
+      "tron": "TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8",
+      "near-protocol": "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+      "hedera-hashgraph": "0.0.456858",
+      "aptos": "0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b",
+      "algorand": "31566704",
+      "stellar": "USDC-GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+      "celo": "0xceba9300f2b948710d2653dd7b07f33a8b32118c",
+      "sui": "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+      "avalanche": "0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e",
+      "arbitrum-one": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+      "polygon-pos": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+      "base": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "solana": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+    }
+  },
+  {
+    "id": "usd-coin-avalanche-bridged-usdc-e",
+    "symbol": "usdc.e",
+    "name": "Avalanche Bridged USDC (Avalanche)",
+    "platforms": {
+      "avalanche": "0xa7d7079b0fead91f3e65f86e8915cb59c1a4c664"
+    }
+  },
+  {
+    "id": "usd-coin-celer",
+    "symbol": "ceusdc",
+    "name": "Bridged USD Coin (Celer)",
+    "platforms": {
+      "celer-network": "0x6a2d262d56735dba19dd70682b39f6be9a931d98",
+      "moonbeam": "0x6a2d262d56735dba19dd70682b39f6be9a931d98",
+      "milkomeda-cardano": "0x6a2d262d56735dba19dd70682b39f6be9a931d98"
+    }
+  },
+  {
+    "id": "statter-network",
+    "symbol": "stt",
+    "name": "Statter Network",
+    "platforms": {}
+  },
+  {
+    "id": "status",
+    "symbol": "snt",
+    "name": "Status",
+    "platforms": {
+      "ethereum": "0x744d70fdbe2ba4cf95131626614a1763df805b9e",
+      "energi": "0x6bb14afedc740dce4904b7a65807fe3b967f4c94"
+    }
+  },
+  {
+    "id": "dai",
+    "symbol": "dai",
+    "name": "Dai",
+    "platforms": {
+      "ethereum": "0x6b175474e89094c44da98b954eedeac495271d0f"
+    }
+  },
+  {
+    "id": "daige",
+    "symbol": "daige",
+    "name": "Daige",
+    "platforms": {
+      "solana": "HsNx7RirehVMy54xnFtcgCBPDMrwNnJKykageqdWpump"
+    }
+  },
+  {
+    "id": "daii",
+    "symbol": "daii",
+    "name": "DAII",
+    "platforms": {
+      "ethereum": "0x1981e32c2154936741ab6541a737b87c68f13ce1",
+      "ordinals": "85ac8fe340bddf87486729ee7529a724805c93fbf2ba88df7fe57aa7e56c9d02i0"
+    }
+  }
+]
+`
 
 // #nosec G101
 const uniswapTokenListJsonResponse = `{
