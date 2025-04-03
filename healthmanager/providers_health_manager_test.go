@@ -222,6 +222,46 @@ func (s *ProvidersHealthManagerSuite) TestPanicWithNilSubscriptionManager() {
 	}, "emitChainStatus should not panic with nil subscriptionManager thanks to nil check")
 }
 
+// TestReset verifies that Reset sets lastStatus to nil and creates a new aggregator
+func (s *ProvidersHealthManagerSuite) TestReset() {
+	// First, update the providers to establish a known state
+	ch := s.phm.Subscribe()
+	defer s.phm.Unsubscribe(ch)
+
+	// Update provider to Up and wait for notification
+	upStatuses := []rpcstatus.RpcProviderCallStatus{
+		{Name: "Provider1", Timestamp: time.Now(), Err: nil},
+	}
+	s.updateAndWait(ch, upStatuses, rpcstatus.StatusUp, time.Second)
+
+	// Verify providers are in statuses
+	statusesBeforeReset := s.phm.GetStatuses()
+	s.Len(statusesBeforeReset, 1, "Expected 1 provider status before reset")
+	s.Contains(statusesBeforeReset, "Provider1", "Expected Provider1 in statuses before reset")
+
+	// Capture the aggregator and lastStatus references before reset
+	originalAggregator := s.phm.aggregator
+
+	// Access the lastStatus field directly
+	s.NotNil(s.phm.lastStatus, "lastStatus should not be nil before reset")
+
+	// Reset the providers health manager
+	s.phm.Reset()
+
+	// Verify lastStatus is nil
+	s.Nil(s.phm.lastStatus, "lastStatus should be nil after reset")
+
+	// Verify aggregator was recreated (different instance)
+	s.NotSame(originalAggregator, s.phm.aggregator, "Aggregator should be a new instance after reset")
+
+	// Verify statuses are cleared
+	statusesAfterReset := s.phm.GetStatuses()
+	s.Empty(statusesAfterReset, "Expected no provider statuses after reset")
+
+	// Verify chain ID remains the same
+	s.Equal(uint64(1), s.phm.ChainID(), "Chain ID should remain unchanged after reset")
+}
+
 func TestProvidersHealthManagerSuite(t *testing.T) {
 	suite.Run(t, new(ProvidersHealthManagerSuite))
 }

@@ -3,6 +3,7 @@ package chain
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strconv"
 	"testing"
 
@@ -80,4 +81,58 @@ func TestClient_Fallbacks(t *testing.T) {
 	ethClients[2].EXPECT().BlockByHash(ctx, hash).Return(nil, errors.New("some other other error")).Times(1)
 	_, err = client.BlockByHash(ctx, hash)
 	require.Error(t, err)
+}
+
+func TestClientWithFallback_Copy(t *testing.T) {
+	client, _, cleanup := setupClientTest(t)
+	defer cleanup()
+
+	// Setup test values
+	testTag := "test-tag"
+	testGroupTag := "test-group-tag"
+	testNotifier := func(chainId uint64, message string) {}
+
+	// Set values on the original client
+	client.tag = testTag
+	client.groupTag = testGroupTag
+	client.WalletNotifier = testNotifier
+
+	// Copy the client
+	clientCopy := client.Copy().(*ClientWithFallback)
+
+	// Check that the copy has the same values
+	require.Equal(t, client.ChainID, clientCopy.ChainID)
+	require.Equal(t, client.tag, clientCopy.tag)
+	require.Equal(t, client.groupTag, clientCopy.groupTag)
+	require.Equal(t, client.LastCheckedAt, clientCopy.LastCheckedAt)
+
+	// Verify that both clients have the same ethClients slice
+	require.Equal(t, len(client.ethClients), len(clientCopy.ethClients))
+	for i := 0; i < len(client.ethClients); i++ {
+		require.Equal(t, client.ethClients[i], clientCopy.ethClients[i])
+	}
+
+	// Check that pointer values are the same (shallow copy)
+	require.Same(t, client.isConnected, clientCopy.isConnected)
+	require.Same(t, client.circuitbreaker, clientCopy.circuitbreaker)
+	require.Same(t, client.providersHealthManager, clientCopy.providersHealthManager)
+
+	// Verify that function references are the same
+	clientFuncPtr := getFuncPtr(client.WalletNotifier)
+	copyFuncPtr := getFuncPtr(clientCopy.WalletNotifier)
+	require.Equal(t, clientFuncPtr, copyFuncPtr)
+
+	// Modify the copy, ensure it doesn't affect the original
+	clientCopy.tag = "new-tag"
+	clientCopy.groupTag = "new-group-tag"
+	require.Equal(t, testTag, client.tag)
+	require.Equal(t, testGroupTag, client.groupTag)
+}
+
+// Helper function to get a comparable value for function pointers
+func getFuncPtr(f func(uint64, string)) uintptr {
+	if f == nil {
+		return 0
+	}
+	return reflect.ValueOf(f).Pointer()
 }
