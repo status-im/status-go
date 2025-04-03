@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/extkeys"
+	"github.com/igor-sirotin/extkeys"
 )
 
 func generateTestKey(t *testing.T) *extkeys.ExtendedKey {

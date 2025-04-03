@@ -9,7 +9,7 @@ import (
 	accountJson "github.com/status-im/status-go/account/json"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/extkeys"
+	"github.com/igor-sirotin/extkeys"
 	"github.com/status-im/status-go/multiaccounts"
 )
 

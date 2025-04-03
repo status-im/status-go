@@ -8,7 +8,7 @@ import (
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/extkeys"
+	"github.com/igor-sirotin/extkeys"
 )
 
 // OnboardingAccount is returned during onboarding and contains its ID and the mnemonic to re-generate the same account Info keys.
