@@ -527,6 +527,11 @@ var (
 		dBColumnName:   "last_tokens_update",
 		valueHandler:   TimeHandler,
 	}
+	NewsFeedEnabled = SettingField{
+		reactFieldName: "news-feed-enabled?",
+		dBColumnName:   "news_feed_enabled",
+		valueHandler:   BoolHandler,
+	}
 	SettingFieldRegister = []SettingField{
 		AnonMetricsShouldSend,
 		Appearance,
@@ -607,6 +612,7 @@ var (
 		WebviewAllowPermissionRequests,
 		AutoRefreshTokensEnabled,
 		LastTokensUpdate,
+		NewsFeedEnabled,
 	}
 )
 

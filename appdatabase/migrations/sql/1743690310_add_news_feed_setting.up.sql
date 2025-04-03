@@ -1,0 +1,1 @@
+ALTER TABLE settings ADD COLUMN news_feed_enabled BOOLEAN DEFAULT TRUE;

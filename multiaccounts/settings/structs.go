@@ -227,6 +227,7 @@ type Settings struct {
 	PeerSyncingEnabled                  bool                          `json:"peer-syncing-enabled?,omitempty"`
 	AutoRefreshTokensEnabled            bool                          `json:"auto-refresh-tokens-enabled,omitempty"`
 	LastTokensUpdate                    time.Time                     `json:"last-tokens-update,omitempty"`
+	NewsFeedEnabled                     bool                          `json:"news-feed-enabled?,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {

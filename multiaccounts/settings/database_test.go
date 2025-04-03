@@ -47,7 +47,8 @@ var (
 		WalletRootAddress:                   types.HexToAddress("0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6"),
 		DisplayAssetsBelowBalanceThreshold:  int64(100000000),
 		DisplayAssetsBelowBalance:           false,
-		ShowCommunityAssetWhenSendingTokens: true}
+		ShowCommunityAssetWhenSendingTokens: true,
+		NewsFeedEnabled:                     true}
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -230,4 +231,23 @@ func TestDatabase_MessengerNotificationsEnabled(t *testing.T) {
 	settings, err = db.GetSettings()
 	require.NoError(t, err)
 	require.Equal(t, true, settings.MessengerNotificationsEnabled)
+}
+
+func TestDatabase_NewsFeedEnabled(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	settings, err := db.GetSettings()
+	require.NoError(t, err)
+
+	require.Equal(t, true, settings.NewsFeedEnabled)
+
+	err = db.SaveSetting(NewsFeedEnabled.GetReactName(), false)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, false, settings.NewsFeedEnabled)
 }
