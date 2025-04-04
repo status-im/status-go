@@ -938,3 +938,13 @@ func (api *API) GetLeaderboardData(ctx context.Context) ([]leaderboard.Cryptocur
 	}
 	return api.s.leaderboardService.GetCombinedData(), nil
 }
+
+func (api *API) GetMarketTokenPageAsync(ctx context.Context, page, pageSize, sortOrder int) {
+	logutils.ZapLogger().Debug("call to GetMarketTokenPageAsync", zap.Int("page", page), zap.Int("pageSize", pageSize), zap.Int("sortOrder", sortOrder))
+	api.s.leaderboardService.GetLeaderboardPageAsync(page, pageSize, sortOrder)
+}
+
+func (api *API) UnsubscribeFromLeaderboard() error {
+	logutils.ZapLogger().Debug("call to UnsubscribeFromLeaderboard")
+	return api.s.leaderboardService.UnsubscribeFromLeaderboard()
+}

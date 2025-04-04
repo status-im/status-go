@@ -220,7 +220,7 @@ func NewService(
 		AllowGzip:           true,
 		AllowETag:           true,
 	}
-	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig)
+	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, feed)
 
 	return &Service{
 		db:                    db,
