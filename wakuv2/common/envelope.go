@@ -32,7 +32,7 @@ type tmpWakuMessageJson struct {
 	RateLimitProof []byte  `json:"proof,omitempty"`
 }
 
-type tmpEnvelopeStruct struct {
+type nwakuEnvelope struct {
 	WakuMessage tmpWakuMessageJson `json:"wakuMessage"`
 	PubsubTopic string             `json:"pubsubTopic"`
 	MessageHash string             `json:"messageHash"`
@@ -49,28 +49,28 @@ func NewWakuEnvelope(msg *pb.WakuMessage, topic string, hash pb.MessageHash) *Wa
 
 // NewEnvelope creates a new Envelope from a json string generated in nwaku
 func NewEnvelope(jsonEventStr string) (Envelope, error) {
-	tmpEnvelopeStruct := tmpEnvelopeStruct{}
-	err := json.Unmarshal([]byte(jsonEventStr), &tmpEnvelopeStruct)
+	nwakuEnvelope := nwakuEnvelope{}
+	err := json.Unmarshal([]byte(jsonEventStr), &nwakuEnvelope)
 	if err != nil {
 		return nil, err
 	}
 
-	hash, err := hexutil.Decode(tmpEnvelopeStruct.MessageHash)
+	hash, err := hexutil.Decode(nwakuEnvelope.MessageHash)
 	if err != nil {
 		return nil, err
 	}
 
 	return &WakuEnvelope{
 		msg: &pb.WakuMessage{
-			Payload:        tmpEnvelopeStruct.WakuMessage.Payload,
-			ContentTopic:   tmpEnvelopeStruct.WakuMessage.ContentTopic,
-			Version:        tmpEnvelopeStruct.WakuMessage.Version,
-			Timestamp:      tmpEnvelopeStruct.WakuMessage.Timestamp,
-			Meta:           tmpEnvelopeStruct.WakuMessage.Meta,
-			Ephemeral:      tmpEnvelopeStruct.WakuMessage.Ephemeral,
-			RateLimitProof: tmpEnvelopeStruct.WakuMessage.RateLimitProof,
+			Payload:        nwakuEnvelope.WakuMessage.Payload,
+			ContentTopic:   nwakuEnvelope.WakuMessage.ContentTopic,
+			Version:        nwakuEnvelope.WakuMessage.Version,
+			Timestamp:      nwakuEnvelope.WakuMessage.Timestamp,
+			Meta:           nwakuEnvelope.WakuMessage.Meta,
+			Ephemeral:      nwakuEnvelope.WakuMessage.Ephemeral,
+			RateLimitProof: nwakuEnvelope.WakuMessage.RateLimitProof,
 		},
-		topic: tmpEnvelopeStruct.PubsubTopic,
+		topic: nwakuEnvelope.PubsubTopic,
 		hash:  pb.ToMessageHash(hash),
 	}, nil
 }
