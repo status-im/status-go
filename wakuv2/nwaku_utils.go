@@ -12,24 +12,6 @@ import (
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 )
 
-type envelopeImpl struct {
-	msg   *pb.WakuMessage
-	topic string
-	hash  pb.MessageHash
-}
-
-func (e *envelopeImpl) Message() *pb.WakuMessage {
-	return e.msg
-}
-
-func (e *envelopeImpl) PubsubTopic() string {
-	return e.topic
-}
-
-func (e *envelopeImpl) Hash() pb.MessageHash {
-	return e.hash
-}
-
 func HexToPbHash(hexHash bindings.MessageHash) (pb.MessageHash, error) {
 	bytesHash, err := hexHash.Bytes()
 	if err != nil {
@@ -154,7 +136,7 @@ func BindingsToCommonEnvelope(bindingsEnv bindings.Envelope) (common.Envelope, e
 		return nil, err
 	}
 
-	env := envelopeImpl{topic: bindingsEnv.PubsubTopic(), msg: bindingsEnv.Message(), hash: hash}
+	env := common.NewWakuEnvelope(bindingsEnv.Message(), bindingsEnv.PubsubTopic(), hash)
 
-	return &env, nil
+	return env, nil
 }

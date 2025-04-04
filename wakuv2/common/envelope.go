@@ -16,7 +16,7 @@ type Envelope interface {
 	Hash() pb.MessageHash
 }
 
-type envelopeImpl struct {
+type WakuEnvelope struct {
 	msg   *pb.WakuMessage
 	topic string
 	hash  pb.MessageHash
@@ -38,6 +38,15 @@ type tmpEnvelopeStruct struct {
 	MessageHash string             `json:"messageHash"`
 }
 
+func NewWakuEnvelope(msg *pb.WakuMessage, topic string, hash pb.MessageHash) *WakuEnvelope {
+	return &WakuEnvelope{
+		msg:   msg,
+		topic: topic,
+		hash:  hash,
+	}
+
+}
+
 // NewEnvelope creates a new Envelope from a json string generated in nwaku
 func NewEnvelope(jsonEventStr string) (Envelope, error) {
 	tmpEnvelopeStruct := tmpEnvelopeStruct{}
@@ -51,7 +60,7 @@ func NewEnvelope(jsonEventStr string) (Envelope, error) {
 		return nil, err
 	}
 
-	return &envelopeImpl{
+	return &WakuEnvelope{
 		msg: &pb.WakuMessage{
 			Payload:        tmpEnvelopeStruct.WakuMessage.Payload,
 			ContentTopic:   tmpEnvelopeStruct.WakuMessage.ContentTopic,
@@ -66,14 +75,14 @@ func NewEnvelope(jsonEventStr string) (Envelope, error) {
 	}, nil
 }
 
-func (e *envelopeImpl) Message() *pb.WakuMessage {
+func (e *WakuEnvelope) Message() *pb.WakuMessage {
 	return e.msg
 }
 
-func (e *envelopeImpl) PubsubTopic() string {
+func (e *WakuEnvelope) PubsubTopic() string {
 	return e.topic
 }
 
-func (e *envelopeImpl) Hash() pb.MessageHash {
+func (e *WakuEnvelope) Hash() pb.MessageHash {
 	return e.hash
 }
