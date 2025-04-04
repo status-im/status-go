@@ -41,13 +41,16 @@ else
 endif
 
 ifeq ($(detected_OS),Darwin)
- GOBIN_SHARED_LIB_EXT := so
+ GOBIN_SHARED_LIB_EXT := dylib
+ LIBWAKU_EXT := so
  GOBIN_SHARED_LIB_CFLAGS := CGO_ENABLED=1 GOOS=darwin
 else ifeq ($(detected_OS),Windows)
  GOBIN_SHARED_LIB_EXT := dll
+ LIBWAKU_EXT := dll
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS=""
 else
  GOBIN_SHARED_LIB_EXT := so
+ LIBWAKU_EXT := so
  GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,-soname,libstatus.so.0"
 endif
 
@@ -146,7 +149,7 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	echo "Compilation done." ;\
 	echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
-LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(GOBIN_SHARED_LIB_EXT)
+LIBWAKU := $(CURDIR)/vendor/github.com/waku-org/waku-go-bindings/third_party/nwaku/build/libwaku.$(LIBWAKU_EXT)
 $(LIBWAKU):
 ifeq ($(USE_NWAKU),true)
 	@echo "Building libwaku"
