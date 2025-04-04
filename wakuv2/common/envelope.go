@@ -22,7 +22,7 @@ type WakuEnvelope struct {
 	hash  pb.MessageHash
 }
 
-type tmpWakuMessageJson struct {
+type nwakuMessage struct {
 	Payload        []byte  `json:"payload,omitempty"`
 	ContentTopic   string  `json:"contentTopic,omitempty"`
 	Version        *uint32 `json:"version,omitempty"`
@@ -33,9 +33,9 @@ type tmpWakuMessageJson struct {
 }
 
 type nwakuEnvelope struct {
-	WakuMessage tmpWakuMessageJson `json:"wakuMessage"`
-	PubsubTopic string             `json:"pubsubTopic"`
-	MessageHash string             `json:"messageHash"`
+	WakuMessage nwakuMessage `json:"wakuMessage"`
+	PubsubTopic string       `json:"pubsubTopic"`
+	MessageHash string       `json:"messageHash"`
 }
 
 func NewWakuEnvelope(msg *pb.WakuMessage, topic string, hash pb.MessageHash) *WakuEnvelope {
