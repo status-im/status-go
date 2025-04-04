@@ -13,9 +13,8 @@ var (
 
 func _getLogger() *zap.SugaredLogger {
 	once.Do(func() {
+
 		config := zap.NewDevelopmentConfig()
-		config.DisableCaller = true
-		config.EncoderConfig.CallerKey = ""
 		l, err := config.Build()
 		if err != nil {
 			panic(err)
