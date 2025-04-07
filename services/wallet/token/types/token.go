@@ -5,6 +5,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/services/wallet/community"
+
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
 )
 
 type Token struct {
@@ -36,5 +38,9 @@ type StorageToken struct {
 }
 
 func (t *Token) IsNative() bool {
+	if t.ChainID == wallet_common.BSCMainnet ||
+		t.ChainID == wallet_common.BSCTestnet {
+		return strings.EqualFold(t.Symbol, "BNB")
+	}
 	return strings.EqualFold(t.Symbol, "ETH")
 }

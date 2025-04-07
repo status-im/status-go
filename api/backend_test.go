@@ -1530,6 +1530,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	alchemyOptimismSepoliaToken := "alchemy-optimism-sepolia-token"
 	alchemyBaseMainnetToken := "alchemy-base-mainnet-token" // nolint: gosec
 	alchemyBaseSepoliaToken := "alchemy-base-sepolia-token" // nolint: gosec
+	alchemyBSCMainnetToken := "alchemy-bsc-mainnet-token"   // nolint: gosec
+	alchemyBSCTestnetToken := "alchemy-bsc-testnet-token"   // nolint: gosec
 	raribleMainnetAPIKey := "rarible-mainnet-api-key"       // nolint: gosec
 	raribleTestnetAPIKey := "rarible-testnet-api-key"       // nolint: gosec
 
@@ -1570,6 +1572,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 			AlchemyOptimismSepoliaToken: alchemyOptimismSepoliaToken,
 			AlchemyBaseMainnetToken:     alchemyBaseMainnetToken,
 			AlchemyBaseSepoliaToken:     alchemyBaseSepoliaToken,
+			AlchemyBSCMainnetToken:      alchemyBSCMainnetToken,
+			AlchemyBSCTestnetToken:      alchemyBSCTestnetToken,
 			RaribleMainnetAPIKey:        raribleMainnetAPIKey,
 			RaribleTestnetAPIKey:        raribleTestnetAPIKey,
 		},
@@ -1592,6 +1596,8 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.OptimismSepoliaChainID], alchemyOptimismSepoliaToken)
 	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.BaseChainID], alchemyBaseMainnetToken)
 	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.BaseSepoliaChainID], alchemyBaseSepoliaToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.BNBSmartChainID], alchemyBSCMainnetToken)
+	require.Equal(t, b.config.WalletConfig.AlchemyAPIKeys[common.BNBSmartChainTestnetChainID], alchemyBSCTestnetToken)
 	require.Equal(t, b.config.WalletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)
 	require.Equal(t, b.config.WalletConfig.RaribleTestnetAPIKey, raribleTestnetAPIKey)
 
@@ -1855,6 +1861,8 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 				"alchemyOptimismSepoliaToken": "",
 				"alchemyBaseMainnetToken":     "",
 				"alchemyBaseSepoliaToken":     "",
+				"alchemyBNBMainnetToken":      "",
+				"alchemyBNBSepoliaToken":      "",
 			},
 			"torrentConfigEnabled":   false,
 			"torrentConfigPort":      0,
