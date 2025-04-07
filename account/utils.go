@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/extkeys"
+	"github.com/status-im/extkeys"
 	"github.com/status-im/status-go/multiaccounts"
 )
 
