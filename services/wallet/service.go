@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -38,7 +37,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/opensea"
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/rarible"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/coingecko"
-	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -134,15 +132,8 @@ func NewService(
 	transferController := transfer.NewTransferController(db, accountsDB, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
 		tokenManager, balanceCacher, blockChainState)
 
-	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
-	cryptoCompareProxy := cryptocompare.NewClientWithParams(cryptocompare.Params{
-		ID:       fmt.Sprintf("%s-proxy", cryptoCompare.ID()),
-		URL:      fmt.Sprintf("https://%s.api.status.im/cryptocompare/", statusProxyStageName),
-		User:     config.WalletConfig.StatusProxyMarketUser,
-		Password: config.WalletConfig.StatusProxyMarketPassword,
-	})
-	marketManager := market.NewManager([]thirdparty.MarketDataProvider{cryptoCompare, coingecko, cryptoCompareProxy}, feed)
+	marketManager := market.NewManager([]thirdparty.MarketDataProvider{coingecko}, feed) // TODO: add `coingeckoProxy` once we add it to the proxy server
 	reader := NewReader(tokenManager, marketManager, token.NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, accountFeed, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)

@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token/balancefetcher"
 	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
@@ -74,6 +75,7 @@ type ManagerInterface interface {
 	LookupToken(chainID *uint64, tokenSymbol string) (token *tokenTypes.Token, isNative bool)
 	GetTokenHistoricalBalance(account common.Address, chainID uint64, symbol string, timestamp int64) (*big.Int, error)
 	GetTokensByChainIDs(chainIDs []uint64) ([]*tokenTypes.Token, error)
+	GetTokensGroupedByGroupKey() (map[string][]*tokenTypes.Token, error)
 }
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
@@ -481,6 +483,21 @@ func (tm *Manager) GetTokensByChainIDs(chainIDs []uint64) ([]*tokenTypes.Token, 
 	return res, nil
 }
 
+func (tm *Manager) GetTokensGroupedByGroupKey() (map[string][]*tokenTypes.Token, error) {
+	tokens, err := tm.GetAllTokens()
+	if err != nil {
+		return nil, err
+	}
+
+	res := make(map[string][]*tokenTypes.Token)
+
+	for _, token := range tokens {
+		res[token.TokenGroupKey()] = append(res[token.TokenGroupKey()], token)
+	}
+
+	return res, nil
+}
+
 func (tm *Manager) GetList() *ListWrapper {
 	data := make([]*List, 0)
 	nativeTokens, err := tm.getNativeTokens()
@@ -507,8 +524,8 @@ func (tm *Manager) GetList() *ListWrapper {
 	for _, tokensList := range tokensLists {
 		timestamp, err := time.Parse(time.RFC3339, tokensList.Timestamp)
 		if err != nil {
-			logutils.ZapLogger().Error("Failed to parse timestamp", zap.Error(err))
-			continue
+			logutils.ZapLogger().Error("Failed to parse timestamp", zap.Error(err), zap.String("token list", tokensList.Name))
+			timestamp = time.Now()
 		}
 		data = append(data, &List{
 			Name:                tokensList.Name,
@@ -621,6 +638,7 @@ func (tm *Manager) getTokensFromDB(query string, args ...any) ([]*tokenTypes.Tok
 			}
 		}
 
+		token.GroupKey = fmt.Sprintf(tokenTypes.TokenKeyPattern, token.ChainID, token.Address.Hex())
 		_ = tm.fillCommunityData(token)
 
 		rst = append(rst, token)
@@ -641,6 +659,7 @@ func (tm *Manager) ToToken(network *params.Network) *tokenTypes.Token {
 		// TODO: we need to change the address for the native token to the correct one, we cannot to that right now cause will affect other parts of the code
 		// The following line is the right fix for `{"error":"Validation failed: \"srcToken\" contains an invalid value"}` error for Swap
 		// Address:  common.HexToAddress("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"), // for all the chains we support this is the address of the native (ETH) token
+		GroupKey: walletCommon.ETHTokenGroupKey,
 		Address:  common.HexToAddress("0x"),
 		Name:     network.NativeCurrencyName,
 		Symbol:   network.NativeCurrencySymbol,

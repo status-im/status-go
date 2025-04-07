@@ -1045,6 +1045,7 @@ const sequentialCommandsTestsListJsonData = `{
 	"keywords": [],
 	"tokens": [
 		{
+			"id": "id1",
 			"name": "Test Token 1",
 			"address": "0x0000000000000000000000000000000000053211",
 			"symbol": "TXX",
@@ -1052,6 +1053,7 @@ const sequentialCommandsTestsListJsonData = `{
 			"chainId": 777333
 		},
 		{
+			"id": "id2",
 			"name": "Test Token 2",
 			"address": "0x0000000000000000000000000000000000073211",
 			"symbol": "TXY",

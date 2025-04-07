@@ -2,6 +2,7 @@ package market
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -112,9 +113,9 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 	return result.Result()[0], nil
 }
 
-func (pm *Manager) FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+func (pm *Manager) FetchHistoricalDailyPrices(groupedTokensKeys string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchHistoricalDailyPrices(symbol, currency, limit, allData, aggregate)
+		return provider.FetchHistoricalDailyPrices(groupedTokensKeys, currency, limit, allData, aggregate)
 	})
 
 	if err != nil {
@@ -126,9 +127,9 @@ func (pm *Manager) FetchHistoricalDailyPrices(symbol string, currency string, li
 	return prices, nil
 }
 
-func (pm *Manager) FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+func (pm *Manager) FetchHistoricalHourlyPrices(groupedTokensKey string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchHistoricalHourlyPrices(symbol, currency, limit, aggregate)
+		return provider.FetchHistoricalHourlyPrices(groupedTokensKey, currency, limit, aggregate)
 	})
 
 	if err != nil {
@@ -140,9 +141,9 @@ func (pm *Manager) FetchHistoricalHourlyPrices(symbol string, currency string, l
 	return prices, nil
 }
 
-func (pm *Manager) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
+func (pm *Manager) FetchTokenMarketValues(groupedTokensKeys []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
 	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchTokenMarketValues(symbols, currency)
+		return provider.FetchTokenMarketValues(groupedTokensKeys, currency)
 	})
 
 	if err != nil {
@@ -229,9 +230,9 @@ func (pm *Manager) GetOrFetchTokenMarketValues(symbols []string, currency string
 	return tokenMarketValues, nil
 }
 
-func (pm *Manager) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
+func (pm *Manager) FetchTokenDetails(groupedTokensKeys []string) (map[string]thirdparty.TokenDetails, error) {
 	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchTokenDetails(symbols)
+		return provider.FetchTokenDetails(groupedTokensKeys)
 	})
 
 	if err != nil {
@@ -243,22 +244,22 @@ func (pm *Manager) FetchTokenDetails(symbols []string) (map[string]thirdparty.To
 	return tokenDetails, nil
 }
 
-func (pm *Manager) FetchPrice(symbol string, currency string) (float64, error) {
-	symbols := [1]string{symbol}
+func (pm *Manager) FetchPrice(groupedTokensKey string, currency string) (float64, error) {
+	groupedTokensKeys := [1]string{groupedTokensKey}
 	currencies := [1]string{currency}
 
-	prices, err := pm.FetchPrices(symbols[:], currencies[:])
+	prices, err := pm.FetchPrices(groupedTokensKeys[:], currencies[:])
 
 	if err != nil {
 		return 0, err
 	}
 
-	return prices[symbol][currency], nil
+	return prices[groupedTokensKey][currency], nil
 }
 
-func (pm *Manager) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
+func (pm *Manager) FetchPrices(groupedTokensKeys []string, currencies []string) (map[string]map[string]float64, error) {
 	response, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchPrices(symbols, currencies)
+		return provider.FetchPrices(groupedTokensKeys, currencies)
 	})
 
 	if err != nil {
@@ -266,18 +267,22 @@ func (pm *Manager) FetchPrices(symbols []string, currencies []string) (map[strin
 		return nil, err
 	}
 
-	prices := response.(map[string]map[string]float64)
+	prices, ok := response.(map[string]map[string]float64)
+	if !ok {
+		logutils.ZapLogger().Error("Unexpected response type", zap.Any("response", response))
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
 	pm.updatePriceCache(prices)
 	return prices, nil
 }
 
-func (pm *Manager) getCachedPricesFor(symbols []string, currencies []string) DataPerTokenAndCurrency {
+func (pm *Manager) getCachedPricesFor(groupedTokensKeys []string, currencies []string) DataPerTokenAndCurrency {
 	return Read(&pm.priceCache, func(tokenPriceCache TokenPriceCache) DataPerTokenAndCurrency {
 		prices := make(DataPerTokenAndCurrency)
-		for _, symbol := range symbols {
-			prices[symbol] = make(map[string]DataPoint)
+		for _, gtKey := range groupedTokensKeys {
+			prices[gtKey] = make(map[string]DataPoint)
 			for _, currency := range currencies {
-				prices[symbol][currency] = tokenPriceCache[symbol][currency]
+				prices[gtKey][currency] = tokenPriceCache[gtKey][currency]
 			}
 		}
 		return prices
@@ -286,13 +291,13 @@ func (pm *Manager) getCachedPricesFor(symbols []string, currencies []string) Dat
 
 func (pm *Manager) updatePriceCache(prices map[string]map[string]float64) {
 	Write(&pm.priceCache, func(tokenPriceCache TokenPriceCache) TokenPriceCache {
-		for token, pricesPerCurrency := range prices {
-			_, present := tokenPriceCache[token]
+		for gtKey, pricesPerCurrency := range prices {
+			_, present := tokenPriceCache[gtKey]
 			if !present {
-				tokenPriceCache[token] = make(map[string]DataPoint)
+				tokenPriceCache[gtKey] = make(map[string]DataPoint)
 			}
 			for currency, price := range pricesPerCurrency {
-				tokenPriceCache[token][currency] = DataPoint{
+				tokenPriceCache[gtKey][currency] = DataPoint{
 					Price:     price,
 					UpdatedAt: time.Now().Unix(),
 				}
@@ -304,44 +309,47 @@ func (pm *Manager) updatePriceCache(prices map[string]map[string]float64) {
 }
 
 // Return cached price if present in cache and age is less than maxAgeInSeconds. Fetch otherwise.
-func (pm *Manager) GetOrFetchPrices(symbols []string, currencies []string, maxAgeInSeconds int64) (DataPerTokenAndCurrency, error) {
-	symbolsToFetch := Read(&pm.priceCache, func(tokenPriceCache TokenPriceCache) []string {
-		symbolsToFetchMap := make(map[string]bool)
-		symbolsToFetch := make([]string, 0, len(symbols))
+func (pm *Manager) GetOrFetchPrices(groupedTokensKeys []string, currencies []string, maxAgeInSeconds int64) (DataPerTokenAndCurrency, error) {
+	if len(groupedTokensKeys) == 0 || len(currencies) == 0 {
+		return nil, fmt.Errorf("empty token keys or currencies")
+	}
+	tokensKeysToFetch := Read(&pm.priceCache, func(tokenPriceCache TokenPriceCache) []string {
+		tokensKeysToFetchMap := make(map[string]bool)
+		tokensKeysToFetch := make([]string, 0, len(groupedTokensKeys))
 
 		now := time.Now().Unix()
 
-		for _, symbol := range symbols {
-			tokenPriceCache, ok := tokenPriceCache[symbol]
+		for _, gtKey := range groupedTokensKeys {
+			tokenPriceCache, ok := tokenPriceCache[gtKey]
 			if !ok {
-				if !symbolsToFetchMap[symbol] {
-					symbolsToFetchMap[symbol] = true
-					symbolsToFetch = append(symbolsToFetch, symbol)
+				if !tokensKeysToFetchMap[gtKey] {
+					tokensKeysToFetchMap[gtKey] = true
+					tokensKeysToFetch = append(tokensKeysToFetch, gtKey)
 				}
 				continue
 			}
 			for _, currency := range currencies {
 				if now-tokenPriceCache[currency].UpdatedAt > maxAgeInSeconds {
-					if !symbolsToFetchMap[symbol] {
-						symbolsToFetchMap[symbol] = true
-						symbolsToFetch = append(symbolsToFetch, symbol)
+					if !tokensKeysToFetchMap[gtKey] {
+						tokensKeysToFetchMap[gtKey] = true
+						tokensKeysToFetch = append(tokensKeysToFetch, gtKey)
 					}
 					break
 				}
 			}
 		}
 
-		return symbolsToFetch
+		return tokensKeysToFetch
 	})
 
-	if len(symbolsToFetch) > 0 {
-		_, err := pm.FetchPrices(symbolsToFetch, currencies)
+	if len(tokensKeysToFetch) > 0 {
+		_, err := pm.FetchPrices(tokensKeysToFetch, currencies)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	prices := pm.getCachedPricesFor(symbols, currencies)
+	prices := pm.getCachedPricesFor(groupedTokensKeys, currencies)
 
 	return prices, nil
 }

@@ -21,18 +21,10 @@ class TestRpc(StatusBackendSteps):
                 "wallet_fetchPrices",
                 [
                     [
-                        "WETH9",
-                        "USDC",
-                        "ZEENUS",
-                        "EUROC",
-                        "WEENUS",
-                        "XEENUS",
-                        "WETH",
-                        "ETH",
-                        "STT",
-                        "UNI",
-                        "YEENUS",
-                        "DAI",
+                        "status",
+                        "ethereum",
+                        "dai",
+                        "usd-coin",
                     ],
                     ["usd"],
                 ],
@@ -41,6 +33,10 @@ class TestRpc(StatusBackendSteps):
                 "wallet_fetchMarketValues",
                 [
                     [
+                        "status",
+                        "ethereum",
+                        "dai",
+                        "usd-coin",
                         "WETH9",
                         "USDC",
                         "ZEENUS",
@@ -61,6 +57,10 @@ class TestRpc(StatusBackendSteps):
                 "wallet_fetchTokenDetails",
                 [
                     [
+                        "status",
+                        "ethereum",
+                        "dai",
+                        "usd-coin",
                         "WETH9",
                         "USDC",
                         "ZEENUS",

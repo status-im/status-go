@@ -1846,7 +1846,7 @@ func getNormalTestParamsList() []normalTestParams {
 			},
 			expectedError: &errors.ErrorResponse{
 				Code:    ErrNotEnoughTokenBalance.Code,
-				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, walletCommon.UsdcSymbol, walletCommon.OptimismMainnet),
+				Details: fmt.Sprintf(ErrNotEnoughTokenBalance.Details, walletCommon.UsdcSymbol, walletCommon.BaseMainnet),
 			},
 			expectedCandidates: routes.Route{
 				{

@@ -25,12 +25,12 @@ func (mpp *MockPriceProvider) ID() string {
 	return "MockPriceProvider"
 }
 
-func (mpp *MockPriceProvider) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
+func (mpp *MockPriceProvider) FetchPrices(tokenKeys []string, currencies []string) (map[string]map[string]float64, error) {
 	res := make(map[string]map[string]float64)
-	for _, symbol := range symbols {
-		res[symbol] = make(map[string]float64)
+	for _, tokenKey := range tokenKeys {
+		res[tokenKey] = make(map[string]float64)
 		for _, currency := range currencies {
-			res[symbol][currency] = mpp.mockPrices[symbol][currency]
+			res[tokenKey][currency] = mpp.mockPrices[tokenKey][currency]
 		}
 	}
 	return res, nil
@@ -49,6 +49,6 @@ func NewMockPriceProviderWithError(ctrl *gomock.Controller, err error) *MockPric
 	}
 }
 
-func (mpp *MockPriceProviderWithError) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
+func (mpp *MockPriceProviderWithError) FetchPrices(tokenKeys []string, currencies []string) (map[string]map[string]float64, error) {
 	return nil, mpp.err
 }

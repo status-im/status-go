@@ -23,6 +23,11 @@ const (
 	UsdcSymbol = "USDC"
 	HopSymbol  = "HOP"
 	DaiSymbol  = "DAI"
+
+	ETHTokenGroupKey  = "ethereum"
+	SNTTokenGroupKey  = "status"
+	USDCTokenGroupKey = "usd-coin"
+	DAITokenGroupKey  = "dai"
 )
 
 type ChainID uint64
