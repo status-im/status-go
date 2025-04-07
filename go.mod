@@ -2,7 +2,7 @@ module github.com/status-im/status-go
 
 go 1.22
 
-replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.18
+replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.18.0.20250407114703-95a0cb61664d
 
 replace github.com/rjeczalik/notify => github.com/status-im/notify v1.0.2-status
 
@@ -53,7 +53,6 @@ require (
 	github.com/status-im/markdown v0.0.0-20240404192634-b7e33c6ac3d4
 	github.com/status-im/migrate/v4 v4.6.2-status.3
 	github.com/status-im/mvds v0.0.27-0.20241031073756-b192c603a75d
-	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v1.1.1-status
 	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
 	github.com/stretchr/testify v1.9.0
@@ -95,6 +94,7 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
+	github.com/status-im/extkeys v1.0.1-0.20250407114414-33d3756ad493
 	github.com/urfave/cli/v2 v2.27.2
 	github.com/waku-org/go-waku v0.8.1-0.20250411145637-900b98812a91
 	github.com/waku-org/waku-go-bindings v0.0.0-20250313132258-6f95d51df46c
