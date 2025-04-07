@@ -24,19 +24,21 @@ cd status-go
 
 status-go uses nix in the Makefile to provide every tools required.
 
-### 4. Build the statusd CLI
+### 4. Build the status-backend
 
 To get started, let’s build the Ethereum node Command Line Interface tool, called `statusd`.
 
 ```shell
-make statusgo
+make status-backend
 ```
 
-Once that is completed, you can run it straight away with a default configuration by running
-
+Once that is completed, you can start it straight away by running
 ```shell
-build/bin/statusd
+./build/bin/status-backend --address=localhost:12345
 ```
+
+This will provide full API at http://localhost:12345. \
+Checkout [`status-backend docs`](../cmd/status-backend/README.md) for more details.
 
 ### 5. Build a library for Android and iOS
 
@@ -63,13 +65,13 @@ Run
 adb shell tail -f sdcard/Android/data/im.status.ethereum.debug/files/Download/geth.log
 ```
 
-## Testing
-
-First, make sure the code is linted properly:
+## Linting
 
 ```shell
 make lint
 ```
+
+## Testing
 
 Next, run unit tests:
 
@@ -85,42 +87,9 @@ go test -tags gowaku_skip_migrations -v ./api/ -testify.m ^RPCSendTransaction$
 
 Note -testify.m as [testify/suite](https://godoc.org/github.com/stretchr/testify/suite) is used to group individual tests.
 
-Finally, run e2e tests:
-
+To run a single test in a test suite (e.g. `TestTransferringKeystoreFiles`, which is part of `SyncDeviceSuite`):
 ```shell
-make test-e2e
+go test -tags gowaku_skip_migrations -v ./server/pairing -test.run TestSyncDeviceSuite -testify.m ^TestTransferringKeystoreFiles$
 ```
 
-There is also a command to run all tests in one go:
-
-```shell
-make ci
-```
-
-### Running
-
-Passing the `-h` flag will output all the possible flags used to configure the tool. Although the tool can be used with default configuration, you’ll probably want to delve into the configuration and modify it to your needs.
-
-Node configuration - be it through the CLI or as a static library - is done through JSON files following a precise structure. At any point, you can add the `-version` argument to `statusd` to get an output of the JSON configuration in use. You can pass multiple configuration files which will be applied in the order in which they were specified.
-
-There are a few standard configuration files located in the config/cli folder to get you started. For instance you can pass `-c les-enabled.json` to enable LES mode.
-
-For more details on running a Status Node see [the dedicated page](https://github.com/status-im/status-go/blob/develop/_examples/README.md#run-waku-node).
-
-### Testing with an Ethereum network
-
-To setup accounts passphrase you need to setup an environment variable: `export ACCOUNT_PASSWORD="secret_pass_phrase"`.
-
-To test statusgo using a given network by name, use:
-
-```shell
-make ci networkid=rinkeby
-```
-
-To test statusgo using a given network by number ID, use:
-
-```shell
-make ci networkid=3
-```
-
-If you have problems running tests on public network we suggest reading e2e guide.
+Note: `TestSyncDeviceSuite` is not the name of the test suite, but the name of the test function that runs the `SyncDeviceSuite` suite.

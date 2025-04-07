@@ -1,3 +1,7 @@
+> [!CAUTION]
+> `status-cli` tool is deprecated. Use [status-backend](./cmd/status-backend/README.md) instead. \
+> This tool is scheduled to be completely removed in May 2025.
+
 # Status CLI
 
 The Status CLI is a command line interface for interacting with the Status messenging process. It is a tool for developers and QAs to test the communication workflow without running Status desktop and mobile app.

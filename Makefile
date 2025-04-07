@@ -326,13 +326,6 @@ test-unit-network: ##@tests Run unit and integration tests with network access
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
 
-test-e2e: ##@tests Run e2e tests
-	# order: reliability then alphabetical
-	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
-
-test-e2e-race: export GOTEST_EXTRAFLAGS=-race
-test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
-
 test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
 test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
@@ -345,10 +338,6 @@ lint-panics: generate
 
 lint: generate lint-panics
 	golangci-lint --build-tags '$(BUILD_TAGS)' run ./...
-
-ci: generate lint test-unit test-e2e ##@tests Run all linters and tests at once
-
-ci-race: generate lint test-unit test-e2e-race ##@tests Run all linters and tests at once + race
 
 clean: ##@other Cleanup
 	rm -fr build/bin/* mailserver-config.json
