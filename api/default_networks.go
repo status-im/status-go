@@ -380,6 +380,71 @@ func statusNetworkSepolia(proxyHost string) params.Network {
 	}
 }
 
+func bnbSmartChain(proxyHost string) params.Network {
+	const chainID = common.BNBSmartChainID
+	const chainName = "bsc"
+	const networkName = "mainnet"
+
+	rpcProviders := []params.RpcProvider{
+		// Smart proxy provider
+		*params.NewEthRpcProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(proxyHost, chainName, networkName), false),
+		// Direct providers
+		*params.NewDirectProvider(chainID, DirectInfura, "https://bsc-mainnet.infura.io/v3/", true),
+		*params.NewDirectProvider(chainID, DirectGrove, "https://bsc.rpc.grove.city/v1/", false),
+	}
+
+	return params.Network{
+		ChainID:                chainID,
+		ChainName:              "BNB Smart Chain",
+		RpcProviders:           rpcProviders,
+		BlockExplorerURL:       "https://bscscan.com/",
+		IconURL:                "network/Network=bsc",
+		ChainColor:             "#f7bb0f",
+		ShortName:              "bsc",
+		NativeCurrencyName:     "BNB",
+		NativeCurrencySymbol:   "BNB",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 false,
+		Layer:                  1,
+		Enabled:                true,
+		RelatedChainID:         common.BNBSmartChainTestnetChainID,
+		IsActive:               true,
+		IsDeactivatable:        true,
+	}
+}
+
+func bnbSmartChainTestnet(proxyHost string) params.Network {
+	const chainID = common.BNBSmartChainTestnetChainID
+	const chainName = "bsc"
+	const networkName = "testnet"
+
+	rpcProviders := []params.RpcProvider{
+		// Smart proxy provider
+		*params.NewEthRpcProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(proxyHost, chainName, networkName), false),
+		// Direct providers
+		*params.NewDirectProvider(chainID, DirectInfura, "https://bsc-testnet.infura.io/v3/", true),
+	}
+
+	return params.Network{
+		ChainID:                chainID,
+		ChainName:              "BNB Smart Chain Testnet",
+		RpcProviders:           rpcProviders,
+		BlockExplorerURL:       "https://testnet.bscscan.com/",
+		IconURL:                "network/Network=bsc-test",
+		ChainColor:             "#f7bb0f",
+		ShortName:              "bsc",
+		NativeCurrencyName:     "BNB",
+		NativeCurrencySymbol:   "BNB",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 true,
+		Layer:                  1,
+		Enabled:                true,
+		RelatedChainID:         common.BNBSmartChainID,
+		IsActive:               false,
+		IsDeactivatable:        true,
+	}
+}
+
 func defaultNetworks(proxyHost, stageName string) []params.Network {
 	return []params.Network{
 		mainnet(proxyHost, stageName),
@@ -391,6 +456,8 @@ func defaultNetworks(proxyHost, stageName string) []params.Network {
 		base(proxyHost, stageName),
 		baseSepolia(proxyHost, stageName),
 		statusNetworkSepolia(proxyHost),
+		bnbSmartChain(proxyHost),
+		bnbSmartChainTestnet(proxyHost),
 	}
 }
 
