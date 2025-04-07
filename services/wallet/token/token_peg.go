@@ -1,24 +1,21 @@
 package token
 
 var tokenPeg = map[string]string{
-	"aUSDC": "USD",
-	"DAI":   "USD",
-	"EURC":  "EUR",
-	"SAI":   "USD",
-	"sUSD":  "USD",
-	"PAXG":  "XAU",
-	"TCAD":  "CAD",
-	"TUSD":  "USD",
-	"TGBP":  "GBP",
-	"TAUD":  "AUD",
-	"USDC":  "USD",
-	"USDD":  "USD",
-	"USDS":  "USD",
-	"USDT":  "USD",
-	"USDP":  "USD",
-	"USDSC": "USD",
+	"aave-usdc-v1":      "USD", // AUSDC
+	"dai":               "USD", // DAI
+	"euro-coin":         "EUR", // EURC
+	"sai":               "USD", // SAI
+	"nusd":              "USD", // SUSD
+	"pax-gold":          "XAU", // PAXG
+	"caduceus-protocol": "CAD", // CAD
+	"true-usd":          "USD", // TUSD
+	"usd-coin":          "USD", // USDC
+	"usdd":              "USD", // USDD
+	"usds":              "USD", // USDS
+	"tether":            "USD", // USDT
+	"paxos-standard":    "USD", // USDP
 }
 
-func GetTokenPegSymbol(symbol string) string {
-	return tokenPeg[symbol]
+func GetTokenPegSymbol(id string) string {
+	return tokenPeg[id]
 }

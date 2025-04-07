@@ -32,9 +32,9 @@ type TokenDetails struct {
 
 type MarketDataProvider interface {
 	ID() string
-	FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error)
-	FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]HistoricalPrice, error)
-	FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]HistoricalPrice, error)
-	FetchTokenMarketValues(symbols []string, currency string) (map[string]TokenMarketValues, error)
-	FetchTokenDetails(symbols []string) (map[string]TokenDetails, error)
+	FetchPrices(groupedTokensKeys []string, currencies []string) (map[string]map[string]float64, error)
+	FetchHistoricalDailyPrices(groupedTokensKeys string, currency string, limit int, allData bool, aggregate int) ([]HistoricalPrice, error)
+	FetchHistoricalHourlyPrices(groupedTokensKeys string, currency string, limit int, aggregate int) ([]HistoricalPrice, error)
+	FetchTokenMarketValues(groupedTokensKeys []string, currency string) (map[string]TokenMarketValues, error)
+	FetchTokenDetails(groupedTokensKeys []string) (map[string]TokenDetails, error)
 }

@@ -376,31 +376,36 @@ func (api *API) GetFlatEthereumChains(ctx context.Context) ([]*params.Network, e
 }
 
 // @deprecated
-func (api *API) FetchPrices(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]float64, error) {
+// FetchPrices returns price map (per token group key and currencies) for passed group token keys (refer to description of `TokenGroupKey()` function) and currencies.
+func (api *API) FetchPrices(ctx context.Context, groupedTokensKeys []string, currencies []string) (map[string]map[string]float64, error) {
 	logutils.ZapLogger().Debug("call to FetchPrices")
-	return api.s.marketManager.FetchPrices(symbols, currencies)
+	return api.s.marketManager.FetchPrices(groupedTokensKeys, currencies)
 }
 
 // @deprecated
-func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
+// FetchMarketValues returns market values for passed group token keys (refer to description of `TokenGroupKey()` function) and currency.
+func (api *API) FetchMarketValues(ctx context.Context, groupedTokensKeys []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
 	logutils.ZapLogger().Debug("call to FetchMarketValues")
-	return api.s.marketManager.FetchTokenMarketValues(symbols, currency)
+	return api.s.marketManager.FetchTokenMarketValues(groupedTokensKeys, currency)
 }
 
-func (api *API) GetHourlyMarketValues(ctx context.Context, symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+// GetHourlyMarketValues returns historical hourly prices for passed group token key (refer to description of `TokenGroupKey()` function) and currency.
+func (api *API) GetHourlyMarketValues(ctx context.Context, groupedTokensKey string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	logutils.ZapLogger().Debug("call to GetHourlyMarketValues")
-	return api.s.marketManager.FetchHistoricalHourlyPrices(symbol, currency, limit, aggregate)
+	return api.s.marketManager.FetchHistoricalHourlyPrices(groupedTokensKey, currency, limit, aggregate)
 }
 
-func (api *API) GetDailyMarketValues(ctx context.Context, symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+// GetDailyMarketValues returns historical daily prices for passed group token key (refer to description of `TokenGroupKey()` function) and currency.
+func (api *API) GetDailyMarketValues(ctx context.Context, groupedTokensKey string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	logutils.ZapLogger().Debug("call to GetDailyMarketValues")
-	return api.s.marketManager.FetchHistoricalDailyPrices(symbol, currency, limit, allData, aggregate)
+	return api.s.marketManager.FetchHistoricalDailyPrices(groupedTokensKey, currency, limit, allData, aggregate)
 }
 
 // @deprecated
-func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]thirdparty.TokenDetails, error) {
+// FetchTokenDetails fetches the token details for the given token keys (coingecko id param is used for token key).
+func (api *API) FetchTokenDetails(ctx context.Context, groupedTokensKeys []string) (map[string]thirdparty.TokenDetails, error) {
 	logutils.ZapLogger().Debug("call to FetchTokenDetails")
-	return api.s.marketManager.FetchTokenDetails(symbols)
+	return api.s.marketManager.FetchTokenDetails(groupedTokensKeys)
 }
 
 // @deprecated we should remove it once clients fully switched to wallet router, `GetSuggestedRoutesAsync` should be used instead
@@ -712,12 +717,12 @@ func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []wcomm
 	return api.s.transactionManager.GetMultiTransactions(ctx, transactionIDs)
 }
 
-func (api *API) GetCachedCurrencyFormats() (currency.FormatPerSymbol, error) {
+func (api *API) GetCachedCurrencyFormats() (currency.Formats, error) {
 	logutils.ZapLogger().Debug("call to GetCachedCurrencyFormats")
 	return api.s.currency.GetCachedCurrencyFormats()
 }
 
-func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
+func (api *API) FetchAllCurrencyFormats() (currency.Formats, error) {
 	logutils.ZapLogger().Debug("call to FetchAllCurrencyFormats")
 	return api.s.currency.FetchAllCurrencyFormats()
 }

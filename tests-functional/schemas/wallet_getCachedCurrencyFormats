@@ -17,14 +17,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -36,14 +36,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -55,14 +55,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -74,14 +74,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -93,14 +93,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -112,14 +112,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -131,14 +131,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -150,14 +150,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -169,14 +169,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -188,14 +188,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -207,14 +207,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -226,14 +226,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -245,14 +245,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -264,14 +264,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -283,14 +283,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -302,14 +302,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -321,14 +321,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -340,14 +340,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -359,14 +359,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -378,14 +378,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -397,14 +397,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -416,14 +416,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -435,14 +435,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -454,14 +454,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -473,14 +473,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -492,14 +492,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -511,14 +511,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -530,14 +530,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -549,14 +549,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -568,14 +568,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -587,14 +587,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -606,14 +606,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -625,14 +625,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -644,14 +644,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -663,14 +663,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -682,14 +682,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -701,14 +701,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -720,14 +720,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -739,14 +739,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -758,14 +758,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -777,14 +777,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -796,14 +796,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -815,14 +815,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -834,14 +834,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -853,14 +853,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -872,14 +872,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -891,14 +891,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -910,14 +910,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -929,14 +929,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -948,14 +948,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -967,14 +967,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -986,14 +986,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1005,14 +1005,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1024,14 +1024,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1043,14 +1043,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1062,14 +1062,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1081,14 +1081,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1100,14 +1100,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1119,14 +1119,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1138,14 +1138,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1157,14 +1157,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1176,14 +1176,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1195,14 +1195,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1214,14 +1214,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1233,14 +1233,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1252,14 +1252,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1271,14 +1271,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1290,14 +1290,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1309,14 +1309,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1328,14 +1328,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1347,14 +1347,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1366,14 +1366,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1385,14 +1385,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1404,14 +1404,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1423,14 +1423,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1442,14 +1442,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1461,14 +1461,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1480,14 +1480,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1499,14 +1499,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1518,14 +1518,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1537,14 +1537,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1556,14 +1556,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1575,14 +1575,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1594,14 +1594,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1613,14 +1613,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1632,14 +1632,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1651,14 +1651,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1670,14 +1670,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1689,14 +1689,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1708,14 +1708,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1727,14 +1727,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1746,14 +1746,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1765,14 +1765,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1784,14 +1784,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1803,14 +1803,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1822,14 +1822,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1841,14 +1841,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1860,14 +1860,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1879,14 +1879,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1898,14 +1898,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1917,14 +1917,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1936,14 +1936,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1955,14 +1955,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1974,14 +1974,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -1993,14 +1993,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2012,14 +2012,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2031,14 +2031,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2050,14 +2050,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2069,14 +2069,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2088,14 +2088,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2107,14 +2107,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2126,14 +2126,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2145,14 +2145,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2164,14 +2164,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2183,14 +2183,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2202,14 +2202,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2221,14 +2221,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2240,14 +2240,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2259,14 +2259,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2278,14 +2278,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2297,14 +2297,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2316,14 +2316,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2335,14 +2335,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2354,14 +2354,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2373,14 +2373,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2392,14 +2392,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2411,14 +2411,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2430,14 +2430,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2449,14 +2449,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2468,14 +2468,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2487,14 +2487,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2506,14 +2506,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2525,14 +2525,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2544,14 +2544,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2563,14 +2563,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2582,14 +2582,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2601,14 +2601,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2620,14 +2620,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2639,14 +2639,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2658,14 +2658,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2677,14 +2677,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2696,14 +2696,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2715,14 +2715,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2734,14 +2734,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2753,14 +2753,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2772,14 +2772,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2791,14 +2791,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2810,14 +2810,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2829,14 +2829,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2848,14 +2848,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2867,14 +2867,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2886,14 +2886,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2905,14 +2905,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2924,14 +2924,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2943,14 +2943,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2962,14 +2962,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -2981,14 +2981,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3000,14 +3000,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3019,14 +3019,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3038,14 +3038,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3057,14 +3057,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3076,14 +3076,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3095,14 +3095,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3114,14 +3114,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3133,14 +3133,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3152,14 +3152,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3171,14 +3171,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3190,14 +3190,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3209,14 +3209,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3228,14 +3228,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3247,14 +3247,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3266,14 +3266,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3285,14 +3285,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3304,14 +3304,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3323,14 +3323,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3342,14 +3342,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3361,14 +3361,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3380,14 +3380,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3399,14 +3399,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 },
@@ -3418,14 +3418,14 @@
                         "stripTrailingZeroes": {
                             "type": "boolean"
                         },
-                        "symbol": {
+                        "id": {
                             "type": "string"
                         }
                     },
                     "required": [
                         "displayDecimals",
                         "stripTrailingZeroes",
-                        "symbol"
+                        "id"
                     ],
                     "type": "object"
                 }

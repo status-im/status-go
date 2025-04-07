@@ -84,6 +84,7 @@ func TestCustoms(t *testing.T) {
 		Decimals: 12,
 		ChainID:  777,
 	}
+	token.GroupKey = fmt.Sprintf(tokenTypes.TokenKeyPattern, token.ChainID, token.Address.Hex())
 
 	err = manager.UpsertCustom(token)
 	require.NoError(t, err)
@@ -116,6 +117,7 @@ func TestCommunityTokens(t *testing.T) {
 		Decimals: 12,
 		ChainID:  777,
 	}
+	token.GroupKey = fmt.Sprintf(tokenTypes.TokenKeyPattern, token.ChainID, token.Address.Hex())
 
 	err = manager.UpsertCustom(token)
 	require.NoError(t, err)
@@ -130,6 +132,7 @@ func TestCommunityTokens(t *testing.T) {
 			ID: "random_community_id",
 		},
 	}
+	communityToken.GroupKey = fmt.Sprintf(tokenTypes.TokenKeyPattern, communityToken.ChainID, communityToken.Address.Hex())
 
 	upsertCommunityToken(t, &communityToken, manager)
 

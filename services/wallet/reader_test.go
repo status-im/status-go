@@ -24,6 +24,12 @@ import (
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
+const (
+	tokensGroupKey1 = "token-group-1"
+	tokensGroupKey2 = "token-group-2"
+	tokensGroupKey3 = "token-group-3"
+)
+
 var (
 	testTokenAddress1 = common.Address{0x34}
 	testTokenAddress2 = common.Address{0x56}
@@ -503,6 +509,7 @@ func TestCreateBalancePerChainPerSymbol(t *testing.T) {
 
 	tokens := []*tokenTypes.Token{
 		{
+			GroupKey: tokensGroupKey1,
 			Name:     "Token 1 mainnet",
 			ChainID:  1,
 			Address:  common.Address{0x34},
@@ -510,6 +517,7 @@ func TestCreateBalancePerChainPerSymbol(t *testing.T) {
 			Decimals: 18,
 		},
 		{
+			GroupKey: tokensGroupKey1,
 			Name:     "Token 1 optimism",
 			ChainID:  2,
 			Address:  common.Address{0x56},
@@ -569,13 +577,14 @@ func TestCreateBalancePerChainPerSymbol(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	tokenManager.EXPECT().GetTokenHistoricalBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(nil, errors.New("error"))
-	result := reader.createBalancePerChainPerSymbol(address, balances, tokens, cachedTokens, clientConnectionPerChain, dayAgoTimestamp)
+	result := reader.createBalancePerChainPerSymbol(address, balances, tokensGroupKey1, tokens, cachedTokens, clientConnectionPerChain, dayAgoTimestamp)
 
 	assert.Len(t, result, 2)
 	testBalancePerChainEqual(t, expectedBalancesPerChain, result)
 }
 
 func TestCreateBalancePerChainPerSymbolWithMissingBalance(t *testing.T) {
+	const tokensGroupKey = "Group 1"
 	address := common.Address{0x12}
 	tokens := []*tokenTypes.Token{
 		{
@@ -630,7 +639,7 @@ func TestCreateBalancePerChainPerSymbolWithMissingBalance(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	tokenManager.EXPECT().GetTokenHistoricalBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(big.NewInt(1), nil)
-	result := reader.createBalancePerChainPerSymbol(address, oneBalanceMissing, tokens, emptyCachedTokens, clientConnectionPerChain, dayAgoTimestamp)
+	result := reader.createBalancePerChainPerSymbol(address, oneBalanceMissing, tokensGroupKey, tokens, emptyCachedTokens, clientConnectionPerChain, dayAgoTimestamp)
 	assert.Len(t, result, 1)
 	testBalancePerChainEqual(t, expectedBalancesPerChain, result)
 }
@@ -646,45 +655,52 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 		common.HexToAddress("0x456"),
 	}
 
-	allTokens := []*tokenTypes.Token{
-		{
-			Name:     "Token 1",
-			Symbol:   "T1",
-			Decimals: 18,
-			Verified: true,
-			ChainID:  1,
-			Address:  common.HexToAddress("0x789"),
+	tokensGroupedByGroupKey := map[string][]*tokenTypes.Token{
+		tokensGroupKey1: []*tokenTypes.Token{
+			{
+				GroupKey: tokensGroupKey1,
+				Name:     "Token 1",
+				Symbol:   "T1",
+				Decimals: 18,
+				Verified: true,
+				ChainID:  1,
+				Address:  common.HexToAddress("0x789"),
+			},
 		},
-		{
-			Name:     "Token 2",
-			Symbol:   "T2",
-			Decimals: 18,
-			Verified: true,
-			ChainID:  1,
-			Address:  common.HexToAddress("0xdef"),
-		},
-		{
-			Name:     "Token 2 optimism",
-			Symbol:   "T2",
-			Decimals: 18,
-			Verified: true,
-			ChainID:  2,
-			Address:  common.HexToAddress("0xabc"),
+		tokensGroupKey2: []*tokenTypes.Token{
+			{
+				GroupKey: tokensGroupKey2,
+				Name:     "Token 2",
+				Symbol:   "T2",
+				Decimals: 18,
+				Verified: true,
+				ChainID:  1,
+				Address:  common.HexToAddress("0xdef"),
+			},
+			{
+				GroupKey: tokensGroupKey2,
+				Name:     "Token 2",
+				Symbol:   "T2",
+				Decimals: 18,
+				Verified: true,
+				ChainID:  2,
+				Address:  common.HexToAddress("0xabc"),
+			},
 		},
 	}
 
 	balances := map[uint64]map[common.Address]map[common.Address]*hexutil.Big{
 		1: {
 			addresses[0]: {
-				allTokens[0].Address: (*hexutil.Big)(big.NewInt(1000000000000000000)),
+				tokensGroupedByGroupKey[tokensGroupKey1][0].Address: (*hexutil.Big)(big.NewInt(1000000000000000000)),
 			},
 			addresses[1]: {
-				allTokens[1].Address: (*hexutil.Big)(big.NewInt(2000000000000000000)),
+				tokensGroupedByGroupKey[tokensGroupKey2][0].Address: (*hexutil.Big)(big.NewInt(2000000000000000000)),
 			},
 		},
 		2: {
-			addresses[1]: {
-				allTokens[2].Address: (*hexutil.Big)(big.NewInt(3000000000000000000)),
+			addresses[0]: {
+				tokensGroupedByGroupKey[tokensGroupKey2][1].Address: (*hexutil.Big)(big.NewInt(3000000000000000000)),
 			},
 		},
 	}
@@ -693,6 +709,7 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 		addresses[0]: {
 			{
 				Token: tokenTypes.Token{
+					GroupKey: tokensGroupKey1,
 					Name:     "Token 1",
 					Symbol:   "T1",
 					Decimals: 18,
@@ -717,6 +734,7 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 		addresses[0]: {
 			{
 				Token: tokenTypes.Token{
+					GroupKey: tokensGroupKey1,
 					Name:     "Token 1",
 					Symbol:   "T1",
 					Decimals: 18,
@@ -733,10 +751,30 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 					},
 				},
 			},
+			{
+				Token: tokenTypes.Token{
+					GroupKey: tokensGroupKey2,
+					Name:     "Token 2",
+					Symbol:   "T2",
+					Decimals: 18,
+					Verified: true,
+				},
+				BalancesPerChain: map[uint64]tokenTypes.ChainBalance{
+					2: {
+						RawBalance:     "3000000000000000000",
+						Balance:        big.NewFloat(3),
+						Address:        common.HexToAddress("0xabc"),
+						ChainID:        2,
+						HasError:       false,
+						Balance1DayAgo: "0",
+					},
+				},
+			},
 		},
 		addresses[1]: {
 			{
 				Token: tokenTypes.Token{
+					GroupKey: tokensGroupKey2,
 					Name:     "Token 2",
 					Symbol:   "T2",
 					Decimals: 18,
@@ -751,14 +789,6 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 						HasError:       false,
 						Balance1DayAgo: "0",
 					},
-					2: {
-						RawBalance:     "3000000000000000000",
-						Balance:        big.NewFloat(3),
-						Address:        common.HexToAddress("0xabc"),
-						ChainID:        2,
-						HasError:       false,
-						Balance1DayAgo: "0",
-					},
 				},
 			},
 		},
@@ -768,10 +798,10 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	tokenManager.EXPECT().GetTokenHistoricalBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil, nil)
-	tokens := reader.balancesToTokensByAddress(connectedPerChain, addresses, allTokens, balances, cachedTokens)
+	tokens := reader.balancesToTokensByAddress(connectedPerChain, addresses, tokensGroupedByGroupKey, balances, cachedTokens)
 
 	assert.Len(t, tokens, 2)
-	assert.Equal(t, 1, len(tokens[addresses[0]]))
+	assert.Equal(t, 2, len(tokens[addresses[0]]))
 	assert.Equal(t, 1, len(tokens[addresses[1]]))
 
 	for _, address := range addresses {
@@ -798,27 +828,36 @@ func TestGetCachedBalances(t *testing.T) {
 		2: mockClientIface2,
 	}
 
-	allTokens := []*tokenTypes.Token{
-		{
-			Address:  common.HexToAddress("0xabc"),
-			Name:     "Token 1",
-			Symbol:   "T1",
-			Decimals: 18,
-			ChainID:  1,
+	tokensGroupedByGroupKey := map[string][]*tokenTypes.Token{
+		tokensGroupKey1: []*tokenTypes.Token{
+			{
+				GroupKey: tokensGroupKey1,
+				Address:  common.HexToAddress("0xabc"),
+				Name:     "Token 1",
+				Symbol:   "T1",
+				Decimals: 18,
+				ChainID:  1,
+			},
 		},
-		{
-			Address:  common.HexToAddress("0xdef"),
-			Name:     "Token 2",
-			Symbol:   "T2",
-			Decimals: 18,
-			ChainID:  2,
+		tokensGroupKey2: []*tokenTypes.Token{
+			{
+				GroupKey: tokensGroupKey2,
+				Address:  common.HexToAddress("0xdef"),
+				Name:     "Token 2",
+				Symbol:   "T2",
+				Decimals: 18,
+				ChainID:  2,
+			},
 		},
-		{
-			Address:  common.HexToAddress("0x789"),
-			Name:     "Token 3",
-			Symbol:   "T3",
-			Decimals: 10,
-			ChainID:  1,
+		tokensGroupKey3: []*tokenTypes.Token{
+			{
+				GroupKey: tokensGroupKey3,
+				Address:  common.HexToAddress("0x789"),
+				Name:     "Token 3",
+				Symbol:   "T3",
+				Decimals: 10,
+				ChainID:  1,
+			},
 		},
 	}
 
@@ -862,6 +901,7 @@ func TestGetCachedBalances(t *testing.T) {
 		addresses[1]: {
 			{
 				Token: tokenTypes.Token{
+					GroupKey: tokensGroupKey2,
 					Name:     "Token 2",
 					Symbol:   "T2",
 					Decimals: 18,
@@ -881,8 +921,7 @@ func TestGetCachedBalances(t *testing.T) {
 	}
 
 	persistence.EXPECT().GetTokens().Return(cachedTokens, nil)
-	expectedChains := []uint64{1, 2}
-	tokenManager.EXPECT().GetTokensByChainIDs(testutils.NewUint64SliceMatcher(expectedChains)).Return(allTokens, nil)
+	tokenManager.EXPECT().GetTokensGroupedByGroupKey().Return(tokensGroupedByGroupKey, nil)
 	tokenManager.EXPECT().GetTokenHistoricalBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
 	mockClientIface1.EXPECT().IsConnected().Return(true)
 	mockClientIface2.EXPECT().IsConnected().Return(true)
@@ -913,27 +952,36 @@ func TestFetchBalances(t *testing.T) {
 		2: mockClientIface2,
 	}
 
-	allTokens := []*tokenTypes.Token{
-		{
-			Address:  common.HexToAddress("0xabc"),
-			Name:     "Token 1",
-			Symbol:   "T1",
-			Decimals: 18,
-			ChainID:  1,
+	tokensGroupedByGroupKey := map[string][]*tokenTypes.Token{
+		tokensGroupKey1: []*tokenTypes.Token{
+			{
+				GroupKey: tokensGroupKey1,
+				Address:  common.HexToAddress("0xabc"),
+				Name:     "Token 1",
+				Symbol:   "T1",
+				Decimals: 18,
+				ChainID:  1,
+			},
 		},
-		{
-			Address:  common.HexToAddress("0xdef"),
-			Name:     "Token 2",
-			Symbol:   "T2",
-			Decimals: 18,
-			ChainID:  2,
+		tokensGroupKey2: []*tokenTypes.Token{
+			{
+				GroupKey: tokensGroupKey2,
+				Address:  common.HexToAddress("0xdef"),
+				Name:     "Token 2",
+				Symbol:   "T2",
+				Decimals: 18,
+				ChainID:  2,
+			},
 		},
-		{
-			Address:  common.HexToAddress("0x789"),
-			Name:     "Token 3",
-			Symbol:   "T3",
-			Decimals: 10,
-			ChainID:  1,
+		tokensGroupKey3: []*tokenTypes.Token{
+			{
+				GroupKey: tokensGroupKey3,
+				Address:  common.HexToAddress("0x789"),
+				Name:     "Token 3",
+				Symbol:   "T3",
+				Decimals: 10,
+				ChainID:  1,
+			},
 		},
 	}
 
@@ -941,6 +989,7 @@ func TestFetchBalances(t *testing.T) {
 		addresses[0]: {
 			{
 				Token: tokenTypes.Token{
+					GroupKey: tokensGroupKey1,
 					Address:  common.HexToAddress("0xabc"),
 					Name:     "Token 1",
 					Symbol:   "T1",
@@ -953,6 +1002,7 @@ func TestFetchBalances(t *testing.T) {
 		addresses[1]: {
 			{
 				Token: tokenTypes.Token{
+					GroupKey: tokensGroupKey2,
 					Address:  common.HexToAddress("0xdef"),
 					Name:     "Token 2",
 					Symbol:   "T2",
@@ -977,6 +1027,7 @@ func TestFetchBalances(t *testing.T) {
 		addresses[1]: {
 			{
 				Token: tokenTypes.Token{
+					GroupKey: tokensGroupKey2,
 					Name:     "Token 2",
 					Symbol:   "T2",
 					Decimals: 18,
@@ -998,18 +1049,18 @@ func TestFetchBalances(t *testing.T) {
 	persistence.EXPECT().GetTokens().Times(2).Return(cachedTokens, nil)
 	// Verify that proper tokens are saved
 	persistence.EXPECT().SaveTokens(newMapTokenWithBalanceMatcher([]interface{}{expectedTokens})).Return(nil)
-	expectedChains := []uint64{1, 2}
-	tokenManager.EXPECT().GetTokensByChainIDs(testutils.NewUint64SliceMatcher(expectedChains)).Return(allTokens, nil)
+	tokenManager.EXPECT().GetTokensGroupedByGroupKey().Return(tokensGroupedByGroupKey, nil)
 	tokenManager.EXPECT().GetTokenHistoricalBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
 	expectedBalances := map[uint64]map[common.Address]map[common.Address]*hexutil.Big{
 		2: {
 			addresses[1]: {
-				allTokens[1].Address: (*hexutil.Big)(big.NewInt(2000000000000000000)),
+				tokensGroupedByGroupKey[tokensGroupKey2][0].Address: (*hexutil.Big)(big.NewInt(2000000000000000000)),
 			},
 		},
 	}
 
-	tokenAddresses := getTokenAddresses(allTokens)
+	tokenAddresses := getTokenAddresses(tokensGroupedByGroupKey)
+
 	tokenManager.EXPECT().GetBalancesByChain(context.TODO(), clients, addresses, testutils.NewAddressSliceMatcher(tokenAddresses)).Return(expectedBalances, nil)
 	mockClientIface1.EXPECT().IsConnected().Return(true)
 	mockClientIface2.EXPECT().IsConnected().Return(true)

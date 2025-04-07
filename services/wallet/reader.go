@@ -18,6 +18,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/rpc/chain"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -35,10 +36,10 @@ const (
 	activityReloadMarginSeconds = 30 // Trigger a wallet reload if activity is detected this many seconds before the last reload
 )
 
-func belongsToMandatoryTokens(symbol string) bool {
-	var mandatoryTokens = []string{"ETH", "DAI", "SNT", "STT", "USDC"}
+func belongsToMandatoryTokenGroup(tokenGroupKey string) bool {
+	var mandatoryTokens = []string{walletCommon.ETHTokenGroupKey, walletCommon.SNTTokenGroupKey, walletCommon.USDCTokenGroupKey, walletCommon.DAITokenGroupKey}
 	for _, t := range mandatoryTokens {
-		if t == symbol {
+		if t == tokenGroupKey {
 			return true
 		}
 	}
@@ -78,45 +79,14 @@ type Reader struct {
 	rw                             sync.RWMutex
 }
 
-func splitVerifiedTokens(tokens []*tokenTypes.Token) ([]*tokenTypes.Token, []*tokenTypes.Token) {
-	verified := make([]*tokenTypes.Token, 0)
-	unverified := make([]*tokenTypes.Token, 0)
-
-	for _, t := range tokens {
-		if t.Verified {
-			verified = append(verified, t)
-		} else {
-			unverified = append(unverified, t)
+func getTokenAddresses(groupedTokens map[string][]*tokenTypes.Token) []common.Address {
+	set := make(map[common.Address]struct{})
+	for _, tokenGroup := range groupedTokens {
+		for _, token := range tokenGroup {
+			set[token.Address] = struct{}{}
 		}
 	}
-
-	return verified, unverified
-}
-
-func getTokenBySymbols(tokens []*tokenTypes.Token) map[string][]*tokenTypes.Token {
-	res := make(map[string][]*tokenTypes.Token)
-
-	for _, t := range tokens {
-		if _, ok := res[t.Symbol]; !ok {
-			res[t.Symbol] = make([]*tokenTypes.Token, 0)
-		}
-
-		res[t.Symbol] = append(res[t.Symbol], t)
-	}
-
-	return res
-}
-
-func getTokenAddresses(tokens []*tokenTypes.Token) []common.Address {
-	set := make(map[common.Address]bool)
-	for _, token := range tokens {
-		set[token.Address] = true
-	}
-	res := make([]common.Address, 0)
-	for address := range set {
-		res = append(res, address)
-	}
-	return res
+	return maps.Keys(set)
 }
 
 func (r *Reader) Start() error {
@@ -396,35 +366,32 @@ func (r *Reader) getBalance1DayAgo(balance *tokenTypes.ChainBalance, dayAgoTimes
 	return balance1DayAgo, nil
 }
 
-func (r *Reader) balancesToTokensByAddress(connectedPerChain map[uint64]bool, addresses []common.Address, allTokens []*tokenTypes.Token, balances map[uint64]map[common.Address]map[common.Address]*hexutil.Big, cachedTokens map[common.Address][]tokenTypes.StorageToken) map[common.Address][]tokenTypes.StorageToken {
-	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
-
+func (r *Reader) balancesToTokensByAddress(connectedPerChain map[uint64]bool, addresses []common.Address, tokensGroupedByGroupKey map[string][]*tokenTypes.Token, balances map[uint64]map[common.Address]map[common.Address]*hexutil.Big, cachedTokens map[common.Address][]tokenTypes.StorageToken) map[common.Address][]tokenTypes.StorageToken {
 	result := make(map[common.Address][]tokenTypes.StorageToken)
 	dayAgoTimestamp := time.Now().Add(-24 * time.Hour).Unix()
 
 	for _, address := range addresses {
-		for _, tokenList := range [][]*tokenTypes.Token{verifiedTokens, unverifiedTokens} {
-			for symbol, tokens := range getTokenBySymbols(tokenList) {
-				balancesPerChain := r.createBalancePerChainPerSymbol(address, balances, tokens, cachedTokens, connectedPerChain, dayAgoTimestamp)
-				if balancesPerChain == nil {
-					continue
-				}
-
-				walletToken := tokenTypes.StorageToken{
-					Token: tokenTypes.Token{
-						Name:          tokens[0].Name,
-						Symbol:        symbol,
-						Decimals:      tokens[0].Decimals,
-						PegSymbol:     token.GetTokenPegSymbol(symbol),
-						Verified:      tokens[0].Verified,
-						CommunityData: tokens[0].CommunityData,
-						Image:         tokens[0].Image,
-					},
-					BalancesPerChain: balancesPerChain,
-				}
-
-				result[address] = append(result[address], walletToken)
+		for tokensGroupKey, tokens := range tokensGroupedByGroupKey {
+			balancesPerChain := r.createBalancePerChainPerSymbol(address, balances, tokensGroupKey, tokens, cachedTokens, connectedPerChain, dayAgoTimestamp)
+			if balancesPerChain == nil {
+				continue
 			}
+
+			walletToken := tokenTypes.StorageToken{
+				Token: tokenTypes.Token{
+					GroupKey:      tokens[0].GroupKey,
+					Name:          tokens[0].Name,
+					Symbol:        tokens[0].Symbol,
+					Decimals:      tokens[0].Decimals,
+					PegSymbol:     token.GetTokenPegSymbol(tokensGroupKey),
+					Verified:      tokens[0].Verified,
+					CommunityData: tokens[0].CommunityData,
+					Image:         tokens[0].Image,
+				},
+				BalancesPerChain: balancesPerChain,
+			}
+
+			result[address] = append(result[address], walletToken)
 		}
 	}
 
@@ -434,14 +401,14 @@ func (r *Reader) balancesToTokensByAddress(connectedPerChain map[uint64]bool, ad
 func (r *Reader) createBalancePerChainPerSymbol(
 	address common.Address,
 	balances map[uint64]map[common.Address]map[common.Address]*hexutil.Big,
+	tokensGroupKey string,
 	tokens []*tokenTypes.Token,
 	cachedTokens map[common.Address][]tokenTypes.StorageToken,
 	clientConnectionPerChain map[uint64]bool,
 	dayAgoTimestamp int64,
 ) map[uint64]tokenTypes.ChainBalance {
 	var balancesPerChain map[uint64]tokenTypes.ChainBalance
-	decimals := tokens[0].Decimals
-	isMandatoryToken := belongsToMandatoryTokens(tokens[0].Symbol) // we expect all tokens in the list to have the same symbol
+	isMandatory := belongsToMandatoryTokenGroup(tokensGroupKey)
 	for _, tok := range tokens {
 		hasError := false
 		if connected, ok := clientConnectionPerChain[tok.ChainID]; ok {
@@ -453,7 +420,7 @@ func (r *Reader) createBalancePerChainPerSymbol(
 		}
 
 		// TODO: Avoid passing the entire balances map to toChainBalance. Iterate over the balances map once and pass the balance per address per token to toChainBalance
-		balance := toChainBalance(balances, tok, address, decimals, cachedTokens, hasError, isMandatoryToken)
+		balance := toChainBalance(balances, tok, address, tok.Decimals, cachedTokens, hasError, isMandatory)
 		if balance != nil {
 			balance1DayAgo, _ := r.getBalance1DayAgo(balance, dayAgoTimestamp, tok.Symbol, address) // Ignore error
 			if balance1DayAgo != nil {
@@ -519,13 +486,12 @@ func (r *Reader) FetchBalances(ctx context.Context, clients map[uint64]chain.Cli
 		return nil, err
 	}
 
-	chainIDs := maps.Keys(clients)
-	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs)
+	tokensGroupedByGroupKey, err := r.tokenManager.GetTokensGroupedByGroupKey()
 	if err != nil {
 		return nil, err
 	}
 
-	tokenAddresses := getTokenAddresses(allTokens)
+	tokenAddresses := getTokenAddresses(tokensGroupedByGroupKey)
 	balances, err := r.fetchBalances(ctx, clients, addresses, tokenAddresses)
 	if err != nil {
 		logutils.ZapLogger().Error("failed to update balances", zap.Error(err))
@@ -537,7 +503,7 @@ func (r *Reader) FetchBalances(ctx context.Context, clients map[uint64]chain.Cli
 		connectedPerChain[chainID] = client.IsConnected()
 	}
 
-	tokens := r.balancesToTokensByAddress(connectedPerChain, addresses, allTokens, balances, cachedTokens)
+	tokens := r.balancesToTokensByAddress(connectedPerChain, addresses, tokensGroupedByGroupKey, balances, cachedTokens)
 
 	err = r.persistence.SaveTokens(tokens)
 	if err != nil {
@@ -556,8 +522,7 @@ func (r *Reader) GetCachedBalances(clients map[uint64]chain.ClientInterface, add
 		return nil, err
 	}
 
-	chainIDs := maps.Keys(clients)
-	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs)
+	tokensGroupedByGroupKey, err := r.tokenManager.GetTokensGroupedByGroupKey()
 	if err != nil {
 		return nil, err
 	}
@@ -568,5 +533,5 @@ func (r *Reader) GetCachedBalances(clients map[uint64]chain.ClientInterface, add
 	}
 
 	balances := tokensToBalancesPerChain(cachedTokens)
-	return r.balancesToTokensByAddress(connectedPerChain, addresses, allTokens, balances, cachedTokens), nil
+	return r.balancesToTokensByAddress(connectedPerChain, addresses, tokensGroupedByGroupKey, balances, cachedTokens), nil
 }

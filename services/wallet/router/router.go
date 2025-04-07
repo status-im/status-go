@@ -901,24 +901,39 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute rou
 }
 
 func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputParams, candidates routes.Route) (suggestedRoutes *SuggestedRoutes, err error) {
+	testsMode := input.TestsMode && input.TestParams != nil
+	// We consider that the price for the token is the same on all chains, so we can fetch the price for the token on the mainnet
+	fromToken, toToken := r.findFromAndToTokens(testsMode, input, &params.Network{ChainID: walletCommon.EthereumMainnet})
+	var (
+		fromGroupedTokenKey string
+		toGrouperTokenKey   string
+	)
+	if fromToken != nil {
+		fromGroupedTokenKey = fromToken.TokenGroupKey()
+	}
+	if toToken != nil {
+		toGrouperTokenKey = toToken.TokenGroupKey()
+	}
+
 	var prices map[string]float64
 	if input.TestsMode {
 		prices = input.TestParams.TokenPrices
 	} else {
-		prices, err = fetchPrices(input.SendType, r.marketManager, []string{input.TokenID, input.ToTokenID})
+		groupedTokensKeys := []string{walletCommon.ETHTokenGroupKey, fromGroupedTokenKey, toGrouperTokenKey}
+		prices, err = fetchPrices(input.SendType, r.marketManager, groupedTokensKeys)
 		if err != nil {
 			return nil, errors.CreateErrorResponseFromError(err)
 		}
 	}
 
-	tokenPrice := prices[input.TokenID]
-	nativeTokenPrice := prices[walletCommon.EthSymbol]
+	tokenPrice := prices[fromGroupedTokenKey]
+	nativeTokenPrice := prices[walletCommon.ETHTokenGroupKey]
 
 	var allRoutes []routes.Route
 	suggestedRoutes, allRoutes = newSuggestedRoutes(input, candidates, prices)
 
 	defer func() {
-		if suggestedRoutes.Best != nil && len(suggestedRoutes.Best) > 0 {
+		if len(suggestedRoutes.Best) > 0 {
 			sort.Slice(suggestedRoutes.Best, func(i, j int) bool {
 				iChain := getChainPriority(suggestedRoutes.Best[i].FromChain.ChainID)
 				jChain := getChainPriority(suggestedRoutes.Best[j].FromChain.ChainID)
