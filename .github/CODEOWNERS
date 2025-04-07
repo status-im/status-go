@@ -13,7 +13,7 @@ shell.nix             @status-im/devops
 
 # Custom ownership for specific folders
 # Feel free to add yourself for any new packages you implement.
-/_docs/policies       @status-im/status-go-guild @iurimatias @alaibe @shivekkhurana @ilmotta @plopezlpz
+/_docs/policies       @status-im/status-go-guild @jrainville @alaibe @shivekkhurana @ilmotta @plopezlpz
 /cmd/status-backend   @igor-sirotin
 /internal/sentry      @igor-sirotin
 /healthmanager	      @friofry
