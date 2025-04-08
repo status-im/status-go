@@ -111,7 +111,7 @@ func TestClient_PushPeerCount(t *testing.T) {
 	client := createTestClient(t)
 
 	client.PushPeerCount(5)
-	value := getGaugeValue(metrics.ConnectedPeers)
+	value := getGaugeValue(metrics.ConnectedPeerCount)
 	require.Equal(t, float64(5), value)
 }
 

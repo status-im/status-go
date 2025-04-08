@@ -97,7 +97,7 @@ func (c *Client) PushErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSendi
 }
 
 func (c *Client) PushPeerCount(peerCount int) {
-	metrics.ConnectedPeers.Set(float64(peerCount))
+	metrics.ConnectedPeerCount.Set(float64(peerCount))
 }
 
 func (c *Client) PushPeerConnFailures(peerConnFailures map[string]int) {
