@@ -1,6 +1,3 @@
-//go:build gowaku_no_rln
-// +build gowaku_no_rln
-
 package leaderboard
 
 // CryptoResponse represents the API response structure
@@ -31,9 +28,25 @@ type QuoteDetails struct {
 
 // PriceData represents price data for a specific cryptocurrency
 type PriceData struct {
+	Symbol           string  `json:"symbol,omitempty"`
 	Price            float64 `json:"price"`
 	Volume24h        float64 `json:"volume_24h"`
 	PercentChange24h float64 `json:"percent_change_24h"`
+}
+
+type LeaderboardPage struct {
+	TotalCount int              `json:"all_cryptocurrency_count"`
+	Page       int              `json:"page"`
+	PageSize   int              `json:"page_size"`
+	SortOrder  int              `json:"sorting"`
+	Data       []Cryptocurrency `json:"cryptocurrencies"`
+}
+
+type LeaderboardPagePrices struct {
+	Page      int         `json:"page"`
+	PageSize  int         `json:"page_size"`
+	SortOrder int         `json:"sorting"`
+	Data      []PriceData `json:"prices"`
 }
 
 // PriceMap is a map of cryptocurrency symbols to their price data
