@@ -1,6 +1,3 @@
-//go:build gowaku_no_rln
-// +build gowaku_no_rln
-
 package leaderboard
 
 import (
@@ -76,14 +73,4 @@ func (c *ServiceConfig) Validate() error {
 	}
 
 	return nil
-}
-
-// SaveConfig saves the configuration to a JSON file
-func SaveConfig(config *ServiceConfig, path string) error {
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(path, data, 0644)
 }
