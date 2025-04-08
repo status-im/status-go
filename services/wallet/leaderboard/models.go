@@ -7,30 +7,20 @@ type CryptoResponse struct {
 
 // Cryptocurrency represents a cryptocurrency entry
 type Cryptocurrency struct {
-	ID     int    `json:"id"`
-	Name   string `json:"name"`
-	Symbol string `json:"symbol"`
-	Quote  Quote  `json:"quote"`
+	ID                       string  `json:"id"`
+	Symbol                   string  `json:"symbol"`
+	Name                     string  `json:"name"`
+	Image                    string  `json:"image"`
+	CurrentPrice             float64 `json:"current_price"`
+	MarketCap                float64 `json:"market_cap"`
+	TotalVolume              float64 `json:"total_volume"`
+	PriceChangePercentage24h float64 `json:"price_change_percentage_24h"`
 }
 
-// Quote contains price information for different currencies
-type Quote struct {
-	USD QuoteDetails `json:"USD"`
-}
-
-// QuoteDetails contains detailed price information
-type QuoteDetails struct {
-	Price            float64 `json:"price"`
-	Volume24h        float64 `json:"volume_24h"`
-	MarketCap        float64 `json:"market_cap"`
-	PercentChange24h float64 `json:"percent_change_24h"`
-}
-
-// PriceData represents price data for a specific cryptocurrency
+// PriceData represents price data update
 type PriceData struct {
 	Symbol           string  `json:"symbol,omitempty"`
 	Price            float64 `json:"price"`
-	Volume24h        float64 `json:"volume_24h"`
 	PercentChange24h float64 `json:"percent_change_24h"`
 }
 
