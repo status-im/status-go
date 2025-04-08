@@ -1,9 +1,7 @@
-//go:build gowaku_no_rln
-// +build gowaku_no_rln
-
 package leaderboard
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -68,6 +66,13 @@ func (s *DataStorage) GetCryptoData() []Cryptocurrency {
 	return result
 }
 
+func (s *DataStorage) GetCryptoDataSize() int {
+	s.dataMutex.RLock()
+	defer s.dataMutex.RUnlock()
+
+	return len(s.cryptoData)
+}
+
 // GetPriceData returns the latest price data
 func (s *DataStorage) GetPriceData() PriceMap {
 	s.dataMutex.RLock()
@@ -119,6 +124,26 @@ func (s *DataStorage) GetCombinedData() []Cryptocurrency {
 	}
 
 	return result
+}
+
+func (s *DataStorage) GetCryptoDataForPage(page, pageSize int) []Cryptocurrency {
+	if pageSize <= 0 || page < 0 {
+		return nil
+	}
+	s.dataMutex.RLock()
+	defer s.dataMutex.RUnlock()
+
+	start := page * pageSize
+	totalCount := len(s.cryptoData)
+
+	if start >= totalCount {
+		return []Cryptocurrency{}
+	}
+	end := start + pageSize
+	if end > totalCount {
+		end = totalCount
+	}
+	return append([]Cryptocurrency{}, s.cryptoData[start:end]...)
 }
 
 // GetCryptoEtag returns the current crypto data etag
@@ -177,4 +202,57 @@ func (s *DataStorage) GetCryptoStatsRef() *Stats {
 // GetPriceStatsRef returns a reference to price stats for updating
 func (s *DataStorage) GetPriceStatsRef() *Stats {
 	return &s.priceStats
+}
+
+func (s *DataStorage) GetLeaderboardPagePrices(page LeaderboardPage) *LeaderboardPagePrices {
+	if page.PageSize <= 0 || page.Page < 0 {
+		return nil
+	}
+	data := s.GetCryptoDataForPage(page.Page, page.PageSize)
+
+	s.dataMutex.RLock()
+	defer s.dataMutex.RUnlock()
+
+	result := &LeaderboardPagePrices{
+		Page:      page.Page,
+		PageSize:  page.PageSize,
+		SortOrder: page.SortOrder,
+	}
+
+	for i := range data {
+		crypto := &data[i]
+		symbol := crypto.Symbol
+
+		// If we have updated price data for this symbol, update the cryptocurrency
+		if priceUpdate, ok := s.priceData[symbol]; ok {
+			priceUpdate.Symbol = symbol
+			result.Data = append(result.Data, priceUpdate)
+		}
+	}
+	return result
+}
+
+func (s *DataStorage) GetLeaderboardPage(page, pageSize int, sortOrder int) (*LeaderboardPage, error) {
+	if pageSize <= 0 {
+		return nil, fmt.Errorf("Invalid page size")
+	}
+
+	totalCount := s.GetCryptoDataSize()
+
+	// TODO: fetch from db
+	// if totalCount == 0 {
+	// }
+
+	if page < 0 || page > (totalCount/pageSize) {
+		return nil, fmt.Errorf("Invalid page")
+	}
+
+	result := &LeaderboardPage{
+		TotalCount: totalCount,
+		Page:       page,
+		PageSize:   pageSize,
+		SortOrder:  sortOrder,
+		Data:       s.GetCryptoDataForPage(page, pageSize),
+	}
+	return result, nil
 }
