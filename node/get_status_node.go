@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/gif"
+	"github.com/status-im/status-go/services/kvstore"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/permissions"
@@ -96,6 +97,7 @@ type StatusNode struct {
 	mailserversSrvc        *mailservers.Service
 	providerSrvc           *web3provider.Service
 	appMetricsSrvc         *appmetricsservice.Service
+	kvstoreSrvc            *kvstore.Service
 	walletSrvc             *wallet.Service
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service

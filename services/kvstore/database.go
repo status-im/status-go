@@ -1,4 +1,4 @@
-package kvstore2
+package kvstore
 
 import (
 	"database/sql"

@@ -1,4 +1,4 @@
-package kvstore2
+package kvstore
 
 import (
 	"context"
@@ -13,23 +13,23 @@ type API struct {
 	db *Database
 }
 
-type KvstoreConfigs struct {
+type StoreEntry struct {
 	RlnRateLimitEnabled bool `json:"rlnRateLimitEnabled"`
 }
 
-func (api *API) GetKvstoreConfigs(ctx context.Context) (*KvstoreConfigs, error) {
+func (api *API) GetStoreEntry(ctx context.Context) (*StoreEntry, error) {
 	rlnRateLimitEnabled, err := api.db.GetBool(ConfigRlnRateLimitEnabled)
 	if err != nil {
 		return nil, err
 	}
 
-	configs := KvstoreConfigs{
+	configs := StoreEntry{
 		RlnRateLimitEnabled: rlnRateLimitEnabled,
 	}
 
 	return &configs, nil
 }
 
-func (api *API) SaveRlnRateLimitEnabled(ctx context.Context, enabled bool) error {
+func (api *API) SetRlnRateLimitEnabled(ctx context.Context, enabled bool) error {
 	return api.db.SetBool(ConfigRlnRateLimitEnabled, enabled)
 }

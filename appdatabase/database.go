@@ -9,8 +9,8 @@ import (
 	"go.uber.org/zap"
 
 	d_common "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/kvstore"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/services/kvstore"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"

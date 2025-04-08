@@ -41,6 +41,7 @@ import (
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/eth"
 	"github.com/status-im/status-go/services/gif"
+	"github.com/status-im/status-go/services/kvstore"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/permissions"
@@ -80,6 +81,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.subscriptionService())
 	services = append(services, b.rpcStatsService())
 	services = append(services, b.appmetricsService())
+	services = append(services, b.kvstoreService())
 	services = append(services, b.appgeneralService())
 	services = append(services, b.personalService())
 	services = append(services, b.statusPublicService())
@@ -427,6 +429,13 @@ func (b *StatusNode) appmetricsService() common.StatusService {
 		b.appMetricsSrvc = appmetricsservice.NewService(appmetrics.NewDB(b.appDB))
 	}
 	return b.appMetricsSrvc
+}
+
+func (b *StatusNode) kvstoreService() *kvstore.Service {
+	if b.kvstoreSrvc == nil {
+		b.kvstoreSrvc = kvstore.NewService(kvstore.NewDB(b.appDB))
+	}
+	return b.kvstoreSrvc
 }
 
 func (b *StatusNode) appgeneralService() *appgeneral.Service {

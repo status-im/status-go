@@ -1,4 +1,4 @@
-package kvstore2
+package kvstore
 
 import (
 	"context"
@@ -16,12 +16,12 @@ func TestGetKvstoreConfigs(t *testing.T) {
 	api, cancel := setupTestAPI(t)
 	defer cancel()
 
-	require.NoError(t, api.SaveRlnRateLimitEnabled(context.TODO(), true))
+	require.NoError(t, api.SetRlnRateLimitEnabled(context.TODO(), true))
 
-	configs, err := api.GetKvstoreConfigs(context.TODO())
+	configs, err := api.GetStoreEntry(context.TODO())
 	require.NoError(t, err)
 
-	expected := KvstoreConfigs{
+	expected := StoreEntry{
 		RlnRateLimitEnabled: true,
 	}
 	require.Equal(t, expected, *configs)
