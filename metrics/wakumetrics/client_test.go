@@ -55,15 +55,6 @@ func getCounterValue(metric *prometheus.CounterVec, labels ...string) float64 {
 	return pb.Counter.GetValue()
 }
 
-func getGaugeValue(metric prometheus.Gauge) float64 {
-	pb := &dto.Metric{}
-	err := metric.(prometheus.Metric).Write(pb)
-	if err != nil {
-		return 0
-	}
-	return pb.Gauge.GetValue()
-}
-
 func getGaugeVecValue(metric *prometheus.GaugeVec, labels ...string) float64 {
 	m := metric.WithLabelValues(labels...)
 	pb := &dto.Metric{}
