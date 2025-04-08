@@ -107,14 +107,6 @@ func TestClient_PushReceivedMessages(t *testing.T) {
 	require.Equal(t, float64(1), value)
 }
 
-func TestClient_PushPeerCount(t *testing.T) {
-	client := createTestClient(t)
-
-	client.PushPeerCount(5)
-	value := getGaugeValue(metrics.ConnectedPeerCount)
-	require.Equal(t, float64(5), value)
-}
-
 func TestClient_PushPeerCountByOrigin(t *testing.T) {
 	client := createTestClient(t)
 

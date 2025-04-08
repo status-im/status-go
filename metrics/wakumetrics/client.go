@@ -96,10 +96,6 @@ func (c *Client) PushErrorSendingEnvelope(errorSendingEnvelope wakuv2.ErrorSendi
 	).Inc()
 }
 
-func (c *Client) PushPeerCount(peerCount int) {
-	metrics.ConnectedPeerCount.Set(float64(peerCount))
-}
-
 func (c *Client) PushPeerConnFailures(peerConnFailures map[string]int) {
 	for peerID, failures := range peerConnFailures {
 		if lastFailures, exists := c.lastPeerConnFailures[peerID]; exists {

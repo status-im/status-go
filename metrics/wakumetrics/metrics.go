@@ -17,7 +17,6 @@ type MetricsCollection struct {
 	PeerConnectionFailures       prometheus.Counter
 	StoreQuerySuccesses          prometheus.Counter
 	StoreQueryFailures           prometheus.Counter
-	ConnectedPeerCount           prometheus.Gauge
 	PeersByOrigin                *prometheus.GaugeVec
 	PeersByShard                 *prometheus.GaugeVec
 	RawMessagesSizeBytes         *prometheus.CounterVec
@@ -69,13 +68,6 @@ var metrics = MetricsCollection{
 		prometheus.CounterOpts{
 			Name: "waku_message_delivery_confirmations_total",
 			Help: "Frequency of message delivery confirmations",
-		},
-	),
-
-	ConnectedPeerCount: prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "waku_connected_peer_count",
-			Help: "Current number of peers connected",
 		},
 	),
 
@@ -163,7 +155,6 @@ var collectors = []prometheus.Collector{
 	metrics.WakuMessagesSizeBytes,
 	metrics.EnvelopeSentErrors,
 	metrics.MessageDeliveryConfirmations,
-	metrics.ConnectedPeerCount,
 	metrics.PeersByOrigin,
 	metrics.PeersByShard,
 	metrics.PeerConnectionFailures,
