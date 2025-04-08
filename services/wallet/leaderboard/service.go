@@ -1,29 +1,53 @@
-//go:build gowaku_no_rln
-// +build gowaku_no_rln
-
 package leaderboard
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/ethereum/go-ethereum/event"
+	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/walletevent"
+)
+
+const (
+	// EventGetLeaderboardPageDone contains a LeaderboardPage payload
+	EventGetLeaderboardPageDone walletevent.EventType = "wallet-leaderboard-get-page-done"
+	// EventLeaderboardPagePricesUpdated contains a EventLeaderboardPagePricesUpdate payload
+	EventLeaderboardPagePricesUpdated walletevent.EventType = "wallet-leaderboard-page-prices-updated"
+)
+
+var (
+	fetchLeaderboardPageTask = async.TaskType{
+		ID:     1,
+		Policy: async.ReplacementPolicyCancelOld,
+	}
 )
 
 // MarketDataService manages market data fetching and provides access to the latest data
 type MarketDataService struct {
-	config ServiceConfig
-	client *http.Client
+	config    ServiceConfig
+	client    *http.Client
+	scheduler *async.Scheduler
+	feed      *event.Feed
 
 	// Request handler
 	requestHandler *RequestHandler
 
 	// Data storage
 	storage *DataStorage
+	cache   *PageCache
 
 	// Subscription management
-	subscriptionManager *SubscriptionManager
+	subscriptionManager    *SubscriptionManager
+	pageUpdateSubscription chan struct{}
 
 	// Context management
 	cancelFunc     context.CancelFunc
@@ -42,7 +66,7 @@ type Stats struct {
 }
 
 // NewMarketDataService creates a new market data service with the given configuration
-func NewMarketDataService(config ServiceConfig) *MarketDataService {
+func NewMarketDataService(config ServiceConfig, feed *event.Feed) *MarketDataService {
 	// Set default values for intervals if not provided
 	if config.FullDataInterval <= 0 {
 		config.FullDataInterval = 10
@@ -55,11 +79,15 @@ func NewMarketDataService(config ServiceConfig) *MarketDataService {
 	storage := NewDataStorage()
 
 	return &MarketDataService{
-		config:              config,
-		client:              client,
-		requestHandler:      NewRequestHandler(config, client),
-		storage:             storage,
-		subscriptionManager: NewSubscriptionManager(),
+		config:                 config,
+		client:                 client,
+		feed:                   feed,
+		requestHandler:         NewRequestHandler(config, client),
+		storage:                storage,
+		subscriptionManager:    NewSubscriptionManager(),
+		scheduler:              async.NewScheduler(),
+		pageUpdateSubscription: nil,
+		cache:                  NewPageCache(),
 	}
 }
 
@@ -78,10 +106,16 @@ func (s *MarketDataService) Start(ctx context.Context) {
 	s.isRunning = true
 
 	// Start crypto data refresh loop
-	go s.cryptoRefreshLoop(ctx)
+	go func() {
+		defer common.LogOnPanic()
+		s.cryptoRefreshLoop(ctx)
+	}()
 
 	// Start price data refresh loop
-	go s.priceRefreshLoop(ctx)
+	go func() {
+		defer common.LogOnPanic()
+		s.priceRefreshLoop(ctx)
+	}()
 }
 
 // Stop halts all data refresh operations
@@ -98,6 +132,8 @@ func (s *MarketDataService) Stop() {
 		s.cancelFunc()
 		s.cancelFunc = nil
 	}
+
+	s.UnsubscribeFromLeaderboard() //nolint:errcheck
 
 	s.isRunning = false
 }
@@ -247,4 +283,63 @@ func (s *MarketDataService) fetchPriceData(ctx context.Context) bool {
 
 	// Update the data
 	return s.storage.UpdatePriceData(priceData)
+}
+
+func (s *MarketDataService) sendLeaderboardPagePricesUpdate() {
+	if s.pageUpdateSubscription == nil {
+		return
+	}
+
+	result := s.storage.GetLeaderboardPagePrices(s.cache.GetLastPage())
+	if result == nil {
+		logutils.ZapLogger().Error("No leaderboard page prices found")
+		return
+	}
+	payload, err := json.Marshal(result)
+	if err != nil {
+		logutils.ZapLogger().Error("Error marshalling leaderboard page prices", zap.Error(err))
+	}
+
+	event := walletevent.Event{
+		Type:    EventLeaderboardPagePricesUpdated,
+		Message: string(payload),
+	}
+	s.feed.Send(event)
+}
+
+func (s *MarketDataService) GetLeaderboardPageAsync(page, pageSize int, sortOrder int) {
+	s.scheduler.Enqueue(fetchLeaderboardPageTask, func(ctx context.Context) (interface{}, error) {
+		result, err := s.storage.GetLeaderboardPage(page, pageSize, sortOrder)
+		s.cache.UpdateLastPage(result)
+		return result, err
+	}, func(result interface{}, taskType async.TaskType, resErr error) {
+		payload, err := json.Marshal(result.(*LeaderboardPage))
+		if err != nil {
+			logutils.ZapLogger().Error("Error marshalling leaderboard page", zap.Error(err))
+		}
+		event := walletevent.Event{
+			Type:    EventGetLeaderboardPageDone,
+			Message: string(payload),
+		}
+		if s.pageUpdateSubscription == nil {
+			s.pageUpdateSubscription = s.subscriptionManager.Subscribe()
+			go func() {
+				defer common.LogOnPanic()
+				for range s.pageUpdateSubscription {
+					s.sendLeaderboardPagePricesUpdate()
+				}
+			}()
+		}
+		s.feed.Send(event)
+	})
+}
+
+func (s *MarketDataService) UnsubscribeFromLeaderboard() error {
+	if s.pageUpdateSubscription == nil {
+		return fmt.Errorf("No subscription found")
+	}
+	s.Unsubscribe(s.pageUpdateSubscription)
+	s.pageUpdateSubscription = nil
+	s.cache.Clear()
+	return nil
 }
