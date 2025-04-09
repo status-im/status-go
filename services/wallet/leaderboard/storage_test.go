@@ -8,88 +8,77 @@ import (
 
 var mockCrypto = []Cryptocurrency{
 	{
-		ID:     1,
-		Name:   "Bitcoin",
-		Symbol: "BTC",
-		Quote: Quote{
-			USD: QuoteDetails{
-				Price:            88260.1619455892,
-				Volume24h:        23933002554.825462,
-				MarketCap:        1751201028999.603,
-				PercentChange24h: 3.85381097,
-			},
-		},
+		ID:                       "bitcoin",
+		Name:                     "Bitcoin",
+		Symbol:                   "btc",
+		Image:                    "https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png?1696501400",
+		CurrentPrice:             79451,
+		MarketCap:                1577274527423,
+		TotalVolume:              78498730801,
+		PriceChangePercentage24h: 6.49692,
 	},
 	{
-		ID:     2,
-		Name:   "Ethereum",
-		Symbol: "ETH",
-		Quote: Quote{
-			USD: QuoteDetails{
-				Price:            2031.451,
-				Volume24h:        13904210482.120,
-				MarketCap:        245320045879.50,
-				PercentChange24h: -1.4823,
-			},
-		},
+		ID:                       "ethereum",
+		Name:                     "Ethereum",
+		Symbol:                   "eth",
+		Image:                    "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628",
+		CurrentPrice:             1576.35,
+		MarketCap:                190254450318,
+		TotalVolume:              38689205530,
+		PriceChangePercentage24h: 9.82681,
 	},
 	{
-		ID:     3,
-		Name:   "Ripple",
-		Symbol: "XRP",
-		Quote: Quote{
-			USD: QuoteDetails{
-				Price:            0.5113,
-				Volume24h:        1240345020.84,
-				MarketCap:        27320420359.92,
-				PercentChange24h: 0.0275,
-			},
-		},
+		ID:                       "tether",
+		Name:                     "Tether",
+		Symbol:                   "usdt",
+		Image:                    "https://coin-images.coingecko.com/coins/images/325/large/Tether.png?1696501661",
+		CurrentPrice:             0.999637,
+		MarketCap:                144139703405,
+		TotalVolume:              119147509139,
+		PriceChangePercentage24h: 0.08216,
 	},
 	{
-		ID:     4,
-		Name:   "Litecoin",
-		Symbol: "LTC",
-		Quote: Quote{
-			USD: QuoteDetails{
-				Price:            92.38,
-				Volume24h:        637203095.76,
-				MarketCap:        6789040512.34,
-				PercentChange24h: -0.5721,
-			},
-		},
+		ID:                       "ripple",
+		Name:                     "XRP",
+		Symbol:                   "xrp",
+		Image:                    "https://coin-images.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png?1696501442",
+		CurrentPrice:             1.86,
+		MarketCap:                108451149043,
+		TotalVolume:              9387214286,
+		PriceChangePercentage24h: 12.25473,
 	},
 	{
-		ID:     5,
-		Name:   "Cardano",
-		Symbol: "ADA",
-		Quote: Quote{
-			USD: QuoteDetails{
-				Price:            0.3742,
-				Volume24h:        238203495.91,
-				MarketCap:        13200401234.55,
-				PercentChange24h: 0.0041,
-			},
-		},
+		ID:                       "cardano",
+		Name:                     "Cardano",
+		Symbol:                   "ada",
+		Image:                    "https://coin-images.coingecko.com/coins/images/975/large/cardano.png?1696502090",
+		CurrentPrice:             0.3742,
+		MarketCap:                13200401234.55,
+		TotalVolume:              238203495.91,
+		PriceChangePercentage24h: 0.0041,
 	},
 }
 
 var mockPriceData = map[string]PriceData{
-	"BTC": {
-		Price:            88260.1619455892,
-		Volume24h:        23933002554.825462,
-		PercentChange24h: 3.85381097,
+	"btc": {
+		Price:            79451,
+		PercentChange24h: 6.49692,
 	},
-	"ETH": {
-		Price:            2031.451,
-		Volume24h:        13904210482.120,
-		PercentChange24h: -1.4823,
+	"eth": {
+		Price:            1576.35,
+		PercentChange24h: 9.82681,
 	},
-	"ADA": {
+	"ada": {
 		Price:            0.3742,
-		Volume24h:        238203495.91,
 		PercentChange24h: 0.0041,
 	},
+}
+
+// Helper function to verify crypto price data
+func verifyCryptoPriceData(t *testing.T, expected PriceData, actual Cryptocurrency) {
+	t.Helper()
+	require.Equal(t, expected.Price, actual.CurrentPrice)
+	require.Equal(t, expected.PercentChange24h, actual.PriceChangePercentage24h)
 }
 
 func TestGetLeaderboardPageErrors(t *testing.T) {
@@ -170,12 +159,8 @@ func TestGetLeaderboardPageWithUpdatedPrices(t *testing.T) {
 		require.Equal(t, -1, rst.SortOrder)
 		require.Equal(t, 3, len(rst.Data))
 		require.Equal(t, mockCrypto[2], rst.Data[2])
-		require.Equal(t, mockPriceData["BTC"].Price, rst.Data[0].Quote.USD.Price)
-		require.Equal(t, mockPriceData["BTC"].Volume24h, rst.Data[0].Quote.USD.Volume24h)
-		require.Equal(t, mockPriceData["BTC"].PercentChange24h, rst.Data[0].Quote.USD.PercentChange24h)
-		require.Equal(t, mockPriceData["ETH"].Price, rst.Data[1].Quote.USD.Price)
-		require.Equal(t, mockPriceData["ETH"].Volume24h, rst.Data[1].Quote.USD.Volume24h)
-		require.Equal(t, mockPriceData["ETH"].PercentChange24h, rst.Data[1].Quote.USD.PercentChange24h)
+		verifyCryptoPriceData(t, mockPriceData["btc"], rst.Data[0])
+		verifyCryptoPriceData(t, mockPriceData["eth"], rst.Data[1])
 	}
 }
 
