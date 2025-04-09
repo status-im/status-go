@@ -103,23 +103,15 @@ func (s *DataStorage) GetCombinedData() []Cryptocurrency {
 
 		// If we have updated price data for this symbol, update the cryptocurrency
 		if priceUpdate, ok := s.priceData[symbol]; ok {
-			// Update the price in the USD quote
-			if crypto.Quote.USD.Price != priceUpdate.Price {
-				crypto.Quote.USD.Price = priceUpdate.Price
-			}
-
-			// Update volume data if available
-			if priceUpdate.Volume24h > 0 {
-				crypto.Quote.USD.Volume24h = priceUpdate.Volume24h
+			// Update the price
+			if crypto.CurrentPrice != priceUpdate.Price {
+				crypto.CurrentPrice = priceUpdate.Price
 			}
 
 			// Update percentage change if available
 			if priceUpdate.PercentChange24h != 0 {
-				crypto.Quote.USD.PercentChange24h = priceUpdate.PercentChange24h
+				crypto.PriceChangePercentage24h = priceUpdate.PercentChange24h
 			}
-
-			// Optionally add a field to indicate this has updated pricing
-			// This could be done if the Cryptocurrency struct has such a field
 		}
 	}
 
