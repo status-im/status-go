@@ -420,14 +420,15 @@ type NodeConfig struct {
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
 	Enabled                   bool
-	OpenseaAPIKey             string            `json:"OpenseaAPIKey"`
-	RaribleMainnetAPIKey      string            `json:"RaribleMainnetAPIKey"`
-	RaribleTestnetAPIKey      string            `json:"RaribleTestnetAPIKey"`
-	AlchemyAPIKeys            map[uint64]string `json:"AlchemyAPIKeys"`
-	InfuraAPIKey              string            `json:"InfuraAPIKey"`
-	InfuraAPIKeySecret        string            `json:"InfuraAPIKeySecret"`
-	StatusProxyMarketUser     string            `json:"StatusProxyMarketUser"`
-	StatusProxyMarketPassword string            `json:"StatusProxyMarketPassword"`
+	OpenseaAPIKey             string                `json:"OpenseaAPIKey"`
+	RaribleMainnetAPIKey      string                `json:"RaribleMainnetAPIKey"`
+	RaribleTestnetAPIKey      string                `json:"RaribleTestnetAPIKey"`
+	AlchemyAPIKeys            map[uint64]string     `json:"AlchemyAPIKeys"`
+	InfuraAPIKey              string                `json:"InfuraAPIKey"`
+	InfuraAPIKeySecret        string                `json:"InfuraAPIKeySecret"`
+	StatusProxyMarketUser     string                `json:"StatusProxyMarketUser"`
+	StatusProxyMarketPassword string                `json:"StatusProxyMarketPassword"`
+	MarketDataProxyConfig     MarketDataProxyConfig `json:"MarketDataProxyConfig"`
 	// FIXME: remove when EthRpcProxy* is integrated
 	StatusProxyBlockchainUser     string `json:"StatusProxyBlockchainUser"`
 	StatusProxyBlockchainPassword string `json:"StatusProxyBlockchainPassword"`
@@ -441,6 +442,14 @@ type WalletConfig struct {
 
 	TokensListsAutoRefreshInterval      int `json:"TokensListsAutoRefreshInterval"`      // in seconds
 	TokensListsAutoRefreshCheckInterval int `json:"TokensListsAutoRefreshCheckInterval"` // in seconds
+}
+
+type MarketDataProxyConfig struct {
+	Url                     string `json:"Url"`
+	Login                   string `json:"Login"`
+	Password                string `json:"Password"`
+	FullDataRefreshInterval int    `json:"FullDataRefreshInterval"`
+	PriceRefreshInterval    int    `json:"PriceRefreshInterval"`
 }
 
 // MarshalJSON custom marshalling to avoid exposing sensitive data in log,

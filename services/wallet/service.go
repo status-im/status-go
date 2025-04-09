@@ -210,16 +210,7 @@ func NewService(
 
 	routeExecutionManager := routeexecution.NewManager(db, feed, router, transactionManager, transferController)
 
-	// Initialize leaderboard service
-	leaderboardConfig := leaderboard.ServiceConfig{
-		ProxyURL:            "https://cmc.callfry.com",
-		Login:               "admin",
-		Password:            "testest",
-		FullDataInterval:    10,
-		PriceUpdateInterval: 1,
-		AllowGzip:           true,
-		AllowETag:           true,
-	}
+	leaderboardConfig := leaderboard.NewLeaderbordConfig(config.WalletConfig.MarketDataProxyConfig)
 	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, feed)
 
 	return &Service{
