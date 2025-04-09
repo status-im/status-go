@@ -92,6 +92,8 @@ type CreateAccount struct {
 type WalletConfig struct {
 	TokensListsAutoRefreshInterval      int `json:"tokensListsAutoRefreshInterval"`      // in seconds
 	TokensListsAutoRefreshCheckInterval int `json:"tokensListsAutoRefreshCheckInterval"` // in seconds
+	MarketDataFullDataRefreshInterval   int `json:"marketDataFullDataRefreshInterval"`   // in seconds
+	MarketDataPriceRefreshInterval      int `json:"marketDataPriceRefreshInterval"`      // in seconds
 }
 type WalletSecretsConfig struct {
 	PoktToken            string `json:"poktToken"`
@@ -113,6 +115,10 @@ type WalletSecretsConfig struct {
 	StatusProxyStageName      string `json:"statusProxyStageName"`
 	StatusProxyMarketUser     string `json:"statusProxyMarketUser"`
 	StatusProxyMarketPassword string `json:"statusProxyMarketPassword"`
+
+	MarketDataProxyUrl      string `json:"marketDataProxyUrl"`
+	MarketDataProxyLogin    string `json:"marketDataProxyLogin"`
+	MarketDataProxyPassword string `json:"marketDataProxyPassword"`
 	// FIXME: remove when EthRpcProxy* is integrated
 	StatusProxyBlockchainUser     string `json:"statusProxyBlockchainUser"`
 	StatusProxyBlockchainPassword string `json:"statusProxyBlockchainPassword"`
