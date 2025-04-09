@@ -16,5 +16,7 @@ shell.nix             @status-im/devops
 /_docs/policies       @status-im/status-go-guild @jrainville @alaibe @shivekkhurana @ilmotta @plopezlpz
 /cmd/status-backend   @igor-sirotin
 /internal/sentry      @igor-sirotin
-/healthmanager	      @friofry
+/healthmanager        @friofry
 /rpc/network          @friofry
+
+/services/wallet/leaderboard @cuteivist @friofry
