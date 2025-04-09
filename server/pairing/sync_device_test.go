@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -34,7 +33,6 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	accservice "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/wakuv2"
 )
 
@@ -87,10 +85,8 @@ func (s *SyncDeviceSuite) SetupTest() {
 		DefaultShardPubsubTopic:                wakuv2.DefaultShardPubsubTopic(),
 		EnableStoreConfirmationForMessagesSent: false,
 	}
-
-	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.Require().NoError(err)
-	s.pxBootNode, err = wakuv2.New(nil, exchangeNodeConfig, s.logger.Named("pxServerNode"), db, nil, nil, nil)
+	var err error
+	s.pxBootNode, err = wakuv2.New(nil, exchangeNodeConfig, s.logger.Named("pxServerNode"), nil, nil, nil, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(s.pxBootNode.Start())
 

@@ -96,7 +96,7 @@ require (
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 	github.com/status-im/extkeys v1.1.0
 	github.com/urfave/cli/v2 v2.27.2
-	github.com/waku-org/go-waku v0.8.1-0.20250325095250-f59588a970e6
+	github.com/waku-org/go-waku v0.8.1-0.20250320134751-fdf03de179a7
 	github.com/waku-org/waku-go-bindings v0.0.0-20250313132258-6f95d51df46c
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1

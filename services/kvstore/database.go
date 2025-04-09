@@ -5,8 +5,6 @@ import (
 )
 
 const (
-	WakuRlnRateLimitState = "waku/rln-rate-limit-state"
-
 	ConfigRlnRateLimitEnabled = "config/rln-rate-limit-enabled"
 )
 
