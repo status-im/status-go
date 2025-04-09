@@ -233,7 +233,7 @@ func (s *MarketDataService) fetchCryptoData(ctx context.Context) bool {
 	cryptoEtag := s.storage.GetCryptoEtag()
 
 	// Fetch data using the request handler
-	endpoint := "/v1/cryptocurrency/listings/latest"
+	endpoint := "/v1/leaderboard/markets"
 	body, updated := s.requestHandler.FetchData(ctx, endpoint, &cryptoEtag, s.storage.GetCryptoStatsRef())
 	if !updated {
 		return false
@@ -259,7 +259,7 @@ func (s *MarketDataService) fetchPriceData(ctx context.Context) bool {
 	priceEtag := s.storage.GetPriceEtag()
 
 	// Fetch data using the request handler
-	endpoint := "/v1/prices"
+	endpoint := "/v1/leaderboard/prices"
 	body, updated := s.requestHandler.FetchData(ctx, endpoint, &priceEtag, s.storage.GetPriceStatsRef())
 	if !updated {
 		return false

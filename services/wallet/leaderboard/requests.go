@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // RequestHandler manages HTTP requests for market data
@@ -61,9 +62,17 @@ func (h *RequestHandler) FetchData(ctx context.Context, endpoint string, etag *s
 	return body, true
 }
 
+// buildURL constructs a properly formatted URL by combining the proxy URL and endpoint
+func (h *RequestHandler) buildURL(proxyURL, endpoint string) string {
+	// Trim trailing slashes from proxy URL and leading slashes from endpoint
+	baseURL := strings.TrimRight(proxyURL, "/")
+	cleanEndpoint := strings.TrimLeft(endpoint, "/")
+	return baseURL + "/" + cleanEndpoint
+}
+
 // createRequest creates a new HTTP request with proper headers
 func (h *RequestHandler) createRequest(ctx context.Context, endpoint string, etag *string) (*http.Request, error) {
-	url := h.config.ProxyURL + endpoint
+	url := h.buildURL(h.config.ProxyURL, endpoint)
 
 	// Create a new request with context
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
