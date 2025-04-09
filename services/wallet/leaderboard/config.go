@@ -1,76 +1,56 @@
 package leaderboard
 
 import (
-	"encoding/json"
-	"errors"
-	"os"
+	"github.com/status-im/status-go/params"
+)
+
+const (
+	defaultFullDataInterval    = 10 // Default full data refresh interval in seconds
+	defaultPriceUpdateInterval = 1  // Default price update interval in seconds
 )
 
 // ServiceConfig defines the configuration for the market data service
 type ServiceConfig struct {
 	// API connection settings
-	ProxyURL string `json:"proxy_url"`
-	Login    string `json:"login"`
-	Password string `json:"password"`
+	ProxyURL string
+	Login    string
+	Password string
 
 	// Refresh intervals (in seconds)
-	FullDataInterval    int `json:"full_data_interval"`
-	PriceUpdateInterval int `json:"price_update_interval"`
+	FullDataInterval    int
+	PriceUpdateInterval int
 
 	// Feature flags
-	AllowGzip bool `json:"allow_gzip"`
-	AllowETag bool `json:"allow_etag"`
-}
-
-// LoadConfig loads the service configuration from a JSON file
-func LoadConfig(path string) (*ServiceConfig, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var config ServiceConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, err
-	}
-
-	// Validate the config
-	if err := config.Validate(); err != nil {
-		return nil, err
-	}
-
-	return &config, nil
+	AllowGzip bool
+	AllowETag bool
 }
 
 // Validate checks if the configuration is valid
-func (c *ServiceConfig) Validate() error {
-	if c.ProxyURL == "" {
-		return errors.New("proxy URL is required")
-	}
-	if c.Login == "" {
-		return errors.New("login is required")
-	}
-	if c.Password == "" {
-		return errors.New("password is required")
-	}
-
+func (c *ServiceConfig) validate() {
 	// Set default refresh intervals if not provided
 	if c.FullDataInterval <= 0 {
-		c.FullDataInterval = 10 // Default full data refresh interval in seconds
+		c.FullDataInterval = defaultFullDataInterval
 	}
 
 	if c.PriceUpdateInterval <= 0 {
-		c.PriceUpdateInterval = 1 // Default price update interval in seconds
+		c.PriceUpdateInterval = defaultPriceUpdateInterval
+	}
+}
+
+func NewLeaderbordConfig(config params.MarketDataProxyConfig) ServiceConfig {
+	// Create a new ServiceConfig instance with default values
+	serviceConfig := ServiceConfig{
+		ProxyURL:            config.Url,
+		Login:               config.Login,
+		Password:            config.Password,
+		FullDataInterval:    config.FullDataRefreshInterval,
+		PriceUpdateInterval: config.PriceRefreshInterval,
+		AllowGzip:           true,
+		AllowETag:           true,
 	}
 
-	// Set default feature flags if not explicitly set
-	if !c.AllowGzip {
-		c.AllowGzip = true // Enable gzip by default
-	}
+	// Validate the configuration
+	serviceConfig.validate()
 
-	if !c.AllowETag {
-		c.AllowETag = true // Enable ETag by default
-	}
-
-	return nil
+	return serviceConfig
 }

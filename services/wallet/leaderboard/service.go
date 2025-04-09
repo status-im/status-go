@@ -68,13 +68,6 @@ type Stats struct {
 // NewMarketDataService creates a new market data service with the given configuration
 func NewMarketDataService(config ServiceConfig, feed *event.Feed) *MarketDataService {
 	// Set default values for intervals if not provided
-	if config.FullDataInterval <= 0 {
-		config.FullDataInterval = 10
-	}
-	if config.PriceUpdateInterval <= 0 {
-		config.PriceUpdateInterval = 1
-	}
-
 	client := &http.Client{Timeout: 10 * time.Second}
 	storage := NewDataStorage()
 
