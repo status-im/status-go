@@ -1139,6 +1139,20 @@ var StatusTokenList = fetcher.FetchedTokenList{
       "symbol": "STT",
       "decimals": 18,
       "chainId": 1660990954
+    },
+    {
+      "address": "0xc445a18CA49190578DaD62Fba3048C07Efc07ffe",
+      "name": "USD Coin",
+      "symbol": "USDC",
+      "decimals": 6,
+      "chainId": 1660990954
+    },
+    {
+      "address": "0xFe8bE27656b1508194D9302d12A940B4d7c35B99",
+      "name": "Euro Coin",
+      "symbol": "EURC",
+      "decimals": 6,
+      "chainId": 1660990954
     }
   ]
 }
