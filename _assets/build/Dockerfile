@@ -37,6 +37,7 @@ RUN mkdir -p /static/configs
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/$build_target /usr/local/bin/
 COPY --from=builder /go/src/github.com/status-im/status-go/static/keys/* /static/keys/
 COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/config.json /static/configs/
+COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku_configs/* /static/configs/
 
 RUN ln -s /usr/local/bin/$build_target /usr/local/bin/entrypoint
 

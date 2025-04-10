@@ -1,0 +1,17 @@
+{
+    "status-go.test": {
+      "clusterId": 16,
+      "wakuNodes": [
+        "enr:-La4QNqv0XQy7XuM0YHun6vTp9sxXoq4IT-rh3nDDOtaUP_BeFkoo-5JHtHFjM6p3hqTvOHmj3RvXedil9042MpTtlkBgmlkgnY0gmlwhKwSAAOKbXVsdGlhZGRyc40ACzYGYm9vdC0xBuphgnJzhwAQAgAgAECJc2VjcDI1NmsxoQJ-L7RtImvRuvgn_pQnJsag8tbaqPZ7mBM4Z1scEreWGoN0Y3CC6mGDdWRwgiMohXdha3UyDQ"
+      ],
+      "discV5BootstrapNodes": [],
+      "storeNodes": [
+        {
+          "id": "store-1",
+          "enr": "enr:-LW4QK-uN7FmYgWHd7w8vbUbqBljJPpfZUqSCftH_YmmfGxmP4HmDDcDj-FGO7fbr7kBrKRnPQC5Ma3RnxTj4wUvAP0EgmlkgnY0gmlwhKwSAAKKbXVsdGlhZGRyc4wACjYFc3RvcmUG6mKCcnOHABACACAAQIlzZWNwMjU2azGhAvmO_1uGYSBbONMOibc2Q7Caq36O7fOVUNsMhMwTxHPHg3RjcILqYoN1ZHCCIyiFd2FrdTID",
+          "addr": "/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
+          "fleet": "status-go.test"
+        }
+      ]
+    }
+  }

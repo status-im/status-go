@@ -23,7 +23,7 @@ mkdir -p "${binary_coverage_reports_path}"
 mkdir -p "${merged_coverage_reports_path}"
 mkdir -p "${test_results_path}"
 
-all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.test.status-go.yml"
+all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.test.status-go.yml -f ${root_path}/docker-compose.waku.yml"
 identifier=${BUILD_ID:-$(git rev-parse --short HEAD)}
 project_name="status-go-func-tests-${identifier}"
 

@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  boot-1:
+    image: wakuorg/nwaku:v0.35.0
+    entrypoint: [
+      "/usr/bin/wakunode",
+      "--peer-exchange=true",
+      "--rest-address=0.0.0.0",
+      "--rest-admin",
+      "--keep-alive=true",
+      "--max-connections=18000",
+      "--discv5-discovery=true",
+      "--discv5-enr-auto-update=True",
+      "--cluster-id=16",
+      "--shard=32",
+      "--shard=64",
+      "--tcp-port=60001",
+      "--discv5-udp-port=9000",
+      "--log-level=DEBUG",
+      "--nodekey=03ce9122016be1f80a23df36525103bed1c7c4b9a0ff7605d97553ed8ed96bcf",
+      # Docker DNS server
+      "--dns-addrs-name-server=127.0.0.11",
+      "--dns4-domain-name=boot-1",
+      "--relay=true",
+      "--filter=true",
+      "--lightpush=true",
+      "--staticnode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi",
+      "--storenode=/dns4/store/tcp/60002/p2p/16Uiu2HAmCDqxtfF1DwBqs7UJ4TgSnjoh6j1RtE1hhQxLLao84jLi"
+      # "--dns-addrs=true"
+    ]
+    depends_on:
+      - store
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
+
+  store:
+    image: wakuorg/nwaku:v0.35.0
+    entrypoint: [
+      "/usr/bin/wakunode",
+      "--peer-exchange=true",
+      "--rest-address=0.0.0.0",
+      "--rest-admin",
+      "--keep-alive=true",
+      "--max-connections=18000",
+      "--discv5-discovery=true",
+      "--discv5-enr-auto-update=True",
+      "--cluster-id=16",
+      "--shard=32",
+      "--shard=64",
+      "--tcp-port=60002",
+      "--discv5-udp-port=9000",
+      "--log-level=DEBUG",
+      "--nodekey=3190bc9b55b18dbc171997a7a67abcd5bbf0c81002ad9617b1cb67f2f15daa64",
+      # Docker DNS server
+      "--dns-addrs-name-server=127.0.0.11",
+      #"--dns-addrs=true"
+      "--dns4-domain-name=store",
+      "--relay=true",
+      "--store=true"
+    ]
+    # --staticnode="/dns4/boot-1/tcp/60002/p2p/16Uiu2HAm3vFYHkGRURyJ6F7bwDyzMLtPEuCg4DU89T7km2u8Fjyb"
+    command: >
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
+

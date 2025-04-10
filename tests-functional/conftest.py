@@ -45,7 +45,7 @@ def pytest_addoption(parser):
         "--waku-fleets-config",
         action="store",
         help="Path to a local JSON file with Waku fleets configuration",
-        default=None,
+        default="wakufleetconfig.json",
     )
     parser.addoption(
         "--waku-fleet",
