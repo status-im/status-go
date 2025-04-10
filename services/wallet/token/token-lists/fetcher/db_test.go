@@ -16,9 +16,9 @@ func TestDbActions(t *testing.T) {
 	tokenListsFetched := []FetchedTokenList{
 		{
 			TokenList: TokenList{
-				ID:        defaultTokensList[0].ID,
-				SourceURL: defaultTokensList[0].SourceURL,
-				Schema:    defaultTokensList[0].Schema,
+				ID:        FetchedTokensList[0].ID,
+				SourceURL: FetchedTokensList[0].SourceURL,
+				Schema:    FetchedTokensList[0].Schema,
 			},
 			Etag:     "etag1",
 			Fetched:  time.Now().Add(-48 * time.Hour),
@@ -26,9 +26,9 @@ func TestDbActions(t *testing.T) {
 		},
 		{
 			TokenList: TokenList{
-				ID:        defaultTokensList[1].ID,
-				SourceURL: defaultTokensList[1].SourceURL,
-				Schema:    defaultTokensList[1].Schema,
+				ID:        FetchedTokensList[1].ID,
+				SourceURL: FetchedTokensList[1].SourceURL,
+				Schema:    FetchedTokensList[1].Schema,
 			},
 			Etag:     "etag2",
 			Fetched:  time.Now().Add(-48 * time.Hour),

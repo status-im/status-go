@@ -133,7 +133,7 @@ func NewService(
 		tokenManager, balanceCacher, blockChainState)
 
 	coingecko := coingecko.NewClient()
-	marketManager := market.NewManager([]thirdparty.MarketDataProvider{coingecko}, feed) // TODO: add `coingeckoProxy` once we add it to the proxy server
+	marketManager := market.NewManager(tokenManager, []thirdparty.MarketDataProvider{coingecko}, feed) // TODO: add `coingeckoProxy` once we add it to the proxy server
 	reader := NewReader(tokenManager, marketManager, token.NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, accountFeed, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)

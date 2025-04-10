@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/circuitbreaker"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -42,6 +43,7 @@ type TokenMarketCache MarketValuesPerCurrencyAndToken
 type TokenPriceCache DataPerTokenAndCurrency
 
 type Manager struct {
+	tokenManager    token.ManagerInterface
 	feed            *event.Feed
 	priceCache      MarketCache[TokenPriceCache]
 	marketCache     MarketCache[TokenMarketCache]
@@ -52,7 +54,7 @@ type Manager struct {
 	providers       []thirdparty.MarketDataProvider
 }
 
-func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Manager {
+func NewManager(tokenManager token.ManagerInterface, providers []thirdparty.MarketDataProvider, feed *event.Feed) *Manager {
 	cb := circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
 		Timeout:               60000,
 		MaxConcurrentRequests: 100,
@@ -61,6 +63,7 @@ func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Ma
 	})
 
 	return &Manager{
+		tokenManager:   tokenManager,
 		feed:           feed,
 		priceCache:     *NewCache(make(TokenPriceCache)),
 		marketCache:    *NewCache(make(TokenMarketCache)),
@@ -113,9 +116,9 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 	return result.Result()[0], nil
 }
 
-func (pm *Manager) FetchHistoricalDailyPrices(groupedTokensKeys string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+func (pm *Manager) FetchHistoricalDailyPrices(groupedTokensKey string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
 	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchHistoricalDailyPrices(groupedTokensKeys, currency, limit, allData, aggregate)
+		return provider.FetchHistoricalDailyPrices(groupedTokensKey, currency, limit, allData, aggregate)
 	})
 
 	if err != nil {
@@ -134,11 +137,10 @@ func (pm *Manager) FetchHistoricalHourlyPrices(groupedTokensKey string, currency
 
 	if err != nil {
 		logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
-		return nil, err
+		return []thirdparty.HistoricalPrice{}, nil // return empty slice without error
 	}
 
-	prices := result.([]thirdparty.HistoricalPrice)
-	return prices, nil
+	return result.([]thirdparty.HistoricalPrice), nil
 }
 
 func (pm *Manager) FetchTokenMarketValues(groupedTokensKeys []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
@@ -235,12 +237,31 @@ func (pm *Manager) FetchTokenDetails(groupedTokensKeys []string) (map[string]thi
 		return provider.FetchTokenDetails(groupedTokensKeys)
 	})
 
+	if err == nil {
+		return result.(map[string]thirdparty.TokenDetails), nil
+	}
+
+	logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
+
+	groupedTokens, err := pm.tokenManager.GetTokensGroupedByGroupKey()
 	if err != nil {
-		logutils.ZapLogger().Error("Error fetching prices", zap.Error(err))
+		logutils.ZapLogger().Error("Error fetching tokens", zap.Error(err))
 		return nil, err
 	}
 
-	tokenDetails := result.(map[string]thirdparty.TokenDetails)
+	tokenDetails := make(map[string]thirdparty.TokenDetails)
+	for _, gtKey := range groupedTokensKeys {
+		tokens, ok := groupedTokens[gtKey]
+		if !ok || len(tokens) == 0 {
+			tokenDetails[gtKey] = thirdparty.TokenDetails{}
+			continue
+		}
+		tokenDetails[gtKey] = thirdparty.TokenDetails{
+			ID:     gtKey,
+			Name:   groupedTokens[gtKey][0].Name, // allowed cause the group has the same name and symbol
+			Symbol: groupedTokens[gtKey][0].Symbol,
+		}
+	}
 	return tokenDetails, nil
 }
 
