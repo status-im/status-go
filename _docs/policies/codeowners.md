@@ -27,3 +27,5 @@ reviewing and maintaining code in the `status-go` repository.
 ### Pull Request Reviews
 
 - At least one of the code owners for the affected files MUST review a PR for it to be eligible for merging.
+- If a code owner is unresponsive within a reasonable timeframe, another CC from the relevant area MAY approve 
+the PR in their place.
