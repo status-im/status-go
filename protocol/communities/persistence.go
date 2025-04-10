@@ -296,6 +296,11 @@ func (p *Persistence) SpectatedCommunities(memberIdentity *ecdsa.PublicKey) ([]*
 	return p.queryCommunities(memberIdentity, query)
 }
 
+func (p *Persistence) JoinedOrSpectatedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
+	query := communitiesBaseQuery + ` WHERE c.joined OR c.spectated`
+	return p.queryCommunities(memberIdentity, query)
+}
+
 func (p *Persistence) rowsToCommunityRecords(rows *sql.Rows) (result []*CommunityRecordBundle, err error) {
 	defer func() {
 		if err != nil {

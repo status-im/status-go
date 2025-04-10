@@ -822,6 +822,10 @@ func (m *Manager) Spectated() ([]*Community, error) {
 	return m.persistence.SpectatedCommunities(&m.identity.PublicKey)
 }
 
+func (m *Manager) JoinedOrSpectated() ([]*Community, error) {
+	return m.persistence.JoinedOrSpectatedCommunities(&m.identity.PublicKey)
+}
+
 func (m *Manager) CommunityUpdateLastOpenedAt(communityID types.HexBytes, timestamp int64) (*Community, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)

@@ -844,9 +844,8 @@ func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
 }
 
 func (m *Messenger) CheckCommunitiesToUnmute() (*MessengerResponse, error) {
-	m.logger.Debug("watching communities to unmute")
 	response := &MessengerResponse{}
-	communities, err := m.communitiesManager.All()
+	communities, err := m.communitiesManager.JoinedOrSpectated()
 	currTime := time.Now()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get all communities: %v", err)

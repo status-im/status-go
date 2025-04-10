@@ -1621,26 +1621,29 @@ func (m *Messenger) watchChatsToUnmute() {
 
 // watchCommunitiesToUnmute checks every minute to identify and unmute communities that should no longer be muted.
 func (m *Messenger) watchCommunitiesToUnmute() {
-	m.logger.Debug("Checking for communities to unmute every minute")
+	logger := m.logger.Named("watchCommunitiesToUnmute")
+	logger.Debug("starting")
+
+	check := func() {
+		response, err := m.CheckCommunitiesToUnmute()
+		if err != nil {
+			logger.Warn("couldn't check communities to unmute", zap.Error(err))
+		} else if !response.IsEmpty() {
+			signal.SendNewMessages(response)
+		}
+	}
+
 	go func() {
 		defer gocommon.LogOnPanic()
+		check()
+
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+
 		for {
-			// Execute the check immediately upon starting
-			response, err := m.CheckCommunitiesToUnmute()
-			if err != nil {
-				m.logger.Warn("watchCommunitiesToUnmute error", zap.Any("Couldn't unmute communities", err))
-			} else if !response.IsEmpty() {
-				signal.SendNewMessages(response)
-			}
-
-			// Calculate the time until the next whole minute
-			now := time.Now()
-			waitDuration := time.Until(now.Truncate(time.Minute).Add(time.Minute))
-
-			// Wait until the next minute
 			select {
-			case <-time.After(waitDuration):
-				// Continue to next iteration
+			case <-ticker.C:
+				check()
 			case <-m.quit:
 				return
 			}
