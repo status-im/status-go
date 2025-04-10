@@ -86,17 +86,17 @@ func TestGetLeaderboardPageErrors(t *testing.T) {
 	s.UpdateCryptoData(mockCrypto)
 
 	{
-		_, err := s.GetLeaderboardPage(-1, 10, -1)
+		_, err := s.GetLeaderboardPage(-1, 10, -1, "usd")
 		require.Error(t, err)
 	}
 
 	{
-		_, err := s.GetLeaderboardPage(1, 0, -1)
+		_, err := s.GetLeaderboardPage(1, 0, -1, "usd")
 		require.Error(t, err)
 	}
 
 	{
-		_, err := s.GetLeaderboardPage(100, 100, -1)
+		_, err := s.GetLeaderboardPage(100, 100, -1, "usd")
 		require.Error(t, err)
 	}
 }
@@ -106,12 +106,13 @@ func TestGetLeaderboardPage(t *testing.T) {
 	s.UpdateCryptoData(mockCrypto)
 
 	{
-		rst, err := s.GetLeaderboardPage(0, 3, -1)
+		rst, err := s.GetLeaderboardPage(0, 3, -1, "usd")
 		require.NoError(t, err)
 		require.Equal(t, 5, rst.TotalCount)
 		require.Equal(t, 0, rst.Page)
 		require.Equal(t, 3, rst.PageSize)
 		require.Equal(t, -1, rst.SortOrder)
+		require.Equal(t, "usd", rst.Currency)
 		require.Equal(t, 3, len(rst.Data))
 		require.Equal(t, mockCrypto[0], rst.Data[0])
 		require.Equal(t, mockCrypto[1], rst.Data[1])
@@ -119,11 +120,12 @@ func TestGetLeaderboardPage(t *testing.T) {
 	}
 
 	{
-		rst, err := s.GetLeaderboardPage(1, 3, -1)
+		rst, err := s.GetLeaderboardPage(1, 3, -1, "eur")
 		require.NoError(t, err)
 		require.Equal(t, 5, rst.TotalCount)
 		require.Equal(t, 1, rst.Page)
 		require.Equal(t, 3, rst.PageSize)
+		require.Equal(t, "eur", rst.Currency)
 		require.Equal(t, -1, rst.SortOrder)
 		require.Equal(t, 2, len(rst.Data))
 		require.Equal(t, mockCrypto[3], rst.Data[0])
@@ -135,11 +137,12 @@ func TestGetLeaderboardPageEmpty(t *testing.T) {
 	s := NewDataStorage()
 
 	{
-		rst, err := s.GetLeaderboardPage(0, 3, -1)
+		rst, err := s.GetLeaderboardPage(0, 3, -1, "usd")
 		require.NoError(t, err)
 		require.Equal(t, 0, rst.TotalCount)
 		require.Equal(t, 0, rst.Page)
 		require.Equal(t, 3, rst.PageSize)
+		require.Equal(t, "usd", rst.Currency)
 		require.Equal(t, -1, rst.SortOrder)
 		require.Equal(t, 0, len(rst.Data))
 	}
@@ -151,12 +154,13 @@ func TestGetLeaderboardPageWithUpdatedPrices(t *testing.T) {
 	s.UpdatePriceData(mockPriceData)
 
 	{
-		rst, err := s.GetLeaderboardPage(0, 3, -1)
+		rst, err := s.GetLeaderboardPage(0, 3, -1, "usd")
 		require.NoError(t, err)
 		require.Equal(t, 5, rst.TotalCount)
 		require.Equal(t, 0, rst.Page)
 		require.Equal(t, 3, rst.PageSize)
 		require.Equal(t, -1, rst.SortOrder)
+		require.Equal(t, "usd", rst.Currency)
 		require.Equal(t, 3, len(rst.Data))
 		require.Equal(t, mockCrypto[2], rst.Data[2])
 		verifyCryptoPriceData(t, mockPriceData["btc"], rst.Data[0])
@@ -170,11 +174,12 @@ func TestGetLeaderboardPagePrices(t *testing.T) {
 	s.UpdatePriceData(mockPriceData)
 
 	{
-		rst, err := s.GetLeaderboardPage(1, 3, -1)
+		rst, err := s.GetLeaderboardPage(1, 3, -1, "usd")
 		require.NoError(t, err)
 		require.Equal(t, 5, rst.TotalCount)
 		require.Equal(t, 1, rst.Page)
 		require.Equal(t, 3, rst.PageSize)
+		require.Equal(t, "usd", rst.Currency)
 		require.Equal(t, -1, rst.SortOrder)
 		require.Equal(t, 2, len(rst.Data))
 	}

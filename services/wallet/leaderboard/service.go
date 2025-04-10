@@ -18,10 +18,16 @@ import (
 )
 
 const (
-	// EventGetLeaderboardPageDone contains a LeaderboardPage payload
-	EventGetLeaderboardPageDone walletevent.EventType = "wallet-leaderboard-get-page-done"
-	// EventLeaderboardPagePricesUpdated contains a EventLeaderboardPagePricesUpdate payload
+	// Contains a LeaderboardPage payload
+	EventFetchLeaderboardPageDone walletevent.EventType = "wallet-leaderboard-fetch-page-done"
+	// Contains a LeaderboardPage payload
+	EvenLeaderboardPageDone walletevent.EventType = "wallet-leaderboard-page-updated"
+	// Contains a EventLeaderboardPagePricesUpdate payload
 	EventLeaderboardPagePricesUpdated walletevent.EventType = "wallet-leaderboard-page-prices-updated"
+
+	// Signal source
+	TickerFullDataUpdateSource int = 0
+	TickerPriceUpdateSource    int = 1
 )
 
 var (
@@ -47,7 +53,7 @@ type MarketDataService struct {
 
 	// Subscription management
 	subscriptionManager    *SubscriptionManager
-	pageUpdateSubscription chan struct{}
+	pageUpdateSubscription chan Signal
 
 	// Context management
 	cancelFunc     context.CancelFunc
@@ -93,6 +99,7 @@ func (s *MarketDataService) Start(ctx context.Context) {
 		return // Already running
 	}
 
+	// TODO_ES optimize to stop fetching data when not needed
 	// Create a cancellable context that can stop all data operations
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancelFunc = cancel
@@ -138,39 +145,8 @@ func (s *MarketDataService) IsRunning() bool {
 	return s.isRunning
 }
 
-// Subscribe creates a subscription to data updates
-func (s *MarketDataService) Subscribe() chan struct{} {
-	return s.subscriptionManager.Subscribe()
-}
-
-// Unsubscribe removes a subscription
-func (s *MarketDataService) Unsubscribe(ch chan struct{}) {
-	s.subscriptionManager.Unsubscribe(ch)
-}
-
-// GetCryptoData returns the latest cryptocurrency data
-func (s *MarketDataService) GetCryptoData() []Cryptocurrency {
-	return s.storage.GetCryptoData()
-}
-
-// GetPriceData returns the latest price data
-func (s *MarketDataService) GetPriceData() PriceMap {
-	return s.storage.GetPriceData()
-}
-
-// GetCombinedData returns cryptocurrency data with updated price information
-func (s *MarketDataService) GetCombinedData() []Cryptocurrency {
-	return s.storage.GetCombinedData()
-}
-
-// GetCryptoStats returns statistics for crypto data requests
-func (s *MarketDataService) GetCryptoStats() Stats {
-	return s.storage.GetCryptoStats()
-}
-
-// GetPriceStats returns statistics for price data requests
-func (s *MarketDataService) GetPriceStats() Stats {
-	return s.storage.GetPriceStats()
+func (s *MarketDataService) isSubscribed() bool {
+	return s.pageUpdateSubscription != nil
 }
 
 // cryptoRefreshLoop periodically fetches the full cryptocurrency data
@@ -179,7 +155,7 @@ func (s *MarketDataService) cryptoRefreshLoop(ctx context.Context) {
 	s.fetchCryptoData(ctx)
 
 	// Notify subscribers of the initial data
-	s.subscriptionManager.Emit(ctx)
+	s.subscriptionManager.Emit(ctx, TickerFullDataUpdateSource)
 
 	// Set up ticker for periodic updates
 	ticker := time.NewTicker(time.Duration(s.config.FullDataInterval) * time.Second)
@@ -192,7 +168,7 @@ func (s *MarketDataService) cryptoRefreshLoop(ctx context.Context) {
 		case <-ticker.C:
 			if s.fetchCryptoData(ctx) {
 				// Only notify if data was actually updated
-				s.subscriptionManager.Emit(ctx)
+				s.subscriptionManager.Emit(ctx, TickerFullDataUpdateSource)
 			}
 		}
 	}
@@ -207,7 +183,7 @@ func (s *MarketDataService) priceRefreshLoop(ctx context.Context) {
 	s.fetchPriceData(ctx)
 
 	// Notify subscribers of the initial data
-	s.subscriptionManager.Emit(ctx)
+	s.subscriptionManager.Emit(ctx, TickerPriceUpdateSource)
 
 	// Set up ticker for periodic updates
 	ticker := time.NewTicker(time.Duration(s.config.PriceUpdateInterval) * time.Second)
@@ -220,7 +196,7 @@ func (s *MarketDataService) priceRefreshLoop(ctx context.Context) {
 		case <-ticker.C:
 			if s.fetchPriceData(ctx) {
 				// Only notify if data was actually updated
-				s.subscriptionManager.Emit(ctx)
+				s.subscriptionManager.Emit(ctx, TickerPriceUpdateSource)
 			}
 		}
 	}
@@ -279,7 +255,7 @@ func (s *MarketDataService) fetchPriceData(ctx context.Context) bool {
 }
 
 func (s *MarketDataService) sendLeaderboardPagePricesUpdate() {
-	if s.pageUpdateSubscription == nil {
+	if !s.isSubscribed() {
 		return
 	}
 
@@ -300,9 +276,32 @@ func (s *MarketDataService) sendLeaderboardPagePricesUpdate() {
 	s.feed.Send(event)
 }
 
-func (s *MarketDataService) GetLeaderboardPageAsync(page, pageSize int, sortOrder int) {
+func (s *MarketDataService) sendLeaderboardPageUpdate() {
+	if !s.isSubscribed() {
+		return
+	}
+
+	lastPage := s.cache.GetLastPage()
+	result, err := s.storage.GetLeaderboardPage(lastPage.Page, lastPage.PageSize, lastPage.SortOrder, lastPage.Currency)
+	if err != nil {
+		logutils.ZapLogger().Error("Error fetching leaderboard page", zap.Error(err))
+		return
+	}
+	payload, err := json.Marshal(result)
+	if err != nil {
+		logutils.ZapLogger().Error("Error marshalling leaderboard page", zap.Error(err))
+	}
+
+	event := walletevent.Event{
+		Type:    EvenLeaderboardPageDone,
+		Message: string(payload),
+	}
+	s.feed.Send(event)
+}
+
+func (s *MarketDataService) FetchLeaderboardPageAsync(page, pageSize, sortOrder int, currency string) {
 	s.scheduler.Enqueue(fetchLeaderboardPageTask, func(ctx context.Context) (interface{}, error) {
-		result, err := s.storage.GetLeaderboardPage(page, pageSize, sortOrder)
+		result, err := s.storage.GetLeaderboardPage(page, pageSize, sortOrder, currency)
 		s.cache.UpdateLastPage(result)
 		return result, err
 	}, func(result interface{}, taskType async.TaskType, resErr error) {
@@ -311,27 +310,41 @@ func (s *MarketDataService) GetLeaderboardPageAsync(page, pageSize int, sortOrde
 			logutils.ZapLogger().Error("Error marshalling leaderboard page", zap.Error(err))
 		}
 		event := walletevent.Event{
-			Type:    EventGetLeaderboardPageDone,
+			Type:    EventFetchLeaderboardPageDone,
 			Message: string(payload),
 		}
-		if s.pageUpdateSubscription == nil {
-			s.pageUpdateSubscription = s.subscriptionManager.Subscribe()
-			go func() {
-				defer common.LogOnPanic()
-				for range s.pageUpdateSubscription {
-					s.sendLeaderboardPagePricesUpdate()
-				}
-			}()
-		}
+		s.subscribeToLeaderboard()
 		s.feed.Send(event)
 	})
 }
 
+func (s *MarketDataService) subscribeToLeaderboard() {
+	if s.isSubscribed() {
+		return
+	}
+
+	s.pageUpdateSubscription = s.subscriptionManager.Subscribe()
+	go func() {
+		defer common.LogOnPanic()
+		for {
+			select {
+			case sig := <-s.pageUpdateSubscription:
+				switch sig.Source() {
+				case TickerFullDataUpdateSource:
+					s.sendLeaderboardPageUpdate()
+				case TickerPriceUpdateSource:
+					s.sendLeaderboardPagePricesUpdate()
+				}
+			}
+		}
+	}()
+}
+
 func (s *MarketDataService) UnsubscribeFromLeaderboard() error {
-	if s.pageUpdateSubscription == nil {
+	if !s.isSubscribed() {
 		return fmt.Errorf("No subscription found")
 	}
-	s.Unsubscribe(s.pageUpdateSubscription)
+	s.subscriptionManager.Unsubscribe(s.pageUpdateSubscription)
 	s.pageUpdateSubscription = nil
 	s.cache.Clear()
 	return nil

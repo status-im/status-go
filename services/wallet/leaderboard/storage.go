@@ -224,7 +224,7 @@ func (s *DataStorage) GetLeaderboardPagePrices(page LeaderboardPage) *Leaderboar
 	return result
 }
 
-func (s *DataStorage) GetLeaderboardPage(page, pageSize int, sortOrder int) (*LeaderboardPage, error) {
+func (s *DataStorage) GetLeaderboardPage(page, pageSize, sortOrder int, currency string) (*LeaderboardPage, error) {
 	if pageSize <= 0 {
 		return nil, fmt.Errorf("Invalid page size")
 	}
@@ -244,6 +244,7 @@ func (s *DataStorage) GetLeaderboardPage(page, pageSize int, sortOrder int) (*Le
 		Page:       page,
 		PageSize:   pageSize,
 		SortOrder:  sortOrder,
+		Currency:   currency,
 		Data:       s.GetCryptoDataForPage(page, pageSize),
 	}
 	return result, nil

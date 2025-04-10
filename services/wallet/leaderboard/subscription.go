@@ -5,22 +5,34 @@ import (
 	"sync"
 )
 
+type Signal struct {
+	source int
+}
+
+func NewSignal(source int) Signal {
+	return Signal{source: source}
+}
+
+func (s Signal) Source() int {
+	return s.source
+}
+
 // SubscriptionManager handles event subscriptions and notifications
 type SubscriptionManager struct {
 	mu          sync.RWMutex
-	subscribers map[chan struct{}]struct{}
+	subscribers map[chan Signal]struct{}
 }
 
 // NewSubscriptionManager creates a new subscription manager
 func NewSubscriptionManager() *SubscriptionManager {
 	return &SubscriptionManager{
-		subscribers: make(map[chan struct{}]struct{}),
+		subscribers: make(map[chan Signal]struct{}),
 	}
 }
 
 // Subscribe creates a new subscription and returns a channel that will receive notifications
-func (s *SubscriptionManager) Subscribe() chan struct{} {
-	ch := make(chan struct{}, 1)
+func (s *SubscriptionManager) Subscribe() chan Signal {
+	ch := make(chan Signal, 2) // Buffered channel to avoid blocking
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.subscribers[ch] = struct{}{}
@@ -28,7 +40,7 @@ func (s *SubscriptionManager) Subscribe() chan struct{} {
 }
 
 // Unsubscribe removes a subscription and closes its channel
-func (s *SubscriptionManager) Unsubscribe(ch chan struct{}) {
+func (s *SubscriptionManager) Unsubscribe(ch chan Signal) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, exist := s.subscribers[ch]
@@ -40,15 +52,16 @@ func (s *SubscriptionManager) Unsubscribe(ch chan struct{}) {
 }
 
 // Emit sends a notification to all subscribers
-func (s *SubscriptionManager) Emit(ctx context.Context) {
+func (s *SubscriptionManager) Emit(ctx context.Context, source int) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	signal := NewSignal(source)
 	for subscriber := range s.subscribers {
 		select {
 		case <-ctx.Done():
 			// Stop sending notifications when the context is cancelled
 			return
-		case subscriber <- struct{}{}:
+		case subscriber <- signal:
 			// Notified successfully
 		default:
 			// Skip notification if the subscriber's channel is full (non-blocking)
