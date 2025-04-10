@@ -189,7 +189,7 @@ class StatusBackend(RpcClient, SignalClient):
             "dataDir": self.data_dir,
             "logEnabled": True,
             "logLevel": "DEBUG",
-            "apiLogging": True
+            "apiLogging": True,
         }
 
         if option.waku_fleet:
