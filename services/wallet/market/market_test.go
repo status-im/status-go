@@ -16,7 +16,7 @@ import (
 )
 
 func setupMarketManager(t *testing.T, providers []thirdparty.MarketDataProvider) *Manager {
-	return NewManager(providers, &event.Feed{})
+	return NewManager(nil, providers, &event.Feed{})
 }
 
 const (

@@ -5,6 +5,7 @@ package fetcher
 // var remoteListOfTokenLists = fmt.Sprintf("https://raw.githubusercontent.com/status-im/status-go/refs/heads/release/%s/token-lists.json", version.Version())
 
 // sourceList is a hardcoded list of URLs to fetch token lists from (list format as below) will be used if fetching the remote list fails.
+// When updating defaultListOfTokenLists, make sure that `defaulttokenlists.TokensSources` and `fetcher.defaultTokensList` are in sync.
 // #nosec G101
 const defaultListOfTokenLists = `[
   {

@@ -32,26 +32,6 @@ func setupTest(t *testing.T, response []byte) (*httptest.Server, func()) {
 	}
 }
 
-func TestGettingTokens(t *testing.T) {
-	expectedTokenIDTokenMap := make(map[string]GeckoToken)
-	for _, token := range coinsList {
-		expectedTokenIDTokenMap[token.ID] = token
-	}
-
-	srv, stop := setupTest(t, responseCoinsListData)
-	defer stop()
-
-	geckoClient := &Client{
-		httpClient:      thirdparty.NewHTTPClient(),
-		baseURL:         srv.URL,
-		tokenIDTokenMap: make(map[string]GeckoToken),
-	}
-
-	tokenIDTokenMap, err := geckoClient.getTokenIDTokenMap()
-	require.NoError(t, err)
-	require.True(t, reflect.DeepEqual(expectedTokenIDTokenMap, tokenIDTokenMap))
-}
-
 func TestFetchPrices(t *testing.T) {
 	groupedTokensKeys := []string{
 		ethGroupedTokenKey,
@@ -90,9 +70,8 @@ func TestFetchPrices(t *testing.T) {
 	srv := httptest.NewServer(mux)
 
 	geckoClient := &Client{
-		httpClient:      thirdparty.NewHTTPClient(),
-		baseURL:         srv.URL,
-		tokenIDTokenMap: make(map[string]GeckoToken),
+		httpClient: thirdparty.NewHTTPClient(),
+		baseURL:    srv.URL,
 	}
 
 	prices, err := geckoClient.FetchPrices(groupedTokensKeys, []string{"USD"})
@@ -150,9 +129,8 @@ func TestFetchMarketValues(t *testing.T) {
 	srv := httptest.NewServer(mux)
 
 	geckoClient := &Client{
-		httpClient:      thirdparty.NewHTTPClient(),
-		baseURL:         srv.URL,
-		tokenIDTokenMap: make(map[string]GeckoToken),
+		httpClient: thirdparty.NewHTTPClient(),
+		baseURL:    srv.URL,
 	}
 
 	prices, err := geckoClient.FetchTokenMarketValues(groupedTokensKeys, "USD")
