@@ -21,7 +21,8 @@ reviewing and maintaining code in the `status-go` repository.
   - Any CC MAY nominate themselves as a code owner for any part of the existing code.
   - Nominations SHOULD be discussed and agreed upon with other CCs if there are overlaps or concerns.
 - For **new** code:
-  - When introducing a new file/module, CCs SHOULD assign themselves or another CC as a code owner for this file/module. 
+  - When introducing a new module or substantial new component, CCs SHOULD assign ownership.
+  - File-level ownership MAY be used where appropriate but is not required.
 
 ### Pull Request Reviews
 
