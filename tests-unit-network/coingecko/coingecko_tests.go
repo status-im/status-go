@@ -1,4 +1,4 @@
-package cryptocompare_tests
+package coingecko_tests
 
 import (
 	"testing"
@@ -7,17 +7,19 @@ import (
 	"github.com/status-im/status-go/params"
 	mock_network "github.com/status-im/status-go/rpc/network/mock"
 	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
+	"github.com/status-im/status-go/services/wallet/thirdparty/market/coingecko"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/stretchr/testify/require"
 
 	"go.uber.org/mock/gomock"
 )
 
-func getTokenSymbols(t *testing.T) []string {
+func getGroupKeys(t *testing.T) []string {
 	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
@@ -54,34 +56,24 @@ func getTokenSymbols(t *testing.T) []string {
 	// Skeleton token store to get full list of tokens
 	tm := token.NewTokenManager(walletDB, nil, nil, networkManager, appDB, nil, nil, nil, nil, nil)
 
-	tokens, err := tm.GetAllTokens()
+	groupedTokens, err := tm.GetTokensGroupedByGroupKey()
 	require.NoError(t, err)
 
-	symbolsMap := make(map[string]bool)
-	for _, token := range tokens {
-		symbolsMap[token.Symbol] = true
-	}
-
-	symbols := make([]string, 0, len(symbolsMap))
-	for symbol := range symbolsMap {
-		symbols = append(symbols, symbol)
-	}
-
-	return symbols
+	return maps.Keys(groupedTokens)
 }
 
 func TestFetchPrices(t *testing.T) {
-	symbols := getTokenSymbols(t)
+	groupKeys := getGroupKeys(t)
 
-	stdClient := cryptocompare.NewClient()
-	_, err := stdClient.FetchPrices(symbols, []string{"USD"})
+	stdClient := coingecko.NewClient()
+	_, err := stdClient.FetchPrices(groupKeys, []string{"USD"})
 	require.NoError(t, err)
 }
 
 func TestFetchTokenMarketValues(t *testing.T) {
-	symbols := getTokenSymbols(t)
+	groupKeys := getGroupKeys(t)
 
-	stdClient := cryptocompare.NewClient()
-	_, err := stdClient.FetchTokenMarketValues(symbols, "USD")
+	stdClient := coingecko.NewClient()
+	_, err := stdClient.FetchTokenMarketValues(groupKeys, "USD")
 	require.NoError(t, err)
 }
