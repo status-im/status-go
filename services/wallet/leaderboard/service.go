@@ -75,14 +75,13 @@ type Stats struct {
 func NewMarketDataService(config ServiceConfig, feed *event.Feed) *MarketDataService {
 	// Set default values for intervals if not provided
 	client := &http.Client{Timeout: 10 * time.Second}
-	storage := NewDataStorage()
 
 	return &MarketDataService{
 		config:                 config,
 		client:                 client,
 		feed:                   feed,
 		requestHandler:         NewRequestHandler(config, client),
-		storage:                storage,
+		storage:                NewDataStorage(),
 		subscriptionManager:    NewSubscriptionManager(),
 		scheduler:              async.NewScheduler(),
 		pageUpdateSubscription: nil,
@@ -92,16 +91,36 @@ func NewMarketDataService(config ServiceConfig, feed *event.Feed) *MarketDataSer
 
 // Start begins the data refresh loops
 func (s *MarketDataService) Start(ctx context.Context) {
+	if s.startRefreshLoops() {
+		// Stop everything when the top-level context is cancelled
+		go func() {
+			defer common.LogOnPanic()
+			<-ctx.Done()
+			s.stopRefreshLoops() // gracefully stop if running
+		}()
+	}
+}
+
+// Stop halts all data refresh operations
+func (s *MarketDataService) Stop() {
+	s.stopRefreshLoops()
+	s.UnsubscribeFromLeaderboard() //nolint:errcheck
+}
+
+// GetCombinedData returns cryptocurrency data with updated price information
+func (s *MarketDataService) GetCombinedData() []Cryptocurrency {
+	return s.storage.GetCombinedData()
+}
+
+func (s *MarketDataService) startRefreshLoops() bool {
 	s.isRunningMutex.Lock()
 	defer s.isRunningMutex.Unlock()
 
 	if s.isRunning {
-		return // Already running
+		return false // Already running
 	}
 
-	// TODO_ES optimize to stop fetching data when not needed
-	// Create a cancellable context that can stop all data operations
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	s.cancelFunc = cancel
 	s.isRunning = true
 
@@ -116,10 +135,10 @@ func (s *MarketDataService) Start(ctx context.Context) {
 		defer common.LogOnPanic()
 		s.priceRefreshLoop(ctx)
 	}()
+	return true
 }
 
-// Stop halts all data refresh operations
-func (s *MarketDataService) Stop() {
+func (s *MarketDataService) stopRefreshLoops() {
 	s.isRunningMutex.Lock()
 	defer s.isRunningMutex.Unlock()
 
@@ -133,16 +152,7 @@ func (s *MarketDataService) Stop() {
 		s.cancelFunc = nil
 	}
 
-	s.UnsubscribeFromLeaderboard() //nolint:errcheck
-
 	s.isRunning = false
-}
-
-// IsRunning returns whether the service is currently running
-func (s *MarketDataService) IsRunning() bool {
-	s.isRunningMutex.Lock()
-	defer s.isRunningMutex.Unlock()
-	return s.isRunning
 }
 
 func (s *MarketDataService) isSubscribed() bool {
@@ -323,24 +333,24 @@ func (s *MarketDataService) subscribeToLeaderboard() {
 		return
 	}
 
+	s.startRefreshLoops()
+
 	s.pageUpdateSubscription = s.subscriptionManager.Subscribe()
 	go func() {
 		defer common.LogOnPanic()
-		for {
-			select {
-			case sig := <-s.pageUpdateSubscription:
-				switch sig.Source() {
-				case TickerFullDataUpdateSource:
-					s.sendLeaderboardPageUpdate()
-				case TickerPriceUpdateSource:
-					s.sendLeaderboardPagePricesUpdate()
-				}
+		for sig := range s.pageUpdateSubscription {
+			switch sig.Source() {
+			case TickerFullDataUpdateSource:
+				s.sendLeaderboardPageUpdate()
+			case TickerPriceUpdateSource:
+				s.sendLeaderboardPagePricesUpdate()
 			}
 		}
 	}()
 }
 
 func (s *MarketDataService) UnsubscribeFromLeaderboard() error {
+	s.stopRefreshLoops()
 	if !s.isSubscribed() {
 		return fmt.Errorf("No subscription found")
 	}
