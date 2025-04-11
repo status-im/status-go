@@ -6,6 +6,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 func NewDefaultStorenodeMessageVerifier(store *store.WakuStore) StorenodeMessageVerifier {
@@ -18,10 +19,13 @@ type defaultStorenodeMessageVerifier struct {
 	store *store.WakuStore
 }
 
-func (d *defaultStorenodeMessageVerifier) MessageHashesExist(ctx context.Context, requestID []byte, peerID peer.AddrInfo, pageSize uint64, messageHashes []pb.MessageHash) ([]pb.MessageHash, error) {
+func (d *defaultStorenodeMessageVerifier) MessageHashesExist(ctx context.Context, requestID []byte, peerInfo peer.AddrInfo, pageSize uint64, messageHashes []pb.MessageHash) ([]pb.MessageHash, error) {
+
+	addrs := utils.EncapsulatePeerID(peerInfo.ID, peerInfo.Addrs...)
+
 	var opts []store.RequestOption
 	opts = append(opts, store.WithRequestID(requestID))
-	opts = append(opts, store.WithPeerAddr(peerID.Addrs...))
+	opts = append(opts, store.WithPeerAddr(addrs...))
 	opts = append(opts, store.WithPaging(false, pageSize))
 	opts = append(opts, store.IncludeData(false))
 
