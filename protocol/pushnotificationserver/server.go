@@ -41,15 +41,18 @@ type Server struct {
 	SentRequests int64
 }
 
-func New(config *Config, persistence Persistence, messageSender *common.MessageSender) *Server {
+func New(config *Config) *Server {
 	if len(config.GorushURL) == 0 {
 		config.GorushURL = DefaultGorushURL
 
 	}
-	return &Server{persistence: persistence, config: config, messageSender: messageSender}
+	return &Server{config: config}
 }
 
-func (s *Server) Start() error {
+func (s *Server) Start(persistence Persistence, messageSender *common.MessageSender) error {
+	s.persistence = persistence
+	s.messageSender = messageSender
+
 	if s.config.Logger == nil {
 		logger, err := zap.NewDevelopment()
 		if err != nil {
