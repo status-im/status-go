@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -62,11 +61,6 @@ type MarketDataService struct {
 	// Subscription management
 	subscriptionManager    *SubscriptionManager
 	pageUpdateSubscription chan Signal
-
-	// Context management
-	cancelFunc     context.CancelFunc
-	isRunning      bool
-	isRunningMutex sync.Mutex
 }
 
 type GetLeaderboardPageResponse struct {
@@ -91,19 +85,12 @@ func NewMarketDataService(config ServiceConfig, feed *event.Feed) *MarketDataSer
 
 // Start begins the data refresh loops
 func (s *MarketDataService) Start(ctx context.Context) {
-	if s.startRefreshLoops() {
-		// Stop everything when the top-level context is cancelled
-		go func() {
-			defer common.LogOnPanic()
-			<-ctx.Done()
-			s.stopRefreshLoops() // gracefully stop if running
-		}()
-	}
+	s.fetcher.Start(ctx)
 }
 
 // Stop halts all data refresh operations
 func (s *MarketDataService) Stop() {
-	s.stopRefreshLoops()
+	s.fetcher.Stop()
 	s.UnsubscribeFromLeaderboard() //nolint:errcheck
 }
 
@@ -112,126 +99,8 @@ func (s *MarketDataService) GetCombinedData() []Cryptocurrency {
 	return s.storage.GetCombinedData()
 }
 
-func (s *MarketDataService) startRefreshLoops() bool {
-	s.isRunningMutex.Lock()
-	defer s.isRunningMutex.Unlock()
-
-	if s.isRunning {
-		return false // Already running
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancelFunc = cancel
-	s.isRunning = true
-
-	// Start crypto data refresh loop
-	go func() {
-		defer common.LogOnPanic()
-		s.cryptoRefreshLoop(ctx)
-	}()
-
-	// Start price data refresh loop
-	go func() {
-		defer common.LogOnPanic()
-		s.priceRefreshLoop(ctx)
-	}()
-	return true
-}
-
-func (s *MarketDataService) stopRefreshLoops() {
-	s.isRunningMutex.Lock()
-	defer s.isRunningMutex.Unlock()
-
-	if !s.isRunning {
-		return // Not running
-	}
-
-	// Cancel the context to stop all loops
-	if s.cancelFunc != nil {
-		s.cancelFunc()
-		s.cancelFunc = nil
-	}
-
-	s.isRunning = false
-}
-
 func (s *MarketDataService) isSubscribed() bool {
 	return s.pageUpdateSubscription != nil
-}
-
-// cryptoRefreshLoop periodically fetches the full cryptocurrency data
-func (s *MarketDataService) cryptoRefreshLoop(ctx context.Context) {
-	// Initial fetch
-	s.fetchCryptoData(ctx)
-
-	// Notify subscribers of the initial data
-	s.subscriptionManager.Emit(ctx, TickerFullDataUpdateSource)
-
-	// Set up ticker for periodic updates
-	ticker := time.NewTicker(time.Duration(s.config.FullDataInterval) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return // Context cancelled, stop the loop
-		case <-ticker.C:
-			if s.fetchCryptoData(ctx) {
-				// Only notify if data was actually updated
-				s.subscriptionManager.Emit(ctx, TickerFullDataUpdateSource)
-			}
-		}
-	}
-}
-
-// priceRefreshLoop periodically fetches price updates
-func (s *MarketDataService) priceRefreshLoop(ctx context.Context) {
-	// Wait a short time before starting price updates
-	time.Sleep(1 * time.Second)
-
-	// Initial fetch
-	s.fetchPriceData(ctx)
-
-	// Notify subscribers of the initial data
-	s.subscriptionManager.Emit(ctx, TickerPriceUpdateSource)
-
-	// Set up ticker for periodic updates
-	ticker := time.NewTicker(time.Duration(s.config.PriceUpdateInterval) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return // Context cancelled, stop the loop
-		case <-ticker.C:
-			if s.fetchPriceData(ctx) {
-				// Only notify if data was actually updated
-				s.subscriptionManager.Emit(ctx, TickerPriceUpdateSource)
-			}
-		}
-	}
-}
-
-// fetchCryptoData fetches the latest cryptocurrency data
-// Returns true if data was updated, false if using cached data (304)
-func (s *MarketDataService) fetchCryptoData(ctx context.Context) bool {
-	result, err := s.fetcher.FetchMarkets(ctx)
-	if err != nil {
-		logutils.ZapLogger().Error("Error fetching crypto data", zap.Error(err))
-		return false
-	}
-	return result.Updated
-}
-
-// fetchPriceData fetches the latest price data
-// Returns true if data was updated, false if using cached data (304)
-func (s *MarketDataService) fetchPriceData(ctx context.Context) bool {
-	result, err := s.fetcher.FetchPrices(ctx)
-	if err != nil {
-		logutils.ZapLogger().Error("Error fetching price data", zap.Error(err))
-		return false
-	}
-	return result.Updated
 }
 
 func (s *MarketDataService) sendLeaderboardPagePricesUpdate() {
@@ -317,7 +186,7 @@ func (s *MarketDataService) subscribeToLeaderboard() {
 		return
 	}
 
-	s.startRefreshLoops()
+	s.fetcher.Start(context.Background())
 
 	s.pageUpdateSubscription = s.subscriptionManager.Subscribe()
 	go func() {
@@ -334,7 +203,7 @@ func (s *MarketDataService) subscribeToLeaderboard() {
 }
 
 func (s *MarketDataService) UnsubscribeFromLeaderboard() error {
-	s.stopRefreshLoops()
+	s.fetcher.Stop()
 	if !s.isSubscribed() {
 		return fmt.Errorf("No subscription found")
 	}

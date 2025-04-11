@@ -4,7 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sync"
 	"time"
+
+	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/logutils"
+	"go.uber.org/zap"
 )
 
 // DataFetcher defines the interface for fetching market and price data
@@ -13,6 +18,10 @@ type DataFetcher interface {
 	FetchMarkets(ctx context.Context) (*FetchResult[[]Cryptocurrency], error)
 	// FetchPrices fetches the latest price data
 	FetchPrices(ctx context.Context) (*FetchResult[PriceMap], error)
+	// Start begins the data refresh loops
+	Start(ctx context.Context)
+	// Stop halts all data refresh operations
+	Stop()
 }
 
 // FetchResult represents the result of a fetch operation
@@ -26,6 +35,12 @@ type FetchResult[T any] struct {
 type ProxyFetcher struct {
 	requestHandler *RequestHandler
 	storage        *DataStorage
+	config         ServiceConfig
+
+	// Background polling state
+	isRunning      bool
+	isRunningMutex sync.Mutex
+	cancelFunc     context.CancelFunc
 }
 
 // NewProxyFetcher creates a new proxy data fetcher
@@ -34,6 +49,112 @@ func NewProxyFetcher(config ServiceConfig, storage *DataStorage) DataFetcher {
 	return &ProxyFetcher{
 		requestHandler: NewRequestHandler(config, client),
 		storage:        storage,
+		config:         config,
+	}
+}
+
+// Start begins the data refresh loops
+func (f *ProxyFetcher) Start(ctx context.Context) {
+	if f.startRefreshLoops() {
+		// Stop everything when the top-level context is cancelled
+		go func() {
+			defer common.LogOnPanic()
+			<-ctx.Done()
+			f.Stop() // gracefully stop if running
+		}()
+	}
+}
+
+// Stop halts all data refresh operations
+func (f *ProxyFetcher) Stop() {
+	f.isRunningMutex.Lock()
+	defer f.isRunningMutex.Unlock()
+
+	if !f.isRunning {
+		return // Not running
+	}
+
+	// Cancel the context to stop all loops
+	if f.cancelFunc != nil {
+		f.cancelFunc()
+		f.cancelFunc = nil
+	}
+
+	f.isRunning = false
+}
+
+func (f *ProxyFetcher) startRefreshLoops() bool {
+	f.isRunningMutex.Lock()
+	defer f.isRunningMutex.Unlock()
+
+	if f.isRunning {
+		return false // Already running
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	f.cancelFunc = cancel
+	f.isRunning = true
+
+	// Start crypto data refresh loop
+	go func() {
+		defer common.LogOnPanic()
+		f.cryptoRefreshLoop(ctx)
+	}()
+
+	// Start price data refresh loop
+	go func() {
+		defer common.LogOnPanic()
+		f.priceRefreshLoop(ctx)
+	}()
+	return true
+}
+
+// cryptoRefreshLoop periodically fetches the full cryptocurrency data
+func (f *ProxyFetcher) cryptoRefreshLoop(ctx context.Context) {
+	// Initial fetch
+	if _, err := f.FetchMarkets(ctx); err != nil {
+		logutils.ZapLogger().Error("Error in initial crypto data fetch", zap.Error(err))
+	}
+
+	// Set up ticker for periodic updates
+	ticker := time.NewTicker(time.Duration(f.config.FullDataInterval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return // Context cancelled, stop the loop
+		case <-ticker.C:
+			if _, err := f.FetchMarkets(ctx); err != nil {
+				logutils.ZapLogger().Error("Error fetching crypto data", zap.Error(err))
+			}
+		}
+	}
+}
+
+// priceRefreshLoop periodically fetches price updates
+func (f *ProxyFetcher) priceRefreshLoop(ctx context.Context) {
+	// Wait a short time before starting price updates
+	time.Sleep(1 * time.Second)
+
+	// Initial fetch
+	if _, err := f.FetchPrices(ctx); err != nil {
+		logutils.ZapLogger().Error("Error in initial price data fetch", zap.Error(err))
+	}
+
+	// Set up ticker for periodic updates
+	ticker := time.NewTicker(time.Duration(f.config.PriceUpdateInterval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return // Context cancelled, stop the loop
+		case <-ticker.C:
+			if _, err := f.FetchPrices(ctx); err != nil {
+				logutils.ZapLogger().Error("Error fetching price data", zap.Error(err))
+			}
+		}
 	}
 }
 
