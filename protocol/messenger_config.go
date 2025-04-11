@@ -104,6 +104,7 @@ type config struct {
 	anonMetricsServerConfig *anonmetrics.ServerConfig
 
 	pushNotificationClientConfig *pushnotificationclient.Config
+	pushNotificationServer       PushNotificationServer
 
 	logger *zap.Logger
 
@@ -287,6 +288,13 @@ func WithDatasync() func(c *config) error {
 func WithPushNotifications() func(c *config) error {
 	return func(c *config) error {
 		c.featureFlags.PushNotifications = true
+		return nil
+	}
+}
+
+func WithPushNotificationServer(server PushNotificationServer) func(c *config) error {
+	return func(c *config) error {
+		c.pushNotificationServer = server
 		return nil
 	}
 }
