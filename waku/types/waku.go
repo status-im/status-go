@@ -16,6 +16,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/connection"
 )
 
@@ -155,7 +156,7 @@ type Waku interface {
 	BloomFilter() []byte
 
 	// GetCurrentTime returns current time.
-	GetCurrentTime() time.Time
+	GetCurrentTime() uint64
 
 	// GetPrivateKey retrieves the private key of the specified identity.
 	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)

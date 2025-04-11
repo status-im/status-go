@@ -395,7 +395,7 @@ func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages
 
 // GetCurrentTime returns the current unix timestamp in milliseconds
 func (t *Transport) GetCurrentTime() uint64 {
-	return uint64(t.waku.GetCurrentTime().UnixNano() / int64(time.Millisecond))
+	return t.waku.GetCurrentTime()
 }
 
 func (t *Transport) MaxMessageSize() uint32 {

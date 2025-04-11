@@ -2061,8 +2061,9 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 }
 
 // GetCurrentTime returns current time.
-func (w *Waku) GetCurrentTime() time.Time {
-	return w.CurrentTime()
+// Implements protocol/common.TimeSource
+func (w *Waku) GetCurrentTime() uint64 {
+	return uint64(w.CurrentTime().UnixNano() / int64(time.Millisecond))
 }
 
 func (w *Waku) GetActiveStorenode() peer.AddrInfo {
