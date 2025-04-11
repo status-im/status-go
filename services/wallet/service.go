@@ -211,6 +211,11 @@ func NewService(
 	routeExecutionManager := routeexecution.NewManager(db, feed, router, transactionManager, transferController)
 
 	leaderboardConfig := leaderboard.NewLeaderbordConfig(config.WalletConfig.MarketDataProxyConfig)
+	{ // TODO REMOVE debug code
+		leaderboardConfig.ProxyURL = "https://cmc.callfry.com"
+		leaderboardConfig.Login = "admin"
+		leaderboardConfig.Password = "testest"
+	}
 	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, feed)
 
 	return &Service{

@@ -3,6 +3,7 @@ package leaderboard
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -17,6 +18,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
+type ErrorCode = int
+
 const (
 	// Contains a LeaderboardPage payload
 	EventFetchLeaderboardPageDone walletevent.EventType = "wallet-leaderboard-fetch-page-done"
@@ -28,6 +31,11 @@ const (
 	// Signal source
 	TickerFullDataUpdateSource int = 0
 	TickerPriceUpdateSource    int = 1
+
+	// Error codes
+	ErrorCodeSuccess      ErrorCode = 1
+	ErrorCodeTaskCanceled           = 2
+	ErrorCodeFailed                 = 3
 )
 
 var (
@@ -69,6 +77,11 @@ type Stats struct {
 	TotalResponseSize int64
 	NotModifiedCount  int
 	GzipResponseCount int
+}
+
+type GetLeaderboardPageResponse struct {
+	LeaderboardPage
+	ErrorCode ErrorCode `json:"error_code"`
 }
 
 // NewMarketDataService creates a new market data service with the given configuration
@@ -312,18 +325,32 @@ func (s *MarketDataService) sendLeaderboardPageUpdate() {
 func (s *MarketDataService) FetchLeaderboardPageAsync(page, pageSize, sortOrder int, currency string) {
 	s.scheduler.Enqueue(fetchLeaderboardPageTask, func(ctx context.Context) (interface{}, error) {
 		result, err := s.storage.GetLeaderboardPage(page, pageSize, sortOrder, currency)
+		if err != nil {
+			logutils.ZapLogger().Error("Error fetching leaderboard page", zap.Error(err))
+			return nil, err
+		}
 		s.cache.UpdateLastPage(result)
 		return result, err
 	}, func(result interface{}, taskType async.TaskType, resErr error) {
-		payload, err := json.Marshal(result.(*LeaderboardPage))
+		res := GetLeaderboardPageResponse{
+			ErrorCode: ErrorCodeFailed,
+		}
+		if errors.Is(resErr, context.Canceled) || errors.Is(resErr, async.ErrTaskOverwritten) {
+			res.ErrorCode = ErrorCodeTaskCanceled
+		} else if resErr == nil {
+			res.ErrorCode = ErrorCodeSuccess
+			res.LeaderboardPage = *(result.(*LeaderboardPage))
+			s.subscribeToLeaderboard()
+		}
+
+		payload, err := json.Marshal(res)
 		if err != nil {
-			logutils.ZapLogger().Error("Error marshalling leaderboard page", zap.Error(err))
+			logutils.ZapLogger().Error("Error marshalling leaderboard page response", zap.Error(err))
 		}
 		event := walletevent.Event{
 			Type:    EventFetchLeaderboardPageDone,
 			Message: string(payload),
 		}
-		s.subscribeToLeaderboard()
 		s.feed.Send(event)
 	})
 }

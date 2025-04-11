@@ -927,7 +927,7 @@ func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
 
 func (api *API) IsChecksumValidForAddress(address string) (bool, error) {
 	logutils.ZapLogger().Debug("wallet.api.isChecksumValidForAddress", zap.String("address", address))
-	return abi_spec.CheckAddressChecksum(address)
+	return abi_spec.CheckAddressChecksum(address)	 
 }
 
 // GetLeaderboardData returns cryptocurrency data with updated price information
@@ -939,9 +939,10 @@ func (api *API) GetLeaderboardData(ctx context.Context) ([]leaderboard.Cryptocur
 	return api.s.leaderboardService.GetCombinedData(), nil
 }
 
-func (api *API) FetchMarketTokenPageAsync(ctx context.Context, page, pageSize, sortOrder int, currency string) {
+func (api *API) FetchMarketTokenPageAsync(ctx context.Context, page, pageSize, sortOrder int, currency string) error {
 	logutils.ZapLogger().Debug("call to GetMarketTokenPageAsync", zap.Int("page", page), zap.Int("pageSize", pageSize), zap.Int("sortOrder", sortOrder), zap.String("currency", currency))
 	api.s.leaderboardService.FetchLeaderboardPageAsync(page, pageSize, sortOrder, currency)
+	return nil
 }
 
 func (api *API) UnsubscribeFromLeaderboard() error {
