@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/jellydator/ttlcache/v3"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -113,6 +114,7 @@ type Manager struct {
 	communityLock            *CommunityLock
 	mediaServer              server.MediaServerInterface
 	communityImageVersions   map[string]uint32
+	cache                    *ttlcache.Cache[string, ReadonlyCommunity]
 }
 
 type CommunityLock struct {
@@ -432,6 +434,7 @@ func NewManager(
 		communityLock:          NewCommunityLock(logger),
 		mediaServer:            mediaServer,
 		communityImageVersions: make(map[string]uint32),
+		cache:                  ttlcache.New(ttlcache.WithCapacity[string, ReadonlyCommunity](5), ttlcache.WithTTL[string, ReadonlyCommunity](time.Minute)),
 	}
 
 	manager.persistence = &Persistence{
@@ -919,7 +922,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	// We join any community we create
 	community.Join()
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -1727,7 +1730,7 @@ func (m *Manager) RemovePrivateKey(id types.HexBytes) (*Community, error) {
 	}
 
 	community.config.PrivateKey = nil
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return community, err
 	}
@@ -1804,7 +1807,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 	}
 
 	community.Join()
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -2038,7 +2041,7 @@ func (m *Manager) EditChatFirstMessageTimestamp(communityID types.HexBytes, chat
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -2401,7 +2404,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		changes.ShouldMemberJoin = true
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -2488,7 +2491,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 			}
 		}
 
-		err = m.persistence.SaveCommunity(community)
+		err = m.SaveCommunity(community)
 		if err != nil {
 			return nil, err
 		}
@@ -2500,7 +2503,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 
 		m.publish(&Subscription{Community: community})
 	} else {
-		err = m.persistence.SaveCommunity(community)
+		err = m.SaveCommunity(community)
 		if err != nil {
 			return nil, err
 		}
@@ -3246,7 +3249,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 		return err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return err
 	}
@@ -3651,7 +3654,7 @@ func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, 
 		return community, ErrOrgAlreadyJoined
 	}
 	community.Join()
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -3667,7 +3670,7 @@ func (m *Manager) SpectateCommunity(id types.HexBytes) (*Community, error) {
 		return nil, err
 	}
 	community.Spectate()
-	if err = m.persistence.SaveCommunity(community); err != nil {
+	if err = m.SaveCommunity(community); err != nil {
 		return nil, err
 	}
 	return community, nil
@@ -3707,7 +3710,7 @@ func (m *Manager) UpdateCommunityDescriptionMagnetlinkMessageClock(communityID t
 		return err
 	}
 	community.config.CommunityDescription.ArchiveMagnetlinkClock = clock
-	return m.persistence.SaveCommunity(community)
+	return m.SaveCommunity(community)
 }
 
 func (m *Manager) UpdateMagnetlinkMessageClock(communityID types.HexBytes, clock uint64) error {
@@ -3734,7 +3737,7 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	community.RemoveOurselvesFromOrg(&m.identity.PublicKey)
 	community.Leave()
 
-	if err = m.persistence.SaveCommunity(community); err != nil {
+	if err = m.SaveCommunity(community); err != nil {
 		return nil, err
 	}
 
@@ -3757,7 +3760,7 @@ func (m *Manager) KickedOutOfCommunity(id types.HexBytes, spectateMode bool) (*C
 		community.Spectate()
 	}
 
-	if err = m.persistence.SaveCommunity(community); err != nil {
+	if err = m.SaveCommunity(community); err != nil {
 		return nil, err
 	}
 
@@ -3778,7 +3781,7 @@ func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecds
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -3861,7 +3864,7 @@ func (m *Manager) AddRoleToMember(request *requests.AddRoleToMember) (*Community
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -3895,7 +3898,7 @@ func (m *Manager) RemoveRoleFromMember(request *requests.RemoveRoleFromMember) (
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -3993,12 +3996,31 @@ func (m *Manager) GetByID(id []byte) (*Community, error) {
 	return community, nil
 }
 
+func (m *Manager) GetByIDReadonly(id []byte) (ReadonlyCommunity, error) {
+	return m.GetByIDStringReadonly(types.EncodeHex(id))
+}
+
 func (m *Manager) GetByIDString(idString string) (*Community, error) {
 	id, err := types.DecodeHex(idString)
 	if err != nil {
 		return nil, err
 	}
 	return m.GetByID(id)
+}
+
+func (m *Manager) GetByIDStringReadonly(idString string) (ReadonlyCommunity, error) {
+	cached := m.cache.Get(idString)
+	if cached != nil {
+		return cached.Value(), nil
+	}
+
+	community, err := m.GetByIDString(idString)
+	if err != nil {
+		return nil, err
+	}
+	m.cache.Set(idString, ReadonlyCommunity(community), ttlcache.DefaultTTL)
+
+	return ReadonlyCommunity(community), err
 }
 
 func (m *Manager) GetCommunityShard(communityID types.HexBytes) (*wakuv2.Shard, error) {
@@ -4130,7 +4152,7 @@ func (m *Manager) RequestsToJoinForCommunityAwaitingAddresses(id types.HexBytes)
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error) {
-	community, err := m.GetByIDString(communityID)
+	community, err := m.GetByIDStringReadonly(communityID)
 	if err != nil {
 		return false, err
 	}
@@ -4494,7 +4516,7 @@ func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembe
 	}
 
 	if updated {
-		if err = m.persistence.SaveCommunity(community); err != nil {
+		if err = m.SaveCommunity(community); err != nil {
 			return err
 		}
 
@@ -4543,7 +4565,7 @@ func (m *Manager) SaveAndPublish(community *Community) error {
 }
 
 func (m *Manager) saveAndPublish(community *Community) error {
-	err := m.persistence.SaveCommunity(community)
+	err := m.SaveCommunity(community)
 	if err != nil {
 		return err
 	}
@@ -4898,7 +4920,7 @@ func (m *Manager) handleCommunityEvents(community *Community) error {
 	community.config.EventsData = nil // clear events, they are already applied
 	community.increaseClock()
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.SaveCommunity(community)
 	if err != nil {
 		return err
 	}
@@ -5037,6 +5059,7 @@ func (m *Manager) GetCommunityRequestsToJoinWithRevealedAddresses(communityID ty
 }
 
 func (m *Manager) SaveCommunity(community *Community) error {
+	m.cache.Delete(community.IDString())
 	return m.persistence.SaveCommunity(community)
 }
 

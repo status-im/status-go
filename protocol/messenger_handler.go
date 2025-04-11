@@ -2198,7 +2198,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			return err
 		}
 
-		community, err := m.GetCommunityByID(communityID)
+		community, err := m.communitiesManager.GetByIDReadonly(communityID)
 		if err != nil {
 			return err
 		}

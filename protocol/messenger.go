@@ -2344,7 +2344,7 @@ func (m *Messenger) updateChatFirstMessageTimestamp(chat *Chat, timestamp uint32
 		return nil
 	}
 
-	community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+	community, err := m.communitiesManager.GetByIDStringReadonly(chat.CommunityID)
 	if err != nil {
 		return err
 	}
