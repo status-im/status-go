@@ -11,9 +11,9 @@ import (
 // DataFetcher defines the interface for fetching market and price data
 type DataFetcher interface {
 	// FetchMarkets fetches the full market data
-	FetchMarkets(ctx context.Context, etag string) (*FetchResult[[]Cryptocurrency], error)
+	FetchMarkets(ctx context.Context) (*FetchResult[[]Cryptocurrency], error)
 	// FetchPrices fetches the latest price data
-	FetchPrices(ctx context.Context, etag string) (*FetchResult[PriceMap], error)
+	FetchPrices(ctx context.Context) (*FetchResult[PriceMap], error)
 	// GetStats returns stats for a specific endpoint
 	GetStats(endpoint string) Stats
 }
@@ -28,23 +28,26 @@ type FetchResult[T any] struct {
 // ProxyFetcher implements DataFetcher interface using HTTP proxy
 type ProxyFetcher struct {
 	requestHandler *RequestHandler
+	storage        *DataStorage
 	stats          map[string]*Stats
 	mu             sync.RWMutex
 }
 
 // NewProxyFetcher creates a new proxy data fetcher
-func NewProxyFetcher(config ServiceConfig) DataFetcher {
+func NewProxyFetcher(config ServiceConfig, storage *DataStorage) DataFetcher {
 	client := &http.Client{Timeout: 10 * time.Second}
 	return &ProxyFetcher{
 		requestHandler: NewRequestHandler(config, client),
+		storage:        storage,
 		stats:          make(map[string]*Stats),
 	}
 }
 
 // FetchMarkets fetches the full market data
-func (f *ProxyFetcher) FetchMarkets(ctx context.Context, etag string) (*FetchResult[[]Cryptocurrency], error) {
+func (f *ProxyFetcher) FetchMarkets(ctx context.Context) (*FetchResult[[]Cryptocurrency], error) {
 	endpoint := "/v1/leaderboard/markets"
 	stats := f.getOrCreateStats(endpoint)
+	etag := f.storage.GetCryptoEtag()
 
 	body, updated := f.requestHandler.FetchData(ctx, endpoint, &etag, stats)
 	if !updated {
@@ -56,6 +59,9 @@ func (f *ProxyFetcher) FetchMarkets(ctx context.Context, etag string) (*FetchRes
 		return nil, err
 	}
 
+	// Store data and etag atomically
+	f.storage.UpdateCryptoDataWithEtag(data.Data, etag)
+
 	return &FetchResult[[]Cryptocurrency]{
 		Updated: true,
 		Data:    data.Data,
@@ -64,9 +70,10 @@ func (f *ProxyFetcher) FetchMarkets(ctx context.Context, etag string) (*FetchRes
 }
 
 // FetchPrices fetches the latest price data
-func (f *ProxyFetcher) FetchPrices(ctx context.Context, etag string) (*FetchResult[PriceMap], error) {
+func (f *ProxyFetcher) FetchPrices(ctx context.Context) (*FetchResult[PriceMap], error) {
 	endpoint := "/v1/leaderboard/prices"
 	stats := f.getOrCreateStats(endpoint)
+	etag := f.storage.GetPriceEtag()
 
 	body, updated := f.requestHandler.FetchData(ctx, endpoint, &etag, stats)
 	if !updated {
@@ -77,6 +84,9 @@ func (f *ProxyFetcher) FetchPrices(ctx context.Context, etag string) (*FetchResu
 	if err := json.Unmarshal(body, &priceData); err != nil {
 		return nil, err
 	}
+
+	// Store data and etag atomically
+	f.storage.UpdatePriceDataWithEtag(priceData, etag)
 
 	return &FetchResult[PriceMap]{
 		Updated: true,

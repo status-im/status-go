@@ -86,12 +86,13 @@ type GetLeaderboardPageResponse struct {
 
 // NewMarketDataService creates a new market data service with the given configuration
 func NewMarketDataService(config ServiceConfig, feed *event.Feed) *MarketDataService {
+	storage := NewDataStorage()
 	return &MarketDataService{
 		config:              config,
-		fetcher:             NewProxyFetcher(config),
+		fetcher:             NewProxyFetcher(config, storage),
 		feed:                feed,
 		requestHandler:      NewRequestHandler(config, &http.Client{Timeout: 10 * time.Second}),
-		storage:             NewDataStorage(),
+		storage:             storage,
 		subscriptionManager: NewSubscriptionManager(),
 		scheduler:           async.NewScheduler(),
 		cache:               NewPageCache(),
@@ -224,33 +225,23 @@ func (s *MarketDataService) priceRefreshLoop(ctx context.Context) {
 // fetchCryptoData fetches the latest cryptocurrency data
 // Returns true if data was updated, false if using cached data (304)
 func (s *MarketDataService) fetchCryptoData(ctx context.Context) bool {
-	result, err := s.fetcher.FetchMarkets(ctx, s.storage.GetCryptoEtag())
+	result, err := s.fetcher.FetchMarkets(ctx)
 	if err != nil {
 		logutils.ZapLogger().Error("Error fetching crypto data", zap.Error(err))
 		return false
 	}
-	if !result.Updated {
-		return false
-	}
-
-	s.storage.SetCryptoEtag(result.ETag)
-	return s.storage.UpdateCryptoData(result.Data)
+	return result.Updated
 }
 
 // fetchPriceData fetches the latest price data
 // Returns true if data was updated, false if using cached data (304)
 func (s *MarketDataService) fetchPriceData(ctx context.Context) bool {
-	result, err := s.fetcher.FetchPrices(ctx, s.storage.GetPriceEtag())
+	result, err := s.fetcher.FetchPrices(ctx)
 	if err != nil {
 		logutils.ZapLogger().Error("Error fetching price data", zap.Error(err))
 		return false
 	}
-	if !result.Updated {
-		return false
-	}
-
-	s.storage.SetPriceEtag(result.ETag)
-	return s.storage.UpdatePriceData(result.Data)
+	return result.Updated
 }
 
 func (s *MarketDataService) sendLeaderboardPagePricesUpdate() {

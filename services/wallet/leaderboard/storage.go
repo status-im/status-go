@@ -27,9 +27,9 @@ func NewDataStorage() *DataStorage {
 	}
 }
 
-// UpdateCryptoData updates the cryptocurrency data
+// UpdateCryptoDataWithEtag updates both cryptocurrency data and etag atomically
 // Returns true if the data was actually updated
-func (s *DataStorage) UpdateCryptoData(data []Cryptocurrency) bool {
+func (s *DataStorage) UpdateCryptoDataWithEtag(data []Cryptocurrency, etag string) bool {
 	if data == nil {
 		return false
 	}
@@ -38,12 +38,13 @@ func (s *DataStorage) UpdateCryptoData(data []Cryptocurrency) bool {
 	defer s.dataMutex.Unlock()
 
 	s.cryptoData = data
+	s.cryptoEtag = etag
 	return true
 }
 
-// UpdatePriceData updates the price data
+// UpdatePriceDataWithEtag updates both price data and etag atomically
 // Returns true if the data was actually updated
-func (s *DataStorage) UpdatePriceData(data PriceMap) bool {
+func (s *DataStorage) UpdatePriceDataWithEtag(data PriceMap, etag string) bool {
 	if data == nil {
 		return false
 	}
@@ -52,6 +53,7 @@ func (s *DataStorage) UpdatePriceData(data PriceMap) bool {
 	defer s.dataMutex.Unlock()
 
 	s.priceData = data
+	s.priceEtag = etag
 	return true
 }
 
@@ -146,25 +148,11 @@ func (s *DataStorage) GetCryptoEtag() string {
 	return s.cryptoEtag
 }
 
-// SetCryptoEtag sets the crypto data etag
-func (s *DataStorage) SetCryptoEtag(etag string) {
-	s.dataMutex.Lock()
-	defer s.dataMutex.Unlock()
-	s.cryptoEtag = etag
-}
-
 // GetPriceEtag returns the current price data etag
 func (s *DataStorage) GetPriceEtag() string {
 	s.dataMutex.RLock()
 	defer s.dataMutex.RUnlock()
 	return s.priceEtag
-}
-
-// SetPriceEtag sets the price data etag
-func (s *DataStorage) SetPriceEtag(etag string) {
-	s.dataMutex.Lock()
-	defer s.dataMutex.Unlock()
-	s.priceEtag = etag
 }
 
 // GetCryptoStats returns statistics for crypto data requests
