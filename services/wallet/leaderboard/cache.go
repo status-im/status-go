@@ -35,4 +35,5 @@ func (c *PageCache) UpdateLastPage(page *LeaderboardPage) {
 	c.lastPage.PageSize = page.PageSize
 	c.lastPage.SortOrder = page.SortOrder
 	c.lastPage.Currency = page.Currency
+
 }

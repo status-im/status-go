@@ -172,19 +172,11 @@ func TestFetchDataCompression(t *testing.T) {
 			}, server.Client())
 
 			// Make request
-			stats := &Stats{}
-			body, ok := handler.FetchData(context.Background(), "/test", new(string), stats)
+			body, ok := handler.FetchData(context.Background(), "/test", new(string))
 
 			// Verify response
 			require.True(t, ok)
 			require.Equal(t, tt.responseBody, string(body))
-
-			// Verify stats
-			expectedStats := &Stats{}
-			if tt.useGzip && tt.enableGzip {
-				expectedStats.GzipResponseCount = 1
-			}
-			require.Equal(t, expectedStats.GzipResponseCount, stats.GzipResponseCount, "GzipResponseCount mismatch")
 		})
 	}
 }
