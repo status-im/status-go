@@ -212,9 +212,9 @@ func NewService(
 
 	leaderboardConfig := leaderboard.NewLeaderbordConfig(config.WalletConfig.MarketDataProxyConfig)
 	{ // TODO REMOVE debug code
-		leaderboardConfig.ProxyURL = "https://cmc.callfry.com"
-		leaderboardConfig.Login = "admin"
-		leaderboardConfig.Password = "testest"
+		leaderboardConfig.ProxyURL = "https://cg.callfry.com"
+		leaderboardConfig.Login = "test"
+		leaderboardConfig.Password = "test"
 	}
 	leaderboardService := leaderboard.NewMarketDataService(leaderboardConfig, feed)
 
