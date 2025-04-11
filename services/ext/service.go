@@ -41,6 +41,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -136,7 +137,16 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
-	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsFeed)
+	ensVerifier := ens.New(
+		s.n,
+		logger,
+		waku, // timesource
+		appDb,
+		s.config.ShhextConfig.VerifyENSURL,
+		s.config.ShhextConfig.VerifyENSContractAddress,
+	)
+
+	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsFeed, ensVerifier)
 	if err != nil {
 		return err
 	}
@@ -363,6 +373,7 @@ func buildMessengerOptions(
 	messengerSignalsHandler protocol.MessengerSignalsHandler,
 	accountManager account.Manager,
 	accountsFeed *event.Feed,
+	ensVerifier *ens.Verifier,
 ) ([]protocol.Option, error) {
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
@@ -375,7 +386,7 @@ func buildMessengerOptions(
 		protocol.WithBrowserDatabase(browsers.NewDB(appDb)),
 		protocol.WithEnvelopeEventsConfig(envelopeEventsConfig),
 		protocol.WithSignalsHandler(messengerSignalsHandler),
-		protocol.WithENSVerificationConfig(config.ShhextConfig.VerifyENSURL, config.ShhextConfig.VerifyENSContractAddress),
+		protocol.WithENSVerifier(ensVerifier),
 		protocol.WithClusterConfig(config.ClusterConfig),
 		protocol.WithTorrentConfig(&config.TorrentConfig),
 		protocol.WithHTTPServer(httpServer),

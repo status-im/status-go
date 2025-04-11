@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
+	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -97,9 +98,8 @@ type config struct {
 	collectiblesManager    communities.CollectiblesManager
 	accountsManager        account.Manager
 
-	verifyTransactionClient  EthClient
-	verifyENSURL             string
-	verifyENSContractAddress string
+	verifyTransactionClient EthClient
+	ensVerifier             *ens.Verifier
 
 	anonMetricsClientConfig *anonmetrics.ClientConfig
 	anonMetricsServerConfig *anonmetrics.ServerConfig
@@ -328,14 +328,6 @@ func WithSignalsHandler(h MessengerSignalsHandler) Option {
 	}
 }
 
-func WithENSVerificationConfig(url, address string) Option {
-	return func(c *config) error {
-		c.verifyENSURL = url
-		c.verifyENSContractAddress = address
-		return nil
-	}
-}
-
 func WithClusterConfig(cc params.ClusterConfig) Option {
 	return func(c *config) error {
 		c.clusterConfig = cc
@@ -430,6 +422,13 @@ func WithAccountsFeed(feed *event.Feed) Option {
 func WithNewsFeed() func(c *config) error {
 	return func(c *config) error {
 		c.featureFlags.EnableNewsFeed = true
+		return nil
+	}
+}
+
+func WithENSVerifier(ensVerifier *ens.Verifier) func(c *config) error {
+	return func(c *config) error {
+		c.ensVerifier = ensVerifier
 		return nil
 	}
 }
