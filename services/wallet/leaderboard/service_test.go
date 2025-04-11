@@ -26,20 +26,14 @@ func NewMockFetcher(storage *DataStorage) *MockFetcher {
 	return f
 }
 
-func (f *MockFetcher) FetchMarkets(ctx context.Context) (*FetchResult[[]Cryptocurrency], error) {
-	return &FetchResult[[]Cryptocurrency]{
-		Updated: true,
-		Data:    mockCrypto,
-		ETag:    "test-etag",
-	}, nil
+func (f *MockFetcher) FetchMarkets(ctx context.Context) error {
+	f.storage.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+	return nil
 }
 
-func (f *MockFetcher) FetchPrices(ctx context.Context) (*FetchResult[PriceMap], error) {
-	return &FetchResult[PriceMap]{
-		Updated: true,
-		Data:    mockPriceData,
-		ETag:    "test-etag",
-	}, nil
+func (f *MockFetcher) FetchPrices(ctx context.Context) error {
+	f.storage.UpdatePriceDataWithEtag(mockPriceData, "test-etag")
+	return nil
 }
 
 func (f *MockFetcher) Start(ctx context.Context) {}

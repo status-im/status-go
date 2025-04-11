@@ -15,20 +15,13 @@ import (
 // DataFetcher defines the interface for fetching market and price data
 type DataFetcher interface {
 	// FetchMarkets fetches the full market data
-	FetchMarkets(ctx context.Context) (*FetchResult[[]Cryptocurrency], error)
+	FetchMarkets(ctx context.Context) error
 	// FetchPrices fetches the latest price data
-	FetchPrices(ctx context.Context) (*FetchResult[PriceMap], error)
+	FetchPrices(ctx context.Context) error
 	// Start begins the data refresh loops
 	Start(ctx context.Context)
 	// Stop halts all data refresh operations
 	Stop()
-}
-
-// FetchResult represents the result of a fetch operation
-type FetchResult[T any] struct {
-	Updated bool
-	Data    T
-	ETag    string
 }
 
 // ProxyFetcher implements DataFetcher interface using HTTP proxy
@@ -112,7 +105,7 @@ func (f *ProxyFetcher) startRefreshLoops() bool {
 // cryptoRefreshLoop periodically fetches the full cryptocurrency data
 func (f *ProxyFetcher) cryptoRefreshLoop(ctx context.Context) {
 	// Initial fetch
-	if _, err := f.FetchMarkets(ctx); err != nil {
+	if err := f.FetchMarkets(ctx); err != nil {
 		logutils.ZapLogger().Error("Error in initial crypto data fetch", zap.Error(err))
 	}
 
@@ -125,7 +118,7 @@ func (f *ProxyFetcher) cryptoRefreshLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return // Context cancelled, stop the loop
 		case <-ticker.C:
-			if _, err := f.FetchMarkets(ctx); err != nil {
+			if err := f.FetchMarkets(ctx); err != nil {
 				logutils.ZapLogger().Error("Error fetching crypto data", zap.Error(err))
 			}
 		}
@@ -138,7 +131,7 @@ func (f *ProxyFetcher) priceRefreshLoop(ctx context.Context) {
 	time.Sleep(1 * time.Second)
 
 	// Initial fetch
-	if _, err := f.FetchPrices(ctx); err != nil {
+	if err := f.FetchPrices(ctx); err != nil {
 		logutils.ZapLogger().Error("Error in initial price data fetch", zap.Error(err))
 	}
 
@@ -151,7 +144,7 @@ func (f *ProxyFetcher) priceRefreshLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return // Context cancelled, stop the loop
 		case <-ticker.C:
-			if _, err := f.FetchPrices(ctx); err != nil {
+			if err := f.FetchPrices(ctx); err != nil {
 				logutils.ZapLogger().Error("Error fetching price data", zap.Error(err))
 			}
 		}
@@ -159,51 +152,43 @@ func (f *ProxyFetcher) priceRefreshLoop(ctx context.Context) {
 }
 
 // FetchMarkets fetches the full market data
-func (f *ProxyFetcher) FetchMarkets(ctx context.Context) (*FetchResult[[]Cryptocurrency], error) {
+func (f *ProxyFetcher) FetchMarkets(ctx context.Context) error {
 	endpoint := "/v1/leaderboard/markets"
 	etag := f.storage.GetCryptoEtag()
 
 	body, updated := f.requestHandler.FetchData(ctx, endpoint, &etag)
 	if !updated {
-		return &FetchResult[[]Cryptocurrency]{Updated: false}, nil
+		return nil
 	}
 
 	var data CryptoResponse
 	if err := json.Unmarshal(body, &data); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Store data and etag atomically
 	f.storage.UpdateCryptoDataWithEtag(data.Data, etag)
 
-	return &FetchResult[[]Cryptocurrency]{
-		Updated: true,
-		Data:    data.Data,
-		ETag:    etag,
-	}, nil
+	return nil
 }
 
 // FetchPrices fetches the latest price data
-func (f *ProxyFetcher) FetchPrices(ctx context.Context) (*FetchResult[PriceMap], error) {
+func (f *ProxyFetcher) FetchPrices(ctx context.Context) error {
 	endpoint := "/v1/leaderboard/prices"
 	etag := f.storage.GetPriceEtag()
 
 	body, updated := f.requestHandler.FetchData(ctx, endpoint, &etag)
 	if !updated {
-		return &FetchResult[PriceMap]{Updated: false}, nil
+		return nil
 	}
 
 	var priceData PriceMap
 	if err := json.Unmarshal(body, &priceData); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Store data and etag atomically
 	f.storage.UpdatePriceDataWithEtag(priceData, etag)
 
-	return &FetchResult[PriceMap]{
-		Updated: true,
-		Data:    priceData,
-		ETag:    etag,
-	}, nil
+	return nil
 }
