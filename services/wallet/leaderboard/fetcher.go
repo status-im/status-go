@@ -42,7 +42,7 @@ func (f *ProxyFetcher) FetchMarkets(ctx context.Context) (*FetchResult[[]Cryptoc
 	endpoint := "/v1/leaderboard/markets"
 	etag := f.storage.GetCryptoEtag()
 
-	body, updated := f.requestHandler.FetchData(ctx, endpoint, &etag, nil)
+	body, updated := f.requestHandler.FetchData(ctx, endpoint, &etag)
 	if !updated {
 		return &FetchResult[[]Cryptocurrency]{Updated: false}, nil
 	}
@@ -67,7 +67,7 @@ func (f *ProxyFetcher) FetchPrices(ctx context.Context) (*FetchResult[PriceMap],
 	endpoint := "/v1/leaderboard/prices"
 	etag := f.storage.GetPriceEtag()
 
-	body, updated := f.requestHandler.FetchData(ctx, endpoint, &etag, nil)
+	body, updated := f.requestHandler.FetchData(ctx, endpoint, &etag)
 	if !updated {
 		return &FetchResult[PriceMap]{Updated: false}, nil
 	}

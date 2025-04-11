@@ -2,7 +2,6 @@ package leaderboard
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 )
 
@@ -14,10 +13,6 @@ type DataStorage struct {
 	dataMutex  sync.RWMutex
 	cryptoEtag string
 	priceEtag  string
-
-	// Statistics
-	cryptoStats Stats
-	priceStats  Stats
 }
 
 // NewDataStorage creates a new data storage instance
@@ -153,36 +148,6 @@ func (s *DataStorage) GetPriceEtag() string {
 	s.dataMutex.RLock()
 	defer s.dataMutex.RUnlock()
 	return s.priceEtag
-}
-
-// GetCryptoStats returns statistics for crypto data requests
-func (s *DataStorage) GetCryptoStats() Stats {
-	return s.cryptoStats
-}
-
-// GetPriceStats returns statistics for price data requests
-func (s *DataStorage) GetPriceStats() Stats {
-	return s.priceStats
-}
-
-// UpdateCryptoStats updates the crypto stats reference for request handling
-func (s *DataStorage) UpdateCryptoStats(stats Stats) {
-	s.cryptoStats = stats
-}
-
-// UpdatePriceStats updates the price stats reference for request handling
-func (s *DataStorage) UpdatePriceStats(stats Stats) {
-	s.priceStats = stats
-}
-
-// GetCryptoStatsRef returns a reference to crypto stats for updating
-func (s *DataStorage) GetCryptoStatsRef() *Stats {
-	return &s.cryptoStats
-}
-
-// GetPriceStatsRef returns a reference to price stats for updating
-func (s *DataStorage) GetPriceStatsRef() *Stats {
-	return &s.priceStats
 }
 
 func (s *DataStorage) GetLeaderboardPagePrices(page LeaderboardPage) *LeaderboardPagePrices {
