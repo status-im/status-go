@@ -33,8 +33,8 @@ const (
 
 	// Error codes
 	ErrorCodeSuccess      ErrorCode = 1
-	ErrorCodeTaskCanceled           = 2
-	ErrorCodeFailed                 = 3
+	ErrorCodeTaskCanceled ErrorCode = 2
+	ErrorCodeFailed       ErrorCode = 3
 )
 
 var (

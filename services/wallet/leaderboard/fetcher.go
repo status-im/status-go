@@ -7,9 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
-	"go.uber.org/zap"
 )
 
 // DataFetcher defines the interface for fetching market and price data
