@@ -83,7 +83,7 @@ func verifyCryptoPriceData(t *testing.T, expected PriceData, actual Cryptocurren
 
 func TestGetLeaderboardPageErrors(t *testing.T) {
 	s := NewDataStorage()
-	s.UpdateCryptoData(mockCrypto)
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
 
 	{
 		_, err := s.GetLeaderboardPage(-1, 10, -1, "usd")
@@ -103,7 +103,7 @@ func TestGetLeaderboardPageErrors(t *testing.T) {
 
 func TestGetLeaderboardPage(t *testing.T) {
 	s := NewDataStorage()
-	s.UpdateCryptoData(mockCrypto)
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
 
 	{
 		rst, err := s.GetLeaderboardPage(0, 3, -1, "usd")
@@ -150,8 +150,8 @@ func TestGetLeaderboardPageEmpty(t *testing.T) {
 
 func TestGetLeaderboardPageWithUpdatedPrices(t *testing.T) {
 	s := NewDataStorage()
-	s.UpdateCryptoData(mockCrypto)
-	s.UpdatePriceData(mockPriceData)
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+	s.UpdatePriceDataWithEtag(mockPriceData, "test-etag")
 
 	{
 		rst, err := s.GetLeaderboardPage(0, 3, -1, "usd")
@@ -170,8 +170,8 @@ func TestGetLeaderboardPageWithUpdatedPrices(t *testing.T) {
 
 func TestGetLeaderboardPagePrices(t *testing.T) {
 	s := NewDataStorage()
-	s.UpdateCryptoData(mockCrypto)
-	s.UpdatePriceData(mockPriceData)
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+	s.UpdatePriceDataWithEtag(mockPriceData, "test-etag")
 
 	{
 		rst, err := s.GetLeaderboardPage(1, 3, -1, "usd")
