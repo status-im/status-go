@@ -43,7 +43,6 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
-	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -442,14 +441,6 @@ func buildMessengerOptions(
 
 	if settings.TelemetryServerURL != "" {
 		options = append(options, protocol.WithTelemetry(settings.TelemetryServerURL, time.Duration(settings.TelemetrySendPeriodMs)*time.Millisecond))
-	}
-
-	if settings.PushNotificationsServerEnabled {
-		config := &pushnotificationserver.Config{
-			Enabled: true,
-			Logger:  logger,
-		}
-		options = append(options, protocol.WithPushNotificationServerConfig(config))
 	}
 
 	var pushNotifServKey []*ecdsa.PublicKey

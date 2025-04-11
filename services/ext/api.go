@@ -1098,23 +1098,14 @@ func (api *PublicAPI) RemainingCapacityForSavedAddresses(ctx context.Context, te
 	return api.service.messenger.RemainingCapacityForSavedAddresses(testnetMode)
 }
 
-// PushNotifications server endpoints
+// Deprecated: StartPushNotificationsServer is deprecated and does nothing.
 func (api *PublicAPI) StartPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, true)
-	if err != nil {
-		return err
-	}
-
-	return api.service.messenger.StartPushNotificationsServer()
+	return errors.New("StartPushNotificationsServer endpoint is deprecated")
 }
 
+// Deprecated: StartPushNotificationsServer is deprecated and does nothing.
 func (api *PublicAPI) StopPushNotificationsServer() error {
-	err := api.service.accountsDB.SaveSettingField(settings.PushNotificationsServerEnabled, false)
-	if err != nil {
-		return err
-	}
-
-	return api.service.messenger.StopPushNotificationsServer()
+	return errors.New("StopPushNotificationsServer endpoint is deprecated")
 }
 
 // PushNotification client endpoints
