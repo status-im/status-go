@@ -48,7 +48,7 @@ var (
 // MarketDataService manages market data fetching and provides access to the latest data
 type MarketDataService struct {
 	config    ServiceConfig
-	client    *http.Client
+	fetcher   DataFetcher
 	scheduler *async.Scheduler
 	feed      *event.Feed
 
@@ -86,19 +86,15 @@ type GetLeaderboardPageResponse struct {
 
 // NewMarketDataService creates a new market data service with the given configuration
 func NewMarketDataService(config ServiceConfig, feed *event.Feed) *MarketDataService {
-	// Set default values for intervals if not provided
-	client := &http.Client{Timeout: 10 * time.Second}
-
 	return &MarketDataService{
-		config:                 config,
-		client:                 client,
-		feed:                   feed,
-		requestHandler:         NewRequestHandler(config, client),
-		storage:                NewDataStorage(),
-		subscriptionManager:    NewSubscriptionManager(),
-		scheduler:              async.NewScheduler(),
-		pageUpdateSubscription: nil,
-		cache:                  NewPageCache(),
+		config:              config,
+		fetcher:             NewProxyFetcher(config),
+		feed:                feed,
+		requestHandler:      NewRequestHandler(config, &http.Client{Timeout: 10 * time.Second}),
+		storage:             NewDataStorage(),
+		subscriptionManager: NewSubscriptionManager(),
+		scheduler:           async.NewScheduler(),
+		cache:               NewPageCache(),
 	}
 }
 
@@ -228,53 +224,33 @@ func (s *MarketDataService) priceRefreshLoop(ctx context.Context) {
 // fetchCryptoData fetches the latest cryptocurrency data
 // Returns true if data was updated, false if using cached data (304)
 func (s *MarketDataService) fetchCryptoData(ctx context.Context) bool {
-	// Get current etag
-	cryptoEtag := s.storage.GetCryptoEtag()
-
-	// Fetch data using the request handler
-	endpoint := "/v1/leaderboard/markets"
-	body, updated := s.requestHandler.FetchData(ctx, endpoint, &cryptoEtag, s.storage.GetCryptoStatsRef())
-	if !updated {
+	result, err := s.fetcher.FetchMarkets(ctx, s.storage.GetCryptoEtag())
+	if err != nil {
+		logutils.ZapLogger().Error("Error fetching crypto data", zap.Error(err))
+		return false
+	}
+	if !result.Updated {
 		return false
 	}
 
-	// Update etag if changed
-	s.storage.SetCryptoEtag(cryptoEtag)
-
-	// Parse the response
-	var cryptoResp CryptoResponse
-	if err := json.Unmarshal(body, &cryptoResp); err != nil {
-		return false
-	}
-
-	// Update the data
-	return s.storage.UpdateCryptoData(cryptoResp.Data)
+	s.storage.SetCryptoEtag(result.ETag)
+	return s.storage.UpdateCryptoData(result.Data)
 }
 
 // fetchPriceData fetches the latest price data
 // Returns true if data was updated, false if using cached data (304)
 func (s *MarketDataService) fetchPriceData(ctx context.Context) bool {
-	// Get current etag
-	priceEtag := s.storage.GetPriceEtag()
-
-	// Fetch data using the request handler
-	endpoint := "/v1/leaderboard/prices"
-	body, updated := s.requestHandler.FetchData(ctx, endpoint, &priceEtag, s.storage.GetPriceStatsRef())
-	if !updated {
+	result, err := s.fetcher.FetchPrices(ctx, s.storage.GetPriceEtag())
+	if err != nil {
+		logutils.ZapLogger().Error("Error fetching price data", zap.Error(err))
+		return false
+	}
+	if !result.Updated {
 		return false
 	}
 
-	// Update etag if changed
-	s.storage.SetPriceEtag(priceEtag)
-
-	// Parse the response
-	var priceData PriceMap
-	if err := json.Unmarshal(body, &priceData); err != nil {
-		return false
-	}
-
-	// Update the data
-	return s.storage.UpdatePriceData(priceData)
+	s.storage.SetPriceEtag(result.ETag)
+	return s.storage.UpdatePriceData(result.Data)
 }
 
 func (s *MarketDataService) sendLeaderboardPagePricesUpdate() {
