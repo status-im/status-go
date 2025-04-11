@@ -69,16 +69,6 @@ type MarketDataService struct {
 	isRunningMutex sync.Mutex
 }
 
-// Stats tracks API request statistics
-type Stats struct {
-	TotalRequests     int
-	CacheHits         int
-	CacheMisses       int
-	TotalResponseSize int64
-	NotModifiedCount  int
-	GzipResponseCount int
-}
-
 type GetLeaderboardPageResponse struct {
 	LeaderboardPage
 	ErrorCode ErrorCode `json:"error_code"`
