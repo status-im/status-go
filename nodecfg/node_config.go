@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
@@ -288,15 +289,6 @@ func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func insertPushNotificationsServerConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	hexPrivKey := ""
-	if c.PushNotificationServerConfig.Identity != nil {
-		hexPrivKey = hexutil.Encode(crypto.FromECDSA(c.PushNotificationServerConfig.Identity))
-	}
-	_, err := tx.Exec(`INSERT OR REPLACE INTO push_notifications_server_config (enabled, identity, gorush_url, synthetic_id) VALUES (?, ?, ?, 'id')`, c.PushNotificationServerConfig.Enabled, hexPrivKey, c.PushNotificationServerConfig.GorushURL)
-	return err
-}
-
 func insertClusterConfigNodes(tx *sql.Tx, c *params.NodeConfig) error {
 	if _, err := tx.Exec(`DELETE FROM cluster_nodes WHERE synthetic_id = 'id'`); err != nil {
 		return err
@@ -336,7 +328,6 @@ func nodeConfigUpgradeInserts() []insertFn {
 		insertLightETHConfigTrustedNodes,
 		insertRegisterTopics,
 		insertRequireTopics,
-		insertPushNotificationsServerConfig,
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 	}
@@ -358,7 +349,6 @@ func nodeConfigNormalInserts() []insertFn {
 		insertLightETHConfigTrustedNodes,
 		insertRegisterTopics,
 		insertRequireTopics,
-		insertPushNotificationsServerConfig,
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
 		insertTorrentConfig,
@@ -587,22 +577,6 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 			return nil, err
 		}
 		nodecfg.RequireTopics[topic] = limit
-	}
-
-	var pushNotifHexIdentity string
-	err = tx.QueryRow("SELECT enabled, identity, gorush_url FROM push_notifications_server_config WHERE synthetic_id = 'id'").Scan(&nodecfg.PushNotificationServerConfig.Enabled, &pushNotifHexIdentity, &nodecfg.PushNotificationServerConfig.GorushURL)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, err
-	}
-	if pushNotifHexIdentity != "" {
-		b, err := hexutil.Decode(pushNotifHexIdentity)
-		if err != nil {
-			return nil, err
-		}
-		nodecfg.PushNotificationServerConfig.Identity, err = crypto.ToECDSA(b)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	err = tx.QueryRow(`

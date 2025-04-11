@@ -174,11 +174,6 @@ func randomNodeConfig() *params.NodeConfig {
 		},
 		RegisterTopics: randomTopicSlice(),
 		RequireTopics:  randomTopicLimits(),
-		PushNotificationServerConfig: params.PushNotificationServerConfig{
-			Enabled:   randomBool(),
-			GorushURL: randomString(),
-			Identity:  privK,
-		},
 		ShhextConfig: params.ShhextConfig{
 			PFSEnabled:                   randomBool(),
 			InstallationID:               randomString(),
