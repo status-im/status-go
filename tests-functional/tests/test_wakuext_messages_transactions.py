@@ -6,7 +6,7 @@ from resources.enums import MessageContentType
 from steps.messenger import MessengerSteps
 
 
-@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
+@pytest.mark.parametrize("setup_two_unprivileged_nodes", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 @pytest.mark.rpc
 class TestTransactionsChatMessages(MessengerSteps):
     REQUEST_TRANSACTION_TEXT = "Request transaction"
@@ -38,7 +38,7 @@ class TestTransactionsChatMessages(MessengerSteps):
             print(parameter, expected_value)
             assert command_parameters.get(parameter, "") == expected_value
 
-    def test_request_transaction(self, transaction_data):
+    def test_request_transaction(self, transaction_data, setup_two_unprivileged_nodes):
         self.make_contacts()
         response = self.sender.wakuext_service.request_transaction(
             self.receiver.public_key, transaction_data["value"], transaction_data["contract"], transaction_data["address"]
@@ -51,7 +51,7 @@ class TestTransactionsChatMessages(MessengerSteps):
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
         )
 
-    def test_decline_request_transaction(self, transaction_data):
+    def test_decline_request_transaction(self, transaction_data, setup_two_unprivileged_nodes):
         self.make_contacts()
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.request_transaction(
@@ -70,7 +70,7 @@ class TestTransactionsChatMessages(MessengerSteps):
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
         )
 
-    def test_accept_request_transaction(self, transaction_data):
+    def test_accept_request_transaction(self, transaction_data, setup_two_unprivileged_nodes):
         self.make_contacts()
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.request_transaction(
@@ -95,7 +95,7 @@ class TestTransactionsChatMessages(MessengerSteps):
             ],
         )
 
-    def test_request_address_for_transaction(self, transaction_data):
+    def test_request_address_for_transaction(self, transaction_data, setup_two_unprivileged_nodes):
         self.make_contacts()
         response = self.sender.wakuext_service.request_address_for_transaction(
             self.receiver.public_key, transaction_data["from"], transaction_data["value"], transaction_data["contract"]
@@ -108,7 +108,7 @@ class TestTransactionsChatMessages(MessengerSteps):
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("from", transaction_data["from"])],
         )
 
-    def test_decline_request_address_for_transaction(self, transaction_data):
+    def test_decline_request_address_for_transaction(self, transaction_data, setup_two_unprivileged_nodes):
         self.make_contacts()
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.request_address_for_transaction(
@@ -129,7 +129,7 @@ class TestTransactionsChatMessages(MessengerSteps):
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"])],
         )
 
-    def test_accept_request_address_for_transaction(self, transaction_data):
+    def test_accept_request_address_for_transaction(self, transaction_data, setup_two_unprivileged_nodes):
         self.make_contacts()
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.request_address_for_transaction(
@@ -150,7 +150,7 @@ class TestTransactionsChatMessages(MessengerSteps):
             [("value", transaction_data["value"]), ("contract", transaction_data["contract"]), ("address", transaction_data["address"])],
         )
 
-    def test_send_transaction(self, transaction_data):
+    def test_send_transaction(self, transaction_data, setup_two_unprivileged_nodes):
         self.make_contacts()
         sender_chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.send_transaction(

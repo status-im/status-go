@@ -3,10 +3,10 @@ import pytest
 from steps.messenger import MessengerSteps
 
 
-@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
+@pytest.mark.parametrize("setup_two_unprivileged_nodes", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 @pytest.mark.rpc
 class TestFetchingChatMessages(MessengerSteps):
-    def test_chat_messages(self):
+    def test_chat_messages(self, setup_two_unprivileged_nodes):
         sent_texts, _ = self.send_multiple_one_to_one_messages(1)
 
         sender_chat_id = self.receiver.public_key
@@ -19,7 +19,7 @@ class TestFetchingChatMessages(MessengerSteps):
         actual_text = messages[0].get("text", "")
         assert actual_text == sent_texts[0]
 
-    def test_chat_messages_with_pagination(self):
+    def test_chat_messages_with_pagination(self, setup_two_unprivileged_nodes):
         sent_texts, _ = self.send_multiple_one_to_one_messages(5)
         sender_chat_id = self.receiver.public_key
 
@@ -44,7 +44,7 @@ class TestFetchingChatMessages(MessengerSteps):
         assert messages_page2[1].get("text", "") == sent_texts[0]
         assert cursor2 == ""
 
-    def test_message_by_message_id(self):
+    def test_message_by_message_id(self, setup_two_unprivileged_nodes):
         sent_texts, responses = self.send_multiple_one_to_one_messages(1)
 
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
@@ -63,7 +63,7 @@ class TestFetchingChatMessages(MessengerSteps):
             # ("TEST_MESSAGE_", True, 0),  # Skipped due to https://github.com/status-im/status-go/issues/6359
         ],
     )
-    def test_all_messages_from_chat_which_match_term(self, searchTerm, caseSensitive, expectedCount):
+    def test_all_messages_from_chat_which_match_term(self, searchTerm, caseSensitive, expectedCount, setup_two_unprivileged_nodes):
         self.send_multiple_one_to_one_messages(3)
         sender_chat_id = self.receiver.public_key
 
@@ -74,7 +74,7 @@ class TestFetchingChatMessages(MessengerSteps):
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == expectedCount
 
-    def test_all_messages_from_chats_and_communities_which_match_term(self):
+    def test_all_messages_from_chats_and_communities_which_match_term(self, setup_two_unprivileged_nodes):
         # One to one
         self.make_contacts()
         sent_texts_one_to_one, _ = self.send_multiple_one_to_one_messages(1)
@@ -103,7 +103,7 @@ class TestFetchingChatMessages(MessengerSteps):
         assert text_community in actual_texts
 
     @pytest.mark.skip(reason="Skipped due to https://github.com/status-im/status-go/issues/6359")
-    def test_all_messages_from_chats_and_communities_which_match_term_case_sensitive(self):
+    def test_all_messages_from_chats_and_communities_which_match_term_case_sensitive(self, setup_two_unprivileged_nodes):
         # One to one
         self.make_contacts()
         _, _ = self.send_multiple_one_to_one_messages(1)
@@ -125,7 +125,7 @@ class TestFetchingChatMessages(MessengerSteps):
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == 0
 
-    def test_first_unseen_message(self):
+    def test_first_unseen_message(self, setup_two_unprivileged_nodes):
         _, responses = self.send_multiple_one_to_one_messages(1)
         sender_chat_id = self.receiver.public_key
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")

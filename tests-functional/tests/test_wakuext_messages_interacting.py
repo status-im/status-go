@@ -5,11 +5,11 @@ from steps.messenger import MessengerSteps
 from clients.services.wakuext import SendPinMessagePayload
 
 
-@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
+@pytest.mark.parametrize("setup_two_unprivileged_nodes", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 @pytest.mark.rpc
 class TestInteractingWithChatMessages(MessengerSteps):
 
-    def test_pinned_messages(self):
+    def test_pinned_messages(self, setup_two_unprivileged_nodes):
         sent_texts, responses = self.send_multiple_one_to_one_messages(1)
 
         # pin
@@ -40,7 +40,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         pinned_messages = response.get("result", {}).get("pinnedMessages", [])
         assert pinned_messages is None
 
-    def test_pinned_messages_with_pagination(self):
+    def test_pinned_messages_with_pagination(self, setup_two_unprivileged_nodes):
         sent_texts, responses = self.send_multiple_one_to_one_messages(5)
         sender_chat_id = self.receiver.public_key
 
@@ -74,7 +74,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         assert pinned_messages_page2[1].get("message", {}).get("text", "") == sent_texts[0]
         assert cursor2 == ""
 
-    def test_edit_message(self):
+    def test_edit_message(self, setup_two_unprivileged_nodes):
         sent_texts, responses = self.send_multiple_one_to_one_messages(1)
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
 
@@ -90,7 +90,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         actual_text = response.get("result", {}).get("text", "")
         assert actual_text == new_text
 
-    def test_delete_message(self):
+    def test_delete_message(self, setup_two_unprivileged_nodes):
         _, responses = self.send_multiple_one_to_one_messages(1)
 
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
@@ -106,7 +106,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         assert error_code == -32000
         assert error_message == "record not found"
 
-    def test_delete_message_and_send(self):
+    def test_delete_message_and_send(self, setup_two_unprivileged_nodes):
         _, responses = self.send_multiple_one_to_one_messages(1)
 
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
@@ -124,7 +124,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         assert message.get("id", "") == message_id
         assert message.get("deleted", None) is True
 
-    def test_delete_messages_by_chat_id(self):
+    def test_delete_messages_by_chat_id(self, setup_two_unprivileged_nodes):
         _, _ = self.send_multiple_one_to_one_messages(3)
         sender_chat_id = self.receiver.public_key
 
@@ -139,7 +139,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
         messages = response.get("result", {}).get("messages", [])
         assert messages is None
 
-    def test_delete_message_for_me_and_sync(self):
+    def test_delete_message_for_me_and_sync(self, setup_two_unprivileged_nodes):
         _, responses = self.send_multiple_one_to_one_messages(1)
 
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
@@ -157,7 +157,7 @@ class TestInteractingWithChatMessages(MessengerSteps):
 
         # TODO: assert sync action
 
-    def test_update_message_outgoing_status(self):
+    def test_update_message_outgoing_status(self, setup_two_unprivileged_nodes):
         _, responses = self.send_multiple_one_to_one_messages(1)
         message_id = responses[0].get("result", {}).get("messages", [])[0].get("id", "")
         new_status = "delivered"

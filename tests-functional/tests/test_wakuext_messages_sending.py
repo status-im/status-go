@@ -7,10 +7,10 @@ from resources.enums import MessageContentType
 from steps.messenger import MessengerSteps
 
 
-@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
+@pytest.mark.parametrize("setup_two_unprivileged_nodes", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 @pytest.mark.rpc
 class TestSendingChatMessages(MessengerSteps):
-    def test_send_one_to_one_message(self):
+    def test_send_one_to_one_message(self, setup_two_unprivileged_nodes):
         sent_texts, responses = self.send_multiple_one_to_one_messages(1)
         self.receiver.verify_json_schema(responses[0], method="wakuext_sendOneToOneMessage")
 
@@ -24,7 +24,7 @@ class TestSendingChatMessages(MessengerSteps):
         actual_text = messages[0].get("text", "")
         assert actual_text == sent_texts[0]
 
-    def test_send_chat_message_community(self):
+    def test_send_chat_message_community(self, setup_two_unprivileged_nodes):
         self.create_community(self.sender)
         community_chat_id = self.join_community(self.receiver)
 
@@ -38,7 +38,7 @@ class TestSendingChatMessages(MessengerSteps):
         actual_text = messages[0].get("text", "")
         assert actual_text == text
 
-    def test_send_chat_message_private_group(self):
+    def test_send_chat_message_private_group(self, setup_two_unprivileged_nodes):
         self.make_contacts()
         private_group_id = self.join_private_group()
 
@@ -50,7 +50,7 @@ class TestSendingChatMessages(MessengerSteps):
         actual_text = expected_message.get("text", "")
         assert actual_text == text
 
-    def test_send_chat_messages_same_chat(self):
+    def test_send_chat_messages_same_chat(self, setup_two_unprivileged_nodes):
         self.create_community(self.sender)
         community_chat_id = self.join_community(self.receiver)
 
@@ -70,7 +70,7 @@ class TestSendingChatMessages(MessengerSteps):
         expected_texts.reverse()
         assert actual_texts == expected_texts
 
-    def test_send_chat_messages_different_chats(self):
+    def test_send_chat_messages_different_chats(self, setup_two_unprivileged_nodes):
         # Group
         self.make_contacts()
         private_group_chat_id = self.join_private_group()
@@ -90,7 +90,7 @@ class TestSendingChatMessages(MessengerSteps):
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == 2
 
-    def test_send_group_message(self):
+    def test_send_group_message(self, setup_two_unprivileged_nodes):
         self.make_contacts()
         private_group_id = self.join_private_group()
 
@@ -106,7 +106,7 @@ class TestSendingChatMessages(MessengerSteps):
     # Using delete_message is a workaround that might be considered an incorrect behaviour
     # TODO: create more realistic scenario where the message is intercepted in the network and not delivered,
     # use community messages to avoid 1-1 and group chats reliability mechanisms on protocol level
-    def test_resend_one_to_one_message(self):
+    def test_resend_one_to_one_message(self, setup_two_unprivileged_nodes):
         self.make_contacts()
 
         _, responses = self.send_multiple_one_to_one_messages(1)

@@ -7,10 +7,10 @@ from resources.enums import MessageContentType
 from steps.messenger import MessengerSteps
 
 
-@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
+@pytest.mark.parametrize("setup_two_unprivileged_nodes", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 @pytest.mark.rpc
 class TestMessageReactions(MessengerSteps):
-    def test_one_to_one_message_reactions(self):
+    def test_one_to_one_message_reactions(self, setup_two_unprivileged_nodes):
         self.make_contacts()
         response = self.sender.wakuext_service.send_one_to_one_message(self.receiver.public_key, "test_message")
         message = self.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]

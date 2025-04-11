@@ -5,11 +5,11 @@ from resources.enums import ChatType, ChatPreviewFilterType, MuteType
 from steps.messenger import MessengerSteps
 
 
-@pytest.mark.usefixtures("setup_two_unprivileged_nodes")
+@pytest.mark.parametrize("setup_two_unprivileged_nodes", [False, True], indirect=True, ids=["wakuV2LightClient_False", "wakuV2LightClient_True"])
 @pytest.mark.rpc
 class TestChatActions(MessengerSteps):
 
-    def test_all_chats(self):
+    def test_all_chats(self, setup_two_unprivileged_nodes):
         self.make_contacts()
         private_group_id = self.join_private_group()
         self.sender.wakuext_service.send_chat_message(private_group_id, "test_message")
@@ -23,7 +23,7 @@ class TestChatActions(MessengerSteps):
         assert chats[0].get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chats[1].get("chatType", 0) == ChatType.PRIVATE_GROUP_CHAT.value
 
-    def test_chat_by_chat_id(self):
+    def test_chat_by_chat_id(self, setup_two_unprivileged_nodes):
         sent_texts, _ = self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key
 
@@ -34,7 +34,7 @@ class TestChatActions(MessengerSteps):
         assert chat.get("chatType", 0) == ChatType.ONE_TO_ONE.value
         assert chat.get("lastMessage", {}).get("text", "") == sent_texts[0]
 
-    def test_chats_preview(self):
+    def test_chats_preview(self, setup_two_unprivileged_nodes):
         # One to one
         self.make_contacts()
         self.send_multiple_one_to_one_messages(1)
@@ -63,7 +63,7 @@ class TestChatActions(MessengerSteps):
         assert chats_previews[0].get("id", "") == one_to_one_chat_id
         assert chats_previews[1].get("id", "") == private_group_chat_id
 
-    def test_active_chats(self):
+    def test_active_chats(self, setup_two_unprivileged_nodes):
         self.make_contacts()
         self.send_multiple_one_to_one_messages(1)
         one_to_one_chat_id = self.receiver.public_key
@@ -82,7 +82,7 @@ class TestChatActions(MessengerSteps):
         assert len(chats) == 1
         assert chats[0].get("id", 0) == one_to_one_chat_id
 
-    def test_mute_chat(self):
+    def test_mute_chat(self, setup_two_unprivileged_nodes):
         self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key
 
@@ -109,7 +109,7 @@ class TestChatActions(MessengerSteps):
             (MuteType.MUTE_FOR24_HR.value, timedelta(hours=24)),
         ],
     )
-    def test_mute_chat_v2(self, mute_type, time_delta):
+    def test_mute_chat_v2(self, mute_type, time_delta, setup_two_unprivileged_nodes):
         self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key
 
@@ -134,7 +134,7 @@ class TestChatActions(MessengerSteps):
             # MuteType.UNMUTED.value,
         ],
     )
-    def test_unmute_mute_chat_v2_till_unmuted(self, mute_type):
+    def test_unmute_mute_chat_v2_till_unmuted(self, mute_type, setup_two_unprivileged_nodes):
         self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key
 
@@ -149,7 +149,7 @@ class TestChatActions(MessengerSteps):
         chat = response.get("result", {})
         assert chat.get("muted", True) is False
 
-    def test_clear_history(self):
+    def test_clear_history(self, setup_two_unprivileged_nodes):
         self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key
 
@@ -170,7 +170,7 @@ class TestChatActions(MessengerSteps):
             (True, dict),
         ],
     )
-    def test_deactivate_chat(self, preserve_history, expected):
+    def test_deactivate_chat(self, preserve_history, expected, setup_two_unprivileged_nodes):
         self.send_multiple_one_to_one_messages(1)
         chat_id = self.receiver.public_key
 
@@ -181,7 +181,7 @@ class TestChatActions(MessengerSteps):
         assert chat.get("active", -1) is False
         assert isinstance(chat.get("lastMessage", -1), expected)
 
-    def test_save_chat(self):
+    def test_save_chat(self, setup_two_unprivileged_nodes):
         chat_id = "123"
         response = self.sender.wakuext_service.save_chat(chat_id, active=True)
         assert response.get("result", -1) is None
@@ -191,7 +191,7 @@ class TestChatActions(MessengerSteps):
         assert chat.get("id", "") == chat_id
         assert chat.get("active", -1) is True
 
-    def test_create_one_to_one_chat(self):
+    def test_create_one_to_one_chat(self, setup_two_unprivileged_nodes):
         chat_id = self.receiver.public_key
         response = self.sender.wakuext_service.create_one_to_one_chat(chat_id, ens_name="")
         self.sender.verify_json_schema(response, method="wakuext_createOneToOneChat")

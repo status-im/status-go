@@ -28,8 +28,10 @@ class MessengerSteps(NetworkConditionsSteps):
 
     @pytest.fixture(scope="function", autouse=False)
     def setup_two_unprivileged_nodes(self, request):
-        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False)
-        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False)
+        light_client_mode = request.param if hasattr(request, "param") else False
+        logging.info(f"Starting node with wakuV2LightClient: {light_client_mode}")
+        request.cls.sender = self.sender = self.initialize_backend(self.await_signals, False, wakuV2LightClient=light_client_mode)
+        request.cls.receiver = self.receiver = self.initialize_backend(self.await_signals, False, wakuV2LightClient=light_client_mode)
 
     def initialize_backend(self, await_signals, privileged=True, ipv6=USE_IPV6, **kwargs):
         backend = StatusBackend(await_signals, privileged=privileged, ipv6=ipv6)
