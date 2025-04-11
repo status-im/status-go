@@ -76,6 +76,10 @@ func mapFetchedCoingeckoListToTokenList(fetchedTokenList fetcher.FetchedTokenLis
 			chainIDs = append(chainIDs, walletCommon.BaseMainnet)
 			address = token.Platforms.Base
 		}
+		if token.Platforms.Binance != "" {
+			chainIDs = append(chainIDs, walletCommon.BSCMainnet)
+			address = token.Platforms.Binance
+		}
 
 		if len(chainIDs) == 0 || address == "" {
 			continue

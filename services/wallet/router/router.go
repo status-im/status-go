@@ -882,16 +882,16 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute rou
 			}
 		}
 
-		ethKey := makeBalanceKey(path.FromChain.ChainID, walletCommon.EthSymbol)
-		if nativeBalance, ok := balanceMapCopy[ethKey]; ok {
+		nativeTokenKey := makeBalanceKey(path.FromChain.ChainID, path.FromChain.NativeCurrencySymbol)
+		if nativeBalance, ok := balanceMapCopy[nativeTokenKey]; ok {
 			if nativeBalance.Cmp(path.RequiredNativeBalance) == -1 {
 				err := &errors.ErrorResponse{
 					Code:    ErrNotEnoughNativeBalance.Code,
-					Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, walletCommon.EthSymbol, path.FromChain.ChainID),
+					Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, path.FromChain.NativeCurrencySymbol, path.FromChain.ChainID),
 				}
 				return hasPositiveBalance, err
 			}
-			balanceMapCopy[ethKey].Sub(nativeBalance, path.RequiredNativeBalance)
+			balanceMapCopy[nativeTokenKey].Sub(nativeBalance, path.RequiredNativeBalance)
 		} else {
 			return hasPositiveBalance, ErrNativeTokenNotFound
 		}
@@ -919,7 +919,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputPa
 	if input.TestsMode {
 		prices = input.TestParams.TokenPrices
 	} else {
-		groupedTokensKeys := []string{walletCommon.ETHTokenGroupKey, fromGroupedTokenKey, toGrouperTokenKey}
+		groupedTokensKeys := []string{walletCommon.ETHTokenGroupKey, walletCommon.BNBTokenGroupKey, fromGroupedTokenKey, toGrouperTokenKey}
 		prices, err = fetchPrices(input.SendType, r.marketManager, groupedTokensKeys)
 		if err != nil {
 			return nil, errors.CreateErrorResponseFromError(err)
@@ -982,7 +982,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputPa
 	}
 
 	if len(bestRoute) > 0 {
-		// At this point we have to do the final check and update the amountIn (subtracting fees) if complete balance is going to be sent for native token (ETH)
+		// At this point we have to do the final check and update the amountIn (subtracting fees) if complete balance is going to be sent for native token (ETH/BNB)
 		for _, path := range bestRoute {
 			if path.SubtractFees && path.FromToken.IsNative() {
 				path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxFee.ToInt())

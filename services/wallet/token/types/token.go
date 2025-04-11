@@ -7,6 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/services/wallet/community"
+
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
 )
 
 const TokenKeyPattern = "%d-%s"
@@ -41,7 +43,12 @@ type StorageToken struct {
 }
 
 func (t *Token) IsNative() bool {
-	return strings.EqualFold(t.Symbol, "ETH")
+	switch t.ChainID {
+	case wallet_common.BSCMainnet, wallet_common.BSCTestnet:
+		return strings.EqualFold(t.Symbol, "BNB")
+	default:
+		return strings.EqualFold(t.Symbol, "ETH")
+	}
 }
 
 // TokenKey returns the key of the token, which is chainId + address pair.

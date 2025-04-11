@@ -10,4 +10,6 @@ const (
 	BaseChainID                 uint64 = 8453
 	BaseSepoliaChainID          uint64 = 84532
 	StatusNetworkSepoliaChainID uint64 = 1660990954
+	BNBSmartChainID             uint64 = 56
+	BNBSmartChainTestnetChainID uint64 = 97
 )

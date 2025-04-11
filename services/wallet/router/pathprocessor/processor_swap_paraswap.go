@@ -51,7 +51,9 @@ func getPartnerAddressAndFeePcnt(chainID uint64) (common.Address, float64) {
 	case walletCommon.ArbitrumMainnet:
 		return common.HexToAddress("0x9a8278e856C0B191B9daa2d7DD1f7B28268E4DA2"), partnerFeePcnt
 	case walletCommon.BaseMainnet:
-		return common.Address{}, 0
+		return common.HexToAddress("0x107E3208A27e2A56D420fE6f8c5B88c821052f89"), partnerFeePcnt
+	case walletCommon.BSCMainnet:
+		return common.HexToAddress("0xEF693aCC26e7fb24B96056b33472D89d7dA5bAC9"), partnerFeePcnt
 	}
 	return common.Address{}, 0
 }
@@ -167,7 +169,7 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 		swapSide = paraswap.BuySide
 	}
 
-	// TODO: this is an extra check, we should remove it once we set the proper address for the native (ETH) token
+	// TODO: this is an extra check, we should remove it once we set the proper address for the native (ETH/BNB) token
 	if params.FromToken.IsNative() {
 		params.FromToken.Address = common.HexToAddress("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") // ETH address across all chains that we support
 	}

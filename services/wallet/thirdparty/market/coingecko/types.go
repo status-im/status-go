@@ -12,4 +12,5 @@ type Platforms struct { // When we add a new chain we should update it here
 	Optimism string `json:"optimistic-ethereum"`
 	Arbitrum string `json:"arbitrum-one"`
 	Base     string `json:"base"`
+	Binance  string `json:"binance-smart-chain"`
 }
