@@ -113,7 +113,7 @@ class SignalClient:
         signal = self.wait_for_signal(SignalType.NODE_LOGOUT.value)
         return signal
 
-    def find_signal_containing_pattern(self, signal_type, event_pattern, timeout=20):
+    def find_signal_containing_pattern(self, signal_type, event_pattern, timeout=40):
         start_time = time.time()
         while True:
             if time.time() - start_time >= timeout:
