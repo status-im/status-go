@@ -927,7 +927,7 @@ func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
 
 func (api *API) IsChecksumValidForAddress(address string) (bool, error) {
 	logutils.ZapLogger().Debug("wallet.api.isChecksumValidForAddress", zap.String("address", address))
-	return abi_spec.CheckAddressChecksum(address)	 
+	return abi_spec.CheckAddressChecksum(address)
 }
 
 // GetLeaderboardData returns cryptocurrency data with updated price information

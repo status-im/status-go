@@ -22,9 +22,9 @@ type ErrorCode = int
 
 const (
 	// Contains a LeaderboardPage payload
-	EventFetchLeaderboardPageDone walletevent.EventType = "wallet-leaderboard-fetch-page-done"
+	EventFetchLeaderboardPageDone walletevent.EventType = "wallet-fetch-leaderboard-page-done"
 	// Contains a LeaderboardPage payload
-	EvenLeaderboardPageDone walletevent.EventType = "wallet-leaderboard-page-updated"
+	EventLeaderboardPageDataUpdated walletevent.EventType = "wallet-leaderboard-page-data-updated"
 	// Contains a EventLeaderboardPagePricesUpdate payload
 	EventLeaderboardPagePricesUpdated walletevent.EventType = "wallet-leaderboard-page-prices-updated"
 
@@ -316,7 +316,7 @@ func (s *MarketDataService) sendLeaderboardPageUpdate() {
 	}
 
 	event := walletevent.Event{
-		Type:    EvenLeaderboardPageDone,
+		Type:    EventLeaderboardPageDataUpdated,
 		Message: string(payload),
 	}
 	s.feed.Send(event)

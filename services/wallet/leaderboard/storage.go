@@ -2,6 +2,7 @@ package leaderboard
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -119,13 +120,13 @@ func (s *DataStorage) GetCombinedData() []Cryptocurrency {
 }
 
 func (s *DataStorage) GetCryptoDataForPage(page, pageSize int) []Cryptocurrency {
-	if pageSize <= 0 || page < 0 {
+	if pageSize <= 0 || page <= 0 {
 		return nil
 	}
 	s.dataMutex.RLock()
 	defer s.dataMutex.RUnlock()
 
-	start := page * pageSize
+	start := (page - 1) * pageSize
 	totalCount := len(s.cryptoData)
 
 	if start >= totalCount {
@@ -212,8 +213,7 @@ func (s *DataStorage) GetLeaderboardPagePrices(page LeaderboardPage) *Leaderboar
 	}
 
 	for i := range data {
-		crypto := &data[i]
-		symbol := crypto.Symbol
+		symbol := strings.ToUpper(data[i].Symbol)
 
 		// If we have updated price data for this symbol, update the cryptocurrency
 		if priceUpdate, ok := s.priceData[symbol]; ok {
@@ -235,7 +235,7 @@ func (s *DataStorage) GetLeaderboardPage(page, pageSize, sortOrder int, currency
 	// if totalCount == 0 {
 	// }
 
-	if page < 0 || page > (totalCount/pageSize) {
+	if page <= 0 || page > (totalCount/pageSize) {
 		return nil, fmt.Errorf("Invalid page")
 	}
 
