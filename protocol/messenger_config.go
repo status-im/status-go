@@ -28,7 +28,6 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
-	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
@@ -104,7 +103,6 @@ type config struct {
 	anonMetricsClientConfig *anonmetrics.ClientConfig
 	anonMetricsServerConfig *anonmetrics.ServerConfig
 
-	pushNotificationServerConfig *pushnotificationserver.Config
 	pushNotificationClientConfig *pushnotificationclient.Config
 
 	logger *zap.Logger
@@ -268,13 +266,6 @@ func WithTelemetry(serverURL string, sendPeriod time.Duration) Option {
 	return func(c *config) error {
 		c.telemetryServerURL = serverURL
 		c.telemetrySendPeriod = sendPeriod
-		return nil
-	}
-}
-
-func WithPushNotificationServerConfig(pushNotificationServerConfig *pushnotificationserver.Config) Option {
-	return func(c *config) error {
-		c.pushNotificationServerConfig = pushNotificationServerConfig
 		return nil
 	}
 }

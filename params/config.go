@@ -406,9 +406,6 @@ type NodeConfig struct {
 	// MailServerRegistryAddress is the MailServerRegistry contract address
 	MailServerRegistryAddress string
 
-	// PushNotificationServerConfig is the config for the push notification server
-	PushNotificationServerConfig PushNotificationServerConfig `json:"PushNotificationServerConfig"`
-
 	OutputMessageCSVEnabled bool
 
 	// ProcessBackedupMessages should be set to true when user follows recovery (using seed phrase or keycard) onboarding flow
@@ -520,12 +517,6 @@ func (p *PushNotificationServer) UnmarshalText(data []byte) error {
 
 	p.PublicKey = pk
 	return nil
-}
-
-type PushNotificationServerConfig struct {
-	Enabled   bool
-	Identity  *ecdsa.PrivateKey
-	GorushURL string
 }
 
 // ShhextConfig defines options used by shhext service.
