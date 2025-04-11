@@ -95,7 +95,7 @@ const communityAdvertiseIntervalSecond int64 = 24 * 60 * 60
 // messageCacheIntervalMs is how long we should keep processed messages in the cache, in ms
 var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 
-// Messenger is a entity managing chats and messages.
+// Messenger is an entity managing chats and messages.
 // It acts as a bridge between the application and encryption
 // layers.
 // It needs to expose an interface to manage installations
@@ -284,11 +284,9 @@ func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash types
 }
 
 func NewMessenger(
-	nodeName string,
 	identity *ecdsa.PrivateKey,
 	waku wakutypes.Waku,
 	installationID string,
-	version string,
 	opts ...Option,
 ) (*Messenger, error) {
 	var messenger *Messenger

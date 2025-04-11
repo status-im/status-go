@@ -101,11 +101,9 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 	options = append(options, config.extraOptions...)
 
 	m, err := NewMessenger(
-		config.name,
 		config.privateKey,
 		waku,
 		uuid.New().String(),
-		"testVersion",
 		options...,
 	)
 	if err != nil {

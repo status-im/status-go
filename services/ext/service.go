@@ -44,7 +44,6 @@ import (
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
-	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -137,6 +136,11 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
+	waku, err := s.n.GetWakuV2(nil)
+	if err != nil {
+		return err
+	}
+
 	ensVerifier := ens.New(
 		s.n,
 		logger,
@@ -152,11 +156,9 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	}
 
 	messenger, err := protocol.NewMessenger(
-		nodeName,
 		identity,
-		s.waku,
+		waku,
 		s.config.ShhextConfig.InstallationID,
-		version.Version(),
 		options...,
 	)
 	if err != nil {
