@@ -189,12 +189,12 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 			/* ToTxHash:      */ common.Hash{},
 			/* FromAddress:   */ routeInputParams.AddrFrom,
 			/* ToAddress:     */ routeInputParams.AddrTo,
-			/* FromAsset:     */ routeInputParams.TokenID,
-			/* ToAsset:       */ routeInputParams.ToTokenID,
-			/* FromAmount:    */ routeInputParams.AmountIn,
-			/* ToAmount:      */ routeInputParams.AmountOut,
-			/* Type:		  */ mtType,
-			/* CrossTxID:	  */ "",
+			/* FromGroupedTokensKey: */ routeInputParams.FromGroupedTokensKey,
+			/* ToGroupedTokensKey:   */ routeInputParams.ToGroupedTokensKey,
+			/* FromAmount:           */ routeInputParams.AmountIn,
+			/* ToAmount:             */ routeInputParams.AmountOut,
+			/* Type:		             */ mtType,
+			/* CrossTxID:	           */ "",
 		)
 
 		_, err = m.transactionManager.InsertMultiTransaction(multiTx)

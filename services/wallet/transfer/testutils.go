@@ -209,34 +209,39 @@ var TestCollectibles = []TestCollectible{
 }
 
 var EthMainnet = tokenTypes.Token{
-	Address: eth_common.HexToAddress("0x"),
-	Name:    "Ether",
-	Symbol:  "ETH",
-	ChainID: 1,
+	GroupKey: common.ETHTokenGroupKey,
+	Address:  eth_common.HexToAddress("0x"),
+	Name:     "Ether",
+	Symbol:   "ETH",
+	ChainID:  1,
 }
 
 var EthSepolia = tokenTypes.Token{
-	Address: eth_common.HexToAddress("0x"),
-	Name:    "Ether",
-	Symbol:  "ETH",
-	ChainID: 11155111,
+	GroupKey: common.ETHTokenGroupKey,
+	Address:  eth_common.HexToAddress("0x"),
+	Name:     "Ether",
+	Symbol:   "ETH",
+	ChainID:  11155111,
 }
 
 var EthOptimism = tokenTypes.Token{
-	Address: eth_common.HexToAddress("0x"),
-	Name:    "Ether",
-	Symbol:  "ETH",
-	ChainID: 10,
+	GroupKey: common.ETHTokenGroupKey,
+	Address:  eth_common.HexToAddress("0x"),
+	Name:     "Ether",
+	Symbol:   "ETH",
+	ChainID:  10,
 }
 
 var UsdcMainnet = tokenTypes.Token{
-	Address: eth_common.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"),
-	Name:    "USD Coin",
-	Symbol:  "USDC",
-	ChainID: 1,
+	GroupKey: common.USDCTokenGroupKey,
+	Address:  eth_common.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"),
+	Name:     "USD Coin",
+	Symbol:   "USDC",
+	ChainID:  1,
 }
 
 var UsdcSepolia = tokenTypes.Token{
+	GroupKey: common.USDCTokenGroupKey,
 	Address:  eth_common.HexToAddress("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"),
 	Name:     "USD Coin",
 	Symbol:   "USDC",
@@ -245,10 +250,11 @@ var UsdcSepolia = tokenTypes.Token{
 }
 
 var UsdcOptimism = tokenTypes.Token{
-	Address: eth_common.HexToAddress("0x7f5c764cbc14f9669b88837ca1490cca17c31607"),
-	Name:    "USD Coin",
-	Symbol:  "USDC",
-	ChainID: 10,
+	GroupKey: common.USDCTokenGroupKey,
+	Address:  eth_common.HexToAddress("0x7f5c764cbc14f9669b88837ca1490cca17c31607"),
+	Name:     "USD Coin",
+	Symbol:   "USDC",
+	ChainID:  10,
 }
 
 var SntMainnet = tokenTypes.Token{
@@ -259,13 +265,15 @@ var SntMainnet = tokenTypes.Token{
 }
 
 var DaiMainnet = tokenTypes.Token{
-	Address: eth_common.HexToAddress("0xf2edF1c091f683E3fb452497d9a98A49cBA84666"),
-	Name:    "DAI Stablecoin",
-	Symbol:  "DAI",
-	ChainID: 5,
+	GroupKey: common.DAITokenGroupKey,
+	Address:  eth_common.HexToAddress("0xf2edF1c091f683E3fb452497d9a98A49cBA84666"),
+	Name:     "DAI Stablecoin",
+	Symbol:   "DAI",
+	ChainID:  5,
 }
 
 var DaiSepolia = tokenTypes.Token{
+	GroupKey: common.DAITokenGroupKey,
 	Address:  eth_common.HexToAddress("0x3e622317f8c93f7328350cf0b56d9ed4c620c5d6"),
 	Name:     "DAI Stablecoin",
 	Symbol:   "DAI",

@@ -11,18 +11,18 @@ import (
 )
 
 type SendDetails struct {
-	Uuid                string                `json:"uuid"`
-	SendType            int                   `json:"sendType"`
-	FromAddress         types.Address         `json:"fromAddress"`
-	ToAddress           types.Address         `json:"toAddress"`
-	FromChain           uint64                `json:"fromChain"` // this chain should be used only if en error occurred while sending a transaction
-	ToChain             uint64                `json:"toChain"`   // this chain should be used only if en error occurred while sending a transaction
-	FromToken           string                `json:"fromToken"`
-	ToToken             string                `json:"toToken"`
-	FromAmount          string                `json:"fromAmount"` // total amount
-	ToAmount            string                `json:"toAmount"`
-	OwnerTokenBeingSent bool                  `json:"ownerTokenBeingSent"`
-	ErrorResponse       *errors.ErrorResponse `json:"errorResponse,omitempty"`
+	Uuid                 string                `json:"uuid"`
+	SendType             int                   `json:"sendType"`
+	FromAddress          types.Address         `json:"fromAddress"`
+	ToAddress            types.Address         `json:"toAddress"`
+	FromChain            uint64                `json:"fromChain"` // this chain should be used only if en error occurred while sending a transaction
+	ToChain              uint64                `json:"toChain"`   // this chain should be used only if en error occurred while sending a transaction
+	FromGroupedTokensKey string                `json:"fromGroupedTokensKey"`
+	ToGroupedTokensKey   string                `json:"toGroupedTokensKey"`
+	FromAmount           string                `json:"fromAmount"` // total amount
+	ToAmount             string                `json:"toAmount"`
+	OwnerTokenBeingSent  bool                  `json:"ownerTokenBeingSent"`
+	ErrorResponse        *errors.ErrorResponse `json:"errorResponse,omitempty"`
 
 	Username  string `json:"username"`
 	PublicKey string `json:"publicKey"`
@@ -97,8 +97,8 @@ func (sd *SendDetails) UpdateFields(inputParams requests.RouteInputParams, fromC
 	sd.SendType = int(inputParams.SendType)
 	sd.FromAddress = types.Address(inputParams.AddrFrom)
 	sd.ToAddress = types.Address(inputParams.AddrTo)
-	sd.FromToken = inputParams.TokenID
-	sd.ToToken = inputParams.ToTokenID
+	sd.FromGroupedTokensKey = inputParams.FromGroupedTokensKey
+	sd.ToGroupedTokensKey = inputParams.ToGroupedTokensKey
 	if inputParams.AmountIn != nil {
 		sd.FromAmount = inputParams.AmountIn.String()
 	}

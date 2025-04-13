@@ -168,7 +168,7 @@ func TestTokensLists(t *testing.T) {
 
 	tokensList := tokensLists.GetTokensList("status")
 	require.NotNil(t, tokensList)
-	require.Len(t, tokensList.Tokens, 16)
+	require.Len(t, tokensList.Tokens, 18)
 
 	tokensList = tokensLists.GetTokensList("uniswap")
 	require.NotNil(t, tokensList)
@@ -187,7 +187,7 @@ func TestTokensLists(t *testing.T) {
 	// the token lists should be updated
 	allTokens = tokensLists.GetUniqueTokens()
 	require.True(t, allTokensCount != len(allTokens))
-	require.Equal(t, 23, len(allTokens))
+	require.Equal(t, 25, len(allTokens))
 
 	lastUpdate, err = tokensLists.LastTokensUpdate()
 	require.NoError(t, err)

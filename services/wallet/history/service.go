@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -123,10 +124,10 @@ func (s *Service) Start(ctx context.Context) {
 	}()
 }
 
-func (s *Service) mergeChainsBalances(chainIDs []uint64, addresses []common.Address, tokenSymbol string, fromTimestamp uint64, data map[uint64][]*entry) ([]*DataPoint, error) {
+func (s *Service) mergeChainsBalances(addresses []common.Address, groupedTokens []*tokentypes.Token, fromTimestamp uint64, data map[uint64][]*entry) ([]*DataPoint, error) {
 	logutils.ZapLogger().Debug("Merging balances",
 		zap.Stringers("address", addresses),
-		zap.String("tokenSymbol", tokenSymbol),
+		zap.Int("groupedTokensLen", len(groupedTokens)),
 		zap.Uint64("fromTimestamp", fromTimestamp),
 		zap.Int("len(data)", len(data)),
 	)
@@ -136,9 +137,9 @@ func (s *Service) mergeChainsBalances(chainIDs []uint64, addresses []common.Addr
 
 	// Add edge points per chain
 	// Iterate over chainIDs param, not data keys, because data may not contain all the chains, but we need edge points for all of them
-	for _, chainID := range chainIDs {
+	for _, token := range groupedTokens {
 		// edge points are needed to properly calculate total balance, as they contain the balance for the first and last timestamp
-		chainData, err := s.balance.addEdgePoints(chainID, tokenSymbol, addresses, fromTimestamp, toTimestamp, data[chainID])
+		chainData, err := s.balance.addEdgePoints(addresses, token, fromTimestamp, toTimestamp, data[token.ChainID])
 		if err != nil {
 			return nil, err
 		}
@@ -151,9 +152,9 @@ func (s *Service) mergeChainsBalances(chainIDs []uint64, addresses []common.Addr
 	})
 
 	// Add padding points to make chart look nice
-	numEdgePoints := 2 * len(chainIDs) // 2 edge points per chain
+	numEdgePoints := 2 * len(groupedTokens) // 2 edge points per chain (single token - single chain)
 	if len(allData) < minPointsForGraph {
-		allData, _ = addPaddingPoints(tokenSymbol, addresses, toTimestamp, allData, minPointsForGraph+numEdgePoints)
+		allData, _ = addPaddingPoints(addresses, toTimestamp, allData, minPointsForGraph+numEdgePoints)
 	}
 
 	return entriesToDataPoints(allData)
@@ -252,18 +253,29 @@ func appendPointToSlice(slice []*DataPoint, point *DataPoint) []*DataPoint {
 }
 
 // GetBalanceHistory returns token count balance
-func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, addresses []common.Address, tokenSymbol string, currencySymbol string, fromTimestamp uint64) ([]*ValuePoint, error) {
+func (s *Service) GetBalanceHistory(ctx context.Context, addresses []common.Address, groupedTokensKey string, currencySymbol string, fromTimestamp uint64) ([]*ValuePoint, error) {
 	logutils.ZapLogger().Debug("GetBalanceHistory",
-		zap.Uint64s("chainIDs", chainIDs),
 		zap.Stringers("address", addresses),
-		zap.String("tokenSymbol", tokenSymbol),
+		zap.String("groupedTokensKey", groupedTokensKey),
 		zap.String("currencySymbol", currencySymbol),
 		zap.Uint64("fromTimestamp", fromTimestamp),
 	)
 
+	groupedTokens, err := s.tokenManager.GetTokensForGroupKey(groupedTokensKey)
+	if err != nil {
+		logutils.ZapLogger().Error("Error getting tokens group", zap.String("groupedTokensKey", groupedTokensKey))
+		return nil, err
+	}
+
+	if len(groupedTokens) == 0 {
+		// we should neveer be here, cause in theory every group will have at least a single token
+		logutils.ZapLogger().Error("No tokens found for group", zap.String("groupedTokensKey", groupedTokensKey))
+		return nil, fmt.Errorf("no tokens found for group %s", groupedTokensKey)
+	}
+
 	chainDataMap := make(map[uint64][]*entry)
-	for _, chainID := range chainIDs {
-		chainData, err := s.balance.get(ctx, chainID, tokenSymbol, addresses, fromTimestamp) // TODO Make chainID a slice?
+	for _, token := range groupedTokens {
+		chainData, err := s.balance.get(ctx, token.ChainID, token.Address.Hex(), token.Symbol, addresses, fromTimestamp)
 		if err != nil {
 			return nil, err
 		}
@@ -272,11 +284,11 @@ func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, addr
 			continue
 		}
 
-		chainDataMap[chainID] = chainData
+		chainDataMap[token.ChainID] = chainData
 	}
 
 	// Need to get balance for all the chains for the first timestamp, otherwise total values will be incorrect
-	data, err := s.mergeChainsBalances(chainIDs, addresses, tokenSymbol, fromTimestamp, chainDataMap)
+	data, err := s.mergeChainsBalances(addresses, groupedTokens, fromTimestamp, chainDataMap)
 
 	if err != nil {
 		return nil, err
@@ -284,10 +296,13 @@ func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, addr
 		return make([]*ValuePoint, 0), nil
 	}
 
-	return s.dataPointsToValuePoints(chainIDs, tokenSymbol, currencySymbol, data)
+	// symbol and token decimals are the same for all tokens in the group
+	tokenSymbol := groupedTokens[0].Symbol
+	tokenDecimals := groupedTokens[0].Decimals
+	return s.dataPointsToValuePoints(tokenSymbol, int(tokenDecimals), currencySymbol, data)
 }
 
-func (s *Service) dataPointsToValuePoints(chainIDs []uint64, tokenSymbol string, currencySymbol string, data []*DataPoint) ([]*ValuePoint, error) {
+func (s *Service) dataPointsToValuePoints(tokenSymbol string, tokenDecimals int, currencySymbol string, data []*DataPoint) ([]*ValuePoint, error) {
 	if len(data) == 0 {
 		return make([]*ValuePoint, 0), nil
 	}
@@ -325,11 +340,7 @@ func (s *Service) dataPointsToValuePoints(chainIDs []uint64, tokenSymbol string,
 		}
 	}
 
-	decimals, err := s.decimalsForToken(tokenSymbol, chainIDs[0])
-	if err != nil {
-		return nil, err
-	}
-	weisInOneMain := big.NewFloat(math.Pow(10, float64(decimals)))
+	weisInOneMain := big.NewFloat(math.Pow(10, float64(tokenDecimals)))
 
 	var res []*ValuePoint
 	for _, d := range data {
@@ -366,18 +377,6 @@ func (s *Service) dataPointsToValuePoints(chainIDs []uint64, tokenSymbol string,
 	}
 
 	return res, nil
-}
-
-func (s *Service) decimalsForToken(tokenSymbol string, chainID uint64) (int, error) {
-	network := s.networkManager.Find(chainID)
-	if network == nil {
-		return 0, errors.New("network not found")
-	}
-	token := s.tokenManager.FindToken(network, tokenSymbol)
-	if token == nil {
-		return 0, errors.New("token not found")
-	}
-	return int(token.Decimals), nil
 }
 
 func tokenToValue(tokenCount *big.Int, mainDenominationValue float32, weisInOneMain *big.Float) float64 {

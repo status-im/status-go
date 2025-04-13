@@ -356,8 +356,8 @@ func toChainBalance(
 	}
 }
 
-func (r *Reader) getBalance1DayAgo(balance *tokenTypes.ChainBalance, dayAgoTimestamp int64, symbol string, address common.Address) (*big.Int, error) {
-	balance1DayAgo, err := r.tokenManager.GetTokenHistoricalBalance(address, balance.ChainID, symbol, dayAgoTimestamp)
+func (r *Reader) getBalance1DayAgo(balance *tokenTypes.ChainBalance, dayAgoTimestamp int64, tokenAddress common.Address, address common.Address) (*big.Int, error) {
+	balance1DayAgo, err := r.tokenManager.GetTokenHistoricalBalance(address, balance.ChainID, tokenAddress, dayAgoTimestamp)
 	if err != nil {
 		logutils.ZapLogger().Error("tokenManager.GetTokenHistoricalBalance error", zap.Error(err))
 		return nil, err
@@ -422,7 +422,7 @@ func (r *Reader) createBalancePerChainPerSymbol(
 		// TODO: Avoid passing the entire balances map to toChainBalance. Iterate over the balances map once and pass the balance per address per token to toChainBalance
 		balance := toChainBalance(balances, tok, address, tok.Decimals, cachedTokens, hasError, isMandatory)
 		if balance != nil {
-			balance1DayAgo, _ := r.getBalance1DayAgo(balance, dayAgoTimestamp, tok.Symbol, address) // Ignore error
+			balance1DayAgo, _ := r.getBalance1DayAgo(balance, dayAgoTimestamp, tok.Address, address) // Ignore error
 			if balance1DayAgo != nil {
 				balance.Balance1DayAgo = balance1DayAgo.String()
 			}

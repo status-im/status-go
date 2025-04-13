@@ -35,9 +35,10 @@ type entry struct {
 }
 
 type assetIdentity struct {
-	ChainID     uint64
-	Addresses   []common.Address
-	TokenSymbol string
+	Addresses    []common.Address
+	ChainID      uint64
+	TokenAddress string
+	Symbol       string
 }
 
 func (a *assetIdentity) addressesToString() string {
@@ -61,7 +62,7 @@ func (e *entry) String() string {
 func (b *BalanceDB) add(entry *entry) error {
 	logutils.ZapLogger().Debug("Adding entry to balance_history", zap.Stringer("entry", entry))
 
-	_, err := b.db.Exec("INSERT OR IGNORE INTO balance_history (chain_id, address, currency, block, timestamp, balance) VALUES (?, ?, ?, ?, ?, ?)", entry.chainID, entry.address, entry.tokenSymbol, (*bigint.SQLBigInt)(entry.block), entry.timestamp, (*bigint.SQLBigIntBytes)(entry.balance))
+	_, err := b.db.Exec("INSERT OR IGNORE INTO balance_history (chain_id, address, token_address, block, timestamp, balance) VALUES (?, ?, ?, ?, ?, ?)", entry.chainID, entry.address, entry.tokenAddress, (*bigint.SQLBigInt)(entry.block), entry.timestamp, (*bigint.SQLBigIntBytes)(entry.balance))
 	return err
 }
 
@@ -103,9 +104,10 @@ func (b *BalanceDB) getEntriesWithoutBalances(chainID uint64, address common.Add
 
 func (b *BalanceDB) getNewerThan(identity *assetIdentity, timestamp uint64) (entries []*entry, err error) {
 	// DISTINCT removes duplicates that can happen when a block has multiple transfers of same token
-	rawQueryStr := "SELECT DISTINCT block, timestamp, balance, address FROM balance_history WHERE chain_id = ? AND address IN (%s) AND currency = ? AND timestamp > ? ORDER BY timestamp"
+	rawQueryStr := "SELECT DISTINCT block, timestamp, balance, address FROM balance_history WHERE chain_id = ? AND address IN (%s) AND token_address = ? AND timestamp > ? ORDER BY timestamp"
 	queryString := fmt.Sprintf(rawQueryStr, identity.addressesToString())
-	rows, err := b.db.Query(queryString, identity.ChainID, identity.TokenSymbol, timestamp)
+	tokenAddress := common.HexToAddress(identity.TokenAddress)
+	rows, err := b.db.Query(queryString, identity.ChainID, tokenAddress, timestamp)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
@@ -117,10 +119,11 @@ func (b *BalanceDB) getNewerThan(identity *assetIdentity, timestamp uint64) (ent
 	result := make([]*entry, 0)
 	for rows.Next() {
 		entry := &entry{
-			chainID:     identity.ChainID,
-			tokenSymbol: identity.TokenSymbol,
-			block:       new(big.Int),
-			balance:     new(big.Int),
+			chainID:      identity.ChainID,
+			tokenAddress: common.HexToAddress(identity.TokenAddress),
+			tokenSymbol:  identity.Symbol,
+			block:        new(big.Int),
+			balance:      new(big.Int),
 		}
 		err := rows.Scan((*bigint.SQLBigInt)(entry.block), &entry.timestamp, (*bigint.SQLBigIntBytes)(entry.balance), &entry.address)
 		if err != nil {
@@ -133,15 +136,16 @@ func (b *BalanceDB) getNewerThan(identity *assetIdentity, timestamp uint64) (ent
 
 func (b *BalanceDB) getEntryPreviousTo(item *entry) (res *entry, err error) {
 	res = &entry{
-		chainID:     item.chainID,
-		address:     item.address,
-		block:       new(big.Int),
-		balance:     new(big.Int),
-		tokenSymbol: item.tokenSymbol,
+		address:      item.address,
+		chainID:      item.chainID,
+		tokenSymbol:  item.tokenSymbol,
+		tokenAddress: item.tokenAddress,
+		block:        new(big.Int),
+		balance:      new(big.Int),
 	}
 
-	queryStr := "SELECT block, timestamp, balance FROM balance_history WHERE chain_id = ? AND address = ? AND currency = ? AND timestamp < ? ORDER BY timestamp DESC LIMIT 1"
-	row := b.db.QueryRow(queryStr, item.chainID, item.address, item.tokenSymbol, item.timestamp)
+	queryStr := "SELECT block, timestamp, balance FROM balance_history WHERE chain_id = ? AND address = ? AND token_address = ? AND timestamp < ? ORDER BY timestamp DESC LIMIT 1"
+	row := b.db.QueryRow(queryStr, item.chainID, item.address, item.tokenAddress, item.timestamp)
 
 	err = row.Scan((*bigint.SQLBigInt)(res.block), &res.timestamp, (*bigint.SQLBigIntBytes)(res.balance))
 	if err == sql.ErrNoRows {

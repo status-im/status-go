@@ -132,7 +132,7 @@ type TxResponse struct {
 	TxHash        common.Hash            `json:"txHash,omitempty"`
 }
 
-func NewMultiTransaction(timestamp uint64, fromNetworkID, toNetworkID uint64, fromTxHash, toTxHash common.Hash, fromAddress, toAddress common.Address, fromAsset, toAsset string, fromAmount, toAmount *hexutil.Big, txType MultiTransactionType, crossTxID string) *MultiTransaction {
+func NewMultiTransaction(timestamp uint64, fromNetworkID, toNetworkID uint64, fromTxHash, toTxHash common.Hash, fromAddress, toAddress common.Address, fromGroupedTokensKey, toGroupedTokensKey string, fromAmount, toAmount *hexutil.Big, txType MultiTransactionType, crossTxID string) *MultiTransaction {
 	if timestamp == 0 {
 		timestamp = uint64(time.Now().Unix())
 	}
@@ -146,8 +146,8 @@ func NewMultiTransaction(timestamp uint64, fromNetworkID, toNetworkID uint64, fr
 		ToTxHash:      toTxHash,
 		FromAddress:   fromAddress,
 		ToAddress:     toAddress,
-		FromAsset:     fromAsset,
-		ToAsset:       toAsset,
+		FromAsset:     fromGroupedTokensKey,
+		ToAsset:       toGroupedTokensKey,
 		FromAmount:    fromAmount,
 		ToAmount:      toAmount,
 		Type:          txType,

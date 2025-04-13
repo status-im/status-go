@@ -362,9 +362,9 @@ func ParseCollectibleID(ID string) (contractAddress common.Address, tokenID *big
 	return
 }
 
-func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, tokenID string) *tokenTypes.Token {
+func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collectibles *collectibles.Service, account common.Address, network *params.Network, groupedTokensKey string) *tokenTypes.Token {
 	if !sendType.IsCollectiblesTransfer() {
-		return tokenManager.FindToken(network, tokenID)
+		return tokenManager.FindToken(network, groupedTokensKey)
 	}
 
 	if sendType.IsCommunityRelatedTransfer() {
@@ -372,7 +372,7 @@ func findToken(sendType sendtype.SendType, tokenManager *token.Manager, collecti
 		return nil
 	}
 
-	contractAddress, collectibleTokenID, success := ParseCollectibleID(tokenID)
+	contractAddress, collectibleTokenID, success := ParseCollectibleID(groupedTokensKey)
 	if !success {
 		return nil
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/logutils"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 const genesisTimestamp = 1438269988
@@ -60,15 +61,16 @@ func NewBalance(db *BalanceDB) *Balance {
 }
 
 // get returns the balance history for the given address from the given timestamp till now
-func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addresses []common.Address, fromTimestamp uint64) ([]*entry, error) {
+func (b *Balance) get(ctx context.Context, chainID uint64, tokenAddress string, tokenSymbol string, addresses []common.Address, fromTimestamp uint64) ([]*entry, error) {
 	logutils.ZapLogger().Debug("Getting balance history",
 		zap.Uint64("chainID", chainID),
-		zap.String("currency", currency),
+		zap.String("tokenAddress", tokenAddress),
+		zap.String("tokenSymbol", tokenSymbol),
 		zap.Stringers("address", addresses),
 		zap.Uint64("fromTimestamp", fromTimestamp),
 	)
 
-	cached, err := b.db.getNewerThan(&assetIdentity{chainID, addresses, currency}, fromTimestamp)
+	cached, err := b.db.getNewerThan(&assetIdentity{addresses, chainID, tokenAddress, tokenSymbol}, fromTimestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -76,10 +78,10 @@ func (b *Balance) get(ctx context.Context, chainID uint64, currency string, addr
 	return cached, nil
 }
 
-func (b *Balance) addEdgePoints(chainID uint64, currency string, addresses []common.Address, fromTimestamp, toTimestamp uint64, data []*entry) (res []*entry, err error) {
+func (b *Balance) addEdgePoints(addresses []common.Address, token *tokentypes.Token, fromTimestamp, toTimestamp uint64, data []*entry) (res []*entry, err error) {
 	logutils.ZapLogger().Debug("Adding edge points",
-		zap.Uint64("chainID", chainID),
-		zap.String("currency", currency),
+		zap.Uint64("chainID", token.ChainID),
+		zap.String("tokenAddress", token.Address.String()),
 		zap.Stringers("address", addresses),
 		zap.Uint64("fromTimestamp", fromTimestamp),
 	)
@@ -96,10 +98,11 @@ func (b *Balance) addEdgePoints(chainID uint64, currency string, addresses []com
 		firstEntry = data[0]
 	} else {
 		firstEntry = &entry{
-			chainID:     chainID,
-			address:     addresses[0],
-			tokenSymbol: currency,
-			timestamp:   int64(fromTimestamp),
+			address:      addresses[0],
+			chainID:      token.ChainID,
+			tokenAddress: token.Address,
+			tokenSymbol:  token.Symbol,
+			timestamp:    int64(fromTimestamp),
 		}
 	}
 
@@ -118,11 +121,12 @@ func (b *Balance) addEdgePoints(chainID uint64, currency string, addresses []com
 		// Add a zero point at the beginning to draw a line from
 		res = append([]*entry{
 			{
-				chainID:     chainID,
-				address:     addresses[0],
-				tokenSymbol: currency,
-				timestamp:   int64(firstTimestamp),
-				balance:     big.NewInt(0),
+				address:      addresses[0],
+				chainID:      token.ChainID,
+				tokenAddress: token.Address,
+				tokenSymbol:  token.Symbol,
+				timestamp:    int64(firstTimestamp),
+				balance:      big.NewInt(0),
 			},
 		}, res...)
 	}
@@ -131,11 +135,12 @@ func (b *Balance) addEdgePoints(chainID uint64, currency string, addresses []com
 	if lastPoint.timestamp < int64(lastTimestamp) {
 		// Add a last point to draw a line to
 		res = append(res, &entry{
-			chainID:     chainID,
-			address:     lastPoint.address,
-			tokenSymbol: currency,
-			timestamp:   int64(lastTimestamp),
-			balance:     lastPoint.balance,
+			address:      lastPoint.address,
+			chainID:      token.ChainID,
+			tokenAddress: token.Address,
+			tokenSymbol:  token.Symbol,
+			timestamp:    int64(lastTimestamp),
+			balance:      lastPoint.balance,
 		})
 	}
 
@@ -164,9 +169,8 @@ func timestampBoundaries(fromTimestamp, toTimestamp uint64, data []*entry) (firs
 	return firstTimestamp, lastTimestamp
 }
 
-func addPaddingPoints(currency string, addresses []common.Address, toTimestamp uint64, data []*entry, limit int) (res []*entry, err error) {
+func addPaddingPoints(addresses []common.Address, toTimestamp uint64, data []*entry, limit int) (res []*entry, err error) {
 	logutils.ZapLogger().Debug("addPaddingPoints start",
-		zap.String("currency", currency),
 		zap.Stringers("address", addresses),
 		zap.Int("len(data)", len(data)),
 		zap.Any("data", data),
@@ -202,11 +206,12 @@ func addPaddingPoints(currency string, addresses []common.Address, toTimestamp u
 			res = append(res[:index+1], res[index:]...)
 			// insert a new point
 			entry := &entry{
-				address:     address,
-				tokenSymbol: currency,
-				timestamp:   paddingTimestamp,
-				balance:     data[j-1].balance, // take the previous balance
-				chainID:     data[j-1].chainID,
+				address:      address,
+				timestamp:    paddingTimestamp,
+				balance:      data[j-1].balance, // take the previous balance
+				chainID:      data[j-1].chainID,
+				tokenAddress: data[j-1].tokenAddress,
+				tokenSymbol:  data[j-1].tokenSymbol,
 			}
 			res[index] = entry
 

@@ -81,6 +81,7 @@ type Network struct {
 
 	BlockExplorerURL       string          `json:"blockExplorerUrl,omitempty" validate:"omitempty,url"`
 	IconURL                string          `json:"iconUrl,omitempty" validate:"omitempty"`
+	NativeGroupedKey       string          `json:"nativeGroupedKey,omitempty" validate:"omitempty,min=1"`
 	NativeCurrencyName     string          `json:"nativeCurrencyName,omitempty" validate:"omitempty,min=1"`
 	NativeCurrencySymbol   string          `json:"nativeCurrencySymbol,omitempty" validate:"omitempty,min=1"`
 	NativeCurrencyDecimals uint64          `json:"nativeCurrencyDecimals" validate:"omitempty"`

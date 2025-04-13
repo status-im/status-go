@@ -420,19 +420,19 @@ func (r *Router) prepareBalanceMapForTokenOnChains(ctx context.Context, input *r
 		return nil
 	}
 
-	chainError := func(chainId uint64, token string, intErr error) {
+	chainError := func(chainId uint64, tokensGroupedKey string, intErr error) {
 		if err == nil {
-			err = fmt.Errorf("chain %d, token %s: %w", chainId, token, intErr)
+			err = fmt.Errorf("chain %d, tokens group key %s: %w", chainId, tokensGroupedKey, intErr)
 		} else {
-			err = fmt.Errorf("%s; chain %d, token %s: %w", err.Error(), chainId, token, intErr)
+			err = fmt.Errorf("%s; chain %d, tokens group key %s: %w", err.Error(), chainId, tokensGroupedKey, intErr)
 		}
 	}
 
 	for _, chain := range selectedFromChains {
 		// check token existence
-		token := findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, chain, input.TokenID)
+		token := findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, chain, input.FromGroupedTokensKey)
 		if token == nil {
-			chainError(chain.ChainID, input.TokenID, ErrTokenNotFound)
+			chainError(chain.ChainID, input.FromGroupedTokensKey, ErrTokenNotFound)
 			continue
 		}
 		// check native token existence
@@ -571,14 +571,14 @@ func (r *Router) findFromAndToTokens(testsMode bool, input *requests.RouteInputP
 	if testsMode {
 		fromToken = input.TestParams.TokenFrom
 	} else {
-		fromToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.TokenID)
+		fromToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, input.AddrFrom, network, input.FromGroupedTokensKey)
 	}
 	if fromToken == nil {
 		return
 	}
 
 	if input.SendType == sendtype.Swap {
-		toToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, common.Address{}, network, input.ToTokenID)
+		toToken = findToken(input.SendType, r.tokenManager, r.collectiblesService, common.Address{}, network, input.ToGroupedTokensKey)
 	}
 	return
 }

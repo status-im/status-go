@@ -47,9 +47,9 @@ type RouteInputParams struct {
 	AddrTo               common.Address    `json:"addrTo" validate:"required"`
 	AmountIn             *hexutil.Big      `json:"amountIn" validate:"required"`
 	AmountOut            *hexutil.Big      `json:"amountOut"`
-	TokenID              string            `json:"tokenID" validate:"required"`
+	FromGroupedTokensKey string            `json:"fromGroupedTokensKey" validate:"required"`
 	TokenIDIsOwnerToken  bool              `json:"tokenIDIsOwnerToken"`
-	ToTokenID            string            `json:"toTokenID"`
+	ToGroupedTokensKey   string            `json:"toGroupedTokensKey"`
 	DisabledFromChainIDs []uint64          `json:"disabledFromChainIDs"`
 	DisabledToChainIDs   []uint64          `json:"disabledToChainIDs"`
 	GasFeeMode           fees.GasFeeMode   `json:"gasFeeMode" validate:"required"`
@@ -118,11 +118,11 @@ func (i *RouteInputParams) Validate() error {
 			return ErrENSRegisterRequiresUsernameAndPubKey
 		}
 		if i.TestnetMode {
-			if i.TokenID != walletCommon.SttSymbol {
+			if i.FromGroupedTokensKey != walletCommon.ETHTokenGroupKey {
 				return ErrENSRegisterTestnetSTTOnly
 			}
 		} else {
-			if i.TokenID != walletCommon.SntSymbol {
+			if i.FromGroupedTokensKey != walletCommon.SNTTokenGroupKey {
 				return ErrENSRegisterMainnetSNTOnly
 			}
 		}
@@ -152,10 +152,10 @@ func (i *RouteInputParams) Validate() error {
 	}
 
 	if i.SendType == sendtype.Swap {
-		if i.ToTokenID == "" {
+		if i.ToGroupedTokensKey == "" {
 			return ErrSwapRequiresToTokenID
 		}
-		if i.TokenID == i.ToTokenID {
+		if i.FromGroupedTokensKey == i.ToGroupedTokensKey {
 			return ErrSwapTokenIDMustBeDifferent
 		}
 
@@ -176,10 +176,10 @@ func (i *RouteInputParams) Validate() error {
 	}
 
 	if i.SendType.IsCommunityRelatedTransfer() {
-		if i.DisabledFromChainIDs == nil || len(i.DisabledFromChainIDs) == 0 {
+		if len(i.DisabledFromChainIDs) == 0 {
 			return ErrNoFromChainProvided
 		}
-		if i.DisabledToChainIDs == nil || len(i.DisabledToChainIDs) == 0 {
+		if len(i.DisabledToChainIDs) == 0 {
 			return ErrNoToChainProvided
 		}
 		if !slicesEqual(i.DisabledFromChainIDs, i.DisabledToChainIDs) {

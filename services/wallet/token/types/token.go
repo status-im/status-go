@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
 )
 
@@ -41,7 +42,7 @@ type StorageToken struct {
 }
 
 func (t *Token) IsNative() bool {
-	return strings.EqualFold(t.Symbol, "ETH")
+	return strings.EqualFold(t.GroupKey, walletCommon.ETHTokenGroupKey)
 }
 
 // TokenKey returns the key of the token, which is chainId + address pair.

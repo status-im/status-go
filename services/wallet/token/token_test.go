@@ -282,43 +282,43 @@ func TestGetTokenHistoricalBalance(t *testing.T) {
 
 	account := common.HexToAddress("0x1234567890abcdef")
 	chainID := uint64(1)
-	testSymbol := "TEST"
+	tokenAddress := common.HexToAddress("0x1")
 	block := int64(1)
 	timestamp := int64(1629878400) // Replace with desired timestamp
 	historyBalance := big.NewInt(0)
 
 	// Test case when no rows are returned
-	balance, err := manager.GetTokenHistoricalBalance(account, chainID, testSymbol, timestamp)
+	balance, err := manager.GetTokenHistoricalBalance(account, chainID, tokenAddress, timestamp)
 	require.NoError(t, err)
 	require.Nil(t, balance)
 
 	// Test case when a row is returned
 	historyBalance.SetInt64(int64(100))
-	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", testSymbol, chainID, account, timestamp-100, (*bigint.SQLBigIntBytes)(historyBalance), block)
+	_, err = manager.db.Exec("INSERT INTO balance_history (token_address, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", tokenAddress, chainID, account, timestamp-100, (*bigint.SQLBigIntBytes)(historyBalance), block)
 	require.NoError(t, err)
 
 	expectedBalance := big.NewInt(100)
-	balance, err = manager.GetTokenHistoricalBalance(account, chainID, testSymbol, timestamp)
+	balance, err = manager.GetTokenHistoricalBalance(account, chainID, tokenAddress, timestamp)
 	require.NoError(t, err)
 	require.Equal(t, expectedBalance, balance)
 
 	// Test multiple values. Must return the most recent one
 	historyBalance.SetInt64(int64(100))
-	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", testSymbol, chainID, account, timestamp-200, (*bigint.SQLBigIntBytes)(historyBalance), block+1)
+	_, err = manager.db.Exec("INSERT INTO balance_history (token_address, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", tokenAddress, chainID, account, timestamp-200, (*bigint.SQLBigIntBytes)(historyBalance), block+1)
 	require.NoError(t, err)
 
 	historyBalance.SetInt64(int64(50))
 	symbol := "TEST2"
-	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", symbol, chainID, account, timestamp-1, (*bigint.SQLBigIntBytes)(historyBalance), block)
+	_, err = manager.db.Exec("INSERT INTO balance_history (token_address, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", symbol, chainID, account, timestamp-1, (*bigint.SQLBigIntBytes)(historyBalance), block)
 	require.NoError(t, err)
 
 	historyBalance.SetInt64(int64(50))
 	chainID = uint64(2)
-	_, err = manager.db.Exec("INSERT INTO balance_history (currency, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", testSymbol, chainID, account, timestamp-1, (*bigint.SQLBigIntBytes)(historyBalance), block+2)
+	_, err = manager.db.Exec("INSERT INTO balance_history (token_address, chain_id, address, timestamp, balance, block) VALUES (?, ?, ?, ?, ?, ?)", tokenAddress, chainID, account, timestamp-1, (*bigint.SQLBigIntBytes)(historyBalance), block+2)
 	require.NoError(t, err)
 
 	chainID = uint64(1)
-	balance, err = manager.GetTokenHistoricalBalance(account, chainID, testSymbol, timestamp)
+	balance, err = manager.GetTokenHistoricalBalance(account, chainID, tokenAddress, timestamp)
 	require.NoError(t, err)
 	require.Equal(t, expectedBalance, balance)
 }

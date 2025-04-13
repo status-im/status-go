@@ -366,27 +366,27 @@ func TestGetBalance1DayAgo(t *testing.T) {
 
 	address := common.Address{0x12}
 	chainID := uint64(1)
-	symbol := "T1"
+	tokenAddress := common.HexToAddress("0x12")
 	dayAgoTimestamp := time.Now().Add(-24 * time.Hour).Unix()
 
 	// Test happy path
 	expectedBalance := big.NewInt(1000000000000000000)
-	tokenManager.EXPECT().GetTokenHistoricalBalance(address, chainID, symbol, dayAgoTimestamp).Return(expectedBalance, nil)
+	tokenManager.EXPECT().GetTokenHistoricalBalance(address, chainID, tokenAddress, dayAgoTimestamp).Return(expectedBalance, nil)
 
 	balance1DayAgo, err := reader.getBalance1DayAgo(&tokenTypes.ChainBalance{
 		ChainID: chainID,
 		Address: address,
-	}, dayAgoTimestamp, symbol, address)
+	}, dayAgoTimestamp, tokenAddress, address)
 
 	require.NoError(t, err)
 	assert.Equal(t, expectedBalance, balance1DayAgo)
 
 	// Test error
-	tokenManager.EXPECT().GetTokenHistoricalBalance(address, chainID, symbol, dayAgoTimestamp).Return(nil, errors.New("error"))
+	tokenManager.EXPECT().GetTokenHistoricalBalance(address, chainID, tokenAddress, dayAgoTimestamp).Return(nil, errors.New("error"))
 	balance1DayAgo, err = reader.getBalance1DayAgo(&tokenTypes.ChainBalance{
 		ChainID: chainID,
 		Address: address,
-	}, dayAgoTimestamp, symbol, address)
+	}, dayAgoTimestamp, tokenAddress, address)
 
 	require.Error(t, err)
 	assert.Nil(t, balance1DayAgo)

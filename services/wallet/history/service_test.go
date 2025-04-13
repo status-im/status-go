@@ -398,6 +398,8 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 	require.NoError(t, err)
 
 	address := common.HexToAddress("0x1234")
+	ethTokenAddress := common.HexToAddress("0x0")
+
 	accountFeed := event.Feed{}
 	walletFeed := event.Feed{}
 	chainID := uint64(1)
@@ -420,25 +422,27 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 	// Insert balances for address
 	database := service.balance.db
 	err = database.add(&entry{
-		chainID:     chainID,
-		address:     address,
-		block:       big.NewInt(1),
-		balance:     big.NewInt(1),
-		timestamp:   1,
-		tokenSymbol: "ETH",
+		chainID:      chainID,
+		address:      address,
+		block:        big.NewInt(1),
+		balance:      big.NewInt(1),
+		timestamp:    1,
+		tokenSymbol:  "ETH",
+		tokenAddress: ethTokenAddress,
 	})
 	require.NoError(t, err)
 	err = database.add(&entry{
-		chainID:     chainID,
-		address:     address,
-		block:       big.NewInt(2),
-		balance:     big.NewInt(2),
-		tokenSymbol: "ETH",
-		timestamp:   2,
+		chainID:      chainID,
+		address:      address,
+		block:        big.NewInt(2),
+		balance:      big.NewInt(2),
+		tokenSymbol:  "ETH",
+		tokenAddress: ethTokenAddress,
+		timestamp:    2,
 	})
 	require.NoError(t, err)
 
-	entries, err := database.getNewerThan(&assetIdentity{chainID, []common.Address{address}, "ETH"}, 0)
+	entries, err := database.getNewerThan(&assetIdentity{[]common.Address{address}, chainID, ethTokenAddress.String(), "ETH"}, 0)
 	require.NoError(t, err)
 	require.Len(t, entries, 2)
 
@@ -460,7 +464,7 @@ func Test_removeBalanceHistoryOnEventAccountRemoved(t *testing.T) {
 		})
 
 		err := utils.Eventually(func() error {
-			entries, err := database.getNewerThan(&assetIdentity{1, []common.Address{address}, "ETH"}, 0)
+			entries, err := database.getNewerThan(&assetIdentity{[]common.Address{address}, chainID, ethTokenAddress.String(), "ETH"}, 0)
 			if err == nil && len(entries) == 0 {
 				return nil
 			}

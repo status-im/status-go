@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
+	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -309,7 +310,7 @@ func TestBalance_addPaddingPoints(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotRes, err := addPaddingPoints(tt.args.currency, tt.args.addresses, tt.args.currentTimestamp, tt.args.data, tt.args.limit)
+			gotRes, err := addPaddingPoints(tt.args.addresses, tt.args.currentTimestamp, tt.args.data, tt.args.limit)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Balance.addPaddingPoints() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -329,9 +330,8 @@ func TestBalance_addEdgePoints(t *testing.T) {
 		db *BalanceDB
 	}
 	type args struct {
-		chainID       uint64
-		currency      string
 		addresses     []common.Address
+		token         *tokentypes.Token
 		fromTimestamp uint64
 		toTimestamp   uint64
 		data          []*entry
@@ -349,27 +349,32 @@ func TestBalance_addEdgePoints(t *testing.T) {
 				db: walletDB,
 			},
 			args: args{
-				chainID:       111,
-				currency:      "SNT",
-				addresses:     []common.Address{common.Address{1}},
+				addresses: []common.Address{common.Address{1}},
+				token: &tokentypes.Token{
+					ChainID: 111,
+					Address: common.Address{100},
+					Symbol:  "SNT",
+				},
 				fromTimestamp: 1,
 				toTimestamp:   2,
 				data:          []*entry{},
 			},
 			wantRes: []*entry{
 				{
-					chainID:     111,
-					balance:     big.NewInt(0),
-					timestamp:   1,
-					tokenSymbol: "SNT",
-					address:     common.Address{1},
+					chainID:      111,
+					balance:      big.NewInt(0),
+					timestamp:    1,
+					tokenSymbol:  "SNT",
+					tokenAddress: common.Address{100},
+					address:      common.Address{1},
 				},
 				{
-					chainID:     111,
-					balance:     big.NewInt(0),
-					timestamp:   2,
-					tokenSymbol: "SNT",
-					address:     common.Address{1},
+					chainID:      111,
+					balance:      big.NewInt(0),
+					timestamp:    2,
+					tokenSymbol:  "SNT",
+					tokenAddress: common.Address{100},
+					address:      common.Address{1},
 				},
 			},
 			wantErr: false,
@@ -380,27 +385,32 @@ func TestBalance_addEdgePoints(t *testing.T) {
 				db: walletDB,
 			},
 			args: args{
-				chainID:       111,
-				currency:      "SNT",
-				addresses:     []common.Address{common.Address{1}},
+				addresses: []common.Address{common.Address{1}},
+				token: &tokentypes.Token{
+					ChainID: 111,
+					Address: common.Address{100},
+					Symbol:  "SNT",
+				},
 				fromTimestamp: 0, // will set to genesisTimestamp
 				toTimestamp:   genesisTimestamp + 1,
 				data:          []*entry{},
 			},
 			wantRes: []*entry{
 				{
-					chainID:     111,
-					balance:     big.NewInt(0),
-					timestamp:   genesisTimestamp,
-					tokenSymbol: "SNT",
-					address:     common.Address{1},
+					chainID:      111,
+					balance:      big.NewInt(0),
+					timestamp:    genesisTimestamp,
+					tokenSymbol:  "SNT",
+					tokenAddress: common.Address{100},
+					address:      common.Address{1},
 				},
 				{
-					chainID:     111,
-					balance:     big.NewInt(0),
-					timestamp:   genesisTimestamp + 1,
-					tokenSymbol: "SNT",
-					address:     common.Address{1},
+					chainID:      111,
+					balance:      big.NewInt(0),
+					timestamp:    genesisTimestamp + 1,
+					tokenSymbol:  "SNT",
+					tokenAddress: common.Address{100},
+					address:      common.Address{1},
 				},
 			},
 			wantErr: false,
@@ -410,63 +420,72 @@ func TestBalance_addEdgePoints(t *testing.T) {
 			fields: fields{
 				db: dbWithEntries(t, []*entry{
 					{
-						chainID:     111,
-						balance:     big.NewInt(1),
-						timestamp:   1,
-						block:       big.NewInt(1),
-						tokenSymbol: "SNT",
-						address:     common.Address{1},
+						chainID:      111,
+						balance:      big.NewInt(1),
+						timestamp:    1,
+						block:        big.NewInt(1),
+						tokenAddress: common.Address{100},
+						tokenSymbol:  "SNT",
+						address:      common.Address{1},
 					},
 				}),
 			},
 			args: args{
-				chainID:       111,
-				currency:      "SNT",
-				addresses:     []common.Address{common.Address{1}},
+				addresses: []common.Address{common.Address{1}},
+				token: &tokentypes.Token{
+					ChainID: 111,
+					Address: common.Address{100},
+					Symbol:  "SNT",
+				},
 				fromTimestamp: 2,
 				toTimestamp:   4,
 				data: []*entry{
 					{
-						chainID:     111,
-						balance:     big.NewInt(3),
-						timestamp:   3,
-						block:       big.NewInt(3),
-						tokenSymbol: "SNT",
-						address:     common.Address{1},
+						chainID:      111,
+						balance:      big.NewInt(3),
+						timestamp:    3,
+						block:        big.NewInt(3),
+						tokenSymbol:  "SNT",
+						tokenAddress: common.Address{100},
+						address:      common.Address{1},
 					},
 					{
-						chainID:     111,
-						balance:     big.NewInt(2),
-						timestamp:   4,
-						block:       big.NewInt(4),
-						tokenSymbol: "SNT",
-						address:     common.Address{1},
+						chainID:      111,
+						balance:      big.NewInt(2),
+						timestamp:    4,
+						block:        big.NewInt(4),
+						tokenSymbol:  "SNT",
+						tokenAddress: common.Address{100},
+						address:      common.Address{1},
 					},
 				},
 			},
 			wantRes: []*entry{
 				{
-					chainID:     111,
-					balance:     big.NewInt(1),
-					timestamp:   2,
-					tokenSymbol: "SNT",
-					address:     common.Address{1},
+					chainID:      111,
+					balance:      big.NewInt(1),
+					timestamp:    2,
+					tokenSymbol:  "SNT",
+					tokenAddress: common.Address{100},
+					address:      common.Address{1},
 				},
 				{
-					chainID:     111,
-					balance:     big.NewInt(3),
-					timestamp:   3,
-					block:       big.NewInt(3),
-					tokenSymbol: "SNT",
-					address:     common.Address{1},
+					chainID:      111,
+					balance:      big.NewInt(3),
+					timestamp:    3,
+					block:        big.NewInt(3),
+					tokenSymbol:  "SNT",
+					tokenAddress: common.Address{100},
+					address:      common.Address{1},
 				},
 				{
-					chainID:     111,
-					balance:     big.NewInt(2),
-					timestamp:   4,
-					block:       big.NewInt(4),
-					tokenSymbol: "SNT",
-					address:     common.Address{1},
+					chainID:      111,
+					balance:      big.NewInt(2),
+					timestamp:    4,
+					block:        big.NewInt(4),
+					tokenSymbol:  "SNT",
+					tokenAddress: common.Address{100},
+					address:      common.Address{1},
 				},
 			},
 			wantErr: false,
@@ -477,37 +496,43 @@ func TestBalance_addEdgePoints(t *testing.T) {
 				db: walletDB,
 			},
 			args: args{
-				chainID:       111,
-				currency:      "SNT",
-				addresses:     []common.Address{common.Address{1}},
+				addresses: []common.Address{common.Address{1}},
+				token: &tokentypes.Token{
+					ChainID: 111,
+					Address: common.Address{100},
+					Symbol:  "SNT",
+				},
 				fromTimestamp: 1,
 				toTimestamp:   2,
 				data: []*entry{
 					{
-						chainID:     111,
-						balance:     big.NewInt(2),
-						timestamp:   2,
-						block:       big.NewInt(2),
-						tokenSymbol: "SNT",
-						address:     common.Address{1},
+						chainID:      111,
+						balance:      big.NewInt(2),
+						timestamp:    2,
+						block:        big.NewInt(2),
+						tokenSymbol:  "SNT",
+						tokenAddress: common.Address{100},
+						address:      common.Address{1},
 					},
 				},
 			},
 			wantRes: []*entry{
 				{
-					chainID:     111,
-					balance:     big.NewInt(0),
-					timestamp:   1,
-					tokenSymbol: "SNT",
-					address:     common.Address{1},
+					chainID:      111,
+					balance:      big.NewInt(0),
+					timestamp:    1,
+					tokenSymbol:  "SNT",
+					tokenAddress: common.Address{100},
+					address:      common.Address{1},
 				},
 				{
-					chainID:     111,
-					balance:     big.NewInt(2),
-					timestamp:   2,
-					block:       big.NewInt(2),
-					tokenSymbol: "SNT",
-					address:     common.Address{1},
+					chainID:      111,
+					balance:      big.NewInt(2),
+					timestamp:    2,
+					block:        big.NewInt(2),
+					tokenSymbol:  "SNT",
+					tokenAddress: common.Address{100},
+					address:      common.Address{1},
 				},
 			},
 			wantErr: false,
@@ -518,7 +543,7 @@ func TestBalance_addEdgePoints(t *testing.T) {
 			b := &Balance{
 				db: tt.fields.db,
 			}
-			gotRes, err := b.addEdgePoints(tt.args.chainID, tt.args.currency, tt.args.addresses, tt.args.fromTimestamp, tt.args.toTimestamp, tt.args.data)
+			gotRes, err := b.addEdgePoints(tt.args.addresses, tt.args.token, tt.args.fromTimestamp, tt.args.toTimestamp, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Balance.addEdgePoints() error = %v, wantErr %v", err, tt.wantErr)
 				return

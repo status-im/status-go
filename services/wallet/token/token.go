@@ -16,7 +16,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/contracts"
@@ -33,7 +32,6 @@ import (
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/communitytokens/communitytokensdatabase"
 	"github.com/status-im/status-go/services/utils"
-	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/token/balancefetcher"
@@ -73,9 +71,10 @@ type ManagerInterface interface {
 	balancefetcher.BalanceFetcher
 	LookupTokenIdentity(chainID uint64, address common.Address, native bool) *tokenTypes.Token
 	LookupToken(chainID *uint64, tokenSymbol string) (token *tokenTypes.Token, isNative bool)
-	GetTokenHistoricalBalance(account common.Address, chainID uint64, symbol string, timestamp int64) (*big.Int, error)
+	GetTokenHistoricalBalance(account common.Address, chainID uint64, tokenAddress common.Address, timestamp int64) (*big.Int, error)
 	GetTokensByChainIDs(chainIDs []uint64) ([]*tokenTypes.Token, error)
 	GetTokensGroupedByGroupKey() (map[string][]*tokenTypes.Token, error)
+	GetTokensForGroupKey(groupKey string) ([]*tokenTypes.Token, error)
 }
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
@@ -181,12 +180,12 @@ func overrideTokensInPlace(networks []params.Network, tokens []*tokenTypes.Token
 	}
 }
 
-func (tm *Manager) FindToken(network *params.Network, tokenSymbol string) *tokenTypes.Token {
-	if tokenSymbol == network.NativeCurrencySymbol {
+func (tm *Manager) FindToken(network *params.Network, groupedTokensKey string) *tokenTypes.Token {
+	if groupedTokensKey == network.NativeGroupedKey {
 		return tm.ToToken(network)
 	}
 
-	return tm.GetToken(network.ChainID, tokenSymbol)
+	return tm.GetToken(network.ChainID, groupedTokensKey)
 }
 
 func (tm *Manager) LookupToken(chainID *uint64, tokenSymbol string) (token *tokenTypes.Token, isNative bool) {
@@ -213,20 +212,6 @@ func (tm *Manager) LookupToken(chainID *uint64, tokenSymbol string) (token *toke
 		return tm.GetToken(*chainID, tokenSymbol), false
 	}
 	return nil, false
-}
-
-// GetToken returns token by chainID and tokenSymbol. Use ToToken for native token
-func (tm *Manager) GetToken(chainID uint64, tokenSymbol string) *tokenTypes.Token {
-	allTokens, err := tm.GetTokens(chainID)
-	if err != nil {
-		return nil
-	}
-	for _, token := range allTokens {
-		if token.Symbol == tokenSymbol {
-			return token
-		}
-	}
-	return nil
 }
 
 func (tm *Manager) LookupTokenIdentity(chainID uint64, address common.Address, native bool) *tokenTypes.Token {
@@ -409,93 +394,6 @@ func (tm *Manager) FindSNT(chainID uint64) *tokenTypes.Token {
 	}
 
 	return nil
-}
-
-func (tm *Manager) getNativeTokens() ([]*tokenTypes.Token, error) {
-	tokens := make([]*tokenTypes.Token, 0)
-	networks, err := tm.networkManager.Get(false)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, network := range networks {
-		tokens = append(tokens, tm.ToToken(network))
-	}
-
-	return tokens, nil
-}
-
-func (tm *Manager) GetAllTokens() ([]*tokenTypes.Token, error) {
-	allTokens, err := tm.GetCustoms(true)
-	if err != nil {
-		logutils.ZapLogger().Error("can't fetch custom tokens", zap.Error(err))
-	}
-
-	uniqueListsTokens := tm.tokenLists.GetUniqueTokens()
-
-	allTokens = append(uniqueListsTokens, allTokens...)
-
-	overrideTokensInPlace(tm.networkManager.GetEmbeddedNetworks(), allTokens)
-
-	native, err := tm.getNativeTokens()
-	if err != nil {
-		return nil, err
-	}
-
-	allTokens = append(allTokens, native...)
-
-	return allTokens, nil
-}
-
-func (tm *Manager) GetTokens(chainID uint64) ([]*tokenTypes.Token, error) {
-	tokens, err := tm.GetAllTokens()
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]*tokenTypes.Token, 0)
-
-	for _, token := range tokens {
-		if token.ChainID == chainID {
-			res = append(res, token)
-		}
-	}
-
-	return res, nil
-}
-
-func (tm *Manager) GetTokensByChainIDs(chainIDs []uint64) ([]*tokenTypes.Token, error) {
-	tokens, err := tm.GetAllTokens()
-	if err != nil {
-		return nil, err
-	}
-
-	res := make([]*tokenTypes.Token, 0)
-
-	for _, token := range tokens {
-		for _, chainID := range chainIDs {
-			if token.ChainID == chainID {
-				res = append(res, token)
-			}
-		}
-	}
-
-	return res, nil
-}
-
-func (tm *Manager) GetTokensGroupedByGroupKey() (map[string][]*tokenTypes.Token, error) {
-	tokens, err := tm.GetAllTokens()
-	if err != nil {
-		return nil, err
-	}
-
-	res := make(map[string][]*tokenTypes.Token)
-
-	for _, token := range tokens {
-		res[token.TokenGroupKey()] = append(res[token.TokenGroupKey()], token)
-	}
-
-	return res, nil
 }
 
 func (tm *Manager) GetList() *ListWrapper {
@@ -742,108 +640,4 @@ func (tm *Manager) fillCommunityData(token *tokenTypes.Token) error {
 		token.CommunityData.Image = communityInfo.CommunityImage
 	}
 	return nil
-}
-
-func (tm *Manager) GetTokenHistoricalBalance(account common.Address, chainID uint64, symbol string, timestamp int64) (*big.Int, error) {
-	var balance big.Int
-	err := tm.db.QueryRow("SELECT balance FROM balance_history WHERE currency = ? AND chain_id = ? AND address = ? AND timestamp < ? order by timestamp DESC LIMIT 1", symbol, chainID, account, timestamp).Scan((*bigint.SQLBigIntBytes)(&balance))
-	if err == sql.ErrNoRows {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	return &balance, nil
-}
-
-func (tm *Manager) GetPreviouslyOwnedTokens() (map[common.Address][]tokenTypes.Token, error) {
-	storageTokens, err := tm.tokenBalancesStorage.GetTokens()
-	if err != nil {
-		return nil, err
-	}
-
-	tokens := make(map[common.Address][]tokenTypes.Token)
-	for account, storageToken := range storageTokens {
-		for _, token := range storageToken {
-			tokens[account] = append(tokens[account], token.Token)
-		}
-	}
-
-	return tokens, nil
-}
-
-func (tm *Manager) removeTokenBalances(account common.Address) error {
-	_, err := tm.db.Exec("DELETE FROM token_balances WHERE user_address = ?", account.String())
-	return err
-}
-
-func (tm *Manager) onAccountsChange(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
-	if eventType == accountsevent.EventTypeRemoved {
-		for _, account := range changedAddresses {
-			err := tm.removeTokenBalances(account)
-			if err != nil {
-				logutils.ZapLogger().Error("token.Manager: can't remove token balances", zap.Error(err))
-			}
-		}
-	}
-}
-
-func (tm *Manager) GetCachedBalancesByChain(accounts, tokenAddresses []common.Address, chainIDs []uint64) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
-	accountStrings := make([]string, len(accounts))
-	for i, account := range accounts {
-		accountStrings[i] = fmt.Sprintf("'%s'", account.Hex())
-	}
-
-	tokenAddressStrings := make([]string, len(tokenAddresses))
-	for i, tokenAddress := range tokenAddresses {
-		tokenAddressStrings[i] = fmt.Sprintf("'%s'", tokenAddress.Hex())
-	}
-
-	chainIDStrings := make([]string, len(chainIDs))
-	for i, chainID := range chainIDs {
-		chainIDStrings[i] = fmt.Sprintf("%d", chainID)
-	}
-
-	//nolint: gosec
-	query := `SELECT chain_id, user_address, token_address, raw_balance
-			  	FROM token_balances
-				WHERE user_address IN (` + strings.Join(accountStrings, ",") + `)
-					AND token_address IN (` + strings.Join(tokenAddressStrings, ",") + `)
-					AND chain_id IN (` + strings.Join(chainIDStrings, ",") + `)`
-
-	rows, err := tm.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	ret := make(map[uint64]map[common.Address]map[common.Address]*hexutil.Big)
-
-	for rows.Next() {
-		var chainID uint64
-		var userAddressStr, tokenAddressStr string
-		var rawBalance string
-
-		err := rows.Scan(&chainID, &userAddressStr, &tokenAddressStr, &rawBalance)
-		if err != nil {
-			return nil, err
-		}
-
-		num := new(hexutil.Big)
-		_, ok := num.ToInt().SetString(rawBalance, 10)
-		if !ok {
-			return ret, nil
-		}
-
-		if ret[chainID] == nil {
-			ret[chainID] = make(map[common.Address]map[common.Address]*hexutil.Big)
-		}
-
-		if ret[chainID][common.HexToAddress(userAddressStr)] == nil {
-			ret[chainID][common.HexToAddress(userAddressStr)] = make(map[common.Address]*hexutil.Big)
-		}
-
-		ret[chainID][common.HexToAddress(userAddressStr)][common.HexToAddress(tokenAddressStr)] = num
-	}
-
-	return ret, nil
 }
