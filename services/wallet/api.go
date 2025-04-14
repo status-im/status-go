@@ -939,9 +939,10 @@ func (api *API) GetLeaderboardData(ctx context.Context) ([]leaderboard.Cryptocur
 	return api.s.leaderboardService.GetCombinedData(), nil
 }
 
-func (api *API) GetMarketTokenPageAsync(ctx context.Context, page, pageSize, sortOrder int) {
-	logutils.ZapLogger().Debug("call to GetMarketTokenPageAsync", zap.Int("page", page), zap.Int("pageSize", pageSize), zap.Int("sortOrder", sortOrder))
-	api.s.leaderboardService.GetLeaderboardPageAsync(page, pageSize, sortOrder)
+func (api *API) FetchMarketTokenPageAsync(ctx context.Context, page, pageSize, sortOrder int, currency string) error {
+	logutils.ZapLogger().Debug("call to GetMarketTokenPageAsync", zap.Int("page", page), zap.Int("pageSize", pageSize), zap.Int("sortOrder", sortOrder), zap.String("currency", currency))
+	api.s.leaderboardService.FetchLeaderboardPageAsync(page, pageSize, sortOrder, currency)
+	return nil
 }
 
 func (api *API) UnsubscribeFromLeaderboard() error {
