@@ -2266,10 +2266,6 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}
 
 	if err = b.statusNode.StartWithOptions(config, node.StartOptions{
-		// The peers discovery protocols are started manually after
-		// `node.ready` signal is sent.
-		// It was discussed in https://github.com/status-im/status-go/pull/1333.
-		StartDiscovery:  false,
 		AccountsManager: manager,
 	}); err != nil {
 		return
@@ -2302,11 +2298,6 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}
 
 	signal.SendNodeReady()
-
-	if err := b.statusNode.StartDiscovery(); err != nil {
-		return err
-	}
-
 	return nil
 }
 

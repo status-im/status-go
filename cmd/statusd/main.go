@@ -27,7 +27,6 @@ import (
 	"github.com/status-im/status-go/cmd/status-backend/server"
 	"github.com/status-im/status-go/cmd/utils"
 	"github.com/status-im/status-go/common/dbsetup"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/metrics"
@@ -267,9 +266,8 @@ func main() {
 		messenger, err := protocol.NewMessenger(
 			config.Name,
 			identity,
-			gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuV2Service()),
+			backend.StatusNode().WakuV2Service(),
 			installationID.String(),
-			nil,
 			config.Version,
 			options...,
 		)
@@ -340,9 +338,8 @@ func main() {
 			messenger, err := protocol.NewMessenger(
 				config.Name,
 				identity,
-				gethbridge.NewNodeBridge(backend.StatusNode().GethNode(), backend.StatusNode().WakuV2Service()),
+				backend.StatusNode().WakuV2Service(),
 				installationID.String(),
-				nil,
 				config.Version,
 				options...,
 			)

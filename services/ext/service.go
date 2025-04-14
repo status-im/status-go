@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap"
 
 	commongethtypes "github.com/ethereum/go-ethereum/common"
@@ -22,17 +21,14 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/api/multiformat"
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/db"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
-	gethnode "github.com/status-im/status-go/eth-node/node"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/version"
@@ -53,12 +49,12 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/communitytokens"
-	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
 )
 
@@ -78,13 +74,10 @@ type Service struct {
 	messenger       *protocol.Messenger
 	identity        *ecdsa.PrivateKey
 	cancelMessenger chan struct{}
-	storage         db.TransactionalStorage
-	n               gethnode.Node
+	waku            wakutypes.Waku
 	rpcClient       *rpc.Client
 	config          params.NodeConfig
-	mailMonitor     *MailRequestMonitor
 	server          *p2p.Server
-	peerStore       *mailservers.PeerStore
 	accountsDB      *accounts.Database
 	multiAccountsDB *multiaccounts.Database
 	account         *multiaccounts.Account
@@ -95,21 +88,13 @@ var _ node.Lifecycle = (*Service)(nil)
 
 func New(
 	config params.NodeConfig,
-	n gethnode.Node,
+	waku wakutypes.Waku,
 	rpcClient *rpc.Client,
-	ldb *leveldb.DB,
-	mailMonitor *MailRequestMonitor,
-	eventSub mailservers.EnvelopeEventSubscriber,
 ) *Service {
-	cache := mailservers.NewCache(ldb)
-	peerStore := mailservers.NewPeerStore(cache)
 	return &Service{
-		storage:     db.NewLevelDBStorage(ldb),
-		n:           n,
-		rpcClient:   rpcClient,
-		config:      config,
-		mailMonitor: mailMonitor,
-		peerStore:   peerStore,
+		waku:      waku,
+		rpcClient: rpcClient,
+		config:    config,
 	}
 }
 
@@ -118,13 +103,6 @@ func (s *Service) NodeID() *ecdsa.PrivateKey {
 		return nil
 	}
 	return s.server.PrivateKey
-}
-
-func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
-	if len(rawURL) == 0 {
-		return mailservers.GetFirstConnected(s.server, s.peerStore)
-	}
-	return enode.ParseV4(rawURL)
 }
 
 func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB,
@@ -159,7 +137,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		MaxAttempts:                      s.config.ShhextConfig.MaxMessageDeliveryAttempts,
 		AwaitOnlyMailServerConfirmations: s.config.ShhextConfig.MailServerConfirmations,
 		IsMailserver: func(peer types.EnodeID) bool {
-			return s.peerStore.Exist(peer)
+			return false
 		},
 		EnvelopeEventsHandler: EnvelopeSignalHandler{},
 		Logger:                logger,
@@ -179,9 +157,8 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	messenger, err := protocol.NewMessenger(
 		nodeName,
 		identity,
-		s.n,
+		s.waku,
 		s.config.ShhextConfig.InstallationID,
-		s.peerStore,
 		version.Version(),
 		options...,
 	)

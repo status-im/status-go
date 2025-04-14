@@ -4,14 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
-	"net"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sync"
 
-	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -19,16 +15,12 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/p2p/enr"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/connection"
-	"github.com/status-im/status-go/db"
-	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	accountssvc "github.com/status-im/status-go/services/accounts"
@@ -43,7 +35,6 @@ import (
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
-	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
@@ -67,7 +58,6 @@ var (
 	ErrNoRunningNode          = errors.New("there is no running node")
 	ErrAccountKeyStoreMissing = errors.New("account key store is not set")
 	ErrServiceUnknown         = errors.New("service unknown")
-	ErrDiscoveryRunning       = errors.New("discovery is already running")
 	ErrRPCMethodUnavailable   = `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"the method called does not exist/is not available"}}`
 )
 
@@ -89,11 +79,6 @@ type StatusNode struct {
 	mediaServerEnableTLS *bool
 	httpServer           *server.MediaServer
 
-	discovery discovery.Discovery
-	register  *peers.Register
-	peerPool  *peers.PeerPool
-	db        *leveldb.DB // used as a cache for PeerPool
-
 	logger *zap.Logger
 
 	gethAccountManager *account.GethManager
@@ -114,7 +99,6 @@ type StatusNode struct {
 	providerSrvc           *web3provider.Service
 	appMetricsSrvc         *appmetricsservice.Service
 	walletSrvc             *wallet.Service
-	peerSrvc               *peer.Service
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         *timesource.NTPTimeSource
@@ -187,14 +171,12 @@ func (n *StatusNode) Server() *p2p.Server {
 // It accepts a list of services that should be added to the node.
 func (n *StatusNode) Start(config *params.NodeConfig, accs *accounts.Manager) error {
 	return n.StartWithOptions(config, StartOptions{
-		StartDiscovery:  true,
 		AccountsManager: accs,
 	})
 }
 
 // StartOptions allows to control some parameters of Start() method.
 type StartOptions struct {
-	StartDiscovery  bool
 	AccountsManager *accounts.Manager
 }
 
@@ -245,37 +227,15 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 
 	n.logger.Debug("starting with options", zap.Stringer("ClusterConfig", &config.ClusterConfig))
 
-	db, err := db.Create(config.DataDir, params.StatusDatabase)
-	if err != nil {
-		return fmt.Errorf("failed to create database at %s: %v", config.DataDir, err)
-	}
-
-	n.db = db
-
-	err = n.startWithDB(config, options.AccountsManager, db)
-
-	// continue only if there was no error when starting node with a db
-	if err == nil && options.StartDiscovery && n.discoveryEnabled() {
-		err = n.startDiscovery()
-	}
-
-	if err != nil {
-		if dberr := db.Close(); dberr != nil {
-			n.logger.Error("error while closing leveldb after node crash", zap.Error(dberr))
-		}
-		n.db = nil
-		return err
-	}
-
-	return nil
+	return n.startWithDB(config, options.AccountsManager)
 }
 
 func (n *StatusNode) SetMediaServerEnableTLS(enableTLS *bool) {
 	n.mediaServerEnableTLS = enableTLS
 }
 
-func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) error {
-	if err := n.createNode(config, accs, db); err != nil {
+func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manager) error {
+	if err := n.createNode(config, accs); err != nil {
 		return err
 	}
 	n.config = config
@@ -314,8 +274,8 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 	return n.startGethNode()
 }
 
-func (n *StatusNode) createNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) (err error) {
-	n.gethNode, err = MakeNode(config, accs, db)
+func (n *StatusNode) createNode(config *params.NodeConfig, accs *accounts.Manager) (err error) {
+	n.gethNode, err = MakeNode(config, accs)
 	return err
 }
 
@@ -349,92 +309,6 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	return
 }
 
-// Deprecated: in WakuV2 discoveryEnabled always returns false,
-// because n.config.NoDiscovery is always true.
-func (n *StatusNode) discoveryEnabled() bool {
-	return n.config != nil && (!n.config.NoDiscovery) && n.config.ClusterConfig.Enabled
-}
-
-func (n *StatusNode) discoverNode() (*enode.Node, error) {
-	if !n.isRunning() {
-		return nil, nil
-	}
-
-	server := n.gethNode.Server()
-	discNode := server.Self()
-
-	if n.config.AdvertiseAddr == "" {
-		return discNode, nil
-	}
-
-	n.logger.Info("Using AdvertiseAddr for rendezvous", zap.String("addr", n.config.AdvertiseAddr))
-
-	r := discNode.Record()
-	r.Set(enr.IP(net.ParseIP(n.config.AdvertiseAddr)))
-	if err := enode.SignV4(r, server.PrivateKey); err != nil {
-		return nil, err
-	}
-	return enode.New(enode.ValidSchemes[r.IdentityScheme()], r)
-}
-
-// StartDiscovery starts the peers discovery protocols depending on the node config.
-func (n *StatusNode) StartDiscovery() error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if n.discoveryEnabled() {
-		return n.startDiscovery()
-	}
-
-	return nil
-}
-
-func (n *StatusNode) startDiscovery() error {
-	if n.isDiscoveryRunning() {
-		return ErrDiscoveryRunning
-	}
-
-	discoveries := []discovery.Discovery{}
-	if !n.config.NoDiscovery {
-		discoveries = append(discoveries, discovery.NewDiscV5(
-			n.gethNode.Server().PrivateKey,
-			n.config.ListenAddr,
-			parseNodesV5(n.config.ClusterConfig.BootNodes)))
-	}
-
-	if len(discoveries) == 0 {
-		return errors.New("wasn't able to register any discovery")
-	} else if len(discoveries) > 1 {
-		n.discovery = discovery.NewMultiplexer(discoveries)
-	} else {
-		n.discovery = discoveries[0]
-	}
-	n.logger.Debug("using discovery",
-		zap.Any("instance", reflect.TypeOf(n.discovery)),
-		zap.Any("registerTopics", n.config.RegisterTopics),
-		zap.Any("requireTopics", n.config.RequireTopics),
-	)
-	n.register = peers.NewRegister(n.discovery, n.config.RegisterTopics...)
-	options := peers.NewDefaultOptions()
-	// TODO(dshulyak) consider adding a flag to define this behaviour
-	options.AllowStop = len(n.config.RegisterTopics) == 0
-	options.TrustedMailServers = parseNodesToNodeID(n.config.ClusterConfig.TrustedMailServers)
-
-	n.peerPool = peers.NewPeerPool(
-		n.discovery,
-		n.config.RequireTopics,
-		peers.NewCache(n.db),
-		options,
-	)
-	if err := n.discovery.Start(); err != nil {
-		return err
-	}
-	if err := n.register.Start(); err != nil {
-		return err
-	}
-	return n.peerPool.Start(n.gethNode.Server())
-}
-
 // Stop will stop current StatusNode. A stopped node cannot be resumed.
 func (n *StatusNode) Stop() error {
 	n.mu.Lock()
@@ -449,15 +323,6 @@ func (n *StatusNode) Stop() error {
 
 // stop will stop current StatusNode. A stopped node cannot be resumed.
 func (n *StatusNode) stop() error {
-	if n.isDiscoveryRunning() {
-		if err := n.stopDiscovery(); err != nil {
-			n.logger.Error("Error stopping the discovery components", zap.Error(err))
-		}
-		n.register = nil
-		n.peerPool = nil
-		n.discovery = nil
-	}
-
 	if err := n.gethNode.Close(); err != nil {
 		return err
 	}
@@ -478,14 +343,6 @@ func (n *StatusNode) stop() error {
 	n.downloader.Stop()
 	n.downloader = nil
 
-	if n.db != nil {
-		if err = n.db.Close(); err != nil {
-			n.logger.Error("Error closing the leveldb of status node", zap.Error(err))
-			return err
-		}
-		n.db = nil
-	}
-
 	n.rpcFiltersSrvc = nil
 	n.subscriptionsSrvc = nil
 	n.rpcStatsSrvc = nil
@@ -496,7 +353,6 @@ func (n *StatusNode) stop() error {
 	n.providerSrvc = nil
 	n.appMetricsSrvc = nil
 	n.walletSrvc = nil
-	n.peerSrvc = nil
 	n.localNotificationsSrvc = nil
 	n.personalSrvc = nil
 	n.timeSourceSrvc = nil
@@ -511,16 +367,6 @@ func (n *StatusNode) stop() error {
 	n.appGeneralSrvc = nil
 	n.logger.Debug("status node stopped")
 	return nil
-}
-
-func (n *StatusNode) isDiscoveryRunning() bool {
-	return n.register != nil || n.peerPool != nil || n.discovery != nil
-}
-
-func (n *StatusNode) stopDiscovery() error {
-	n.register.Stop()
-	n.peerPool.Stop()
-	return n.discovery.Stop()
 }
 
 // ResetChainData removes chain data if node is not running.
@@ -679,17 +525,6 @@ func (n *StatusNode) RPCClient() *rpc.Client {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.rpcClient
-}
-
-// Discover sets up the discovery for a specific topic.
-func (n *StatusNode) Discover(topic string, max, min int) (err error) {
-	if n.peerPool == nil {
-		return errors.New("peerPool not running")
-	}
-	return n.peerPool.UpdateTopic(topic, params.Limits{
-		Max: max,
-		Min: min,
-	})
 }
 
 func (n *StatusNode) SetAppDB(db *sql.DB) {

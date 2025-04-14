@@ -15,7 +15,7 @@ type PublicAPI struct {
 // NewPublicAPI returns instance of the public API.
 func NewPublicAPI(s *Service) *PublicAPI {
 	return &PublicAPI{
-		PublicAPI: ext.NewPublicAPI(s.Service, s.w),
+		PublicAPI: ext.NewPublicAPI(s.Service),
 		service:   s,
 		publicAPI: s.w.PublicWakuAPI(),
 	}

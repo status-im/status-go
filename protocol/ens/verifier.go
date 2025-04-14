@@ -11,11 +11,10 @@ import (
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/protocol/common"
 
-	gethnode "github.com/status-im/status-go/eth-node/node"
+	gethens "github.com/status-im/status-go/eth-node/bridge/geth/ens"
 )
 
 type Verifier struct {
-	node            gethnode.Node
 	online          bool
 	persistence     *Persistence
 	logger          *zap.Logger
@@ -26,10 +25,9 @@ type Verifier struct {
 	quit            chan struct{}
 }
 
-func New(node gethnode.Node, logger *zap.Logger, timesource common.TimeSource, db *sql.DB, rpcEndpoint, contractAddress string) *Verifier {
+func New(logger *zap.Logger, timesource common.TimeSource, db *sql.DB, rpcEndpoint, contractAddress string) *Verifier {
 	persistence := NewPersistence(db)
 	return &Verifier{
-		node:            node,
 		logger:          logger,
 		persistence:     persistence,
 		timesource:      timesource,
@@ -133,14 +131,14 @@ func (v *Verifier) publish(records []*VerificationRecord) {
 }
 
 func (v *Verifier) ReverseResolve(address gethcommon.Address) (string, error) {
-	verifier := v.node.NewENSVerifier(v.logger)
+	verifier := gethens.NewVerifier(v.logger)
 	return verifier.ReverseResolve(address, v.rpcEndpoint)
 }
 
 // Verify verifies that a registered ENS name matches the expected public key
 func (v *Verifier) verify(rpcEndpoint, contractAddress string) error {
 	v.logger.Debug("verifying ENS Names")
-	verifier := v.node.NewENSVerifier(v.logger)
+	verifier := gethens.NewVerifier(v.logger)
 
 	var ensDetails []enstypes.ENSDetails
 

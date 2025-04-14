@@ -40,7 +40,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/verification"
-	"github.com/status-im/status-go/services/ext/mailservers"
 	"github.com/status-im/status-go/wakuv2"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -152,17 +151,15 @@ type MessagesResponse struct {
 
 // PublicAPI extends whisper public API.
 type PublicAPI struct {
-	service  *Service
-	eventSub mailservers.EnvelopeEventSubscriber
-	logger   *zap.Logger
+	service *Service
+	logger  *zap.Logger
 }
 
 // NewPublicAPI returns instance of the public API.
-func NewPublicAPI(s *Service, eventSub mailservers.EnvelopeEventSubscriber) *PublicAPI {
+func NewPublicAPI(s *Service) *PublicAPI {
 	return &PublicAPI{
-		service:  s,
-		eventSub: eventSub,
-		logger:   logutils.ZapLogger().Named("sshextService"),
+		service: s,
+		logger:  logutils.ZapLogger().Named("sshextService"),
 	}
 }
 

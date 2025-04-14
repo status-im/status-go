@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -37,7 +36,7 @@ var (
 var logger = logutils.ZapLogger().Named("node")
 
 // MakeNode creates a geth node entity
-func MakeNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) (*node.Node, error) {
+func MakeNode(config *params.NodeConfig, accs *accounts.Manager) (*node.Node, error) {
 	// If DataDir is empty, it means we want to create an ephemeral node
 	// keeping data only in memory.
 	if config.DataDir != "" {

@@ -24,9 +24,7 @@ import (
 
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/common"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
-	gethnode "github.com/status-im/status-go/eth-node/node"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -42,11 +40,9 @@ import (
 	"github.com/status-im/status-go/services/connector"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/eth"
-	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/gif"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
-	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
@@ -85,7 +81,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.rpcStatsService())
 	services = append(services, b.appmetricsService())
 	services = append(services, b.appgeneralService())
-	services = append(services, b.peerService())
 	services = append(services, b.personalService())
 	services = append(services, b.statusPublicService())
 	services = append(services, b.pendingTrackerService(&b.walletFeed))
@@ -153,8 +148,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 
 	services = append(services, b.ethService())
 
-	b.peerSrvc.SetDiscoverer(b)
-
 	for i := range services {
 		b.RegisterLifecycle(services[i])
 	}
@@ -179,16 +172,12 @@ func (b *StatusNode) addPublicMethods(apis []gethrpc.API) {
 	}
 }
 
-func (b *StatusNode) nodeBridge() gethnode.Node {
-	return gethbridge.NewNodeBridge(b.gethNode, b.wakuV2Srvc)
-}
-
 func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Service, error) {
 	if b.gethNode == nil {
 		return nil, errors.New("geth node not initialized")
 	}
 	if b.wakuV2ExtSrvc == nil {
-		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.nodeBridge(), b.rpcClient, ext.EnvelopeSignalHandler{}, b.db)
+		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.wakuV2Srvc, b.rpcClient)
 	}
 
 	b.wakuV2ExtSrvc.SetP2PServer(b.gethNode.Server())
@@ -486,13 +475,6 @@ func (b *StatusNode) localNotificationsService(network uint64) (*localnotificati
 		}
 	}
 	return b.localNotificationsSrvc, nil
-}
-
-func (b *StatusNode) peerService() *peer.Service {
-	if b.peerSrvc == nil {
-		b.peerSrvc = peer.New()
-	}
-	return b.peerSrvc
 }
 
 func (b *StatusNode) ethService() *eth.Service {

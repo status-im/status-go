@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/storage"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -21,10 +19,7 @@ func TestMakeNodeDefaultConfig(t *testing.T) {
 	config, err := utils.MakeTestNodeConfig(3)
 	require.NoError(t, err)
 
-	db, err := leveldb.Open(storage.NewMemStorage(), nil)
-	require.NoError(t, err)
-
-	_, err = MakeNode(config, &accounts.Manager{}, db)
+	_, err = MakeNode(config, &accounts.Manager{})
 	require.NoError(t, err)
 }
 

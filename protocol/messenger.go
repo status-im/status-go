@@ -15,7 +15,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mmcdole/gofeed"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -65,7 +64,6 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 	ensservice "github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/services/ext/mailservers"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
@@ -73,7 +71,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
 
-	gethnode "github.com/status-im/status-go/eth-node/node"
 	wakutypes "github.com/status-im/status-go/waku/types"
 
 	_ "github.com/mmcdole/gofeed"
@@ -106,9 +103,8 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
 type Messenger struct {
-	node                      gethnode.Node
+	waku                      wakutypes.Waku
 	server                    *p2p.Server
-	peerStore                 *mailservers.PeerStore
 	config                    *config
 	identity                  *ecdsa.PrivateKey
 	persistence               *sqlitePersistence
@@ -292,9 +288,8 @@ func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash types
 func NewMessenger(
 	nodeName string,
 	identity *ecdsa.PrivateKey,
-	node gethnode.Node,
+	waku wakutypes.Waku,
 	installationID string,
-	peerStore *mailservers.PeerStore,
 	version string,
 	opts ...Option,
 ) (*Messenger, error) {
@@ -340,16 +335,8 @@ func NewMessenger(
 	}
 
 	// Initialize transport layer.
-	var transp *transport.Transport
-	var peerId peer.ID
-
-	wakuV2, err := node.GetWakuV2(nil)
-	if err != nil || wakuV2 == nil {
-		return nil, errors.Wrap(err, "failed to find Whisper and Waku V1/V2 services")
-	}
-	peerId = wakuV2.PeerID()
-	transp, err = transport.NewTransport(
-		wakuV2,
+	transp, err := transport.NewTransport(
+		waku,
 		identity,
 		database,
 		"wakuv2_keys",
@@ -432,7 +419,7 @@ func NewMessenger(
 
 	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, sender, sqlitePersistence)
 
-	ensVerifier := ens.New(node, logger, transp, database, c.verifyENSURL, c.verifyENSContractAddress)
+	ensVerifier := ens.New(logger, transp, database, c.verifyENSURL, c.verifyENSContractAddress)
 
 	managerOptions := []communities.ManagerOption{
 		communities.WithAccountManager(c.accountsManager),
@@ -519,7 +506,7 @@ func NewMessenger(
 	var wakuMetricsHandler *wakumetrics.Client
 	if c.telemetryServerURL != "" {
 		options := []wakumetrics.TelemetryClientOption{
-			wakumetrics.WithPeerID(peerId.String()),
+			wakumetrics.WithPeerID(waku.PeerID().String()),
 		}
 		wakuMetricsHandler, err = wakumetrics.NewClient(options...)
 		if err != nil {
@@ -538,7 +525,7 @@ func NewMessenger(
 	ctx, cancel := context.WithCancel(context.Background())
 	messenger = &Messenger{
 		config:                     &c,
-		node:                       node,
+		waku:                       waku,
 		identity:                   identity,
 		persistence:                sqlitePersistence,
 		transport:                  transp,
@@ -573,7 +560,6 @@ func NewMessenger(
 		peersyncing:             peersyncing.New(peersyncing.Config{Database: database, Timesource: transp}),
 		peersyncingOffers:       make(map[string]uint64),
 		peersyncingRequests:     make(map[string]uint64),
-		peerStore:               peerStore,
 		mvdsStatusChangeEvent:   make(chan datasyncnode.PeerStatusChangeEvent, 5),
 		verificationDatabase:    verification.NewPersistence(database),
 		mailserversDatabase:     c.mailserversDatabase,
@@ -1036,12 +1022,7 @@ func (m *Messenger) Online() bool {
 		return m.config.onlineChecker()
 	}
 
-	switch m.transport.WakuVersion() {
-	case 2:
-		return m.transport.PeerCount() > 0
-	default:
-		return m.node.PeersCount() > 0
-	}
+	return m.transport.PeerCount() > 0
 }
 
 func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvertisement, error) {
@@ -1549,20 +1530,6 @@ func (m *Messenger) watchConnectionChange() {
 		m.handleConnectionChange(state)
 	}
 
-	pollConnectionStatus := func() {
-		defer gocommon.LogOnPanic()
-		func() {
-			for {
-				select {
-				case <-time.After(200 * time.Millisecond):
-					processNewState(m.Online())
-				case <-m.quit:
-					return
-				}
-			}
-		}()
-	}
-
 	subscribedConnectionStatus := func(subscription *wakutypes.ConnStatusSubscription) {
 		defer gocommon.LogOnPanic()
 		defer subscription.Unsubscribe()
@@ -1583,19 +1550,7 @@ func (m *Messenger) watchConnectionChange() {
 	m.logger.Debug("watching connection changes")
 	m.handleConnectionChange(state)
 
-	waku, err := m.node.GetWakuV2(nil)
-	if err != nil {
-		// No waku v2, we can't watch connection changes
-		// Instead we will poll the connection status.
-		m.logger.Warn("using WakuV1, can't watch connection changes, this might be have side-effects")
-		go pollConnectionStatus()
-		return
-	}
-
-	// Wakuv2 is not going to return an error
-	// from SubscribeToConnStatusChanges
-	subscription, _ := waku.SubscribeToConnStatusChanges()
-
+	subscription, _ := m.waku.SubscribeToConnStatusChanges()
 	go subscribedConnectionStatus(subscription)
 }
 

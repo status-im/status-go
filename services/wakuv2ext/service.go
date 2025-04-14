@@ -1,10 +1,7 @@
 package wakuv2ext
 
 import (
-	"github.com/syndtr/goleveldb/leveldb"
-
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	gethnode "github.com/status-im/status-go/eth-node/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ext"
@@ -17,19 +14,9 @@ type Service struct {
 	w wakutypes.Waku
 }
 
-func New(config params.NodeConfig, n gethnode.Node, rpcClient *rpc.Client, handler ext.EnvelopeEventsHandler, ldb *leveldb.DB) *Service {
-	w, err := n.GetWakuV2(nil)
-	if err != nil {
-		panic(err)
-	}
-	delay := ext.DefaultRequestsDelay
-	if config.ShhextConfig.RequestsDelay != 0 {
-		delay = config.ShhextConfig.RequestsDelay
-	}
-	requestsRegistry := ext.NewRequestsRegistry(delay)
-	mailMonitor := ext.NewMailRequestMonitor(w, handler, requestsRegistry)
+func New(config params.NodeConfig, w wakutypes.Waku, rpcClient *rpc.Client) *Service {
 	return &Service{
-		Service: ext.New(config, n, rpcClient, ldb, mailMonitor, w),
+		Service: ext.New(config, w, rpcClient),
 		w:       w,
 	}
 }

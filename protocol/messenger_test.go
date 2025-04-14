@@ -15,13 +15,11 @@ import (
 
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/deprecation"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
@@ -32,8 +30,6 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/timesource"
-
-	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 const (
@@ -51,30 +47,6 @@ func TestMessengerSuite(t *testing.T) {
 
 type MessengerSuite struct {
 	MessengerBaseTestSuite
-}
-
-type testNode struct {
-	shh wakutypes.Waku
-}
-
-func (n *testNode) NewENSVerifier(_ *zap.Logger) enstypes.ENSVerifier {
-	panic("not implemented")
-}
-
-func (n *testNode) AddPeer(_ string) error {
-	panic("not implemented")
-}
-
-func (n *testNode) RemovePeer(_ string) error {
-	panic("not implemented")
-}
-
-func (n *testNode) GetWakuV2(_ interface{}) (wakutypes.Waku, error) {
-	return n.shh, nil
-}
-
-func (n *testNode) PeersCount() int {
-	return 1
 }
 
 func (s *MessengerSuite) TestInitFilters() {
