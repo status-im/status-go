@@ -19,7 +19,7 @@ type Cryptocurrency struct {
 
 // PriceData represents price data update
 type PriceData struct {
-	Symbol           string  `json:"symbol,omitempty"`
+	ID               string  `json:"id,omitempty"`
 	Price            float64 `json:"price"`
 	PercentChange24h float64 `json:"percent_change_24h"`
 }

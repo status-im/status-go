@@ -152,7 +152,7 @@ func (s *DataStorage) GetPriceEtag() string {
 }
 
 func (s *DataStorage) GetLeaderboardPagePrices(page LeaderboardPage) *LeaderboardPagePrices {
-	if page.PageSize <= 0 || page.Page < 0 {
+	if page.PageSize <= 0 || page.Page <= 0 {
 		return nil
 	}
 	data := s.GetCryptoDataForPage(page.Page, page.PageSize)
@@ -172,7 +172,7 @@ func (s *DataStorage) GetLeaderboardPagePrices(page LeaderboardPage) *Leaderboar
 
 		// If we have updated price data for this symbol, update the cryptocurrency
 		if priceUpdate, ok := s.priceData[symbol]; ok {
-			priceUpdate.Symbol = symbol
+			priceUpdate.ID = data[i].ID
 			result.Data = append(result.Data, priceUpdate)
 		}
 	}
