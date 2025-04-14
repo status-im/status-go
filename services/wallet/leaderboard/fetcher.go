@@ -27,9 +27,10 @@ type DataFetcher interface {
 
 // ProxyFetcher implements DataFetcher interface using HTTP proxy
 type ProxyFetcher struct {
-	requestHandler *RequestHandler
-	storage        *DataStorage
-	config         ServiceConfig
+	requestHandler      *RequestHandler
+	storage             *DataStorage
+	subscriptionManager *SubscriptionManager
+	config              ServiceConfig
 
 	// Background polling state
 	isRunning      bool
@@ -38,12 +39,13 @@ type ProxyFetcher struct {
 }
 
 // NewProxyFetcher creates a new proxy data fetcher
-func NewProxyFetcher(config ServiceConfig, storage *DataStorage) DataFetcher {
+func NewProxyFetcher(config ServiceConfig, storage *DataStorage, subscriptionManager *SubscriptionManager) DataFetcher {
 	client := &http.Client{Timeout: 10 * time.Second}
 	return &ProxyFetcher{
-		requestHandler: NewRequestHandler(config, client),
-		storage:        storage,
-		config:         config,
+		requestHandler:      NewRequestHandler(config, client),
+		storage:             storage,
+		subscriptionManager: subscriptionManager,
+		config:              config,
 	}
 }
 
@@ -108,6 +110,8 @@ func (f *ProxyFetcher) cryptoRefreshLoop(ctx context.Context) {
 	// Initial fetch
 	if err := f.FetchMarkets(ctx); err != nil {
 		logutils.ZapLogger().Error("Error in initial crypto data fetch", zap.Error(err))
+	} else {
+		f.subscriptionManager.Emit(ctx, TickerFullDataUpdateSource)
 	}
 
 	// Set up ticker for periodic updates
@@ -121,6 +125,8 @@ func (f *ProxyFetcher) cryptoRefreshLoop(ctx context.Context) {
 		case <-ticker.C:
 			if err := f.FetchMarkets(ctx); err != nil {
 				logutils.ZapLogger().Error("Error fetching crypto data", zap.Error(err))
+			} else {
+				f.subscriptionManager.Emit(ctx, TickerFullDataUpdateSource)
 			}
 		}
 	}
@@ -134,6 +140,8 @@ func (f *ProxyFetcher) priceRefreshLoop(ctx context.Context) {
 	// Initial fetch
 	if err := f.FetchPrices(ctx); err != nil {
 		logutils.ZapLogger().Error("Error in initial price data fetch", zap.Error(err))
+	} else {
+		f.subscriptionManager.Emit(ctx, TickerPriceUpdateSource)
 	}
 
 	// Set up ticker for periodic updates
@@ -147,6 +155,8 @@ func (f *ProxyFetcher) priceRefreshLoop(ctx context.Context) {
 		case <-ticker.C:
 			if err := f.FetchPrices(ctx); err != nil {
 				logutils.ZapLogger().Error("Error fetching price data", zap.Error(err))
+			} else {
+				f.subscriptionManager.Emit(ctx, TickerPriceUpdateSource)
 			}
 		}
 	}

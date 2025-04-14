@@ -71,13 +71,14 @@ type GetLeaderboardPageResponse struct {
 // NewMarketDataService creates a new market data service with the given configuration
 func NewMarketDataService(config ServiceConfig, feed *event.Feed) *MarketDataService {
 	storage := NewDataStorage()
+	subscriptionManager := NewSubscriptionManager()
 	return &MarketDataService{
 		config:              config,
-		fetcher:             NewProxyFetcher(config, storage),
+		fetcher:             NewProxyFetcher(config, storage, subscriptionManager),
 		feed:                feed,
 		requestHandler:      NewRequestHandler(config, &http.Client{Timeout: 10 * time.Second}),
 		storage:             storage,
-		subscriptionManager: NewSubscriptionManager(),
+		subscriptionManager: subscriptionManager,
 		scheduler:           async.NewScheduler(),
 		cache:               NewPageCache(),
 	}
