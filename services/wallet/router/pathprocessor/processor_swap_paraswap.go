@@ -50,7 +50,7 @@ func getPartnerAddressAndFeePcnt(chainID uint64) (common.Address, float64) {
 	case walletCommon.ArbitrumMainnet:
 		return common.HexToAddress("0x9a8278e856C0B191B9daa2d7DD1f7B28268E4DA2"), partnerFeePcnt
 	case walletCommon.BaseMainnet:
-		return common.Address{}, 0
+		return common.HexToAddress("0x107E3208A27e2A56D420fE6f8c5B88c821052f89"), partnerFeePcnt
 	}
 	return common.Address{}, 0
 }
