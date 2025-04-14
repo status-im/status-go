@@ -2,6 +2,7 @@ package leaderboard
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -13,10 +14,6 @@ type DataStorage struct {
 	dataMutex  sync.RWMutex
 	cryptoEtag string
 	priceEtag  string
-
-	// Statistics
-	cryptoStats Stats
-	priceStats  Stats
 }
 
 // NewDataStorage creates a new data storage instance
@@ -26,9 +23,9 @@ func NewDataStorage() *DataStorage {
 	}
 }
 
-// UpdateCryptoData updates the cryptocurrency data
+// UpdateCryptoDataWithEtag updates both cryptocurrency data and etag atomically
 // Returns true if the data was actually updated
-func (s *DataStorage) UpdateCryptoData(data []Cryptocurrency) bool {
+func (s *DataStorage) UpdateCryptoDataWithEtag(data []Cryptocurrency, etag string) bool {
 	if data == nil {
 		return false
 	}
@@ -37,12 +34,13 @@ func (s *DataStorage) UpdateCryptoData(data []Cryptocurrency) bool {
 	defer s.dataMutex.Unlock()
 
 	s.cryptoData = data
+	s.cryptoEtag = etag
 	return true
 }
 
-// UpdatePriceData updates the price data
+// UpdatePriceDataWithEtag updates both price data and etag atomically
 // Returns true if the data was actually updated
-func (s *DataStorage) UpdatePriceData(data PriceMap) bool {
+func (s *DataStorage) UpdatePriceDataWithEtag(data PriceMap, etag string) bool {
 	if data == nil {
 		return false
 	}
@@ -51,6 +49,7 @@ func (s *DataStorage) UpdatePriceData(data PriceMap) bool {
 	defer s.dataMutex.Unlock()
 
 	s.priceData = data
+	s.priceEtag = etag
 	return true
 }
 
@@ -119,13 +118,13 @@ func (s *DataStorage) GetCombinedData() []Cryptocurrency {
 }
 
 func (s *DataStorage) GetCryptoDataForPage(page, pageSize int) []Cryptocurrency {
-	if pageSize <= 0 || page < 0 {
+	if pageSize <= 0 || page <= 0 {
 		return nil
 	}
 	s.dataMutex.RLock()
 	defer s.dataMutex.RUnlock()
 
-	start := page * pageSize
+	start := (page - 1) * pageSize
 	totalCount := len(s.cryptoData)
 
 	if start >= totalCount {
@@ -145,55 +144,11 @@ func (s *DataStorage) GetCryptoEtag() string {
 	return s.cryptoEtag
 }
 
-// SetCryptoEtag sets the crypto data etag
-func (s *DataStorage) SetCryptoEtag(etag string) {
-	s.dataMutex.Lock()
-	defer s.dataMutex.Unlock()
-	s.cryptoEtag = etag
-}
-
 // GetPriceEtag returns the current price data etag
 func (s *DataStorage) GetPriceEtag() string {
 	s.dataMutex.RLock()
 	defer s.dataMutex.RUnlock()
 	return s.priceEtag
-}
-
-// SetPriceEtag sets the price data etag
-func (s *DataStorage) SetPriceEtag(etag string) {
-	s.dataMutex.Lock()
-	defer s.dataMutex.Unlock()
-	s.priceEtag = etag
-}
-
-// GetCryptoStats returns statistics for crypto data requests
-func (s *DataStorage) GetCryptoStats() Stats {
-	return s.cryptoStats
-}
-
-// GetPriceStats returns statistics for price data requests
-func (s *DataStorage) GetPriceStats() Stats {
-	return s.priceStats
-}
-
-// UpdateCryptoStats updates the crypto stats reference for request handling
-func (s *DataStorage) UpdateCryptoStats(stats Stats) {
-	s.cryptoStats = stats
-}
-
-// UpdatePriceStats updates the price stats reference for request handling
-func (s *DataStorage) UpdatePriceStats(stats Stats) {
-	s.priceStats = stats
-}
-
-// GetCryptoStatsRef returns a reference to crypto stats for updating
-func (s *DataStorage) GetCryptoStatsRef() *Stats {
-	return &s.cryptoStats
-}
-
-// GetPriceStatsRef returns a reference to price stats for updating
-func (s *DataStorage) GetPriceStatsRef() *Stats {
-	return &s.priceStats
 }
 
 func (s *DataStorage) GetLeaderboardPagePrices(page LeaderboardPage) *LeaderboardPagePrices {
@@ -209,11 +164,11 @@ func (s *DataStorage) GetLeaderboardPagePrices(page LeaderboardPage) *Leaderboar
 		Page:      page.Page,
 		PageSize:  page.PageSize,
 		SortOrder: page.SortOrder,
+		Currency:  page.Currency,
 	}
 
 	for i := range data {
-		crypto := &data[i]
-		symbol := crypto.Symbol
+		symbol := strings.ToUpper(data[i].Symbol)
 
 		// If we have updated price data for this symbol, update the cryptocurrency
 		if priceUpdate, ok := s.priceData[symbol]; ok {
@@ -224,7 +179,7 @@ func (s *DataStorage) GetLeaderboardPagePrices(page LeaderboardPage) *Leaderboar
 	return result
 }
 
-func (s *DataStorage) GetLeaderboardPage(page, pageSize int, sortOrder int) (*LeaderboardPage, error) {
+func (s *DataStorage) GetLeaderboardPage(page, pageSize, sortOrder int, currency string) (*LeaderboardPage, error) {
 	if pageSize <= 0 {
 		return nil, fmt.Errorf("Invalid page size")
 	}
@@ -235,7 +190,8 @@ func (s *DataStorage) GetLeaderboardPage(page, pageSize int, sortOrder int) (*Le
 	// if totalCount == 0 {
 	// }
 
-	if page < 0 || page > (totalCount/pageSize) {
+	totalPages := (totalCount + pageSize - 1) / pageSize
+	if page <= 0 || (page > totalPages && totalCount > 0) {
 		return nil, fmt.Errorf("Invalid page")
 	}
 
@@ -244,6 +200,7 @@ func (s *DataStorage) GetLeaderboardPage(page, pageSize int, sortOrder int) (*Le
 		Page:       page,
 		PageSize:   pageSize,
 		SortOrder:  sortOrder,
+		Currency:   currency,
 		Data:       s.GetCryptoDataForPage(page, pageSize),
 	}
 	return result, nil

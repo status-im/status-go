@@ -23,8 +23,8 @@ func NewRequestHandler(config ServiceConfig, client *http.Client) *RequestHandle
 }
 
 // FetchData performs an HTTP request and processes the response
-// Returns the response body, a success flag, and update statistics
-func (h *RequestHandler) FetchData(ctx context.Context, endpoint string, etag *string, stats *Stats) ([]byte, bool) {
+// Returns the response body and a success flag
+func (h *RequestHandler) FetchData(ctx context.Context, endpoint string, etag *string) ([]byte, bool) {
 	// Create request
 	req, err := h.createRequest(ctx, endpoint, etag)
 	if err != nil {
@@ -38,13 +38,8 @@ func (h *RequestHandler) FetchData(ctx context.Context, endpoint string, etag *s
 	}
 	defer resp.Body.Close()
 
-	// Update statistics
-	stats.TotalRequests++
-	h.updateCacheStats(stats, resp)
-
 	// Check for 304 Not Modified
 	if resp.StatusCode == http.StatusNotModified {
-		stats.NotModifiedCount++
 		return nil, false // No data update
 	}
 
@@ -54,7 +49,7 @@ func (h *RequestHandler) FetchData(ctx context.Context, endpoint string, etag *s
 	}
 
 	// Process response body
-	body, updated := h.processResponseBody(stats, resp, etag)
+	body, updated := h.processResponseBody(resp, etag)
 	if !updated {
 		return nil, false
 	}
@@ -96,22 +91,12 @@ func (h *RequestHandler) createRequest(ctx context.Context, endpoint string, eta
 	return req, nil
 }
 
-// updateCacheStats updates cache-related statistics based on response headers
-func (h *RequestHandler) updateCacheStats(stats *Stats, resp *http.Response) {
-	if cacheStatus := resp.Header.Get("X-Proxy-Cache"); cacheStatus == "HIT" {
-		stats.CacheHits++
-	} else {
-		stats.CacheMisses++
-	}
-}
-
 // processResponseBody handles the response body, including gzip decompression
 // Returns the body and a success flag
-func (h *RequestHandler) processResponseBody(stats *Stats, resp *http.Response, etag *string) ([]byte, bool) {
+func (h *RequestHandler) processResponseBody(resp *http.Response, etag *string) ([]byte, bool) {
 	// Set up appropriate reader based on content encoding
 	var reader io.ReadCloser = resp.Body
 	if h.config.AllowGzip && resp.Header.Get("Content-Encoding") == "gzip" {
-		stats.GzipResponseCount++
 		var gzipErr error
 		reader, gzipErr = gzip.NewReader(resp.Body)
 		if gzipErr != nil {
@@ -130,9 +115,6 @@ func (h *RequestHandler) processResponseBody(stats *Stats, resp *http.Response, 
 	if err != nil {
 		return nil, false
 	}
-
-	// Update total response size
-	stats.TotalResponseSize += int64(len(body))
 
 	return body, true
 }
