@@ -26,7 +26,7 @@ type ServiceConfig struct {
 }
 
 // Validate checks if the configuration is valid
-func (c *ServiceConfig) validate() {
+func (c *ServiceConfig) Validate() {
 	// Set default refresh intervals if not provided
 	if c.FullDataInterval <= 0 {
 		c.FullDataInterval = defaultFullDataInterval
@@ -50,7 +50,7 @@ func NewLeaderbordConfig(config params.MarketDataProxyConfig) ServiceConfig {
 	}
 
 	// Validate the configuration
-	serviceConfig.validate()
+	serviceConfig.Validate()
 
 	return serviceConfig
 }

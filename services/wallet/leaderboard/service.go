@@ -3,9 +3,9 @@ package leaderboard
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -17,11 +17,24 @@ import (
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
+type ErrorCode = int
+
 const (
-	// EventGetLeaderboardPageDone contains a LeaderboardPage payload
-	EventGetLeaderboardPageDone walletevent.EventType = "wallet-leaderboard-get-page-done"
-	// EventLeaderboardPagePricesUpdated contains a EventLeaderboardPagePricesUpdate payload
+	// Contains a LeaderboardPage payload
+	EventFetchLeaderboardPageDone walletevent.EventType = "wallet-fetch-leaderboard-page-done"
+	// Contains a LeaderboardPage payload
+	EventLeaderboardPageDataUpdated walletevent.EventType = "wallet-leaderboard-page-data-updated"
+	// Contains a EventLeaderboardPagePricesUpdate payload
 	EventLeaderboardPagePricesUpdated walletevent.EventType = "wallet-leaderboard-page-prices-updated"
+
+	// Signal source
+	TickerFullDataUpdateSource int = 0
+	TickerPriceUpdateSource    int = 1
+
+	// Error codes
+	ErrorCodeSuccess      ErrorCode = 1
+	ErrorCodeTaskCanceled ErrorCode = 2
+	ErrorCodeFailed       ErrorCode = 3
 )
 
 var (
@@ -34,7 +47,7 @@ var (
 // MarketDataService manages market data fetching and provides access to the latest data
 type MarketDataService struct {
 	config    ServiceConfig
-	client    *http.Client
+	fetcher   DataFetcher
 	scheduler *async.Scheduler
 	feed      *event.Feed
 
@@ -47,115 +60,38 @@ type MarketDataService struct {
 
 	// Subscription management
 	subscriptionManager    *SubscriptionManager
-	pageUpdateSubscription chan struct{}
-
-	// Context management
-	cancelFunc     context.CancelFunc
-	isRunning      bool
-	isRunningMutex sync.Mutex
+	pageUpdateSubscription chan Signal
 }
 
-// Stats tracks API request statistics
-type Stats struct {
-	TotalRequests     int
-	CacheHits         int
-	CacheMisses       int
-	TotalResponseSize int64
-	NotModifiedCount  int
-	GzipResponseCount int
+type GetLeaderboardPageResponse struct {
+	LeaderboardPage
+	ErrorCode ErrorCode `json:"error_code"`
 }
 
 // NewMarketDataService creates a new market data service with the given configuration
 func NewMarketDataService(config ServiceConfig, feed *event.Feed) *MarketDataService {
-	// Set default values for intervals if not provided
-	client := &http.Client{Timeout: 10 * time.Second}
 	storage := NewDataStorage()
-
 	return &MarketDataService{
-		config:                 config,
-		client:                 client,
-		feed:                   feed,
-		requestHandler:         NewRequestHandler(config, client),
-		storage:                storage,
-		subscriptionManager:    NewSubscriptionManager(),
-		scheduler:              async.NewScheduler(),
-		pageUpdateSubscription: nil,
-		cache:                  NewPageCache(),
+		config:              config,
+		fetcher:             NewProxyFetcher(config, storage),
+		feed:                feed,
+		requestHandler:      NewRequestHandler(config, &http.Client{Timeout: 10 * time.Second}),
+		storage:             storage,
+		subscriptionManager: NewSubscriptionManager(),
+		scheduler:           async.NewScheduler(),
+		cache:               NewPageCache(),
 	}
 }
 
 // Start begins the data refresh loops
 func (s *MarketDataService) Start(ctx context.Context) {
-	s.isRunningMutex.Lock()
-	defer s.isRunningMutex.Unlock()
-
-	if s.isRunning {
-		return // Already running
-	}
-
-	// Create a cancellable context that can stop all data operations
-	ctx, cancel := context.WithCancel(ctx)
-	s.cancelFunc = cancel
-	s.isRunning = true
-
-	// Start crypto data refresh loop
-	go func() {
-		defer common.LogOnPanic()
-		s.cryptoRefreshLoop(ctx)
-	}()
-
-	// Start price data refresh loop
-	go func() {
-		defer common.LogOnPanic()
-		s.priceRefreshLoop(ctx)
-	}()
+	s.fetcher.Start(ctx)
 }
 
 // Stop halts all data refresh operations
 func (s *MarketDataService) Stop() {
-	s.isRunningMutex.Lock()
-	defer s.isRunningMutex.Unlock()
-
-	if !s.isRunning {
-		return // Not running
-	}
-
-	// Cancel the context to stop all loops
-	if s.cancelFunc != nil {
-		s.cancelFunc()
-		s.cancelFunc = nil
-	}
-
+	s.fetcher.Stop()
 	s.UnsubscribeFromLeaderboard() //nolint:errcheck
-
-	s.isRunning = false
-}
-
-// IsRunning returns whether the service is currently running
-func (s *MarketDataService) IsRunning() bool {
-	s.isRunningMutex.Lock()
-	defer s.isRunningMutex.Unlock()
-	return s.isRunning
-}
-
-// Subscribe creates a subscription to data updates
-func (s *MarketDataService) Subscribe() chan struct{} {
-	return s.subscriptionManager.Subscribe()
-}
-
-// Unsubscribe removes a subscription
-func (s *MarketDataService) Unsubscribe(ch chan struct{}) {
-	s.subscriptionManager.Unsubscribe(ch)
-}
-
-// GetCryptoData returns the latest cryptocurrency data
-func (s *MarketDataService) GetCryptoData() []Cryptocurrency {
-	return s.storage.GetCryptoData()
-}
-
-// GetPriceData returns the latest price data
-func (s *MarketDataService) GetPriceData() PriceMap {
-	return s.storage.GetPriceData()
 }
 
 // GetCombinedData returns cryptocurrency data with updated price information
@@ -163,123 +99,12 @@ func (s *MarketDataService) GetCombinedData() []Cryptocurrency {
 	return s.storage.GetCombinedData()
 }
 
-// GetCryptoStats returns statistics for crypto data requests
-func (s *MarketDataService) GetCryptoStats() Stats {
-	return s.storage.GetCryptoStats()
-}
-
-// GetPriceStats returns statistics for price data requests
-func (s *MarketDataService) GetPriceStats() Stats {
-	return s.storage.GetPriceStats()
-}
-
-// cryptoRefreshLoop periodically fetches the full cryptocurrency data
-func (s *MarketDataService) cryptoRefreshLoop(ctx context.Context) {
-	// Initial fetch
-	s.fetchCryptoData(ctx)
-
-	// Notify subscribers of the initial data
-	s.subscriptionManager.Emit(ctx)
-
-	// Set up ticker for periodic updates
-	ticker := time.NewTicker(time.Duration(s.config.FullDataInterval) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return // Context cancelled, stop the loop
-		case <-ticker.C:
-			if s.fetchCryptoData(ctx) {
-				// Only notify if data was actually updated
-				s.subscriptionManager.Emit(ctx)
-			}
-		}
-	}
-}
-
-// priceRefreshLoop periodically fetches price updates
-func (s *MarketDataService) priceRefreshLoop(ctx context.Context) {
-	// Wait a short time before starting price updates
-	time.Sleep(1 * time.Second)
-
-	// Initial fetch
-	s.fetchPriceData(ctx)
-
-	// Notify subscribers of the initial data
-	s.subscriptionManager.Emit(ctx)
-
-	// Set up ticker for periodic updates
-	ticker := time.NewTicker(time.Duration(s.config.PriceUpdateInterval) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return // Context cancelled, stop the loop
-		case <-ticker.C:
-			if s.fetchPriceData(ctx) {
-				// Only notify if data was actually updated
-				s.subscriptionManager.Emit(ctx)
-			}
-		}
-	}
-}
-
-// fetchCryptoData fetches the latest cryptocurrency data
-// Returns true if data was updated, false if using cached data (304)
-func (s *MarketDataService) fetchCryptoData(ctx context.Context) bool {
-	// Get current etag
-	cryptoEtag := s.storage.GetCryptoEtag()
-
-	// Fetch data using the request handler
-	endpoint := "/v1/leaderboard/markets"
-	body, updated := s.requestHandler.FetchData(ctx, endpoint, &cryptoEtag, s.storage.GetCryptoStatsRef())
-	if !updated {
-		return false
-	}
-
-	// Update etag if changed
-	s.storage.SetCryptoEtag(cryptoEtag)
-
-	// Parse the response
-	var cryptoResp CryptoResponse
-	if err := json.Unmarshal(body, &cryptoResp); err != nil {
-		return false
-	}
-
-	// Update the data
-	return s.storage.UpdateCryptoData(cryptoResp.Data)
-}
-
-// fetchPriceData fetches the latest price data
-// Returns true if data was updated, false if using cached data (304)
-func (s *MarketDataService) fetchPriceData(ctx context.Context) bool {
-	// Get current etag
-	priceEtag := s.storage.GetPriceEtag()
-
-	// Fetch data using the request handler
-	endpoint := "/v1/leaderboard/prices"
-	body, updated := s.requestHandler.FetchData(ctx, endpoint, &priceEtag, s.storage.GetPriceStatsRef())
-	if !updated {
-		return false
-	}
-
-	// Update etag if changed
-	s.storage.SetPriceEtag(priceEtag)
-
-	// Parse the response
-	var priceData PriceMap
-	if err := json.Unmarshal(body, &priceData); err != nil {
-		return false
-	}
-
-	// Update the data
-	return s.storage.UpdatePriceData(priceData)
+func (s *MarketDataService) isSubscribed() bool {
+	return s.pageUpdateSubscription != nil
 }
 
 func (s *MarketDataService) sendLeaderboardPagePricesUpdate() {
-	if s.pageUpdateSubscription == nil {
+	if !s.isSubscribed() {
 		return
 	}
 
@@ -300,38 +125,89 @@ func (s *MarketDataService) sendLeaderboardPagePricesUpdate() {
 	s.feed.Send(event)
 }
 
-func (s *MarketDataService) GetLeaderboardPageAsync(page, pageSize int, sortOrder int) {
+func (s *MarketDataService) sendLeaderboardPageUpdate() {
+	if !s.isSubscribed() {
+		return
+	}
+
+	lastPage := s.cache.GetLastPage()
+	result, err := s.storage.GetLeaderboardPage(lastPage.Page, lastPage.PageSize, lastPage.SortOrder, lastPage.Currency)
+	if err != nil {
+		logutils.ZapLogger().Error("Error fetching leaderboard page", zap.Error(err))
+		return
+	}
+	payload, err := json.Marshal(result)
+	if err != nil {
+		logutils.ZapLogger().Error("Error marshalling leaderboard page", zap.Error(err))
+	}
+
+	event := walletevent.Event{
+		Type:    EventLeaderboardPageDataUpdated,
+		Message: string(payload),
+	}
+	s.feed.Send(event)
+}
+
+func (s *MarketDataService) FetchLeaderboardPageAsync(page, pageSize, sortOrder int, currency string) {
 	s.scheduler.Enqueue(fetchLeaderboardPageTask, func(ctx context.Context) (interface{}, error) {
-		result, err := s.storage.GetLeaderboardPage(page, pageSize, sortOrder)
+		result, err := s.storage.GetLeaderboardPage(page, pageSize, sortOrder, currency)
+		if err != nil {
+			logutils.ZapLogger().Error("Error fetching leaderboard page", zap.Error(err))
+			return nil, err
+		}
 		s.cache.UpdateLastPage(result)
 		return result, err
 	}, func(result interface{}, taskType async.TaskType, resErr error) {
-		payload, err := json.Marshal(result.(*LeaderboardPage))
+		res := GetLeaderboardPageResponse{
+			ErrorCode: ErrorCodeFailed,
+		}
+		if errors.Is(resErr, context.Canceled) || errors.Is(resErr, async.ErrTaskOverwritten) {
+			res.ErrorCode = ErrorCodeTaskCanceled
+		} else if resErr == nil {
+			res.ErrorCode = ErrorCodeSuccess
+			res.LeaderboardPage = *(result.(*LeaderboardPage))
+			s.subscribeToLeaderboard()
+		}
+
+		payload, err := json.Marshal(res)
 		if err != nil {
-			logutils.ZapLogger().Error("Error marshalling leaderboard page", zap.Error(err))
+			logutils.ZapLogger().Error("Error marshalling leaderboard page response", zap.Error(err))
 		}
 		event := walletevent.Event{
-			Type:    EventGetLeaderboardPageDone,
+			Type:    EventFetchLeaderboardPageDone,
 			Message: string(payload),
-		}
-		if s.pageUpdateSubscription == nil {
-			s.pageUpdateSubscription = s.subscriptionManager.Subscribe()
-			go func() {
-				defer common.LogOnPanic()
-				for range s.pageUpdateSubscription {
-					s.sendLeaderboardPagePricesUpdate()
-				}
-			}()
 		}
 		s.feed.Send(event)
 	})
 }
 
+func (s *MarketDataService) subscribeToLeaderboard() {
+	if s.isSubscribed() {
+		return
+	}
+
+	s.fetcher.Start(context.Background())
+
+	s.pageUpdateSubscription = s.subscriptionManager.Subscribe()
+	go func() {
+		defer common.LogOnPanic()
+		for sig := range s.pageUpdateSubscription {
+			switch sig.Source() {
+			case TickerFullDataUpdateSource:
+				s.sendLeaderboardPageUpdate()
+			case TickerPriceUpdateSource:
+				s.sendLeaderboardPagePricesUpdate()
+			}
+		}
+	}()
+}
+
 func (s *MarketDataService) UnsubscribeFromLeaderboard() error {
-	if s.pageUpdateSubscription == nil {
+	s.fetcher.Stop()
+	if !s.isSubscribed() {
 		return fmt.Errorf("No subscription found")
 	}
-	s.Unsubscribe(s.pageUpdateSubscription)
+	s.subscriptionManager.Unsubscribe(s.pageUpdateSubscription)
 	s.pageUpdateSubscription = nil
 	s.cache.Clear()
 	return nil
