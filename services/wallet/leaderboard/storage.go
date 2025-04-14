@@ -164,6 +164,7 @@ func (s *DataStorage) GetLeaderboardPagePrices(page LeaderboardPage) *Leaderboar
 		Page:      page.Page,
 		PageSize:  page.PageSize,
 		SortOrder: page.SortOrder,
+		Currency:  page.Currency,
 	}
 
 	for i := range data {
@@ -189,7 +190,8 @@ func (s *DataStorage) GetLeaderboardPage(page, pageSize, sortOrder int, currency
 	// if totalCount == 0 {
 	// }
 
-	if page <= 0 || page > (totalCount/pageSize) {
+	totalPages := (totalCount + pageSize - 1) / pageSize
+	if page <= 0 || (page > totalPages && totalCount > 0) {
 		return nil, fmt.Errorf("Invalid page")
 	}
 

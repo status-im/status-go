@@ -37,6 +37,7 @@ type LeaderboardPagePrices struct {
 	Page      int         `json:"page"`
 	PageSize  int         `json:"page_size"`
 	SortOrder int         `json:"sorting"`
+	Currency  string      `json:"currency"`
 	Data      []PriceData `json:"prices"`
 }
 
