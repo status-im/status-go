@@ -217,12 +217,6 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if request.AlchemyBaseSepoliaToken != "" {
 		walletConfig.AlchemyAPIKeys[common.BaseSepoliaChainID] = request.AlchemyBaseSepoliaToken
 	}
-	if request.AlchemyBSCMainnetToken != "" {
-		walletConfig.AlchemyAPIKeys[common.BNBSmartChainID] = request.AlchemyBSCMainnetToken
-	}
-	if request.AlchemyBSCTestnetToken != "" {
-		walletConfig.AlchemyAPIKeys[common.BNBSmartChainTestnetChainID] = request.AlchemyBSCTestnetToken
-	}
 	if request.StatusProxyMarketUser != "" {
 		walletConfig.StatusProxyMarketUser = request.StatusProxyMarketUser
 	}
