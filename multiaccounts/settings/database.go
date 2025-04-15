@@ -147,10 +147,11 @@ INSERT INTO settings (
   wallet_collectible_preferences_group_by_community,
   test_networks_enabled,
   fleet,
-	auto_refresh_tokens_enabled
+  auto_refresh_tokens_enabled,
+  news_feed_last_fetched_timestamp
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?,?,?,?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -185,6 +186,8 @@ INSERT INTO settings (
 		s.TestNetworksEnabled,
 		s.Fleet,
 		s.AutoRefreshTokensEnabled,
+		// Default the news feed last fetched timestamp to now
+		time.Now().Unix(),
 	)
 	if err != nil {
 		return err
@@ -372,8 +375,9 @@ func (db *Database) SetSettingLastSynced(setting SettingField, clock uint64) err
 
 func (db *Database) GetSettings() (Settings, error) {
 	var (
-		s                Settings
-		lastTokensUpdate sql.NullTime
+		s                            Settings
+		lastTokensUpdate             sql.NullTime
+		newsFeedLastFetchedTimestamp sql.NullTime
 	)
 	err := db.db.QueryRow(`
 	SELECT
@@ -392,7 +396,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, wallet_token_preferences_group_by_community, url_unfurling_mode,
 		mnemonic_was_not_shown, wallet_show_community_asset_when_sending_tokens, wallet_display_assets_below_balance,
 		wallet_display_assets_below_balance_threshold, wallet_collectible_preferences_group_by_collection, wallet_collectible_preferences_group_by_community,
-		peer_syncing_enabled, auto_refresh_tokens_enabled, last_tokens_update, news_feed_enabled
+		peer_syncing_enabled, auto_refresh_tokens_enabled, last_tokens_update, news_feed_enabled, news_feed_last_fetched_timestamp
 	FROM
 		settings
 	WHERE
@@ -480,6 +484,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.AutoRefreshTokensEnabled,
 		&lastTokensUpdate,
 		&s.NewsFeedEnabled,
+		&newsFeedLastFetchedTimestamp,
 	)
 
 	if err != nil {
@@ -488,6 +493,10 @@ func (db *Database) GetSettings() (Settings, error) {
 
 	if lastTokensUpdate.Valid {
 		s.LastTokensUpdate = lastTokensUpdate.Time
+	}
+
+	if newsFeedLastFetchedTimestamp.Valid {
+		s.NewsFeedLastFetchedTimestamp = newsFeedLastFetchedTimestamp.Time
 	}
 
 	return s, err
@@ -878,6 +887,18 @@ func (db *Database) LastTokensUpdate() (result time.Time, err error) {
 	}
 	if lastTokensUpdate.Valid {
 		result = lastTokensUpdate.Time
+	}
+	return
+}
+
+func (db *Database) NewsFeedLastFetchedTimestamp() (result time.Time, err error) {
+	var newsFeedLastFetchedTimestamp sql.NullTime
+	err = db.makeSelectRow(NewsFeedLastFetchedTimestamp).Scan(&newsFeedLastFetchedTimestamp)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	if newsFeedLastFetchedTimestamp.Valid {
+		result = newsFeedLastFetchedTimestamp.Time
 	}
 	return
 }

@@ -96,8 +96,10 @@ func (n *NewsFeedManager) FetchRSS() ([]*gofeed.Item, error) {
 		}
 	}
 
-	// Update fetchFrom to now
-	n.fetchFrom = time.Now()
+	if len(filteredItems) > 0 {
+		// Update fetchFrom to now since we have new items
+		n.fetchFrom = time.Now()
+	}
 
 	return filteredItems, nil
 }

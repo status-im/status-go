@@ -902,15 +902,17 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	if m.config.featureFlags.EnableNewsFeed {
-		// TODO get the last time we opened the app
-		twoHoursAgo := time.Now().Add(-2 * time.Hour)
+		lastFetched, err := m.settings.NewsFeedLastFetchedTimestamp()
+		if err != nil {
+			return nil, err
+		}
 		m.newsFeedManager = newsfeed.NewNewsFeedManager(
 			newsfeed.WithURL(newsfeed.STATUS_FEED_URL),
 			newsfeed.WithParser(gofeed.NewParser()),
 			newsfeed.WithHandler(m),
 			newsfeed.WithLogger(m.logger),
 			newsfeed.WithPollingInterval(30*time.Minute),
-			newsfeed.WithFetchFrom(twoHoursAgo),
+			newsfeed.WithFetchFrom(lastFetched),
 		)
 
 		// TODO only start if the setting is enabled

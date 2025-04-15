@@ -43,6 +43,12 @@ func (s *MessengerNewsFeedSuite) TestHandleNewsFeedItem() {
 	err := s.m.HandleFeedItemAndSend(&item)
 	s.Require().NoError(err)
 
+	// Check that the lastFetched timestamp is updated
+	lastFetched, err := s.m.settings.NewsFeedLastFetchedTimestamp()
+	s.Require().NoError(err)
+	s.Require().GreaterOrEqual(time.Now().UTC().Second(), lastFetched.UTC().Second())
+
+	// Check that the notification is saved in the database
 	_, notifications, err := s.m.persistence.ActivityCenterNotifications("", 10, []ActivityCenterType{ActivityCenterNotificationTypeNews}, ActivityCenterQueryParamsReadAll, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(notifications)

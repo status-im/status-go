@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -48,7 +49,8 @@ var (
 		DisplayAssetsBelowBalanceThreshold:  int64(100000000),
 		DisplayAssetsBelowBalance:           false,
 		ShowCommunityAssetWhenSendingTokens: true,
-		NewsFeedEnabled:                     true}
+		NewsFeedEnabled:                     true,
+	}
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -130,6 +132,9 @@ func TestCreateSettings(t *testing.T) {
 
 	s, err := db.GetSettings()
 	require.NoError(t, err)
+	require.NotEqual(t, 0, s.NewsFeedLastFetchedTimestamp.UTC().Second())
+	// Reset the timestamp to 0 as it is set during CreateSettings as time.now and it's impossible to test reliably
+	s.NewsFeedLastFetchedTimestamp = time.Time{}
 	require.Equal(t, settings, s)
 }
 
@@ -250,4 +255,25 @@ func TestDatabase_NewsFeedEnabled(t *testing.T) {
 	settings, err = db.GetSettings()
 	require.NoError(t, err)
 	require.Equal(t, false, settings.NewsFeedEnabled)
+}
+
+func TestDatabase_NewsFeedLastFetchedTimestamp(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	settings, err := db.GetSettings()
+	require.NoError(t, err)
+
+	// Using GreaterOrEqual because the timestamp is set during CreateSettings and there is a tiny chance that the second changes between
+	require.GreaterOrEqual(t, time.Now().UTC().Second(), settings.NewsFeedLastFetchedTimestamp.UTC().Second())
+
+	dateNow := time.Now()
+	err = db.SaveSetting(NewsFeedLastFetchedTimestamp.GetReactName(), dateNow)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, dateNow.UTC().Second(), settings.NewsFeedLastFetchedTimestamp.UTC().Second())
 }

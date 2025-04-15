@@ -1,11 +1,14 @@
 package protocol
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/mmcdole/gofeed"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -43,6 +46,13 @@ func (m *Messenger) HandleFeedItem(feedItem *gofeed.Item) (*MessengerResponse, e
 	err = m.addActivityCenterNotification(response, notification, nil)
 	if err != nil {
 		m.logger.Error("HandleFeedItem: failed to save notification", zap.Error(err))
+		return nil, err
+	}
+
+	// Update the lastFetch time to the current time
+	err = m.settings.SaveSetting(settings.NewsFeedLastFetchedTimestamp.GetReactName(), time.Now())
+	if err != nil {
+		m.logger.Error("HandleFeedItem: failed to save last fetch time", zap.Error(err))
 		return nil, err
 	}
 

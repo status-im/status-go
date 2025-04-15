@@ -83,4 +83,5 @@ type DatabaseSettingsManager interface {
 	GetPeerSyncingEnabled() (result bool, err error)
 	AutoRefreshTokensEnabled() (result bool, err error)
 	LastTokensUpdate() (result time.Time, err error)
+	NewsFeedLastFetchedTimestamp() (result time.Time, err error)
 }

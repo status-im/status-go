@@ -227,6 +227,21 @@ var (
 		dBColumnName:   "networks",
 		valueHandler:   JSONBlobHandler,
 	}
+	NewsFeedEnabled = SettingField{
+		reactFieldName: "news-feed-enabled?",
+		dBColumnName:   "news_feed_enabled",
+		valueHandler:   BoolHandler,
+	}
+	NewsFeedLastFetchedTimestamp = SettingField{
+		reactFieldName: "news-feed-last-fetched-timestamp",
+		dBColumnName:   "news_feed_last_fetched_timestamp",
+		valueHandler:   TimeHandler,
+	}
+	NewsNotificationsEnabled = SettingField{
+		reactFieldName: "news-notifications-enabled?",
+		dBColumnName:   "news_notifications_enabled",
+		valueHandler:   BoolHandler,
+	}
 	NodeConfig = SettingField{
 		reactFieldName: "node-config",
 		dBColumnName:   "node_config",
@@ -322,11 +337,6 @@ var (
 	RemotePushNotificationsEnabled = SettingField{
 		reactFieldName: "remote-push-notifications-enabled?",
 		dBColumnName:   "remote_push_notifications_enabled",
-		valueHandler:   BoolHandler,
-	}
-	NewsNotificationsEnabled = SettingField{
-		reactFieldName: "news-notifications-enabled?",
-		dBColumnName:   "news_notifications_enabled",
 		valueHandler:   BoolHandler,
 	}
 	MessengerNotificationsEnabled = SettingField{
@@ -527,11 +537,6 @@ var (
 		dBColumnName:   "last_tokens_update",
 		valueHandler:   TimeHandler,
 	}
-	NewsFeedEnabled = SettingField{
-		reactFieldName: "news-feed-enabled?",
-		dBColumnName:   "news_feed_enabled",
-		valueHandler:   BoolHandler,
-	}
 	SettingFieldRegister = []SettingField{
 		AnonMetricsShouldSend,
 		Appearance,
@@ -574,6 +579,8 @@ var (
 		Name,
 		NetworksCurrentNetwork,
 		NetworksNetworks,
+		NewsFeedEnabled,
+		NewsFeedLastFetchedTimestamp,
 		NewsNotificationsEnabled,
 		MessengerNotificationsEnabled,
 		NodeConfig,
@@ -612,7 +619,6 @@ var (
 		WebviewAllowPermissionRequests,
 		AutoRefreshTokensEnabled,
 		LastTokensUpdate,
-		NewsFeedEnabled,
 	}
 )
 
