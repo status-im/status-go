@@ -192,8 +192,8 @@ class StatusBackend(RpcClient, SignalClient):
             "apiLogging": True,
         }
 
-        if option.waku_fleet:
-            data["wakuFleetsConfigFilePath"] = f"/static/configs/{option.waku_fleets_config}"
+        if option.waku_fleets_config and option.waku_fleet:
+            data["wakuFleetsConfigFilePath"] = option.waku_fleets_config
 
         return self.api_valid_request(method, data)
 
