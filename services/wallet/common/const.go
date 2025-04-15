@@ -23,6 +23,7 @@ const (
 	UsdcSymbol = "USDC"
 	HopSymbol  = "HOP"
 	DaiSymbol  = "DAI"
+	BNBSymbol  = "BNB"
 )
 
 type ChainID uint64
