@@ -50,8 +50,8 @@ def pytest_addoption(parser):
     parser.addoption(
         "--waku-fleet",
         action="store",
-        help="Waku fleet to be used. Example: --waku-fleet=status-go.test",
-        default=None,
+        help="Waku fleet to be used. Default: --waku-fleet=status-go.test",
+        default="status-go.test",
     )
 
 
