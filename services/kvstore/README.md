@@ -30,4 +30,4 @@ The database API provides a simple interface for setting and getting key-value p
 - `Get(key string) ([]byte, error)`: Gets the value for the given key. If the key does not exist, it will return `nil`.
 - `Delete(key string) error`: Deletes the key-value pair for the given key.
 - `SetBool(key string, value bool) error`: Helper function is save a boolean value.
-- `GetBool(key string) (bool, error)`: Helper function to get a boolean value.
+- `GetBool(key string) (bool, error)`: Helper function to get a boolean value, the default value is false if not present.

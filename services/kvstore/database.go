@@ -2,11 +2,22 @@ package kvstore
 
 import (
 	"database/sql"
+	"errors"
+	"slices"
 )
 
 const (
+	TestDemoKey               = "test/demo-key"
 	ConfigRlnRateLimitEnabled = "config/rln-rate-limit-enabled"
 )
+
+var KeysInUsage = []string{
+	// This key is for test purpose, not used in the app.
+	TestDemoKey,
+
+	// Keys for configuration settings.
+	ConfigRlnRateLimitEnabled,
+}
 
 var DeprecatedKeys = []string{}
 
@@ -26,6 +37,9 @@ func (db Database) Close() error {
 
 // Set stores a key-value pair in kv_store
 func (db *Database) Set(key string, value []byte) error {
+	if !slices.Contains(KeysInUsage, key) {
+		return errors.New("key not in usage")
+	}
 	query := `INSERT INTO kv_store (key, value) VALUES (?, ?)
 	          ON CONFLICT(key) DO UPDATE SET value = excluded.value;`
 	_, err := db.db.Exec(query, key, value)
