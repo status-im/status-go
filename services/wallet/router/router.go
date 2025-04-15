@@ -740,16 +740,6 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		return nil, err
 	}
 
-	txPackedData, err := pathProcessor.PackTxInputData(processorInputParams)
-	if err != nil {
-		return nil, err
-	}
-
-	gasLimit, err := pathProcessor.EstimateGas(processorInputParams, txPackedData)
-	if err != nil {
-		return nil, err
-	}
-
 	contractAddress, err := pathProcessor.GetContractAddress(processorInputParams)
 	if err != nil {
 		return nil, err
@@ -762,6 +752,8 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 	var (
 		approvalGasLimit   uint64
 		approvalPackedData []byte
+		gasLimit           uint64
+		txPackedData       []byte
 	)
 	if approvalRequired {
 		if processorInputParams.TestsMode {
@@ -775,6 +767,20 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 			if err != nil {
 				return nil, err
 			}
+		}
+	}
+
+	// Until we change the logic for Bridge to follow the same logic as for Swap (meaning first approval, then bridge tx) we have to provide txPackedData
+	// otherwise we could do the logic below in the else block of `if approvalRequired` codition.
+	if input.SendType != sendtype.Swap || !approvalRequired {
+		txPackedData, err = pathProcessor.PackTxInputData(processorInputParams)
+		if err != nil {
+			return nil, err
+		}
+
+		gasLimit, err = pathProcessor.EstimateGas(processorInputParams, txPackedData)
+		if err != nil {
+			return nil, err
 		}
 	}
 

@@ -29,6 +29,35 @@ type Route struct {
 	TokenTransferProxy common.Address  `json:"tokenTransferProxy"`
 }
 
+func (r *Route) Copy() *Route {
+	gasCost := new(bigint.BigInt)
+	if r.GasCost != nil {
+		gasCost.Int = big.NewInt(r.GasCost.Int64())
+	}
+	srcAmount := new(bigint.BigInt)
+	if r.SrcAmount != nil {
+		srcAmount.Int = big.NewInt(r.SrcAmount.Int64())
+	}
+	destAmount := new(bigint.BigInt)
+	if r.DestAmount != nil {
+		destAmount.Int = big.NewInt(r.DestAmount.Int64())
+	}
+
+	return &Route{
+		GasCost:            gasCost,
+		SrcAmount:          srcAmount,
+		SrcTokenAddress:    r.SrcTokenAddress,
+		SrcTokenDecimals:   r.SrcTokenDecimals,
+		DestAmount:         destAmount,
+		DestTokenAddress:   r.DestTokenAddress,
+		DestTokenDecimals:  r.DestTokenDecimals,
+		RawPriceRoute:      r.RawPriceRoute,
+		Side:               r.Side,
+		ContractAddress:    r.ContractAddress,
+		TokenTransferProxy: r.TokenTransferProxy,
+	}
+}
+
 type PriceRouteResponse struct {
 	PriceRoute json.RawMessage `json:"priceRoute"`
 	Error      string          `json:"error"`

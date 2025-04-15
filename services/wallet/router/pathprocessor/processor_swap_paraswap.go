@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -30,6 +31,7 @@ type SwapParaswapTxArgs struct {
 }
 
 type SwapParaswapProcessor struct {
+	rpcClient      *rpc.Client
 	paraswapClient paraswap.ClientInterface
 	tokenManager   *walletToken.Manager
 	transactor     transactions.TransactorIface
@@ -61,6 +63,7 @@ func NewSwapParaswapProcessor(rpcClient *rpc.Client, transactor transactions.Tra
 	partnerAddress, partnerFeePcnt := getPartnerAddressAndFeePcnt(defaultChainID)
 
 	return &SwapParaswapProcessor{
+		rpcClient: rpcClient,
 		paraswapClient: paraswap.NewClientV5(
 			defaultChainID,
 			partnerID,
@@ -147,21 +150,7 @@ func (s *SwapParaswapProcessor) CalculateFees(params ProcessorInputParams) (*big
 	return walletCommon.ZeroBigIntValue(), walletCommon.ZeroBigIntValue(), nil
 }
 
-func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
-	// not sure what we can do here since we're using the api to build the transaction
-	return []byte{}, nil
-}
-
-func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	if params.TestsMode {
-		if params.TestEstimationMap != nil {
-			if val, ok := params.TestEstimationMap[s.Name()]; ok {
-				return val.Value, val.Err
-			}
-		}
-		return 0, ErrNoEstimationFound
-	}
-
+func (s *SwapParaswapProcessor) fetchAndStorePriceRoute(params ProcessorInputParams) error {
 	swapSide := paraswap.SellSide
 	if params.AmountOut != nil && params.AmountOut.Cmp(walletCommon.ZeroBigIntValue()) > 0 {
 		swapSide = paraswap.BuySide
@@ -178,25 +167,110 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 	priceRoute, err := s.paraswapClient.FetchPriceRoute(context.Background(), params.FromToken.Address, params.FromToken.Decimals,
 		params.ToToken.Address, params.ToToken.Decimals, params.AmountIn, params.FromAddr, params.ToAddr, swapSide)
 	if err != nil {
-		return 0, createSwapParaswapErrorResponse(err)
+		return createSwapParaswapErrorResponse(err)
 	}
 
 	key := pathProcessorCommon.MakeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol, params.AmountIn)
 	s.priceRoute.Store(key, &priceRoute)
+	return nil
+}
 
-	return priceRoute.GasCost.Uint64(), nil
+func (s *SwapParaswapProcessor) getPriceRoute(key string) (*paraswap.Route, error) {
+	priceRouteIns, ok := s.priceRoute.Load(key)
+	if !ok {
+		return nil, ErrPriceRouteNotFound
+	}
+	priceRoute, ok := priceRouteIns.(*paraswap.Route)
+	if !ok {
+		return nil, ErrPriceRouteNotFound
+	}
+	return priceRoute.Copy(), nil
 }
 
 func (s *SwapParaswapProcessor) GetContractAddress(params ProcessorInputParams) (address common.Address, err error) {
-	key := pathProcessorCommon.MakeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol, params.AmountIn)
-	priceRouteIns, ok := s.priceRoute.Load(key)
-	if !ok {
-		err = ErrPriceRouteNotFound
-		return
+	err = s.fetchAndStorePriceRoute(params)
+	if err != nil {
+		return common.Address{}, createSwapParaswapErrorResponse(err)
 	}
-	priceRoute := priceRouteIns.(*paraswap.Route)
 
+	key := pathProcessorCommon.MakeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol, params.AmountIn)
+	priceRoute, err := s.getPriceRoute(key)
+	if err != nil {
+		return common.Address{}, err
+	}
 	return priceRoute.TokenTransferProxy, nil
+}
+
+func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams) ([]byte, error) {
+	if params.TestsMode {
+		return []byte{}, nil
+	}
+
+	addr := types.Address(params.ToAddr)
+	sendArgs := &wallettypes.SendTxArgs{
+		Version: wallettypes.SendTxArgsVersion1,
+
+		// tx fields
+		From:  types.Address(params.FromAddr),
+		To:    &addr,
+		Value: (*hexutil.Big)(params.AmountIn),
+		// additional fields version 1
+		ValueIn:            (*hexutil.Big)(params.AmountIn),
+		FromChainID:        params.FromChain.ChainID,
+		ToChainID:          params.ToChain.ChainID,
+		FromTokenID:        params.FromToken.Symbol,
+		ToTokenID:          params.ToToken.Symbol,
+		SlippagePercentage: params.SlippagePercentage,
+	}
+
+	err := s.prepareTransactionV2(sendArgs)
+	if err != nil {
+		return []byte{}, createSwapParaswapErrorResponse(err)
+	}
+
+	return sendArgs.Data, nil
+}
+
+func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
+	if params.TestsMode {
+		if params.TestEstimationMap != nil {
+			if val, ok := params.TestEstimationMap[s.Name()]; ok {
+				return val.Value, val.Err
+			}
+		}
+		return 0, ErrNoEstimationFound
+	}
+
+	value := big.NewInt(0)
+	if params.FromToken.IsNative() {
+		value = params.AmountIn
+	}
+
+	contractAddress, err := s.GetContractAddress(params)
+	if err != nil {
+		return 0, createENSRegisterProcessorErrorResponse(err)
+	}
+
+	ethClient, err := s.rpcClient.EthClient(params.FromChain.ChainID)
+	if err != nil {
+		return 0, createENSRegisterProcessorErrorResponse(err)
+	}
+
+	msg := ethereum.CallMsg{
+		From:  params.FromAddr,
+		To:    &contractAddress,
+		Value: value,
+		Data:  input,
+	}
+
+	estimation, err := ethClient.EstimateGas(context.Background(), msg)
+	if err != nil {
+		return 0, createENSRegisterProcessorErrorResponse(err)
+	}
+
+	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
+
+	return uint64(increasedEstimation), nil
 }
 
 // TODO: remove this struct once mobile switches to the new approach
@@ -204,11 +278,10 @@ func (s *SwapParaswapProcessor) prepareTransaction(sendArgs *MultipathProcessorT
 	slippageBP := uint(sendArgs.SwapTx.SlippagePercentage * 100) // convert to basis points
 
 	key := pathProcessorCommon.MakeKey(sendArgs.SwapTx.ChainID, sendArgs.SwapTx.ChainIDTo, sendArgs.SwapTx.TokenIDFrom, sendArgs.SwapTx.TokenIDTo, sendArgs.SwapTx.ValueIn.ToInt())
-	priceRouteIns, ok := s.priceRoute.Load(key)
-	if !ok {
-		return ErrPriceRouteNotFound
+	priceRoute, err := s.getPriceRoute(key)
+	if err != nil {
+		return createSwapParaswapErrorResponse(err)
 	}
-	priceRoute := priceRouteIns.(*paraswap.Route)
 
 	tx, err := s.paraswapClient.BuildTransaction(context.Background(), priceRoute.SrcTokenAddress, priceRoute.SrcTokenDecimals, priceRoute.SrcAmount.Int,
 		priceRoute.DestTokenAddress, priceRoute.DestTokenDecimals, priceRoute.DestAmount.Int, slippageBP,
@@ -250,11 +323,10 @@ func (s *SwapParaswapProcessor) prepareTransactionV2(sendArgs *wallettypes.SendT
 	slippageBP := uint(sendArgs.SlippagePercentage * 100) // convert to basis points
 
 	key := pathProcessorCommon.MakeKey(sendArgs.FromChainID, sendArgs.ToChainID, sendArgs.FromTokenID, sendArgs.ToTokenID, sendArgs.ValueIn.ToInt())
-	priceRouteIns, ok := s.priceRoute.Load(key)
-	if !ok {
-		return ErrPriceRouteNotFound
+	priceRoute, err := s.getPriceRoute(key)
+	if err != nil {
+		return createSwapParaswapErrorResponse(err)
 	}
-	priceRoute := priceRouteIns.(*paraswap.Route)
 
 	tx, err := s.paraswapClient.BuildTransaction(context.Background(), priceRoute.SrcTokenAddress, priceRoute.SrcTokenDecimals, priceRoute.SrcAmount.Int,
 		priceRoute.DestTokenAddress, priceRoute.DestTokenDecimals, priceRoute.DestAmount.Int, slippageBP,
@@ -318,11 +390,10 @@ func (s *SwapParaswapProcessor) Send(sendArgs *MultipathProcessorTxArgs, lastUse
 
 func (s *SwapParaswapProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
 	key := pathProcessorCommon.MakeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol, params.AmountIn)
-	priceRouteIns, ok := s.priceRoute.Load(key)
-	if !ok {
-		return nil, ErrPriceRouteNotFound
+	priceRoute, err := s.getPriceRoute(key)
+	if err != nil {
+		return nil, createSwapParaswapErrorResponse(err)
 	}
-	priceRoute := priceRouteIns.(*paraswap.Route)
 
 	_, partnerFeePcnt := getPartnerAddressAndFeePcnt(params.FromChain.ChainID)
 	destAmount, _ := calcReceivedAmountAndFee(priceRoute.DestAmount.Int, partnerFeePcnt)
