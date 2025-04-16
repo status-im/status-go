@@ -30,6 +30,7 @@ class StatusBackend(RpcClient, SignalClient):
     container = None
 
     def __init__(self, await_signals=[], privileged=False, ipv6=USE_IPV6):
+        self.temp_dir = None
         self.ipv6 = True if ipv6 == "Yes" else False
         logging.debug(f"Flag USE_IPV6 is: {self.ipv6}")
         self.docker_project_name = option.docker_project_name
