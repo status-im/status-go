@@ -80,6 +80,9 @@ type ClientWithFallback struct {
 
 	tag      string // tag for the limiter
 	groupTag string // tag for the limiter group
+
+	done   chan struct{} // channel to signal client closure
+	closed atomic.Bool   // flag to track if client is closed
 }
 
 func (c *ClientWithFallback) Copy() interface{} {
@@ -94,6 +97,8 @@ func (c *ClientWithFallback) Copy() interface{} {
 		LastCheckedAt:          c.LastCheckedAt,
 		tag:                    c.tag,
 		groupTag:               c.groupTag,
+		done:                   c.done,
+		closed:                 c.closed,
 	}
 }
 
@@ -135,10 +140,18 @@ func NewClient(ethClients []ethclient.RPSLimitedEthClientInterface, chainID uint
 		LastCheckedAt:          time.Now().Unix(),
 		circuitbreaker:         circuitbreaker.NewCircuitBreaker(cbConfig),
 		providersHealthManager: providersHealthManager,
+		done:                   make(chan struct{}),
 	}
 }
 
 func (c *ClientWithFallback) Close() {
+	if !c.closed.CompareAndSwap(false, true) {
+		return // already closed
+	}
+
+	close(c.done) // signal all ongoing operations to stop
+
+	// Close all eth clients
 	for _, client := range c.ethClients {
 		client.Close()
 	}
@@ -188,6 +201,22 @@ func (c *ClientWithFallback) IsConnected() bool {
 }
 
 func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (interface{}, error) {
+	if c.closed.Load() {
+		return nil, errors.New("client is closed")
+	}
+
+	// Create a context that will be cancelled when either the parent context is done or the client is closed
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Start a goroutine to watch for client closure
+	go func() {
+		select {
+		case <-c.done:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 	if c.commonLimiter != nil {
 		if allow, err := c.commonLimiter.Allow(c.tag); !allow {
 			return nil, fmt.Errorf("tag=%s, %w", c.tag, err)

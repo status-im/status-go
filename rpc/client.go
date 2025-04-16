@@ -188,6 +188,12 @@ func (c *Client) Start(ctx context.Context) {
 func (c *Client) Stop() {
 	c.NetworkManager.Stop()
 
+	c.rpcClientsMutex.Lock()
+	for _, client := range c.rpcClients {
+		client.Close()
+	}
+	c.rpcClientsMutex.Unlock()
+
 	c.healthMgr.Stop()
 	if c.stopMonitoringFunc == nil {
 		return

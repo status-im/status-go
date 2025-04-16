@@ -198,3 +198,59 @@ func TestClientWithFallback_NilClientPanic(t *testing.T) {
 	// Wait for the operation to complete
 	<-done
 }
+
+// TestClientWithFallback_CloseStopsOperations tests that closing the client
+// properly stops all ongoing operations
+func TestClientWithFallback_CloseStopsOperations(t *testing.T) {
+	client, ethClients, cleanup := setupClientTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	addr := common.HexToAddress("0x1234")
+
+	// Create channels to coordinate the test
+	done := make(chan struct{})
+	operationStarted := make(chan struct{})
+
+	// Set up the first client to block for a short time
+	ethClients[0].EXPECT().CodeAt(ctx, addr, nil).DoAndReturn(
+		func(ctx context.Context, addr common.Address, blockNumber *big.Int) ([]byte, error) {
+			close(operationStarted) // Signal that operation has started
+
+			// Wait for context cancellation
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}).Times(1)
+
+	// Set up expectations for other clients - they should not be called
+	// because the operation should be cancelled after the first client
+	ethClients[1].EXPECT().CodeAt(ctx, addr, nil).Times(0)
+	ethClients[2].EXPECT().CodeAt(ctx, addr, nil).Times(0)
+
+	// Set up expectations for Close on all clients
+	for _, ethClient := range ethClients {
+		ethClient.EXPECT().Close().Times(1)
+	}
+
+	// Start the operation in a goroutine
+	go func() {
+		defer close(done)
+		_, err := client.CodeAt(ctx, addr, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "context canceled")
+	}()
+
+	// Wait for operation to start
+	<-operationStarted
+
+	// Close the client while operation is running
+	client.Close()
+
+	// Wait for the operation to complete
+	<-done
+
+	// Verify that subsequent calls fail immediately
+	_, err := client.CodeAt(ctx, addr, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "client is closed")
+}
