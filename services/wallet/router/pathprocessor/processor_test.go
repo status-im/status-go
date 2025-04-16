@@ -15,7 +15,7 @@ import (
 
 var mainnet = params.Network{
 	ChainID:                walletCommon.EthereumMainnet,
-	ChainName:              "Mainnet",
+	ChainName:              "Ethereum",
 	BlockExplorerURL:       "https://etherscan.io/",
 	IconURL:                "network/Network=Ethereum",
 	ChainColor:             "#627EEA",

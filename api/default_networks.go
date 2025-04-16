@@ -70,7 +70,7 @@ func mainnet(proxyHost, stageName string) params.Network {
 
 	return params.Network{
 		ChainID:                chainID,
-		ChainName:              "Mainnet",
+		ChainName:              "Ethereum",
 		RpcProviders:           rpcProviders,
 		BlockExplorerURL:       "https://etherscan.io/",
 		IconURL:                "network/Network=Ethereum",

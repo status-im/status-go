@@ -99,7 +99,7 @@ var (
 
 var mainnet = params.Network{
 	ChainID:   walletCommon.EthereumMainnet,
-	ChainName: "Mainnet",
+	ChainName: "Ethereum",
 	RpcProviders: []params.RpcProvider{
 		*params.NewProxyProvider(walletCommon.EthereumMainnet, proxyNodefleet, fmt.Sprintf("https://%s.api.status.im/nodefleet/ethereum/mainnet/", stageName), false),
 		*params.NewProxyProvider(walletCommon.EthereumMainnet, proxyInfura, fmt.Sprintf("https://%s.api.status.im/infura/ethereum/mainnet/", stageName), false),

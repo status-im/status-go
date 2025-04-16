@@ -58,7 +58,7 @@ var (
 		"network-id",
 		params.SepoliaNetworkID,
 		fmt.Sprintf(
-			"A network ID: %d (Mainnet), %d (Sepolia)",
+			"A network ID: %d (Ethereum), %d (Sepolia)",
 			params.MainNetworkID, params.SepoliaNetworkID,
 		),
 	)
