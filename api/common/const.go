@@ -10,4 +10,6 @@ const (
 	BaseChainID                 uint64 = 8453
 	BaseSepoliaChainID          uint64 = 84532
 	StatusNetworkSepoliaChainID uint64 = 1660990954
+	LineaChainID                uint64 = 59144
+	LineaSepoliaChainID         uint64 = 59141
 )

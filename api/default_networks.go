@@ -294,7 +294,7 @@ func base(proxyHost, stageName string) params.Network {
 		ChainID:                chainID,
 		ChainName:              "Base",
 		RpcProviders:           rpcProviders,
-		BlockExplorerURL:       "https://basescan.org",
+		BlockExplorerURL:       "https://basescan.org/",
 		IconURL:                "network/Network=Base",
 		ChainColor:             "#0052FF",
 		ShortName:              "base",
@@ -380,6 +380,77 @@ func statusNetworkSepolia(proxyHost string) params.Network {
 	}
 }
 
+func linea(proxyHost, stageName string) params.Network {
+	const chainID = common.LineaChainID
+	const chainName = "linea"
+	const networkName = "mainnet"
+
+	rpcProviders := []params.RpcProvider{
+		// Smart proxy provider
+		*params.NewEthRpcProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(proxyHost, chainName, networkName), false),
+		// Proxy providers
+		*params.NewProxyProvider(chainID, ProxyNodefleet, proxyUrl(stageName, Nodefleet, chainName, networkName), false),
+		*params.NewProxyProvider(chainID, ProxyInfura, proxyUrl(stageName, Infura, chainName, networkName), false),
+		*params.NewProxyProvider(chainID, ProxyGrove, proxyUrl(stageName, Grove, chainName, networkName), true),
+		// Direct providers
+		*params.NewDirectProvider(chainID, DirectInfura, "https://linea-mainnet.infura.io/v3/", true),
+		*params.NewDirectProvider(chainID, DirectGrove, "https://linea.rpc.grove.city/v1/", false),
+	}
+
+	return params.Network{
+		ChainID:                chainID,
+		ChainName:              "Linea",
+		RpcProviders:           rpcProviders,
+		BlockExplorerURL:       "https://lineascan.build/",
+		IconURL:                "network/Network=Linea",
+		ChainColor:             "#FFF068",
+		ShortName:              "linea",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 false,
+		Layer:                  2,
+		Enabled:                true,
+		RelatedChainID:         common.LineaSepoliaChainID,
+		IsActive:               true,
+		IsDeactivatable:        true,
+	}
+}
+
+func lineaSepolia(proxyHost, stageName string) params.Network {
+	const chainID = common.LineaSepoliaChainID
+	const chainName = "linea"
+	const networkName = "sepolia"
+
+	rpcProviders := []params.RpcProvider{
+		// Smart proxy provider
+		*params.NewEthRpcProxyProvider(chainID, StatusSmartProxy, smartProxyUrl(proxyHost, chainName, networkName), false),
+		// Proxy providers
+		*params.NewProxyProvider(chainID, ProxyInfura, proxyUrl(stageName, Infura, chainName, networkName), false),
+		// Direct providers
+		*params.NewDirectProvider(chainID, DirectInfura, "https://linea-sepolia.infura.io/v3/", true),
+	}
+
+	return params.Network{
+		ChainID:                chainID,
+		ChainName:              "Linea Sepolia",
+		RpcProviders:           rpcProviders,
+		BlockExplorerURL:       "https://sepolia.lineascan.build/",
+		IconURL:                "network/Network=Linea-test",
+		ChainColor:             "#FFF068",
+		ShortName:              "linea",
+		NativeCurrencyName:     "Ether",
+		NativeCurrencySymbol:   "ETH",
+		NativeCurrencyDecimals: 18,
+		IsTest:                 true,
+		Layer:                  2,
+		Enabled:                true,
+		RelatedChainID:         common.LineaSepoliaChainID,
+		IsActive:               true,
+		IsDeactivatable:        true,
+	}
+}
+
 func defaultNetworks(proxyHost, stageName string) []params.Network {
 	return []params.Network{
 		mainnet(proxyHost, stageName),
@@ -391,6 +462,8 @@ func defaultNetworks(proxyHost, stageName string) []params.Network {
 		base(proxyHost, stageName),
 		baseSepolia(proxyHost, stageName),
 		statusNetworkSepolia(proxyHost),
+		linea(proxyHost, stageName),
+		lineaSepolia(proxyHost, stageName),
 	}
 }
 

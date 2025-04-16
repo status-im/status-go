@@ -15,11 +15,13 @@ var contractDataByChainID = map[uint64]common.Address{
 	wallet_common.OptimismMainnet:      common.HexToAddress("0x55bD303eA3D50FC982A8a5b43972d7f38D129bbF"),
 	wallet_common.ArbitrumMainnet:      common.HexToAddress("0x54764eF12d29b249fDC7FC3caDc039955A396A8e"),
 	wallet_common.BaseMainnet:          common.HexToAddress("0x84A1C94fcc5EcFA292771f6aE7Fbf24ec062D34e"),
+	wallet_common.LineaMainnet:         common.HexToAddress("0xAEc0E08615fD7e427F44240C4D8830eC36258Fe9"),
 	wallet_common.EthereumSepolia:      common.HexToAddress("0x55bD303eA3D50FC982A8a5b43972d7f38D129bbF"),
 	wallet_common.ArbitrumSepolia:      common.HexToAddress("0x54764eF12d29b249fDC7FC3caDc039955A396A8e"),
 	wallet_common.OptimismSepolia:      common.HexToAddress("0x55bD303eA3D50FC982A8a5b43972d7f38D129bbF"),
 	wallet_common.BaseSepolia:          common.HexToAddress("0x84A1C94fcc5EcFA292771f6aE7Fbf24ec062D34e"),
 	wallet_common.StatusNetworkSepolia: common.HexToAddress("0x84A1C94fcc5EcFA292771f6aE7Fbf24ec062D34e"),
+	wallet_common.LineaSepolia:         common.HexToAddress("0xF10E000e33852D09Cf855Ce36FEDCe959c9285A9"),
 	777333:                             common.HexToAddress("0x0000000000000000000000000000000010777333"),
 }
 

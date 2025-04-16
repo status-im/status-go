@@ -54,6 +54,7 @@ var (
 	sepoliaErc20OptimismBatchSize      = big.NewInt(10000)
 	sepoliaErc20BaseBatchSize          = big.NewInt(10000)
 	sepoliaErc20StatusNetworkBatchSize = big.NewInt(10000)
+	sepoliaErc20LineaBatchSize         = big.NewInt(10000)
 	erc20BatchSize                     = big.NewInt(100000)
 
 	transfersRetryInterval = 5 * time.Second
@@ -159,6 +160,8 @@ func getErc20BatchSize(chainID uint64) *big.Int {
 		return sepoliaErc20BaseBatchSize
 	case w_common.StatusNetworkSepolia:
 		return sepoliaErc20StatusNetworkBatchSize
+	case w_common.LineaSepolia:
+		return sepoliaErc20LineaBatchSize
 	case w_common.BinanceChainID:
 		return binanceChainErc20BatchSize
 	case w_common.BinanceTestChainID:

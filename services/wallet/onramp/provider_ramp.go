@@ -34,7 +34,7 @@ func (p *RampProvider) GetCryptoOnRamp(ctx context.Context) (CryptoOnRamp, error
 		Hostname:                  "ramp.network",
 		SupportsSinglePurchase:    true,
 		SupportsRecurrentPurchase: false,
-		SupportedChainIDs:         []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet},
+		SupportedChainIDs:         []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet, walletCommon.LineaMainnet},
 		URLsNeedParameters:        false,
 		SiteURL:                   rampSiteURL,
 	}
