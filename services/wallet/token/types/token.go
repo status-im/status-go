@@ -13,6 +13,8 @@ type Token struct {
 	Address common.Address `json:"address"`
 	Name    string         `json:"name"`
 	Symbol  string         `json:"symbol"`
+	// DONT USE THE FIELD BELOW
+	TmpSymbol string `json:"-"` // TODO: this is just a temporary solution to solve the collision, remove this when switching to CoinGecko tokens list
 	// Decimals defines how divisible the token is. For example, 0 would be
 	// indivisible, whereas 18 would allow very small amounts of the token
 	// to be traded.
