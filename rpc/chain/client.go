@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/circuitbreaker"
+	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/healthmanager"
 	"github.com/status-im/status-go/healthmanager/rpcstatus"
 	"github.com/status-im/status-go/logutils"
@@ -211,12 +212,14 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (i
 
 	// Start a goroutine to watch for client closure
 	go func() {
+		defer gocommon.LogOnPanic()
 		select {
 		case <-c.done:
 			cancel()
 		case <-ctx.Done():
 		}
 	}()
+
 	if c.commonLimiter != nil {
 		if allow, err := c.commonLimiter.Allow(c.tag); !allow {
 			return nil, fmt.Errorf("tag=%s, %w", c.tag, err)
@@ -235,6 +238,9 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (i
 	for _, ethProviderClient := range c.ethClients {
 		ethProviderClient := ethProviderClient
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			res, err := ethProviderClient.ExecuteWithRPSLimit(f.Func)
 			if err != nil && (isVMError(err) || errors.Is(err, context.Canceled)) {
 				cmd.Cancel()
