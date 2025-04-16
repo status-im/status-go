@@ -3,7 +3,9 @@ package chain
 import (
 	"context"
 	"errors"
+	"math/big"
 	"reflect"
+	"runtime"
 	"strconv"
 	"testing"
 
@@ -135,4 +137,64 @@ func getFuncPtr(f func(uint64, string)) uintptr {
 		return 0
 	}
 	return reflect.ValueOf(f).Pointer()
+}
+
+// TestClientWithFallback_NilClientPanic tests that a nil pointer panic occurs
+// when the client's internal state is nullified during operation
+func TestClientWithFallback_NilClientPanic(t *testing.T) {
+	client, ethClients, cleanup := setupClientTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	addr := common.HexToAddress("0x1234")
+
+	// Create channels to coordinate the test
+	done := make(chan struct{})
+	operationStarted := make(chan struct{})
+	stateNulled := make(chan struct{})
+
+	// Set up the first client to block for a short time
+	ethClients[0].EXPECT().CodeAt(ctx, addr, nil).DoAndReturn(
+		func(ctx context.Context, addr common.Address, blockNumber *big.Int) ([]byte, error) {
+			close(operationStarted) // Signal that operation has started
+			<-stateNulled           // Wait until state is nulled
+			return nil, errors.New("timeout")
+		}).Times(1)
+
+	// Set up expectations for other clients
+	ethClients[1].EXPECT().CodeAt(ctx, addr, nil).Return(nil, errors.New("error")).Times(1)
+	ethClients[2].EXPECT().CodeAt(ctx, addr, nil).Return(nil, errors.New("error")).Times(1)
+
+	// Start the operation in a goroutine
+	go func() {
+		defer close(done)
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic but got none")
+			} else {
+				// Verify it's the expected nil pointer panic
+				if _, ok := r.(runtime.Error); !ok {
+					t.Errorf("Expected runtime error, got: %v", r)
+				}
+			}
+		}()
+
+		// Start the operation that should trigger the panic
+		_, _ = client.CodeAt(ctx, addr, nil)
+		t.Error("Expected panic, but operation completed successfully")
+	}()
+
+	// Wait for operation to start
+	<-operationStarted
+
+	// Nullify the client's internal state while operation is running
+	client.ethClients = nil
+	client.circuitbreaker = nil
+	client.commonLimiter = nil
+	client.providersHealthManager = nil
+	client.isConnected = nil
+	close(stateNulled)
+
+	// Wait for the operation to complete
+	<-done
 }

@@ -647,3 +647,54 @@ func TestCircuitBreaker_ErrorLogging(t *testing.T) {
 		assert.True(t, duration >= 0)
 	})
 }
+
+func TestCircuitBreaker_NilPointerPanic(t *testing.T) {
+	// Create a nil pointer to CommandResult
+	var result *CommandResult
+
+	// This should panic with nil pointer dereference
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic but got none")
+		}
+	}()
+
+	// Attempt to call addCallStatus on nil pointer, which should cause the panic
+	result.addCallStatus("test-circuit", nil)
+}
+
+func TestCircuitBreaker_DeinitializedPanic(t *testing.T) {
+	// Create a circuit breaker
+	cb := NewCircuitBreaker(Config{})
+
+	// Create a command that will be executed
+	cmd := NewCommand(context.Background(), nil)
+	cmd.Add(NewFunctor(func() ([]any, error) {
+		return nil, nil
+	}, "test-circuit", ""))
+
+	// Create a channel to coordinate the test
+	done := make(chan struct{})
+
+	// Start executing the command in a goroutine
+	go func() {
+		defer close(done)
+
+		// Execute will try to use the circuit breaker after we nil it
+		result := cb.Execute(cmd)
+
+		// This line should never be reached due to panic
+		t.Error("Expected panic but got result:", result)
+	}()
+
+	// Set circuit breaker to nil to simulate deinitialization
+	cb = nil
+
+	// Wait for goroutine to finish or timeout
+	select {
+	case <-done:
+		t.Error("Expected panic but goroutine completed normally")
+	case <-time.After(time.Second):
+		// Test passes if we timeout, as this means the goroutine panicked
+	}
+}
