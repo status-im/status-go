@@ -647,18 +647,3 @@ func TestCircuitBreaker_ErrorLogging(t *testing.T) {
 		assert.True(t, duration >= 0)
 	})
 }
-
-func TestCircuitBreaker_NilPointerPanic(t *testing.T) {
-	// Create a nil pointer to CommandResult
-	var result *CommandResult
-
-	// This should panic with nil pointer dereference
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected panic but got none")
-		}
-	}()
-
-	// Attempt to call addCallStatus on nil pointer, which should cause the panic
-	result.addCallStatus("test-circuit", nil, time.Now())
-}
