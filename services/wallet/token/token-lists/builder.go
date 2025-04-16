@@ -32,6 +32,10 @@ func (t *TokenLists) rebuildTokensMap(fetchedLists []fetcher.FetchedTokenList) e
 		t.tokensListsMu.Unlock()
 	}
 
+	// TODO: remove this once we switch to CoinGecko tokens list
+	// temporary soltion to avoid token collisions
+	t.solveCollision()
+
 	return nil
 }
 
