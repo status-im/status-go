@@ -87,20 +87,25 @@ type ClientWithFallback struct {
 }
 
 func (c *ClientWithFallback) Copy() interface{} {
-	return &ClientWithFallback{
+	// Create a new ClientWithFallback with copied values
+	clientCopy := &ClientWithFallback{
 		ChainID:                c.ChainID,
 		ethClients:             c.ethClients,
 		commonLimiter:          c.commonLimiter,
 		circuitbreaker:         c.circuitbreaker,
 		providersHealthManager: c.providersHealthManager,
 		WalletNotifier:         c.WalletNotifier,
-		isConnected:            c.isConnected,
+		isConnected:            c.isConnected, // Use the same isConnected pointer
 		LastCheckedAt:          c.LastCheckedAt,
 		tag:                    c.tag,
 		groupTag:               c.groupTag,
-		done:                   c.done,
-		closed:                 c.closed,
+		done:                   make(chan struct{}),
 	}
+
+	// Copy the closed value
+	clientCopy.closed.Store(c.closed.Load())
+
+	return clientCopy
 }
 
 // Don't mark connection as failed if we get one of these errors
@@ -803,8 +808,24 @@ func (c *ClientWithFallback) SetGroupTag(tag string) {
 }
 
 func (c *ClientWithFallback) DeepCopyTag() tagger.Tagger {
-	clientCopy := *c
-	return &clientCopy
+	// Create a new ClientWithFallback with copied values
+	clientCopy := &ClientWithFallback{
+		ChainID:                c.ChainID,
+		ethClients:             c.ethClients,
+		commonLimiter:          c.commonLimiter,
+		circuitbreaker:         c.circuitbreaker,
+		providersHealthManager: c.providersHealthManager,
+		WalletNotifier:         c.WalletNotifier,
+		isConnected:            c.isConnected,
+		LastCheckedAt:          c.LastCheckedAt,
+		tag:                    c.tag,
+		groupTag:               c.groupTag,
+		done:                   make(chan struct{}),
+	}
+
+	clientCopy.closed.Store(c.closed.Load())
+
+	return clientCopy
 }
 
 func (c *ClientWithFallback) GetLimiter() rpclimiter.RequestLimiter {
