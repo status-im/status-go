@@ -2,6 +2,7 @@ package rarible
 
 import (
 	"context"
+	"github.com/status-im/status-go/internal/security"
 	"os"
 	"testing"
 	"time"
@@ -35,7 +36,7 @@ func (s *RaribleClientIntegrationSuite) SetupTest() {
 		testnetKey = os.Getenv("STATUS_RUNTIME_RARIBLE_TESTNET_API_KEY")
 	}
 
-	s.client = NewClient(mainnetKey, testnetKey)
+	s.client = NewClient(security.NewSensitiveString(mainnetKey), security.NewSensitiveString(testnetKey))
 }
 
 func (s *RaribleClientIntegrationSuite) TestAPIKeysAvailable() {

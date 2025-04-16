@@ -135,7 +135,7 @@ func OverrideDirectProvidersAuth(networks []params.Network, authTokens map[strin
 				continue
 			}
 
-			host, err := extractHost(provider.URL)
+			host, err := extractHost(provider.URL.Reveal())
 			if err != nil {
 				continue
 			}

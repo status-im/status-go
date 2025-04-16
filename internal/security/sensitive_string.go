@@ -3,6 +3,7 @@ package security
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 const RedactionPlaceholder = "***"
@@ -73,4 +74,12 @@ func (s SensitiveString) Plus(other SensitiveString) SensitiveString {
 
 func (s SensitiveString) PlusString(other string) SensitiveString {
 	return NewSensitiveString(s.value + other)
+}
+
+func (s SensitiveString) TrimRight(cutset string) SensitiveString {
+	return NewSensitiveString(strings.TrimRight(s.value, cutset))
+}
+
+func (s SensitiveString) Contains(substr string) bool {
+	return strings.Contains(s.value, substr)
 }

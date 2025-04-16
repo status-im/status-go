@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/status-im/status-go/internal/security"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -63,8 +64,8 @@ func TestHTTPClient_GetRequests(t *testing.T) {
 			url:        "/test-credentials",
 			statusCode: http.StatusOK,
 			credentials: &BasicCreds{
-				User:     "username",
-				Password: "password",
+				User:     security.NewSensitiveString("username"),
+				Password: security.NewSensitiveString("password"),
 			},
 			expectedHeaders: map[string]string{
 				"Content-Type": "application/json",

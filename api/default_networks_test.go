@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/status-im/status-go/internal/security"
 	"strings"
 	"testing"
 
@@ -14,8 +15,8 @@ import (
 )
 
 func TestBuildDefaultNetworks(t *testing.T) {
-	infuraToken := "infura-token"
-	poktToken := "pokt-token"
+	infuraToken := security.NewSensitiveString("infura-token")
+	poktToken := security.NewSensitiveString("pokt-token")
 	stageName := "fast-n-bulbous"
 	request := &requests.CreateAccount{
 		WalletSecretsConfig: requests.WalletSecretsConfig{
@@ -60,16 +61,16 @@ func TestBuildDefaultNetworks(t *testing.T) {
 
 		// check fallback options
 		if strings.Contains(n.RPCURL, "infura.io") {
-			require.True(t, strings.Contains(n.RPCURL, infuraToken))
+			require.True(t, strings.Contains(n.RPCURL, infuraToken.Reveal()))
 		}
 		if strings.Contains(n.FallbackURL, "grove.city") {
-			require.True(t, strings.Contains(n.FallbackURL, poktToken))
+			require.True(t, strings.Contains(n.FallbackURL, poktToken.Reveal()))
 		}
 
 		// Check proxy providers for stageName
 		for _, provider := range n.RpcProviders {
 			if provider.Type == params.EmbeddedProxyProviderType {
-				require.Contains(t, provider.URL, stageName, "Proxy provider URL should contain stageName")
+				require.Contains(t, provider.URL.Reveal(), stageName, "Proxy provider URL should contain stageName")
 			}
 		}
 
@@ -78,9 +79,9 @@ func TestBuildDefaultNetworks(t *testing.T) {
 			if provider.Type != params.EmbeddedDirectProviderType {
 				continue
 			}
-			if strings.Contains(provider.URL, "infura.io") {
+			if provider.URL.Contains("infura.io") {
 				require.Equal(t, provider.AuthToken, infuraToken, "Direct provider URL should have infuraToken")
-			} else if strings.Contains(provider.URL, "grove.city") {
+			} else if provider.URL.Contains("grove.city") {
 				require.Equal(t, provider.AuthToken, poktToken, "Direct provider URL should have poktToken")
 			}
 		}

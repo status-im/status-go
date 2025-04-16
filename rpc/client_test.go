@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"github.com/status-im/status-go/internal/security"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -154,11 +155,11 @@ func TestGetClientsUsingCache(t *testing.T) {
 			providers = append(providers, params.RpcProvider{
 				Name:         fmt.Sprintf("Provider%d", i+1),
 				ChainID:      1,
-				URL:          baseURL + path,
+				URL:          security.NewSensitiveString(baseURL).PlusString(path),
 				Type:         params.EmbeddedProxyProviderType,
 				AuthType:     params.BasicAuth,
-				AuthLogin:    "incorrectUser",
-				AuthPassword: "incorrectPwd", // will be replaced by correct values by OverrideBasicAuth
+				AuthLogin:    security.NewSensitiveString("incorrectUser"),
+				AuthPassword: security.NewSensitiveString("incorrectPwd"), // will be replaced by correct values by OverrideBasicAuth
 				Enabled:      true,
 			})
 		}
@@ -173,7 +174,12 @@ func TestGetClientsUsingCache(t *testing.T) {
 		},
 	}
 
-	networks = networkhelper.OverrideBasicAuth(networks, params.EmbeddedProxyProviderType, true, user, password)
+	networks = networkhelper.OverrideBasicAuth(
+		networks,
+		params.EmbeddedProxyProviderType,
+		true,
+		security.NewSensitiveString(user),
+			security.NewSensitiveString(password))
 
 	config := ClientConfig{
 		Client:          nil,

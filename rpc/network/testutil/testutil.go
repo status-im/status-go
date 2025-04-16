@@ -9,7 +9,7 @@ import (
 )
 
 // Helper function to create a provider
-func CreateProvider(chainID uint64, name string, providerType params.RpcProviderType, enabled bool, url string) params.RpcProvider {
+func CreateProvider(chainID uint64, name string, providerType params.RpcProviderType, enabled bool, url security.SensitiveString) params.RpcProvider {
 	return params.RpcProvider{
 		ChainID:          chainID,
 		Name:             name,

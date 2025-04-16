@@ -6,6 +6,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"gopkg.in/go-playground/validator.v9"
 
+	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
 )
@@ -68,22 +69,31 @@ func (p *RpcProvidersPersistence) GetRpcProviders(chainID uint64) ([]params.RpcP
 	var providers []params.RpcProvider
 	for rows.Next() {
 		var provider params.RpcProvider
+		var url, authLogin, authPassword, authToken string
+
 		err := rows.Scan(
 			&provider.ID,
 			&provider.ChainID,
 			&provider.Name,
-			&provider.URL,
+			&url,
 			&provider.EnableRPSLimiter,
 			&provider.Type,
 			&provider.Enabled,
 			&provider.AuthType,
-			&provider.AuthLogin,
-			&provider.AuthPassword,
-			&provider.AuthToken,
+			&authLogin,
+			&authPassword,
+			&authToken,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
+
+		// Convert strings to SensitiveString
+		provider.URL = security.NewSensitiveString(url)
+		provider.AuthLogin = security.NewSensitiveString(authLogin)
+		provider.AuthPassword = security.NewSensitiveString(authPassword)
+		provider.AuthToken = security.NewSensitiveString(authToken)
+
 		providers = append(providers, provider)
 	}
 
@@ -118,6 +128,12 @@ func (p *RpcProvidersPersistence) AddRpcProvider(provider params.RpcProvider) er
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
+	// Extract values from SensitiveString fields
+	url := provider.URL.Reveal()
+	authLogin := provider.AuthLogin.Reveal()
+	authPassword := provider.AuthPassword.Reveal()
+	authToken := provider.AuthToken.Reveal()
+
 	// Proceed with adding the provider to the database
 	q := sq.Insert("rpc_providers").
 		Columns(
@@ -135,14 +151,14 @@ func (p *RpcProvidersPersistence) AddRpcProvider(provider params.RpcProvider) er
 		Values(
 			provider.ChainID,
 			provider.Name,
-			provider.URL,
+			url,
 			provider.EnableRPSLimiter,
 			provider.Type,
 			provider.Enabled,
 			provider.AuthType,
-			provider.AuthLogin,
-			provider.AuthPassword,
-			provider.AuthToken,
+			authLogin,
+			authPassword,
+			authToken,
 		)
 
 	query, args, err := q.ToSql()
@@ -200,17 +216,23 @@ func (p *RpcProvidersPersistence) UpdateRpcProvider(provider params.RpcProvider)
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
+	// Extract values from SensitiveString fields
+	url := provider.URL.Reveal()
+	authLogin := provider.AuthLogin.Reveal()
+	authPassword := provider.AuthPassword.Reveal()
+	authToken := provider.AuthToken.Reveal()
+
 	// Proceed with updating the provider in the database
 	q := sq.Update("rpc_providers").
 		SetMap(sq.Eq{
-			"url":                provider.URL,
+			"url":                url,
 			"enable_rps_limiter": provider.EnableRPSLimiter,
 			"type":               provider.Type,
 			"enabled":            provider.Enabled,
 			"auth_type":          provider.AuthType,
-			"auth_login":         provider.AuthLogin,
-			"auth_password":      provider.AuthPassword,
-			"auth_token":         provider.AuthToken,
+			"auth_login":         authLogin,
+			"auth_password":      authPassword,
+			"auth_token":         authToken,
 		}).
 		Where(sq.Eq{"id": provider.ID})
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"github.com/status-im/status-go/internal/security"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -72,10 +73,10 @@ func setupCommand(t *testing.T, method string) (state testState, close func()) {
 
 	initNetworks := []params.Network{
 		*network_testutil.CreateNetwork(walletCommon.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
-			network_testutil.CreateProvider(walletCommon.EthereumMainnet, "Infura Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.infura.io"),
+			network_testutil.CreateProvider(walletCommon.EthereumMainnet, "Infura Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
 		}),
 		*network_testutil.CreateNetwork(walletCommon.OptimismMainnet, "Optimism Mainnet", []params.RpcProvider{
-			network_testutil.CreateProvider(walletCommon.OptimismMainnet, "Optimism Mainnet", params.EmbeddedProxyProviderType, true, "https://mainnet.optimism.io"),
+			network_testutil.CreateProvider(walletCommon.OptimismMainnet, "Optimism Mainnet", params.EmbeddedProxyProviderType, true, security.NewSensitiveString("https://mainnet.optimism.io")),
 		}),
 	}
 	err := networkManager.InitEmbeddedNetworks(initNetworks)

@@ -77,3 +77,16 @@ func TestPlusString(t *testing.T) {
 	s1 := NewSensitiveString(secretValue)
 	require.Equal(t, s1.PlusString(secretValue), NewSensitiveString(secretValue+secretValue))
 }
+
+func TestTrimRight(t *testing.T) {
+	secretValue := "¡¡¡Hello, Gophers!!!"
+	s1 := NewSensitiveString(secretValue)
+	require.Equal(t, s1.TrimRight("!"), NewSensitiveString("¡¡¡Hello, Gophers"))
+}
+
+func TestContains(t *testing.T) {
+	secretValue := "¡¡¡Hello, Gophers!!!"
+	s1 := NewSensitiveString(secretValue)
+	require.True(t, s1.Contains("Hello"))
+	require.False(t, s1.Contains("World"))
+}

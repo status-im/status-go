@@ -2,7 +2,6 @@ package params
 
 import (
 	"net/url"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -33,7 +32,7 @@ type RpcProvider struct {
 	ID               int64           `json:"id" validate:"omitempty"`          // Auto-increment ID (for sorting order)
 	ChainID          uint64          `json:"chainId" validate:"required,gt=0"` // Chain ID of the network
 	Name             string          `json:"name" validate:"required,min=1"`   // Provider name for identification
-	URL              string          `json:"url" validate:"required,url"`      // Current Provider URL
+	URL              security.SensitiveString          `json:"url" validate:"required,url"`      // Current Provider URL
 	EnableRPSLimiter bool            `json:"enableRpsLimiter"`                 // Enable RPC rate limiting for this provider
 	Type             RpcProviderType `json:"type" validate:"required,oneof=embedded-proxy embedded-direct user"`
 	Enabled          bool            `json:"enabled"` // Whether the provider is enabled
@@ -45,16 +44,16 @@ type RpcProvider struct {
 }
 
 // GetFullURL returns the URL with auth token if TokenAuth is used
-func (p RpcProvider) GetFullURL() string {
+func (p RpcProvider) GetFullURL() security.SensitiveString {
 	if p.AuthType == TokenAuth && p.AuthToken.NotEmpty() {
-		return strings.TrimRight(p.URL, "/") + "/" + p.AuthToken.Reveal()
+		return p.URL.TrimRight("/").PlusString("/").Plus(p.AuthToken)
 	}
 	return p.URL
 }
 
 // GetHost returns the host from the provider's URL
 func (p RpcProvider) GetHost() string {
-	u, err := url.Parse(p.URL)
+	u, err := url.Parse(p.URL.Reveal())
 	if err != nil {
 		return ""
 	}
@@ -106,7 +105,7 @@ func (n *Network) DeepCopy() Network {
 	return updatedNetwork
 }
 
-func newRpcProvider(chainID uint64, name, url string, enableRpsLimiter bool, providerType RpcProviderType) *RpcProvider {
+func newRpcProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool, providerType RpcProviderType) *RpcProvider {
 	return &RpcProvider{
 		ChainID:          chainID,
 		Name:             name,
@@ -118,18 +117,18 @@ func newRpcProvider(chainID uint64, name, url string, enableRpsLimiter bool, pro
 	}
 }
 
-func NewUserProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
+func NewUserProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, UserProviderType)
 }
 
-func NewProxyProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
+func NewProxyProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedProxyProviderType)
 }
 
-func NewEthRpcProxyProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
+func NewEthRpcProxyProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedEthRpcProxyProviderType)
 }
 
-func NewDirectProvider(chainID uint64, name, url string, enableRpsLimiter bool) *RpcProvider {
+func NewDirectProvider(chainID uint64, name string, url security.SensitiveString, enableRpsLimiter bool) *RpcProvider {
 	return newRpcProvider(chainID, name, url, enableRpsLimiter, EmbeddedDirectProviderType)
 }

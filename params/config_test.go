@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/brianvoe/gofakeit/v6"
+	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/internal/security"
-	"github.com/brianvoe/gofakeit/v6"
 )
 
 func TestNewNodeConfigWithDefaults(t *testing.T) {
@@ -323,5 +323,5 @@ func TestMarshalWalletConfigJSON(t *testing.T) {
 	walletConfig = params.WalletConfig{}
 	err = json.Unmarshal([]byte(`{"OpenseaAPIKey":"some-key"}`), &walletConfig)
 	require.NoError(t, err)
-	require.Equal(t, "some-key", walletConfig.OpenseaAPIKey)
+	require.Equal(t, "some-key", walletConfig.OpenseaAPIKey.Reveal())
 }

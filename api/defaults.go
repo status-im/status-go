@@ -283,7 +283,7 @@ func getMainnetRPCURL(networks []params.Network) string {
 		}
 		for _, provider := range network.RpcProviders {
 			if provider.AuthType == params.TokenAuth && provider.Enabled {
-				return provider.GetFullURL()
+				return provider.GetFullURL().Reveal()
 			}
 		}
 		break
