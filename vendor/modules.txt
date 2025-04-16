@@ -219,7 +219,7 @@ github.com/edsrzf/mmap-go
 ## explicit; go 1.14
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.18.0.20250407114703-95a0cb61664d
+# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.19
 ## explicit; go 1.21
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
@@ -970,7 +970,7 @@ github.com/spaolacci/murmur3
 # github.com/status-im/doubleratchet v3.0.0+incompatible
 ## explicit
 github.com/status-im/doubleratchet
-# github.com/status-im/extkeys v1.0.1-0.20250407114414-33d3756ad493
+# github.com/status-im/extkeys v1.1.0
 ## explicit; go 1.21
 github.com/status-im/extkeys
 # github.com/status-im/keycard-go v0.0.0-20200402102358-957c09536969
