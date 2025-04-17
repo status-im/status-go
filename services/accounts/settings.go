@@ -50,6 +50,19 @@ func (api *SettingsAPI) SaveNodeConfig(ctx context.Context, n *params.NodeConfig
 	return nodecfg.SaveNodeConfig(api.db.DB(), n)
 }
 
+// News Settings
+func (api *SettingsAPI) NewsFeedEnabled() (bool, error) {
+	return api.db.NewsFeedEnabled()
+}
+
+func (api *SettingsAPI) NewsNotificationsEnabled() (bool, error) {
+	return api.db.NewsNotificationsEnabled()
+}
+
+func (api *SettingsAPI) NewsRSSEnabled() (bool, error) {
+	return api.db.NewsRSSEnabled()
+}
+
 // Notifications Settings
 func (api *SettingsAPI) NotificationsGetAllowNotifications() (bool, error) {
 	return api.db.GetAllowNotifications()

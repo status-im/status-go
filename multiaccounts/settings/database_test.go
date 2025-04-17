@@ -50,6 +50,7 @@ var (
 		DisplayAssetsBelowBalance:           false,
 		ShowCommunityAssetWhenSendingTokens: true,
 		NewsFeedEnabled:                     true,
+		NewsRSSEnabled:                      true,
 	}
 )
 
@@ -208,9 +209,9 @@ func TestDatabase_NewsNotificationsEnabled(t *testing.T) {
 
 	require.NoError(t, db.CreateSettings(settings, config))
 
-	settings, err := db.GetSettings()
+	enabled, err := db.NewsNotificationsEnabled()
 	require.NoError(t, err)
-	require.Equal(t, false, settings.NewsNotificationsEnabled)
+	require.Equal(t, false, enabled)
 
 	err = db.SaveSetting(NewsNotificationsEnabled.GetReactName(), true)
 	require.NoError(t, err)
@@ -244,10 +245,10 @@ func TestDatabase_NewsFeedEnabled(t *testing.T) {
 
 	require.NoError(t, db.CreateSettings(settings, config))
 
-	settings, err := db.GetSettings()
+	enabled, err := db.NewsFeedEnabled()
 	require.NoError(t, err)
 
-	require.Equal(t, true, settings.NewsFeedEnabled)
+	require.Equal(t, true, enabled)
 
 	err = db.SaveSetting(NewsFeedEnabled.GetReactName(), false)
 	require.NoError(t, err)
@@ -263,11 +264,11 @@ func TestDatabase_NewsFeedLastFetchedTimestamp(t *testing.T) {
 
 	require.NoError(t, db.CreateSettings(settings, config))
 
-	settings, err := db.GetSettings()
+	timestamp, err := db.NewsFeedLastFetchedTimestamp()
 	require.NoError(t, err)
 
 	// Using GreaterOrEqual because the timestamp is set during CreateSettings and there is a tiny chance that the second changes between
-	require.GreaterOrEqual(t, time.Now().UTC().Second(), settings.NewsFeedLastFetchedTimestamp.UTC().Second())
+	require.GreaterOrEqual(t, time.Now().UTC().Second(), timestamp.UTC().Second())
 
 	dateNow := time.Now()
 	err = db.SaveSetting(NewsFeedLastFetchedTimestamp.GetReactName(), dateNow)
@@ -276,4 +277,22 @@ func TestDatabase_NewsFeedLastFetchedTimestamp(t *testing.T) {
 	settings, err = db.GetSettings()
 	require.NoError(t, err)
 	require.Equal(t, dateNow.UTC().Second(), settings.NewsFeedLastFetchedTimestamp.UTC().Second())
+}
+
+func TestDatabase_NewsRSSEnabled(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	enabled, err := db.NewsRSSEnabled()
+	require.NoError(t, err)
+	require.Equal(t, true, enabled)
+
+	err = db.SaveSetting(NewsRSSEnabled.GetReactName(), false)
+	require.NoError(t, err)
+
+	settings, err = db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, false, settings.NewsRSSEnabled)
 }

@@ -27,6 +27,7 @@ type NewsFeedManager struct {
 	handler         FeedHandler
 	fetchFrom       time.Time
 	pollingInterval time.Duration
+	polling         bool
 	cancel          context.CancelFunc
 	logger          *zap.Logger
 }
@@ -73,6 +74,7 @@ func NewNewsFeedManager(opts ...Option) *NewsFeedManager {
 	nfm := &NewsFeedManager{
 		pollingInterval: time.Minute * 30,
 		fetchFrom:       time.Now(),
+		polling:         false,
 	}
 
 	for _, opt := range opts {
@@ -122,7 +124,16 @@ func (n *NewsFeedManager) fetchRSSAndHandle() error {
 	return nil
 }
 
-func (n *NewsFeedManager) StartFetching(ctx context.Context) {
+func (n *NewsFeedManager) IsPolling() bool {
+	return n.polling
+}
+
+func (n *NewsFeedManager) StartPolling(ctx context.Context) {
+	if n.polling {
+		return
+	}
+	n.polling = true
+
 	// Derive the given context, save the CancelFunc
 	ctx, n.cancel = context.WithCancel(ctx)
 
@@ -145,6 +156,10 @@ func (n *NewsFeedManager) StartFetching(ctx context.Context) {
 	}()
 }
 
-func (n *NewsFeedManager) StopFetching() {
+func (n *NewsFeedManager) StopPolling() {
+	if !n.polling {
+		return
+	}
 	n.cancel()
+	n.polling = false
 }

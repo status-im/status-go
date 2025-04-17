@@ -242,6 +242,11 @@ var (
 		dBColumnName:   "news_notifications_enabled",
 		valueHandler:   BoolHandler,
 	}
+	NewsRSSEnabled = SettingField{
+		reactFieldName: "news-rss-enabled?",
+		dBColumnName:   "news_rss_enabled",
+		valueHandler:   BoolHandler,
+	}
 	NodeConfig = SettingField{
 		reactFieldName: "node-config",
 		dBColumnName:   "node_config",
@@ -582,6 +587,7 @@ var (
 		NewsFeedEnabled,
 		NewsFeedLastFetchedTimestamp,
 		NewsNotificationsEnabled,
+		NewsRSSEnabled,
 		MessengerNotificationsEnabled,
 		NodeConfig,
 		NotificationsEnabled,

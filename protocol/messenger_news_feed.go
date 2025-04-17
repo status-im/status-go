@@ -91,3 +91,54 @@ func (m *Messenger) FetchNewsMessages() (*MessengerResponse, error) {
 	}
 	return response, nil
 }
+
+// The News Feed is enabled if both:
+// 1. The News Feed is enabled in the settings.
+// 2. The RSS feed is enabled in the settings.
+func (m *Messenger) IsNewsFeedEnabled() (bool, error) {
+	newsFeedEnabled, err := m.settings.NewsFeedEnabled()
+	if err != nil {
+		return false, err
+	}
+	if !newsFeedEnabled {
+		return false, nil
+	}
+	newsRSSEnabled, err := m.settings.NewsRSSEnabled()
+	if err != nil {
+		return false, err
+	}
+	return newsRSSEnabled, nil
+}
+
+func (m *Messenger) changeNewsFeedManagerAfterUpdate() error {
+	if m.newsFeedManager == nil {
+		return nil
+	}
+	isNewsFeedEnabled, err := m.IsNewsFeedEnabled()
+	if err != nil {
+		return err
+	}
+
+	if isNewsFeedEnabled {
+		m.newsFeedManager.StartPolling(m.ctx)
+	} else {
+		m.newsFeedManager.StopPolling()
+	}
+	return nil
+}
+
+func (m *Messenger) ToggleNewsFeedEnabled(value bool) error {
+	err := m.settings.SaveSetting(settings.NewsFeedEnabled.GetReactName(), value)
+	if err != nil {
+		return err
+	}
+	return m.changeNewsFeedManagerAfterUpdate()
+}
+
+func (m *Messenger) ToggleNewsRSSEnabled(value bool) error {
+	err := m.settings.SaveSetting(settings.NewsRSSEnabled.GetReactName(), value)
+	if err != nil {
+		return err
+	}
+	return m.changeNewsFeedManagerAfterUpdate()
+}

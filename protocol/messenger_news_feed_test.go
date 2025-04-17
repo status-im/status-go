@@ -4,10 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/suite"
-
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/mmcdole/gofeed"
+	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/internal/newsfeed"
 )
 
 type MessengerNewsFeedSuite struct {
@@ -19,6 +20,14 @@ func (s *MessengerNewsFeedSuite) SetupTest() {
 	s.MessengerBaseTestSuite.SetupTest()
 
 	s.m = s.newMessenger()
+	s.m.newsFeedManager = newsfeed.NewNewsFeedManager(
+		newsfeed.WithURL(newsfeed.STATUS_FEED_URL),
+		newsfeed.WithParser(gofeed.NewParser()),
+		newsfeed.WithHandler(s.m),
+		newsfeed.WithLogger(s.m.logger),
+		newsfeed.WithPollingInterval(30*time.Minute),
+		newsfeed.WithFetchFrom(time.Now().Add(-1*time.Hour)),
+	)
 }
 
 func TestMessengerNewsFeedSuite(t *testing.T) {
@@ -54,4 +63,32 @@ func (s *MessengerNewsFeedSuite) TestHandleNewsFeedItem() {
 	s.Require().NotNil(notifications)
 	s.Require().Len(notifications, 1)
 	s.Require().Equal(item.Title, notifications[0].NewsTitle)
+}
+
+func (s *MessengerNewsFeedSuite) TestToggleSettings() {
+	err := s.m.ToggleNewsFeedEnabled(true)
+	s.Require().NoError(err)
+	s.Require().True(s.m.newsFeedManager.IsPolling())
+
+	// Polling is off as soon as one setting is off
+	err = s.m.ToggleNewsFeedEnabled(false)
+	s.Require().NoError(err)
+	s.Require().False(s.m.newsFeedManager.IsPolling())
+
+	err = s.m.ToggleNewsRSSEnabled(false)
+	s.Require().NoError(err)
+	s.Require().False(s.m.newsFeedManager.IsPolling())
+
+	//Poolling is still off
+	err = s.m.ToggleNewsRSSEnabled(true)
+	s.Require().NoError(err)
+	s.Require().False(s.m.newsFeedManager.IsPolling())
+
+	// Polling restart if both settings are on
+	err = s.m.ToggleNewsFeedEnabled(true)
+	s.Require().NoError(err)
+	s.Require().True(s.m.newsFeedManager.IsPolling())
+
+	s.m.newsFeedManager.StopPolling()
+	s.Require().False(s.m.newsFeedManager.IsPolling())
 }

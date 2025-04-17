@@ -1362,6 +1362,16 @@ func (api *PublicAPI) FetchNewsMessages() (*protocol.MessengerResponse, error) {
 	return m.FetchNewsMessages()
 }
 
+func (api *PublicAPI) ToggleNewsFeedEnabled(value bool) error {
+	m := api.service.messenger
+	return m.ToggleNewsFeedEnabled(value)
+}
+
+func (api *PublicAPI) ToggleNewsRSSEnabled(value bool) error {
+	m := api.service.messenger
+	return m.ToggleNewsRSSEnabled(value)
+}
+
 func (api *PublicAPI) RequestAllHistoricMessages(forceFetchingBackup bool) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RequestAllHistoricMessages(forceFetchingBackup, false)
 }

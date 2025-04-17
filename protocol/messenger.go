@@ -912,8 +912,13 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 			newsfeed.WithFetchFrom(lastFetched),
 		)
 
-		// TODO only start if the setting is enabled
-		m.newsFeedManager.StartFetching(m.ctx)
+		newsFeedEnabled, err := m.IsNewsFeedEnabled()
+		if err != nil {
+			return nil, err
+		}
+		if newsFeedEnabled {
+			m.newsFeedManager.StartPolling(m.ctx)
+		}
 	}
 
 	return response, nil

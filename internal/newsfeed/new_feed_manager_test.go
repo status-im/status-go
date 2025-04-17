@@ -149,13 +149,15 @@ func (s *NewsFeedManagerSuite) TestStartAndStopFetching() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	newsFeedManager.StartFetching(ctx)
+	newsFeedManager.StartPolling(ctx)
 
 	time.Sleep(1 * time.Millisecond) // Leave time for the go routine to run and process
 
 	// The start fetching does an initial fetch immediately
 	s.Require().Len(captured, 1)
 	s.Require().Equal("New Item", captured[0].Title)
+	s.Require().True(newsFeedManager.IsPolling())
 
-	newsFeedManager.StopFetching()
+	newsFeedManager.StopPolling()
+	s.Require().False(newsFeedManager.IsPolling())
 }
