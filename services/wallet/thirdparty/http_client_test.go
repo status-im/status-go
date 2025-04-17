@@ -120,7 +120,7 @@ func TestHTTPClient_GetRequests(t *testing.T) {
 					require.Equal(t, value[0], r.URL.Query().Get(param))
 				}
 				if data.credentials != nil {
-					authToken := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", data.credentials.User, data.credentials.Password)))
+					authToken := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", data.credentials.User.Reveal(), data.credentials.Password.Reveal())))
 					require.Equal(t, fmt.Sprintf("Basic %s", authToken), r.Header.Get("Authorization"))
 				}
 
