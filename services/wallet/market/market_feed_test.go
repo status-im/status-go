@@ -39,7 +39,8 @@ func (s *MarketTestSuite) TestEventOnRpsError() {
 	// GIVEN
 	customErr := errors.New("request rate exceeded")
 	priceProviderWithError := mock_market.NewMockPriceProviderWithError(ctrl, customErr)
-	manager := NewManager([]thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
+	manager, close := setupMarketManager(s.T(), []thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
+	s.T().Cleanup(close)
 
 	// WHEN
 	_, err := manager.FetchPrices(s.symbols, s.currencies)
@@ -58,7 +59,8 @@ func (s *MarketTestSuite) TestEventOnNetworkError() {
 	// GIVEN
 	customErr := errors.New("dial tcp: lookup optimism-goerli.infura.io: no such host")
 	priceProviderWithError := mock_market.NewMockPriceProviderWithError(ctrl, customErr)
-	manager := NewManager([]thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
+	manager, close := setupMarketManager(s.T(), []thirdparty.MarketDataProvider{priceProviderWithError}, s.feedSub.GetFeed())
+	s.T().Cleanup(close)
 
 	_, err := manager.FetchPrices(s.symbols, s.currencies)
 	s.Require().Error(err, "expected error from FetchPrices due to MockPriceProviderWithError")
