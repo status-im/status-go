@@ -1,16 +1,15 @@
 package networkhelper_test
 
 import (
-	"github.com/status-im/status-go/internal/security"
 	"testing"
-
-	"github.com/status-im/status-go/params/networkhelper"
 
 	"github.com/stretchr/testify/require"
 
 	"gopkg.in/go-playground/validator.v9"
 
+	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/params/networkhelper"
 )
 
 func TestValidation(t *testing.T) {

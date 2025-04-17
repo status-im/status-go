@@ -2,19 +2,19 @@ package network_test
 
 import (
 	"database/sql"
-	"github.com/status-im/status-go/internal/security"
 	"testing"
+
+	"github.com/stretchr/testify/suite"
 
 	api_common "github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/rpc/network/db"
 	"github.com/status-im/status-go/rpc/network/testutil"
 	"github.com/status-im/status-go/t/helpers"
-
-	"github.com/stretchr/testify/suite"
 )
 
 type NetworkManagerTestSuite struct {

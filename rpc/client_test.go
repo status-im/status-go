@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
-	"github.com/status-im/status-go/internal/security"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -13,14 +12,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/status-im/status-go/params/networkhelper"
-
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -179,7 +178,7 @@ func TestGetClientsUsingCache(t *testing.T) {
 		params.EmbeddedProxyProviderType,
 		true,
 		security.NewSensitiveString(user),
-			security.NewSensitiveString(password))
+		security.NewSensitiveString(password))
 
 	config := ClientConfig{
 		Client:          nil,

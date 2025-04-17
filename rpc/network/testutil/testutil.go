@@ -1,10 +1,10 @@
 package testutil
 
 import (
-	"github.com/status-im/status-go/internal/security"
 	"github.com/stretchr/testify/require"
 
 	api_common "github.com/status-im/status-go/api/common"
+	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
 )
 

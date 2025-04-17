@@ -19,11 +19,11 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/static"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
-	"github.com/status-im/status-go/internal/security"
 )
 
 // ----------
@@ -434,9 +434,9 @@ type WalletConfig struct {
 	StatusProxyBlockchainUser     security.SensitiveString `json:"StatusProxyBlockchainUser"`
 	StatusProxyBlockchainPassword security.SensitiveString `json:"StatusProxyBlockchainPassword"`
 
-	StatusProxyStageName   string `json:"StatusProxyStageName"`
-	EnableCelerBridge      bool   `json:"EnableCelerBridge"`
-	EnableMercuryoProvider bool   `json:"EnableMercuryoProvider"`
+	StatusProxyStageName   string                   `json:"StatusProxyStageName"`
+	EnableCelerBridge      bool                     `json:"EnableCelerBridge"`
+	EnableMercuryoProvider bool                     `json:"EnableMercuryoProvider"`
 	EthRpcProxyUrl         security.SensitiveString `json:"EthRpcProxyUrl"`
 	EthRpcProxyUser        security.SensitiveString `json:"EthRpcProxyUser"`
 	EthRpcProxyPassword    security.SensitiveString `json:"EthRpcProxyPassword"`

@@ -6,13 +6,14 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/status-im/status-go/internal/security"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/internal/security"
 )
 
 func TestHTTPClient_GetRequests(t *testing.T) {

@@ -2,13 +2,13 @@ package rarible
 
 import (
 	"context"
-	"github.com/status-im/status-go/internal/security"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/internal/security"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 

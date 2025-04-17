@@ -23,6 +23,7 @@ import (
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/brianvoe/gofakeit/v6"
+
 	"github.com/status-im/status-go/api/common"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/connection"

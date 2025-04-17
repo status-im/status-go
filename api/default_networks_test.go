@@ -1,16 +1,15 @@
 package api
 
 import (
-	"github.com/status-im/status-go/internal/security"
 	"strings"
 	"testing"
-
-	"github.com/status-im/status-go/api/common"
-	"github.com/status-im/status-go/params"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/api/common"
+	"github.com/status-im/status-go/internal/security"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 )
 

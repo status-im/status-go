@@ -36,6 +36,7 @@ import (
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/internal/security"
 )
 

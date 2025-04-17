@@ -2,7 +2,6 @@ package router
 
 import (
 	"fmt"
-	"github.com/status-im/status-go/internal/security"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -11,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/requests"

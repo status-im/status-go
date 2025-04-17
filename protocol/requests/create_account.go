@@ -4,8 +4,8 @@ import (
 	"github.com/pkg/errors"
 
 	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/internal/security"
+	"github.com/status-im/status-go/params"
 )
 
 var ErrCreateAccountInvalidDisplayName = errors.New("create-account: invalid display name")
@@ -113,7 +113,7 @@ type WalletSecretsConfig struct {
 	AlchemyBaseMainnetToken     security.SensitiveString `json:"alchemyBaseMainnetToken"`
 	AlchemyBaseSepoliaToken     security.SensitiveString `json:"alchemyBaseSepoliaToken"`
 
-	StatusProxyStageName      string `json:"statusProxyStageName"`
+	StatusProxyStageName      string                   `json:"statusProxyStageName"`
 	StatusProxyMarketUser     security.SensitiveString `json:"statusProxyMarketUser"`
 	StatusProxyMarketPassword security.SensitiveString `json:"statusProxyMarketPassword"`
 

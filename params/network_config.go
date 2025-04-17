@@ -29,18 +29,18 @@ const (
 
 // RpcProvider represents an RPC provider configuration with various options
 type RpcProvider struct {
-	ID               int64           `json:"id" validate:"omitempty"`          // Auto-increment ID (for sorting order)
-	ChainID          uint64          `json:"chainId" validate:"required,gt=0"` // Chain ID of the network
-	Name             string          `json:"name" validate:"required,min=1"`   // Provider name for identification
-	URL              security.SensitiveString          `json:"url" validate:"required,url"`      // Current Provider URL
-	EnableRPSLimiter bool            `json:"enableRpsLimiter"`                 // Enable RPC rate limiting for this provider
-	Type             RpcProviderType `json:"type" validate:"required,oneof=embedded-proxy embedded-direct user"`
-	Enabled          bool            `json:"enabled"` // Whether the provider is enabled
+	ID               int64                    `json:"id" validate:"omitempty"`          // Auto-increment ID (for sorting order)
+	ChainID          uint64                   `json:"chainId" validate:"required,gt=0"` // Chain ID of the network
+	Name             string                   `json:"name" validate:"required,min=1"`   // Provider name for identification
+	URL              security.SensitiveString `json:"url" validate:"required,url"`      // Current Provider URL
+	EnableRPSLimiter bool                     `json:"enableRpsLimiter"`                 // Enable RPC rate limiting for this provider
+	Type             RpcProviderType          `json:"type" validate:"required,oneof=embedded-proxy embedded-direct user"`
+	Enabled          bool                     `json:"enabled"` // Whether the provider is enabled
 	// Authentication
-	AuthType     RpcProviderAuthType `json:"authType" validate:"required,oneof=no-auth basic-auth token-auth"` // Type of authentication
-	AuthLogin    security.SensitiveString              `json:"authLogin" validate:"omitempty,min=1"`                             // Login for BasicAuth (empty string if not used)
-	AuthPassword security.SensitiveString              `json:"authPassword" validate:"omitempty,min=1"`                          // Password for BasicAuth (empty string if not used)
-	AuthToken    security.SensitiveString              `json:"authToken" validate:"omitempty,min=1"`                             // Token for TokenAuth (empty string if not used)
+	AuthType     RpcProviderAuthType      `json:"authType" validate:"required,oneof=no-auth basic-auth token-auth"` // Type of authentication
+	AuthLogin    security.SensitiveString `json:"authLogin" validate:"omitempty,min=1"`                             // Login for BasicAuth (empty string if not used)
+	AuthPassword security.SensitiveString `json:"authPassword" validate:"omitempty,min=1"`                          // Password for BasicAuth (empty string if not used)
+	AuthToken    security.SensitiveString `json:"authToken" validate:"omitempty,min=1"`                             // Token for TokenAuth (empty string if not used)
 }
 
 // GetFullURL returns the URL with auth token if TokenAuth is used

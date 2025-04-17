@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/status-im/status-go/internal/security"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/internal/security"
 	"github.com/status-im/status-go/params/networkhelper"
 	"github.com/status-im/status-go/rpc/network/testutil"
 

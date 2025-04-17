@@ -1,12 +1,12 @@
 package params_test
 
 import (
-	"github.com/status-im/status-go/internal/security"
 	"testing"
 
-	"github.com/status-im/status-go/params"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/status-im/status-go/internal/security"
+	"github.com/status-im/status-go/params"
 )
 
 func TestRpcProvider_GetHost(t *testing.T) {
@@ -17,9 +17,10 @@ func TestRpcProvider_GetHost(t *testing.T) {
 
 func TestRpcProvider_GetFullURL(t *testing.T) {
 	provider := params.RpcProvider{
-		URL: security.NewSensitiveString("https://api.example.com"),
-		AuthType: params.TokenAuth,
-		AuthToken: security.NewSensitiveString("mytoken")}
+		URL:       security.NewSensitiveString("https://api.example.com"),
+		AuthType:  params.TokenAuth,
+		AuthToken: security.NewSensitiveString("mytoken"),
+	}
 	expectedFullURL := "https://api.example.com/mytoken"
 	assert.Equal(t, expectedFullURL, provider.GetFullURL().Reveal())
 
