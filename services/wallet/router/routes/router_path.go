@@ -147,18 +147,21 @@ func (p *Path) Copy() *Path {
 		if p.SuggestedLevelsForMaxFeesPerGas.LowPriority != nil {
 			newPath.SuggestedLevelsForMaxFeesPerGas.LowPriority = (*hexutil.Big)(big.NewInt(0).Set(p.SuggestedLevelsForMaxFeesPerGas.LowPriority.ToInt()))
 		}
+		newPath.SuggestedLevelsForMaxFeesPerGas.LowEstimatedTime = p.SuggestedLevelsForMaxFeesPerGas.LowEstimatedTime
 		if p.SuggestedLevelsForMaxFeesPerGas.Medium != nil {
 			newPath.SuggestedLevelsForMaxFeesPerGas.Medium = (*hexutil.Big)(big.NewInt(0).Set(p.SuggestedLevelsForMaxFeesPerGas.Medium.ToInt()))
 		}
 		if p.SuggestedLevelsForMaxFeesPerGas.MediumPriority != nil {
 			newPath.SuggestedLevelsForMaxFeesPerGas.MediumPriority = (*hexutil.Big)(big.NewInt(0).Set(p.SuggestedLevelsForMaxFeesPerGas.MediumPriority.ToInt()))
 		}
+		newPath.SuggestedLevelsForMaxFeesPerGas.MediumEstimatedTime = p.SuggestedLevelsForMaxFeesPerGas.MediumEstimatedTime
 		if p.SuggestedLevelsForMaxFeesPerGas.High != nil {
 			newPath.SuggestedLevelsForMaxFeesPerGas.High = (*hexutil.Big)(big.NewInt(0).Set(p.SuggestedLevelsForMaxFeesPerGas.High.ToInt()))
 		}
 		if p.SuggestedLevelsForMaxFeesPerGas.HighPriority != nil {
 			newPath.SuggestedLevelsForMaxFeesPerGas.HighPriority = (*hexutil.Big)(big.NewInt(0).Set(p.SuggestedLevelsForMaxFeesPerGas.HighPriority.ToInt()))
 		}
+		newPath.SuggestedLevelsForMaxFeesPerGas.HighEstimatedTime = p.SuggestedLevelsForMaxFeesPerGas.HighEstimatedTime
 	}
 
 	if p.SuggestedMinPriorityFee != nil {
