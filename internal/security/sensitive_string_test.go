@@ -5,88 +5,107 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestNewSensitiveString(t *testing.T) {
-	secretValue := gofakeit.LetterN(10)
-	s := NewSensitiveString(secretValue)
-	require.Equal(t, secretValue, s.Reveal())
+// SensitiveStringSuite defines a testify suite for testing SensitiveString
+type SensitiveStringSuite struct {
+	suite.Suite
 }
 
-func TestStringRedaction(t *testing.T) {
+// SensitiveStringSuite is the test suite for all SensitiveString behaviors.
+func (suite *SensitiveStringSuite) TestNewSensitiveString() {
 	secretValue := gofakeit.LetterN(10)
 	s := NewSensitiveString(secretValue)
-	require.Equal(t, RedactionPlaceholder, s.String())
+	suite.Require().Equal(secretValue, s.Reveal())
 }
 
-func TestEmptyStringRedaction(t *testing.T) {
+func (suite *SensitiveStringSuite) TestStringRedaction() {
+	secretValue := gofakeit.LetterN(10)
+	s := NewSensitiveString(secretValue)
+	suite.Require().Equal(RedactionPlaceholder, s.String())
+}
+
+func (suite *SensitiveStringSuite) TestEmptyStringRedaction() {
 	s := NewSensitiveString("")
-	require.Equal(t, "", s.String())
+	suite.Require().Equal("", s.String())
 }
 
-func TestMarshalJSON(t *testing.T) {
+func (suite *SensitiveStringSuite) TestMarshalJSON() {
 	secretValue := gofakeit.LetterN(10)
 	s := NewSensitiveString(secretValue)
+
 	data, err := json.Marshal(s)
-	require.NoError(t, err)
-	require.JSONEq(t, `"`+RedactionPlaceholder+`"`, string(data))
+	suite.Require().NoError(err)
+	suite.Require().JSONEq(`"`+RedactionPlaceholder+`"`, string(data))
 }
 
-func TestMarshalJSONPointer(t *testing.T) {
+func (suite *SensitiveStringSuite) TestMarshalJSONPointer() {
 	secretValue := gofakeit.LetterN(10)
-	s := NewSensitiveString(secretValue)
-	data, err := json.Marshal(&s)
-	require.NoError(t, err)
-	require.JSONEq(t, `"`+RedactionPlaceholder+`"`, string(data))
+	sVal := NewSensitiveString(secretValue)
+
+	data, err := json.Marshal(&sVal)
+	suite.Require().NoError(err)
+	suite.Require().JSONEq(`"`+RedactionPlaceholder+`"`, string(data))
 }
 
-func TestUnmarshalJSON(t *testing.T) {
+func (suite *SensitiveStringSuite) TestUnmarshalJSON() {
 	secretValue := gofakeit.LetterN(10)
-	data := `"` + secretValue + `"`
+	payload := `"` + secretValue + `"`
 	var s SensitiveString
-	err := json.Unmarshal([]byte(data), &s)
-	require.NoError(t, err)
-	require.Equal(t, secretValue, s.Reveal())
+
+	suite.Require().NoError(json.Unmarshal([]byte(payload), &s))
+	suite.Require().Equal(secretValue, s.Reveal())
 }
 
-func TestUnamarshalJSONError(t *testing.T) {
+func (suite *SensitiveStringSuite) TestUnmarshalJSONError() {
 	// Can't unmarshal a non-string value
 	var s SensitiveString
-	data := `{"key": "value"}`
-	err := json.Unmarshal([]byte(data), &s)
-	require.Error(t, err)
+	payload := `{"key":"value"}`
+	suite.Require().Error(json.Unmarshal([]byte(payload), &s))
 }
 
-func TestCopySensitiveString(t *testing.T) {
+func (suite *SensitiveStringSuite) TestCopySensitiveString() {
 	secretValue := gofakeit.LetterN(10)
 	s := NewSensitiveString(secretValue)
 	sCopy := s
-	require.Equal(t, secretValue, sCopy.Reveal())
+	suite.Require().Equal(secretValue, sCopy.Reveal())
 }
 
-func TestPlus(t *testing.T) {
+func (suite *SensitiveStringSuite) TestPlus() {
 	secretValue := gofakeit.LetterN(10)
 	s1 := NewSensitiveString(secretValue)
 	s2 := NewSensitiveString(secretValue)
-	require.Equal(t, s1.Plus(s2), NewSensitiveString(secretValue+secretValue))
+
+	suite.Require().Equal(s1.Plus(s2), NewSensitiveString(secretValue+secretValue))
 }
 
-func TestPlusString(t *testing.T) {
+func (suite *SensitiveStringSuite) TestPlusString() {
 	secretValue := gofakeit.LetterN(10)
 	s1 := NewSensitiveString(secretValue)
-	require.Equal(t, s1.PlusString(secretValue), NewSensitiveString(secretValue+secretValue))
+
+	suite.Require().Equal(s1.PlusString(secretValue), NewSensitiveString(secretValue+secretValue))
 }
 
-func TestTrimRight(t *testing.T) {
+func (suite *SensitiveStringSuite) TestTrimRight() {
 	secretValue := "¡¡¡Hello, Gophers!!!" // #nosec G101
 	s1 := NewSensitiveString(secretValue)
-	require.Equal(t, s1.TrimRight("!"), NewSensitiveString("¡¡¡Hello, Gophers"))
+
+	suite.Require().Equal(
+		s1.TrimRight("!"),
+		NewSensitiveString("¡¡¡Hello, Gophers"),
+	)
 }
 
-func TestContains(t *testing.T) {
+func (suite *SensitiveStringSuite) TestContains() {
 	secretValue := "¡¡¡Hello, Gophers!!!" // #nosec G101
 	s1 := NewSensitiveString(secretValue)
-	require.True(t, s1.Contains("Hello"))
-	require.False(t, s1.Contains("World"))
+
+	suite.Require().True(s1.Contains("Hello"))
+	suite.Require().False(s1.Contains("World"))
+}
+
+// Entry point for the suite
+func TestSensitiveStringSuite(t *testing.T) {
+	suite.Run(t, new(SensitiveStringSuite))
 }
