@@ -65,9 +65,6 @@
                                     "compressedKey": {
                                         "type": "string"
                                     },
-                                    "contactRequestState": {
-                                        "type": "integer"
-                                    },
                                     "contentType": {
                                         "type": "integer"
                                     },
