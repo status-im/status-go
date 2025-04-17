@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -82,11 +83,17 @@ type ClientWithFallback struct {
 	tag      string // tag for the limiter
 	groupTag string // tag for the limiter group
 
-	done   chan struct{} // channel to signal client closure
-	closed atomic.Bool   // flag to track if client is closed
+	done   chan struct{}  // channel to signal client closure
+	wg     sync.WaitGroup // wait group to track active operations
+	closed atomic.Bool    // flag to track if client is closed
 }
 
 func (c *ClientWithFallback) Copy() interface{} {
+	clientCopy := c.createCopy()
+	return clientCopy
+}
+
+func (c *ClientWithFallback) createCopy() *ClientWithFallback {
 	// Create a new ClientWithFallback with copied values
 	clientCopy := &ClientWithFallback{
 		ChainID:                c.ChainID,
@@ -95,7 +102,7 @@ func (c *ClientWithFallback) Copy() interface{} {
 		circuitbreaker:         c.circuitbreaker,
 		providersHealthManager: c.providersHealthManager,
 		WalletNotifier:         c.WalletNotifier,
-		isConnected:            c.isConnected, // Use the same isConnected pointer
+		isConnected:            c.isConnected,
 		LastCheckedAt:          c.LastCheckedAt,
 		tag:                    c.tag,
 		groupTag:               c.groupTag,
@@ -157,6 +164,9 @@ func (c *ClientWithFallback) Close() {
 
 	close(c.done) // signal all ongoing operations to stop
 
+	// Wait for all operations to complete
+	c.wg.Wait()
+
 	// Close all eth clients
 	for _, client := range c.ethClients {
 		client.Close()
@@ -210,6 +220,10 @@ func (c *ClientWithFallback) makeCall(ctx context.Context, f MakeCallFunctor) (i
 	if c.closed.Load() {
 		return nil, errors.New("client is closed")
 	}
+
+	// Add the operation to the wait group
+	c.wg.Add(1)
+	defer c.wg.Done()
 
 	// Create a context that will be cancelled when either the parent context is done or the client is closed
 	ctx, cancel := context.WithCancel(ctx)
@@ -808,24 +822,7 @@ func (c *ClientWithFallback) SetGroupTag(tag string) {
 }
 
 func (c *ClientWithFallback) DeepCopyTag() tagger.Tagger {
-	// Create a new ClientWithFallback with copied values
-	clientCopy := &ClientWithFallback{
-		ChainID:                c.ChainID,
-		ethClients:             c.ethClients,
-		commonLimiter:          c.commonLimiter,
-		circuitbreaker:         c.circuitbreaker,
-		providersHealthManager: c.providersHealthManager,
-		WalletNotifier:         c.WalletNotifier,
-		isConnected:            c.isConnected,
-		LastCheckedAt:          c.LastCheckedAt,
-		tag:                    c.tag,
-		groupTag:               c.groupTag,
-		done:                   make(chan struct{}),
-	}
-
-	clientCopy.closed.Store(c.closed.Load())
-
-	return clientCopy
+	return c.createCopy()
 }
 
 func (c *ClientWithFallback) GetLimiter() rpclimiter.RequestLimiter {

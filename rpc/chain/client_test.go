@@ -254,3 +254,129 @@ func TestClientWithFallback_CloseStopsOperations(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "client is closed")
 }
+
+// TestClientWithFallback_CloseStopsMultipleOperations tests that closing the client
+// properly stops multiple concurrent operations
+func TestClientWithFallback_CloseStopsMultipleOperations(t *testing.T) {
+	client, ethClients, cleanup := setupClientTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	addr1 := common.HexToAddress("0x1234")
+	addr2 := common.HexToAddress("0x5678")
+	hash := common.HexToHash("0xabcd")
+	blockNumber := big.NewInt(100)
+
+	// Create channels to coordinate the test
+	operation1Started := make(chan struct{})
+	operation2Started := make(chan struct{})
+	operation3Started := make(chan struct{})
+
+	operation1Done := make(chan struct{})
+	operation2Done := make(chan struct{})
+	operation3Done := make(chan struct{})
+
+	allOperationsStarted := make(chan struct{})
+
+	// Set up the mock responses for operation 1
+	ethClients[0].EXPECT().CodeAt(ctx, addr1, nil).DoAndReturn(
+		func(ctx context.Context, addr common.Address, blockNumber *big.Int) ([]byte, error) {
+			close(operation1Started)
+
+			// Wait for all operations to start or context to be cancelled
+			select {
+			case <-allOperationsStarted:
+				// Continue with normal processing
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+
+			// Now wait for context cancellation
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}).Times(1)
+
+	// Set up the mock responses for operation 2
+	ethClients[0].EXPECT().BalanceAt(ctx, addr2, blockNumber).DoAndReturn(
+		func(ctx context.Context, addr common.Address, blockNumber *big.Int) (*big.Int, error) {
+			close(operation2Started)
+
+			// Wait for all operations to start or context to be cancelled
+			select {
+			case <-allOperationsStarted:
+				// Continue with normal processing
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+
+			// Now wait for context cancellation
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}).Times(1)
+
+	// Set up the mock responses for operation 3
+	ethClients[0].EXPECT().BlockByHash(ctx, hash).DoAndReturn(
+		func(ctx context.Context, hash common.Hash) (*types.Block, error) {
+			close(operation3Started)
+
+			// Wait for all operations to start or context to be cancelled
+			select {
+			case <-allOperationsStarted:
+				// Continue with normal processing
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+
+			// Now wait for context cancellation
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}).Times(1)
+
+	// Set up expectations for Close on all clients
+	for _, ethClient := range ethClients {
+		ethClient.EXPECT().Close().Times(1)
+	}
+
+	// Start operation 1 in a goroutine
+	go func() {
+		defer close(operation1Done)
+		_, err := client.CodeAt(ctx, addr1, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "context canceled")
+	}()
+
+	// Start operation 2 in a goroutine
+	go func() {
+		defer close(operation2Done)
+		_, err := client.BalanceAt(ctx, addr2, blockNumber)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "context canceled")
+	}()
+
+	// Start operation 3 in a goroutine
+	go func() {
+		defer close(operation3Done)
+		_, err := client.BlockByHash(ctx, hash)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "context canceled")
+	}()
+
+	// Wait for all operations to start
+	<-operation1Started
+	<-operation2Started
+	<-operation3Started
+
+	// Signal all operations that they can proceed past their initial state
+	close(allOperationsStarted)
+
+	// Wait a small amount of time for operations to reach the waiting state
+	runtime.Gosched()
+
+	// Close the client while operations are running
+	client.Close()
+
+	// All operations should complete with cancellation errors
+	<-operation1Done
+	<-operation2Done
+	<-operation3Done
+}
