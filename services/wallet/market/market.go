@@ -2,10 +2,12 @@ package market
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -13,6 +15,7 @@ import (
 	"github.com/status-im/status-go/circuitbreaker"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -41,6 +44,7 @@ type TokenMarketCache MarketValuesPerCurrencyAndToken
 type TokenPriceCache DataPerTokenAndCurrency
 
 type Manager struct {
+	tokenManager    *token.Manager
 	feed            *event.Feed
 	priceCache      MarketCache[TokenPriceCache]
 	marketCache     MarketCache[TokenMarketCache]
@@ -51,7 +55,7 @@ type Manager struct {
 	providers       []thirdparty.MarketDataProvider
 }
 
-func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Manager {
+func NewManager(providers []thirdparty.MarketDataProvider, tokenManager *token.Manager, feed *event.Feed) *Manager {
 	cb := circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
 		Timeout:               60000,
 		MaxConcurrentRequests: 100,
@@ -60,6 +64,7 @@ func NewManager(providers []thirdparty.MarketDataProvider, feed *event.Feed) *Ma
 	})
 
 	return &Manager{
+		tokenManager:   tokenManager,
 		feed:           feed,
 		priceCache:     *NewCache(make(TokenPriceCache)),
 		marketCache:    *NewCache(make(TokenMarketCache)),
@@ -111,10 +116,41 @@ func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(pr
 
 	return result.Result()[0], nil
 }
+func (pm *Manager) symbolProviderSymbolMaps(symbols []string) (symbolsToProviderSymbols map[string]string, providerSymbolsToSymbols map[string][]string, err error) {
+	symbolsToProviderSymbols = make(map[string]string)
+	providerSymbolsToSymbols = make(map[string][]string)
+
+	allTokens, err := pm.tokenManager.GetAllTokens()
+	if err != nil {
+		return
+	}
+	for _, symbol := range symbols {
+		found := false
+		for _, token := range allTokens {
+			if strings.EqualFold(token.Symbol, symbol) || strings.EqualFold(token.TmpSymbol, symbol) {
+				found = true
+				symbolsToProviderSymbols[symbol] = token.TmpSymbol
+				providerSymbolsToSymbols[token.TmpSymbol] = append(providerSymbolsToSymbols[token.TmpSymbol], symbol)
+				break
+			}
+		}
+		if !found {
+			symbolsToProviderSymbols[symbol] = symbol
+			providerSymbolsToSymbols[symbol] = append(providerSymbolsToSymbols[symbol], symbol)
+		}
+	}
+	return
+}
 
 func (pm *Manager) FetchHistoricalDailyPrices(symbol string, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+	symbolsToProviderSymbols, _, err := pm.symbolProviderSymbolMaps([]string{symbol})
+	if err != nil {
+		logutils.ZapLogger().Error("Error mapping symbols to provider symbols", zap.Error(err))
+		return nil, err
+	}
+
 	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchHistoricalDailyPrices(symbol, currency, limit, allData, aggregate)
+		return provider.FetchHistoricalDailyPrices(symbolsToProviderSymbols[symbol], currency, limit, allData, aggregate)
 	})
 
 	if err != nil {
@@ -127,8 +163,14 @@ func (pm *Manager) FetchHistoricalDailyPrices(symbol string, currency string, li
 }
 
 func (pm *Manager) FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]thirdparty.HistoricalPrice, error) {
+	symbolsToProviderSymbols, _, err := pm.symbolProviderSymbolMaps([]string{symbol})
+	if err != nil {
+		logutils.ZapLogger().Error("Error mapping symbols to provider symbols", zap.Error(err))
+		return nil, err
+	}
+
 	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchHistoricalHourlyPrices(symbol, currency, limit, aggregate)
+		return provider.FetchHistoricalHourlyPrices(symbolsToProviderSymbols[symbol], currency, limit, aggregate)
 	})
 
 	if err != nil {
@@ -141,8 +183,14 @@ func (pm *Manager) FetchHistoricalHourlyPrices(symbol string, currency string, l
 }
 
 func (pm *Manager) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
+	symbolsToProviderSymbols, providerSymbolsToSymbols, err := pm.symbolProviderSymbolMaps(symbols)
+	if err != nil {
+		logutils.ZapLogger().Error("Error mapping symbols to provider symbols", zap.Error(err))
+		return nil, err
+	}
+
 	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchTokenMarketValues(symbols, currency)
+		return provider.FetchTokenMarketValues(maps.Values(symbolsToProviderSymbols), currency)
 	})
 
 	if err != nil {
@@ -150,8 +198,15 @@ func (pm *Manager) FetchTokenMarketValues(symbols []string, currency string) (ma
 		return nil, err
 	}
 
+	mappedMarketValues := make(map[string]thirdparty.TokenMarketValues)
 	marketValues := result.(map[string]thirdparty.TokenMarketValues)
-	return marketValues, nil
+	for providerSymbol, tokenMarketValues := range marketValues {
+		symbols := providerSymbolsToSymbols[providerSymbol]
+		for _, symbol := range symbols {
+			mappedMarketValues[symbol] = tokenMarketValues
+		}
+	}
+	return mappedMarketValues, nil
 }
 
 func (pm *Manager) updateMarketCache(currency string, marketValues map[string]thirdparty.TokenMarketValues) {
@@ -230,8 +285,14 @@ func (pm *Manager) GetOrFetchTokenMarketValues(symbols []string, currency string
 }
 
 func (pm *Manager) FetchTokenDetails(symbols []string) (map[string]thirdparty.TokenDetails, error) {
+	symbolsToProviderSymbols, providerSymbolsToSymbols, err := pm.symbolProviderSymbolMaps(symbols)
+	if err != nil {
+		logutils.ZapLogger().Error("Error mapping symbols to provider symbols", zap.Error(err))
+		return nil, err
+	}
+
 	result, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchTokenDetails(symbols)
+		return provider.FetchTokenDetails(maps.Values(symbolsToProviderSymbols))
 	})
 
 	if err != nil {
@@ -239,8 +300,15 @@ func (pm *Manager) FetchTokenDetails(symbols []string) (map[string]thirdparty.To
 		return nil, err
 	}
 
+	mappedTokenDetails := make(map[string]thirdparty.TokenDetails)
 	tokenDetails := result.(map[string]thirdparty.TokenDetails)
-	return tokenDetails, nil
+	for providerSymbol, tokenDetail := range tokenDetails {
+		symbols := providerSymbolsToSymbols[providerSymbol]
+		for _, symbol := range symbols {
+			mappedTokenDetails[symbol] = tokenDetail
+		}
+	}
+	return mappedTokenDetails, nil
 }
 
 func (pm *Manager) FetchPrice(symbol string, currency string) (float64, error) {
@@ -257,8 +325,14 @@ func (pm *Manager) FetchPrice(symbol string, currency string) (float64, error) {
 }
 
 func (pm *Manager) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
+	symbolsToProviderSymbols, providerSymbolsToSymbols, err := pm.symbolProviderSymbolMaps(symbols)
+	if err != nil {
+		logutils.ZapLogger().Error("Error mapping symbols to provider symbols", zap.Error(err))
+		return nil, err
+	}
+
 	response, err := pm.makeCall(pm.providers, func(provider thirdparty.MarketDataProvider) (interface{}, error) {
-		return provider.FetchPrices(symbols, currencies)
+		return provider.FetchPrices(maps.Values(symbolsToProviderSymbols), currencies)
 	})
 
 	if err != nil {
@@ -266,9 +340,18 @@ func (pm *Manager) FetchPrices(symbols []string, currencies []string) (map[strin
 		return nil, err
 	}
 
-	prices := response.(map[string]map[string]float64)
-	pm.updatePriceCache(prices)
-	return prices, nil
+	mappedPrices := make(map[string]map[string]float64)
+	pricesPerSymbolCurrencies := response.(map[string]map[string]float64)
+	for providerSymbol, prices := range pricesPerSymbolCurrencies {
+		symbols := providerSymbolsToSymbols[providerSymbol]
+		for _, symbol := range symbols {
+			mappedPrices[symbol] = prices
+		}
+	}
+
+	pm.updatePriceCache(mappedPrices)
+
+	return mappedPrices, nil
 }
 
 func (pm *Manager) getCachedPricesFor(symbols []string, currencies []string) DataPerTokenAndCurrency {

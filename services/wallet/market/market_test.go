@@ -1,6 +1,7 @@
 package market
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -10,13 +11,38 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/rpc/network"
 	mock_market "github.com/status-im/status-go/services/wallet/market/mock"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	mock_thirdparty "github.com/status-im/status-go/services/wallet/thirdparty/mock"
+	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
-func setupMarketManager(t *testing.T, providers []thirdparty.MarketDataProvider) *Manager {
-	return NewManager(providers, &event.Feed{})
+func setupTokenManager(t *testing.T) (*token.Manager, func()) {
+	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	nm := network.NewManager(appDb, nil, nil, nil)
+
+	return token.NewTokenManager(walletDb, nil, nil, nm, appDb, nil, nil, nil, nil, token.NewPersistence(walletDb)),
+		func() {
+			require.NoError(t, appDb.Close())
+			require.NoError(t, walletDb.Close())
+		}
+}
+
+func setupMarketManager(t *testing.T, providers []thirdparty.MarketDataProvider, feedEvent *event.Feed) (*Manager, func()) {
+	tokenManager, close := setupTokenManager(t)
+
+	tokenManager.Start(context.Background(), 10000, 1000)
+
+	return NewManager(providers, tokenManager, feedEvent), close
 }
 
 var mockPrices = map[string]map[string]float64{
@@ -46,7 +72,8 @@ func TestPrice(t *testing.T) {
 	priceProvider := mock_market.NewMockPriceProvider(ctrl)
 	priceProvider.SetMockPrices(mockPrices)
 
-	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{priceProvider, priceProvider})
+	manager, close := setupMarketManager(t, []thirdparty.MarketDataProvider{priceProvider, priceProvider}, &event.Feed{})
+	t.Cleanup(close)
 
 	{
 		rst := manager.priceCache.Get()
@@ -97,7 +124,9 @@ func TestFetchPriceErrorFirstProvider(t *testing.T) {
 	symbols := []string{"BTC", "ETH"}
 	currencies := []string{"USD", "EUR"}
 
-	manager := setupMarketManager(t, []thirdparty.MarketDataProvider{priceProviderWithError, priceProvider})
+	manager, close := setupMarketManager(t, []thirdparty.MarketDataProvider{priceProviderWithError, priceProvider}, &event.Feed{})
+	t.Cleanup(close)
+
 	rst, err := manager.FetchPrices(symbols, currencies)
 	require.NoError(t, err)
 	for _, symbol := range symbols {
@@ -222,7 +251,9 @@ func TestGetOrFetchTokenMarketValues(t *testing.T) {
 	for _, tc := range testCases {
 		provider := mock_thirdparty.NewMockMarketDataProvider(ctrl)
 		provider.EXPECT().ID().Return("MockMarketProvider").AnyTimes()
-		manager := setupMarketManager(t, []thirdparty.MarketDataProvider{provider})
+		manager, close := setupMarketManager(t, []thirdparty.MarketDataProvider{provider}, &event.Feed{})
+		t.Cleanup(close)
+
 		t.Run(tc.description, func(t *testing.T) {
 			if tc.cachedTokenMarketValues != nil {
 				setMarketCacheForTesting(t, manager, requestCurrency, tc.cachedTokenMarketValues)
@@ -241,4 +272,55 @@ func TestGetOrFetchTokenMarketValues(t *testing.T) {
 			require.Equal(t, tc.wantValues, gotValues)
 		})
 	}
+}
+
+func TestSymbolsMapping(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	provider := mock_thirdparty.NewMockMarketDataProvider(ctrl)
+	provider.EXPECT().ID().Return("MockMarketProvider").AnyTimes()
+	marketManager, close := setupMarketManager(t, []thirdparty.MarketDataProvider{provider}, &event.Feed{})
+	t.Cleanup(close)
+
+	// no symbols provided
+	symbolsToProviderSymbols, providerSymbolsToSymbols, err := marketManager.symbolProviderSymbolMaps([]string{})
+	require.NoError(t, err)
+	require.Empty(t, symbolsToProviderSymbols)
+	require.Empty(t, providerSymbolsToSymbols)
+
+	// regular symbols
+	symbols := []string{"ETH", "BTC"}
+	expectedSymbolsToProviderSymbols := map[string]string{
+		"ETH": "ETH",
+		"BTC": "BTC",
+	}
+	expectedProviderSymbolsToSymbols := map[string][]string{
+		"ETH": {"ETH"},
+		"BTC": {"BTC"},
+	}
+	symbolsToProviderSymbols, providerSymbolsToSymbols, err = marketManager.symbolProviderSymbolMaps(symbols)
+	require.NoError(t, err)
+	require.Equal(t, expectedSymbolsToProviderSymbols, symbolsToProviderSymbols)
+	require.Equal(t, expectedProviderSymbolsToSymbols, providerSymbolsToSymbols)
+
+	// symbols with decimals
+	symbols = []string{"SNT", "DAI", "USDC(6)", "USDC(18)", "ANYTHING"}
+	expectedSymbolsToProviderSymbols = map[string]string{
+		"SNT":      "SNT",
+		"DAI":      "DAI",
+		"USDC(6)":  "USDC",
+		"USDC(18)": "USDC",
+		"ANYTHING": "ANYTHING",
+	}
+	expectedProviderSymbolsToSymbols = map[string][]string{
+		"SNT":      {"SNT"},
+		"DAI":      {"DAI"},
+		"USDC":     {"USDC(6)", "USDC(18)"},
+		"ANYTHING": {"ANYTHING"},
+	}
+	symbolsToProviderSymbols, providerSymbolsToSymbols, err = marketManager.symbolProviderSymbolMaps(symbols)
+	require.NoError(t, err)
+	require.Equal(t, expectedSymbolsToProviderSymbols, symbolsToProviderSymbols)
+	require.Equal(t, expectedProviderSymbolsToSymbols, providerSymbolsToSymbols)
 }
