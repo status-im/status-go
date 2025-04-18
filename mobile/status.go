@@ -1129,16 +1129,6 @@ func makeJSONResponse(err error) string {
 	return string(outBytes)
 }
 
-func AddPeer(enode string) string {
-	return callWithResponse(addPeer, enode)
-}
-
-// addPeer adds an enode as a peer.
-func addPeer(enode string) string {
-	err := statusBackend.StatusNode().AddPeer(enode)
-	return makeJSONResponse(err)
-}
-
 // Deprecated: Use ConnectionChangeV2 instead.
 func ConnectionChange(typ string, expensive int) {
 	call(connectionChange, typ, expensive)

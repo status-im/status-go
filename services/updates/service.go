@@ -1,7 +1,6 @@
 package updates
 
 import (
-	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/services/ens"
 )
@@ -34,9 +33,4 @@ func (s *Service) APIs() []ethRpc.API {
 			Service:   NewAPI(s.ensService),
 		},
 	}
-}
-
-// Protocols returns list of p2p protocols.
-func (s *Service) Protocols() []p2p.Protocol {
-	return nil
 }

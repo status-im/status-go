@@ -1,7 +1,6 @@
 package appmetrics
 
 import (
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/appmetrics"
@@ -32,8 +31,4 @@ func (s *Service) APIs() []rpc.API {
 			Public:    true,
 		},
 	}
-}
-
-func (s *Service) Protocols() []p2p.Protocol {
-	return nil
 }

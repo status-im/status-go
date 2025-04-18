@@ -23,7 +23,6 @@ func TestStatusNodeStart(t *testing.T) {
 	require.Nil(t, n.GethNode())
 	require.Nil(t, n.Config())
 	require.Nil(t, n.RPCClient())
-	require.Equal(t, 0, n.PeerCount())
 
 	appDB, walletDB, stop, err := setupTestDBs()
 	defer func() {
@@ -44,7 +43,6 @@ func TestStatusNodeStart(t *testing.T) {
 	require.NotNil(t, n.GethNode())
 	require.NotNil(t, n.Config())
 	require.NotNil(t, n.RPCClient())
-	require.Equal(t, 0, n.PeerCount())
 	accountManager, err := n.AccountManager()
 	require.Nil(t, err)
 	require.NotNil(t, accountManager)
@@ -59,7 +57,6 @@ func TestStatusNodeStart(t *testing.T) {
 	// checks after node is stopped
 	require.Nil(t, n.GethNode())
 	require.Nil(t, n.RPCClient())
-	require.Equal(t, 0, n.PeerCount())
 }
 
 func TestStatusNodeWithDataDir(t *testing.T) {

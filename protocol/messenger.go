@@ -24,7 +24,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/p2p"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appmetrics"
@@ -104,7 +103,6 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // mailservers because they can also be managed by the user.
 type Messenger struct {
 	waku                      wakutypes.Waku
-	server                    *p2p.Server
 	config                    *config
 	identity                  *ecdsa.PrivateKey
 	persistence               *sqlitePersistence
@@ -654,10 +652,6 @@ func NewMessenger(
 	}
 
 	return messenger, nil
-}
-
-func (m *Messenger) SetP2PServer(server *p2p.Server) {
-	m.server = server
 }
 
 func (m *Messenger) EnableBackedupMessagesProcessing() {

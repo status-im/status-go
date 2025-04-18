@@ -1,7 +1,6 @@
 package rpcstats
 
 import (
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -23,11 +22,6 @@ func (s *Service) APIs() []rpc.API {
 			Public:    true,
 		},
 	}
-}
-
-// Protocols returns list of p2p protocols.
-func (s *Service) Protocols() []p2p.Protocol {
-	return nil
 }
 
 // Start is run when a service is started.

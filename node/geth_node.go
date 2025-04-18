@@ -6,17 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.uber.org/zap"
-
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/p2p/nat"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 )
 
@@ -31,9 +24,6 @@ var (
 	ErrStatusServiceRegistrationFailure           = errors.New("failed to register the Status service")
 	ErrPeerServiceRegistrationFailure             = errors.New("failed to register the Peer service")
 )
-
-// All general log messages in this package should be routed through this logger.
-var logger = logutils.ZapLogger().Named("node")
 
 // MakeNode creates a geth node entity
 func MakeNode(config *params.NodeConfig, accs *accounts.Manager) (*node.Node, error) {
@@ -66,20 +56,6 @@ func MakeNode(config *params.NodeConfig, accs *accounts.Manager) (*node.Node, er
 
 // newGethNodeConfig returns default stack configuration for mobile client node
 func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
-	// NOTE: I haven't changed anything related to this parameters, but
-	// it seems they were previously ignored if set to 0, but now they seem
-	// to be used, so they need to be set to something
-	maxPeers := 100
-	maxPendingPeers := 100
-
-	if config.MaxPeers != 0 {
-		maxPeers = config.MaxPeers
-	}
-
-	if config.MaxPendingPeers != 0 {
-		maxPendingPeers = config.MaxPendingPeers
-	}
-
 	nc := &node.Config{
 		DataDir:           config.DataDir,
 		KeyStoreDir:       config.KeyStoreDir,
@@ -88,11 +64,8 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		Name:              config.Name,
 		Version:           config.Version,
 		P2P: p2p.Config{
-			NoDiscovery:     true, // we always use only v5 server
-			ListenAddr:      config.ListenAddr,
-			NAT:             nat.Any(),
-			MaxPeers:        maxPeers,
-			MaxPendingPeers: maxPendingPeers,
+			NoDiscovery: true,
+			NoDial:      true,
 		},
 	}
 
@@ -121,58 +94,5 @@ func newGethNodeConfig(config *params.NodeConfig) (*node.Config, error) {
 		nc.WSOrigins = []string{"*"}
 	}
 
-	// FIXME: config.ClusterConfig.Enabled is always true?
-	if config.ClusterConfig.Enabled {
-		nc.P2P.BootstrapNodesV5 = parseNodesV5(config.ClusterConfig.BootNodes)
-		nc.P2P.StaticNodes = parseNodes(config.ClusterConfig.StaticNodes)
-	}
-
-	if config.NodeKey != "" {
-		sk, err := crypto.HexToECDSA(config.NodeKey)
-		if err != nil {
-			return nil, err
-		}
-		// override node's private key
-		nc.P2P.PrivateKey = sk
-	}
-
 	return nc, nil
-}
-
-// parseNodes creates list of enode.Node out of enode strings.
-func parseNodes(enodes []string) []*enode.Node {
-	var nodes []*enode.Node
-	for _, item := range enodes {
-		parsedPeer, err := enode.ParseV4(item)
-		if err == nil {
-			nodes = append(nodes, parsedPeer)
-		} else {
-			logger.Error("Failed to parse enode", zap.String("enode", item), zap.Error(err))
-		}
-
-	}
-	return nodes
-}
-
-// parseNodesV5 creates list of discv5.Node out of enode strings.
-func parseNodesV5(enodes []string) []*discv5.Node {
-	var nodes []*discv5.Node
-	for _, enode := range enodes {
-		parsedPeer, err := discv5.ParseNode(enode)
-
-		if err == nil {
-			nodes = append(nodes, parsedPeer)
-		} else {
-			logger.Error("Failed to parse enode", zap.String("enode", enode), zap.Error(err))
-		}
-	}
-	return nodes
-}
-
-func parseNodesToNodeID(enodes []string) []enode.ID {
-	nodeIDs := make([]enode.ID, 0, len(enodes))
-	for _, node := range parseNodes(enodes) {
-		nodeIDs = append(nodeIDs, node.ID())
-	}
-	return nodeIDs
 }

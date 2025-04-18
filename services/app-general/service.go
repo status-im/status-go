@@ -1,7 +1,6 @@
 package appgeneral
 
 import (
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -23,10 +22,6 @@ func (s *Service) APIs() []rpc.API {
 			Service:   NewAPI(s),
 		},
 	}
-}
-
-func (s *Service) Protocols() []p2p.Protocol {
-	return nil
 }
 
 func (s *Service) Start() error {

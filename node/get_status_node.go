@@ -13,8 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/connection"
@@ -153,18 +151,6 @@ func (n *StatusNode) HTTPServer() *server.MediaServer {
 	defer n.mu.RUnlock()
 
 	return n.httpServer
-}
-
-// Server retrieves the currently running P2P network layer.
-func (n *StatusNode) Server() *p2p.Server {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	if n.gethNode == nil {
-		return nil
-	}
-
-	return n.gethNode.Server()
 }
 
 // Start starts current StatusNode, failing if it's already started.
@@ -399,107 +385,6 @@ func (n *StatusNode) IsRunning() bool {
 
 func (n *StatusNode) isRunning() bool {
 	return n.gethNode != nil && n.gethNode.Server() != nil
-}
-
-// populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
-func (n *StatusNode) populateStaticPeers() error {
-	if !n.config.ClusterConfig.Enabled {
-		n.logger.Info("Static peers are disabled")
-		return nil
-	}
-
-	for _, enode := range n.config.ClusterConfig.StaticNodes {
-		if err := n.addPeer(enode); err != nil {
-			n.logger.Error("Static peer addition failed", zap.Error(err))
-			return err
-		}
-		n.logger.Info("Static peer added", zap.String("enode", enode))
-	}
-
-	return nil
-}
-
-func (n *StatusNode) removeStaticPeers() error {
-	if !n.config.ClusterConfig.Enabled {
-		n.logger.Info("Static peers are disabled")
-		return nil
-	}
-
-	for _, enode := range n.config.ClusterConfig.StaticNodes {
-		if err := n.removePeer(enode); err != nil {
-			n.logger.Error("Static peer deletion failed", zap.Error(err))
-			return err
-		}
-		n.logger.Info("Static peer deleted", zap.String("enode", enode))
-	}
-	return nil
-}
-
-// ReconnectStaticPeers removes and adds static peers to a server.
-func (n *StatusNode) ReconnectStaticPeers() error {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if !n.isRunning() {
-		return ErrNoRunningNode
-	}
-
-	if err := n.removeStaticPeers(); err != nil {
-		return err
-	}
-
-	return n.populateStaticPeers()
-}
-
-// AddPeer adds new static peer node
-func (n *StatusNode) AddPeer(url string) error {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	return n.addPeer(url)
-}
-
-// addPeer adds new static peer node
-func (n *StatusNode) addPeer(url string) error {
-	parsedNode, err := enode.ParseV4(url)
-	if err != nil {
-		return err
-	}
-
-	if !n.isRunning() {
-		return ErrNoRunningNode
-	}
-
-	n.gethNode.Server().AddPeer(parsedNode)
-
-	return nil
-}
-
-func (n *StatusNode) removePeer(url string) error {
-	parsedNode, err := enode.ParseV4(url)
-	if err != nil {
-		return err
-	}
-
-	if !n.isRunning() {
-		return ErrNoRunningNode
-	}
-
-	n.gethNode.Server().RemovePeer(parsedNode)
-
-	return nil
-}
-
-// PeerCount returns the number of connected peers.
-func (n *StatusNode) PeerCount() int {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	if !n.isRunning() {
-		return 0
-	}
-
-	return n.gethNode.Server().PeerCount()
 }
 
 func (n *StatusNode) ConnectionChanged(state connection.State) {

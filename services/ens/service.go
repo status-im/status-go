@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
@@ -64,9 +63,4 @@ func (s *Service) APIs() []ethRpc.API {
 			Service:   s.api,
 		},
 	}
-}
-
-// Protocols returns list of p2p protocols.
-func (s *Service) Protocols() []p2p.Protocol {
-	return nil
 }

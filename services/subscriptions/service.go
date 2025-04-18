@@ -2,7 +2,6 @@ package subscriptions
 
 import (
 	gethnode "github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/rpc"
@@ -21,11 +20,6 @@ func New(rpcPrivateClientFunc func() *rpc.Client) *Service {
 	return &Service{
 		api: NewPublicAPI(rpcPrivateClientFunc),
 	}
-}
-
-// Protocols returns a new protocols list. In this case, there are none.
-func (s *Service) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{}
 }
 
 // APIs returns a list of new APIs.

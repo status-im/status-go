@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -29,11 +28,6 @@ func New() *Service {
 
 func (s *Service) Init(messenger *protocol.Messenger) {
 	s.messenger = messenger
-}
-
-// Protocols returns a new protocols list. In this case, there are none.
-func (s *Service) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{}
 }
 
 // APIs returns a list of new APIs.

@@ -1,14 +1,11 @@
 package node
 
 import (
-	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/utils"
@@ -21,18 +18,6 @@ func TestMakeNodeDefaultConfig(t *testing.T) {
 
 	_, err = MakeNode(config, &accounts.Manager{})
 	require.NoError(t, err)
-}
-
-func TestParseNodesToNodeID(t *testing.T) {
-	identity, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	node := enode.NewV4(&identity.PublicKey, net.IP{10, 10, 10, 10}, 10, 20)
-	nodeIDs := parseNodesToNodeID([]string{
-		"enode://badkey@127.0.0.1:30303",
-		node.String(),
-	})
-	require.Len(t, nodeIDs, 1)
-	require.Equal(t, node.ID(), nodeIDs[0])
 }
 
 func TestNewGethNodeConfig(t *testing.T) {

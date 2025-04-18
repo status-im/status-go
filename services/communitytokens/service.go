@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/account"
 	gocommon "github.com/status-im/status-go/common"
@@ -61,11 +60,6 @@ func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, con
 		transactor:      transactor,
 		feeManager:      &fees.FeeManager{RPCClient: rpcClient},
 	}
-}
-
-// Protocols returns a new protocols list. In this case, there are none.
-func (s *Service) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{}
 }
 
 // APIs returns a list of new APIs.

@@ -1,7 +1,6 @@
 package eth
 
 import (
-	"github.com/ethereum/go-ethereum/p2p"
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
 
 	rpc_client "github.com/status-im/status-go/rpc"
@@ -21,10 +20,6 @@ func NewService(
 
 func (s *Service) APIs() []geth_rpc.API {
 	return privateAPIs(s.rpcClient)
-}
-
-func (s *Service) Protocols() []p2p.Protocol {
-	return nil
 }
 
 func (s *Service) Start() error {

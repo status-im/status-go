@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/signal"
@@ -153,11 +152,6 @@ func (s *Service) APIs() []rpc.API {
 			Service:   NewAPI(s),
 		},
 	}
-}
-
-// Protocols returns list of p2p protocols.
-func (s *Service) Protocols() []p2p.Protocol {
-	return nil
 }
 
 func (s *Service) IsStarted() bool {

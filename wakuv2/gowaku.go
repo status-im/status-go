@@ -58,7 +58,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -779,11 +778,6 @@ func (w *Waku) APIs() []rpc.API {
 			Public:    false,
 		},
 	}
-}
-
-// Protocols returns the waku sub-protocols ran by this particular client.
-func (w *Waku) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{}
 }
 
 func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {

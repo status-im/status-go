@@ -158,7 +158,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 func (b *StatusNode) RegisterLifecycle(s common.StatusService) {
 	b.addPublicMethods(s.APIs())
 	b.gethNode.RegisterAPIs(s.APIs())
-	b.gethNode.RegisterProtocols(s.Protocols())
 	b.gethNode.RegisterLifecycle(s)
 }
 
@@ -180,7 +179,6 @@ func (b *StatusNode) wakuV2ExtService(config *params.NodeConfig) (*wakuv2ext.Ser
 		b.wakuV2ExtSrvc = wakuv2ext.New(*config, b.wakuV2Srvc, b.rpcClient)
 	}
 
-	b.wakuV2ExtSrvc.SetP2PServer(b.gethNode.Server())
 	return b.wakuV2ExtSrvc, nil
 }
 

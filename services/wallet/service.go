@@ -10,7 +10,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/p2p"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/account"
@@ -404,11 +403,6 @@ func (s *Service) APIs() []gethrpc.API {
 			Public:    true,
 		},
 	}
-}
-
-// Protocols returns list of p2p protocols.
-func (s *Service) Protocols() []p2p.Protocol {
-	return nil
 }
 
 func (s *Service) IsStarted() bool {

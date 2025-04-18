@@ -20,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/account"
@@ -77,7 +76,6 @@ type Service struct {
 	waku            wakutypes.Waku
 	rpcClient       *rpc.Client
 	config          params.NodeConfig
-	server          *p2p.Server
 	accountsDB      *accounts.Database
 	multiAccountsDB *multiaccounts.Database
 	account         *multiaccounts.Account
@@ -96,13 +94,6 @@ func New(
 		rpcClient: rpcClient,
 		config:    config,
 	}
-}
-
-func (s *Service) NodeID() *ecdsa.PrivateKey {
-	if s.server == nil {
-		return nil
-	}
-	return s.server.PrivateKey
 }
 
 func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB,
@@ -166,7 +157,6 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		return err
 	}
 	s.messenger = messenger
-	s.messenger.SetP2PServer(s.server)
 	if s.config.ProcessBackedupMessages {
 		s.messenger.EnableBackedupMessagesProcessing()
 	}
@@ -324,18 +314,9 @@ func (s *Service) DisableInstallation(installationID string) error {
 	return s.messenger.DisableInstallation(installationID)
 }
 
-// Protocols returns a new protocols list. In this case, there are none.
-func (s *Service) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{}
-}
-
 // APIs returns a list of new APIs.
 func (s *Service) APIs() []gethrpc.API {
 	panic("this is abstract service, use shhext or wakuext implementation")
-}
-
-func (s *Service) SetP2PServer(server *p2p.Server) {
-	s.server = server
 }
 
 // Start is run when a service is started.

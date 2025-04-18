@@ -15,7 +15,6 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/p2p"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	ethTypes "github.com/status-im/status-go/eth-node/types"
 
@@ -441,11 +440,6 @@ func (tm *PendingTxTracker) APIs() []ethrpc.API {
 			Public:    true,
 		},
 	}
-}
-
-// Protocols returns a new protocols list. In this case, there are none.
-func (tm *PendingTxTracker) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{}
 }
 
 func (tm *PendingTxTracker) Stop() error {
