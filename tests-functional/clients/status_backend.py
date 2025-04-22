@@ -42,6 +42,7 @@ class StatusBackend(RpcClient, SignalClient):
             self.temp_dir = tempfile.TemporaryDirectory()
             self.data_dir = self.temp_dir.name
         else:
+            self.temp_dir = None
             self.data_dir = "/usr/status-user"
             self.docker_client = docker.from_env()
             retries = 5

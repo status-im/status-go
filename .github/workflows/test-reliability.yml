@@ -51,7 +51,7 @@ jobs:
     - name: Run tests
       env:
         USE_IPV6: ${{ matrix.config.use_ipv6 }}
-      run: pytest --reruns 2 -n auto -m "reliability" -c tests-functional/pytest.ini --junit-xml=pytest_results.xml --tb=short
+      run: pytest --reruns 2 -n auto -m "reliability" -c tests-functional/pytest.ini --junit-xml=pytest_results.xml --tb=short --waku-fleet=status.staging --waku-fleets-config=""
 
     - name: Test Report
       if: always()
