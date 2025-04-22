@@ -171,8 +171,12 @@ func (s *SwapParaswapProcessor) fetchAndStorePriceRoute(params ProcessorInputPar
 	}
 
 	key := pathProcessorCommon.MakeKey(params.FromChain.ChainID, params.ToChain.ChainID, params.FromToken.Symbol, params.ToToken.Symbol, params.AmountIn)
-	s.priceRoute.Store(key, &priceRoute)
+	s.storePriceRoute(key, &priceRoute)
 	return nil
+}
+
+func (s *SwapParaswapProcessor) storePriceRoute(key string, priceRoute *paraswap.Route) {
+	s.priceRoute.Store(key, priceRoute)
 }
 
 func (s *SwapParaswapProcessor) getPriceRoute(key string) (*paraswap.Route, error) {
@@ -328,12 +332,16 @@ func (s *SwapParaswapProcessor) prepareTransactionV2(sendArgs *wallettypes.SendT
 		return createSwapParaswapErrorResponse(err)
 	}
 
-	tx, err := s.paraswapClient.BuildTransaction(context.Background(), priceRoute.SrcTokenAddress, priceRoute.SrcTokenDecimals, priceRoute.SrcAmount.Int,
+	tx, priceRoute, err := s.paraswapClient.BuildTransactionWithRetry(context.Background(), priceRoute.SrcTokenAddress, priceRoute.SrcTokenDecimals, priceRoute.SrcAmount.Int,
 		priceRoute.DestTokenAddress, priceRoute.DestTokenDecimals, priceRoute.DestAmount.Int, slippageBP,
 		common.Address(sendArgs.From), common.Address(*sendArgs.To),
 		priceRoute.RawPriceRoute, priceRoute.Side)
 	if err != nil {
 		return createSwapParaswapErrorResponse(err)
+	}
+
+	if priceRoute != nil {
+		s.storePriceRoute(key, priceRoute)
 	}
 
 	value, ok := new(big.Int).SetString(tx.Value, 10)

@@ -36,8 +36,8 @@ func expectClientFetchPriceRoute(clientMock *mock_paraswap.MockClientInterface, 
 	).Return(route, err)
 }
 
-func expectClientBuildTransaction(clientMock *mock_paraswap.MockClientInterface, transaction paraswap.Transaction, err error) {
-	clientMock.EXPECT().BuildTransaction(
+func expectClientBuildTransaction(clientMock *mock_paraswap.MockClientInterface, transaction paraswap.Transaction, priceRoute *paraswap.Route, err error) {
+	clientMock.EXPECT().BuildTransactionWithRetry(
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
@@ -50,7 +50,7 @@ func expectClientBuildTransaction(clientMock *mock_paraswap.MockClientInterface,
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
-	).Return(transaction, err)
+	).Return(transaction, priceRoute, err)
 }
 
 func TestParaswapWithPartnerFee(t *testing.T) {
@@ -135,7 +135,7 @@ func TestParaswapWithPartnerFee(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, testPriceRoute.TokenTransferProxy, contractAddress)
 
-		expectClientBuildTransaction(client, *testTransaction, nil)
+		expectClientBuildTransaction(client, *testTransaction, nil, nil)
 		inputData, err := processor.PackTxInputData(testInputParams)
 		assert.NoError(t, err)
 		assert.Equal(t, testTransaction.Data, hexutil.Encode(inputData))
