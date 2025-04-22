@@ -484,7 +484,11 @@ func (n *WakuNode) parseMessageEvent(eventStr string) {
 	if err != nil {
 		Error("could not parse message %v", err)
 	}
-	n.MsgChan <- *envelope
+	select {
+	case n.MsgChan <- *envelope:
+	default:
+		Warn("Can't deliver message to subscription, MsgChan is full")
+	}
 }
 
 func (n *WakuNode) parseTopicHealthChangeEvent(eventStr string) {
@@ -494,7 +498,12 @@ func (n *WakuNode) parseTopicHealthChangeEvent(eventStr string) {
 	if err != nil {
 		Error("could not parse topic health change %v", err)
 	}
-	n.TopicHealthChan <- topicHealth
+
+	select {
+	case n.TopicHealthChan <- topicHealth:
+	default:
+		Warn("Can't deliver topic health event, TopicHealthChan is full")
+	}
 }
 
 func (n *WakuNode) parseConnectionChangeEvent(eventStr string) {
@@ -504,7 +513,12 @@ func (n *WakuNode) parseConnectionChangeEvent(eventStr string) {
 	if err != nil {
 		Error("could not parse connection change %v", err)
 	}
-	n.ConnectionChangeChan <- connectionChange
+
+	select {
+	case n.ConnectionChangeChan <- connectionChange:
+	default:
+		Warn("Can't deliver connection change event, ConnectionChangeChan is full")
+	}
 }
 
 func (n *WakuNode) GetNumConnectedRelayPeers(optPubsubTopic ...string) (int, error) {

@@ -15,7 +15,7 @@ type Envelope struct {
 	hash  MessageHash
 }
 
-type tmpWakuMessageJson struct {
+type wakuMessage struct {
 	Payload        []byte  `json:"payload,omitempty"`
 	ContentTopic   string  `json:"contentTopic,omitempty"`
 	Version        *uint32 `json:"version,omitempty"`
@@ -25,32 +25,32 @@ type tmpWakuMessageJson struct {
 	RateLimitProof []byte  `json:"proof,omitempty"`
 }
 
-type tmpEnvelopeStruct struct {
-	WakuMessage tmpWakuMessageJson `json:"wakuMessage"`
-	PubsubTopic string             `json:"pubsubTopic"`
-	MessageHash MessageHash        `json:"messageHash"`
+type wakuEnvelope struct {
+	WakuMessage wakuMessage `json:"wakuMessage"`
+	PubsubTopic string      `json:"pubsubTopic"`
+	MessageHash MessageHash `json:"messageHash"`
 }
 
 // NewEnvelope creates a new Envelope from a json string generated in nwaku
 func NewEnvelope(jsonEventStr string) (*Envelope, error) {
-	tmpEnvelopeStruct := tmpEnvelopeStruct{}
-	err := json.Unmarshal([]byte(jsonEventStr), &tmpEnvelopeStruct)
+	wakuEnvelope := wakuEnvelope{}
+	err := json.Unmarshal([]byte(jsonEventStr), &wakuEnvelope)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Envelope{
 		msg: &pb.WakuMessage{
-			Payload:        tmpEnvelopeStruct.WakuMessage.Payload,
-			ContentTopic:   tmpEnvelopeStruct.WakuMessage.ContentTopic,
-			Version:        tmpEnvelopeStruct.WakuMessage.Version,
-			Timestamp:      tmpEnvelopeStruct.WakuMessage.Timestamp,
-			Meta:           tmpEnvelopeStruct.WakuMessage.Meta,
-			Ephemeral:      tmpEnvelopeStruct.WakuMessage.Ephemeral,
-			RateLimitProof: tmpEnvelopeStruct.WakuMessage.RateLimitProof,
+			Payload:        wakuEnvelope.WakuMessage.Payload,
+			ContentTopic:   wakuEnvelope.WakuMessage.ContentTopic,
+			Version:        wakuEnvelope.WakuMessage.Version,
+			Timestamp:      wakuEnvelope.WakuMessage.Timestamp,
+			Meta:           wakuEnvelope.WakuMessage.Meta,
+			Ephemeral:      wakuEnvelope.WakuMessage.Ephemeral,
+			RateLimitProof: wakuEnvelope.WakuMessage.RateLimitProof,
 		},
-		topic: tmpEnvelopeStruct.PubsubTopic,
-		hash:  tmpEnvelopeStruct.MessageHash,
+		topic: wakuEnvelope.PubsubTopic,
+		hash:  wakuEnvelope.MessageHash,
 	}, nil
 }
 
