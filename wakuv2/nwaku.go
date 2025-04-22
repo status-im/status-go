@@ -94,7 +94,6 @@ type IMetricsHandler interface {
 	SetDeviceType(deviceType string)
 	PushSentEnvelope(sentEnvelope SentEnvelope)
 	PushErrorSendingEnvelope(errorSendingEnvelope ErrorSendingEnvelope)
-	PushPeerCount(peerCount int)
 	PushPeerConnFailures(peerConnFailures map[string]int)
 	PushMessageCheckSuccess()
 	PushMessageCheckFailure()
@@ -1295,7 +1294,6 @@ func (w *Waku) checkForConnectionChanges() {
 func (w *Waku) reportPeerMetrics() {
 	if w.metricsHandler != nil {
 		connFailures := FormatPeerConnFailures(w.node)
-		w.metricsHandler.PushPeerCount(w.PeerCount())
 		w.metricsHandler.PushPeerConnFailures(connFailures)
 
 		peerCountByOrigin := make(map[wps.Origin]uint)
