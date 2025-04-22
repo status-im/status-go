@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"strings"
 	"time"
 
@@ -113,6 +114,55 @@ func (api *API) FetchDecodedTxData(ctx context.Context, data string) (*thirdpart
 	logutils.ZapLogger().Debug("[Wallet: FetchDecodedTxData]")
 
 	return api.s.decoder.Decode(data)
+}
+
+// GetAggregateBalanceHistory retrieves aggregated balance history for a single address and multiple token symbols
+func (api *API) GetAggregateBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, tokenSymbols []string, currencySymbol string, timeInterval history.TimeInterval) ([]*history.ValuePoint, error) {
+	logutils.ZapLogger().Debug("wallet.api.GetAggregateBalanceHistory",
+		zap.Uint64s("chainIDs", chainIDs),
+		zap.Stringer("address", address),
+		zap.Strings("tokenSymbols", tokenSymbols),
+		zap.String("currencySymbol", currencySymbol),
+		zap.Int("timeInterval", int(timeInterval)),
+	)
+
+	var fromTimestamp uint64
+	now := uint64(time.Now().UTC().Unix())
+	switch timeInterval {
+	case history.BalanceHistoryAllTime:
+		fromTimestamp = 0
+	case history.BalanceHistory1Year,
+		history.BalanceHistory6Months,
+		history.BalanceHistory1Month,
+		history.BalanceHistory7Days:
+		fromTimestamp = now - history.TimeIntervalDurationSecs(timeInterval)
+	default:
+		return nil, fmt.Errorf("unknown time interval: %v", timeInterval)
+	}
+
+	addresses := []common.Address{address}
+	aggregateMap := map[uint64]float64{}
+
+	for _, tokenSymbol := range tokenSymbols {
+		points, err := api.GetBalanceHistoryRange(ctx, chainIDs, addresses, tokenSymbol, currencySymbol, fromTimestamp, now)
+		if err != nil {
+			return nil, err
+		}
+		for _, point := range points {
+			aggregateMap[point.Timestamp] += point.Value
+		}
+	}
+
+	var result []*history.ValuePoint
+	for ts, val := range aggregateMap {
+		result = append(result, &history.ValuePoint{
+			Timestamp: ts,
+			Value:     val,
+		})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Timestamp < result[j].Timestamp })
+
+	return result, nil
 }
 
 // GetBalanceHistory retrieves token balance history for token identity on multiple chains

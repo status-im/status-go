@@ -102,10 +102,39 @@ func (b *BalanceDB) getEntriesWithoutBalances(chainID uint64, address common.Add
 }
 
 func (b *BalanceDB) getNewerThan(identity *assetIdentity, timestamp uint64) (entries []*entry, err error) {
+	rows, err := b.db.Query("SELECT chain_id, address, currency, timestamp, balance FROM balance_history ORDER BY timestamp")
+	if err != nil {
+		logutils.ZapLogger().Error("Mohsen raw query balance 1 ", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			chainID   uint64
+			address   string
+			currency  string
+			timestamp uint64
+			balance   []byte
+		)
+		err := rows.Scan(&chainID, &address, &currency, &timestamp, &balance)
+		if err != nil {
+			logutils.ZapLogger().Error("Mohsen raw query balance 2", zap.Error(err))
+			continue
+		}
+		logutils.ZapLogger().Debug("Mohsen raw query balance result ",
+			zap.Uint64("chainID", chainID),
+			zap.String("currency", currency),
+			zap.String("balance", new(big.Int).SetBytes(balance).String()),
+			zap.String("address", address),
+			zap.Uint64("fromTimestamp", timestamp),
+		)
+	}
+
 	// DISTINCT removes duplicates that can happen when a block has multiple transfers of same token
 	rawQueryStr := "SELECT DISTINCT block, timestamp, balance, address FROM balance_history WHERE chain_id = ? AND address IN (%s) AND currency = ? AND timestamp > ? ORDER BY timestamp"
 	queryString := fmt.Sprintf(rawQueryStr, identity.addressesToString())
-	rows, err := b.db.Query(queryString, identity.ChainID, identity.TokenSymbol, timestamp)
+	rows, err = b.db.Query(queryString, identity.ChainID, identity.TokenSymbol, timestamp)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
