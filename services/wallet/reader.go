@@ -415,7 +415,7 @@ func (r *Reader) balancesToTokensByAddress(connectedPerChain map[uint64]bool, ad
 						Name:          tokens[0].Name,
 						Symbol:        symbol,
 						Decimals:      tokens[0].Decimals,
-						PegSymbol:     token.GetTokenPegSymbol(symbol),
+						PegSymbol:     tokenTypes.GetTokenPegSymbol(symbol),
 						Verified:      tokens[0].Verified,
 						CommunityData: tokens[0].CommunityData,
 						Image:         tokens[0].Image,
