@@ -1773,6 +1773,11 @@ func (b *GethStatusBackend) prepareSettings(request *requests.CreateAccount, inp
 		//settings.MnemonicWasNotShown = true
 	}
 
+	if !input.fetchBackup {
+		// This is a an account created from scratch, we can mark the BackupFetched as true
+		settings.BackupFetched = true
+	}
+
 	if request.WakuV2Fleet != "" {
 		settings.Fleet = &request.WakuV2Fleet
 	}

@@ -127,6 +127,10 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 }
 
 func (m *Messenger) updateBackupFetchProgress(message *protobuf.Backup, response *wakusync.WakuBackedUpDataResponse, state *ReceivedMessageState) error {
+	if m.backedUpFetchingStatus == nil {
+		return nil
+	}
+
 	m.backedUpFetchingStatus.fetchingCompletedMutex.Lock()
 	defer m.backedUpFetchingStatus.fetchingCompletedMutex.Unlock()
 

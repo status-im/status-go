@@ -320,11 +320,6 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 
 	allResponses := &MessengerResponse{}
 	if forceFetchingBackup || !backupFetched {
-		err = m.startBackupFetchingTracking(allResponses)
-		if err != nil {
-			return nil, err
-		}
-
 		m.logger.Info("fetching backup")
 		err := m.syncBackup()
 		if err != nil {

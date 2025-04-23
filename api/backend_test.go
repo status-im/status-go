@@ -865,6 +865,13 @@ func TestLoginAccount(t *testing.T) {
 	acc, err := b.CreateAccountAndLogin(createAccountRequest)
 	require.NoError(t, err)
 	require.Equal(t, nameserver, b.config.WakuV2Config.Nameserver)
+
+	accountsDB, err := b.accountsDB()
+	require.NoError(t, err)
+	backupFecthed, err := accountsDB.BackupFetched()
+	require.NoError(t, err)
+	require.True(t, backupFecthed)
+
 	require.True(t, acc.HasAcceptedTerms)
 
 	waitForLogin(c)

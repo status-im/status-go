@@ -417,6 +417,37 @@ func (s *MessengerBackupSuite) TestFetchingDuringBackup() {
 	s.Require().Equal(ActivityCenterNotificationTypeBackupSyncingSuccess, state.Response.ActivityCenterNotifications()[0].Type)
 }
 
+func (s *MessengerBackupSuite) TestBackupWithoutStatusFetching() {
+	bob1 := s.m
+	// Remove the status fetching
+	bob1.backedUpFetchingStatus = nil
+	bob1.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{
+		wakuBackedUpDataResponseChan: make(chan *wakusync.WakuBackedUpDataResponse, 1000),
+	}
+
+	state := ReceivedMessageState{
+		Response: &MessengerResponse{},
+	}
+
+	backup := &protobuf.Backup{
+		Clock: 1,
+		ContactsDetails: &protobuf.FetchingBackedUpDataDetails{
+			DataNumber:  uint32(0),
+			TotalNumber: uint32(1),
+		},
+	}
+
+	err := bob1.HandleBackup(
+		&state,
+		backup,
+		&v1protocol.StatusMessage{},
+	)
+	s.Require().NoError(err)
+	// The backup was handled but nothing was sent to the AC
+	s.Require().Len(state.Response.ActivityCenterNotifications(), 0)
+	s.Require().True(state.Response.BackupHandled)
+}
+
 func (s *MessengerBackupSuite) TestBackupSettings() {
 	s.T().Skip("flaky test")
 	const (
