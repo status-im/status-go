@@ -2,7 +2,9 @@ package statusgo
 
 import (
 	"encoding/json"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -46,4 +48,73 @@ func TestIntendedPanic(t *testing.T) {
 	require.PanicsWithError(t, message, func() {
 		IntendedPanic(message)
 	})
+}
+
+func TestSwitchToLowMemoryMode(t *testing.T) {
+	// Reset the lastGCTime to ensure we can trigger GC
+	lastGCTimeLock.Lock()
+	lastGCTime = time.Time{}
+	lastGCTimeLock.Unlock()
+
+	// First call should succeed
+	result := SwitchToLowMemoryMode()
+
+	var response APIResponse
+	err := json.Unmarshal([]byte(result), &response)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	if response.Error != "" {
+		t.Errorf("Expected no error on first call, got: %s", response.Error)
+	}
+
+	// Second immediate call should be skipped due to rate limiting
+	result = SwitchToLowMemoryMode()
+
+	err = json.Unmarshal([]byte(result), &response)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	if response.Error == "" {
+		t.Error("Expected error on second immediate call, but got none")
+	}
+
+	// The error should indicate that GC was skipped
+	if response.Error != "skipping GC because it was called too recently" {
+		t.Errorf("Unexpected error message: %s", response.Error)
+	}
+
+	// Test concurrent access
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			SwitchToLowMemoryMode()
+		}()
+	}
+	wg.Wait()
+
+	// After waiting, we should be able to call it again
+	lastGCTimeLock.Lock()
+	lastGCTime = time.Now().Add(-(gcInterval + time.Second))
+	lastGCTimeLock.Unlock()
+
+	result = SwitchToLowMemoryMode()
+
+	err = json.Unmarshal([]byte(result), &response)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	if response.Error != "" {
+		t.Errorf("Expected no error after waiting, got: %s", response.Error)
+	}
+}
+
+// TestReleaseMemory is a simple test to ensure the function doesn't panic
+func TestReleaseMemory(t *testing.T) {
+	releaseMemory()
 }

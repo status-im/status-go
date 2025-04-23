@@ -8,6 +8,8 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"runtime/debug"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -55,6 +57,15 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/services/wallet/wallettypes"
 	"github.com/status-im/status-go/signal"
+)
+
+var (
+	lastGCTime     time.Time
+	lastGCTimeLock sync.Mutex
+)
+
+const (
+	gcInterval = 10 * time.Second
 )
 
 func call(fn any, params ...any) any {
@@ -2428,4 +2439,53 @@ func IntendedPanic(message string) string {
 		err := intendedPanic{error: errors.New(message)}
 		panic(err)
 	})
+}
+
+func SwitchToLowMemoryMode() string {
+	return callWithResponse(switchToLowMemoryMode)
+}
+
+func switchToLowMemoryMode() string {
+	lastGCTimeLock.Lock()
+	defer lastGCTimeLock.Unlock()
+
+	var err error
+	// Only run GC if 10 seconds have passed since the last call
+	if time.Since(lastGCTime) >= gcInterval {
+		releaseMemory()
+		lastGCTime = time.Now()
+	} else {
+		err = errors.New("skipping GC because it was called too recently")
+	}
+
+	return makeJSONResponse(err)
+}
+
+func releaseMemory() {
+	logger := logutils.ZapLogger()
+	var before, after runtime.MemStats
+
+	// Collect stats before GC
+	runtime.ReadMemStats(&before)
+	logger.Info("Before garbage collection",
+		zap.Uint64("heap_alloc_mb", before.HeapAlloc/1024/1024),
+		zap.Uint64("heap_objects", before.HeapObjects),
+		zap.Uint64("sys_mb", before.Sys/1024/1024),
+	)
+
+	runtime.GC()
+	debug.FreeOSMemory()
+
+	// Collect stats after GC
+	runtime.ReadMemStats(&after)
+
+	// Log results with differences
+	logger.Info("After garbage collection",
+		zap.Uint64("heap_alloc_mb", after.HeapAlloc/1024/1024),
+		zap.Uint64("heap_objects", after.HeapObjects),
+		zap.Uint64("sys_mb", after.Sys/1024/1024),
+		zap.Int64("freed_mb", int64(before.HeapAlloc-after.HeapAlloc)/1024/1024),
+		zap.Int64("objects_freed", int64(before.HeapObjects-after.HeapObjects)),
+		zap.Int64("released_mb", int64(after.HeapReleased-before.HeapReleased)/1024/1024),
+	)
 }
