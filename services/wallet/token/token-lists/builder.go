@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/token-lists/default-lists"
 	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
+	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
 
 func (t *TokenLists) rebuildTokensMap(fetchedLists []fetcher.FetchedTokenList) error {
@@ -26,6 +27,8 @@ func (t *TokenLists) rebuildTokensMap(fetchedLists []fetcher.FetchedTokenList) e
 
 		list.Source = fetchedTokenList.SourceURL
 		list.FetchedTimestamp = fetchedTokenList.Fetched.Format(time.RFC3339)
+
+		processTokenPegs(list.Tokens)
 
 		t.tokensListsMu.Lock()
 		t.tokensLists[fetchedTokenList.ID] = &list
@@ -95,4 +98,10 @@ func (t *TokenLists) rebuildTokensListsMap() error {
 	tokensListsForProcessing = append(tokensListsForProcessing, fetchedTokensLists...)
 
 	return t.rebuildTokensMap(tokensListsForProcessing)
+}
+
+func processTokenPegs(tokens []*tokenTypes.Token) {
+	for _, token := range tokens {
+		token.PegSymbol = tokenTypes.GetTokenPegSymbol(token.Symbol)
+	}
 }
