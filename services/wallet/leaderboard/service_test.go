@@ -2,6 +2,7 @@ package leaderboard
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"testing"
 	"time"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 // MockFetcher implements DataFetcher interface for testing
@@ -39,10 +42,17 @@ func (f *MockFetcher) FetchPrices(ctx context.Context) error {
 
 func (f *MockFetcher) Start(ctx context.Context) {}
 func (f *MockFetcher) Stop()                     {}
+func (f *MockFetcher) StartRefreshLoops()        {}
 
-func setupMarketDatadService(t *testing.T, config ServiceConfig) *MarketDataService {
+func setupTestWalletDB(t *testing.T) (*sql.DB, func()) {
+	db, cleanup, err := helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "wallet-tests")
+	require.NoError(t, err)
+	return db, func() { require.NoError(t, cleanup()) }
+}
+
+func setupMarketDatadService(t *testing.T, config ServiceConfig, db *sql.DB) *MarketDataService {
 	config.Validate()
-	storage := NewDataStorage()
+	storage := NewDataStorage(db)
 	service := &MarketDataService{
 		config:              config,
 		feed:                &event.Feed{},
@@ -59,7 +69,9 @@ func setupMarketDatadService(t *testing.T, config ServiceConfig) *MarketDataServ
 func TestServiceStartStop(t *testing.T) {
 	config := ServiceConfig{}
 
-	service := setupMarketDatadService(t, config)
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	service := setupMarketDatadService(t, config, db)
 	require.NotNil(t, service)
 
 	service.Start(context.Background())
@@ -68,7 +80,9 @@ func TestServiceStartStop(t *testing.T) {
 
 func TestUnsubscribeWhenNotSubscribed(t *testing.T) {
 	config := ServiceConfig{}
-	service := setupMarketDatadService(t, config)
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	service := setupMarketDatadService(t, config, db)
 
 	// Unsubscribe should not panic or error
 	_ = service.UnsubscribeFromLeaderboard()
@@ -76,7 +90,9 @@ func TestUnsubscribeWhenNotSubscribed(t *testing.T) {
 
 func TestSubsribe(t *testing.T) {
 	config := ServiceConfig{}
-	service := setupMarketDatadService(t, config)
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	service := setupMarketDatadService(t, config, db)
 
 	// Subscribe should not panic or error
 	service.FetchLeaderboardPageAsync(0, 0, 0, "usd")

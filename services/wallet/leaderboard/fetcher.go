@@ -19,6 +19,8 @@ type DataFetcher interface {
 	FetchMarkets(ctx context.Context) error
 	// FetchPrices fetches the latest price data
 	FetchPrices(ctx context.Context) error
+	// StartRefreshLoops starts the data refresh loops
+	StartRefreshLoops()
 	// Start begins the data refresh loops
 	Start(ctx context.Context)
 	// Stop halts all data refresh operations
@@ -36,6 +38,7 @@ type ProxyFetcher struct {
 	isRunning      bool
 	isRunningMutex sync.Mutex
 	cancelFunc     context.CancelFunc
+	ctx            context.Context
 }
 
 // NewProxyFetcher creates a new proxy data fetcher
@@ -46,19 +49,25 @@ func NewProxyFetcher(config ServiceConfig, storage *DataStorage, subscriptionMan
 		storage:             storage,
 		subscriptionManager: subscriptionManager,
 		config:              config,
+		isRunning:           false,
 	}
 }
 
 // Start begins the data refresh loops
 func (f *ProxyFetcher) Start(ctx context.Context) {
-	if f.startRefreshLoops() {
-		// Stop everything when the top-level context is cancelled
-		go func() {
-			defer common.LogOnPanic()
-			<-ctx.Done()
-			f.Stop() // gracefully stop if running
-		}()
-	}
+	f.isRunningMutex.Lock()
+	defer f.isRunningMutex.Unlock()
+
+	ctx, cancel := context.WithCancel(ctx)
+	f.cancelFunc = cancel
+
+	go func() {
+		defer common.LogOnPanic()
+		<-ctx.Done()
+		f.Stop() // gracefully stop if running
+		f.cancelFunc = nil
+		f.ctx = nil
+	}()
 }
 
 // Stop halts all data refresh operations
@@ -73,36 +82,31 @@ func (f *ProxyFetcher) Stop() {
 	// Cancel the context to stop all loops
 	if f.cancelFunc != nil {
 		f.cancelFunc()
-		f.cancelFunc = nil
 	}
 
 	f.isRunning = false
 }
 
-func (f *ProxyFetcher) startRefreshLoops() bool {
+func (f *ProxyFetcher) StartRefreshLoops() {
 	f.isRunningMutex.Lock()
 	defer f.isRunningMutex.Unlock()
 
-	if f.isRunning {
-		return false // Already running
+	if f.isRunning || f.ctx == nil {
+		return
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	f.cancelFunc = cancel
 	f.isRunning = true
 
 	// Start crypto data refresh loop
 	go func() {
 		defer common.LogOnPanic()
-		f.cryptoRefreshLoop(ctx)
+		f.cryptoRefreshLoop(f.ctx)
 	}()
 
 	// Start price data refresh loop
 	go func() {
 		defer common.LogOnPanic()
-		f.priceRefreshLoop(ctx)
+		f.priceRefreshLoop(f.ctx)
 	}()
-	return true
 }
 
 // cryptoRefreshLoop periodically fetches the full cryptocurrency data

@@ -1,6 +1,7 @@
 package leaderboard
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -74,6 +75,17 @@ var mockPriceData = map[string]PriceData{
 	},
 }
 
+func insertCryptoDataToDatabase(t *testing.T, db *sql.DB, cryptoData []Cryptocurrency) {
+	t.Helper()
+	for _, crypto := range cryptoData {
+		_, err := db.Exec(`
+			INSERT INTO market_data (id, symbol, current_price, market_cap, total_volume, price_change_percentage_24h)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`, crypto.ID, crypto.Symbol, crypto.CurrentPrice, crypto.MarketCap, crypto.TotalVolume, crypto.PriceChangePercentage24h)
+		require.NoError(t, err)
+	}
+}
+
 // Helper function to verify crypto price data
 func verifyCryptoPriceData(t *testing.T, expected PriceData, actual Cryptocurrency) {
 	t.Helper()
@@ -82,7 +94,9 @@ func verifyCryptoPriceData(t *testing.T, expected PriceData, actual Cryptocurren
 }
 
 func TestGetLeaderboardPageErrors(t *testing.T) {
-	s := NewDataStorage()
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	s := NewDataStorage(db)
 	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
 
 	{
@@ -102,7 +116,9 @@ func TestGetLeaderboardPageErrors(t *testing.T) {
 }
 
 func TestGetLeaderboardPage(t *testing.T) {
-	s := NewDataStorage()
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	s := NewDataStorage(db)
 	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
 
 	{
@@ -138,7 +154,9 @@ func TestGetLeaderboardPage(t *testing.T) {
 }
 
 func TestGetLeaderboardPageEmpty(t *testing.T) {
-	s := NewDataStorage()
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	s := NewDataStorage(db)
 
 	{
 		rst, err := s.GetLeaderboardPage(1, 3, -1, "usd")
@@ -153,7 +171,9 @@ func TestGetLeaderboardPageEmpty(t *testing.T) {
 }
 
 func TestGetLeaderboardPageWithUpdatedPrices(t *testing.T) {
-	s := NewDataStorage()
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	s := NewDataStorage(db)
 	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
 	s.UpdatePriceDataWithEtag(mockPriceData, "test-etag")
 
@@ -173,7 +193,9 @@ func TestGetLeaderboardPageWithUpdatedPrices(t *testing.T) {
 }
 
 func TestGetLeaderboardPagePrices(t *testing.T) {
-	s := NewDataStorage()
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	s := NewDataStorage(db)
 	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
 	s.UpdatePriceDataWithEtag(mockPriceData, "test-etag")
 
@@ -207,5 +229,52 @@ func TestGetLeaderboardPagePrices(t *testing.T) {
 		require.Equal(t, "usd", rst.Currency)
 		require.Equal(t, -1, rst.SortOrder)
 		require.Equal(t, 1, len(rst.Data)) // Only one crypto price (out of 2) was updated on this page
+	}
+}
+
+func TestGetLeaderboardPageDatabase(t *testing.T) {
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	s := NewDataStorage(db)
+
+	{
+		rst, err := s.GetLeaderboardPage(1, 3, -1, "usd")
+		require.NoError(t, err)
+		require.Equal(t, 0, rst.TotalCount)
+	}
+
+	insertCryptoDataToDatabase(t, db, []Cryptocurrency{
+		{
+			ID:                       "bitcoin",
+			Symbol:                   "btc",
+			Name:                     "Bitcoin",
+			CurrentPrice:             79451,
+			MarketCap:                1577274527423,
+			TotalVolume:              78498730801,
+			PriceChangePercentage24h: 6.49692,
+		},
+		{
+			ID:                       "ethereum",
+			Symbol:                   "eth",
+			Name:                     "Ethereum",
+			CurrentPrice:             1576.35,
+			MarketCap:                190254450318,
+			TotalVolume:              38689205530,
+			PriceChangePercentage24h: 9.82681,
+		},
+	})
+
+	{
+		rst, err := s.GetLeaderboardPage(1, 3, -1, "usd")
+		require.NoError(t, err)
+		require.Equal(t, 2, rst.TotalCount) // Only from database
+	}
+
+	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
+
+	{
+		rst, err := s.GetLeaderboardPage(1, 3, -1, "usd")
+		require.NoError(t, err)
+		require.Equal(t, 5, rst.TotalCount) // From mocked data
 	}
 }

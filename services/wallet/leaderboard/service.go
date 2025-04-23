@@ -2,6 +2,7 @@ package leaderboard
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -69,8 +70,8 @@ type GetLeaderboardPageResponse struct {
 }
 
 // NewMarketDataService creates a new market data service with the given configuration
-func NewMarketDataService(config ServiceConfig, feed *event.Feed) *MarketDataService {
-	storage := NewDataStorage()
+func NewMarketDataService(config ServiceConfig, walletDB *sql.DB, feed *event.Feed) *MarketDataService {
+	storage := NewDataStorage(walletDB)
 	subscriptionManager := NewSubscriptionManager()
 	return &MarketDataService{
 		config:              config,
@@ -187,7 +188,7 @@ func (s *MarketDataService) subscribeToLeaderboard() {
 		return
 	}
 
-	s.fetcher.Start(context.Background())
+	s.fetcher.StartRefreshLoops()
 
 	s.pageUpdateSubscription = s.subscriptionManager.Subscribe()
 	go func() {
