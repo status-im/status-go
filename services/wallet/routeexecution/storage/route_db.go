@@ -40,10 +40,6 @@ func (db *DB) PutRouteData(routeData *wallettypes.RouteData) (err error) {
 		return
 	}
 
-	if err = putBuildTxParams(tx, routeData.BuildInputParams); err != nil {
-		return
-	}
-
 	if err = putPathsData(tx, routeData.RouteInputParams.Uuid, routeData.PathsData); err != nil {
 		return
 	}
@@ -66,26 +62,6 @@ func (db *DB) GetRouteDataByHash(chainID uint64, txHash types.Hash) (*wallettype
 func putRouteInputParams(creator sqlite.StatementCreator, p *requests.RouteInputParams) error {
 	q := sq.Replace("route_input_parameters").
 		SetMap(sq.Eq{"route_input_params_json": &sqlite.JSONBlob{Data: p}})
-
-	query, args, err := q.ToSql()
-	if err != nil {
-		return err
-	}
-
-	stmt, err := creator.Prepare(query)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(args...)
-
-	return err
-}
-
-func putBuildTxParams(creator sqlite.StatementCreator, p *requests.RouterBuildTransactionsParams) error {
-	q := sq.Replace("route_build_tx_parameters").
-		SetMap(sq.Eq{"route_build_tx_params_json": &sqlite.JSONBlob{Data: p}})
 
 	query, args, err := q.ToSql()
 	if err != nil {
@@ -240,11 +216,6 @@ func getRouteData(creator sqlite.StatementCreator, uuid string) (*wallettypes.Ro
 		return nil, err
 	}
 
-	buildTxParams, err := getBuildTxParams(creator, uuid)
-	if err != nil {
-		return nil, err
-	}
-
 	pathsData, err := getPathsData(creator, uuid)
 	if err != nil {
 		return nil, err
@@ -252,7 +223,6 @@ func getRouteData(creator sqlite.StatementCreator, uuid string) (*wallettypes.Ro
 
 	return &wallettypes.RouteData{
 		RouteInputParams: routeInputParams,
-		BuildInputParams: buildTxParams,
 		PathsData:        pathsData,
 	}, nil
 }
@@ -261,27 +231,6 @@ func getRouteInputParams(creator sqlite.StatementCreator, uuid string) (*request
 	var p requests.RouteInputParams
 	q := sq.Select("route_input_params_json").
 		From("route_input_parameters").
-		Where(sq.Eq{"uuid": uuid})
-
-	query, args, err := q.ToSql()
-	if err != nil {
-		return nil, err
-	}
-
-	stmt, err := creator.Prepare(query)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
-	err = stmt.QueryRow(args...).Scan(&sqlite.JSONBlob{Data: &p})
-	return &p, err
-}
-
-func getBuildTxParams(creator sqlite.StatementCreator, uuid string) (*requests.RouterBuildTransactionsParams, error) {
-	var p requests.RouterBuildTransactionsParams
-	q := sq.Select("route_build_tx_params_json").
-		From("route_build_tx_parameters").
 		Where(sq.Eq{"uuid": uuid})
 
 	query, args, err := q.ToSql()

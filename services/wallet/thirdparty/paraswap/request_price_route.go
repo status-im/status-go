@@ -32,15 +32,27 @@ type Route struct {
 func (r *Route) Copy() *Route {
 	gasCost := new(bigint.BigInt)
 	if r.GasCost != nil {
-		gasCost.Int = big.NewInt(r.GasCost.Int64())
+		var ok bool
+		gasCost.Int, ok = new(big.Int).SetString(r.GasCost.String(), 10)
+		if !ok {
+			gasCost.Int = big.NewInt(0)
+		}
 	}
 	srcAmount := new(bigint.BigInt)
 	if r.SrcAmount != nil {
-		srcAmount.Int = big.NewInt(r.SrcAmount.Int64())
+		var ok bool
+		srcAmount.Int, ok = new(big.Int).SetString(r.SrcAmount.String(), 10)
+		if !ok {
+			srcAmount.Int = big.NewInt(0)
+		}
 	}
 	destAmount := new(bigint.BigInt)
 	if r.DestAmount != nil {
-		destAmount.Int = big.NewInt(r.DestAmount.Int64())
+		var ok bool
+		destAmount.Int, ok = new(big.Int).SetString(r.DestAmount.String(), 10)
+		if !ok {
+			destAmount.Int = big.NewInt(0)
+		}
 	}
 
 	return &Route{

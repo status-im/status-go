@@ -51,7 +51,6 @@ func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresse
 		rpt.is_approval,
 		rp.path_json,
 		rip.route_input_params_json,
-		rbtp.route_build_tx_params_json,
 		tt.tx_status,
 		tt.timestamp
 		`).Distinct()
@@ -65,8 +64,6 @@ func getActivityEntriesV2(ctx context.Context, deps FilterDependencies, addresse
 		LeftJoin(`route_paths rp ON
 			rpt.uuid = rp.uuid AND
 			rpt.path_idx = rp.path_idx`).
-		LeftJoin(`route_build_tx_parameters rbtp ON
-			rpt.uuid = rbtp.uuid`).
 		LeftJoin(`route_input_parameters rip ON
 			rpt.uuid = rip.uuid`)
 	q = q.OrderBy("tt.timestamp DESC", "rpt.is_approval ASC")
@@ -116,7 +113,6 @@ type entryDataV2 struct {
 	Timestamp        int64
 	Path             *routes.Path
 	RouteInputParams *requests.RouteInputParams
-	BuildInputParams *requests.RouterBuildTransactionsParams
 }
 
 func newEntryDataV2() *entryDataV2 {
@@ -125,7 +121,6 @@ func newEntryDataV2() *entryDataV2 {
 		Tx:               new(ethTypes.Transaction),
 		Path:             new(routes.Path),
 		RouteInputParams: new(requests.RouteInputParams),
-		BuildInputParams: new(requests.RouterBuildTransactionsParams),
 	}
 }
 
@@ -139,7 +134,6 @@ func rowsToDataV2(rows *sql.Rows) ([]*entryDataV2, error) {
 		nullableIsApproval := sql.NullBool{}
 		nullablePath := sqlite.JSONBlob{Data: data.Path}
 		nullableRouteInputParams := sqlite.JSONBlob{Data: data.RouteInputParams}
-		nullableBuildInputParams := sqlite.JSONBlob{Data: data.BuildInputParams}
 		nullableStatus := sql.NullString{}
 		nullableTimestamp := sql.NullInt64{}
 
@@ -149,7 +143,6 @@ func rowsToDataV2(rows *sql.Rows) ([]*entryDataV2, error) {
 			&nullableIsApproval,
 			&nullablePath,
 			&nullableRouteInputParams,
-			&nullableBuildInputParams,
 			&nullableStatus,
 			&nullableTimestamp,
 		)
@@ -164,8 +157,7 @@ func rowsToDataV2(rows *sql.Rows) ([]*entryDataV2, error) {
 			!nullableStatus.Valid ||
 			!nullableTimestamp.Valid ||
 			!nullablePath.Valid ||
-			!nullableRouteInputParams.Valid ||
-			!nullableBuildInputParams.Valid {
+			!nullableRouteInputParams.Valid {
 			logutils.ZapLogger().Warn("some fields missing in entryData")
 			continue
 		}

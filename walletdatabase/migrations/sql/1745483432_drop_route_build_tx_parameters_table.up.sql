@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS route_build_tx_parameters;

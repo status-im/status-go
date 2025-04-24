@@ -1,6 +1,7 @@
 package token
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -415,6 +416,8 @@ func Test_tokensListsValidity(t *testing.T) {
 
 	manager := NewTokenManager(walletDB, nil, nil, nm, appDB, nil, nil, nil, accountsDB, NewPersistence(walletDB))
 	require.NotNil(t, manager)
+
+	manager.Start(context.Background(), 1*time.Hour, 1*time.Hour)
 
 	tokensListWrapper := manager.GetList()
 	require.NotNil(t, tokensListWrapper)

@@ -34,10 +34,11 @@ var (
 	ErrENSSetPubKeyInvalidUsername = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-017"), Details: "a valid username, ending in '.eth', is required for ENSSetPubKey"}
 	// ErrLockedAmountExcludesAllSupported = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-018"), Details: "all supported chains are excluded, routing impossible"}
 	// ErrCannotCheckLockedAmounts         = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-019"), Details: "cannot check locked amounts"}
-	ErrNoCommunityParametersProvided = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-020"), Details: "no community parameters provided"}
-	ErrNoFromChainProvided           = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-021"), Details: "from chain not provided"}
-	ErrNoToChainProvided             = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-022"), Details: "to chain not provided"}
-	ErrFromAndToChainMustBeTheSame   = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-023"), Details: "from and to chain IDs must be the same"}
+	ErrNoCommunityParametersProvided        = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-020"), Details: "no community parameters provided"}
+	ErrNoFromChainProvided                  = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-021"), Details: "from chain not provided"}
+	ErrNoToChainProvided                    = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-022"), Details: "to chain not provided"}
+	ErrFromAndToChainMustBeTheSame          = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-023"), Details: "from and to chain IDs must be the same"}
+	ErrSwapSlippagePercentageMustBePositive = &errors.ErrorResponse{Code: errors.ErrorCode("WRR-024"), Details: "slippage percentage must be positive"}
 )
 
 type RouteInputParams struct {
@@ -53,6 +54,7 @@ type RouteInputParams struct {
 	DisabledFromChainIDs []uint64          `json:"disabledFromChainIDs"`
 	DisabledToChainIDs   []uint64          `json:"disabledToChainIDs"`
 	GasFeeMode           fees.GasFeeMode   `json:"gasFeeMode" validate:"required"`
+	SlippagePercentage   float32           `json:"slippagePercentage"`
 	TestnetMode          bool
 
 	// For send types like EnsRegister, EnsRelease, EnsSetPubKey, StickersBuy
@@ -157,6 +159,10 @@ func (i *RouteInputParams) Validate() error {
 		}
 		if i.TokenID == i.ToTokenID {
 			return ErrSwapTokenIDMustBeDifferent
+		}
+
+		if i.SlippagePercentage <= 0 {
+			return ErrSwapSlippagePercentageMustBePositive
 		}
 
 		if i.AmountIn != nil &&

@@ -250,15 +250,22 @@ func sendRouterResult(uuid string, result interface{}, err error) {
 		Uuid: uuid,
 	}
 
+	emptySignal := true
 	if err != nil {
 		errorResponse := errors.CreateErrorResponseFromError(err)
 		routesResponse.ErrorResponse = errorResponse.(*errors.ErrorResponse)
+		emptySignal = false
 	}
 
 	if suggestedRoutes, ok := result.(*SuggestedRoutes); ok && suggestedRoutes != nil {
 		routesResponse.Best = suggestedRoutes.Best
 		routesResponse.Candidates = suggestedRoutes.Candidates
 		routesResponse.UpdatedPrices = suggestedRoutes.UpdatedPrices
+		emptySignal = false
+	}
+
+	if emptySignal {
+		return
 	}
 
 	signal.SendWalletEvent(signal.SuggestedRoutes, routesResponse)
@@ -367,7 +374,11 @@ func (r *Router) SuggestedRoutes(ctx context.Context, input *requests.RouteInput
 		return nil, errors.CreateErrorResponseFromError(err)
 	}
 
-	suggestedRoutes, err = r.resolveRoutes(ctx, input, candidates)
+	nativeTokenSymbol := walletCommon.EthSymbol
+	if len(selectedFromChains) == 1 {
+		nativeTokenSymbol = selectedFromChains[0].NativeCurrencySymbol
+	}
+	suggestedRoutes, err = r.resolveRoutes(ctx, input, candidates, nativeTokenSymbol)
 
 	if err == nil && (suggestedRoutes == nil || len(suggestedRoutes.Best) == 0) {
 		// No best route found, but no error given.
@@ -505,8 +516,7 @@ func (r *Router) getSelectedChains(input *requests.RouteInputParams) (selectedFr
 }
 
 func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fromNetwork *params.Network, toNetwork *params.Network,
-	fromToken *tokenTypes.Token, toToken *tokenTypes.Token, slippagePercentage float32,
-	useCommunityTokenTransferDetailsAtIndex int) (pathprocessor.ProcessorInputParams, error) {
+	fromToken *tokenTypes.Token, toToken *tokenTypes.Token, useCommunityTokenTransferDetailsAtIndex int) (pathprocessor.ProcessorInputParams, error) {
 	var err error
 	processorInputParams := pathprocessor.ProcessorInputParams{
 		FromChain:          fromNetwork,
@@ -516,7 +526,7 @@ func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fr
 		ToAddr:             input.AddrTo,
 		FromAddr:           input.AddrFrom,
 		AmountIn:           input.AmountIn.ToInt(),
-		SlippagePercentage: slippagePercentage,
+		SlippagePercentage: input.SlippagePercentage,
 
 		Username:  input.Username,
 		PublicKey: input.PublicKey,
@@ -722,7 +732,7 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		return nil, ErrPathNotSupportedBetweenProvidedChains
 	}
 
-	processorInputParams, err := r.CreateProcessorInputParams(input, fromNetwork, toNetwork, fromToken, toToken, 0, useCommunityTokenTransferDetailsAtIndex)
+	processorInputParams, err := r.CreateProcessorInputParams(input, fromNetwork, toNetwork, fromToken, toToken, useCommunityTokenTransferDetailsAtIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -888,16 +898,16 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute rou
 			}
 		}
 
-		ethKey := makeBalanceKey(path.FromChain.ChainID, walletCommon.EthSymbol)
-		if nativeBalance, ok := balanceMapCopy[ethKey]; ok {
+		nativeTokenKey := makeBalanceKey(path.FromChain.ChainID, path.FromChain.NativeCurrencySymbol)
+		if nativeBalance, ok := balanceMapCopy[nativeTokenKey]; ok {
 			if nativeBalance.Cmp(path.RequiredNativeBalance) == -1 {
 				err := &errors.ErrorResponse{
 					Code:    ErrNotEnoughNativeBalance.Code,
-					Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, walletCommon.EthSymbol, path.FromChain.ChainID),
+					Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, path.FromChain.NativeCurrencySymbol, path.FromChain.ChainID),
 				}
 				return hasPositiveBalance, err
 			}
-			balanceMapCopy[ethKey].Sub(nativeBalance, path.RequiredNativeBalance)
+			balanceMapCopy[nativeTokenKey].Sub(nativeBalance, path.RequiredNativeBalance)
 		} else {
 			return hasPositiveBalance, ErrNativeTokenNotFound
 		}
@@ -906,7 +916,7 @@ func (r *Router) checkBalancesForTheBestRoute(ctx context.Context, bestRoute rou
 	return hasPositiveBalance, nil
 }
 
-func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputParams, candidates routes.Route) (suggestedRoutes *SuggestedRoutes, err error) {
+func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputParams, candidates routes.Route, nativeTokenSymbol string) (suggestedRoutes *SuggestedRoutes, err error) {
 	var prices map[string]float64
 	if input.TestsMode {
 		prices = input.TestParams.TokenPrices
@@ -918,7 +928,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputPa
 	}
 
 	tokenPrice := prices[input.TokenID]
-	nativeTokenPrice := prices[walletCommon.EthSymbol]
+	nativeTokenPrice := prices[nativeTokenSymbol]
 
 	var allRoutes []routes.Route
 	suggestedRoutes, allRoutes = newSuggestedRoutes(input, candidates, prices)
@@ -973,7 +983,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputPa
 	}
 
 	if len(bestRoute) > 0 {
-		// At this point we have to do the final check and update the amountIn (subtracting fees) if complete balance is going to be sent for native token (ETH)
+		// At this point we have to do the final check and update the amountIn (subtracting fees) if complete balance is going to be sent for native token (ETH/BNB)
 		for _, path := range bestRoute {
 			if path.SubtractFees && path.FromToken.IsNative() {
 				path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxFee.ToInt())

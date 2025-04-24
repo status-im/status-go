@@ -683,9 +683,9 @@ func (api *API) SendTransactionWithSignature(ctx context.Context, chainID uint64
 	return api.s.transactionManager.SendTransactionWithSignature(chainID, params, sig)
 }
 
-func (api *API) BuildTransactionsFromRoute(ctx context.Context, buildInputParams *requests.RouterBuildTransactionsParams) {
-	logutils.ZapLogger().Debug("[WalletAPI::BuildTransactionsFromRoute] builds transactions from the generated best route", zap.String("uuid", buildInputParams.Uuid))
-	api.s.routeExecutionManager.BuildTransactionsFromRoute(ctx, buildInputParams)
+func (api *API) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
+	logutils.ZapLogger().Debug("[WalletAPI::BuildTransactionsFromRoute] builds transactions from the generated best route", zap.String("uuid", uuid))
+	api.s.routeExecutionManager.BuildTransactionsFromRoute(ctx, uuid)
 }
 
 // Deprecated: `ProceedWithTransactionsSignatures` is the endpoint used in the old way of sending transactions and should not be used anymore.

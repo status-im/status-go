@@ -37,9 +37,6 @@ type Manager struct {
 	transferController *transfer.Controller
 	db                 *storage.DB
 	eventFeed          *event.Feed
-
-	// Local data used for storage purposes
-	buildInputParams *requests.RouterBuildTransactionsParams
 }
 
 func NewManager(walletDB *sql.DB, eventFeed *event.Feed, router *router.Router, transactionManager *transfer.TransactionManager, transferController *transfer.Controller) *Manager {
@@ -53,11 +50,10 @@ func NewManager(walletDB *sql.DB, eventFeed *event.Feed, router *router.Router, 
 }
 
 func (m *Manager) ClearLocalRouteData() {
-	m.buildInputParams = nil
 	m.transactionManager.ClearLocalRouterTransactionsData()
 }
 
-func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputParams *requests.RouterBuildTransactionsParams) {
+func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 	go func() {
 		defer status_common.LogOnPanic()
 
@@ -66,7 +62,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 		var err error
 		response := &responses.RouterTransactionsForSigning{
 			SendDetails: &responses.SendDetails{
-				Uuid: buildInputParams.Uuid,
+				Uuid: uuid,
 			},
 		}
 
@@ -80,7 +76,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 		}()
 
 		route, routeInputParams := m.router.GetBestRouteAndAssociatedInputParams()
-		if routeInputParams.Uuid != buildInputParams.Uuid {
+		if routeInputParams.Uuid != uuid {
 			// should never be here
 			err = ErrCannotResolveRouteId
 			return
@@ -88,12 +84,10 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, buildInputPara
 
 		// re-use path processor input params structure to pass extra params to transaction manager
 		var extraParams pathprocessor.ProcessorInputParams
-		extraParams, err = m.router.CreateProcessorInputParams(&routeInputParams, nil, nil, nil, nil, buildInputParams.SlippagePercentage, 0)
+		extraParams, err = m.router.CreateProcessorInputParams(&routeInputParams, nil, nil, nil, nil, 0)
 		if err != nil {
 			return
 		}
-
-		m.buildInputParams = buildInputParams
 
 		fromChainID, toChainID := route.GetFirstPathChains()
 
@@ -214,7 +208,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 		// don't overwrite err since we want to process it in the deferred function
 		var tmpErr error
 		routerTransactions := m.transactionManager.GetRouterTransactions()
-		routeData := wallettypes.NewRouteData(&routeInputParams, m.buildInputParams, routerTransactions)
+		routeData := wallettypes.NewRouteData(&routeInputParams, routerTransactions)
 		tmpErr = m.db.PutRouteData(routeData)
 		if tmpErr != nil {
 			logutils.ZapLogger().Error("Error storing route data", zap.Error(tmpErr))

@@ -35,18 +35,12 @@ def get_suggested_routes(rpc_client, **kwargs):
     return routes
 
 
-def build_transactions_from_route(rpc_client, **kwargs):
+def build_transactions_from_route(rpc_client, uuid):
     method = "wallet_buildTransactionsFromRoute"
-    required_params = []
-    build_tx_params = {}
-    for key, new_value in kwargs.items():
-        build_tx_params[key] = new_value
+    if uuid is None or uuid == "":
+        logging.info(f"Warning: provided '{uuid}' does not exist or is empty")
 
-    for key in required_params:
-        if key not in build_tx_params:
-            logging.info(f"Warning: The key '{key}' does not exist in the build_tx_params parameters and will be ignored.")
-
-    params = [build_tx_params]
+    params = [uuid]
     _ = rpc_client.rpc_valid_request(method, params)
 
     wallet_router_sign_transactions_signal = rpc_client.wait_for_signal("wallet.router.sign-transactions")
@@ -177,12 +171,7 @@ def send_router_transaction(rpc_client, **kwargs):
     routes = get_suggested_routes(rpc_client, **kwargs)
     assert "Best" in routes, f"No best route found: {routes}"
 
-    router_build_tx_params = {}
-    for key in kwargs:
-        if key in ["uuid", "slippagePercentage"]:
-            router_build_tx_params[key] = kwargs[key]
-
-    build_tx = build_transactions_from_route(rpc_client, **router_build_tx_params)
+    build_tx = build_transactions_from_route(rpc_client, kwargs.get("uuid"))
 
     tx_signatures = sign_messages(rpc_client, build_tx["signingDetails"]["hashes"], kwargs.get("addrFrom"))
 
