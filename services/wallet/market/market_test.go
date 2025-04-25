@@ -305,18 +305,18 @@ func TestSymbolsMapping(t *testing.T) {
 	require.Equal(t, expectedProviderSymbolsToSymbols, providerSymbolsToSymbols)
 
 	// symbols with decimals
-	symbols = []string{"SNT", "DAI", "USDC(6)", "USDC(18)", "ANYTHING"}
+	symbols = []string{"SNT", "DAI", "USDC (EVM)", "USDC (BSC)", "ANYTHING"}
 	expectedSymbolsToProviderSymbols = map[string]string{
-		"SNT":      "SNT",
-		"DAI":      "DAI",
-		"USDC(6)":  "USDC",
-		"USDC(18)": "USDC",
-		"ANYTHING": "ANYTHING",
+		"SNT":        "SNT",
+		"DAI":        "DAI",
+		"USDC (EVM)": "USDC",
+		"USDC (BSC)": "USDC",
+		"ANYTHING":   "ANYTHING",
 	}
 	expectedProviderSymbolsToSymbols = map[string][]string{
 		"SNT":      {"SNT"},
 		"DAI":      {"DAI"},
-		"USDC":     {"USDC(6)", "USDC(18)"},
+		"USDC":     {"USDC (EVM)", "USDC (BSC)"},
 		"ANYTHING": {"ANYTHING"},
 	}
 	symbolsToProviderSymbols, providerSymbolsToSymbols, err = marketManager.symbolProviderSymbolMaps(symbols)

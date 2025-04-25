@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/token-lists/default-lists"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
 )
@@ -57,7 +58,12 @@ func getSymbolChainPair(token *tokenTypes.Token) string {
 }
 
 func makeUniqueSymbol(token *tokenTypes.Token) string {
-	return fmt.Sprintf("%s(%d)", token.Symbol, token.Decimals)
+	// Based on proposal here https://discord.com/channels/1210237582470807632/1363907888082321448/1364611566753812601
+	l1Chain := "EVM"
+	if token.ChainID == walletCommon.BSCMainnet || token.ChainID == walletCommon.BSCTestnet {
+		l1Chain = "BSC"
+	}
+	return fmt.Sprintf("%s (%s)", token.Symbol, l1Chain)
 }
 
 func removeDuplicateSymbolOnTheSameChain(tokens []*tokenTypes.Token) []*tokenTypes.Token {

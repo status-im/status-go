@@ -42,6 +42,7 @@ const (
 	BaseMainnet          uint64 = 8453
 	BaseSepolia          uint64 = 84532
 	StatusNetworkSepolia uint64 = 1660990954
+	TestnetChainID       uint64 = 777333
 )
 
 var (
@@ -117,6 +118,7 @@ func AllChainIDs() []ChainID {
 		ChainID(StatusNetworkSepolia),
 		ChainID(BSCMainnet),
 		ChainID(BSCTestnet),
+		ChainID(TestnetChainID),
 	}
 }
 
