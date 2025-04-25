@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/services/wallet/common"
 	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/token-lists/default-lists"
 	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
 	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
@@ -27,6 +28,8 @@ func (t *TokenLists) rebuildTokensMap(fetchedLists []fetcher.FetchedTokenList) e
 
 		list.Source = fetchedTokenList.SourceURL
 		list.FetchedTimestamp = fetchedTokenList.Fetched.Format(time.RFC3339)
+
+		list.Tokens = filterTokens(list.Tokens)
 
 		processTokenPegs(list.Tokens)
 
@@ -98,6 +101,24 @@ func (t *TokenLists) rebuildTokensListsMap() error {
 	tokensListsForProcessing = append(tokensListsForProcessing, fetchedTokensLists...)
 
 	return t.rebuildTokensMap(tokensListsForProcessing)
+}
+
+func filterTokens(tokens []*tokenTypes.Token) []*tokenTypes.Token {
+	var filteredTokens []*tokenTypes.Token
+	for _, token := range tokens {
+		found := false
+		for _, chainID := range common.AllChainIDs() {
+			if token.ChainID == uint64(chainID) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			continue
+		}
+		filteredTokens = append(filteredTokens, token)
+	}
+	return filteredTokens
 }
 
 func processTokenPegs(tokens []*tokenTypes.Token) {
