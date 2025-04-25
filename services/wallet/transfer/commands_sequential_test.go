@@ -323,7 +323,7 @@ func (tc *TestClient) GetBaseFeeFromBlock(ctx context.Context, blockNumber *big.
 }
 
 func (tc *TestClient) NetworkID() uint64 {
-	return 777333
+	return walletcommon.TestnetChainID
 }
 
 func (tc *TestClient) ToBigInt() *big.Int {

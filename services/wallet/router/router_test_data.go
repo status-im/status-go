@@ -2940,8 +2940,8 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 				TokenID:              walletCommon.UsdcSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
-				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -3026,8 +3026,8 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 				TokenID:              walletCommon.UsdcSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.BaseMainnet},
-				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
+				DisabledFromChainIDs: []uint64{walletCommon.BaseMainnet, walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -3089,7 +3089,7 @@ func getNoBalanceTestParamsList() []noBalanceTestParams {
 				AddrTo:             common.HexToAddress("0x2"),
 				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount100USDC)),
 				TokenID:            walletCommon.UsdcSymbol,
-				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
+				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{

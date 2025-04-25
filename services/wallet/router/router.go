@@ -928,7 +928,7 @@ func (r *Router) resolveRoutes(ctx context.Context, input *requests.RouteInputPa
 	suggestedRoutes, allRoutes = newSuggestedRoutes(input, candidates, prices)
 
 	defer func() {
-		if suggestedRoutes.Best != nil && len(suggestedRoutes.Best) > 0 {
+		if len(suggestedRoutes.Best) > 0 {
 			sort.Slice(suggestedRoutes.Best, func(i, j int) bool {
 				iChain := getChainPriority(suggestedRoutes.Best[i].FromChain.ChainID)
 				jChain := getChainPriority(suggestedRoutes.Best[j].FromChain.ChainID)

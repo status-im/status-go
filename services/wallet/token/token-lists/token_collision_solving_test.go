@@ -106,7 +106,7 @@ func TestTokenExistence(t *testing.T) {
 func TestSolvingDecimalsCollision(t *testing.T) {
 	tokens := []*tokenTypes.Token{
 		{
-			ChainID:  walletCommon.EthereumMainnet,
+			ChainID:  walletCommon.BSCMainnet,
 			Address:  common.HexToAddress("0x1"),
 			Symbol:   "ETH1",
 			Decimals: 18,
