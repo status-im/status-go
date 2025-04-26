@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,13 +78,10 @@ var mockPriceData = map[string]PriceData{
 
 func insertCryptoDataToDatabase(t *testing.T, db *sql.DB, cryptoData []Cryptocurrency) {
 	t.Helper()
-	for _, crypto := range cryptoData {
-		_, err := db.Exec(`
-			INSERT INTO market_data (id, symbol, current_price, market_cap, total_volume, price_change_percentage_24h)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`, crypto.ID, crypto.Symbol, crypto.CurrentPrice, crypto.MarketCap, crypto.TotalVolume, crypto.PriceChangePercentage24h)
-		require.NoError(t, err)
-	}
+
+	persistence := NewPersistance(db)
+	err := persistence.UpsertCryptocurrencies(cryptoData)
+	require.NoError(t, err)
 }
 
 // Helper function to verify crypto price data
@@ -97,6 +95,7 @@ func TestGetLeaderboardPageErrors(t *testing.T) {
 	db, cleanup := setupTestWalletDB(t)
 	defer cleanup()
 	s := NewDataStorage(db)
+	s.Start()
 	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
 
 	{
@@ -262,12 +261,23 @@ func TestGetLeaderboardPageDatabase(t *testing.T) {
 			TotalVolume:              38689205530,
 			PriceChangePercentage24h: 9.82681,
 		},
+		{
+			ID:                       "samba",
+			Symbol:                   "smb",
+			Name:                     "Samba",
+			CurrentPrice:             2376.35,
+			MarketCap:                194454450318,
+			TotalVolume:              386669205530,
+			PriceChangePercentage24h: 5.5124,
+		},
 	})
+
+	s.Start()
 
 	{
 		rst, err := s.GetLeaderboardPage(1, 3, -1, "usd")
 		require.NoError(t, err)
-		require.Equal(t, 2, rst.TotalCount) // Only from database
+		require.Equal(t, 3, rst.TotalCount) // Only from database
 	}
 
 	s.UpdateCryptoDataWithEtag(mockCrypto, "test-etag")
@@ -276,5 +286,33 @@ func TestGetLeaderboardPageDatabase(t *testing.T) {
 		rst, err := s.GetLeaderboardPage(1, 3, -1, "usd")
 		require.NoError(t, err)
 		require.Equal(t, 5, rst.TotalCount) // From mocked data
+	}
+
+	{
+		rows, err := sq.Select("id").From("market_data").RunWith(db).Query()
+		require.NoError(t, err)
+
+		var ids []string
+		for rows.Next() {
+			id := ""
+			err := rows.Scan(
+				&id,
+			)
+			require.NoError(t, err)
+			ids = append(ids, id)
+		}
+		rows.Close()
+
+		// Samba should be deleted because it doesn't exist in the mocked data
+		require.Equal(t, 5, len(ids))
+
+		actualIDs := make(map[string]bool)
+		for _, id := range ids {
+			actualIDs[id] = true
+		}
+
+		for _, crypto := range mockCrypto {
+			require.True(t, actualIDs[crypto.ID], "Expected ID %s was missing from results", crypto.ID)
+		}
 	}
 }

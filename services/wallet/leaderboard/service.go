@@ -87,6 +87,7 @@ func NewMarketDataService(config ServiceConfig, walletDB *sql.DB, feed *event.Fe
 
 // Start begins the data refresh loops
 func (s *MarketDataService) Start(ctx context.Context) {
+	s.storage.Start()
 	s.fetcher.Start(ctx)
 }
 

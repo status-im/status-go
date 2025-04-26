@@ -15,11 +15,12 @@ import (
 type DataStorage struct {
 	// Data and synchronization
 	cryptoData []Cryptocurrency
-	db         *sql.DB
-	priceData  PriceMap
-	dataMutex  sync.RWMutex
-	cryptoEtag string
-	priceEtag  string
+
+	marketDataPersistence MarketDataPersistenceInterface
+	priceData             PriceMap
+	dataMutex             sync.RWMutex
+	cryptoEtag            string
+	priceEtag             string
 }
 
 type FingerprintData map[string]string // map[crypto_id]fingerprint
@@ -27,9 +28,15 @@ type FingerprintData map[string]string // map[crypto_id]fingerprint
 // NewDataStorage creates a new data storage instance
 func NewDataStorage(walletDB *sql.DB) *DataStorage {
 	return &DataStorage{
-		priceData: make(PriceMap),
-		db:        walletDB,
+		priceData:             make(PriceMap),
+		marketDataPersistence: NewPersistance(walletDB),
 	}
+}
+
+func (s *DataStorage) Start() {
+	s.dataMutex.Lock()
+	defer s.dataMutex.Unlock()
+	s.cryptoData, _ = s.marketDataPersistence.GetCryptocurrencies()
 }
 
 // UpdateCryptoDataWithEtag updates both cryptocurrency data and etag atomically
@@ -45,69 +52,28 @@ func (s *DataStorage) UpdateCryptoDataWithEtag(data []Cryptocurrency, etag strin
 	currentIds := s.extractCryptocurrencyIDs(s.cryptoData)
 	s.cryptoData = data
 	s.cryptoEtag = etag
-	err := s.upsertCryptocurrencyData(s.db, s.cryptoData, currentIds)
+	err := s.marketDataPersistence.UpsertCryptocurrencies(s.cryptoData)
 	if err != nil {
 		logutils.ZapLogger().Error("Market - error creating database snapshot", zap.Error(err))
 	}
-	return true
-}
-
-func (s *DataStorage) upsertCryptocurrencyData(db *sql.DB, cryptos []Cryptocurrency, existingProviderIDs map[string]bool) error {
-	// Begin transaction
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		_ = tx.Rollback()
-	}()
-
+	// Remove old data
 	updatedIDs := make(map[string]bool)
-	stmt, err := tx.Prepare(`
-        INSERT INTO market_data (
-            id, symbol, current_price, market_cap, total_volume, price_change_percentage_24h
-        ) VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT (id) DO UPDATE SET
-            symbol = excluded.symbol,
-            current_price = excluded.current_price,
-            market_cap = excluded.market_cap,
-            total_volume = excluded.total_volume,
-            price_change_percentage_24h = excluded.price_change_percentage_24h
-    `)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
-
-	for _, crypto := range cryptos {
-		_, err := stmt.Exec(
-			crypto.ID,
-			crypto.Symbol,
-			crypto.CurrentPrice,
-			crypto.MarketCap,
-			crypto.TotalVolume,
-			crypto.PriceChangePercentage24h,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to upsert data for %s: %w", crypto.ID, err)
-		}
+	for _, crypto := range s.cryptoData {
 		updatedIDs[crypto.ID] = true
 	}
-
-	for id := range existingProviderIDs {
+	var idsToDelete []string
+	for id := range currentIds {
 		if !updatedIDs[id] {
-			_, err := tx.Exec("DELETE FROM market_data WHERE provider_id = ?", id)
-			if err != nil {
-				return fmt.Errorf("failed to delete removed cryptocurrency %s: %w", id, err)
-			}
+			idsToDelete = append(idsToDelete, id)
 		}
 	}
-
-	return nil
+	if len(idsToDelete) > 0 {
+		err = s.marketDataPersistence.DeleteCryptocurrencies(idsToDelete)
+		if err != nil {
+			logutils.ZapLogger().Error("Market - error deleting old data", zap.Error(err))
+		}
+	}
+	return true
 }
 
 func (s *DataStorage) extractCryptocurrencyIDs(cryptos []Cryptocurrency) map[string]bool {
@@ -116,25 +82,6 @@ func (s *DataStorage) extractCryptocurrencyIDs(cryptos []Cryptocurrency) map[str
 		ids[crypto.ID] = true
 	}
 	return ids
-}
-
-func (s *DataStorage) getCryptoCurrenciesFromDb() ([]Cryptocurrency, error) {
-	rows, err := s.db.Query("SELECT id, symbol, current_price, market_cap, total_volume, price_change_percentage_24h FROM market_data")
-	if err != nil {
-		return nil, fmt.Errorf("failed to query database: %w", err)
-	}
-	defer rows.Close()
-
-	var cryptos []Cryptocurrency
-	for rows.Next() {
-		var crypto Cryptocurrency
-		if err := rows.Scan(&crypto.ID, &crypto.Symbol, &crypto.CurrentPrice, &crypto.MarketCap, &crypto.TotalVolume, &crypto.PriceChangePercentage24h); err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
-		}
-		cryptos = append(cryptos, crypto)
-	}
-
-	return cryptos, nil
 }
 
 // UpdatePriceDataWithEtag updates both price data and etag atomically
@@ -157,10 +104,6 @@ func (s *DataStorage) GetCryptoData() []Cryptocurrency {
 	s.dataMutex.RLock()
 	defer s.dataMutex.RUnlock()
 
-	if len(s.cryptoData) == 0 {
-		s.cryptoData, _ = s.getCryptoCurrenciesFromDb()
-	}
-
 	// Create a copy to avoid data races
 	result := make([]Cryptocurrency, len(s.cryptoData))
 	copy(result, s.cryptoData)
@@ -171,10 +114,6 @@ func (s *DataStorage) GetCryptoData() []Cryptocurrency {
 func (s *DataStorage) GetCryptoDataSize() int {
 	s.dataMutex.RLock()
 	defer s.dataMutex.RUnlock()
-
-	if len(s.cryptoData) == 0 {
-		s.cryptoData, _ = s.getCryptoCurrenciesFromDb()
-	}
 
 	return len(s.cryptoData)
 }
@@ -197,10 +136,6 @@ func (s *DataStorage) GetPriceData() PriceMap {
 func (s *DataStorage) GetCombinedData() []Cryptocurrency {
 	s.dataMutex.RLock()
 	defer s.dataMutex.RUnlock()
-
-	if len(s.cryptoData) == 0 {
-		s.cryptoData, _ = s.getCryptoCurrenciesFromDb()
-	}
 
 	// Create a copy of the crypto data
 	result := make([]Cryptocurrency, len(s.cryptoData))
@@ -234,10 +169,6 @@ func (s *DataStorage) GetCryptoDataForPage(page, pageSize int) []Cryptocurrency 
 	}
 	s.dataMutex.RLock()
 	defer s.dataMutex.RUnlock()
-
-	if len(s.cryptoData) == 0 {
-		s.cryptoData, _ = s.getCryptoCurrenciesFromDb()
-	}
 
 	start := (page - 1) * pageSize
 	totalCount := len(s.cryptoData)
