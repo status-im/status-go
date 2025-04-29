@@ -1,26 +1,42 @@
 package leaderboard
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 	"sync"
+
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 // DataStorage manages the storage and retrieval of market data
 type DataStorage struct {
 	// Data and synchronization
 	cryptoData []Cryptocurrency
-	priceData  PriceMap
-	dataMutex  sync.RWMutex
-	cryptoEtag string
-	priceEtag  string
+
+	marketDataPersistence MarketDataPersistenceInterface
+	priceData             PriceMap
+	dataMutex             sync.RWMutex
+	cryptoEtag            string
+	priceEtag             string
 }
 
+type FingerprintData map[string]string // map[crypto_id]fingerprint
+
 // NewDataStorage creates a new data storage instance
-func NewDataStorage() *DataStorage {
+func NewDataStorage(walletDB *sql.DB) *DataStorage {
 	return &DataStorage{
-		priceData: make(PriceMap),
+		priceData:             make(PriceMap),
+		marketDataPersistence: NewPersistance(walletDB),
 	}
+}
+
+func (s *DataStorage) Start() {
+	s.dataMutex.Lock()
+	defer s.dataMutex.Unlock()
+	s.cryptoData, _ = s.marketDataPersistence.GetCryptocurrencies()
 }
 
 // UpdateCryptoDataWithEtag updates both cryptocurrency data and etag atomically
@@ -33,9 +49,39 @@ func (s *DataStorage) UpdateCryptoDataWithEtag(data []Cryptocurrency, etag strin
 	s.dataMutex.Lock()
 	defer s.dataMutex.Unlock()
 
+	currentIds := s.extractCryptocurrencyIDs(s.cryptoData)
 	s.cryptoData = data
 	s.cryptoEtag = etag
+	err := s.marketDataPersistence.UpsertCryptocurrencies(s.cryptoData)
+	if err != nil {
+		logutils.ZapLogger().Error("Market - error creating database snapshot", zap.Error(err))
+	}
+	// Remove old data
+	updatedIDs := make(map[string]bool)
+	for _, crypto := range s.cryptoData {
+		updatedIDs[crypto.ID] = true
+	}
+	var idsToDelete []string
+	for id := range currentIds {
+		if !updatedIDs[id] {
+			idsToDelete = append(idsToDelete, id)
+		}
+	}
+	if len(idsToDelete) > 0 {
+		err = s.marketDataPersistence.DeleteCryptocurrencies(idsToDelete)
+		if err != nil {
+			logutils.ZapLogger().Error("Market - error deleting old data", zap.Error(err))
+		}
+	}
 	return true
+}
+
+func (s *DataStorage) extractCryptocurrencyIDs(cryptos []Cryptocurrency) map[string]bool {
+	ids := make(map[string]bool, len(cryptos))
+	for _, crypto := range cryptos {
+		ids[crypto.ID] = true
+	}
+	return ids
 }
 
 // UpdatePriceDataWithEtag updates both price data and etag atomically
@@ -184,11 +230,11 @@ func (s *DataStorage) GetLeaderboardPage(page, pageSize, sortOrder int, currency
 		return nil, fmt.Errorf("Invalid page size")
 	}
 
-	totalCount := s.GetCryptoDataSize()
+	if page <= 0 {
+		return nil, fmt.Errorf("Invalid page")
+	}
 
-	// TODO: fetch from db
-	// if totalCount == 0 {
-	// }
+	totalCount := s.GetCryptoDataSize()
 
 	totalPages := (totalCount + pageSize - 1) / pageSize
 	if page <= 0 || (page > totalPages && totalCount > 0) {
