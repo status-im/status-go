@@ -12,12 +12,12 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/wakuv2"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/protocol/communities"
 
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -43,7 +43,7 @@ func (r *storeNodeRequestID) getCommunityID() string {
 	case storeNodeCommunityRequest:
 		return r.DataID
 	case storeNodeShardRequest:
-		return strings.TrimSuffix(r.DataID, transport.CommunityShardInfoTopicPrefix())
+		return strings.TrimSuffix(r.DataID, messaging.CommunityShardInfoTopicPrefix())
 	default:
 		return ""
 	}
@@ -103,7 +103,7 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, community 
 	// if shard was not passed or nil, request shard first
 	communityShard := community.Shard
 	if communityShard == nil {
-		id := transport.CommunityShardInfoTopic(community.CommunityID)
+		id := messaging.CommunityShardInfoTopic(community.CommunityID)
 		fetchedShard, err := m.subscribeToRequest(ctx, storeNodeShardRequest, id, wakuv2.DefaultNonProtectedShard(), cfg)
 		if err != nil {
 			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a shard info request: %w", err)
@@ -199,7 +199,7 @@ func (m *StoreNodeRequestManager) subscribeToRequest(ctx context.Context, reques
 	if !requestFound {
 		// Create corresponding filter
 		var err error
-		var filter *transport.Filter
+		var filter *messaging.ChatFilter
 		filterCreated := false
 
 		filter, filterCreated, err = m.getFilter(requestType, dataID, shard)
@@ -237,9 +237,9 @@ func (m *StoreNodeRequestManager) newStoreNodeRequest(ctx context.Context) *stor
 
 // getFilter checks if a filter for a given community is already created and creates one of not found.
 // Returns the found/created filter, a flag if the filter was created by the function and an error.
-func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, dataID string, shard *wakuv2.Shard) (*transport.Filter, bool, error) {
+func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, dataID string, shard *wakuv2.Shard) (*messaging.ChatFilter, bool, error) {
 	// First check if such filter already exists.
-	filter := m.messenger.transport.FilterByChatID(dataID)
+	filter := m.messenger.messaging.ChatFilterByChatID(dataID)
 	if filter != nil {
 		//we don't remember filter id associated with community because it was already installed
 		return filter, false, nil
@@ -249,7 +249,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 	case storeNodeShardRequest, storeNodeCommunityRequest:
 		// If filter wasn't installed we create it and
 		// remember for uninstalling after response is received
-		filters, err := m.messenger.transport.InitPublicFilters([]transport.FiltersToInitialize{{
+		filters, err := m.messenger.messaging.InitPublicChats(messaging.ChatsToInitialize{{
 			ChatID:      dataID,
 			PubsubTopic: shard.PubsubTopic(),
 		}})
@@ -276,8 +276,7 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 			return nil, false, fmt.Errorf("failed to unmarshal public key: %w", err)
 		}
 
-		filter, err = m.messenger.transport.JoinPrivate(publicKey)
-
+		filter, err = m.messenger.messaging.JoinPrivateChat(publicKey)
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to install filter for contact: %w", err)
 		}
@@ -292,8 +291,8 @@ func (m *StoreNodeRequestManager) getFilter(requestType storeNodeRequestType, da
 }
 
 // forgetFilter uninstalls the given filter
-func (m *StoreNodeRequestManager) forgetFilter(filter *transport.Filter) {
-	err := m.messenger.transport.RemoveFilters([]*transport.Filter{filter})
+func (m *StoreNodeRequestManager) forgetFilter(filter *messaging.ChatFilter) {
+	err := m.messenger.messaging.RemoveFilters(messaging.ChatFilters{filter})
 	if err != nil {
 		m.logger.Warn("failed to remove filter", zap.Error(err))
 	}
@@ -320,7 +319,7 @@ type storeNodeRequest struct {
 	config           StoreNodeRequestConfig
 
 	// request corresponding metadata to be used in finalize
-	filterToForget *transport.Filter
+	filterToForget *messaging.ChatFilter
 
 	// internal fields
 	manager       *StoreNodeRequestManager
@@ -458,7 +457,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 		r.result.community = community
 
 	case storeNodeShardRequest:
-		communityIDStr := strings.TrimSuffix(r.requestID.DataID, transport.CommunityShardInfoTopicPrefix())
+		communityIDStr := strings.TrimSuffix(r.requestID.DataID, messaging.CommunityShardInfoTopicPrefix())
 		communityID, err := types.DecodeHex(communityIDStr)
 		if err != nil {
 			logger.Error("decode community ID failed",
@@ -532,7 +531,7 @@ func (r *storeNodeRequest) routine() {
 	if r.requestID.RequestType != storeNodeCommunityRequest || !r.manager.messenger.communityStorenodes.HasStorenodeSetup(communityID) {
 		ctx, cancel := context.WithTimeout(r.ctx, storeNodeAvailableTimeout)
 		defer cancel()
-		if !r.manager.messenger.transport.WaitForAvailableStoreNode(ctx) {
+		if !r.manager.messenger.messaging.WaitForAvailableStoreNode(ctx) {
 			r.result.err = fmt.Errorf("store node is not available")
 			return
 		}

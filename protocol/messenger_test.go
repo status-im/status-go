@@ -144,7 +144,7 @@ func (s *MessengerSuite) TestInitFilters() {
 			tc.Prep()
 			err := s.m.InitFilters()
 			s.Require().NoError(err)
-			filters := s.m.transport.Filters()
+			filters := s.m.messaging.ChatFilters()
 			expectedFilters += tc.AddedFilters
 			s.Equal(deprecation.AddTimelineFiltersCount(expectedFilters), len(filters))
 		})
@@ -216,7 +216,7 @@ func buildTestGapMessage(chat Chat) *common.Message {
 }
 
 func (s *MessengerSuite) TestMarkMessagesSeen() {
-	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	chat.UnviewedMessagesCount = 2
 	chat.UnviewedMentionsCount = 3
 	chat.Highlight = true
@@ -267,7 +267,7 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 }
 
 func (s *MessengerSuite) TestMarkAllRead() {
-	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	chat.UnviewedMessagesCount = 2
 	chat.Highlight = true
 	err := s.m.SaveChat(chat)
@@ -296,7 +296,7 @@ func (s *MessengerSuite) TestMarkAllRead() {
 }
 
 func (s *MessengerSuite) TestSendPublic() {
-	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	clock := getTimeWithAllowedFutureDrift()
 	chat.LastClockValue = clock
 	err := s.m.SaveChat(chat)
@@ -328,7 +328,7 @@ func (s *MessengerSuite) TestSendProfile() {
 		return
 	}
 
-	chat := CreateProfileChat("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), s.m.transport)
+	chat := CreateProfileChat("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), s.m.getTimesource())
 	chat.LastClockValue = uint64(100000000000000)
 	err := s.m.SaveChat(chat)
 	s.NoError(err)
@@ -358,7 +358,7 @@ func (s *MessengerSuite) TestSendPrivateOneToOne() {
 	recipientKey, err := crypto.GenerateKey()
 	s.NoError(err)
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&recipientKey.PublicKey))
-	chat := CreateOneToOneChat(pkString, &recipientKey.PublicKey, s.m.transport)
+	chat := CreateOneToOneChat(pkString, &recipientKey.PublicKey, s.m.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -450,7 +450,7 @@ func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
 
 // Make sure public messages sent by us are not
 func (s *MessengerSuite) TestRetrieveOwnPublic() {
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat("status", s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.NoError(err)
 	// Right-to-left text
@@ -486,11 +486,11 @@ func (s *MessengerSuite) TestRetrieveOwnPublic() {
 func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
-	theirChat := CreatePublicChat("status", s.m.transport)
+	theirChat := CreatePublicChat("status", s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat("status", s.m.getTimesource())
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -528,11 +528,11 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 func (s *MessengerSuite) TestDropAudioMessageInPublicGroup() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
-	theirChat := CreatePublicChat("status", s.m.transport)
+	theirChat := CreatePublicChat("status", s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat("status", s.m.getTimesource())
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -553,11 +553,11 @@ func (s *MessengerSuite) TestDropAudioMessageInPublicGroup() {
 func (s *MessengerSuite) TestDeletedAtClockValue() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
-	theirChat := CreatePublicChat("status", s.m.transport)
+	theirChat := CreatePublicChat("status", s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat("status", s.m.getTimesource())
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -584,13 +584,13 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreatePublicChat("status", s.m.transport)
+	theirChat := CreatePublicChat("status", s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 	_, err = theirMessenger.Join(theirChat)
 	s.Require().NoError(err)
 
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat("status", s.m.getTimesource())
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 	_, err = s.m.Join(chat)
@@ -661,11 +661,11 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 func (s *MessengerSuite) TestResendPublicMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
-	theirChat := CreatePublicChat("status", s.m.transport)
+	theirChat := CreatePublicChat("status", s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat("status", s.m.getTimesource())
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -715,11 +715,11 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
-	theirChat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.transport)
+	theirChat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("our-chat", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("our-chat", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	ourChat.UnviewedMessagesCount = 1
 	// Make chat inactive
 	ourChat.Active = false
@@ -756,7 +756,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
-	chat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.transport)
+	chat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(chat)
 	s.NoError(err)
 
@@ -793,7 +793,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
-	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	err := theirMessenger.SaveChat(chat)
 	s.NoError(err)
 
@@ -1473,7 +1473,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	myPkString := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
-	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -1568,7 +1568,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	receiverAddress := crypto.PubkeyToAddress(theirMessenger.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 
-	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -1670,7 +1670,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	receiverAddress := crypto.PubkeyToAddress(theirMessenger.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 
-	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -1771,7 +1771,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 
 	myAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 
-	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -1864,7 +1864,7 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
-	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -1952,7 +1952,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
-	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -2126,7 +2126,7 @@ func (s *MessengerSuite) TestMessageJSON() {
 func (s *MessengerSuite) TestSentEventTracking() {
 
 	//when message sent, its sent field should be "false" until we got confirmation
-	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.NoError(err)
 	inputMessage := buildTestMessage(*chat)
@@ -2149,7 +2149,7 @@ func (s *MessengerSuite) TestSentEventTracking() {
 
 func (s *MessengerSuite) TestLastSentField() {
 	//send message
-	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.NoError(err)
 	inputMessage := buildTestMessage(*chat)
@@ -2243,7 +2243,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	s.NoError(err)
 	s.m.SetMediaServer(httpServer)
 
-	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	err = s.m.SaveChat(chat)
 	s.NoError(err)
 	inputMsg := buildTestMessage(*chat)
@@ -2350,7 +2350,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 
 func (s *MessengerSuite) TestMessageSent() {
 	//send message
-	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.NoError(err)
 	inputMessage := buildTestMessage(*chat)
@@ -2380,7 +2380,7 @@ func (s *MessengerSuite) TestProcessSentMessages() {
 
 func (s *MessengerSuite) TestResendExpiredEmojis() {
 	//send message
-	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.NoError(err)
 	inputMessage := buildTestMessage(*chat)
@@ -2469,8 +2469,8 @@ func (s *MessengerSuite) TestSendMessageMention() {
 	s.Require().NoError(alice.settings.SaveSettingField(settings.NotificationsEnabled, true))
 
 	// Create one-to-one chats
-	chat, chat2 := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.transport),
-		CreateOneToOneChat(common.PubkeyToHex(&bob.identity.PublicKey), &bob.identity.PublicKey, alice.transport)
+	chat, chat2 := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.getTimesource()),
+		CreateOneToOneChat(common.PubkeyToHex(&bob.identity.PublicKey), &bob.identity.PublicKey, alice.getTimesource())
 	s.Require().NoError(bob.SaveChat(chat))
 	s.Require().NoError(alice.SaveChat(chat2))
 

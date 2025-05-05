@@ -214,7 +214,7 @@ func (s *MessengerProfilePictureHandlerSuite) TestPictureInPrivateChatOneSided()
 	err = s.alice.settings.SaveSettingField(settings.ProfilePicturesVisibility, settings.ProfilePicturesShowToEveryone)
 	s.Require().NoError(err)
 
-	bChat := CreateOneToOneChat(s.alice.IdentityPublicKeyString(), s.alice.IdentityPublicKey(), s.alice.transport)
+	bChat := CreateOneToOneChat(s.alice.IdentityPublicKeyString(), s.alice.IdentityPublicKey(), s.alice.getTimesource())
 	err = s.bob.SaveChat(bChat)
 	s.Require().NoError(err)
 
@@ -336,14 +336,14 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	switch args.chatContext {
 	case publicChat:
 		// Bob opens up the public chat and joins it
-		bChat := CreatePublicChat("status", alice.transport)
+		bChat := CreatePublicChat("status", alice.getTimesource())
 		err = bob.SaveChat(bChat)
 		s.Require().NoError(err)
 
 		_, err = bob.Join(bChat)
 		s.Require().NoError(err)
 	case privateChat:
-		bChat := CreateOneToOneChat(alice.IdentityPublicKeyString(), alice.IdentityPublicKey(), alice.transport)
+		bChat := CreateOneToOneChat(alice.IdentityPublicKeyString(), alice.IdentityPublicKey(), alice.getTimesource())
 		err = bob.SaveChat(bChat)
 		s.Require().NoError(err)
 
@@ -369,7 +369,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 	switch args.chatContext {
 	case publicChat:
 		// Alice opens creates a public chat
-		aChat = CreatePublicChat("status", alice.transport)
+		aChat = CreatePublicChat("status", alice.getTimesource())
 		err = alice.SaveChat(aChat)
 		s.Require().NoError(err)
 
@@ -381,7 +381,7 @@ func (s *MessengerProfilePictureHandlerSuite) testE2eSendingReceivingProfilePict
 		s.Require().Len(response.messages, 1)
 
 	case privateChat:
-		aChat = CreateOneToOneChat(bob.IdentityPublicKeyString(), bob.IdentityPublicKey(), bob.transport)
+		aChat = CreateOneToOneChat(bob.IdentityPublicKeyString(), bob.IdentityPublicKey(), bob.getTimesource())
 		err = alice.SaveChat(aChat)
 		s.Require().NoError(err)
 

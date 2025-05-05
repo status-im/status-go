@@ -32,7 +32,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/version"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -124,14 +124,10 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 		return err
 	}
 
-	envelopesMonitorConfig := &transport.EnvelopesMonitorConfig{
-		MaxAttempts:                      s.config.ShhextConfig.MaxMessageDeliveryAttempts,
-		AwaitOnlyMailServerConfirmations: s.config.ShhextConfig.MailServerConfirmations,
-		IsMailserver: func(peer types.EnodeID) bool {
-			return false
-		},
-		EnvelopeEventsHandler: EnvelopeSignalHandler{},
-		Logger:                logger,
+	envelopeEventsConfig := &messaging.EnvelopeEventsConfig{
+		MaxMessageDeliveryAttempts: s.config.ShhextConfig.MaxMessageDeliveryAttempts,
+		MailServerConfirmations:    s.config.ShhextConfig.MailServerConfirmations,
+		EnvelopeEventsHandler:      EnvelopeSignalHandler{},
 	}
 	s.accountsDB, err = accounts.NewDB(appDb)
 	if err != nil {
@@ -140,7 +136,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
-	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsFeed)
+	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsFeed)
 	if err != nil {
 		return err
 	}
@@ -358,7 +354,7 @@ func buildMessengerOptions(
 	rpcClient *rpc.Client,
 	multiAccounts *multiaccounts.Database,
 	account *multiaccounts.Account,
-	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
+	envelopeEventsConfig *messaging.EnvelopeEventsConfig,
 	accountsDB *accounts.Database,
 	walletService *wallet.Service,
 	communityTokensService *communitytokens.Service,
@@ -377,7 +373,7 @@ func buildMessengerOptions(
 		protocol.WithMailserversDatabase(mailserversDB.NewDB(appDb)),
 		protocol.WithAccount(account),
 		protocol.WithBrowserDatabase(browsers.NewDB(appDb)),
-		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
+		protocol.WithEnvelopeEventsConfig(envelopeEventsConfig),
 		protocol.WithSignalsHandler(messengerSignalsHandler),
 		protocol.WithENSVerificationConfig(config.ShhextConfig.VerifyENSURL, config.ShhextConfig.VerifyENSContractAddress),
 		protocol.WithClusterConfig(config.ClusterConfig),

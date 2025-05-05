@@ -263,6 +263,3 @@ func (m *mockWakuAPI) NewMessageFilter(req wakutypes.Criteria) (string, error) {
 func (m *mockWakuAPI) GetFilterMessages(id string) ([]*wakutypes.Message, error) {
 	return nil, nil
 }
-func (m *mockWakuAPI) BloomFilter() []byte {
-	return nil
-}

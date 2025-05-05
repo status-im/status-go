@@ -18,7 +18,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
@@ -459,7 +459,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityPagingAlgorithm() {
 
 	// Create a community
 	community := s.createCommunity(s.owner)
-	contentTopic := wakutypes.BytesToTopic(transport.ToTopic(community.IDString()))
+	contentTopic := wakutypes.BytesToTopic(messaging.ToContentTopic(community.IDString()))
 	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentTopic)
 
 	// Push spam to the same ContentTopic & PubsubTopic
@@ -597,8 +597,8 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestProfileInfo() {
 	err := s.owner.settings.SaveOrUpdateKeypair(ownerProfileKp)
 	s.Require().NoError(err)
 
-	contentTopicString := transport.ContactCodeTopic(&s.owner.identity.PublicKey)
-	contentTopic := wakutypes.BytesToTopic(transport.ToTopic(contentTopicString))
+	contentTopicString := messaging.ContactCodeTopic(&s.owner.identity.PublicKey)
+	contentTopic := wakutypes.BytesToTopic(messaging.ToContentTopic(contentTopicString))
 	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentTopic)
 
 	// Set display name, this will also publish contact code
@@ -638,7 +638,7 @@ func (s *MessengerStoreNodeRequestSuite) TestSequentialUpdates() {
 	community := s.createCommunity(s.owner)
 	s.fetchCommunity(s.bob, community.CommunityShard(), community)
 
-	contentTopic := wakutypes.BytesToTopic(transport.ToTopic(community.IDString()))
+	contentTopic := wakutypes.BytesToTopic(messaging.ToContentTopic(community.IDString()))
 	communityName := community.Name()
 
 	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentTopic)
@@ -693,8 +693,8 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestShardAndCommunityInfo() {
 		PrivateKey:  &h,
 	}
 
-	shardTopic := transport.CommunityShardInfoTopic(community.IDString())
-	contentContentTopic := wakutypes.BytesToTopic(transport.ToTopic(shardTopic))
+	shardTopic := messaging.CommunityShardInfoTopic(community.IDString())
+	contentContentTopic := wakutypes.BytesToTopic(messaging.ToContentTopic(shardTopic))
 	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentContentTopic)
 
 	_, err = s.owner.SetCommunityShard(shardRequest)
@@ -722,12 +722,12 @@ func (s *MessengerStoreNodeRequestSuite) TestFiltersNotRemoved() {
 
 	// The owner is a member of the community, so he has a filter for community description content topic.
 	// We want to check that filter is not removed by `FetchCommunity` call.
-	filterBefore := s.owner.transport.FilterByChatID(community.IDString())
+	filterBefore := s.owner.messaging.ChatFilterByChatID(community.IDString())
 	s.Require().NotNil(filterBefore)
 
 	s.fetchCommunity(s.owner, community.CommunityShard(), nil)
 
-	filterAfter := s.owner.transport.FilterByChatID(community.IDString())
+	filterAfter := s.owner.messaging.ChatFilterByChatID(community.IDString())
 	s.Require().NotNil(filterAfter)
 
 	s.Require().Equal(filterBefore.FilterID, filterAfter.FilterID)
@@ -741,12 +741,12 @@ func (s *MessengerStoreNodeRequestSuite) TestFiltersRemoved() {
 
 	// The bob is a member of the community, so he has no filters for community description content topic.
 	// We want to check that filter created by `FetchCommunity` is removed on request finish.
-	filterBefore := s.bob.transport.FilterByChatID(community.IDString())
+	filterBefore := s.bob.messaging.ChatFilterByChatID(community.IDString())
 	s.Require().Nil(filterBefore)
 
 	s.fetchCommunity(s.bob, community.CommunityShard(), community)
 
-	filterAfter := s.bob.transport.FilterByChatID(community.IDString())
+	filterAfter := s.bob.messaging.ChatFilterByChatID(community.IDString())
 	s.Require().Nil(filterAfter)
 }
 
@@ -756,7 +756,7 @@ func (s *MessengerStoreNodeRequestSuite) TestRequestCommunityEnvelopesOrder() {
 
 	const descriptionsCount = 4
 	community := s.createCommunity(s.owner)
-	contentTopic := wakutypes.BytesToTopic(transport.ToTopic(community.IDString()))
+	contentTopic := wakutypes.BytesToTopic(messaging.ToContentTopic(community.IDString()))
 	storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentTopic)
 
 	// Push a few descriptions to the store node
@@ -1027,8 +1027,8 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchRealCommunity() {
 
 	// Prepare things depending on the configuration
 	nodesList := params.DefaultStoreNodes(fleet)
-	descriptionContentTopic := wakutypes.BytesToTopic(transport.ToTopic(communityID))
-	shardContentTopic := wakutypes.BytesToTopic(transport.ToTopic(transport.CommunityShardInfoTopic(communityID)))
+	descriptionContentTopic := wakutypes.BytesToTopic(messaging.ToContentTopic(communityID))
+	shardContentTopic := wakutypes.BytesToTopic(messaging.ToContentTopic(messaging.CommunityShardInfoTopic(communityID)))
 
 	communityIDBytes, err := types.DecodeHex(communityID)
 	s.Require().NoError(err)
@@ -1250,8 +1250,8 @@ func (s *MessengerStoreNodeRequestSuite) TestFetchingHistoryWhenOnline() {
 	// Owner sends a contact request while bob is offline
 	{
 		// Setup store nodes envelopes watcher
-		partitionedTopic := transport.PartitionedTopic(s.bob.IdentityPublicKey())
-		topic := transport.ToTopic(partitionedTopic)
+		partitionedTopic := messaging.PartitionedTopic(s.bob.IdentityPublicKey())
+		topic := messaging.ToContentTopic(partitionedTopic)
 		contentTopic := wakutypes.BytesToTopic(topic)
 		storeNodeSubscription := s.setupStoreNodeEnvelopesWatcher(&contentTopic)
 

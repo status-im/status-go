@@ -352,10 +352,10 @@ func (s *MessengerStoreNodeCommunitySuite) TestToggleUseMailservers() {
 	// Enable use of mailservers
 	err := s.owner.ToggleUseMailservers(true)
 	s.Require().NoError(err)
-	s.Require().NotNil(s.owner.transport.GetActiveStorenode())
+	s.Require().NotNil(s.owner.messaging.GetActiveStorenode())
 
 	// Disable use of mailservers
 	err = s.owner.ToggleUseMailservers(false)
 	s.Require().NoError(err)
-	s.Require().Nil(s.owner.transport.GetActiveStorenode())
+	s.Require().Nil(s.owner.messaging.GetActiveStorenode())
 }

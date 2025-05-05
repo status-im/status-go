@@ -54,7 +54,7 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	theirMessenger := s.newMessenger(accountPassword, []string{commonAccountAddress})
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", s.m.IdentityPublicKey(), s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 

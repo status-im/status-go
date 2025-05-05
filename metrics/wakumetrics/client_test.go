@@ -14,7 +14,7 @@ import (
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
@@ -73,7 +73,7 @@ func TestClient_DoubleRegister(t *testing.T) {
 func TestClient_PushReceivedMessages(t *testing.T) {
 	client := createTestClient(t)
 
-	filter := transport.Filter{
+	filter := messaging.ChatFilter{
 		PubsubTopic:  "test-pubsub",
 		ContentTopic: wakutypes.StringToTopic("test-content"),
 		ChatID:       "test-chat",

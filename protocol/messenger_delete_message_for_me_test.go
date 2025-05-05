@@ -216,11 +216,11 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteImageMessageFromReceiverSid
 	bob := s.otherNewMessenger()
 	defer TearDownMessenger(&s.Suite, bob)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, alice.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, alice.getTimesource())
 	err := alice.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.getTimesource())
 	err = bob.SaveChat(ourChat)
 	s.Require().NoError(err)
 

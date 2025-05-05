@@ -1044,7 +1044,7 @@ func testCreateEditDeleteBecomeMemberPermission(base CommunityEventsTestsInterfa
 // To be removed in https://github.com/status-im/status-go/issues/4437
 func advertiseCommunityToUserOldWay(s *suite.Suite, community *communities.Community, owner *Messenger, user *Messenger) {
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID

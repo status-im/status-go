@@ -25,6 +25,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	utils "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/messaging"
 
 	"github.com/status-im/status-go/account"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
@@ -32,7 +33,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -950,26 +950,25 @@ func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {
 
 func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Chat, error) {
 	logger := m.logger.Named("initCommunityChats")
-	publicFiltersToInit := m.DefaultFilters(community)
+	publicChatsToInit := m.DefaultFilters(community)
 
 	chats := CreateCommunityChats(community, m.getTimesource())
 
 	for _, chat := range chats {
-		publicFiltersToInit = append(publicFiltersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: community.PubsubTopic()})
+		publicChatsToInit = append(publicChatsToInit, &messaging.ChatToInitialize{ChatID: chat.ID, PubsubTopic: community.PubsubTopic()})
 
 	}
 
-	// Load transport filters
-	filters, err := m.transport.InitPublicFilters(publicFiltersToInit)
+	filters, err := m.messaging.InitPublicChats(publicChatsToInit)
 	if err != nil {
-		logger.Debug("m.transport.InitPublicFilters error", zap.Error(err))
+		logger.Debug("InitPublicChats error", zap.Error(err))
 		return nil, err
 	}
 
 	if community.IsControlNode() {
 		// Init the community filter so we can receive messages on the community
 
-		communityFilters, err := m.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
+		communityFilters, err := m.InitCommunityFilters(messaging.CommunitiesToInitialize{{
 			Shard:   community.Shard(),
 			PrivKey: community.PrivateKey(),
 		}})
@@ -1046,14 +1045,10 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 }
 
 func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *wakuv2.Shard) error {
-	if m.transport.WakuVersion() != 2 {
-		return nil
-	}
-
 	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
 	pubsubTopic := shard.PubsubTopic()
 
-	privK, err := m.transport.RetrievePubsubTopicKey(pubsubTopic)
+	privK, err := m.messaging.RetrievePubsubTopicKey(pubsubTopic)
 	if err != nil {
 		return err
 	}
@@ -1063,17 +1058,13 @@ func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *wakuv2.
 		pubK = &privK.PublicKey
 	}
 
-	return m.transport.SubscribeToPubsubTopic(pubsubTopic, pubK)
+	return m.messaging.SubscribeToPubsubTopic(pubsubTopic, pubK)
 }
 
 func (m *Messenger) unsubscribeFromShard(shard *wakuv2.Shard) error {
-	if m.transport.WakuVersion() != 2 {
-		return nil
-	}
-
 	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
 
-	return m.transport.UnsubscribeFromPubsubTopic(shard.PubsubTopic())
+	return m.messaging.UnsubscribeFromPubsubTopic(shard.PubsubTopic())
 }
 
 func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
@@ -1984,11 +1975,9 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 		}
 
 		var key *ecdsa.PrivateKey
-		if m.transport.WakuVersion() == 2 {
-			key, err = m.transport.RetrievePubsubTopicKey(community.PubsubTopic())
-			if err != nil {
-				return nil, err
-			}
+		key, err = m.messaging.RetrievePubsubTopicKey(community.PubsubTopic())
+		if err != nil {
+			return nil, err
 		}
 
 		encryptedDescription, err := community.EncryptedDescription()
@@ -2276,7 +2265,7 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		if err != nil {
 			return nil, err
 		}
-		_, err = m.transport.RemoveFilterByChatID(communityChatID)
+		_, err = m.messaging.RemoveFilterByChatID(communityChatID)
 		if err != nil {
 			return nil, err
 		}
@@ -2287,7 +2276,7 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		return nil, err
 	}
 
-	_, err = m.transport.RemoveFilterByChatID(communityID.String())
+	_, err = m.messaging.RemoveFilterByChatID(communityID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -2405,17 +2394,17 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	var chats []*Chat
-	var publicFiltersToInit []transport.FiltersToInitialize
+	var publicFiltersToInit messaging.ChatsToInitialize
 	for chatID, chat := range changes.ChatsAdded {
 		c := CreateCommunityChat(changes.Community.IDString(), chatID, chat, m.getTimesource())
 		chats = append(chats, c)
-		publicFiltersToInit = append(publicFiltersToInit, transport.FiltersToInitialize{ChatID: c.ID, PubsubTopic: changes.Community.PubsubTopic()})
+		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: changes.Community.PubsubTopic()})
 
 		response.AddChat(c)
 	}
 
 	// Load filters
-	filters, err := m.transport.InitPublicFilters(publicFiltersToInit)
+	filters, err := m.messaging.InitPublicChats(publicFiltersToInit)
 	if err != nil {
 		return nil, err
 	}
@@ -2447,16 +2436,16 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	var chats []*Chat
-	var publicFiltersToInit []transport.FiltersToInitialize
+	var publicFiltersToInit messaging.ChatsToInitialize
 	for chatID, change := range changes.ChatsModified {
 		c := CreateCommunityChat(community.IDString(), chatID, change.ChatModified, m.getTimesource())
 		chats = append(chats, c)
-		publicFiltersToInit = append(publicFiltersToInit, transport.FiltersToInitialize{ChatID: c.ID, PubsubTopic: community.PubsubTopic()})
+		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: community.PubsubTopic()})
 		response.AddChat(c)
 	}
 
 	// Load filters
-	filters, err := m.transport.InitPublicFilters(publicFiltersToInit)
+	filters, err := m.messaging.InitPublicChats(publicFiltersToInit)
 	if err != nil {
 		return nil, err
 	}
@@ -2481,7 +2470,7 @@ func (m *Messenger) DeleteCommunityChat(communityID types.HexBytes, chatID strin
 	}
 	response.AddRemovedChat(chatID)
 
-	_, err = m.transport.RemoveFilterByChatID(chatID)
+	_, err = m.messaging.RemoveFilterByChatID(chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -2490,11 +2479,11 @@ func (m *Messenger) DeleteCommunityChat(communityID types.HexBytes, chatID strin
 	return response, nil
 }
 
-func (m *Messenger) InitCommunityFilters(communityFiltersToInitialize []transport.CommunityFilterToInitialize) ([]*transport.Filter, error) {
-	return m.transport.InitCommunityFilters(communityFiltersToInitialize)
+func (m *Messenger) InitCommunityFilters(c messaging.CommunitiesToInitialize) (messaging.ChatFilters, error) {
+	return m.messaging.InitCommunities(c)
 }
 
-func (m *Messenger) DefaultFilters(o *communities.Community) []transport.FiltersToInitialize {
+func (m *Messenger) DefaultFilters(o *communities.Community) messaging.ChatsToInitialize {
 	cID := o.IDString()
 	uncompressedPubKey := common.PubkeyToHex(o.PublicKey())[2:]
 	updatesChannelID := o.StatusUpdatesChannelID()
@@ -2503,7 +2492,7 @@ func (m *Messenger) DefaultFilters(o *communities.Community) []transport.Filters
 
 	communityPubsubTopic := o.PubsubTopic()
 
-	filters := []transport.FiltersToInitialize{
+	chats := messaging.ChatsToInitialize{
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
 		{ChatID: updatesChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},
@@ -2511,7 +2500,7 @@ func (m *Messenger) DefaultFilters(o *communities.Community) []transport.Filters
 		{ChatID: uncompressedPubKey, PubsubTopic: wakuv2.DefaultNonProtectedPubsubTopic()},
 	}
 
-	return filters
+	return chats
 }
 
 func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDefaultChannel bool) (*MessengerResponse, error) {
@@ -2540,7 +2529,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	}
 
 	// Init the community filter so we can receive messages on the community
-	_, err = m.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
+	_, err = m.InitCommunityFilters(messaging.CommunitiesToInitialize{{
 		Shard:   community.Shard(),
 		PrivKey: community.PrivateKey(),
 	}})
@@ -2549,7 +2538,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	}
 
 	// Init the default community filters
-	_, err = m.transport.InitPublicFilters(m.DefaultFilters(community))
+	_, err = m.messaging.InitPublicChats(m.DefaultFilters(community))
 	if err != nil {
 		return nil, err
 	}
@@ -2667,7 +2656,7 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 }
 
 func (m *Messenger) RemovePubsubTopicPrivateKey(topic string) error {
-	return m.transport.RemovePubsubTopicKey(topic)
+	return m.messaging.RemovePubsubTopicKey(topic)
 }
 
 func (m *Messenger) SetCommunityStorenodes(request *requests.SetCommunityStorenodes) (*MessengerResponse, error) {
@@ -2717,31 +2706,31 @@ func (m *Messenger) GetCommunityStorenodes(communityID types.HexBytes) (*Messeng
 
 func (m *Messenger) UpdateCommunityFilters(community *communities.Community) error {
 	defaultFilters := m.DefaultFilters(community)
-	publicFiltersToInit := make([]transport.FiltersToInitialize, 0, len(defaultFilters)+len(community.Chats()))
+	publicFiltersToInit := make(messaging.ChatsToInitialize, 0, len(defaultFilters)+len(community.Chats()))
 
 	publicFiltersToInit = append(publicFiltersToInit, defaultFilters...)
 	for _, filter := range defaultFilters {
-		_, err := m.transport.RemoveFilterByChatID(filter.ChatID)
+		_, err := m.messaging.RemoveFilterByChatID(filter.ChatID)
 		if err != nil {
 			return err
 		}
 	}
 	for chatID := range community.Chats() {
 		communityChatID := community.IDString() + chatID
-		_, err := m.transport.RemoveFilterByChatID(communityChatID)
+		_, err := m.messaging.RemoveFilterByChatID(communityChatID)
 		if err != nil {
 			return err
 		}
-		publicFiltersToInit = append(publicFiltersToInit, transport.FiltersToInitialize{ChatID: communityChatID, PubsubTopic: community.PubsubTopic()})
+		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: communityChatID, PubsubTopic: community.PubsubTopic()})
 	}
 
-	_, err := m.transport.InitPublicFilters(publicFiltersToInit)
+	_, err := m.messaging.InitPublicChats(publicFiltersToInit)
 	if err != nil {
 		return err
 	}
 
 	// Init the community filter so we can receive messages on the community
-	_, err = m.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
+	_, err = m.InitCommunityFilters(messaging.CommunitiesToInitialize{{
 		Shard:   community.Shard(),
 		PrivKey: community.PrivateKey(),
 	}})
@@ -2750,7 +2739,7 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 	}
 
 	// Init the default community filters
-	_, err = m.transport.InitPublicFilters(publicFiltersToInit)
+	_, err = m.messaging.InitPublicChats(publicFiltersToInit)
 	if err != nil {
 		return err
 	}
@@ -2977,7 +2966,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 	}
 
 	// Load filters
-	_, err = m.transport.InitPublicFilters(m.DefaultFilters(community))
+	_, err = m.messaging.InitPublicChats(m.DefaultFilters(community))
 	if err != nil {
 		return nil, err
 	}
@@ -3142,10 +3131,6 @@ func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) 
 }
 
 func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubkeys []*ecdsa.PublicKey) error {
-	if m.transport.WakuVersion() != 2 {
-		return nil
-	}
-
 	if !community.IsControlNode() {
 		return nil
 	}
@@ -3416,7 +3401,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	// Update relevant chats names and add new ones
 	// Currently removal is not supported
 	chats := CreateCommunityChats(community, state.Timesource)
-	var publicFiltersToInit []transport.FiltersToInitialize
+	var publicFiltersToInit messaging.ChatsToInitialize
 	for i, chat := range chats {
 
 		oldChat, ok := state.AllChats.Load(chat.ID)
@@ -3425,7 +3410,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 			state.AllChats.Store(chat.ID, chats[i])
 
 			state.Response.AddChat(chat)
-			publicFiltersToInit = append(publicFiltersToInit, transport.FiltersToInitialize{
+			publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{
 				ChatID:      chat.ID,
 				PubsubTopic: community.PubsubTopic(),
 			})
@@ -3448,14 +3433,14 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	}
 
 	for _, chatID := range removedChatIDs {
-		_, err := m.transport.RemoveFilterByChatID(chatID)
+		_, err := m.messaging.RemoveFilterByChatID(chatID)
 		if err != nil {
 			m.logger.Error("couldn't remove filter", zap.Error(err))
 		}
 	}
 
 	// Load transport filters
-	filters, err := m.transport.InitPublicFilters(publicFiltersToInit)
+	filters, err := m.messaging.InitPublicChats(publicFiltersToInit)
 	if err != nil {
 		return err
 	}
@@ -3962,7 +3947,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 				topics = append(topics, filter.ContentTopic)
 			}
 
-			filters = append(filters, m.transport.FilterByChatID(c.UniversalChatID()))
+			filters = append(filters, m.messaging.ChatFilterByChatID(c.UniversalChatID()))
 
 			// First we need to know the timestamp of the latest waku message
 			// we've received for this community, so we can request messages we've
@@ -4403,7 +4388,7 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 	wakuMessages := make([]*wakutypes.Message, 0)
 	for _, msg := range pinMessages {
 
-		filter := m.transport.FilterByChatID(msg.LocalChatID)
+		filter := m.messaging.ChatFilterByChatID(msg.LocalChatID)
 		encodedPayload, err := proto.Marshal(msg.GetProtobuf())
 		if err != nil {
 			return nil, err
@@ -4433,7 +4418,7 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 	wakuMessages := make([]*wakutypes.Message, 0)
 	for _, msg := range chatMessages {
 
-		filter := m.transport.FilterByChatID(msg.LocalChatID)
+		filter := m.messaging.ChatFilterByChatID(msg.LocalChatID)
 		encodedPayload, err := proto.Marshal(msg.GetProtobuf())
 		if err != nil {
 			return nil, err
@@ -5173,12 +5158,8 @@ func (m *Messenger) startRequestMissingCommunityChannelsHRKeysLoop() {
 // getCommunityStorenode returns the active mailserver if a communityID is present then it'll return the mailserver
 // for that community if it has a mailserver setup otherwise it'll return the global mailserver
 func (m *Messenger) getCommunityStorenode(communityID ...string) peer.AddrInfo {
-	if m.transport.WakuVersion() != 2 {
-		return peer.AddrInfo{}
-	}
-
 	if len(communityID) == 0 || communityID[0] == "" {
-		return m.transport.GetActiveStorenode()
+		return m.messaging.GetActiveStorenode()
 	}
 
 	ms, err := m.communityStorenodes.GetStorenodeByCommunityID(communityID[0])
@@ -5187,13 +5168,13 @@ func (m *Messenger) getCommunityStorenode(communityID ...string) peer.AddrInfo {
 			m.logger.Error("getting storenode for community, using global", zap.String("communityID", gocommon.TruncateWithDot(communityID[0])), zap.Error(err))
 		}
 		// if we don't find a specific mailserver for the community, we just use the regular mailserverCycle's one
-		return m.transport.GetActiveStorenode()
+		return m.messaging.GetActiveStorenode()
 	}
 
 	peerInfo, err := ms.PeerInfo()
 	if err != nil {
 		m.logger.Error("getting storenode for community, using global", zap.String("communityID", gocommon.TruncateWithDot(communityID[0])), zap.Error(err))
-		return m.transport.GetActiveStorenode()
+		return m.messaging.GetActiveStorenode()
 	}
 
 	return peerInfo

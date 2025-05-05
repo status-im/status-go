@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/mailservers"
@@ -40,12 +40,8 @@ const (
 var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
 
 func (m *Messenger) shouldSync() (bool, error) {
-	if m.transport.WakuVersion() != 2 {
-		return false, nil
-	}
-
 	// TODO (pablo) support community store node as well
-	if m.transport.GetActiveStorenode().ID == "" || !m.Online() {
+	if m.messaging.GetActiveStorenode().ID == "" || !m.Online() {
 		return false, nil
 	}
 
@@ -94,7 +90,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 
 func (m *Messenger) performStorenodeTask(task func() (*MessengerResponse, error), opts ...history.StorenodeTaskOption) (*MessengerResponse, error) {
 	responseCh := make(chan *MessengerResponse, 1)
-	err := m.transport.PerformStorenodeTask(func() error {
+	err := m.messaging.PerformStorenodeTask(func() error {
 		r, err := task()
 		if err != nil {
 			return err
@@ -119,7 +115,7 @@ func (m *Messenger) performStorenodeTask(task func() (*MessengerResponse, error)
 	}
 }
 
-func (m *Messenger) scheduleSyncFilters(filters []*transport.Filter) (bool, error) {
+func (m *Messenger) scheduleSyncFilters(filters messaging.ChatFilters) (bool, error) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
 		m.logger.Error("failed to get shouldSync", zap.Error(err))
@@ -169,18 +165,18 @@ func (m *Messenger) calculateMailserverTimeBounds(duration time.Duration) (time.
 	return from, to
 }
 
-func (m *Messenger) filtersForChat(chatID string) ([]*transport.Filter, error) {
+func (m *Messenger) filtersForChat(chatID string) (messaging.ChatFilters, error) {
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
-	var filters []*transport.Filter
+	var filters []*messaging.ChatFilter
 
 	if chat.OneToOne() {
 		// We sync our own topic and any eventual negotiated
 		publicKeys := []string{common.PubkeyToHex(&m.identity.PublicKey), chatID}
 
-		filters = m.transport.FiltersByIdentities(publicKeys)
+		filters = m.messaging.ChatFiltersByIdentities(publicKeys)
 
 	} else if chat.PrivateGroupChat() {
 		var publicKeys []string
@@ -188,14 +184,14 @@ func (m *Messenger) filtersForChat(chatID string) ([]*transport.Filter, error) {
 			publicKeys = append(publicKeys, m.ID)
 		}
 
-		filters = m.transport.FiltersByIdentities(publicKeys)
+		filters = m.messaging.ChatFiltersByIdentities(publicKeys)
 
 	} else {
-		filter := m.transport.FilterByChatID(chatID)
+		filter := m.messaging.ChatFilterByChatID(chatID)
 		if filter == nil {
 			return nil, ErrNoFiltersForChat
 		}
-		filters = []*transport.Filter{filter}
+		filters = []*messaging.ChatFilter{filter}
 	}
 
 	return filters, nil
@@ -227,7 +223,7 @@ func (m *Messenger) syncChatWithFilters(peerInfo peer.AddrInfo, chatID string) (
 
 func (m *Messenger) syncBackup() error {
 
-	filter := m.transport.PersonalTopicFilter()
+	filter := m.messaging.PersonalTopicFilter()
 	if filter == nil {
 		return errors.New("personal topic filter not loaded")
 	}
@@ -270,7 +266,7 @@ func (m *Messenger) capToDefaultSyncPeriod(period uint32) (uint32, error) {
 	return period - tolerance, nil
 }
 
-func (m *Messenger) updateFiltersPriority(filters []*transport.Filter) {
+func (m *Messenger) updateFiltersPriority(filters messaging.ChatFilters) {
 	for _, filter := range filters {
 		chatID := filter.ChatID
 		chat := m.Chat(chatID)
@@ -280,22 +276,22 @@ func (m *Messenger) updateFiltersPriority(filters []*transport.Filter) {
 	}
 }
 
-func (m *Messenger) resetFiltersPriority(filters []*transport.Filter) {
+func (m *Messenger) resetFiltersPriority(filters messaging.ChatFilters) {
 	for _, filter := range filters {
 		filter.Priority = 0
 	}
 }
 
-func (m *Messenger) SplitFiltersByStoreNode(filters []*transport.Filter) map[string][]*transport.Filter {
+func (m *Messenger) SplitFiltersByStoreNode(filters messaging.ChatFilters) map[string]messaging.ChatFilters {
 	// split filters by community store node so we can request the filters to the correct mailserver
-	filtersByMs := make(map[string][]*transport.Filter, len(filters))
+	filtersByMs := make(map[string]messaging.ChatFilters, len(filters))
 	for _, f := range filters {
 		communityID := "" // none by default
 		if chat, ok := m.allChats.Load(f.ChatID); ok && chat.CommunityChat() && m.communityStorenodes.HasStorenodeSetup(chat.CommunityID) {
 			communityID = chat.CommunityID
 		}
 		if _, exists := filtersByMs[communityID]; !exists {
-			filtersByMs[communityID] = make([]*transport.Filter, 0, len(filters))
+			filtersByMs[communityID] = make(messaging.ChatFilters, 0, len(filters))
 		}
 		filtersByMs[communityID] = append(filtersByMs[communityID], f)
 	}
@@ -337,7 +333,7 @@ func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup, withRetries 
 		m.logger.Info("backup fetched")
 	}
 
-	filters := m.transport.Filters()
+	filters := m.messaging.ChatFilters()
 	m.updateFiltersPriority(filters)
 	defer m.resetFiltersPriority(filters)
 
@@ -374,14 +370,10 @@ const missingMessageCheckPeriod = 30 * time.Second
 func (m *Messenger) checkForMissingMessagesLoop() {
 	defer gocommon.LogOnPanic()
 
-	if m.transport.WakuVersion() != 2 {
-		return
-	}
-
 	t := time.NewTicker(missingMessageCheckPeriod)
 	defer t.Stop()
 
-	mailserverAvailableSignal := m.transport.OnStorenodeAvailable()
+	mailserverAvailableSignal := m.messaging.OnStorenodeAvailable()
 
 	for {
 		select {
@@ -395,7 +387,7 @@ func (m *Messenger) checkForMissingMessagesLoop() {
 
 		}
 
-		filters := m.transport.Filters()
+		filters := m.messaging.ChatFilters()
 		filtersByMs := m.SplitFiltersByStoreNode(filters)
 		for communityID, filtersForMs := range filtersByMs {
 			peerInfo := m.getCommunityStorenode(communityID)
@@ -403,7 +395,7 @@ func (m *Messenger) checkForMissingMessagesLoop() {
 				continue
 			}
 
-			m.transport.SetCriteriaForMissingMessageVerification(peerInfo, filtersForMs)
+			m.messaging.SetCriteriaForMissingMessageVerification(peerInfo, filtersForMs)
 		}
 	}
 }
@@ -412,7 +404,7 @@ func getPrioritizedBatches() []int {
 	return []int{1, 5, 10}
 }
 
-func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters []*transport.Filter, lastRequest uint32) (*MessengerResponse, error) {
+func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters messaging.ChatFilters, lastRequest uint32) (*MessengerResponse, error) {
 	canSync, err := m.canSyncWithStoreNodes()
 	if err != nil {
 		return nil, err
@@ -454,7 +446,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters []*transport
 		return nil, err
 	}
 
-	contentTopicsPerPubsubTopic := make(map[string]map[string]*transport.Filter)
+	contentTopicsPerPubsubTopic := make(map[string]map[string]*messaging.ChatFilter)
 	for _, filter := range filters {
 		if !filter.Listen || filter.Ephemeral {
 			continue
@@ -462,7 +454,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters []*transport
 
 		contentTopics, ok := contentTopicsPerPubsubTopic[filter.PubsubTopic]
 		if !ok {
-			contentTopics = make(map[string]*transport.Filter)
+			contentTopics = make(map[string]*messaging.ChatFilter)
 		}
 		contentTopics[filter.ContentTopic.String()] = filter
 		contentTopicsPerPubsubTopic[filter.PubsubTopic] = contentTopics
@@ -610,7 +602,7 @@ func (m *Messenger) syncFiltersFrom(peerInfo peer.AddrInfo, filters []*transport
 	return response, nil
 }
 
-func (m *Messenger) syncFilters(peerInfo peer.AddrInfo, filters []*transport.Filter) (*MessengerResponse, error) {
+func (m *Messenger) syncFilters(peerInfo peer.AddrInfo, filters messaging.ChatFilters) (*MessengerResponse, error) {
 	return m.syncFiltersFrom(peerInfo, filters, 0)
 }
 
@@ -674,7 +666,7 @@ func (m *Messenger) processMailserverBatch(peerInfo peer.AddrInfo, batch wakutyp
 		return nil
 	}
 
-	return m.transport.ProcessMailserverBatch(m.ctx, batch, peerInfo, defaultStoreNodeRequestPageSize, nil, false)
+	return m.messaging.ProcessMailserverBatch(m.ctx, batch, peerInfo, defaultStoreNodeRequestPageSize, nil, false)
 }
 
 func (m *Messenger) processMailserverBatchWithOptions(peerInfo peer.AddrInfo, batch wakutypes.MailserverBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {
@@ -686,7 +678,7 @@ func (m *Messenger) processMailserverBatchWithOptions(peerInfo peer.AddrInfo, ba
 		return nil
 	}
 
-	return m.transport.ProcessMailserverBatch(m.ctx, batch, peerInfo, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return m.messaging.ProcessMailserverBatch(m.ctx, batch, peerInfo, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
@@ -815,7 +807,7 @@ func (m *Messenger) ToggleUseMailservers(value bool) error {
 		return err
 	}
 
-	m.transport.DisconnectActiveStorenode(m.ctx, backoffByUserAction, value)
+	m.messaging.DisconnectActiveStorenode(m.ctx, backoffByUserAction, value)
 
 	return nil
 }
@@ -826,17 +818,17 @@ func (m *Messenger) SetPinnedMailservers(mailservers map[string]string) error {
 		return err
 	}
 
-	m.transport.DisconnectActiveStorenode(m.ctx, backoffByUserAction, true)
+	m.messaging.DisconnectActiveStorenode(m.ctx, backoffByUserAction, true)
 
 	return nil
 }
 
-func (m *Messenger) RemoveFilters(filters []*transport.Filter) error {
-	return m.transport.RemoveFilters(filters)
+func (m *Messenger) RemoveFilters(filters []*messaging.ChatFilter) error {
+	return m.messaging.RemoveFilters(filters)
 }
 
 func (m *Messenger) ConnectionChanged(state connection.State) {
-	m.transport.ConnectionChanged(state)
+	m.messaging.ConnectionChanged(state)
 	if !m.connectionState.Offline && state.Offline {
 		m.sender.StopDatasync()
 	}

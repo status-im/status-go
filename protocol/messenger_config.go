@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -16,7 +17,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/appdatabase/migrations"
-	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -74,8 +74,7 @@ type MessengerSignalsHandler interface {
 type config struct {
 	// systemMessagesTranslations holds translations for system-messages
 	systemMessagesTranslations *systemMessageTranslationsMap
-	// Config for the envelopes monitor
-	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
+	envelopeEventsConfig       *messaging.EnvelopeEventsConfig
 
 	featureFlags     common.FeatureFlags
 	codeControlFlags common.CodeControlFlags
@@ -315,9 +314,9 @@ func WithAutoMessageDisabled() func(c *config) error {
 	}
 }
 
-func WithEnvelopesMonitorConfig(emc *transport.EnvelopesMonitorConfig) Option {
+func WithEnvelopeEventsConfig(emc *messaging.EnvelopeEventsConfig) Option {
 	return func(c *config) error {
-		c.envelopesMonitorConfig = emc
+		c.envelopeEventsConfig = emc
 		return nil
 	}
 }

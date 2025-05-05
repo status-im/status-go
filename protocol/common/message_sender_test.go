@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	transport2 "github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/t/helpers"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
@@ -82,22 +82,19 @@ func (s *MessageSenderSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.Require().NoError(shh.Start())
 
-	whisperTransport, err := transport2.NewTransport(
+	messaging, err := messaging.NewCore(
 		shh,
 		identity,
 		database,
-		"waku_keys",
-		nil,
-		nil,
-		s.logger,
+		messaging.WithLogger(s.logger),
 	)
 	s.Require().NoError(err)
 
 	s.sender, err = NewMessageSender(
 		identity,
 		database,
+		messaging.API(),
 		encryptionProtocol,
-		whisperTransport,
 		s.logger,
 		FeatureFlags{
 			Datasync: true,

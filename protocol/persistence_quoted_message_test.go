@@ -29,7 +29,7 @@ func (s *TestMessengerPrepareMessageSuite) SetupTest() {
 }
 
 func (s *TestMessengerPrepareMessageSuite) setUpTestDatabase() (string, *sqlitePersistence) {
-	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat := CreatePublicChat("test-chat", s.m.getTimesource())
 	err := s.m.SaveChat(chat)
 	s.NoError(err)
 

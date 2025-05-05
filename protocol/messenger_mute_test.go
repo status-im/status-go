@@ -29,7 +29,7 @@ func (s *MessengerMuteSuite) TestSetMute() {
 
 	chatID := publicChatName
 
-	chat := CreatePublicChat(chatID, s.m.transport)
+	chat := CreatePublicChat(chatID, s.m.getTimesource())
 
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
@@ -82,7 +82,7 @@ func (s *MessengerMuteSuite) TestSetMuteForDuration() {
 
 	chatID := publicChatName
 
-	chat := CreatePublicChat(chatID, s.m.transport)
+	chat := CreatePublicChat(chatID, s.m.getTimesource())
 
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)

@@ -12,6 +12,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/signal"
@@ -25,7 +26,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -179,7 +179,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		if err != nil {
 			return errors.Wrap(err, "failed to get group members")
 		}
-		filters, err := m.transport.JoinGroup(publicKeys)
+		filters, err := m.messaging.JoinGroupChat(publicKeys)
 		if err != nil {
 			return errors.Wrap(err, "failed to join group")
 		}
@@ -499,7 +499,7 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 		return nil
 	}
 
-	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+	clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
 	contactRequest, err := m.generateContactRequest(clock, timestamp, contact, defaultContactRequestText(), outgoing)
 	if err != nil {
 		return err
@@ -1048,7 +1048,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 
 		// Add mutual state update message for incoming contact request
 		if !previouslyAccepted {
-			clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+			clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
 
 			updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, false)
 			if err != nil {
@@ -1454,10 +1454,10 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 
 func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessage) (*MessengerResponse, error) {
 
-	messagesToHandle := make(map[transport.Filter][]*wakutypes.Message)
+	messagesToHandle := make(map[messaging.ChatFilter][]*wakutypes.Message)
 
 	for _, message := range archiveMessages {
-		filter := m.transport.FilterByTopic(message.Topic)
+		filter := m.messaging.ChatFilterByTopic(message.Topic)
 		if filter != nil {
 			shhMessage := &wakutypes.Message{
 				Sig:          message.Sig,
@@ -1472,8 +1472,8 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 		}
 	}
 
-	importedMessages := make(map[transport.Filter][]*wakutypes.Message, 0)
-	otherMessages := make(map[transport.Filter][]*wakutypes.Message, 0)
+	importedMessages := make(map[messaging.ChatFilter][]*wakutypes.Message, 0)
+	otherMessages := make(map[messaging.ChatFilter][]*wakutypes.Message, 0)
 
 	for filter, messages := range messagesToHandle {
 		for _, message := range messages {
@@ -3965,7 +3965,7 @@ func (m *Messenger) HandleSyncClearHistory(state *ReceivedMessageState, message 
 	}
 
 	if existingChat.Public() {
-		err = m.transport.ClearProcessedMessageIDsCache()
+		err = m.messaging.ClearProcessedMessageIDsCache()
 		if err != nil {
 			return err
 		}

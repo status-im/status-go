@@ -45,7 +45,7 @@ func (s *SegmentMessage) IsParityMessage() bool {
 func (s *MessageSender) segmentMessage(newMessage *wakutypes.NewMessage) ([]*wakutypes.NewMessage, error) {
 	// We set the max message size to 3/4 of the allowed message size, to leave
 	// room for segment message metadata.
-	newMessages, err := segmentMessage(newMessage, int(s.transport.MaxMessageSize()/4*3))
+	newMessages, err := segmentMessage(newMessage, int(s.messaging.MaxMessageSize()/4*3))
 	s.logger.Debug("message segmented", zap.Int("segments", len(newMessages)))
 	return newMessages, err
 }

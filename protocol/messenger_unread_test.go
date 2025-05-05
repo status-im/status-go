@@ -39,7 +39,7 @@ func (s *MessengerSuite) retrieveAllWithRetry(errorMessage string) (*MessengerRe
 }
 
 func (s *MessengerSuite) TestMarkMessageAsUnreadWhenMessageListContainsSingleMessage() {
-	chat := CreatePublicChat("test-chat-1", s.m.transport)
+	chat := CreatePublicChat("test-chat-1", s.m.getTimesource())
 
 	chat.UnviewedMessagesCount = 2
 	chat.UnviewedMentionsCount = 2
@@ -89,7 +89,7 @@ func (s *MessengerSuite) TestMarkMessageAsUnreadWhenMessageListContainsSingleMes
 }
 
 func (s *MessengerSuite) TestMarkMessageAsUnreadWhenMessageListContainsSeveralMessages() {
-	chat := CreatePublicChat("test-chat-2", s.m.transport)
+	chat := CreatePublicChat("test-chat-2", s.m.getTimesource())
 
 	chat.UnviewedMessagesCount = 0
 	chat.UnviewedMentionsCount = 0
@@ -169,7 +169,7 @@ func (s *MessengerSuite) TestMarkMessageAsUnreadWhenMessageListContainsSeveralMe
 }
 
 func (s *MessengerSuite) TestMarkMessageAsUnreadWhenMessageIsAlreadyInUnreadState() {
-	chat := CreatePublicChat("test-chat-3", s.m.transport)
+	chat := CreatePublicChat("test-chat-3", s.m.getTimesource())
 
 	chat.UnviewedMessagesCount = 1
 	chat.UnviewedMentionsCount = 0
@@ -214,11 +214,11 @@ func (s *MessengerSuite) TestMarkMessageAsUnreadWhenMessageIsAlreadyInUnreadStat
 }
 
 func (s *MessengerSuite) TestMarkMessageAsUnreadInOneChatDoesNotImpactOtherChats() {
-	chat1 := CreatePublicChat("test-chat-1", s.m.transport)
+	chat1 := CreatePublicChat("test-chat-1", s.m.getTimesource())
 	err := s.m.SaveChat(chat1)
 	s.Require().NoError(err)
 
-	chat2 := CreatePublicChat("test-chat-2", s.m.transport)
+	chat2 := CreatePublicChat("test-chat-2", s.m.getTimesource())
 	err = s.m.SaveChat(chat2)
 	s.Require().NoError(err)
 

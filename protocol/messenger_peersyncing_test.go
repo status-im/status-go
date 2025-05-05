@@ -279,7 +279,7 @@ func (s *MessengerPeersyncingSuite) TestSyncOneToOne() {
 	s.owner.featureFlags.Peersyncing = true
 
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.alice.identity.PublicKey))
-	chat := CreateOneToOneChat(pkString, &s.alice.identity.PublicKey, s.owner.transport)
+	chat := CreateOneToOneChat(pkString, &s.alice.identity.PublicKey, s.owner.getTimesource())
 
 	chat.LastClockValue = uint64(100000000000000)
 	err := s.owner.SaveChat(chat)
@@ -342,7 +342,7 @@ func (s *MessengerPeersyncingSuite) TestCanSyncOneToOneMessageWith() {
 	s.owner.featureFlags.Peersyncing = true
 
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.alice.identity.PublicKey))
-	chat := CreateOneToOneChat(pkString, &s.alice.identity.PublicKey, s.owner.transport)
+	chat := CreateOneToOneChat(pkString, &s.alice.identity.PublicKey, s.owner.getTimesource())
 
 	chat.LastClockValue = uint64(100000000000000)
 	err := s.owner.SaveChat(chat)

@@ -14,6 +14,7 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -26,7 +27,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/messaging/transport"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol"
@@ -345,7 +345,7 @@ func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*protocol
 	return api.service.messenger.FetchContact(pubkey, true)
 }
 
-func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*transport.Filter) error {
+func (api *PublicAPI) RemoveFilters(parent context.Context, chats messaging.ChatFilters) error {
 	return api.service.messenger.RemoveFilters(chats)
 }
 
@@ -1381,19 +1381,6 @@ func (api *PublicAPI) FillGaps(chatID string, messageIDs []string) error {
 
 func (api *PublicAPI) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 	return api.service.messenger.SyncChatFromSyncedFrom(chatID)
-}
-
-// BloomFilter returns the current bloom filter bytes
-func (api *PublicAPI) BloomFilter() string {
-	return hexutil.Encode(api.service.messenger.BloomFilter())
-}
-
-func (api *PublicAPI) StartDiscV5() error {
-	return api.service.messenger.StartDiscV5()
-}
-
-func (api *PublicAPI) StopDiscV5() error {
-	return api.service.messenger.StopDiscV5()
 }
 
 func (api *PublicAPI) GetCommunitiesSettings() ([]communities.CommunitySettings, error) {

@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
@@ -931,7 +931,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 				importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
 			}
 
-			_, err := m.transport.JoinPublic(newChat.ID)
+			_, err := m.messaging.JoinPublicChat(newChat.ID)
 			if err != nil {
 				m.logger.Error("failed to load filter for chat", zap.Error(err))
 				continue
@@ -1703,7 +1703,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				importProgress.UpdateTaskProgress(discord.DownloadAssetsTask, progressValue)
 			}
 
-			_, err := m.transport.JoinPublic(processedChannelIds[channel.Channel.ID])
+			_, err := m.messaging.JoinPublicChat(processedChannelIds[channel.Channel.ID])
 			if err != nil {
 				m.logger.Error("failed to load filter for chat", zap.Error(err))
 				continue
@@ -1794,7 +1794,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		}
 
 		// Init the community filter so we can receive messages on the community
-		_, err = m.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
+		_, err = m.InitCommunityFilters(messaging.CommunitiesToInitialize{{
 			Shard:   discordCommunity.Shard(),
 			PrivKey: discordCommunity.PrivateKey(),
 		}})
@@ -1815,7 +1815,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			return
 		}
 
-		_, err = m.transport.InitPublicFilters(m.DefaultFilters(discordCommunity))
+		_, err = m.messaging.InitPublicChats(m.DefaultFilters(discordCommunity))
 		if err != nil {
 			m.cleanUpImport(communityID)
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
@@ -1834,7 +1834,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			return
 		}
 
-		filters := m.transport.Filters()
+		filters := m.messaging.ChatFilters()
 		_, err = m.scheduleSyncFilters(filters)
 		if err != nil {
 			m.cleanUpImport(communityID)

@@ -115,7 +115,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	)
 	s.Require().NoError(err)
 
-	chat := CreatePublicChat(statusChatID, s.m.transport)
+	chat := CreatePublicChat(statusChatID, s.m.getTimesource())
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -162,7 +162,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	// add chat
-	chat := CreatePublicChat(statusChatID, s.m.transport)
+	chat := CreatePublicChat(statusChatID, s.m.getTimesource())
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
@@ -219,12 +219,12 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	defer TearDownMessenger(&s.Suite, alice)
 
 	// Create 1-1 chat
-	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)
+	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.getTimesource())
 	err = s.m.SaveChat(ourOneOneChat)
 	s.Require().NoError(err)
 
 	// add and deactivate chat
-	chat2 := CreatePublicChat(removedChatID, s.m.transport)
+	chat2 := CreatePublicChat(removedChatID, s.m.getTimesource())
 	chat2.DeletedAtClockValue = 1
 	err = s.m.SaveChat(chat2)
 	s.Require().NoError(err)
@@ -388,7 +388,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 	// send a message from bob1 to alice, it should be received on both bob1 and bob2
 
 	alicePkString := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
-	chat := CreateOneToOneChat(alicePkString, &alice.identity.PublicKey, bob1.transport)
+	chat := CreateOneToOneChat(alicePkString, &alice.identity.PublicKey, bob1.getTimesource())
 	s.Require().NoError(bob1.SaveChat(chat))
 
 	inputMessage := buildTestMessage(*chat)

@@ -105,11 +105,11 @@ func (s *MessengerSyncChatSuite) Pair() {
 }
 
 func (s *MessengerSyncChatSuite) TestRemovePubChat() {
-	chat := CreatePublicChat(publicChatName, s.alice1.transport)
+	chat := CreatePublicChat(publicChatName, s.alice1.getTimesource())
 	err := s.alice1.SaveChat(chat)
 	s.Require().NoError(err)
 
-	chat = CreatePublicChat(publicChatName, s.alice2.transport)
+	chat = CreatePublicChat(publicChatName, s.alice2.getTimesource())
 	err = s.alice2.SaveChat(chat)
 	s.Require().NoError(err)
 

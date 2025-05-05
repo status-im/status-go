@@ -173,10 +173,6 @@ func (api *PublicWakuAPI) DeleteSymKey(ctx context.Context, id string) bool {
 	return api.w.DeleteSymKey(id)
 }
 
-func (api *PublicWakuAPI) BloomFilter() []byte {
-	return nil
-}
-
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
 func (api *PublicWakuAPI) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {

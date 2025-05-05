@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	wakutypes "github.com/status-im/status-go/waku/types"
 	"github.com/status-im/status-go/wakuv2"
 
@@ -16,7 +16,7 @@ import (
 )
 
 type ReceivedMessages struct {
-	Filter     transport.Filter
+	Filter     messaging.ChatFilter
 	SHHMessage *wakutypes.Message
 	Messages   []*v1protocol.StatusMessage
 }

@@ -65,6 +65,4 @@ type PublicWakuAPI interface {
 	// GetFilterMessages returns the messages that match the filter criteria and
 	// are received between the last poll and now.
 	GetFilterMessages(id string) ([]*Message, error)
-
-	BloomFilter() []byte
 }

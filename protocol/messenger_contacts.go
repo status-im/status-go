@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -316,7 +316,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 		return nil, err
 	}
 
-	clock, _ := chat.NextClockAndTimestamp(m.transport)
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 	contact.AcceptContactRequest(clock)
 
 	if !fromSyncing {
@@ -367,7 +367,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	response.AddContact(contact)
 
 	// Add mutual state update message for incoming contact request
-	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+	clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
 	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, true)
 	if err != nil {
 		return nil, err
@@ -526,7 +526,7 @@ func (m *Messenger) addContact(ctx context.Context,
 	if !deprecation.ChatProfileDeprecated {
 		response.AddChat(profileChat)
 
-		_, err = m.transport.InitFilters([]transport.FiltersToInitialize{{ChatID: profileChat.ID}}, []*ecdsa.PublicKey{publicKey})
+		err := m.messaging.InitChats(messaging.ChatsToInitialize{{ChatID: profileChat.ID}}, []*ecdsa.PublicKey{publicKey})
 		if err != nil {
 			return nil, err
 		}
@@ -540,7 +540,7 @@ func (m *Messenger) addContact(ctx context.Context,
 
 	// Add mutual state update message for outgoing contact request
 	if len(contactRequestID) == 0 {
-		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+		clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
 		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, true)
 		if err != nil {
 			return nil, err
@@ -564,7 +564,7 @@ func (m *Messenger) addContact(ctx context.Context,
 
 	// Add outgoing contact request notification
 	if createOutgoingContactRequestNotification {
-		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+		clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
 		contactRequest, err := m.generateContactRequest(clock, timestamp, contact, contactRequestText, true)
 		if err != nil {
 			return nil, err
@@ -669,7 +669,7 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 
 func (m *Messenger) resetLastPublishedTimeForChatIdentity() error {
 	// Reset last published time for ChatIdentity so new contact can receive data
-	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
+	contactCodeTopic := messaging.ContactCodeTopic(&m.identity.PublicKey)
 	m.logger.Debug("contact state changed ResetWhenChatIdentityLastPublished")
 	return m.persistence.ResetWhenChatIdentityLastPublished(contactCodeTopic)
 }
@@ -1284,12 +1284,12 @@ func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, erro
 	return contact, nil
 }
 
-func (m *Messenger) scheduleSyncFiltersForContact(publicKey *ecdsa.PublicKey) (*transport.Filter, error) {
-	filter, err := m.transport.JoinPrivate(publicKey)
+func (m *Messenger) scheduleSyncFiltersForContact(publicKey *ecdsa.PublicKey) (*messaging.ChatFilter, error) {
+	filter, err := m.messaging.JoinPrivateChat(publicKey)
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.scheduleSyncFilters([]*transport.Filter{filter})
+	_, err = m.scheduleSyncFilters(messaging.ChatFilters{filter})
 	if err != nil {
 		return filter, err
 	}

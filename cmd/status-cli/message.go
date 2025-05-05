@@ -73,7 +73,7 @@ func (cli *StatusCLI) sendDirectMessage(ctx context.Context, text string, option
 	chat := cli.messenger.Chat(cli.messenger.MutualContacts()[0].ID)
 	cli.logger.Info("will send message to contact: ", chat.ID)
 
-	clock, timestamp := chat.NextClockAndTimestamp(cli.messenger.GetTransport())
+	clock, timestamp := chat.NextClockAndTimestamp(cli.messenger.GetTimesource())
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
 	inputMessage.LocalChatID = chat.ID

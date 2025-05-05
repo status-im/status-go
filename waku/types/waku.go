@@ -182,9 +182,6 @@ type Waku interface {
 	Unsubscribe(ctx context.Context, id string) error
 	UnsubscribeMany(ids []string) error
 
-	// ProcessingP2PMessages indicates whether there are in-flight p2p messages
-	ProcessingP2PMessages() bool
-
 	// MarkP2PMessageAsProcessed tells the waku layer that a P2P message has been processed
 	MarkP2PMessageAsProcessed(common.Hash)
 

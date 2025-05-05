@@ -35,7 +35,7 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 
 	chatID := statusChatID
 
-	chat := CreatePublicChat(chatID, alice.transport)
+	chat := CreatePublicChat(chatID, alice.getTimesource())
 
 	err = alice.SaveChat(chat)
 	s.Require().NoError(err)

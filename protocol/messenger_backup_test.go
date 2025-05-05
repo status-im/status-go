@@ -1074,7 +1074,7 @@ func (s *MessengerBackupSuite) TestBackupChats() {
 	alice := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, alice)
 
-	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)
+	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.getTimesource())
 	err = bob1.SaveChat(ourOneOneChat)
 	s.Require().NoError(err)
 

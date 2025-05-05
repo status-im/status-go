@@ -1978,12 +1978,6 @@ func (w *Waku) DropPeer(peerID peer.ID) error {
 	return w.node.ClosePeerById(peerID)
 }
 
-func (w *Waku) ProcessingP2PMessages() bool {
-	w.storeMsgIDsMu.Lock()
-	defer w.storeMsgIDsMu.Unlock()
-	return len(w.storeMsgIDs) != 0
-}
-
 func (w *Waku) MarkP2PMessageAsProcessed(hash gethcommon.Hash) {
 	w.storeMsgIDsMu.Lock()
 	defer w.storeMsgIDsMu.Unlock()

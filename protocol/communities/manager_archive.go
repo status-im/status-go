@@ -22,7 +22,7 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/signal"
@@ -68,7 +68,7 @@ type ArchiveManager struct {
 
 	logger      *zap.Logger
 	persistence *Persistence
-	transport   *transport.Transport
+	messaging   *messaging.API
 	identity    *ecdsa.PrivateKey
 	encryptor   *encryption.Protocol
 
@@ -88,7 +88,7 @@ func NewArchiveManager(amc *ArchiveManagerConfig) *ArchiveManager {
 
 		logger:      amc.Logger,
 		persistence: amc.Persistence,
-		transport:   amc.Transport,
+		messaging:   amc.Messaging,
 		identity:    amc.Identity,
 		encryptor:   amc.Encryptor,
 
@@ -227,15 +227,15 @@ func (m *ArchiveManager) IsReady() bool {
 		m.torrentClientStarted()
 }
 
-func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error) {
+func (m *ArchiveManager) GetCommunityChatsFilters(communityID types.HexBytes) (messaging.ChatFilters, error) {
 	chatIDs, err := m.persistence.GetCommunityChatIDs(communityID)
 	if err != nil {
 		return nil, err
 	}
 
-	filters := []*transport.Filter{}
+	filters := messaging.ChatFilters{}
 	for _, cid := range chatIDs {
-		filters = append(filters, m.transport.FilterByChatID(cid))
+		filters = append(filters, m.messaging.ChatFilterByChatID(cid))
 	}
 	return filters, nil
 }
@@ -359,7 +359,7 @@ func (m *ArchiveManager) StartHistoryArchiveTasksInterval(community *Community, 
 			// adding the content-topic used for member updates.
 			// since member updates would not be too frequent i.e only addition/deletion would add a new message,
 			// this shouldn't cause too much increase in size of archive generated.
-			topics = append(topics, m.transport.FilterByChatID(community.UniversalChatID()).ContentTopic)
+			topics = append(topics, m.messaging.ChatFilterByChatID(community.UniversalChatID()).ContentTopic)
 
 			ts := time.Now().Unix()
 			to := time.Unix(ts, 0)

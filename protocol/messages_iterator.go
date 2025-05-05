@@ -3,22 +3,22 @@ package protocol
 import (
 	"golang.org/x/exp/maps"
 
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	wakutypes "github.com/status-im/status-go/waku/types"
 )
 
 type MessagesIterator interface {
 	HasNext() bool
-	Next() (transport.Filter, []*wakutypes.Message)
+	Next() (messaging.ChatFilter, []*wakutypes.Message)
 }
 
 type DefaultMessagesIterator struct {
-	chatWithMessages map[transport.Filter][]*wakutypes.Message
-	keys             []transport.Filter
+	chatWithMessages map[messaging.ChatFilter][]*wakutypes.Message
+	keys             []messaging.ChatFilter
 	currentIndex     int
 }
 
-func NewDefaultMessagesIterator(chatWithMessages map[transport.Filter][]*wakutypes.Message) MessagesIterator {
+func NewDefaultMessagesIterator(chatWithMessages map[messaging.ChatFilter][]*wakutypes.Message) MessagesIterator {
 	return &DefaultMessagesIterator{
 		chatWithMessages: chatWithMessages,
 		keys:             maps.Keys(chatWithMessages),
@@ -30,11 +30,11 @@ func (it *DefaultMessagesIterator) HasNext() bool {
 	return it.currentIndex < len(it.keys)
 }
 
-func (it *DefaultMessagesIterator) Next() (transport.Filter, []*wakutypes.Message) {
+func (it *DefaultMessagesIterator) Next() (messaging.ChatFilter, []*wakutypes.Message) {
 	if it.HasNext() {
 		key := it.keys[it.currentIndex]
 		it.currentIndex++
 		return key, it.chatWithMessages[key]
 	}
-	return transport.Filter{}, nil
+	return messaging.ChatFilter{}, nil
 }

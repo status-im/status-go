@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	userimages "github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	community_token "github.com/status-im/status-go/protocol/communities/token"
@@ -68,7 +68,7 @@ func (s *ManagerSuite) buildManagers(ownerVerifier OwnerVerifier) (*Manager, *Ar
 		TorrentConfig: buildTorrentConfig(),
 		Logger:        logger,
 		Persistence:   m.GetPersistence(),
-		Transport:     nil,
+		Messaging:     nil,
 		Identity:      key,
 		Encryptor:     nil,
 		Publisher:     m,
@@ -560,7 +560,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_WithoutMessages() {
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
-	topic := wakutypes.BytesToTopic(transport.ToTopic(chatID))
+	topic := wakutypes.BytesToTopic(messaging.ToContentTopic(chatID))
 	topics := []wakutypes.TopicType{topic}
 
 	// Time range of 7 days
@@ -586,7 +586,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateArchive() {
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
-	topic := wakutypes.BytesToTopic(transport.ToTopic(chatID))
+	topic := wakutypes.BytesToTopic(messaging.ToContentTopic(chatID))
 	topics := []wakutypes.TopicType{topic}
 
 	// Time range of 7 days
@@ -640,7 +640,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldCreateMultipleArchi
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
-	topic := wakutypes.BytesToTopic(transport.ToTopic(chatID))
+	topic := wakutypes.BytesToTopic(messaging.ToContentTopic(chatID))
 	topics := []wakutypes.TopicType{topic}
 
 	// Time range of 3 weeks
@@ -699,7 +699,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_ShouldAppendArchives() {
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
-	topic := wakutypes.BytesToTopic(transport.ToTopic(chatID))
+	topic := wakutypes.BytesToTopic(messaging.ToContentTopic(chatID))
 	topics := []wakutypes.TopicType{topic}
 
 	// Time range of 1 week
@@ -739,7 +739,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages() {
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
-	topic := wakutypes.BytesToTopic(transport.ToTopic(chatID))
+	topic := wakutypes.BytesToTopic(messaging.ToContentTopic(chatID))
 	topics := []wakutypes.TopicType{topic}
 
 	// Time range of 7 days
@@ -786,7 +786,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages_ShouldCreateM
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
-	topic := wakutypes.BytesToTopic(transport.ToTopic(chatID))
+	topic := wakutypes.BytesToTopic(messaging.ToContentTopic(chatID))
 	topics := []wakutypes.TopicType{topic}
 
 	// Time range of 3 weeks
@@ -836,7 +836,7 @@ func (s *ManagerSuite) TestCreateHistoryArchiveTorrentFromMessages_ShouldAppendA
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
-	topic := wakutypes.BytesToTopic(transport.ToTopic(chatID))
+	topic := wakutypes.BytesToTopic(messaging.ToContentTopic(chatID))
 	topics := []wakutypes.TopicType{topic}
 
 	// Time range of 1 week
@@ -876,7 +876,7 @@ func (s *ManagerSuite) TestSeedHistoryArchiveTorrent() {
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
-	topic := wakutypes.BytesToTopic(transport.ToTopic(chatID))
+	topic := wakutypes.BytesToTopic(messaging.ToContentTopic(chatID))
 	topics := []wakutypes.TopicType{topic}
 
 	startDate := time.Date(2020, 1, 1, 00, 00, 00, 0, time.UTC)
@@ -910,7 +910,7 @@ func (s *ManagerSuite) TestUnseedHistoryArchiveTorrent() {
 	community, chatID, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 
-	topic := wakutypes.BytesToTopic(transport.ToTopic(chatID))
+	topic := wakutypes.BytesToTopic(messaging.ToContentTopic(chatID))
 	topics := []wakutypes.TopicType{topic}
 
 	startDate := time.Date(2020, 1, 1, 00, 00, 00, 0, time.UTC)

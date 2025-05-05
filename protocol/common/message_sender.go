@@ -17,7 +17,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/protocol/datasync"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 	"github.com/status-im/status-go/protocol/encryption"
@@ -66,8 +66,8 @@ type MessageSender struct {
 	identity    *ecdsa.PrivateKey
 	datasync    *datasync.DataSync
 	database    *sql.DB
+	messaging   *messaging.API
 	protocol    *encryption.Protocol
-	transport   *transport.Transport
 	logger      *zap.Logger
 	persistence *RawMessagesPersistence
 
@@ -93,8 +93,8 @@ type MessageSender struct {
 func NewMessageSender(
 	identity *ecdsa.PrivateKey,
 	database *sql.DB,
+	messaging *messaging.API,
 	enc *encryption.Protocol,
-	transport *transport.Transport,
 	logger *zap.Logger,
 	features FeatureFlags,
 ) (*MessageSender, error) {
@@ -104,7 +104,7 @@ func NewMessageSender(
 		protocol:        enc,
 		database:        database,
 		persistence:     NewRawMessagesPersistence(database),
-		transport:       transport,
+		messaging:       messaging,
 		logger:          logger,
 		ephemeralKeys:   make(map[string]*ecdsa.PrivateKey),
 		featureFlags:    features,
@@ -436,7 +436,7 @@ func (s *MessageSender) sendCommunity(
 		zap.String("messageType", "community"),
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
-	s.transport.Track(messageID, hashes, newMessages)
+	s.messaging.Track(messageID, hashes, newMessages)
 	s.sendBandwidthMetrics(rawMessage)
 
 	return messageID, nil
@@ -532,7 +532,7 @@ func (s *MessageSender) sendPrivate(
 			zap.String("messageType", "private"),
 			zap.Any("contentType", rawMessage.MessageType),
 			zap.Strings("hashes", types.EncodeHexes(hashes)))
-		s.transport.Track(messageID, hashes, newMessages)
+		s.messaging.Track(messageID, hashes, newMessages)
 
 	} else {
 		messageSpec, err := s.protocol.BuildEncryptedMessage(rawMessage.Sender, recipient, wrappedMessage)
@@ -552,7 +552,7 @@ func (s *MessageSender) sendPrivate(
 			zap.Any("contentType", rawMessage.MessageType),
 			zap.String("messageType", "private"),
 			zap.Strings("hashes", types.EncodeHexes(hashes)))
-		s.transport.Track(messageID, hashes, newMessages)
+		s.messaging.Track(messageID, hashes, newMessages)
 	}
 
 	s.sendBandwidthMetrics(rawMessage)
@@ -585,7 +585,7 @@ func (s *MessageSender) SendPairInstallation(
 		return nil, errors.Wrap(err, "failed to send a message spec")
 	}
 
-	s.transport.Track(messageID, hashes, newMessages)
+	s.messaging.Track(messageID, hashes, newMessages)
 	s.sendBandwidthMetrics(&rawMessage)
 
 	return messageID, nil
@@ -688,7 +688,7 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 
 	hashes := make([][]byte, 0, len(newMessages))
 	for _, newMessage := range newMessages {
-		hash, err := s.transport.SendPublic(ctx, newMessage, rawMessage.ContentTopic)
+		hash, err := s.messaging.SendPublic(ctx, newMessage, rawMessage.ContentTopic)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -790,7 +790,7 @@ func (s *MessageSender) SendPublic(
 
 	hashes := make([][]byte, 0, len(newMessages))
 	for _, newMessage := range newMessages {
-		hash, err := s.transport.SendPublic(ctx, newMessage, chatName)
+		hash, err := s.messaging.SendPublic(ctx, newMessage, chatName)
 		if err != nil {
 			return nil, err
 		}
@@ -810,7 +810,7 @@ func (s *MessageSender) SendPublic(
 		zap.Any("contentType", rawMessage.MessageType),
 		zap.String("messageType", "public"),
 		zap.Strings("hashes", types.EncodeHexes(hashes)))
-	s.transport.Track(messageID, hashes, newMessages)
+	s.messaging.Track(messageID, hashes, newMessages)
 	s.sendBandwidthMetrics(&rawMessage)
 
 	return messageID, nil
@@ -1119,9 +1119,9 @@ func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *R
 	var hash []byte
 	for _, newMessage := range newMessages {
 		if rawMessage.SendOnPersonalTopic {
-			hash, err = s.transport.SendPrivateOnPersonalTopic(ctx, newMessage, publicKey)
+			hash, err = s.messaging.SendPrivateOnPersonalTopic(ctx, newMessage, publicKey)
 		} else {
-			hash, err = s.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
+			hash, err = s.messaging.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
 		}
 		if err != nil {
 			return nil, nil, err
@@ -1176,7 +1176,7 @@ func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey 
 
 	hashes := make([][]byte, 0, len(newMessages))
 	for _, newMessage := range newMessages {
-		hash, err := s.transport.SendCommunityMessage(ctx, newMessage, publicKey)
+		hash, err := s.messaging.SendCommunityMessage(ctx, newMessage, publicKey)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1219,10 +1219,10 @@ func (s *MessageSender) sendMessageSpec(ctx context.Context, publicKey *ecdsa.Pu
 		// process shared secret
 		if messageSpec.AgreedSecret {
 			logger.Debug("sending using shared secret")
-			hash, err = s.transport.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret.Key)
+			hash, err = s.messaging.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret.Key)
 		} else {
 			logger.Debug("sending partitioned topic")
-			hash, err = s.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
+			hash, err = s.messaging.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
 		}
 		if err != nil {
 			return nil, nil, err
@@ -1287,8 +1287,8 @@ func (s *MessageSender) notifyOnScheduledMessage(recipient *ecdsa.PublicKey, mes
 	}
 }
 
-func (s *MessageSender) JoinPublic(id string) (*transport.Filter, error) {
-	return s.transport.JoinPublic(id)
+func (s *MessageSender) JoinPublic(id string) (*messaging.ChatFilter, error) {
+	return s.messaging.JoinPublicChat(id)
 }
 
 func (s *MessageSender) getRandomEphemeralKey() *ecdsa.PrivateKey {
@@ -1316,7 +1316,7 @@ func (s *MessageSender) GetEphemeralKey() (*ecdsa.PrivateKey, error) {
 
 	s.ephemeralKeys[types.EncodeHex(crypto.FromECDSAPub(&privateKey.PublicKey))] = privateKey
 	s.ephemeralKeysMutex.Unlock()
-	_, err = s.transport.LoadKeyFilters(privateKey)
+	_, err = s.messaging.LoadKeyFilters(privateKey)
 	if err != nil {
 		return nil, err
 	}

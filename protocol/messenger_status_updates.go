@@ -11,9 +11,9 @@ import (
 	datasyncnode "github.com/status-im/mvds/node"
 
 	gocommon "github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/messaging"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 
-	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -67,7 +67,7 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 		return err
 	}
 
-	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
+	contactCodeTopic := messaging.ContactCodeTopic(&m.identity.PublicKey)
 
 	rawMessage := common.RawMessage{
 		LocalChatID: contactCodeTopic,

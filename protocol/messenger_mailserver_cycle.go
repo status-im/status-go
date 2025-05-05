@@ -58,7 +58,7 @@ func (m *Messenger) getFleet() (string, error) {
 }
 
 func (m *Messenger) asyncRequestAllHistoricMessages() {
-	if !m.config.codeControlFlags.AutoRequestHistoricMessages || m.transport.WakuVersion() == 1 {
+	if !m.config.codeControlFlags.AutoRequestHistoricMessages {
 		return
 	}
 
@@ -129,13 +129,9 @@ func (m *Messenger) Storenodes() ([]peer.AddrInfo, error) {
 func (m *Messenger) checkForStorenodeCycleSignals() {
 	defer gocommon.LogOnPanic()
 
-	if m.transport.WakuVersion() != 2 {
-		return
-	}
-
-	changed := m.transport.OnStorenodeChanged()
-	notWorking := m.transport.OnStorenodeNotWorking()
-	available := m.transport.OnStorenodeAvailable()
+	changed := m.messaging.OnStorenodeChanged()
+	notWorking := m.messaging.OnStorenodeNotWorking()
+	available := m.messaging.OnStorenodeAvailable()
 
 	allMailservers, err := m.AllMailservers()
 	if err != nil {

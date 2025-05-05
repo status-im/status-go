@@ -12,7 +12,7 @@ import (
 
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/deprecation"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/wakuv2"
 )
@@ -33,14 +33,14 @@ func (m *Messenger) InitFilters() error {
 		return err
 	}
 
-	_, err = m.transport.InitFilters(filters, publicKeys)
+	err = m.messaging.InitChats(filters, publicKeys)
 	return err
 }
 
-func (m *Messenger) collectFiltersAndKeys() ([]transport.FiltersToInitialize, []*ecdsa.PublicKey, error) {
+func (m *Messenger) collectFiltersAndKeys() (messaging.ChatsToInitialize, []*ecdsa.PublicKey, error) {
 	var wg sync.WaitGroup
 	errCh := make(chan error, 5)
-	filtersCh := make(chan []transport.FiltersToInitialize, 3)
+	filtersCh := make(chan messaging.ChatsToInitialize, 3)
 	publicKeysCh := make(chan []*ecdsa.PublicKey, 2)
 
 	wg.Add(5)
@@ -58,7 +58,7 @@ func (m *Messenger) collectFiltersAndKeys() ([]transport.FiltersToInitialize, []
 	return m.collectResults(filtersCh, publicKeysCh, errCh)
 }
 
-func (m *Messenger) processJoinedCommunities(wg *sync.WaitGroup, filtersCh chan<- []transport.FiltersToInitialize, errCh chan<- error) {
+func (m *Messenger) processJoinedCommunities(wg *sync.WaitGroup, filtersCh chan<- messaging.ChatsToInitialize, errCh chan<- error) {
 	defer gocommon.LogOnPanic()
 	defer wg.Done()
 
@@ -72,9 +72,9 @@ func (m *Messenger) processJoinedCommunities(wg *sync.WaitGroup, filtersCh chan<
 	filtersCh <- filtersToInit
 }
 
-func (m *Messenger) processCommunitiesSettings(communities []*communities.Community) []transport.FiltersToInitialize {
+func (m *Messenger) processCommunitiesSettings(communities []*communities.Community) messaging.ChatsToInitialize {
 	logger := m.logger.With(zap.String("site", "processCommunitiesSettings"))
-	filtersToInit := make([]transport.FiltersToInitialize, 0, len(communities))
+	filtersToInit := make(messaging.ChatsToInitialize, 0, len(communities))
 
 	for _, org := range communities {
 		// the org advertise on the public topic derived by the pk
@@ -88,7 +88,7 @@ func (m *Messenger) processCommunitiesSettings(communities []*communities.Commun
 	return filtersToInit
 }
 
-func (m *Messenger) processSpectatedCommunities(wg *sync.WaitGroup, filtersCh chan<- []transport.FiltersToInitialize, errCh chan<- error) {
+func (m *Messenger) processSpectatedCommunities(wg *sync.WaitGroup, filtersCh chan<- messaging.ChatsToInitialize, errCh chan<- error) {
 	defer gocommon.LogOnPanic()
 	defer wg.Done()
 
@@ -98,14 +98,14 @@ func (m *Messenger) processSpectatedCommunities(wg *sync.WaitGroup, filtersCh ch
 		return
 	}
 
-	filtersToInit := make([]transport.FiltersToInitialize, 0, len(spectatedCommunities))
+	filtersToInit := make(messaging.ChatsToInitialize, 0, len(spectatedCommunities))
 	for _, org := range spectatedCommunities {
 		filtersToInit = append(filtersToInit, m.DefaultFilters(org)...)
 	}
 	filtersCh <- filtersToInit
 }
 
-func (m *Messenger) processChats(wg *sync.WaitGroup, filtersCh chan<- []transport.FiltersToInitialize, publicKeysCh chan<- []*ecdsa.PublicKey, errCh chan<- error) {
+func (m *Messenger) processChats(wg *sync.WaitGroup, filtersCh chan<- messaging.ChatsToInitialize, publicKeysCh chan<- []*ecdsa.PublicKey, errCh chan<- error) {
 	defer gocommon.LogOnPanic()
 	defer wg.Done()
 
@@ -150,8 +150,8 @@ func (m *Messenger) validateChats(chats []*Chat) []*Chat {
 	return validChats
 }
 
-func (m *Messenger) processValidChats(validChats []*Chat, communityInfo map[string]*communities.Community) ([]transport.FiltersToInitialize, []*ecdsa.PublicKey, error) {
-	var filtersToInit []transport.FiltersToInitialize
+func (m *Messenger) processValidChats(validChats []*Chat, communityInfo map[string]*communities.Community) (messaging.ChatsToInitialize, []*ecdsa.PublicKey, error) {
+	var filtersToInit messaging.ChatsToInitialize
 	var publicKeys []*ecdsa.PublicKey
 
 	for _, chat := range validChats {
@@ -173,20 +173,20 @@ func (m *Messenger) processValidChats(validChats []*Chat, communityInfo map[stri
 	return filtersToInit, publicKeys, nil
 }
 
-func (m *Messenger) processSingleChat(chat *Chat, communityInfo map[string]*communities.Community) ([]transport.FiltersToInitialize, []*ecdsa.PublicKey, error) {
-	var filters []transport.FiltersToInitialize
+func (m *Messenger) processSingleChat(chat *Chat, communityInfo map[string]*communities.Community) (messaging.ChatsToInitialize, []*ecdsa.PublicKey, error) {
+	var filters messaging.ChatsToInitialize
 	var publicKeys []*ecdsa.PublicKey
 
 	switch chat.ChatType {
 	case ChatTypePublic, ChatTypeProfile:
-		filters = append(filters, transport.FiltersToInitialize{ChatID: chat.ID})
+		filters = append(filters, &messaging.ChatToInitialize{ChatID: chat.ID})
 
 	case ChatTypeCommunityChat:
 		filter, err := m.processCommunityChat(chat, communityInfo)
 		if err != nil {
 			return nil, nil, err
 		}
-		filters = append(filters, filter)
+		filters = append(filters, &filter)
 
 	case ChatTypeOneToOne:
 		pk, err := chat.PublicKey()
@@ -209,13 +209,13 @@ func (m *Messenger) processSingleChat(chat *Chat, communityInfo map[string]*comm
 	return filters, publicKeys, nil
 }
 
-func (m *Messenger) processCommunityChat(chat *Chat, communityInfo map[string]*communities.Community) (transport.FiltersToInitialize, error) {
+func (m *Messenger) processCommunityChat(chat *Chat, communityInfo map[string]*communities.Community) (messaging.ChatToInitialize, error) {
 	community, ok := communityInfo[chat.CommunityID]
 	if !ok {
 		var err error
 		community, err = m.communitiesManager.GetByIDString(chat.CommunityID)
 		if err != nil {
-			return transport.FiltersToInitialize{}, err
+			return messaging.ChatToInitialize{}, err
 		}
 		communityInfo[chat.CommunityID] = community
 	}
@@ -229,7 +229,7 @@ func (m *Messenger) processCommunityChat(chat *Chat, communityInfo map[string]*c
 		}
 	}
 
-	return transport.FiltersToInitialize{
+	return messaging.ChatToInitialize{
 		ChatID:      chat.ID,
 		PubsubTopic: community.PubsubTopic(),
 	}, nil
@@ -312,9 +312,9 @@ func (m *Messenger) processControlledCommunities(wg *sync.WaitGroup, errCh chan<
 		return
 	}
 
-	var communityFiltersToInitialize []transport.CommunityFilterToInitialize
+	var communityFiltersToInitialize messaging.CommunitiesToInitialize
 	for _, c := range controlledCommunities {
-		communityFiltersToInitialize = append(communityFiltersToInitialize, transport.CommunityFilterToInitialize{
+		communityFiltersToInitialize = append(communityFiltersToInitialize, &messaging.CommunityToInitialize{
 			Shard:   c.Shard(),
 			PrivKey: c.PrivateKey(),
 		})
@@ -326,7 +326,7 @@ func (m *Messenger) processControlledCommunities(wg *sync.WaitGroup, errCh chan<
 	}
 }
 
-func (m *Messenger) collectResults(filtersCh <-chan []transport.FiltersToInitialize, publicKeysCh <-chan []*ecdsa.PublicKey, errCh <-chan error) ([]transport.FiltersToInitialize, []*ecdsa.PublicKey, error) {
+func (m *Messenger) collectResults(filtersCh <-chan messaging.ChatsToInitialize, publicKeysCh <-chan []*ecdsa.PublicKey, errCh <-chan error) (messaging.ChatsToInitialize, []*ecdsa.PublicKey, error) {
 	var errs []error
 	for err := range errCh {
 		m.logger.Error("error collecting filters and public keys", zap.Error(err))
@@ -337,7 +337,7 @@ func (m *Messenger) collectResults(filtersCh <-chan []transport.FiltersToInitial
 		return nil, nil, stderrors.Join(errs...)
 	}
 
-	var allFilters []transport.FiltersToInitialize
+	var allFilters messaging.ChatsToInitialize
 	var allPublicKeys []*ecdsa.PublicKey
 
 	for filters := range filtersCh {

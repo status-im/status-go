@@ -488,7 +488,7 @@ func (s *MessengerCommunitiesSignersSuite) TestNewOwnerAcceptRequestToJoin() {
 	s.Require().NoError(err)
 
 	// Alice advertises community to Bob
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.bob.identity.PublicKey), &s.bob.identity.PublicKey, s.bob.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.bob.identity.PublicKey), &s.bob.identity.PublicKey, s.bob.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID

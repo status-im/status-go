@@ -27,7 +27,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/protocol/common"
@@ -151,7 +151,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
 
 	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -206,7 +206,7 @@ func (s *MessengerCommunitiesSuite) TestJoiningOpenCommunityReturnsChatsResponse
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -349,7 +349,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(chats, 2)
 
 	// Send a community message
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.bob.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.bob.getTimesource())
 
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
@@ -801,7 +801,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1008,7 +1008,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1199,7 +1199,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1451,7 +1451,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -1892,7 +1892,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 	community := response.Communities()[0]
 
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 
 	s.Require().NoError(s.bob.SaveChat(chat))
 
@@ -2768,7 +2768,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Len(tcs1, 0, "Must have 0 communities")
 
 	// Bob the admin opens up a 1-1 chat with alice
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 	s.Require().NoError(s.bob.SaveChat(chat))
 
 	// Bob the admin shares with Alice, via public chat, an invite link to the new community
@@ -2996,7 +2996,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	s.Len(tcs1, 0, "Must have 0 communities")
 
 	// Bob the admin opens up a 1-1 chat with alice
-	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.getTimesource())
 	s.Require().NoError(s.bob.SaveChat(chat))
 
 	// Bob the admin shares with Alice, via public chat, an invite link to the new community
@@ -3641,8 +3641,8 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	message.Sig = crypto.FromECDSAPub(&s.owner.identity.PublicKey)
 	message.Payload = wrappedPayload
 
-	filter := s.alice.transport.FilterByChatID(chat.ID)
-	importedMessages := make(map[transport.Filter][]*wakutypes.Message, 0)
+	filter := s.alice.messaging.ChatFilterByChatID(chat.ID)
+	importedMessages := make(map[messaging.ChatFilter][]*wakutypes.Message, 0)
 
 	importedMessages[*filter] = append(importedMessages[*filter], message)
 
@@ -4687,10 +4687,8 @@ func (s *MessengerCommunitiesSuite) TestAliceDidNotProcessOutdatedCommunityReque
 	s.Require().NoError(err)
 
 	var key *ecdsa.PrivateKey
-	if s.owner.transport.WakuVersion() == 2 {
-		key, err = s.owner.transport.RetrievePubsubTopicKey(community.PubsubTopic())
-		s.Require().NoError(err)
-	}
+	key, err = s.owner.messaging.RetrievePubsubTopicKey(community.PubsubTopic())
+	s.Require().NoError(err)
 
 	descriptionMessage, err := community.ToProtocolMessageBytes()
 	s.Require().NoError(err)

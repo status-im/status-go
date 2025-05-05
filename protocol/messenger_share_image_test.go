@@ -57,11 +57,11 @@ func (s *MessengerShareMessageSuite) TestImageMessageSharing() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 

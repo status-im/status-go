@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	wakutypes "github.com/status-im/status-go/waku/types"
@@ -74,7 +74,7 @@ func TestTopic(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, topics, 3)
 
-	filters := []*transport.Filter{
+	filters := messaging.ChatFilters{
 		// Existing topic, is not updated
 		{
 			PubsubTopic:  wakuv2.DefaultShardPubsubTopic(),

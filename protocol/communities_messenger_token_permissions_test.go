@@ -22,7 +22,7 @@ import (
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -2153,8 +2153,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestImportDecryptedArchiveMe
 	messageDate := time.UnixMilli(int64(message1.Timestamp))
 	startDate := messageDate.Add(-time.Minute)
 	endDate := messageDate.Add(time.Minute)
-	topic := wakutypes.BytesToTopic(transport.ToTopic(chat.ID))
-	communityCommonTopic := wakutypes.BytesToTopic(transport.ToTopic(community.UniversalChatID()))
+	topic := wakutypes.BytesToTopic(messaging.ToContentTopic(chat.ID))
+	communityCommonTopic := wakutypes.BytesToTopic(messaging.ToContentTopic(community.UniversalChatID()))
 	topics := []wakutypes.TopicType{topic, communityCommonTopic}
 
 	torrentConfig := params.TorrentConfig{

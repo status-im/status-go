@@ -12,7 +12,7 @@ import (
 	gocommon "github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -62,7 +62,7 @@ func (m *Messenger) sendPublicCommunityShardInfo(community *communities.Communit
 		Priority:            &common.HighPriority,
 	}
 
-	chatName := transport.CommunityShardInfoTopic(community.IDString())
+	chatName := messaging.CommunityShardInfoTopic(community.IDString())
 	messageID, err := m.sender.SendPublic(context.Background(), chatName, rawMessage)
 	if err == nil {
 		m.logger.Debug("published public community shard info",

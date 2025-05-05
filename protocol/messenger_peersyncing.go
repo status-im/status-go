@@ -51,7 +51,7 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 			m.logger.Debug("can't set raw message as sent", zap.Error(err))
 		}
 
-		m.transport.ConfirmMessageDelivered(messageID)
+		m.messaging.ConfirmMessageDelivered(messageID)
 
 		//send signal to client that message status updated
 		if m.config.messengerSignalsHandler != nil {
@@ -415,7 +415,7 @@ func (m *Messenger) sendDataSync(receiver state.PeerID, payload *datasyncproto.P
 	}
 
 	m.logger.Debug("sent private messages", zap.Any("messageIDs", hexMessageIDs), zap.Strings("hashes", types.EncodeHexes(hashes)))
-	m.transport.TrackMany(messageIDs, hashes, newMessages)
+	m.messaging.TrackMany(messageIDs, hashes, newMessages)
 	if m.wakuMetricsHandler != nil {
 		for _, message := range newMessages {
 			m.wakuMetricsHandler.PushRawMessageByType(message.PubsubTopic, message.Topic.String(), "DATASYNC", uint32(len(message.Payload)))

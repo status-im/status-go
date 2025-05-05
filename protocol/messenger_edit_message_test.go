@@ -25,11 +25,11 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 
@@ -94,11 +94,11 @@ func (s *MessengerEditMessageSuite) TestEditImageMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 
@@ -176,11 +176,11 @@ func (s *MessengerEditMessageSuite) TestEditBridgeMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 
@@ -249,11 +249,11 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 
@@ -350,14 +350,14 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 	messageID := "message-id"
@@ -490,11 +490,11 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithMention() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 
@@ -595,11 +595,11 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithLinkPreviews() {
 	theirMessenger := s.newMessenger()
 	defer TearDownMessenger(&s.Suite, theirMessenger)
 
-	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.getTimesource())
 	err := theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
-	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.getTimesource())
 	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 

@@ -192,14 +192,6 @@ func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
 	return t.filters.LoadPublic(chatID, "")
 }
 
-func (t *Transport) LeavePublic(chatID string) error {
-	chat := t.filters.Filter(chatID)
-	if chat != nil {
-		return nil
-	}
-	return t.filters.Remove(context.Background(), chat)
-}
-
 func (t *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) (*Filter, error) {
 	return t.filters.LoadContactCode(publicKey)
 }
@@ -448,10 +440,6 @@ func (t *Transport) cleanFiltersLoop() {
 	}()
 }
 
-func (t *Transport) WakuVersion() uint {
-	return t.waku.Version()
-}
-
 func (t *Transport) PeerCount() int {
 	return t.waku.PeerCount()
 }
@@ -486,20 +474,8 @@ func (t *Transport) ClearProcessedMessageIDsCache() error {
 	return t.cache.Clear()
 }
 
-func (t *Transport) BloomFilter() []byte {
-	return t.api.BloomFilter()
-}
-
 func PubkeyToHex(key *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(key))
-}
-
-func (t *Transport) StartDiscV5() error {
-	return t.waku.StartDiscV5()
-}
-
-func (t *Transport) StopDiscV5() error {
-	return t.waku.StopDiscV5()
 }
 
 func (t *Transport) ListenAddresses() ([]multiaddr.Multiaddr, error) {
@@ -530,16 +506,8 @@ func (t *Transport) DropPeer(peerID peer.ID) error {
 	return t.waku.DropPeer(peerID)
 }
 
-func (t *Transport) ProcessingP2PMessages() bool {
-	return t.waku.ProcessingP2PMessages()
-}
-
 func (t *Transport) MarkP2PMessageAsProcessed(hash common.Hash) {
 	t.waku.MarkP2PMessageAsProcessed(hash)
-}
-
-func (t *Transport) SubscribeToConnStatusChanges() (*wakutypes.ConnStatusSubscription, error) {
-	return t.waku.SubscribeToConnStatusChanges()
 }
 
 func (t *Transport) ConnectionChanged(state connection.State) {
@@ -548,18 +516,12 @@ func (t *Transport) ConnectionChanged(state connection.State) {
 
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
 func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
-	if t.waku.Version() == 2 {
-		return t.waku.SubscribeToPubsubTopic(topic, optPublicKey)
-	}
-	return nil
+	return t.waku.SubscribeToPubsubTopic(topic, optPublicKey)
 }
 
 // Unsubscribe from a pubsub topic
 func (t *Transport) UnsubscribeFromPubsubTopic(topic string) error {
-	if t.waku.Version() == 2 {
-		return t.waku.UnsubscribeFromPubsubTopic(topic)
-	}
-	return nil
+	return t.waku.UnsubscribeFromPubsubTopic(topic)
 }
 
 func (t *Transport) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
@@ -571,10 +533,7 @@ func (t *Transport) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, err
 }
 
 func (t *Transport) RemovePubsubTopicKey(topic string) error {
-	if t.waku.Version() == 2 {
-		return t.waku.RemovePubsubTopicKey(topic)
-	}
-	return nil
+	return t.waku.RemovePubsubTopicKey(topic)
 }
 
 func (t *Transport) ConfirmMessageDelivered(messageID string) {
@@ -593,10 +552,6 @@ func (t *Transport) ConfirmMessageDelivered(messageID string) {
 }
 
 func (t *Transport) SetCriteriaForMissingMessageVerification(peerInfo peer.AddrInfo, filters []*Filter) {
-	if t.waku.Version() != 2 {
-		return
-	}
-
 	topicMap := make(map[string]map[wakutypes.TopicType]struct{})
 	for _, f := range filters {
 		if !f.Listen || f.Ephemeral {
@@ -669,7 +624,5 @@ func (t *Transport) ProcessMailserverBatch(
 }
 
 func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
-	if t.WakuVersion() == 2 {
-		t.waku.SetStorenodeConfigProvider(c)
-	}
+	t.waku.SetStorenodeConfigProvider(c)
 }

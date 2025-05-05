@@ -54,7 +54,7 @@ func (s *MessengerSuite) TestTwoImagesAreAddedToChatIdentityForPrivateChat() {
 
 	bobPkString := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 
-	chat := CreateOneToOneChat(bobPkString, &bob.identity.PublicKey, alice.transport)
+	chat := CreateOneToOneChat(bobPkString, &bob.identity.PublicKey, alice.getTimesource())
 	s.Require().Equal(privateChat, GetChatContextFromChatType(chat.ChatType))
 
 	imgs := s.retrieveIdentityImages(alice, bob, chat)

@@ -28,7 +28,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/messaging/transport"
+	"github.com/status-im/status-go/messaging"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
@@ -99,7 +99,7 @@ type Manager struct {
 	tokenManager             TokenManager
 	collectiblesManager      CollectiblesManager
 	logger                   *zap.Logger
-	transport                *transport.Transport
+	messaging                *messaging.API
 	timesource               common.TimeSource
 	quit                     chan struct{}
 	walletConfig             *params.WalletConfig
@@ -190,7 +190,7 @@ type ArchiveService interface {
 	StartTorrentClient() error
 	Stop() error
 	IsReady() bool
-	GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error)
+	GetCommunityChatsFilters(communityID types.HexBytes) (messaging.ChatFilters, error)
 	GetCommunityChatsTopics(communityID types.HexBytes) ([]wakutypes.TopicType, error)
 	GetHistoryArchivePartitionStartTimestamp(communityID types.HexBytes) (uint64, error)
 	CreateAndSeedHistoryArchive(communityID types.HexBytes, topics []wakutypes.TopicType, startDate time.Time, endDate time.Time, partition time.Duration, encrypt bool) error
@@ -209,7 +209,7 @@ type ArchiveManagerConfig struct {
 	TorrentConfig *params.TorrentConfig
 	Logger        *zap.Logger
 	Persistence   *Persistence
-	Transport     *transport.Transport
+	Messaging     *messaging.API
 	Identity      *ecdsa.PrivateKey
 	Encryptor     *encryption.Protocol
 	Publisher     Publisher
@@ -393,7 +393,7 @@ func NewManager(
 	logger *zap.Logger,
 	ensverifier *ens.Verifier,
 	ownerVerifier OwnerVerifier,
-	transport *transport.Transport,
+	messaging *messaging.API,
 	timesource common.TimeSource,
 	keyDistributor KeyDistributor,
 	mediaServer server.MediaServerInterface,
@@ -426,7 +426,7 @@ func NewManager(
 		installationID:         installationID,
 		ownerVerifier:          ownerVerifier,
 		quit:                   make(chan struct{}),
-		transport:              transport,
+		messaging:              messaging,
 		timesource:             timesource,
 		keyDistributor:         keyDistributor,
 		communityLock:          NewCommunityLock(logger),
@@ -1625,10 +1625,10 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *wakuv2.Shard) (*Co
 
 func (m *Manager) UpdatePubsubTopicPrivateKey(topic string, privKey *ecdsa.PrivateKey) error {
 	if privKey != nil {
-		return m.transport.StorePubsubTopicKey(topic, privKey)
+		return m.messaging.StorePubsubTopicKey(topic, privKey)
 	}
 
-	return m.transport.RemovePubsubTopicKey(topic)
+	return m.messaging.RemovePubsubTopicKey(topic)
 }
 
 // Managing the version of community images is necessary because image URLs are "constant"
@@ -3958,9 +3958,9 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 			}
 		}
 
-		if m.transport != nil && m.transport.WakuVersion() == 2 {
+		if m.messaging != nil {
 			topic := community.PubsubTopic()
-			privKey, err := m.transport.RetrievePubsubTopicKey(topic)
+			privKey, err := m.messaging.RetrievePubsubTopicKey(topic)
 			if err != nil {
 				return err
 			}

@@ -116,10 +116,6 @@ func (s *FiltersManagerSuite) TestPartitionedTopicWithDiscoveryDisabled() {
 	s.Require().NoError(err)
 
 	s.Require().Equal(3, len(s.chats.filters), "It creates three filters")
-
-	discoveryFilter := s.chats.filters[discoveryTopic]
-	s.Require().Nil(discoveryFilter, "It does not add the discovery filter")
-
 	s.assertRequiredFilters()
 }
 
