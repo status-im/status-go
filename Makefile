@@ -176,7 +176,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 		$(BUILD_FLAGS_MOBILE) \
 		--androidapi="23" \
 		-o build/bin/statusgo.aar \
-		github.com/status-im/status-go/mobile
+		github.com/status-im/status-go/mobile  # Omit "/v10", because GO111MODULE=off
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
 statusgo-ios: generate
@@ -189,7 +189,7 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 		-tags 'nowatchdog $(BUILD_TAGS) disable_torrent' \
 		$(BUILD_FLAGS_MOBILE) \
 		-o build/bin/Statusgo.xcframework \
-		github.com/status-im/status-go/mobile
+		github.com/status-im/status-go/mobile  # Omit "/v10", because GO111MODULE=off
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.xcframework"
 
 statusgo-library: generate

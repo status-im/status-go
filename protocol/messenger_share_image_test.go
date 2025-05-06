@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	// "github.com/status-im/status-go/protocol/requests"
 )
 
 func TestMessengerShareMessageSuite(t *testing.T) {
