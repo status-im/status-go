@@ -28,6 +28,41 @@ var StatusTokenList = fetcher.FetchedTokenList{
   ],
   "tokens": [
     {
+      "address": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+      "name": "Status",
+      "symbol": "SNT",
+      "decimals": 18,
+      "chainId": 31337
+    },
+    {
+      "address": "0x744d70FDBE2Ba4CF95131626614a1763DF805B9E",
+      "name": "Status",
+      "symbol": "SNT",
+      "decimals": 18,
+      "chainId": 1
+    },
+    {
+      "address": "0x650AF3C15AF43dcB218406d30784416D64Cfb6B2",
+      "name": "Status",
+      "symbol": "SNT",
+      "decimals": 18,
+      "chainId": 10
+    },
+    {
+      "address": "0x707F635951193dDaFBB40971a0fCAAb8A6415160",
+      "name": "Status",
+      "symbol": "SNT",
+      "decimals": 18,
+      "chainId": 42161
+    },
+    {
+      "address": "0x662015EC830DF08C0FC45896FaB726542e8AC09E",
+      "name": "Status",
+      "symbol": "SNT",
+      "decimals": 18,
+      "chainId": 8453
+    },
+    {
       "address": "0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359",
       "name": "Sai Stablecoin v1.0",
       "symbol": "SAI",
@@ -1125,13 +1160,6 @@ var StatusTokenList = fetcher.FetchedTokenList{
       "symbol": "USDC",
       "decimals": 6,
       "chainId": 84532
-    },
-    {
-      "address": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
-      "name": "Status",
-      "symbol": "SNT",
-      "decimals": 18,
-      "chainId": 31337
     },
     {
       "address": "0x1C3Ac2a186c6149Ae7Cb4D716eBbD0766E4f898a",
