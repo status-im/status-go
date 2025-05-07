@@ -1,6 +1,7 @@
 package security
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -98,4 +99,24 @@ func getValue(v any) string {
 	default:
 		panic(fmt.Sprintf("unsupported type: %T", v))
 	}
+}
+
+// Value implements the driver.Valuer interface for SensitiveString
+func (s SensitiveString) Value() (driver.Value, error) {
+	return s.value, nil
+}
+
+// Scan implements the sql.Scanner interface for SensitiveString
+func (s *SensitiveString) Scan(value interface{}) error {
+	switch v := value.(type) {
+	case nil:
+		s.value = ""
+	case string:
+		s.value = v
+	case []byte:
+		s.value = string(v)
+	default:
+		return fmt.Errorf("cannot scan type %T into SensitiveString", value)
+	}
+	return nil
 }
