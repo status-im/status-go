@@ -144,9 +144,12 @@ class MessengerSteps(NetworkConditionsSteps):
             community_id = self.community_id
         return node.wakuext_service.fetch_community(community_id)
 
-    def join_community(self, node):
+    def join_community(self, user):
+        return self._join_community(self.community_id, self.sender, user)
+
+    def _join_community(self, community_id, owner, node):
         self.fetch_community(node)
-        response_to_join = node.wakuext_service.request_to_join_community(self.community_id)
+        response_to_join = node.wakuext_service.request_to_join_community(community_id)
         join_id = response_to_join.get("result", {}).get("requestsToJoinCommunity", [{}])[0].get("id")
 
         # I couldn't find any signal related to the requestToJoinCommunity request in the peer node.
@@ -155,7 +158,7 @@ class MessengerSteps(NetworkConditionsSteps):
         retry_interval = 0.5
         for attempt in range(max_retries):
             try:
-                response = self.sender.wakuext_service.accept_request_to_join_community(join_id)
+                response = owner.wakuext_service.accept_request_to_join_community(join_id)
                 if response.get("result"):
                     break
             except Exception as e:
