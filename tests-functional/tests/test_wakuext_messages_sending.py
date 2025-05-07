@@ -1,3 +1,4 @@
+import logging
 from time import sleep
 import pytest
 
@@ -130,3 +131,24 @@ class TestSendingChatMessages(MessengerSteps):
         response = self.receiver.wakuext_service.chat_messages(receiver_chat_id)
         messages = response.get("result", {}).get("messages", [])
         assert len(messages) == 4
+
+
+@pytest.mark.rpc
+class TestCommunityJoin(MessengerSteps):
+    def test_community_simple(self):
+        control_node = self.initialize_backend(self.await_signals, False, wakuV2LightClient=False)
+        control_node.wait_for_online()
+
+        alice = self.initialize_backend(self.await_signals, False, wakuV2LightClient=False)
+        alice.wait_for_online()
+
+        bob = self.initialize_backend(self.await_signals, False, wakuV2LightClient=True)
+        bob.wait_for_online()
+
+        community_id = self.create_community(control_node)
+
+        self._join_community(community_id, control_node, alice)
+        community_chat_id = self._join_community(community_id, control_node, bob)
+
+        logging.info(f"Community chat id: {community_chat_id}")
+
