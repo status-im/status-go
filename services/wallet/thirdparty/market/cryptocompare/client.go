@@ -16,6 +16,10 @@ const baseID = "cryptocompare"
 const extraParamStatus = "Status.im"
 const baseURL = "https://min-api.cryptocompare.com"
 
+// 300 is the max length for fsyms, but we need to subtract the length of the ETH symbol cause we want to add ETH to every chunk
+// to suppress the error from the API for unknown symbols
+const maxFsymsLength = 300 - len("ETH")
+
 type HistoricalPricesContainer struct {
 	Aggregated     bool                         `json:"Aggregated"`
 	TimeFrom       int64                        `json:"TimeFrom"`
@@ -97,7 +101,6 @@ func (c *Client) buildURL(path string) string {
 }
 
 func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]map[string]float64, error) {
-	const maxFsymsLength = 300
 	chunkSymbolParams := utils.ChunkSymbolsParams{
 		MaxCharsPerChunk:    maxFsymsLength,
 		ExtraCharsPerSymbol: 1, // joined with a comma
@@ -109,6 +112,7 @@ func (c *Client) FetchPrices(symbols []string, currencies []string) (map[string]
 	result := make(map[string]map[string]float64)
 	realCurrencies := utils.RenameSymbols(currencies)
 	for _, smbls := range chunks {
+		smbls = append(smbls, "ETH")
 		realSymbols := utils.RenameSymbols(smbls)
 
 		params := url.Values{}
@@ -162,7 +166,6 @@ func (c *Client) FetchTokenDetails(symbols []string) (map[string]thirdparty.Toke
 }
 
 func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
-	const maxFsymsLength = 300
 	chunkSymbolParams := utils.ChunkSymbolsParams{
 		MaxCharsPerChunk:    maxFsymsLength,
 		ExtraCharsPerSymbol: 1, // joined with a comma
@@ -174,6 +177,7 @@ func (c *Client) FetchTokenMarketValues(symbols []string, currency string) (map[
 	realCurrency := utils.GetRealSymbol(currency)
 	item := map[string]thirdparty.TokenMarketValues{}
 	for _, smbls := range chunks {
+		smbls = append(smbls, "ETH")
 		realSymbols := utils.RenameSymbols(smbls)
 
 		params := url.Values{}
