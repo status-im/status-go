@@ -46,24 +46,24 @@ func overrideCoreWithConfig(filteringCore *namespaceFilteringCore, settings LogS
 		return err
 	}
 
-	if settings.File != "" {
-		if settings.MaxBackups == 0 {
-			// Setting MaxBackups to 0 causes all log files to be kept. Even setting MaxAge to > 0 doesn't fix it
-			// Docs: https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2@v2.0.0#readme-cleaning-up-old-log-files
-			settings.MaxBackups = 1
-		}
-		core.UpdateSyncer(ZapSyncerWithRotation(FileOptions{
-			Filename:   settings.File,
-			MaxSize:    settings.MaxSize,
-			MaxBackups: settings.MaxBackups,
-			Compress:   settings.CompressRotated,
-		}))
-	} else {
-		// run TestLoginWithKey will get error: sync /dev/stdout: bad file descriptor
-		// use bufio.NewWriter to wrap os.Stderr to fix it
-		writer := bufio.NewWriter(os.Stderr)
-		core.UpdateSyncer(zapcore.Lock(zapcore.AddSync(writer)))
-	}
+	//if settings.File != "" {
+	//	if settings.MaxBackups == 0 {
+	//		// Setting MaxBackups to 0 causes all log files to be kept. Even setting MaxAge to > 0 doesn't fix it
+	//		// Docs: https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2@v2.0.0#readme-cleaning-up-old-log-files
+	//		settings.MaxBackups = 1
+	//	}
+	//	core.UpdateSyncer(ZapSyncerWithRotation(FileOptions{
+	//		Filename:   settings.File,
+	//		MaxSize:    settings.MaxSize,
+	//		MaxBackups: settings.MaxBackups,
+	//		Compress:   settings.CompressRotated,
+	//	}))
+	//} else {
+	// run TestLoginWithKey will get error: sync /dev/stdout: bad file descriptor
+	// use bufio.NewWriter to wrap os.Stderr to fix it
+	writer := bufio.NewWriter(os.Stderr)
+	core.UpdateSyncer(zapcore.Lock(zapcore.AddSync(writer)))
+	//}
 
 	// FIXME: remove go-libp2p logging altogether
 	// go-libp2p logger
