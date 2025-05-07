@@ -903,8 +903,14 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		if err != nil {
 			return nil, err
 		}
+		var feedUrl string
+		if gocommon.IsMobilePlatform() {
+			feedUrl = newsfeed.STATUS_MOBILE_FEED_URL
+		} else {
+			feedUrl = newsfeed.STATUS_DESKTOP_FEED_URL
+		}
 		m.newsFeedManager = newsfeed.NewNewsFeedManager(
-			newsfeed.WithURL(newsfeed.STATUS_FEED_URL),
+			newsfeed.WithURL(feedUrl),
 			newsfeed.WithParser(gofeed.NewParser()),
 			newsfeed.WithHandler(m),
 			newsfeed.WithLogger(m.logger),

@@ -8,7 +8,7 @@ import (
 	"github.com/mmcdole/gofeed"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/internal/newsfeed"
+	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 type MessengerNewsFeedSuite struct {
@@ -19,15 +19,13 @@ type MessengerNewsFeedSuite struct {
 func (s *MessengerNewsFeedSuite) SetupTest() {
 	s.MessengerBaseTestSuite.SetupTest()
 
-	s.m = s.newMessenger()
-	s.m.newsFeedManager = newsfeed.NewNewsFeedManager(
-		newsfeed.WithURL(newsfeed.STATUS_FEED_URL),
-		newsfeed.WithParser(gofeed.NewParser()),
-		newsfeed.WithHandler(s.m),
-		newsfeed.WithLogger(s.m.logger),
-		newsfeed.WithPollingInterval(30*time.Minute),
-		newsfeed.WithFetchFrom(time.Now().Add(-1*time.Hour)),
-	)
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, []Option{WithNewsFeed()})
+	s.Require().NoError(err)
+
+	s.m = messenger
 }
 
 func TestMessengerNewsFeedSuite(t *testing.T) {
