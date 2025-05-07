@@ -14,95 +14,99 @@ type SensitiveStringSuite struct {
 }
 
 // SensitiveStringSuite is the test suite for all SensitiveString behaviors.
-func (suite *SensitiveStringSuite) TestNewSensitiveString() {
+func (s *SensitiveStringSuite) TestNewSensitiveString() {
 	secretValue := gofakeit.LetterN(10)
-	s := NewSensitiveString(secretValue)
-	suite.Require().Equal(secretValue, s.Reveal())
+	ss := NewSensitiveString(secretValue)
+	s.Require().Equal(secretValue, ss.Reveal())
 }
 
-func (suite *SensitiveStringSuite) TestStringRedaction() {
+func (s *SensitiveStringSuite) TestStringRedaction() {
 	secretValue := gofakeit.LetterN(10)
-	s := NewSensitiveString(secretValue)
-	suite.Require().Equal(RedactionPlaceholder, s.String())
+	ss := NewSensitiveString(secretValue)
+	s.Require().Equal(RedactionPlaceholder, ss.String())
 }
 
-func (suite *SensitiveStringSuite) TestEmptyStringRedaction() {
-	s := NewSensitiveString("")
-	suite.Require().Equal("", s.String())
+func (s *SensitiveStringSuite) TestEmptyStringRedaction() {
+	ss := NewSensitiveString("")
+	s.Require().Equal("", ss.String())
 }
 
-func (suite *SensitiveStringSuite) TestMarshalJSON() {
+func (s *SensitiveStringSuite) TestMarshalJSON() {
 	secretValue := gofakeit.LetterN(10)
-	s := NewSensitiveString(secretValue)
+	ss := NewSensitiveString(secretValue)
 
-	data, err := json.Marshal(s)
-	suite.Require().NoError(err)
-	suite.Require().JSONEq(`"`+RedactionPlaceholder+`"`, string(data))
+	data, err := json.Marshal(ss)
+	s.Require().NoError(err)
+	s.Require().JSONEq(`"`+RedactionPlaceholder+`"`, string(data))
 }
 
-func (suite *SensitiveStringSuite) TestMarshalJSONPointer() {
+func (s *SensitiveStringSuite) TestMarshalJSONPointer() {
 	secretValue := gofakeit.LetterN(10)
 	sVal := NewSensitiveString(secretValue)
 
 	data, err := json.Marshal(&sVal)
-	suite.Require().NoError(err)
-	suite.Require().JSONEq(`"`+RedactionPlaceholder+`"`, string(data))
+	s.Require().NoError(err)
+	s.Require().JSONEq(`"`+RedactionPlaceholder+`"`, string(data))
 }
 
-func (suite *SensitiveStringSuite) TestUnmarshalJSON() {
+func (s *SensitiveStringSuite) TestUnmarshalJSON() {
 	secretValue := gofakeit.LetterN(10)
 	payload := `"` + secretValue + `"`
-	var s SensitiveString
+	var ss SensitiveString
 
-	suite.Require().NoError(json.Unmarshal([]byte(payload), &s))
-	suite.Require().Equal(secretValue, s.Reveal())
+	s.Require().NoError(json.Unmarshal([]byte(payload), &ss))
+	s.Require().Equal(secretValue, ss.Reveal())
 }
 
-func (suite *SensitiveStringSuite) TestUnmarshalJSONError() {
+func (s *SensitiveStringSuite) TestUnmarshalJSONError() {
 	// Can't unmarshal a non-string value
-	var s SensitiveString
+	var ss SensitiveString
 	payload := `{"key":"value"}`
-	suite.Require().Error(json.Unmarshal([]byte(payload), &s))
+	s.Require().Error(json.Unmarshal([]byte(payload), &ss))
 }
 
-func (suite *SensitiveStringSuite) TestCopySensitiveString() {
+func (s *SensitiveStringSuite) TestCopySensitiveString() {
 	secretValue := gofakeit.LetterN(10)
-	s := NewSensitiveString(secretValue)
-	sCopy := s
-	suite.Require().Equal(secretValue, sCopy.Reveal())
+	ss := NewSensitiveString(secretValue)
+	ssCopy := ss
+	s.Require().Equal(secretValue, ssCopy.Reveal())
 }
 
-func (suite *SensitiveStringSuite) TestPlus() {
+func (s *SensitiveStringSuite) TestPlus() {
 	secretValue := gofakeit.LetterN(10)
 	s1 := NewSensitiveString(secretValue)
 	s2 := NewSensitiveString(secretValue)
 
-	suite.Require().Equal(s1.Plus(s2), NewSensitiveString(secretValue+secretValue))
+	s.Require().Equal(s1.Plus(s2), NewSensitiveString(secretValue+secretValue))
+	s.Require().Equal(s1.Plus(secretValue), NewSensitiveString(secretValue+secretValue))
 }
 
-func (suite *SensitiveStringSuite) TestPlusString() {
-	secretValue := gofakeit.LetterN(10)
+func (s *SensitiveStringSuite) TestTrimRight() {
+	const secretValue = "¡¡¡Hello, Gophers!!!" // #nosec G101
 	s1 := NewSensitiveString(secretValue)
 
-	suite.Require().Equal(s1.PlusString(secretValue), NewSensitiveString(secretValue+secretValue))
-}
-
-func (suite *SensitiveStringSuite) TestTrimRight() {
-	secretValue := "¡¡¡Hello, Gophers!!!" // #nosec G101
-	s1 := NewSensitiveString(secretValue)
-
-	suite.Require().Equal(
+	s.Require().Equal(
 		s1.TrimRight("!"),
 		NewSensitiveString("¡¡¡Hello, Gophers"),
 	)
 }
 
-func (suite *SensitiveStringSuite) TestContains() {
-	secretValue := "¡¡¡Hello, Gophers!!!" // #nosec G101
+func (s *SensitiveStringSuite) TestContains() {
+	const secretValue = "¡¡¡Hello, Gophers!!!" // #nosec G101
 	s1 := NewSensitiveString(secretValue)
 
-	suite.Require().True(s1.Contains("Hello"))
-	suite.Require().False(s1.Contains("World"))
+	s.Require().True(s1.Contains("Hello"))
+	s.Require().False(s1.Contains("World"))
+}
+
+func (s *SensitiveStringSuite) TestAppend() {
+	secretValue := gofakeit.LetterN(10)
+	s1 := NewSensitiveString(secretValue)
+	s2 := NewSensitiveString(secretValue)
+
+	s.Require().Equal(s1.Append(s2), NewSensitiveString(secretValue+secretValue))
+	s.Require().Equal(s1.Append(secretValue), NewSensitiveString(secretValue+secretValue))
+	s.Require().Equal(s1.Append(secretValue, secretValue), NewSensitiveString(secretValue+secretValue+secretValue))
 }
 
 // Entry point for the suite

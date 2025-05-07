@@ -68,18 +68,34 @@ func (s SensitiveString) NotEmpty() bool {
 	return !s.Empty()
 }
 
-func (s SensitiveString) Plus(other SensitiveString) SensitiveString {
-	return NewSensitiveString(s.value + other.value)
+func (s SensitiveString) Plus(other any) SensitiveString {
+	return NewSensitiveString(s.value + getValue(other))
 }
 
-func (s SensitiveString) PlusString(other string) SensitiveString {
-	return NewSensitiveString(s.value + other)
+func (s SensitiveString) TrimRight(cutset any) SensitiveString {
+	return NewSensitiveString(strings.TrimRight(s.value, getValue(cutset)))
 }
 
-func (s SensitiveString) TrimRight(cutset string) SensitiveString {
-	return NewSensitiveString(strings.TrimRight(s.value, cutset))
+func (s SensitiveString) Contains(substr any) bool {
+	return strings.Contains(s.value, getValue(substr))
 }
 
-func (s SensitiveString) Contains(substr string) bool {
-	return strings.Contains(s.value, substr)
+func (s SensitiveString) Append(others ...any) SensitiveString {
+	result := s.value
+	for _, other := range others {
+		result += getValue(other)
+	}
+	return NewSensitiveString(result)
+}
+
+// getValue extracts the string value from various types
+func getValue(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case SensitiveString:
+		return x.value
+	default:
+		panic(fmt.Sprintf("unsupported type: %T", v))
+	}
 }

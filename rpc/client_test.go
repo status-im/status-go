@@ -154,7 +154,7 @@ func TestGetClientsUsingCache(t *testing.T) {
 			providers = append(providers, params.RpcProvider{
 				Name:         fmt.Sprintf("Provider%d", i+1),
 				ChainID:      1,
-				URL:          security.NewSensitiveString(baseURL).PlusString(path),
+				URL:          security.NewSensitiveString(baseURL).Plus(path),
 				Type:         params.EmbeddedProxyProviderType,
 				AuthType:     params.BasicAuth,
 				AuthLogin:    security.NewSensitiveString("incorrectUser"),
