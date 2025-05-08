@@ -168,7 +168,8 @@ status-go-deps:
 statusgo-android: generate
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
-	export GO111MODULE=off; \
+	export GOFLAGS="-mod=readonly"; \
+	export GO111MODULE=on; \
 	gomobile init; \
 	gomobile bind -v \
 		-target=android -ldflags="-s -w" \
@@ -182,7 +183,8 @@ statusgo-android: ##@cross-compile Build status-go for Android
 statusgo-ios: generate
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
-	export GO111MODULE=off; \
+	export GOFLAGS="-mod=readonly"; \
+	export GO111MODULE=on; \
 	gomobile init; \
 	gomobile bind -v \
 		-target=ios -ldflags="-s -w" \
