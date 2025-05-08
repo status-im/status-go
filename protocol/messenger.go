@@ -335,7 +335,7 @@ func NewMessenger(
 	messaging, err := messaging.NewCore(
 		waku,
 		identity,
-		database,
+		common.NewMessagingPersistence(database),
 		messaging.WithLogger(logger),
 		messaging.WithEnvelopeEventsConfig(c.envelopeEventsConfig),
 	)

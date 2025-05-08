@@ -85,7 +85,7 @@ func (s *MessageSenderSuite) SetupTest() {
 	messaging, err := messaging.NewCore(
 		shh,
 		identity,
-		database,
+		NewMessagingPersistence(database),
 		messaging.WithLogger(s.logger),
 	)
 	s.Require().NoError(err)

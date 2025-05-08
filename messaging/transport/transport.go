@@ -3,7 +3,6 @@ package transport
 import (
 	"context"
 	"crypto/ecdsa"
-	"database/sql"
 	"sync"
 	"time"
 
@@ -76,9 +75,8 @@ type Transport struct {
 	keysManager *transportKeysManager
 	filters     *FiltersManager
 	logger      *zap.Logger
-	cache       *ProcessedMessageIDsCache
+	cache       ProcessedMessageIDsCachePersistence
 
-	mailservers      []string
 	envelopesMonitor *EnvelopesMonitor
 	quit             chan struct{}
 }
@@ -91,14 +89,13 @@ type Transport struct {
 func NewTransport(
 	waku wakutypes.Waku,
 	privateKey *ecdsa.PrivateKey,
-	db *sql.DB,
-	sqlitePersistenceTableName string,
-	mailservers []string,
+	keysPersistence KeysPersistence,
+	messageIDsCachePersistence ProcessedMessageIDsCachePersistence,
 	envelopesMonitorConfig *EnvelopesMonitorConfig,
 	logger *zap.Logger,
 	opts ...Option,
 ) (*Transport, error) {
-	filtersManager, err := NewFiltersManager(newSQLitePersistence(db, sqlitePersistenceTableName), waku, privateKey, logger)
+	filtersManager, err := NewFiltersManager(keysPersistence, waku, privateKey, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +113,7 @@ func NewTransport(
 	t := &Transport{
 		waku:             waku,
 		api:              api,
-		cache:            NewProcessedMessageIDsCache(db),
+		cache:            messageIDsCachePersistence,
 		envelopesMonitor: envelopesMonitor,
 		quit:             make(chan struct{}),
 		keysManager: &transportKeysManager{
@@ -124,9 +121,8 @@ func NewTransport(
 			privateKey:        privateKey,
 			passToSymKeyCache: make(map[string]string),
 		},
-		filters:     filtersManager,
-		mailservers: mailservers,
-		logger:      logger.With(zap.Namespace("Transport")),
+		filters: filtersManager,
+		logger:  logger.With(zap.Namespace("Transport")),
 	}
 
 	for _, opt := range opts {

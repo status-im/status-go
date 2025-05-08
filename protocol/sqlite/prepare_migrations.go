@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	wakumigrations "github.com/status-im/status-go/messaging/transport/migrations"
 	encryptmigrations "github.com/status-im/status-go/protocol/encryption/migrations"
 	appmigrations "github.com/status-im/status-go/protocol/migrations"
 	push_notification_client_migrations "github.com/status-im/status-go/protocol/pushnotificationclient/migrations"
@@ -20,10 +19,6 @@ type migrationsWithGetter struct {
 }
 
 var defaultMigrations = []migrationsWithGetter{
-	{
-		Names:  wakumigrations.AssetNames(),
-		Getter: wakumigrations.Asset,
-	},
 	{
 		Names:  encryptmigrations.AssetNames(),
 		Getter: encryptmigrations.Asset,

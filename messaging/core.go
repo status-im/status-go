@@ -2,7 +2,6 @@ package messaging
 
 import (
 	"crypto/ecdsa"
-	"database/sql"
 
 	"go.uber.org/zap"
 
@@ -17,7 +16,7 @@ type Core struct {
 	logger                 *zap.Logger
 }
 
-func NewCore(waku wakutypes.Waku, identity *ecdsa.PrivateKey, db *sql.DB, options ...Options) (*Core, error) {
+func NewCore(waku wakutypes.Waku, identity *ecdsa.PrivateKey, persistence Persistence, options ...Options) (*Core, error) {
 	core := &Core{
 		envelopesMonitorConfig: &transport.EnvelopesMonitorConfig{
 			IsMailserver: func(types.EnodeID) bool { return false },
@@ -37,9 +36,8 @@ func NewCore(waku wakutypes.Waku, identity *ecdsa.PrivateKey, db *sql.DB, option
 	core.transport, err = transport.NewTransport(
 		waku,
 		identity,
-		db,
-		"wakuv2_keys",
-		nil,
+		&keysPersistenceAdapter{p: persistence},
+		&processedMessageIDsCacheAdapter{p: persistence},
 		core.envelopesMonitorConfig,
 		core.logger,
 	)
