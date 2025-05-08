@@ -14,6 +14,8 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/go-playground/validator.v9"
 
+	_ "golang.org/x/tools/go/packages"
+
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/zxcvbn-go"
