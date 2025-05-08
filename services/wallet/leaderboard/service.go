@@ -162,7 +162,7 @@ func (s *MarketDataService) sendLeaderboardPageUpdate() {
 func (s *MarketDataService) FetchLeaderboardPageAsync(page, pageSize, sortOrder int, currency string) {
 	s.scheduler.Enqueue(fetchLeaderboardPageTask, func(ctx context.Context) (interface{}, error) {
 		if s.storage.IsDataStale() {
-			s.fetcher.FetchMarkets(ctx)
+			s.fetcher.FetchMarkets(ctx) //nolint:errcheck
 		}
 		result, err := s.storage.GetLeaderboardPage(page, pageSize, sortOrder, currency)
 		if err != nil {
