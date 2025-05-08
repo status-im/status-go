@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/internal/newsfeed"
 	"github.com/status-im/status-go/messaging"
+	"github.com/status-im/status-go/messaging/transport"
 	"github.com/status-im/status-go/metrics/wakumetrics"
 	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 
@@ -331,6 +332,8 @@ func NewMessenger(
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to apply migrations")
 	}
+
+	_ = transport.Filter{}
 
 	messaging, err := messaging.NewCore(
 		waku,
