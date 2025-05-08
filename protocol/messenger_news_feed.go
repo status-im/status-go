@@ -19,9 +19,11 @@ func (m *Messenger) HandleFeedItem(feedItem *gofeed.Item) (*MessengerResponse, e
 	if feedItem.Image != nil {
 		imageURL = feedItem.Image.URL
 	}
+	newsLink := ""
 	newsLinkLabel := ""
 	if feedItem.Custom != nil {
-		newsLinkLabel = feedItem.Custom["linkLabel"]
+		newsLink = feedItem.Custom["newsLink"]
+		newsLinkLabel = feedItem.Custom["newsLinkLabel"]
 	}
 
 	id, err := uuid.NewRandom()
@@ -39,7 +41,7 @@ func (m *Messenger) HandleFeedItem(feedItem *gofeed.Item) (*MessengerResponse, e
 		NewsDescription: feedItem.Description,
 		NewsContent:     feedItem.Content,
 		NewsImageURL:    imageURL,
-		NewsLink:        feedItem.Link,
+		NewsLink:        newsLink,
 		NewsLinkLabel:   newsLinkLabel,
 	}
 
