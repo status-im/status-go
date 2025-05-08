@@ -46,7 +46,7 @@ type RpcProvider struct {
 // GetFullURL returns the URL with auth token if TokenAuth is used
 func (p RpcProvider) GetFullURL() security.SensitiveString {
 	if p.AuthType == TokenAuth && p.AuthToken.NotEmpty() {
-		return p.URL.TrimRight("/").Plus("/").Plus(p.AuthToken)
+		return p.URL.TrimRight("/").Append("/", p.AuthToken)
 	}
 	return p.URL
 }

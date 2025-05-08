@@ -72,15 +72,6 @@ func (s *SensitiveStringSuite) TestCopySensitiveString() {
 	s.Require().Equal(secretValue, ssCopy.Reveal())
 }
 
-func (s *SensitiveStringSuite) TestPlus() {
-	secretValue := gofakeit.LetterN(10)
-	s1 := NewSensitiveString(secretValue)
-	s2 := NewSensitiveString(secretValue)
-
-	s.Require().Equal(s1.Plus(s2), NewSensitiveString(secretValue+secretValue))
-	s.Require().Equal(s1.Plus(secretValue), NewSensitiveString(secretValue+secretValue))
-}
-
 func (s *SensitiveStringSuite) TestTrimRight() {
 	const secretValue = "¡¡¡Hello, Gophers!!!" // #nosec G101
 	s1 := NewSensitiveString(secretValue)

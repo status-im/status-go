@@ -24,10 +24,10 @@ func CreateEthClientFromProvider(provider params.RpcProvider, rpcUserAgentName s
 	// Set up authentication if needed
 	switch provider.AuthType {
 	case params.BasicAuth:
-		authEncoded := base64.StdEncoding.EncodeToString([]byte(provider.AuthLogin.Plus(":").Plus(provider.AuthPassword).Reveal()))
+		authEncoded := base64.StdEncoding.EncodeToString([]byte(provider.AuthLogin.Append(":", provider.AuthPassword).Reveal()))
 		headers.Set("Authorization", "Basic "+authEncoded)
 	case params.TokenAuth:
-		provider.URL = provider.URL.Plus(provider.AuthToken)
+		provider.URL = provider.URL.Append(provider.AuthToken)
 	case params.NoAuth:
 		// no-op
 	default:

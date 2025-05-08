@@ -69,10 +69,6 @@ func (s SensitiveString) NotEmpty() bool {
 	return !s.Empty()
 }
 
-func (s SensitiveString) Plus(other any) SensitiveString {
-	return NewSensitiveString(s.value + getValue(other))
-}
-
 func (s SensitiveString) TrimRight(cutset any) SensitiveString {
 	return NewSensitiveString(strings.TrimRight(s.value, getValue(cutset)))
 }
