@@ -1,8 +1,9 @@
 import os
+import sys
+import threading
 from dataclasses import dataclass, field
 from typing import List
 import pytest
-
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -69,7 +70,7 @@ def pytest_addoption(parser):
         "--push-fleets-config",
         action="store",
         help="Path to a local JSON file with Push Notifications fleets configuration. Default value is a path to config in Docker to run 1 pn-server",
-        default="",
+        default="/static/configs/pushfleetconfig.json",
     )
 
 

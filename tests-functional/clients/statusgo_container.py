@@ -7,6 +7,7 @@ import threading
 import docker
 import docker.errors
 import random
+# import netifaces
 
 from conftest import option
 from docker.errors import APIError
@@ -16,6 +17,11 @@ DATA_DIR = "/usr/status-user"
 
 class StatusGoContainer:
     container = None
+
+    @staticmethod
+    def network_name():
+        docker_project_name = option.docker_project_name
+        return f"{docker_project_name}_default"
 
     def __init__(self, entrypoint, ports=None, privileged=False, container_name_suffix=""):
         if ports is None:
@@ -29,7 +35,7 @@ class StatusGoContainer:
         # NOTE: This part needs some love.
         #       There's magic with `docker_project_name`, `docker_image` and `identifier` variables.
         docker_project_name = option.docker_project_name
-        self.network_name = f"{docker_project_name}_default"
+        self.network_name = self.network_name()
         git_commit = os.popen("git rev-parse --short HEAD").read().strip()
         identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else git_commit
         image_name = option.docker_image or f"statusgo-{identifier}:latest"
@@ -53,6 +59,9 @@ class StatusGoContainer:
                     "bind": "/coverage/binary",
                     "mode": "rw",
                 }
+            },
+            "extra_hosts": {
+                "host.docker.internal": "host-gateway",
             },
             "entrypoint": entrypoint,
             "ports": ports,
@@ -174,6 +183,17 @@ class StatusGoContainer:
                 return os.path.join(temp_dir, tar.getmembers()[0].name)
 
         return temp_dir
+
+    @staticmethod
+    def get_bridge_ip():
+        client = docker.from_env()
+        network = client.networks.get("bridge")  # default bridge network
+        for config in network.attrs.get("IPAM", {}).get("Config", []):
+            gateway = config.get("Gateway")
+            if gateway:
+                return gateway  # typically 172.17.0.1
+
+        raise RuntimeError("No bridge gateway found")
 
     def save_logs(self):
         if not self.container:
