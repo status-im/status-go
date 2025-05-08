@@ -136,28 +136,22 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
-	waku, err := s.n.GetWakuV2(nil)
-	if err != nil {
-		return err
-	}
-
 	ensVerifier := ens.New(
-		s.n,
 		logger,
-		waku, // timesource
+		s.waku, // timesource
 		appDb,
 		s.config.ShhextConfig.VerifyENSURL,
 		s.config.ShhextConfig.VerifyENSContractAddress,
 	)
 
-	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsFeed, ensVerifier)
+	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopeEventsConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{}, accountManager, accountsFeed, ensVerifier)
 	if err != nil {
 		return err
 	}
 
 	messenger, err := protocol.NewMessenger(
 		identity,
-		waku,
+		s.waku,
 		s.config.ShhextConfig.InstallationID,
 		options...,
 	)

@@ -77,7 +77,6 @@ func newTestMessenger(waku wakutypes.Waku, config testMessengerConfig) (*Messeng
 	}
 
 	ensVerifier := ens.New(
-		&testNode{shh: waku},
 		config.logger,
 		waku, // timesource
 		appDb,
