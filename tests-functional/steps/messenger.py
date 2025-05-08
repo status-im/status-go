@@ -147,10 +147,12 @@ class MessengerSteps(NetworkConditionsSteps):
     def join_community(self, user):
         return self._join_community(self.community_id, self.sender, user)
 
-    def _join_community(self, community_id, owner, node):
-        self.fetch_community(node)
-        response_to_join = node.wakuext_service.request_to_join_community(community_id)
+    def _join_community(self, community_id, owner, user):
+        self.fetch_community(user)
+        response_to_join = user.wakuext_service.request_to_join_community(community_id)
         join_id = response_to_join.get("result", {}).get("requestsToJoinCommunity", [{}])[0].get("id")
+
+        logging.info(f"Request to join sent: user_public_key = {user.public_key}, community_id = {community_id}, join_id = {join_id}")
 
         # I couldn't find any signal related to the requestToJoinCommunity request in the peer node.
         # That's why I need this retry logic for accepting the request to join the community.
@@ -168,8 +170,29 @@ class MessengerSteps(NetworkConditionsSteps):
             raise Exception(f"Failed to accept request to join community in {max_retries * retry_interval} seconds.")
 
         chats = response.get("result", {}).get("communities", [{}])[0].get("chats", {})
-        chat_id = list(chats.keys())[0] if chats else None
-        return self.community_id + chat_id
+        channel_id = list(chats.keys())[0] if chats else None
+        chat_id = self.community_id + channel_id
+
+        logging.info(f"Request to join accepted: user_public_key = {user.public_key}, community_id = {community_id}, join_id = {join_id}")
+
+        # Wait for COMMUNITY_REQUEST_TO_JOIN_RESPONSE
+
+        def condition(signal):
+            requests = signal.get("event", {}).get('requestsToJoinCommunity', [])
+            return len(requests) > 0
+        signal = user.find_signal_matching_condition(
+            SignalType.MESSAGES_NEW.value,
+            condition,
+        )
+
+        requests_to_join_community = signal.get("event", {}).get('requestsToJoinCommunity', [])
+        assert len(requests_to_join_community) == 1
+        assert requests_to_join_community[0].get('id') == join_id
+        assert requests_to_join_community[0].get('state') == 3 # TODO: enum from https://github.com/status-im/status-go/blob/3ef445dbcfed01f9481b2885ca36e32e811e488a/protocol/communities/request_to_join.go#L15-L23
+
+        logging.info(f"Request to join accepted: user_public_key = {user.public_key}, community_id = {community_id}, join_id = {join_id}")
+
+        return chat_id
 
     @retry(stop=stop_after_delay(20), wait=wait_fixed(0.5), reraise=True)
     def leave_the_community(self, node, community_id=None):

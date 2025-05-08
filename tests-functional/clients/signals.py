@@ -113,19 +113,23 @@ class SignalClient:
         signal = self.wait_for_signal(SignalType.NODE_LOGOUT.value)
         return signal
 
-    def find_signal_containing_pattern(self, signal_type, event_pattern, timeout=20):
+    def find_signal_matching_condition(self, signal_type, condition_fn, timeout=20):
         start_time = time.time()
         while True:
             if time.time() - start_time >= timeout:
-                raise TimeoutError(f"Signal {signal_type} containing {event_pattern} is not received in {timeout} seconds")
+                raise TimeoutError(f"Signal {signal_type} matching condition {condition_fn} is not received in {timeout} seconds")
             if not self.received_signals.get(signal_type):
                 time.sleep(0.2)
                 continue
             for event in self.received_signals[signal_type]["received"]:
-                if event_pattern in json.dumps(event):
-                    logging.info(f"Signal {signal_type} containing {event_pattern} is received in {round(time.time() - start_time)} seconds")
+                if condition_fn(event):
+                    logging.info(f"Signal {signal_type} matching condition {condition_fn} is received in {round(time.time() - start_time)} seconds")
                     return event
             time.sleep(0.2)
+
+    def find_signal_containing_pattern(self, signal_type, event_pattern, timeout=20):
+        condition_fn = lambda event: event_pattern in json.dumps(event)
+        return self.find_signal_matching_condition(signal_type, condition_fn, timeout)
 
     def _on_error(self, ws, error):
         logging.error(f"Error: {error}")
