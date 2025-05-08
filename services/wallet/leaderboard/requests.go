@@ -76,7 +76,7 @@ func (h *RequestHandler) createRequest(ctx context.Context, endpoint string, eta
 	}
 
 	// Add authentication
-	req.SetBasicAuth(h.config.Login, h.config.Password)
+	req.SetBasicAuth(h.config.User, h.config.Password)
 
 	// Add headers for features
 	if h.config.AllowGzip {

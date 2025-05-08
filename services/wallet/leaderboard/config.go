@@ -13,7 +13,7 @@ const (
 type ServiceConfig struct {
 	// API connection settings
 	ProxyURL string
-	Login    string
+	User     string
 	Password string
 
 	// Refresh intervals (in seconds)
@@ -41,7 +41,7 @@ func NewLeaderbordConfig(config params.MarketDataProxyConfig) ServiceConfig {
 	// Create a new ServiceConfig instance with default values
 	serviceConfig := ServiceConfig{
 		ProxyURL:            config.Url,
-		Login:               config.Login,
+		User:                config.User,
 		Password:            config.Password,
 		FullDataInterval:    config.FullDataRefreshInterval,
 		PriceUpdateInterval: config.PriceRefreshInterval,

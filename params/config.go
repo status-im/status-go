@@ -446,7 +446,7 @@ type WalletConfig struct {
 
 type MarketDataProxyConfig struct {
 	Url                     string `json:"Url"`
-	Login                   string `json:"Login"`
+	User                    string `json:"User"`
 	Password                string `json:"Password"`
 	FullDataRefreshInterval int    `json:"FullDataRefreshInterval"`
 	PriceRefreshInterval    int    `json:"PriceRefreshInterval"`
