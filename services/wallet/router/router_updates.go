@@ -17,7 +17,7 @@ var (
 	newBlockCheckIntervalOptimism      = 1 * time.Second
 	newBlockCheckIntervalArbitrum      = 200 * time.Millisecond
 	newBlockCheckIntervalBase          = 1 * time.Second
-	newBlockCheckIntervalBSC           = 1 * time.Second
+	newBlockCheckIntervalBSC           = 3 * time.Second
 	newBlockCheckIntervalStatusNetwork = 1 * time.Second
 	newBlockCheckIntervalAnvilMainnet  = 2 * time.Second
 
