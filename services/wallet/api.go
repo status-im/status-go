@@ -707,6 +707,12 @@ func (api *API) SendRouterTransactionsWithSignatures(ctx context.Context, sendIn
 	api.s.routeExecutionManager.SendRouterTransactionsWithSignatures(ctx, sendInputParams)
 }
 
+// ReevaluateRouterPath reevaluates the tx-fields from the router path that matches the provided pathTxIdentity and sends signal.SuggestedRoutes.
+func (api *API) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *requests.PathTxIdentity) error {
+	logutils.ZapLogger().Debug("wallet.api.ReevaluateRouterPath")
+	return api.s.routeExecutionManager.ReevaluateRouterPath(ctx, pathTxIdentity)
+}
+
 func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []wcommon.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {
 	logutils.ZapLogger().Debug("wallet.api.GetMultiTransactions", zap.Int("IDs.len", len(transactionIDs)))
 	return api.s.transactionManager.GetMultiTransactions(ctx, transactionIDs)
