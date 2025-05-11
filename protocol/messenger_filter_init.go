@@ -24,7 +24,16 @@ func (m *Messenger) InitFilters() error {
 	rand.Seed(time.Now().Unix())
 
 	// Community requests will arrive in this pubsub topic
-	if err := m.SubscribeToPubsubTopic(wakuv2.DefaultNonProtectedPubsubTopic(), nil); err != nil {
+	// TODO depracate
+	if err := m.SubscribeToPubsubTopic(wakuv2.DefaultNonProtectedPubsubTopic()); err != nil {
+		return err
+	}
+	// TODO only subscribe if interested in communities
+	if err := m.SubscribeToPubsubTopic(wakuv2.GlobalCommunityControlPubsubTopic()); err != nil {
+		return err
+	}
+	// TODO only subscribe if interested in communities
+	if err := m.SubscribeToPubsubTopic(wakuv2.GlobalCommunityContentPubsubTopic()); err != nil {
 		return err
 	}
 

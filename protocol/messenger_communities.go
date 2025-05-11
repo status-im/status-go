@@ -1045,20 +1045,7 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 }
 
 func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *wakuv2.Shard) error {
-	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
-	pubsubTopic := shard.PubsubTopic()
-
-	privK, err := m.messaging.RetrievePubsubTopicKey(pubsubTopic)
-	if err != nil {
-		return err
-	}
-
-	var pubK *ecdsa.PublicKey
-	if privK != nil {
-		pubK = &privK.PublicKey
-	}
-
-	return m.messaging.SubscribeToPubsubTopic(pubsubTopic, pubK)
+	return m.messaging.SubscribeToPubsubTopic(shard.PubsubTopic())
 }
 
 func (m *Messenger) unsubscribeFromShard(shard *wakuv2.Shard) error {
@@ -2498,6 +2485,13 @@ func (m *Messenger) DefaultFilters(o *communities.Community) messaging.ChatsToIn
 		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: uncompressedPubKey, PubsubTopic: wakuv2.DefaultNonProtectedPubsubTopic()},
+
+		// While we migrate to 128 and 256 shards, we listen to community messages in the new shards as well as in the old ones. After migration we should remove the old ones
+		{ChatID: cID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()},
+		{ChatID: updatesChannelID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()},
+		{ChatID: mlChannelID, PubsubTopic: wakuv2.GlobalCommunityControlPubsubTopic()},
+		{ChatID: memberUpdateChannelID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()}, // Making content since chat messages are sent in this contenttopic
+		{ChatID: uncompressedPubKey, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()},
 	}
 
 	return chats

@@ -5,6 +5,8 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -162,6 +164,8 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 
 		topics := make([]string, 0)
 		topics = append(topics, wakuv2.DefaultNonProtectedPubsubTopic())
+		topics = append(topics, wakuv2.GlobalCommunityControlPubsubTopic())
+		topics = append(topics, wakuv2.GlobalCommunityContentPubsubTopic())
 		topics = append(topics, communityFilter.Shard.PubsubTopic())
 
 		for _, pubsubTopic := range topics {
@@ -220,7 +224,16 @@ func (f *FiltersManager) Filters() (result []*Filter) {
 func (f *FiltersManager) Filter(chatID string) *Filter {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
-	return f.filters[chatID]
+
+	// find the first filter that matches this chat ID
+	// TODO this is temporary so not changing the return type, otherwise we should return a slice
+	for key, filter := range f.filters {
+		if strings.HasPrefix(key, chatID) {
+			return filter
+		}
+	}
+
+	return nil
 }
 
 // FilterByFilterID returns a Filter with a given Whisper filter ID.
@@ -276,19 +289,23 @@ func (f *FiltersManager) FilterByChatID(chatID string) *Filter {
 	return f.filters[chatID]
 }
 
-// Remove remove all the filters associated with a chat/identity
-func (f *FiltersManager) Remove(ctx context.Context, filters ...*Filter) error {
+// Remove removes all the filtersToRemove
+func (f *FiltersManager) Remove(ctx context.Context, filtersToRemove ...*Filter) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	for _, filter := range filters {
+	for _, filter := range filtersToRemove {
 		if err := f.service.Unsubscribe(ctx, filter.FilterID); err != nil {
 			return err
 		}
 		if filter.SymKeyID != "" {
 			f.service.DeleteSymKey(filter.SymKeyID)
 		}
-		delete(f.filters, filter.ChatID)
+		for k, v := range f.filters {
+			if filter.FilterID == v.FilterID {
+				delete(f.filters, k)
+			}
+		}
 	}
 
 	return nil
@@ -301,10 +318,10 @@ func (f *FiltersManager) RemoveNoListenFilters() error {
 	var filterIDs []string
 	var filters []*Filter
 
-	for _, f := range filters {
-		if !f.Listen {
-			filterIDs = append(filterIDs, f.FilterID)
-			filters = append(filters, f)
+	for _, v := range f.filters {
+		if !v.Listen {
+			filterIDs = append(filterIDs, v.FilterID)
+			filters = append(filters, v)
 		}
 	}
 	if err := f.service.UnsubscribeMany(filterIDs); err != nil {
@@ -315,30 +332,40 @@ func (f *FiltersManager) RemoveNoListenFilters() error {
 		if filter.SymKeyID != "" {
 			f.service.DeleteSymKey(filter.SymKeyID)
 		}
-		delete(f.filters, filter.ChatID)
+		for k, v := range f.filters {
+			if filter.FilterID == v.FilterID {
+				delete(f.filters, k)
+			}
+		}
 	}
 
 	return nil
 }
 
-// Remove remove all the filters associated with a chat/identity
+// RemoveFilterByChatID removes the filters associated with a chat/identity
 func (f *FiltersManager) RemoveFilterByChatID(chatID string) (*Filter, error) {
 	// TODO: remove subscriptions from waku2 if required. Might need to be implemented in transport
 
+	toRemove := make([]*Filter, 0)
 	f.mutex.Lock()
-	filter, ok := f.filters[chatID]
+	for _, filter := range f.filters {
+		if filter.ChatID == chatID {
+			toRemove = append(toRemove, filter)
+		}
+	}
 	f.mutex.Unlock()
 
-	if !ok {
+	if len(toRemove) == 0 {
 		return nil, nil
 	}
 
-	err := f.Remove(context.Background(), filter)
+	err := f.Remove(context.Background(), toRemove...)
 	if err != nil {
 		return nil, err
 	}
 
-	return filter, nil
+	// TODO temporary so not changing the return type, otherwise we should return a slice
+	return toRemove[0], nil
 }
 
 // LoadPartitioned creates a filter for a partitioned topic.
@@ -514,12 +541,14 @@ func (f *FiltersManager) PersonalTopicFilter() *Filter {
 	return f.filters[personalDiscoveryTopic]
 }
 
-// LoadPublic adds a filter for a public chat.
+// LoadPublic adds a filter for a public chat with specific pubsubTopic
 func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	if chat, ok := f.filters[chatID]; ok {
+	filterKey := toFilterKey(chatID, pubsubTopic)
+
+	if chat, ok := f.filters[filterKey]; ok {
 		if chat.PubsubTopic != pubsubTopic {
 			f.logger.Debug("updating pubsub topic for filter",
 				zap.String("chatID", chatID),
@@ -528,9 +557,8 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 				zap.String("newTopic", pubsubTopic),
 			)
 			chat.PubsubTopic = pubsubTopic
-			f.filters[chatID] = chat
+			f.filters[filterKey] = chat
 		}
-
 		return chat, nil
 	}
 
@@ -550,7 +578,7 @@ func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter,
 		OneToOne:     false,
 	}
 
-	f.filters[chatID] = chat
+	f.filters[filterKey] = chat
 
 	f.logger.Debug("registering filter for",
 		zap.String("chatID", chatID),
@@ -680,4 +708,14 @@ func (f *FiltersManager) GetNegotiated(identity *ecdsa.PublicKey) *Filter {
 	defer f.mutex.Unlock()
 
 	return f.filters[NegotiatedTopic(identity)]
+}
+
+// toFilterKey creates a unique key for filters map using chatID and pubsubTopic
+//
+// to allow one chat to have multiple filters in different pubsubTopics so that we can migrate the communities to 128 and 256 shards
+func toFilterKey(chatID string, pubsubTopic string) string {
+	if pubsubTopic == "" {
+		return chatID
+	}
+	return fmt.Sprintf("%s::%s", chatID, pubsubTopic)
 }

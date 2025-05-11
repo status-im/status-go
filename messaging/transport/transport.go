@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"fmt"
 	"sync"
 	"time"
 
@@ -515,8 +516,25 @@ func (t *Transport) ConnectionChanged(state connection.State) {
 }
 
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
-func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
-	return t.waku.SubscribeToPubsubTopic(topic, optPublicKey)
+func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKeys ...*ecdsa.PublicKey) error {
+	if len(optPublicKeys) > 1 {
+		return fmt.Errorf("at most one public key can be passed, pub keys: %v", len(optPublicKeys))
+	}
+	var pubKey *ecdsa.PublicKey
+	if len(optPublicKeys) == 1 {
+		pubKey = optPublicKeys[0]
+	} else {
+		// try to retrieve pubkey for pubsubtopic if none provided
+		privK, err := t.RetrievePubsubTopicKey(topic)
+		if err != nil {
+			return err
+		}
+		if privK != nil {
+			pubKey = &privK.PublicKey
+		}
+	}
+	t.logger.Debug("subscribing to protected pubsub topic", zap.String("pubsubtopic", topic), zap.Any("pubkey", pubKey))
+	return t.waku.SubscribeToPubsubTopic(topic, pubKey)
 }
 
 // Unsubscribe from a pubsub topic

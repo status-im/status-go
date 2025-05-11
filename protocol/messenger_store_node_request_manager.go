@@ -86,46 +86,72 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, community 
 		zap.Any("community", community),
 		zap.Any("config", cfg))
 
-	requestCommunity := func(communityID string, shard *wakuv2.Shard) (*communities.Community, StoreNodeRequestStats, error) {
-		channel, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, communityID, shard, cfg)
-		if err != nil {
-			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a request for community: %w", err)
+	fetch := func() (*communities.Community, StoreNodeRequestStats, error) {
+		// if shard was not passed or nil, see if this community has a custom shard by requesting for this config to the store node
+		communityCustomShard := community.Shard
+		if communityCustomShard == nil {
+			var err error
+			communityCustomShard, err = m.fetchCustomShard(ctx, community.CommunityID, cfg, wakuv2.DefaultNonProtectedShard(), wakuv2.GlobalCommunityControlShard())
+			if err != nil {
+				return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to fetch community shard: %w", err)
+			}
 		}
-
-		if !cfg.WaitForResponse {
-			return nil, StoreNodeRequestStats{}, nil
+		if communityCustomShard != nil {
+			return m.fetchCommunity(ctx, community.CommunityID, cfg, communityCustomShard)
 		}
-
-		result := <-channel
-		return result.community, result.stats, result.err
+		// request community in 32 and 64 shards
+		return m.fetchCommunity(ctx, community.CommunityID, cfg, wakuv2.DefaultShard(), wakuv2.GlobalCommunityControlShard())
 	}
 
-	// if shard was not passed or nil, request shard first
-	communityShard := community.Shard
-	if communityShard == nil {
-		id := messaging.CommunityShardInfoTopic(community.CommunityID)
-		fetchedShard, err := m.subscribeToRequest(ctx, storeNodeShardRequest, id, wakuv2.DefaultNonProtectedShard(), cfg)
+	if !cfg.WaitForResponse {
+		go fetch()
+		return nil, StoreNodeRequestStats{}, nil
+	}
+	return fetch()
+}
+
+// fetchCommunity fetches a community from the store node.
+//
+// Since now we could have this community description in shards 32 and 128 we are doing the following:
+//  1. trying to fetch in shards 32 and 128
+//  2. returning the first non-nil community result
+//
+// Eventually we should just go to shard 128, once full migration to Global Community Control and Content Topic is done.
+func (m *StoreNodeRequestManager) fetchCommunity(ctx context.Context, communityID string, cfg StoreNodeRequestConfig, shards ...*wakuv2.Shard) (*communities.Community, StoreNodeRequestStats, error) {
+	for _, shard := range shards {
+		sub, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, communityID, shard, cfg)
 		if err != nil {
 			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a shard info request: %w", err)
 		}
-
-		if !cfg.WaitForResponse {
-			go func() {
-				defer gocommon.LogOnPanic()
-				shardResult := <-fetchedShard
-				communityShard = shardResult.shard
-
-				_, _, _ = requestCommunity(community.CommunityID, communityShard)
-			}()
-			return nil, StoreNodeRequestStats{}, nil
+		// not doing this concurrently to avoid two filters for the same communityID, not a big deal since it is at most 2 shards and temporary
+		res := <-sub
+		if res.community != nil {
+			return res.community, res.stats, res.err
 		}
-
-		shardResult := <-fetchedShard
-		communityShard = shardResult.shard
 	}
+	return nil, StoreNodeRequestStats{}, nil
+}
 
-	// request community with on shard
-	return requestCommunity(community.CommunityID, communityShard)
+// fetchCustomShard fetches a community custom shard from the store node.
+//
+// Since now we could have communities' shard info in shards 64 and 128 we are doing the following:
+//  1. trying to fetch in shards 64 and 128
+//  2. returning the first non-nil shard result
+//
+// Eventually we should just go to shard 128, once full migration to Global Community Control and Content Topic is done.
+func (m *StoreNodeRequestManager) fetchCustomShard(ctx context.Context, communityID string, cfg StoreNodeRequestConfig, shards ...*wakuv2.Shard) (*wakuv2.Shard, error) {
+	for _, shard := range shards {
+		sub, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, messaging.CommunityShardInfoTopic(communityID), shard, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create a shard info request: %w", err)
+		}
+		// not doing this concurrently to avoid two filters for the same CommunityShardInfoTopic, not a big deal since it is at most 2 shards and temporary
+		res := <-sub
+		if res.community != nil {
+			return shard, nil
+		}
+	}
+	return nil, nil
 }
 
 // FetchCommunities makes a FetchCommunity for each element in given `communities` list.

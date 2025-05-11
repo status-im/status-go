@@ -44,8 +44,8 @@ func (m *Messenger) ENR() (*enode.Node, error) {
 }
 
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
-func (m *Messenger) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
-	return m.messaging.SubscribeToPubsubTopic(topic, optPublicKey)
+func (m *Messenger) SubscribeToPubsubTopic(topic string, optPublicKey ...*ecdsa.PublicKey) error {
+	return m.messaging.SubscribeToPubsubTopic(topic, optPublicKey...)
 }
 
 func (m *Messenger) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
