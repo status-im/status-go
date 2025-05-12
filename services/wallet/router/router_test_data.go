@@ -2061,15 +2061,16 @@ func getNormalTestParamsList() []normalTestParams {
 		{
 			name: "Bridge - No Specific FromChain - No Specific ToChain",
 			input: &requests.RouteInputParams{
-				TestnetMode: false,
-				Uuid:        uuid.NewString(),
-				SendType:    sendtype.Bridge,
-				AddrFrom:    common.HexToAddress("0x1"),
-				AddrTo:      common.HexToAddress("0x2"),
-				AmountIn:    (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:     walletCommon.UsdcSymbol,
-
-				TestsMode: true,
+				TestnetMode:          false,
+				Uuid:                 uuid.NewString(),
+				SendType:             sendtype.Bridge,
+				AddrFrom:             common.HexToAddress("0x1"),
+				AddrTo:               common.HexToAddress("0x2"),
+				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
+				TokenID:              walletCommon.UsdcSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.BSCMainnet},
+				TestsMode:            true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
@@ -2164,14 +2165,15 @@ func getNormalTestParamsList() []normalTestParams {
 		{
 			name: "Bridge - No Specific FromChain - Specific Single ToChain",
 			input: &requests.RouteInputParams{
-				TestnetMode:        false,
-				Uuid:               uuid.NewString(),
-				SendType:           sendtype.Bridge,
-				AddrFrom:           common.HexToAddress("0x1"),
-				AddrTo:             common.HexToAddress("0x2"),
-				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:            walletCommon.UsdcSymbol,
-				DisabledToChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
+				TestnetMode:          false,
+				Uuid:                 uuid.NewString(),
+				SendType:             sendtype.Bridge,
+				AddrFrom:             common.HexToAddress("0x1"),
+				AddrTo:               common.HexToAddress("0x2"),
+				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
+				TokenID:              walletCommon.UsdcSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -2214,14 +2216,15 @@ func getNormalTestParamsList() []normalTestParams {
 		{
 			name: "Bridge - No Specific FromChain - Specific Multiple ToChain",
 			input: &requests.RouteInputParams{
-				TestnetMode:        false,
-				Uuid:               uuid.NewString(),
-				SendType:           sendtype.Bridge,
-				AddrFrom:           common.HexToAddress("0x1"),
-				AddrTo:             common.HexToAddress("0x2"),
-				AmountIn:           (*hexutil.Big)(big.NewInt(testAmount1USDC)),
-				TokenID:            walletCommon.UsdcSymbol,
-				DisabledToChainIDs: []uint64{walletCommon.EthereumMainnet},
+				TestnetMode:          false,
+				Uuid:                 uuid.NewString(),
+				SendType:             sendtype.Bridge,
+				AddrFrom:             common.HexToAddress("0x1"),
+				AddrTo:               common.HexToAddress("0x2"),
+				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
+				TokenID:              walletCommon.UsdcSymbol,
+				DisabledFromChainIDs: []uint64{walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.BSCMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -2307,9 +2310,9 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:              walletCommon.UsdcSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet},
-
-				TestsMode: true,
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.BSCMainnet},
+				TestsMode:            true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
@@ -2357,9 +2360,9 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:              walletCommon.UsdcSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet},
-
-				TestsMode: true,
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.BSCMainnet},
+				TestsMode:            true,
 				TestParams: &requests.RouterTestParams{
 					TokenFrom: &tokenTypes.Token{
 						ChainID:  1,
@@ -2476,8 +2479,8 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:              walletCommon.UsdcSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet},
-				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -2548,8 +2551,8 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:              walletCommon.UsdcSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet},
-				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet},
+				DisabledFromChainIDs: []uint64{walletCommon.OptimismMainnet, walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.BSCMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -2617,8 +2620,8 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:              walletCommon.UsdcSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet},
-				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -2656,8 +2659,8 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(testAmount1USDC)),
 				TokenID:              walletCommon.UsdcSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
-				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
@@ -2773,8 +2776,8 @@ func getNormalTestParamsList() []normalTestParams {
 				AddrTo:               common.HexToAddress("0x2"),
 				AmountIn:             (*hexutil.Big)(big.NewInt(0.01 * testAmount1USDC)),
 				TokenID:              walletCommon.UsdcSymbol,
-				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet},
-				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet},
+				DisabledFromChainIDs: []uint64{walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
+				DisabledToChainIDs:   []uint64{walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet, walletCommon.BaseMainnet, walletCommon.BSCMainnet},
 
 				TestsMode: true,
 				TestParams: &requests.RouterTestParams{
