@@ -395,7 +395,7 @@ func bnbSmartChain(proxyHost string) params.Network {
 
 	return params.Network{
 		ChainID:                chainID,
-		ChainName:              "BNB Smart Chain",
+		ChainName:              "Binance",
 		RpcProviders:           rpcProviders,
 		BlockExplorerURL:       "https://bscscan.com/",
 		IconURL:                "network/Network=bsc",
@@ -427,7 +427,7 @@ func bnbSmartChainTestnet(proxyHost string) params.Network {
 
 	return params.Network{
 		ChainID:                chainID,
-		ChainName:              "BNB Smart Chain Testnet",
+		ChainName:              "Binance Testnet",
 		RpcProviders:           rpcProviders,
 		BlockExplorerURL:       "https://testnet.bscscan.com/",
 		IconURL:                "network/Network=bsc-test",
