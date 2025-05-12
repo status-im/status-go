@@ -2389,6 +2389,7 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 		c := CreateCommunityChat(changes.Community.IDString(), chatID, chat, m.getTimesource())
 		chats = append(chats, c)
 		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: changes.Community.PubsubTopic()})
+		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()})
 
 		response.AddChat(c)
 	}
@@ -2431,6 +2432,7 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 		c := CreateCommunityChat(community.IDString(), chatID, change.ChatModified, m.getTimesource())
 		chats = append(chats, c)
 		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: community.PubsubTopic()})
+		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: c.ID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()})
 		response.AddChat(c)
 	}
 
@@ -2719,6 +2721,7 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community) err
 			return err
 		}
 		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: communityChatID, PubsubTopic: community.PubsubTopic()})
+		publicFiltersToInit = append(publicFiltersToInit, &messaging.ChatToInitialize{ChatID: communityChatID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()})
 	}
 
 	_, err := m.messaging.InitPublicChats(publicFiltersToInit)
