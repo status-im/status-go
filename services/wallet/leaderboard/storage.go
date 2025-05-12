@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
 )
+
+const DATA_STALE_THRESHOLD = 10 * time.Minute
 
 // DataStorage manages the storage and retrieval of market data
 type DataStorage struct {
@@ -21,6 +24,7 @@ type DataStorage struct {
 	dataMutex             sync.RWMutex
 	cryptoEtag            string
 	priceEtag             string
+	lastUpdateTime        time.Time
 }
 
 type FingerprintData map[string]string // map[crypto_id]fingerprint
@@ -52,6 +56,7 @@ func (s *DataStorage) UpdateCryptoDataWithEtag(data []Cryptocurrency, etag strin
 	currentIds := s.extractCryptocurrencyIDs(s.cryptoData)
 	s.cryptoData = data
 	s.cryptoEtag = etag
+	s.lastUpdateTime = time.Now()
 	err := s.marketDataPersistence.UpsertCryptocurrencies(s.cryptoData)
 	if err != nil {
 		logutils.ZapLogger().Error("Market - error creating database snapshot", zap.Error(err))
@@ -82,6 +87,14 @@ func (s *DataStorage) extractCryptocurrencyIDs(cryptos []Cryptocurrency) map[str
 		ids[crypto.ID] = true
 	}
 	return ids
+}
+
+func (s *DataStorage) IsDataStale() bool {
+	if s.lastUpdateTime.IsZero() {
+		return true
+	}
+	// Check if the data is older than 5 minutes
+	return time.Since(s.lastUpdateTime) > DATA_STALE_THRESHOLD
 }
 
 // UpdatePriceDataWithEtag updates both price data and etag atomically

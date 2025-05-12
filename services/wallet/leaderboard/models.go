@@ -33,6 +33,10 @@ type LeaderboardPage struct {
 	Data       []Cryptocurrency `json:"cryptocurrencies"`
 }
 
+func (p *LeaderboardPage) Valid() bool {
+	return p.Page > 0 && p.PageSize > 0
+}
+
 type LeaderboardPagePrices struct {
 	Page      int         `json:"page"`
 	PageSize  int         `json:"page_size"`

@@ -117,7 +117,7 @@ type WalletSecretsConfig struct {
 	StatusProxyMarketPassword string `json:"statusProxyMarketPassword"`
 
 	MarketDataProxyUrl      string `json:"marketDataProxyUrl"`
-	MarketDataProxyLogin    string `json:"marketDataProxyLogin"`
+	MarketDataProxyUser     string `json:"marketDataProxyUser"`
 	MarketDataProxyPassword string `json:"marketDataProxyPassword"`
 	// FIXME: remove when EthRpcProxy* is integrated
 	StatusProxyBlockchainUser     string `json:"statusProxyBlockchainUser"`

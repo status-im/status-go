@@ -60,6 +60,7 @@ func (f *ProxyFetcher) Start(ctx context.Context) {
 
 	ctx, cancel := context.WithCancel(ctx)
 	f.cancelFunc = cancel
+	f.ctx = ctx
 
 	go func() {
 		defer common.LogOnPanic()
@@ -111,13 +112,6 @@ func (f *ProxyFetcher) StartRefreshLoops() {
 
 // cryptoRefreshLoop periodically fetches the full cryptocurrency data
 func (f *ProxyFetcher) cryptoRefreshLoop(ctx context.Context) {
-	// Initial fetch
-	if err := f.FetchMarkets(ctx); err != nil {
-		logutils.ZapLogger().Error("Error in initial crypto data fetch", zap.Error(err))
-	} else {
-		f.subscriptionManager.Emit(ctx, TickerFullDataUpdateSource)
-	}
-
 	// Set up ticker for periodic updates
 	ticker := time.NewTicker(time.Duration(f.config.FullDataInterval) * time.Second)
 	defer ticker.Stop()
@@ -140,13 +134,6 @@ func (f *ProxyFetcher) cryptoRefreshLoop(ctx context.Context) {
 func (f *ProxyFetcher) priceRefreshLoop(ctx context.Context) {
 	// Wait a short time before starting price updates
 	time.Sleep(1 * time.Second)
-
-	// Initial fetch
-	if err := f.FetchPrices(ctx); err != nil {
-		logutils.ZapLogger().Error("Error in initial price data fetch", zap.Error(err))
-	} else {
-		f.subscriptionManager.Emit(ctx, TickerPriceUpdateSource)
-	}
 
 	// Set up ticker for periodic updates
 	ticker := time.NewTicker(time.Duration(f.config.PriceUpdateInterval) * time.Second)

@@ -111,7 +111,12 @@ func (s *MarketDataService) sendLeaderboardPagePricesUpdate() {
 		return
 	}
 
-	result := s.storage.GetLeaderboardPagePrices(s.cache.GetLastPage())
+	lastPage := s.cache.GetLastPage()
+	if !lastPage.Valid() {
+		return
+	}
+
+	result := s.storage.GetLeaderboardPagePrices(lastPage)
 	if result == nil {
 		logutils.ZapLogger().Error("No leaderboard page prices found")
 		return
@@ -134,6 +139,9 @@ func (s *MarketDataService) sendLeaderboardPageUpdate() {
 	}
 
 	lastPage := s.cache.GetLastPage()
+	if !lastPage.Valid() {
+		return
+	}
 	result, err := s.storage.GetLeaderboardPage(lastPage.Page, lastPage.PageSize, lastPage.SortOrder, lastPage.Currency)
 	if err != nil {
 		logutils.ZapLogger().Error("Error fetching leaderboard page", zap.Error(err))
@@ -153,6 +161,9 @@ func (s *MarketDataService) sendLeaderboardPageUpdate() {
 
 func (s *MarketDataService) FetchLeaderboardPageAsync(page, pageSize, sortOrder int, currency string) {
 	s.scheduler.Enqueue(fetchLeaderboardPageTask, func(ctx context.Context) (interface{}, error) {
+		if s.storage.IsDataStale() {
+			s.fetcher.FetchMarkets(ctx) //nolint:errcheck
+		}
 		result, err := s.storage.GetLeaderboardPage(page, pageSize, sortOrder, currency)
 		if err != nil {
 			logutils.ZapLogger().Error("Error fetching leaderboard page", zap.Error(err))

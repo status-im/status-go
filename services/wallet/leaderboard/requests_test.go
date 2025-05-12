@@ -70,7 +70,7 @@ func TestCreateRequest(t *testing.T) {
 	handler := &RequestHandler{
 		config: ServiceConfig{
 			ProxyURL:  "https://api.example.com",
-			Login:     "testuser",
+			User:      "testuser",
 			Password:  "testpass",
 			AllowGzip: true,
 			AllowETag: true,
@@ -166,7 +166,7 @@ func TestFetchDataCompression(t *testing.T) {
 			// Create handler with test configuration
 			handler := NewRequestHandler(ServiceConfig{
 				ProxyURL:  server.URL,
-				Login:     "testuser",
+				User:      "testuser",
 				Password:  "testpass",
 				AllowGzip: tt.enableGzip,
 			}, server.Client())

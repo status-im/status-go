@@ -13,7 +13,7 @@ func TestServiceConfigValidate(t *testing.T) {
 		// Zero intervals
 		config := NewLeaderbordConfig(params.MarketDataProxyConfig{
 			Url:                     "https://example.com",
-			Login:                   "user",
+			User:                    "user",
 			Password:                "pass",
 			FullDataRefreshInterval: 0,
 			PriceRefreshInterval:    0,
@@ -24,7 +24,7 @@ func TestServiceConfigValidate(t *testing.T) {
 		require.Equal(t, defaultFullDataInterval, config.FullDataInterval)
 		require.Equal(t, defaultPriceUpdateInterval, config.PriceUpdateInterval)
 		require.Equal(t, "https://example.com", config.ProxyURL)
-		require.Equal(t, "user", config.Login)
+		require.Equal(t, "user", config.User)
 		require.Equal(t, "pass", config.Password)
 		require.Equal(t, true, config.AllowGzip)
 		require.Equal(t, true, config.AllowETag)
@@ -34,7 +34,7 @@ func TestServiceConfigValidate(t *testing.T) {
 		// Negative intervals
 		config := NewLeaderbordConfig(params.MarketDataProxyConfig{
 			Url:                     "https://example.com",
-			Login:                   "user",
+			User:                    "user",
 			Password:                "pass",
 			FullDataRefreshInterval: -5,
 			PriceRefreshInterval:    -5,
@@ -45,7 +45,7 @@ func TestServiceConfigValidate(t *testing.T) {
 		require.Equal(t, defaultFullDataInterval, config.FullDataInterval)
 		require.Equal(t, defaultPriceUpdateInterval, config.PriceUpdateInterval)
 		require.Equal(t, "https://example.com", config.ProxyURL)
-		require.Equal(t, "user", config.Login)
+		require.Equal(t, "user", config.User)
 		require.Equal(t, "pass", config.Password)
 		require.Equal(t, true, config.AllowGzip)
 		require.Equal(t, true, config.AllowETag)
@@ -55,7 +55,7 @@ func TestServiceConfigValidate(t *testing.T) {
 		// Custom intervals
 		config := NewLeaderbordConfig(params.MarketDataProxyConfig{
 			Url:                     "https://example.com",
-			Login:                   "user",
+			User:                    "user",
 			Password:                "pass",
 			FullDataRefreshInterval: 50,
 			PriceRefreshInterval:    65,
@@ -66,7 +66,7 @@ func TestServiceConfigValidate(t *testing.T) {
 		require.Equal(t, 50, config.FullDataInterval)
 		require.Equal(t, 65, config.PriceUpdateInterval)
 		require.Equal(t, "https://example.com", config.ProxyURL)
-		require.Equal(t, "user", config.Login)
+		require.Equal(t, "user", config.User)
 		require.Equal(t, "pass", config.Password)
 		require.Equal(t, true, config.AllowGzip)
 		require.Equal(t, true, config.AllowETag)
