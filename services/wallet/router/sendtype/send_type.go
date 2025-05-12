@@ -137,6 +137,21 @@ func (s SendType) IsAvailableFor(network *params.Network) bool {
 		return ok
 	}
 
+	if s == Bridge {
+		bridgeAllowedNetworks := map[uint64]bool{
+			walletCommon.EthereumMainnet: true,
+			walletCommon.EthereumSepolia: true,
+			walletCommon.OptimismMainnet: true,
+			walletCommon.OptimismSepolia: true,
+			walletCommon.ArbitrumMainnet: true,
+			walletCommon.ArbitrumSepolia: true,
+			walletCommon.BaseMainnet:     true,
+			walletCommon.BaseSepolia:     true,
+		}
+		_, ok := bridgeAllowedNetworks[network.ChainID]
+		return ok
+	}
+
 	if s.IsEnsTransfer() || s.IsStickersTransfer() {
 		return network.ChainID == walletCommon.EthereumMainnet || network.ChainID == walletCommon.EthereumSepolia
 	}
