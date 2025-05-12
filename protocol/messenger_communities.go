@@ -950,13 +950,16 @@ func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {
 
 func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Chat, error) {
 	logger := m.logger.Named("initCommunityChats")
-	publicChatsToInit := m.DefaultFilters(community)
 
 	chats := CreateCommunityChats(community, m.getTimesource())
 
+	publicChatsToInit := m.DefaultFilters(community)
 	for _, chat := range chats {
 		publicChatsToInit = append(publicChatsToInit, &messaging.ChatToInitialize{ChatID: chat.ID, PubsubTopic: community.PubsubTopic()})
-
+		if community.PubsubTopic() == "" {
+			// add the new content pubsubtopic as well
+			publicChatsToInit = append(publicChatsToInit, &messaging.ChatToInitialize{ChatID: chat.ID, PubsubTopic: wakuv2.GlobalCommunityContentPubsubTopic()})
+		}
 	}
 
 	filters, err := m.messaging.InitPublicChats(publicChatsToInit)
