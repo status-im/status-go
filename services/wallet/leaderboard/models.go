@@ -20,8 +20,8 @@ type Cryptocurrency struct {
 // PriceData represents price data update
 type PriceData struct {
 	ID               string  `json:"id,omitempty"`
-	Price            float64 `json:"price"`
-	PercentChange24h float64 `json:"percent_change_24h"`
+	Price            float64 `json:"current_price"`
+	PercentChange24h float64 `json:"price_change_percentage_24h"`
 }
 
 type LeaderboardPage struct {
