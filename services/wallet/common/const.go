@@ -17,13 +17,14 @@ const (
 	StatusDomain = "stateofus.eth"
 	EthDomain    = "eth"
 
-	EthSymbol  = "ETH"
-	SntSymbol  = "SNT"
-	SttSymbol  = "STT"
-	UsdcSymbol = "USDC"
-	HopSymbol  = "HOP"
-	DaiSymbol  = "DAI"
-	BNBSymbol  = "BNB"
+	EthSymbol     = "ETH"
+	SntSymbol     = "SNT"
+	SttSymbol     = "STT"
+	UsdcSymbol    = "USDC"
+	UsdcSymbolEVM = "USDC (EVM)"
+	HopSymbol     = "HOP"
+	DaiSymbol     = "DAI"
+	BNBSymbol     = "BNB"
 )
 
 type ChainID uint64
@@ -119,6 +120,7 @@ func AllChainIDs() []ChainID {
 		ChainID(BSCMainnet),
 		ChainID(BSCTestnet),
 		ChainID(TestnetChainID),
+		ChainID(AnvilMainnet),
 	}
 }
 

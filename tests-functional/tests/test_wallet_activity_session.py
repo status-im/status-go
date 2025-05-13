@@ -50,8 +50,8 @@ class TestWalletActivitySession(WalletSteps):
             "tokenID": "ETH",
             "tokenIDIsOwnerToken": False,
             "toTokenID": "",
-            "disabledFromChainIDs": [10, 42161, 56],
-            "disabledToChainIDs": [10, 42161, 56],
+            "disabledFromChainIDs": [1, 10, 42161, 8453, 56],
+            "disabledToChainIDs": [1, 10, 42161, 8453, 56],
             "gasFeeMode": 1,
             # params for building tx from route
             "slippagePercentage": 0,
@@ -101,8 +101,6 @@ class TestWalletActivitySession(WalletSteps):
         # Trigger new ETH transfer
         uuid = str(uuid_lib.uuid4())
         input_params["uuid"] = uuid
-        input_params["disabledFromChainIDs"] = [56]
-        input_params["disabledToChainIDs"] = [56]
 
         self.rpc_client.prepare_wait_for_signal(
             "wallet",
@@ -121,8 +119,6 @@ class TestWalletActivitySession(WalletSteps):
         uuid = str(uuid_lib.uuid4())
         input_params["uuid"] = uuid
         input_params["tokenID"] = "SNT"
-        input_params["disabledFromChainIDs"] = [56]
-        input_params["disabledToChainIDs"] = [56]
         self.rpc_client.prepare_wait_for_signal(
             "wallet",
             1,
