@@ -73,7 +73,7 @@ func WithFetchFrom(t time.Time) Option {
 func NewNewsFeedManager(opts ...Option) *NewsFeedManager {
 	nfm := &NewsFeedManager{
 		pollingInterval: time.Minute * 30,
-		fetchFrom:       time.Now(),
+		fetchFrom:       time.Now().UTC(),
 		polling:         false,
 	}
 
@@ -100,7 +100,7 @@ func (n *NewsFeedManager) FetchRSS() ([]*gofeed.Item, error) {
 
 	if len(filteredItems) > 0 {
 		// Update fetchFrom to now since we have new items
-		n.fetchFrom = time.Now()
+		n.SetFetchFrom(time.Now().UTC())
 	}
 
 	return filteredItems, nil
@@ -122,6 +122,14 @@ func (n *NewsFeedManager) fetchRSSAndHandle() error {
 	}
 
 	return nil
+}
+
+func (n *NewsFeedManager) GetFetchFrom() time.Time {
+	return n.fetchFrom
+}
+
+func (n *NewsFeedManager) SetFetchFrom(fetchFrom time.Time) {
+	n.fetchFrom = fetchFrom
 }
 
 func (n *NewsFeedManager) IsPolling() bool {
