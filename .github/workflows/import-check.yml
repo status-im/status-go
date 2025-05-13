@@ -25,10 +25,10 @@ jobs:
 
           echo "Checking for invalid imports of github.com/status-im/status-go/messaging/*..."
           for file in $files; do
-            if grep -qE '"github.com/status-im/status-go/messaging/(?!types).+"' "$file"; then
-              echo "Error: File $file imports github.com/status-im/status-go/messaging/* (except types) which is not allowed."
+            if grep -qE '"github.com/status-im/status-go/messaging/v10/(?!types).+"' "$file"; then
+              echo "Error: File $file imports github.com/status-im/status-go/v10/messaging/* (except types) which is not allowed."
               exit 1
             fi
           done
 
-          echo "No invalid github.com/status-im/status-go/messaging/* imports found."
+          echo "No invalid github.com/status-im/status-go/v10/messaging/* imports found."
