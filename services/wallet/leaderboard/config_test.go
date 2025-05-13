@@ -2,6 +2,7 @@ package leaderboard
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -18,8 +19,6 @@ func TestServiceConfigValidate(t *testing.T) {
 			FullDataRefreshInterval: 0,
 			PriceRefreshInterval:    0,
 		})
-
-		config.Validate()
 
 		require.Equal(t, defaultFullDataInterval, config.FullDataInterval)
 		require.Equal(t, defaultPriceUpdateInterval, config.PriceUpdateInterval)
@@ -40,8 +39,6 @@ func TestServiceConfigValidate(t *testing.T) {
 			PriceRefreshInterval:    -5,
 		})
 
-		config.Validate()
-
 		require.Equal(t, defaultFullDataInterval, config.FullDataInterval)
 		require.Equal(t, defaultPriceUpdateInterval, config.PriceUpdateInterval)
 		require.Equal(t, "https://example.com", config.ProxyURL)
@@ -61,10 +58,8 @@ func TestServiceConfigValidate(t *testing.T) {
 			PriceRefreshInterval:    65,
 		})
 
-		config.Validate()
-
-		require.Equal(t, 50, config.FullDataInterval)
-		require.Equal(t, 65, config.PriceUpdateInterval)
+		require.Equal(t, 50*time.Second, config.FullDataInterval)
+		require.Equal(t, 65*time.Second, config.PriceUpdateInterval)
 		require.Equal(t, "https://example.com", config.ProxyURL)
 		require.Equal(t, "user", config.User)
 		require.Equal(t, "pass", config.Password)

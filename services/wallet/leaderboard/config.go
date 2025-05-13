@@ -1,12 +1,14 @@
 package leaderboard
 
 import (
+	"time"
+
 	"github.com/status-im/status-go/params"
 )
 
 const (
-	defaultFullDataInterval    = 10 // Default full data refresh interval in seconds
-	defaultPriceUpdateInterval = 1  // Default price update interval in seconds
+	defaultFullDataInterval    = 10 * time.Second
+	defaultPriceUpdateInterval = 1 * time.Second
 )
 
 // ServiceConfig defines the configuration for the market data service
@@ -17,8 +19,8 @@ type ServiceConfig struct {
 	Password string
 
 	// Refresh intervals (in seconds)
-	FullDataInterval    int
-	PriceUpdateInterval int
+	FullDataInterval    time.Duration
+	PriceUpdateInterval time.Duration
 
 	// Feature flags
 	AllowGzip bool
@@ -26,7 +28,7 @@ type ServiceConfig struct {
 }
 
 // Validate checks if the configuration is valid
-func (c *ServiceConfig) Validate() {
+func (c *ServiceConfig) setDefaults() {
 	// Set default refresh intervals if not provided
 	if c.FullDataInterval <= 0 {
 		c.FullDataInterval = defaultFullDataInterval
@@ -43,14 +45,14 @@ func NewLeaderbordConfig(config params.MarketDataProxyConfig) ServiceConfig {
 		ProxyURL:            config.Url,
 		User:                config.User,
 		Password:            config.Password,
-		FullDataInterval:    config.FullDataRefreshInterval,
-		PriceUpdateInterval: config.PriceRefreshInterval,
+		FullDataInterval:    time.Duration(config.FullDataRefreshInterval) * time.Second,
+		PriceUpdateInterval: time.Duration(config.PriceRefreshInterval) * time.Second,
 		AllowGzip:           true,
 		AllowETag:           true,
 	}
 
 	// Validate the configuration
-	serviceConfig.Validate()
+	serviceConfig.setDefaults()
 
 	return serviceConfig
 }

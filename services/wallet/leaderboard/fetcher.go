@@ -3,7 +3,6 @@ package leaderboard
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"sync"
 	"time"
 
@@ -11,6 +10,12 @@ import (
 
 	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
+)
+
+const (
+	MARKETS_ENDPOINT = "/v1/leaderboard/markets"
+	PRICES_ENDPOINT  = "/v1/leaderboard/prices"
 )
 
 // DataFetcher defines the interface for fetching market and price data
@@ -29,91 +34,79 @@ type DataFetcher interface {
 
 // ProxyFetcher implements DataFetcher interface using HTTP proxy
 type ProxyFetcher struct {
-	requestHandler      *RequestHandler
+	client              *thirdparty.HTTPClient
 	storage             *DataStorage
 	subscriptionManager *SubscriptionManager
 	config              ServiceConfig
 
 	// Background polling state
-	isRunning      bool
-	isRunningMutex sync.Mutex
-	cancelFunc     context.CancelFunc
-	ctx            context.Context
+	contextMutex sync.Mutex
+	cancelFunc   context.CancelFunc
 }
 
 // NewProxyFetcher creates a new proxy data fetcher
 func NewProxyFetcher(config ServiceConfig, storage *DataStorage, subscriptionManager *SubscriptionManager) DataFetcher {
-	client := &http.Client{Timeout: 10 * time.Second}
+	// Configure HTTP client with detailed timeouts
+	httpClient := thirdparty.NewHTTPClient(
+		thirdparty.WithTimeout(10*time.Second),
+		thirdparty.WithMaxRetries(1),
+	)
 	return &ProxyFetcher{
-		requestHandler:      NewRequestHandler(config, client),
+		client:              httpClient,
 		storage:             storage,
 		subscriptionManager: subscriptionManager,
 		config:              config,
-		isRunning:           false,
 	}
 }
 
 // Start begins the data refresh loops
 func (f *ProxyFetcher) Start(ctx context.Context) {
-	f.isRunningMutex.Lock()
-	defer f.isRunningMutex.Unlock()
-
-	ctx, cancel := context.WithCancel(ctx)
-	f.cancelFunc = cancel
-	f.ctx = ctx
-
 	go func() {
 		defer common.LogOnPanic()
 		<-ctx.Done()
 		f.Stop() // gracefully stop if running
-		f.cancelFunc = nil
-		f.ctx = nil
 	}()
 }
 
 // Stop halts all data refresh operations
 func (f *ProxyFetcher) Stop() {
-	f.isRunningMutex.Lock()
-	defer f.isRunningMutex.Unlock()
-
-	if !f.isRunning {
-		return // Not running
-	}
+	f.contextMutex.Lock()
+	defer f.contextMutex.Unlock()
 
 	// Cancel the context to stop all loops
 	if f.cancelFunc != nil {
 		f.cancelFunc()
+		f.cancelFunc = nil
 	}
-
-	f.isRunning = false
 }
 
 func (f *ProxyFetcher) StartRefreshLoops() {
-	f.isRunningMutex.Lock()
-	defer f.isRunningMutex.Unlock()
+	f.contextMutex.Lock()
+	defer f.contextMutex.Unlock()
 
-	if f.isRunning || f.ctx == nil {
+	if f.cancelFunc != nil {
 		return
 	}
-	f.isRunning = true
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	f.cancelFunc = cancelFunc
 
 	// Start crypto data refresh loop
 	go func() {
 		defer common.LogOnPanic()
-		f.cryptoRefreshLoop(f.ctx)
+		f.cryptoRefreshLoop(ctx)
 	}()
 
 	// Start price data refresh loop
 	go func() {
 		defer common.LogOnPanic()
-		f.priceRefreshLoop(f.ctx)
+		f.priceRefreshLoop(ctx)
 	}()
 }
 
 // cryptoRefreshLoop periodically fetches the full cryptocurrency data
 func (f *ProxyFetcher) cryptoRefreshLoop(ctx context.Context) {
 	// Set up ticker for periodic updates
-	ticker := time.NewTicker(time.Duration(f.config.FullDataInterval) * time.Second)
+	ticker := time.NewTicker(f.config.FullDataInterval)
 	defer ticker.Stop()
 
 	for {
@@ -136,7 +129,7 @@ func (f *ProxyFetcher) priceRefreshLoop(ctx context.Context) {
 	time.Sleep(1 * time.Second)
 
 	// Set up ticker for periodic updates
-	ticker := time.NewTicker(time.Duration(f.config.PriceUpdateInterval) * time.Second)
+	ticker := time.NewTicker(f.config.PriceUpdateInterval)
 	defer ticker.Stop()
 
 	for {
@@ -155,10 +148,9 @@ func (f *ProxyFetcher) priceRefreshLoop(ctx context.Context) {
 
 // FetchMarkets fetches the full market data
 func (f *ProxyFetcher) FetchMarkets(ctx context.Context) error {
-	endpoint := "/v1/leaderboard/markets"
 	etag := f.storage.GetCryptoEtag()
 
-	body, updated := f.requestHandler.FetchData(ctx, endpoint, &etag)
+	body, newEtag, updated := f.fetchData(ctx, MARKETS_ENDPOINT, etag)
 	if !updated {
 		return nil
 	}
@@ -169,28 +161,67 @@ func (f *ProxyFetcher) FetchMarkets(ctx context.Context) error {
 	}
 
 	// Store data and etag atomically
-	f.storage.UpdateCryptoDataWithEtag(data.Data, etag)
+	f.storage.UpdateCryptoDataWithEtag(data.Data, newEtag)
 
 	return nil
 }
 
 // FetchPrices fetches the latest price data
 func (f *ProxyFetcher) FetchPrices(ctx context.Context) error {
-	endpoint := "/v1/leaderboard/prices"
 	etag := f.storage.GetPriceEtag()
 
-	body, updated := f.requestHandler.FetchData(ctx, endpoint, &etag)
+	body, newEtag, updated := f.fetchData(ctx, PRICES_ENDPOINT, etag)
 	if !updated {
 		return nil
 	}
 
-	var priceData PriceMap
-	if err := json.Unmarshal(body, &priceData); err != nil {
+	type ProxyPriceData struct {
+		ID                       string  `json:"id"`
+		CurrentPrice             float64 `json:"price"`
+		PriceChangePercentage24h float64 `json:"percent_change_24h"`
+	}
+
+	var tempPriceMap map[string]ProxyPriceData
+
+	if err := json.Unmarshal(body, &tempPriceMap); err != nil {
 		return err
 	}
 
+	priceData := PriceMap{}
+	for key, tempPrice := range tempPriceMap {
+		priceData[key] = PriceData{
+			ID:               tempPrice.ID,
+			Price:            tempPrice.CurrentPrice,
+			PercentChange24h: tempPrice.PriceChangePercentage24h,
+		}
+	}
+
 	// Store data and etag atomically
-	f.storage.UpdatePriceDataWithEtag(priceData, etag)
+	f.storage.UpdatePriceDataWithEtag(priceData, newEtag)
 
 	return nil
+}
+
+func (f *ProxyFetcher) fetchData(ctx context.Context, endpoint string, etag string) ([]byte, string, bool) {
+	url := f.client.BuildURL(f.config.ProxyURL, endpoint)
+
+	options := []thirdparty.RequestOption{}
+
+	if f.config.AllowGzip {
+		options = append(options, thirdparty.WithGzip())
+	}
+	if f.config.AllowETag {
+		options = append(options, thirdparty.WithEtag(etag))
+	}
+
+	options = append(options, thirdparty.WithCredentials(&thirdparty.BasicCreds{
+		User:     f.config.User,
+		Password: f.config.Password,
+	}))
+
+	body, newEtag, err := f.client.DoGetRequestWithEtag(ctx, url, nil, etag, options...)
+	if err != nil || body == nil {
+		return nil, newEtag, false
+	}
+	return body, newEtag, true
 }

@@ -9,6 +9,10 @@ import (
 )
 
 func TestEmit(t *testing.T) {
+	// Signal ids
+	signal1ID := 10
+	signal2ID := 15
+
 	m := NewSubscriptionManager()
 	chn := m.Subscribe()
 	require.NotNil(t, chn)
@@ -21,8 +25,8 @@ func TestEmit(t *testing.T) {
 		}
 	}()
 
-	m.Emit(context.Background(), 10)
-	m.Emit(context.Background(), 15)
+	m.Emit(context.Background(), signal1ID)
+	m.Emit(context.Background(), signal2ID)
 
 	got := make(map[int]int)
 	timeout := time.After(1 * time.Second)
@@ -39,7 +43,8 @@ func TestEmit(t *testing.T) {
 	}
 
 	// Verify all expected signals were received exactly once
-	for _, expected := range []int{15} {
+	for _, expected := range []int{signal1ID, signal2ID} {
 		require.Equal(t, 1, got[expected], "expected signal from source %d once, got %d", expected, got[expected])
 	}
+	require.Equal(t, 2, len(got))
 }

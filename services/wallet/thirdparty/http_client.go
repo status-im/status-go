@@ -2,12 +2,15 @@ package thirdparty
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	netUrl "net/url"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -30,6 +33,43 @@ type BasicCreds struct {
 type HTTPClient struct {
 	client     *http.Client
 	maxRetries int
+}
+
+// Struct to hold request modifiers and data collectors
+type requestModifiers struct {
+	etag string
+}
+
+// RequestOption is a function that modifies an HTTP request
+type RequestOption func(*http.Request, *requestModifiers)
+
+func WithGzip() RequestOption {
+	return func(req *http.Request, _ *requestModifiers) {
+		req.Header.Set("Accept-Encoding", "gzip")
+	}
+}
+
+func WithCredentials(creds *BasicCreds) RequestOption {
+	return func(req *http.Request, _ *requestModifiers) {
+		if creds != nil {
+			req.SetBasicAuth(creds.User, creds.Password)
+		}
+	}
+}
+
+func WithHeader(key, value string) RequestOption {
+	return func(req *http.Request, _ *requestModifiers) {
+		req.Header.Set(key, value)
+	}
+}
+
+func WithEtag(etag string) RequestOption {
+	return func(req *http.Request, modifiers *requestModifiers) {
+		if etag != "" {
+			req.Header.Set("If-None-Match", etag)
+			modifiers.etag = etag
+		}
+	}
 }
 
 // Option defines a function type for configuring HTTPClient
@@ -86,7 +126,7 @@ func NewHTTPClient(opts ...Option) *HTTPClient {
 // If creds is not nil, it will add basic auth to the request
 // If etag is not empty, it will add an If-None-Match header to the request
 // If the server responds with a 304 status code (`http.StatusNotModified`), it will return an empty body and the same etag
-func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl.Values, creds *BasicCreds, etag string) (body []byte, newEtag string, err error) {
+func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl.Values, options ...RequestOption) (body []byte, newEtag string, err error) {
 	startTime := time.Now()
 	if len(params) > 0 {
 		url = url + "?" + params.Encode()
@@ -101,14 +141,14 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 		return
 	}
 
-	includeEtag := etag != ""
-	if includeEtag {
-		newEtag = etag
-		req.Header.Add("If-None-Match", etag)
+	mods := &requestModifiers{}
+
+	for _, option := range options {
+		option(req, mods)
 	}
 
-	if creds != nil {
-		req.SetBasicAuth(creds.User, creds.Password)
+	if mods.etag != "" {
+		newEtag = mods.etag
 	}
 
 	var resp *http.Response
@@ -139,13 +179,13 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 	}
 	defer resp.Body.Close()
 
-	if includeEtag && resp.StatusCode == http.StatusNotModified {
+	if mods.etag != "" && resp.StatusCode == http.StatusNotModified {
 		return
 	}
 
 	newEtag = resp.Header.Get("Etag")
 
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err = c.readResponse(resp)
 	if err != nil {
 		logutils.ZapLogger().Debug("Failed to read GET response body",
 			zap.String("url", url),
@@ -164,25 +204,48 @@ func (c *HTTPClient) doGetRequest(ctx context.Context, url string, params netUrl
 	return
 }
 
+func (c *HTTPClient) readResponse(resp *http.Response) ([]byte, error) {
+	var reader io.ReadCloser = resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		var gzipErr error
+		reader, gzipErr = gzip.NewReader(resp.Body)
+		if gzipErr != nil {
+			return nil, gzipErr
+		}
+		defer reader.Close()
+	}
+	body, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
+}
+
 // DoGetRequest performs a GET request with the given URL and parameters
-func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl.Values) (body []byte, err error) {
-	body, _, err = c.doGetRequest(ctx, url, params, nil, "")
+func (c *HTTPClient) DoGetRequest(ctx context.Context, url string, params netUrl.Values, options ...RequestOption) (body []byte, err error) {
+	body, _, err = c.doGetRequest(ctx, url, params, options...)
 	return
 }
 
 // DoGetRequestWithCredentials performs a GET request with the given URL and parameters
 // If creds is not nil, it will add basic auth to the request
-func (c *HTTPClient) DoGetRequestWithCredentials(ctx context.Context, url string, params netUrl.Values, creds *BasicCreds) (body []byte, err error) {
-	body, _, err = c.doGetRequest(ctx, url, params, creds, "")
+func (c *HTTPClient) DoGetRequestWithCredentials(ctx context.Context, url string, params netUrl.Values, creds *BasicCreds, options ...RequestOption) (body []byte, err error) {
+	allOptions := []RequestOption{WithCredentials(creds)}
+	allOptions = append(allOptions, options...)
+	body, _, err = c.doGetRequest(ctx, url, params, allOptions...)
 	return
 }
 
 // DoGetRequestWithEtag performs a GET request with the given URL and parameters
 // If etag is not empty, it will add an If-None-Match header to the request
 // If the server responds with a 304 status code (`http.StatusNotModified`), it will return an empty body and the same etag
-func (c *HTTPClient) DoGetRequestWithEtag(ctx context.Context, url string, params netUrl.Values, etag string) (body []byte, newEtag string, err error) {
-	return c.doGetRequest(ctx, url, params, nil, etag)
+func (c *HTTPClient) DoGetRequestWithEtag(ctx context.Context, url string, params netUrl.Values, etag string, options ...RequestOption) (body []byte, newEtag string, err error) {
+	allOptions := []RequestOption{WithEtag(etag)}
+	allOptions = append(allOptions, options...)
+	return c.doGetRequest(ctx, url, params, allOptions...)
 }
+
 func (c *HTTPClient) DoPostRequest(ctx context.Context, url string, params map[string]interface{}, creds *BasicCreds) ([]byte, error) {
 	jsonData, err := json.Marshal(params)
 	if err != nil {
@@ -213,4 +276,11 @@ func (c *HTTPClient) DoPostRequest(ctx context.Context, url string, params map[s
 	}
 
 	return body, nil
+}
+
+func (c *HTTPClient) BuildURL(proxyURL, endpoint string) string {
+	// Trim trailing slashes from proxy URL and leading slashes from endpoint
+	baseURL := strings.TrimRight(proxyURL, "/")
+	cleanEndpoint := strings.TrimLeft(endpoint, "/")
+	return baseURL + "/" + cleanEndpoint
 }

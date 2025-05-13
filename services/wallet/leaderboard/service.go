@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -52,9 +50,6 @@ type MarketDataService struct {
 	scheduler *async.Scheduler
 	feed      *event.Feed
 
-	// Request handler
-	requestHandler *RequestHandler
-
 	// Data storage
 	storage *DataStorage
 	cache   *PageCache
@@ -77,7 +72,6 @@ func NewMarketDataService(config ServiceConfig, walletDB *sql.DB, feed *event.Fe
 		config:              config,
 		fetcher:             NewProxyFetcher(config, storage, subscriptionManager),
 		feed:                feed,
-		requestHandler:      NewRequestHandler(config, &http.Client{Timeout: 10 * time.Second}),
 		storage:             storage,
 		subscriptionManager: subscriptionManager,
 		scheduler:           async.NewScheduler(),

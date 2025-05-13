@@ -3,7 +3,6 @@ package leaderboard
 import (
 	"context"
 	"database/sql"
-	"net/http"
 	"testing"
 	"time"
 
@@ -51,12 +50,10 @@ func setupTestWalletDB(t *testing.T) (*sql.DB, func()) {
 }
 
 func setupMarketDatadService(t *testing.T, config ServiceConfig, db *sql.DB) *MarketDataService {
-	config.Validate()
 	storage := NewDataStorage(db)
 	service := &MarketDataService{
 		config:              config,
 		feed:                &event.Feed{},
-		requestHandler:      NewRequestHandler(config, &http.Client{Timeout: 10 * time.Second}),
 		storage:             storage,
 		subscriptionManager: NewSubscriptionManager(),
 		scheduler:           async.NewScheduler(),
