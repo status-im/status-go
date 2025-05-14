@@ -16,6 +16,7 @@ import (
 	"github.com/wealdtech/go-multicodec"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"

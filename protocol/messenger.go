@@ -736,11 +736,14 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}
 	}
 
-	ensSubscription := m.ensVerifier.Subscribe()
+	var ensSubscription chan []*ens.VerificationRecord
+	if m.ensVerifier != nil {
+		ensSubscription = m.ensVerifier.Subscribe()
 
-	// Subscrbe
-	if err := m.ensVerifier.Start(); err != nil {
-		return nil, err
+		// Subscribe
+		if err := m.ensVerifier.Start(); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := m.communitiesManager.Start(); err != nil {
@@ -1009,7 +1012,9 @@ func (m *Messenger) handleConnectionChange(online bool) {
 	}
 
 	// Update ENS verifier
-	m.ensVerifier.SetOnline(online)
+	if m.ensVerifier != nil {
+		m.ensVerifier.SetOnline(online)
+	}
 }
 
 func (m *Messenger) Online() bool {
