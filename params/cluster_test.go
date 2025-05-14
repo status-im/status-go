@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestLoadFleetsFromFile tests the loadFleetsFromFile function.
+// TestLoadFleetsFromFile tests the loadWakuFleetsFromFile function.
 func TestLoadFleetsFromFile(t *testing.T) {
 	t.Run("valid file", func(t *testing.T) {
 		// Arrange: Create a temporary valid JSON file.
@@ -33,7 +33,7 @@ func TestLoadFleetsFromFile(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act: Call the function.
-		result, err := loadFleetsFromFile(tempFile.Name())
+		result, err := loadWakuFleetsFromFile(tempFile.Name())
 
 		// Assert: Check the error.
 		require.NoError(t, err)
@@ -45,7 +45,7 @@ func TestLoadFleetsFromFile(t *testing.T) {
 		nonExistentFile := filepath.Join(os.TempDir(), "non_existent_file.json")
 
 		// Act: Call the function.
-		_, err := loadFleetsFromFile(nonExistentFile)
+		_, err := loadWakuFleetsFromFile(nonExistentFile)
 
 		// Assert: Check the error.
 		require.Error(t, err)
@@ -63,7 +63,7 @@ func TestLoadFleetsFromFile(t *testing.T) {
 		tempFile.Close()
 
 		// Act: Call the function.
-		_, err = loadFleetsFromFile(tempFile.Name())
+		_, err = loadWakuFleetsFromFile(tempFile.Name())
 
 		// Assert: Check the error.
 		require.Error(t, err)

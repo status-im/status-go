@@ -138,7 +138,14 @@ func initializeApplication(requestJSON string) string {
 	}
 
 	if request.WakuFleetsConfigFilePath != "" {
-		err = params.LoadFleetsFromFile(request.WakuFleetsConfigFilePath)
+		err = params.LoadWakuFleetsFromFile(request.WakuFleetsConfigFilePath)
+		if err != nil {
+			return makeJSONResponse(err)
+		}
+	}
+
+	if request.PushFleetsConfigFilePath != "" {
+		err = params.LoadPushFleetsFromFile(request.PushFleetsConfigFilePath)
 		if err != nil {
 			return makeJSONResponse(err)
 		}
