@@ -1,5 +1,5 @@
 # Build status-go in a Go builder container
-FROM golang:1.22.12-bookworm AS builder
+FROM golang:1.23.10-bookworm AS builder
 
 # Set environment variables to use Clang
 ENV CC=clang
@@ -60,6 +60,5 @@ COPY --from=builder /go/src/github.com/status-im/status-go/tests-functional/waku
 
 # 30304 is used for Discovery v5
 EXPOSE 8080 8545 30303 30303/udp 30304/udp
-
 ENTRYPOINT ["status-backend"]
 CMD ["--help"]

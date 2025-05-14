@@ -191,7 +191,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 	export GOFLAGS="-mod=mod"; \
 	gomobile init; \
 	gomobile bind -v \
-		-target=android -ldflags="-s -w" \
+		-target=android -ldflags="-s -w -checklinkname=0" \
 		-tags '$(BUILD_TAGS) disable_torrent' \
 		$(BUILD_FLAGS_MOBILE) \
 		--androidapi="23" \

@@ -768,7 +768,6 @@ github.com/evanphx/json-patch v4.9.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLi
 github.com/evanphx/json-patch v4.11.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/felixge/httpsnoop v1.0.1/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
-github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 h1:FtmdgXiUlNeRsoNMFlKLDt+S+6hbjVMEW6RGQ7aUf7c=
 github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5/go.mod h1:VvhXpOYNQvB+uIk2RvXzuaQtkQJzzIx6lSBe1xv7hi0=
 github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568/go.mod h1:xEzjJPgXI435gkrCt3MPfRiAkVrwSbHsst4LCFVfpJc=
 github.com/flynn/noise v1.1.0 h1:KjPQoQCEFdZDiP03phOvGi11+SVVhBG2wOWAorLsstg=
@@ -2047,8 +2046,8 @@ github.com/status-im/doubleratchet v3.0.0+incompatible h1:aJ1ejcSERpSzmWZBgtfYti
 github.com/status-im/doubleratchet v3.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
 github.com/status-im/extkeys v1.1.0 h1:jH8GKSNgGxT64T6FRSaG7VmrJokVugn1ealo/V4wmvQ=
 github.com/status-im/extkeys v1.1.0/go.mod h1:D6WDVwhax0M/x1hRcQTm7gMgV33/SYSnsV/+4IIfZfA=
-github.com/status-im/go-ethereum v1.10.25-status.19 h1:iiX5x4R5vRRXnFkNgyyQY2qJM/4HB6JPFAe0OGeVQGg=
-github.com/status-im/go-ethereum v1.10.25-status.19/go.mod h1:f0JvrNPETLEqhIN5aG3VKAt8zR0WmCwkusdvgGzfQf4=
+github.com/status-im/go-ethereum v1.10.25-status.21 h1:LSoG0BeQkXPgYLP1KMfYIdWQsBum0PUrW2JQIgGyIdk=
+github.com/status-im/go-ethereum v1.10.25-status.21/go.mod h1:qSfF4zz2PhIy4t8RNBYCUewQiTzyJApK1+lk3ORbDa0=
 github.com/status-im/go-sqlcipher/v4 v4.5.4-status.3 h1:/73h1w1hUfb3wVyTlNrUIwahZxatgesCHa6lwO57C2M=
 github.com/status-im/go-sqlcipher/v4 v4.5.4-status.3/go.mod h1:mF2UmIpBnzFeBdu/ypTDb/LdbS0nk0dfSN1WUsWTjMA=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4 h1:CtobZoiNdHpx+xurFxnuJ1xsGm3oKMfcZkB3vmomJmA=
