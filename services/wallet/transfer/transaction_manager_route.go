@@ -57,6 +57,10 @@ func (tm *TransactionManager) TxPlacedForPath(pathProcessorName string) bool {
 func (tm *TransactionManager) getOrInitDetailsForPath(path *routes.Path) *wallettypes.RouterTransactionDetails {
 	for _, desc := range tm.routerTransactions {
 		if desc.RouterPath.PathIdentity() == path.PathIdentity() {
+			if desc.RouterPath.ProcessorName == pathProcessorCommon.ProcessorSwapParaswapName {
+				// since the path is re-evaluated for swap after approval tx is placed we need to use the latest path
+				desc.RouterPath = path
+			}
 			return desc
 		}
 	}

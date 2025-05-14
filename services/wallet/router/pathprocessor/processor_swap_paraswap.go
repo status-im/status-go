@@ -266,10 +266,6 @@ func (s *SwapParaswapProcessor) PackTxInputData(params ProcessorInputParams) ([]
 	if err != nil {
 		return []byte{}, createSwapParaswapErrorResponse(err)
 	}
-
-	if err != nil {
-		return []byte{}, createSwapParaswapErrorResponse(err)
-	}
 	return types.Hex2Bytes(tx.Data), nil
 }
 

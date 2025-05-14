@@ -259,6 +259,11 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 
 			// update the path details
 			usedNonces := make(map[uint64]uint64)
+			if path.ApprovalRequired {
+				usedNonces[path.FromChain.ChainID] = uint64(*path.ApprovalTxNonce) - 1
+			} else {
+				usedNonces[path.FromChain.ChainID] = uint64(*path.TxNonce - 1)
+			}
 			err = r.evaluateAndUpdatePathDetails(ctx, path, fetchedFees, usedNonces, false, 0)
 			if err != nil {
 				return err
