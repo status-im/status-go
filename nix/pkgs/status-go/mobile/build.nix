@@ -37,7 +37,7 @@ in pkgs.buildGoPackage rec {
       go-bindata
       mockgen
       protoc-gen-go
-      protobuf3_20
+      protobuf3_24
       fakeGit
   ] ++ optional isAndroid pkgs.openjdk_headless
     ++ optional isAndroid pkgs.nwaku.libwaku-android-arm64

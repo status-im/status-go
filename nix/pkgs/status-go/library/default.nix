@@ -23,7 +23,7 @@ in pkgs.buildGoPackage {
       go-bindata
       mockgen
       protoc-gen-go
-      protobuf3_20
+      protobuf3_24
       fakeGit
   ];
 
