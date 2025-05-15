@@ -94,6 +94,7 @@ type Network struct {
 	RelatedChainID         uint64          `json:"relatedChainId" validate:"omitempty"`
 	IsActive               bool            `json:"isActive"`
 	IsDeactivatable        bool            `json:"isDeactivatable"`
+	EIP1559Enabled         bool            `json:"eip1559Enabled"`
 }
 
 func (n *Network) DeepCopy() Network {

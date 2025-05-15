@@ -31,6 +31,13 @@ var (
 	ErrInvalidRewardData                        = &errors.ErrorResponse{Code: errors.ErrorCode("WRF-003"), Details: "invalid reward data"}
 )
 
+// NonEIP1559Fees represents the fees for non EIP-1559 compatible chains
+type NonEIP1559Fees struct {
+	GasPrice      *hexutil.Big `json:"gasPrice"`      // Gas price for the transaction used for non EIP-1559 compatible chains (in base unit of the chain eg. WEI for ETH or BNB)
+	EstimatedTime uint         `json:"estimatedTime"` // Estimated time for the transaction in seconds, used for non EIP-1559 compatible chains
+}
+
+// MaxFeesLevels represents the max fees levels for low, medium and high fee modes and should be used for EIP-1559 compatible chains
 type MaxFeesLevels struct {
 	Low                 *hexutil.Big `json:"low"`                 // Low max fee per gas in WEI
 	LowPriority         *hexutil.Big `json:"lowPriority"`         // Low priority fee in WEI
@@ -49,13 +56,17 @@ type MaxPriorityFeesSuggestedBounds struct {
 }
 
 type SuggestedFees struct {
-	GasPrice                      *big.Int                        // TODO: remove once clients stop using this field, used for EIP-1559 incompatible chains, not in use anymore
-	BaseFee                       *big.Int                        // TODO: remove once clients stop using this field, current network base fee (in ETH WEI), kept for backward compatibility
-	CurrentBaseFee                *big.Int                        // Current network base fee (in ETH WEI)
-	MaxFeesLevels                 *MaxFeesLevels                  // Max fees levels for low, medium and high fee modes
-	MaxPriorityFeePerGas          *big.Int                        // TODO: remove once clients stop using this field, kept for backward compatibility
+	// Fields that need to be removed once clients stop using them
+	GasPrice             *big.Int   // TODO: remove once clients stop using this field, used for EIP-1559 incompatible chains, not in use anymore
+	BaseFee              *big.Int   // TODO: remove once clients stop using this field, current network base fee (in ETH WEI), kept for backward compatibility
+	MaxPriorityFeePerGas *big.Int   // TODO: remove once clients stop using this field, kept for backward compatibility
+	L1GasFee             *big.Float // TODO: remove once clients stop using this field, not in use anymore
+
+	// Fields in use
+	NonEIP1559Fees                *NonEIP1559Fees                 // Fees for non EIP-1559 compatible chains
+	MaxFeesLevels                 *MaxFeesLevels                  // Max fees levels for low, medium and high fee modes, should be used for EIP-1559 compatible chains
 	MaxPriorityFeeSuggestedBounds *MaxPriorityFeesSuggestedBounds // Lower and upper bounds for priority fee per gas in WEI
-	L1GasFee                      *big.Float                      // TODO: remove once clients stop using this field, not in use anymore
+	CurrentBaseFee                *big.Int                        // Current network base fee (in ETH WEI)
 	EIP1559Enabled                bool                            // TODO: remove it since all chains we have support EIP-1559
 }
 
@@ -96,6 +107,18 @@ func (s *SuggestedFees) FeeFor(mode GasFeeMode) (*big.Int, *big.Int, uint, error
 
 type FeeManager struct {
 	RPCClient rpc.ClientInterface
+}
+
+func (f *FeeManager) IsEIP1559Enabled(ctx context.Context, chainID uint64) (bool, error) {
+	backend, err := f.RPCClient.EthClient(chainID)
+	if err != nil {
+		return false, err
+	}
+	block, err := backend.BlockByNumber(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	return block.BaseFee() != nil, nil
 }
 
 func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*SuggestedFees, error) {
@@ -153,9 +176,9 @@ func (f *FeeManager) SuggestedFees(ctx context.Context, chainID uint64) (*Sugges
 		}
 	}
 
-	suggestedFees.MaxFeesLevels.LowEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Low.ToInt(), suggestedFees.MaxFeesLevels.LowPriority.ToInt(), chainID)
-	suggestedFees.MaxFeesLevels.MediumEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Medium.ToInt(), suggestedFees.MaxFeesLevels.MediumPriority.ToInt(), chainID)
-	suggestedFees.MaxFeesLevels.HighEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.High.ToInt(), suggestedFees.MaxFeesLevels.HighPriority.ToInt(), chainID)
+	suggestedFees.MaxFeesLevels.LowEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Low.ToInt(), suggestedFees.MaxFeesLevels.LowPriority.ToInt(), chainID, 1)
+	suggestedFees.MaxFeesLevels.MediumEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.Medium.ToInt(), suggestedFees.MaxFeesLevels.MediumPriority.ToInt(), chainID, 1)
+	suggestedFees.MaxFeesLevels.HighEstimatedTime = estimatedTimeV2(feeHistory, suggestedFees.MaxFeesLevels.High.ToInt(), suggestedFees.MaxFeesLevels.HighPriority.ToInt(), chainID, 1)
 
 	return suggestedFees, nil
 }

@@ -421,8 +421,15 @@ func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64,
 	return api.s.router.GetFeesManager().TransactionEstimatedTime(ctx, chainID, gweiToWei(maxFeePerGas)), nil
 }
 
-func (api *API) GetTransactionEstimatedTimeV2(ctx context.Context, chainID uint64, maxFeePerGas *hexutil.Big, maxPriorityFeePerGas *hexutil.Big) (uint, error) {
+func (api *API) GetTransactionEstimatedTimeV2(ctx context.Context, chainID uint64, gasPrice *hexutil.Big, maxFeePerGas *hexutil.Big, maxPriorityFeePerGas *hexutil.Big) (uint, error) {
 	logutils.ZapLogger().Debug("call to getTransactionEstimatedTimeV2")
+	isEIP1559Enabled, err := api.s.router.GetFeesManager().IsEIP1559Enabled(ctx, chainID)
+	if err != nil {
+		return 0, err
+	}
+	if !isEIP1559Enabled {
+		return api.s.router.GetFeesManager().TransactionEstimatedTimeV2Legacy(ctx, chainID, gasPrice.ToInt()), nil
+	}
 	return api.s.router.GetFeesManager().TransactionEstimatedTimeV2(ctx, chainID, maxFeePerGas.ToInt(), maxPriorityFeePerGas.ToInt()), nil
 }
 

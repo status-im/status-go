@@ -22,49 +22,52 @@ type Path struct {
 	AmountIn              *hexutil.Big      // Amount that will be sent from the source chain
 	AmountOut             *hexutil.Big      // Amount that will be received on the destination chain
 
-	SuggestedLevelsForMaxFeesPerGas *fees.MaxFeesLevels // Suggested max fees by the network (in ETH WEI)
-	SuggestedMinPriorityFee         *hexutil.Big        // Suggested min priority fee by the network (in ETH WEI)
-	SuggestedMaxPriorityFee         *hexutil.Big        // Suggested max priority fee by the network (in ETH WEI)
-	SuggestedTxNonce                *hexutil.Uint64     // Suggested nonce for the transaction
-	SuggestedTxGasAmount            uint64              // Suggested gas amount for the transaction
-	SuggestedApprovalTxNonce        *hexutil.Uint64     // Suggested nonce for the approval transaction
-	SuggestedApprovalGasAmount      uint64              // Suggested gas amount for the approval transaction
-	CurrentBaseFee                  *hexutil.Big        // Current network base fee (in ETH WEI)
-	UsedContractAddress             *common.Address     // Address of the contract that will be used for the transaction
+	SuggestedNonEIP1559Fees         *fees.NonEIP1559Fees // Suggested fees for non EIP-1559 compatible chains
+	SuggestedLevelsForMaxFeesPerGas *fees.MaxFeesLevels  // Suggested max fees by the network (in base unit of the chain eg. WEI for ETH or BNB)
+	SuggestedMinPriorityFee         *hexutil.Big         // Suggested min priority fee by the network (in base unit of the chain eg. WEI for ETH or BNB)
+	SuggestedMaxPriorityFee         *hexutil.Big         // Suggested max priority fee by the network (in base unit of the chain eg. WEI for ETH or BNB)
+	SuggestedTxNonce                *hexutil.Uint64      // Suggested nonce for the transaction
+	SuggestedTxGasAmount            uint64               // Suggested gas amount for the transaction
+	SuggestedApprovalTxNonce        *hexutil.Uint64      // Suggested nonce for the approval transaction
+	SuggestedApprovalGasAmount      uint64               // Suggested gas amount for the approval transaction
+	CurrentBaseFee                  *hexutil.Big         // Current network base fee (in base unit of the chain eg. WEI for ETH or BNB)
+	UsedContractAddress             *common.Address      // Address of the contract that will be used for the transaction
 
 	TxPackedData    []byte          // Packed data for the transaction
 	TxNonce         *hexutil.Uint64 // Nonce for the transaction
+	TxGasPrice      *hexutil.Big    // Gas price for the transaction (in base unit of the chain eg. WEI for ETH or BNB)
 	TxGasFeeMode    fees.GasFeeMode // Gas fee mode for the transaction
-	TxMaxFeesPerGas *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
-	TxBaseFee       *hexutil.Big    // Base fee for the transaction (in ETH WEI)
-	TxPriorityFee   *hexutil.Big    // Priority fee for the transaction (in ETH WEI)
+	TxMaxFeesPerGas *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in base unit of the chain eg. WEI for ETH or BNB)
+	TxBaseFee       *hexutil.Big    // Base fee for the transaction (in base unit of the chain eg. WEI for ETH or BNB)
+	TxPriorityFee   *hexutil.Big    // Priority fee for the transaction (in base unit of the chain eg. WEI for ETH or BNB)
 	TxGasAmount     uint64          // Gas used for the transaction
 	TxBonderFees    *hexutil.Big    // Bonder fees for the transaction - used for Hop bridge (in selected token)
 	TxTokenFees     *hexutil.Big    // Token fees for the transaction - used for bridges (represent the difference between the amount in and the amount out, in selected token)
 	TxEstimatedTime uint            // Estimated time for the transaction in seconds
 
-	TxFee   *hexutil.Big // fee for the transaction (includes tx fee only, doesn't include approval fees, l1 fees, l1 approval fees, token fees or bonders fees, in ETH WEI)
-	TxL1Fee *hexutil.Big // L1 fee for the transaction - used for for transactions placed on L2 chains (in ETH WEI)
+	TxFee   *hexutil.Big // fee for the transaction (includes tx fee only, doesn't include approval fees, l1 fees, l1 approval fees, token fees or bonders fees, in base unit of the chain eg. WEI for ETH or BNB)
+	TxL1Fee *hexutil.Big // L1 fee for the transaction - used for for transactions placed on L2 chains (in base unit of the chain eg. WEI for ETH or BNB)
 
 	ApprovalRequired        bool            // Is approval required for the transaction
 	ApprovalAmountRequired  *hexutil.Big    // Amount required for the approval transaction
 	ApprovalContractAddress *common.Address // Address of the contract that will be used for the approval transaction, the same as UsedContractAddress. We can remove this field and use UsedContractAddress instead.
 	ApprovalPackedData      []byte          // Packed data for the approval transaction
 	ApprovalTxNonce         *hexutil.Uint64 // Nonce for the transaction
+	ApprovalGasPrice        *hexutil.Big    // Gas price for the approval transaction (in base unit of the chain eg. WEI for ETH or BNB)
 	ApprovalGasFeeMode      fees.GasFeeMode // Gas fee mode for the approval transaction
-	ApprovalMaxFeesPerGas   *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in ETH WEI)
-	ApprovalBaseFee         *hexutil.Big    // Base fee for the approval transaction (in ETH WEI)
-	ApprovalPriorityFee     *hexutil.Big    // Priority fee for the approval transaction (in ETH WEI)
+	ApprovalMaxFeesPerGas   *hexutil.Big    // Max fees per gas (determined by client via GasFeeMode, in base unit of the chain eg. WEI for ETH or BNB)
+	ApprovalBaseFee         *hexutil.Big    // Base fee for the approval transaction (in base unit of the chain eg. WEI for ETH or BNB)
+	ApprovalPriorityFee     *hexutil.Big    // Priority fee for the approval transaction (in base unit of the chain eg. WEI for ETH or BNB)
 	ApprovalGasAmount       uint64          // Gas used for the approval transaction
 	ApprovalEstimatedTime   uint            // Estimated time for the approval transaction in seconds
 
-	ApprovalFee   *hexutil.Big // Total fee for the approval transaction (includes approval tx fees only, doesn't include approval l1 fees, in ETH WEI)
-	ApprovalL1Fee *hexutil.Big // L1 fee for the approval transaction - used for for transactions placed on L2 chains (in ETH WEI)
+	ApprovalFee   *hexutil.Big // Total fee for the approval transaction (includes approval tx fees only, doesn't include approval l1 fees, in base unit of the chain eg. WEI for ETH or BNB)
+	ApprovalL1Fee *hexutil.Big // L1 fee for the approval transaction - used for for transactions placed on L2 chains (in base unit of the chain eg. WEI for ETH or BNB)
 
-	TxTotalFee *hexutil.Big // Total fee for the transaction (includes tx fees, approval fees, l1 fees, l1 approval fees, in ETH WEI)
+	TxTotalFee *hexutil.Big // Total fee for the transaction (includes tx fees, approval fees, l1 fees, l1 approval fees, in base unit of the chain eg. WEI for ETH or BNB)
 
 	RequiredTokenBalance  *big.Int // (in selected token)
-	RequiredNativeBalance *big.Int // (in ETH WEI)
+	RequiredNativeBalance *big.Int // (in base unit of the chain eg. WEI for ETH or BNB)
 	SubtractFees          bool
 
 	// used internally
@@ -139,6 +142,14 @@ func (p *Path) Copy() *Path {
 		newPath.AmountOut = (*hexutil.Big)(big.NewInt(0).Set(p.AmountOut.ToInt()))
 	}
 
+	if p.SuggestedNonEIP1559Fees != nil {
+		newPath.SuggestedNonEIP1559Fees = &fees.NonEIP1559Fees{}
+		if p.SuggestedNonEIP1559Fees.GasPrice != nil {
+			newPath.SuggestedNonEIP1559Fees.GasPrice = (*hexutil.Big)(big.NewInt(0).Set(p.SuggestedNonEIP1559Fees.GasPrice.ToInt()))
+		}
+		newPath.SuggestedNonEIP1559Fees.EstimatedTime = p.SuggestedNonEIP1559Fees.EstimatedTime
+	}
+
 	if p.SuggestedLevelsForMaxFeesPerGas != nil {
 		newPath.SuggestedLevelsForMaxFeesPerGas = &fees.MaxFeesLevels{}
 		if p.SuggestedLevelsForMaxFeesPerGas.Low != nil {
@@ -196,6 +207,10 @@ func (p *Path) Copy() *Path {
 		newPath.TxNonce = &txNonce
 	}
 
+	if p.TxGasPrice != nil {
+		newPath.TxGasPrice = (*hexutil.Big)(big.NewInt(0).Set(p.TxGasPrice.ToInt()))
+	}
+
 	if p.TxMaxFeesPerGas != nil {
 		newPath.TxMaxFeesPerGas = (*hexutil.Big)(big.NewInt(0).Set(p.TxMaxFeesPerGas.ToInt()))
 	}
@@ -246,6 +261,10 @@ func (p *Path) Copy() *Path {
 	if p.ApprovalTxNonce != nil {
 		approvalTxNonce := *p.ApprovalTxNonce
 		newPath.ApprovalTxNonce = &approvalTxNonce
+	}
+
+	if p.ApprovalGasPrice != nil {
+		newPath.ApprovalGasPrice = (*hexutil.Big)(big.NewInt(0).Set(p.ApprovalGasPrice.ToInt()))
 	}
 
 	if p.ApprovalMaxFeesPerGas != nil {

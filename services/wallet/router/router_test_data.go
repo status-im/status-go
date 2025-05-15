@@ -90,7 +90,7 @@ var (
 			Medium: (*hexutil.Big)(big.NewInt(testPriorityFeeMedium)),
 			High:   (*hexutil.Big)(big.NewInt(testPriorityFeeHigh)),
 		},
-		EIP1559Enabled: false,
+		EIP1559Enabled: true,
 	}
 
 	testBalanceMapPerChain = map[string]*big.Int{
@@ -128,6 +128,7 @@ var mainnet = params.Network{
 	Layer:                  1,
 	Enabled:                true,
 	RelatedChainID:         walletCommon.EthereumMainnet,
+	EIP1559Enabled:         true,
 }
 
 var optimism = params.Network{
@@ -151,6 +152,7 @@ var optimism = params.Network{
 	Layer:                  2,
 	Enabled:                true,
 	RelatedChainID:         walletCommon.OptimismMainnet,
+	EIP1559Enabled:         true,
 }
 
 var arbitrum = params.Network{
@@ -174,6 +176,7 @@ var arbitrum = params.Network{
 	Layer:                  2,
 	Enabled:                true,
 	RelatedChainID:         walletCommon.ArbitrumMainnet,
+	EIP1559Enabled:         true,
 }
 
 var base = params.Network{
@@ -197,6 +200,7 @@ var base = params.Network{
 	Layer:                  2,
 	Enabled:                true,
 	RelatedChainID:         walletCommon.BaseMainnet,
+	EIP1559Enabled:         true,
 }
 
 var bsc = params.Network{
@@ -217,6 +221,7 @@ var bsc = params.Network{
 	Layer:                  1,
 	Enabled:                true,
 	RelatedChainID:         walletCommon.BSCMainnet,
+	EIP1559Enabled:         true,
 }
 
 var defaultNetworks = []params.Network{
