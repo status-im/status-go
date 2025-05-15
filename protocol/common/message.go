@@ -18,11 +18,11 @@ import (
 	"github.com/status-im/markdown"
 	"github.com/status-im/markdown/ast"
 
-	accountJson "github.com/status-im/status-go/account/json"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/audio"
-	"github.com/status-im/status-go/protocol/protobuf"
+	accountJson "github.com/status-im/status-go/v10/account/json"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/protocol/audio"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 // QuotedMessage contains the original text of the message replied to

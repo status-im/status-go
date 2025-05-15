@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/contracts/ierc20"
+	"github.com/status-im/status-go/v10/contracts/ierc20"
 
-	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
+	pathProcessorCommon "github.com/status-im/status-go/v10/services/wallet/router/pathprocessor/common"
 )
 
 func IsProcessorBridge(name string) bool {

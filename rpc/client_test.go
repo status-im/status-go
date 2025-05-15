@@ -12,15 +12,15 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/v10/params/networkhelper"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/t/helpers"
 
 	"github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"

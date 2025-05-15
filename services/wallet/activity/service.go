@@ -15,15 +15,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	ac "github.com/status-im/status-go/services/wallet/activity/common"
-	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/collectibles"
-	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	ac "github.com/status-im/status-go/v10/services/wallet/activity/common"
+	"github.com/status-im/status-go/v10/services/wallet/async"
+	"github.com/status-im/status-go/v10/services/wallet/collectibles"
+	w_common "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/services/wallet/token"
+	"github.com/status-im/status-go/v10/services/wallet/walletevent"
 )
 
 const (

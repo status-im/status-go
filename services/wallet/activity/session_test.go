@@ -6,7 +6,7 @@ import (
 
 	eth "github.com/ethereum/go-ethereum/common"
 
-	ac "github.com/status-im/status-go/services/wallet/activity/common"
+	ac "github.com/status-im/status-go/v10/services/wallet/activity/common"
 )
 
 // TODO #12120: cover missing cases

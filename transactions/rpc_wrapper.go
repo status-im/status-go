@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
 
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/v10/rpc"
 )
 
 // rpcWrapper wraps provides convenient interface for ethereum RPC APIs we need for sending transactions

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/v10/services/wallet/balance"
 
 	"github.com/stretchr/testify/require"
 

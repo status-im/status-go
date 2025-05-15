@@ -3,8 +3,8 @@ package types
 import (
 	"crypto/ecdsa"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
+	"github.com/status-im/status-go/v10/wakuv2"
 )
 
 type ChatToInitialize struct {

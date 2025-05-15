@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/params/networkhelper"
-	"github.com/status-im/status-go/rpc/network/testutil"
+	"github.com/status-im/status-go/v10/params/networkhelper"
+	"github.com/status-im/status-go/v10/rpc/network/testutil"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -20,18 +20,18 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
-	mock_reader "github.com/status-im/status-go/services/wallet/mock/reader"
-	"github.com/status-im/status-go/services/wallet/onramp"
-	mock_onramp "github.com/status-im/status-go/services/wallet/onramp/mock"
-	"github.com/status-im/status-go/services/wallet/requests"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/walletconnect"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/rpc"
+	mock_reader "github.com/status-im/status-go/v10/services/wallet/mock/reader"
+	"github.com/status-im/status-go/v10/services/wallet/onramp"
+	mock_onramp "github.com/status-im/status-go/v10/services/wallet/onramp/mock"
+	"github.com/status-im/status-go/v10/services/wallet/requests"
+	tokentypes "github.com/status-im/status-go/v10/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/services/wallet/walletconnect"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/walletdatabase"
 )
 
 // TestAPI_GetWalletConnectActiveSessions tames coverage

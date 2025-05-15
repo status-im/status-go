@@ -11,12 +11,12 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 var ErrMessageSegmentsIncomplete = errors.New("message segments incomplete")

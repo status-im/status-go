@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/rpc/chain"
-	"github.com/status-im/status-go/rpc/chain/ethclient"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
+	"github.com/status-im/status-go/v10/rpc/chain"
+	"github.com/status-im/status-go/v10/rpc/chain/ethclient"
+	"github.com/status-im/status-go/v10/rpc/chain/rpclimiter"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
-	statusRpc "github.com/status-im/status-go/rpc"
+	statusRpc "github.com/status-im/status-go/v10/rpc"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -24,16 +24,16 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/sqlite"
-	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/transactions/fake"
-	mock_fake "github.com/status-im/status-go/transactions/fake"
+	"github.com/status-im/status-go/v10/account"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/params"
+	wallet_common "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/sqlite"
+	"github.com/status-im/status-go/v10/t/utils"
+	"github.com/status-im/status-go/v10/transactions/fake"
+	mock_fake "github.com/status-im/status-go/v10/transactions/fake"
 )
 
 func TestTransactorSuite(t *testing.T) {

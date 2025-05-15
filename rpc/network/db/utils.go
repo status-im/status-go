@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/params"
 )
 
 // Deprecated: fillDeprecatedURLs populates the `original_rpc_url`, `original_fallback_url`, `rpc_url`,

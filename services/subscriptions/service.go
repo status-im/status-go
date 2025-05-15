@@ -4,7 +4,7 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/v10/rpc"
 )
 
 // Make sure that Service implements gethnode.Lifecycle interface.

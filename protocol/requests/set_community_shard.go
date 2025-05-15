@@ -3,8 +3,8 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/wakuv2"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/wakuv2"
 )
 
 type SetCommunityShard struct {

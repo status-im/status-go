@@ -20,15 +20,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/messaging"
+	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/protocol/encryption"
+	"github.com/status-im/status-go/v10/signal"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"

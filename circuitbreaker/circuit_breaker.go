@@ -8,7 +8,7 @@ import (
 	"github.com/afex/hystrix-go/hystrix"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/v10/logutils"
 )
 
 type FallbackFunc func() ([]any, error)

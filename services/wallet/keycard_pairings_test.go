@@ -8,13 +8,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/rpc"
+	"github.com/status-im/status-go/v10/rpc/network"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/walletdatabase"
 )
 
 func TestKeycardPairingsFile(t *testing.T) {

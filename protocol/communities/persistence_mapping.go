@@ -5,10 +5,10 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/wakuv2"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/server"
+	"github.com/status-im/status-go/v10/wakuv2"
 )
 
 func communityToRecord(community *Community) (*CommunityRecord, error) {

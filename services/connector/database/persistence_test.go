@@ -5,9 +5,9 @@ import (
 
 	"database/sql"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/walletdatabase"
 
 	"github.com/stretchr/testify/require"
 )

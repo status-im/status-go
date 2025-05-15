@@ -14,13 +14,13 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/requests"
 )
 
 const (

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/v10/common"
 )
 
 // TaskFunc defines the task to be run. The context is canceled when Stop is

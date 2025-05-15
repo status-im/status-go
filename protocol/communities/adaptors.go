@@ -1,7 +1,7 @@
 package communities
 
 import (
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 func (o *Community) ToSyncInstallationCommunityProtobuf(clock uint64, communitySettings *CommunitySettings, syncControlNode *protobuf.SyncCommunityControlNode) (*protobuf.SyncInstallationCommunity, error) {

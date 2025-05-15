@@ -5,10 +5,10 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/sqlite"
+	"github.com/status-im/status-go/v10/t/helpers"
 )
 
 func TestPeerSyncingSuite(t *testing.T) {

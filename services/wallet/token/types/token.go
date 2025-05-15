@@ -4,9 +4,9 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/services/wallet/community"
+	"github.com/status-im/status-go/v10/services/wallet/community"
 
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	wallet_common "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 type Token struct {

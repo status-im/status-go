@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	api_common "github.com/status-im/status-go/api/common"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkhelper"
-	"github.com/status-im/status-go/rpc/network/testutil"
+	api_common "github.com/status-im/status-go/v10/api/common"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/params/networkhelper"
+	"github.com/status-im/status-go/v10/rpc/network/testutil"
 )
 
 func TestMergeProvidersPreserveEnabledAndOrder(t *testing.T) {

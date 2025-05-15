@@ -10,8 +10,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/crypto/ecies"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/crypto/ecies"
 )
 
 const keyBumpValue = uint64(10)

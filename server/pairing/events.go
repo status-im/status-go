@@ -1,6 +1,6 @@
 package pairing
 
-import "github.com/status-im/status-go/multiaccounts"
+import "github.com/status-im/status-go/v10/multiaccounts"
 
 // EventType type for event types.
 type EventType string

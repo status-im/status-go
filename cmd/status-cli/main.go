@@ -7,8 +7,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/v10/api"
+	"github.com/status-im/status-go/v10/protocol"
 
 	"github.com/urfave/cli/v2"
 )

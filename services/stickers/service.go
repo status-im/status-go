@@ -4,13 +4,13 @@ import (
 	"context"
 
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/ipfs"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/v10/account"
+	"github.com/status-im/status-go/v10/ipfs"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/rpc"
+	"github.com/status-im/status-go/v10/server"
+	"github.com/status-im/status-go/v10/transactions"
 )
 
 // NewService initializes service instance.

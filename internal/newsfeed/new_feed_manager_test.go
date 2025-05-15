@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/v10/common"
 )
 
 type NewsFeedManagerSuite struct {

@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/v10/protocol/tt"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 const publicChatName = "status"

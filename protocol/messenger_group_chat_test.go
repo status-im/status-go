@@ -9,12 +9,12 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
-	userimage "github.com/status-im/status-go/images"
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	userimage "github.com/status-im/status-go/v10/images"
+	multiaccountscommon "github.com/status-im/status-go/v10/multiaccounts/common"
 
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 func TestGroupChatSuite(t *testing.T) {

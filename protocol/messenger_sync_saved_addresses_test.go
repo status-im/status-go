@@ -11,13 +11,13 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/v10/protocol/tt"
+	"github.com/status-im/status-go/v10/services/wallet"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 func TestMessengerSyncSavedAddressesSuite(t *testing.T) {

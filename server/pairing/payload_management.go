@@ -5,16 +5,16 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/v10/common"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/api"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 var (

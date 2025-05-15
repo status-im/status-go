@@ -5,8 +5,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/logutils"
 )
 
 var (

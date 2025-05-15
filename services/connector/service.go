@@ -4,8 +4,8 @@ import (
 	"database/sql"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/v10/rpc"
+	"github.com/status-im/status-go/v10/rpc/network"
 )
 
 func NewService(db *sql.DB, rpc rpc.ClientInterface, nm *network.Manager) *Service {

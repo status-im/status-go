@@ -11,11 +11,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/timesource"
+	"github.com/status-im/status-go/v10/timesource"
 
-	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/v10/api"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/server"
 )
 
 /*

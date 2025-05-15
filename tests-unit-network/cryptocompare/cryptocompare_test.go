@@ -3,14 +3,14 @@ package cryptocompare_tests
 import (
 	"testing"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/params"
-	mock_network "github.com/status-im/status-go/rpc/network/mock"
-	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty/market/cryptocompare"
-	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/params"
+	mock_network "github.com/status-im/status-go/v10/rpc/network/mock"
+	w_common "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty/market/cryptocompare"
+	"github.com/status-im/status-go/v10/services/wallet/token"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/walletdatabase"
 
 	"github.com/stretchr/testify/require"
 

@@ -9,7 +9,7 @@ import (
 	udpp2p "github.com/schollz/peerdiscovery"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/v10/common"
 )
 
 const (

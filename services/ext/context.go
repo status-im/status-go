@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/status-im/status-go/db"
+	"github.com/status-im/status-go/v10/db"
 )
 
 // ContextKey is a type used for keys in ext Context.

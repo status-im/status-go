@@ -8,12 +8,12 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/event"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/services/wallet/market"
-	"github.com/status-im/status-go/services/wallet/token"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/walletevent"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/services/wallet/market"
+	"github.com/status-im/status-go/v10/services/wallet/token"
+	tokentypes "github.com/status-im/status-go/v10/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/services/wallet/walletevent"
 )
 
 const (

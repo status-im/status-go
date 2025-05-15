@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/v10/common/dbsetup"
+	"github.com/status-im/status-go/v10/images"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/v10/multiaccounts/common"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {

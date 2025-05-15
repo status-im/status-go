@@ -12,9 +12,9 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/net/html"
 
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 type OpenGraphMetadata struct {

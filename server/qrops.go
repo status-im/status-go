@@ -13,8 +13,8 @@ import (
 	"github.com/yeqown/go-qrcode/writer/standard"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/multiaccounts"
 )
 
 type WriterCloserByteBuffer struct {

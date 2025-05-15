@@ -17,15 +17,15 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/account"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/rpc"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
+	wallet_common "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
 )
 
 const (

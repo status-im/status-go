@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 func preparePersonalSignRequest(dApp signal.ConnectorDApp, challenge, address string) (RPCRequest, error) {

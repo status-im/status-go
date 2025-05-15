@@ -2,7 +2,7 @@ package updates
 
 import (
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/v10/services/ens"
 )
 
 // NewService initializes service instance.

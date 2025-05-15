@@ -8,10 +8,10 @@ import (
 
 	"github.com/bits-and-blooms/bloom/v3"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/encryption"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 func generateBloomFiltersForChannels(description *protobuf.CommunityDescription, privateKey *ecdsa.PrivateKey) error {

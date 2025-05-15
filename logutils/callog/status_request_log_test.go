@@ -15,7 +15,7 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 
-	"github.com/status-im/status-go/logutils/requestlog"
+	"github.com/status-im/status-go/v10/logutils/requestlog"
 )
 
 func TestRemoveSensitiveInfo(t *testing.T) {

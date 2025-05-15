@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/healthmanager"
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
-	mockEthclient "github.com/status-im/status-go/rpc/chain/ethclient/mock/client/ethclient"
+	"github.com/status-im/status-go/v10/healthmanager"
+	"github.com/status-im/status-go/v10/healthmanager/rpcstatus"
+	mockEthclient "github.com/status-im/status-go/v10/rpc/chain/ethclient/mock/client/ethclient"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -20,7 +20,7 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	"github.com/status-im/status-go/rpc/chain/ethclient"
+	"github.com/status-im/status-go/v10/rpc/chain/ethclient"
 )
 
 type BlockchainHealthSuite struct {

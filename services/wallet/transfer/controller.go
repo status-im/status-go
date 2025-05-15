@@ -9,16 +9,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
-	statusaccounts "github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
-	"github.com/status-im/status-go/services/accounts/accountsevent"
-	"github.com/status-im/status-go/services/wallet/balance"
-	"github.com/status-im/status-go/services/wallet/blockchainstate"
-	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/transactions"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/logutils"
+	statusaccounts "github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/rpc"
+	"github.com/status-im/status-go/v10/rpc/chain/rpclimiter"
+	"github.com/status-im/status-go/v10/services/accounts/accountsevent"
+	"github.com/status-im/status-go/v10/services/wallet/balance"
+	"github.com/status-im/status-go/v10/services/wallet/blockchainstate"
+	"github.com/status-im/status-go/v10/services/wallet/token"
+	"github.com/status-im/status-go/v10/transactions"
 )
 
 type Controller struct {

@@ -1,7 +1,7 @@
 package wallettypes
 
 import (
-	"github.com/status-im/status-go/services/wallet/requests"
+	"github.com/status-im/status-go/v10/services/wallet/requests"
 )
 
 // These structs oontain all route execution data

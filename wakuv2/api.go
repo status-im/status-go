@@ -31,10 +31,10 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
-	ethtypes "github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2/common"
+	ethtypes "github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/waku/types"
+	"github.com/status-im/status-go/v10/wakuv2/common"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -42,7 +42,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	gocommon "github.com/status-im/status-go/common"
+	gocommon "github.com/status-im/status-go/v10/common"
 )
 
 // List of errors

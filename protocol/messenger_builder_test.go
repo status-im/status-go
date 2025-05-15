@@ -6,19 +6,19 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/tt"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/v10/account/generator"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/common/dbsetup"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/tt"
+	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/walletdatabase"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 type testMessengerConfig struct {

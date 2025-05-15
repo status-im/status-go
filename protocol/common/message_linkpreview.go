@@ -5,10 +5,10 @@ import (
 	"net/url"
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 type MakeMediaServerURLType func(msgID string, previewURL string, imageID MediaServerImageID) string

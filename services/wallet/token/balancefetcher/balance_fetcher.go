@@ -14,13 +14,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/contracts/ethscan"
-	"github.com/status-im/status-go/contracts/ierc20"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/rpc/chain"
-	"github.com/status-im/status-go/services/wallet/async"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/contracts"
+	"github.com/status-im/status-go/v10/contracts/ethscan"
+	"github.com/status-im/status-go/v10/contracts/ierc20"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/rpc/chain"
+	"github.com/status-im/status-go/v10/services/wallet/async"
 )
 
 var NativeChainAddress = common.HexToAddress("0x")

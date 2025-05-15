@@ -3,8 +3,8 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 var ErrAddRoleToMemberInvalidCommunityID = errors.New("add-role-to-member: invalid community id")

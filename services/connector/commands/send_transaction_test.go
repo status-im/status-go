@@ -10,11 +10,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/eth-node/types"
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
-	"github.com/status-im/status-go/services/wallet/router/fees"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	mock_client "github.com/status-im/status-go/v10/rpc/chain/mock/client"
+	"github.com/status-im/status-go/v10/services/wallet/router/fees"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 func prepareSendTransactionRequest(dApp signal.ConnectorDApp, from types.Address) (RPCRequest, error) {

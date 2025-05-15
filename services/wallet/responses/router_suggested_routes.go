@@ -1,8 +1,8 @@
 package responses
 
 import (
-	"github.com/status-im/status-go/errors"
-	"github.com/status-im/status-go/services/wallet/router/routes"
+	"github.com/status-im/status-go/v10/errors"
+	"github.com/status-im/status-go/v10/services/wallet/router/routes"
 )
 
 type RouterSuggestedRoutes struct {

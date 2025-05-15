@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 
-	gocommon "github.com/status-im/status-go/common"
+	gocommon "github.com/status-im/status-go/v10/common"
 )
 
 func ToColorID(pubkey string) (int64, error) {

@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/types"
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	multiaccountscommon "github.com/status-im/status-go/v10/multiaccounts/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 type RequestToJoinState uint

@@ -1,6 +1,6 @@
 package server
 
-import "github.com/status-im/status-go/protocol/protobuf"
+import "github.com/status-im/status-go/v10/protocol/protobuf"
 
 type MediaServerInterface interface {
 	MakeCommunityDescriptionTokenImageURL(communityID, symbol string) string

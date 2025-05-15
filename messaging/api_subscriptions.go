@@ -1,8 +1,8 @@
 package messaging
 
 import (
-	"github.com/status-im/status-go/messaging/adapters"
-	"github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/v10/messaging/adapters"
+	"github.com/status-im/status-go/v10/messaging/types"
 )
 
 func (a *API) SubscribeToConnStatusChanges() (types.ConnectionStatusSubscription, error) {

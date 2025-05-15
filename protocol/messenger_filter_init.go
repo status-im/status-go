@@ -10,11 +10,11 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/deprecation"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/wakuv2"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/deprecation"
+	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
+	"github.com/status-im/status-go/v10/protocol/communities"
+	"github.com/status-im/status-go/v10/wakuv2"
 )
 
 // InitFilters analyzes chats and contacts in order to setup filters

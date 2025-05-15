@@ -13,14 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/server/servertest"
-	"github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/v10/api"
+	"github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/common/dbsetup"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/protocol/requests"
+	"github.com/status-im/status-go/v10/server/servertest"
+	"github.com/status-im/status-go/v10/t/utils"
 )
 
 var (

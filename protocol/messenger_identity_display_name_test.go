@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
+	utils "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/v10/protocol/tt"
 
 	"github.com/stretchr/testify/suite"
 )

@@ -8,7 +8,7 @@ import (
 
 	"github.com/multiformats/go-multiaddr"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
 )
 
 type Database struct {

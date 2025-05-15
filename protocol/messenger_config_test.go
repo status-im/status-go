@@ -4,12 +4,12 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/services/mailservers"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/protocol/communities"
+	"github.com/status-im/status-go/v10/services/mailservers"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/waku/types"
 )
 
 func WithTestStoreNode(s *suite.Suite, id string, address multiaddr.Multiaddr, fleet string, collectiblesServiceMock *CollectiblesServiceMock) Option {

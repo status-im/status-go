@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
+	"github.com/status-im/status-go/v10/healthmanager/rpcstatus"
 )
 
 type BlockchainHealthManagerSuite struct {

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/storenodes"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/storenodes"
 )
 
 var (

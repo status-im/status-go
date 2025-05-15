@@ -1,8 +1,8 @@
 package communities
 
 import (
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/requests"
 )
 
 func validateCommunityChat(desc *protobuf.CommunityDescription, chat *protobuf.CommunityChat) error {

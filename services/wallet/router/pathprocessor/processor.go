@@ -8,12 +8,12 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/requests"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/account"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/services/wallet/requests"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
 )
 
 type PathProcessor interface {

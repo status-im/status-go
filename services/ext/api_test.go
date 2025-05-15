@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

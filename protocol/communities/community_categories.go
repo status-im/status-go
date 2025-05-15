@@ -3,7 +3,7 @@ package communities
 import (
 	"sort"
 
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 func (o *Community) ChatsByCategoryID(categoryID string) []string {

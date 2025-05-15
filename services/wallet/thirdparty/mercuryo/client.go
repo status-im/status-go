@@ -1,7 +1,7 @@
 package mercuryo
 
 import (
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
 )
 
 type Client struct {

@@ -3,7 +3,7 @@ package eth
 import (
 	geth_rpc "github.com/ethereum/go-ethereum/rpc"
 
-	rpc_client "github.com/status-im/status-go/rpc"
+	rpc_client "github.com/status-im/status-go/v10/rpc"
 )
 
 type Service struct {

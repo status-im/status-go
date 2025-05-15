@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/status-im/status-go/eth-node/types"
-	persistence "github.com/status-im/status-go/services/connector/database"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	persistence "github.com/status-im/status-go/v10/services/connector/database"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 func TestFailToRevokePermissionsWithMissingDAppFields(t *testing.T) {

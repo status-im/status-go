@@ -9,17 +9,17 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts/errors"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/protocol/wakusync"
-	ensservice "github.com/status-im/status-go/services/ens"
+	utils "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/multiaccounts/errors"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/communities"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
+	"github.com/status-im/status-go/v10/protocol/wakusync"
+	ensservice "github.com/status-im/status-go/v10/services/ens"
 )
 
 const (

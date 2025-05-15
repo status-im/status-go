@@ -3,8 +3,8 @@ package storage_test
 import (
 	"encoding/json"
 
-	"github.com/status-im/status-go/services/wallet/requests"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/services/wallet/requests"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
 )
 
 type dbParams struct {

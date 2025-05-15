@@ -9,10 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/types"
-	persistence "github.com/status-im/status-go/services/connector/database"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	persistence "github.com/status-im/status-go/v10/services/connector/database"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 var (

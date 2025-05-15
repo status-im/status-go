@@ -12,7 +12,7 @@ import (
 
 	"github.com/xeipuuv/gojsonschema"
 
-	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/token-lists/default-lists"
+	defaulttokenlists "github.com/status-im/status-go/v10/services/wallet/token/token-lists/default-lists"
 )
 
 const templateText = `package defaulttokenlists

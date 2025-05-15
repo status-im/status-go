@@ -7,17 +7,17 @@ import (
 	"math/big"
 	"path/filepath"
 
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/api/common"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/identity/alias"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/v10/account/generator"
+	"github.com/status-im/status-go/v10/api/common"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/protocol"
+	"github.com/status-im/status-go/v10/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/v10/protocol/identity/alias"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/requests"
 )
 
 const (

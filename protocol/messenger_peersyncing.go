@@ -13,14 +13,14 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
-	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
-	"github.com/status-im/status-go/protocol/peersyncing"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/communities"
+	datasyncpeer "github.com/status-im/status-go/v10/protocol/datasync/peer"
+	"github.com/status-im/status-go/v10/protocol/encryption/sharedsecret"
+	"github.com/status-im/status-go/v10/protocol/peersyncing"
+	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
 )
 
 var peerSyncingLoopInterval time.Duration = 60 * time.Second

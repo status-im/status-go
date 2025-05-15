@@ -10,24 +10,24 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/v10/images"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
 
-	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/multiaccounts"
-	mc "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/v10/common/dbsetup"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	mc "github.com/status-im/status-go/v10/multiaccounts/common"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/sqlite"
+	"github.com/status-im/status-go/v10/protocol/tt"
+	"github.com/status-im/status-go/v10/t/helpers"
 )
 
 func TestHandlersSuite(t *testing.T) {

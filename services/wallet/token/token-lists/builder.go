@@ -7,12 +7,12 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/services/wallet/common"
-	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/token-lists/default-lists"
-	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/services/wallet/common"
+	defaulttokenlists "github.com/status-im/status-go/v10/services/wallet/token/token-lists/default-lists"
+	"github.com/status-im/status-go/v10/services/wallet/token/token-lists/fetcher"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 )
 
 func (t *TokenLists) rebuildTokensMap(fetchedLists []fetcher.FetchedTokenList) error {

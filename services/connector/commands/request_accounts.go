@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	persistence "github.com/status-im/status-go/services/connector/database"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	persistence "github.com/status-im/status-go/v10/services/connector/database"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 // errors

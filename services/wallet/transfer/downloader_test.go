@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	mock_client "github.com/status-im/status-go/v10/rpc/chain/mock/client"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
 
 	"github.com/stretchr/testify/require"
 )

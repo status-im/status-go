@@ -2,11 +2,11 @@ package wakuv2ext
 
 import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/ext"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/rpc"
+	"github.com/status-im/status-go/v10/services/ext"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 type Service struct {

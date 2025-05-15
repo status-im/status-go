@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/v10/multiaccounts"
 )
 
 func TestMigrateKeystoreDir_Validate(t *testing.T) {

@@ -15,8 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	getrpc "github.com/ethereum/go-ethereum/rpc"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/logutils"
 )
 
 const (

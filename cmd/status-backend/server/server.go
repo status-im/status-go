@@ -15,8 +15,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/status-im/status-go/cmd/status-backend/server/api"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/cmd/status-backend/server/api"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 type Server struct {

@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/errors"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/multiaccounts/errors"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/sqlite"
 )
 
 func StringFromSyncProtobuf(ss *protobuf.SyncSetting) interface{} {

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/constants"
-	multiAccCommon "github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/v10/constants"
+	multiAccCommon "github.com/status-im/status-go/v10/multiaccounts/common"
 )
 
 type savedAddressMeta struct {

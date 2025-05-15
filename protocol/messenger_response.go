@@ -5,25 +5,25 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	ensservice "github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/waku/types"
+	ensservice "github.com/status-im/status-go/v10/services/ens"
+	"github.com/status-im/status-go/v10/waku/types"
 
-	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/v10/services/browsers"
+	"github.com/status-im/status-go/v10/services/wallet"
 
-	"github.com/status-im/status-go/appmetrics"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/storenodes"
-	"github.com/status-im/status-go/protocol/verification"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/v10/appmetrics"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	walletsettings "github.com/status-im/status-go/v10/multiaccounts/settings_wallet"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/communities"
+	"github.com/status-im/status-go/v10/protocol/discord"
+	"github.com/status-im/status-go/v10/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/storenodes"
+	"github.com/status-im/status-go/v10/protocol/verification"
+	localnotifications "github.com/status-im/status-go/v10/services/local-notifications"
 )
 
 type RemovedMessage struct {

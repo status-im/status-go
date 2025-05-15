@@ -17,18 +17,18 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/api/multiformat"
-	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/common"
-	community_token "github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/wakuv2"
+	"github.com/status-im/status-go/v10/api/multiformat"
+	utils "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/protocol/common"
+	community_token "github.com/status-im/status-go/v10/protocol/communities/token"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/requests"
+	"github.com/status-im/status-go/v10/protocol/v1"
+	"github.com/status-im/status-go/v10/server"
+	"github.com/status-im/status-go/v10/wakuv2"
 )
 
 const signatureLength = 65

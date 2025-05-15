@@ -1,8 +1,8 @@
 package pairing
 
 import (
-	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/v10/protocol"
+	"github.com/status-im/status-go/v10/protocol/encryption/multidevice"
 )
 
 func GetMessengerInstallationsMap(m *protocol.Messenger) map[string]struct{} {

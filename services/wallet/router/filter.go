@@ -3,7 +3,7 @@ package router
 import (
 	"math/big"
 
-	"github.com/status-im/status-go/services/wallet/router/routes"
+	"github.com/status-im/status-go/v10/services/wallet/router/routes"
 
 	"go.uber.org/zap"
 )

@@ -10,11 +10,11 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/api"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/protocol/requests"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 type PayloadReceiver interface {

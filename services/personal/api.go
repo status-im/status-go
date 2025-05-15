@@ -9,10 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/v10/account"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/rpc"
 )
 
 var (

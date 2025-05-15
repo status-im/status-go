@@ -9,12 +9,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/wakuv2"
-	waku2 "github.com/status-im/status-go/wakuv2"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/wakuv2"
+	waku2 "github.com/status-im/status-go/v10/wakuv2"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 type testWakuV2Config struct {

@@ -12,14 +12,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/account"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/logutils"
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/requests"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/v10/account"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/logutils"
+	wallet_common "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/requests"
+	"github.com/status-im/status-go/v10/services/wallet/router/pathprocessor"
 )
 
 func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {

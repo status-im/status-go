@@ -6,8 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 type PushCategory string

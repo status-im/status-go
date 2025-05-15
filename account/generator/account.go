@@ -8,10 +8,10 @@ import (
 
 	"github.com/status-im/extkeys"
 
-	accountJson "github.com/status-im/status-go/account/json"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts"
+	accountJson "github.com/status-im/status-go/v10/account/json"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/multiaccounts"
 )
 
 type Account struct {

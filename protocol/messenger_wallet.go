@@ -9,15 +9,15 @@ import (
 	"go.uber.org/zap"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/account"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/constants"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/account"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/constants"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	walletsettings "github.com/status-im/status-go/v10/multiaccounts/settings_wallet"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 var (

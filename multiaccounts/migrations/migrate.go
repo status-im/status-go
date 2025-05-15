@@ -5,7 +5,7 @@ import (
 
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/v10/sqlite"
 )
 
 // Migrate applies migrations.

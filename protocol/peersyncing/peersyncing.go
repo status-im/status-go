@@ -1,6 +1,6 @@
 package peersyncing
 
-import "github.com/status-im/status-go/eth-node/types"
+import "github.com/status-im/status-go/v10/eth-node/types"
 
 type PeerSyncing struct {
 	persistence SyncMessagePersistence

@@ -11,10 +11,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty/mercuryo"
-	"github.com/status-im/status-go/services/wallet/token"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty/mercuryo"
+	"github.com/status-im/status-go/v10/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 )
 
 const mercuryoID = "mercuryo"

@@ -14,9 +14,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/eth-node/crypto"
-	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	enstypes "github.com/status-im/status-go/v10/eth-node/types/ens"
 )
 
 const (

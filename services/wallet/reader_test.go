@@ -16,12 +16,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/status-im/status-go/rpc/chain"
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
-	"github.com/status-im/status-go/services/wallet/testutils"
-	mock_balance_persistence "github.com/status-im/status-go/services/wallet/token/mock/balance_persistence"
-	mock_token "github.com/status-im/status-go/services/wallet/token/mock/token"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/rpc/chain"
+	mock_client "github.com/status-im/status-go/v10/rpc/chain/mock/client"
+	"github.com/status-im/status-go/v10/services/wallet/testutils"
+	mock_balance_persistence "github.com/status-im/status-go/v10/services/wallet/token/mock/balance_persistence"
+	mock_token "github.com/status-im/status-go/v10/services/wallet/token/mock/token"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 )
 
 var (

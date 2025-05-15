@@ -3,8 +3,8 @@ package chat
 import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/protocol"
 )
 
 func NewService(accountsDB *accounts.Database) *Service {

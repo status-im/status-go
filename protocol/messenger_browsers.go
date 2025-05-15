@@ -3,7 +3,7 @@ package protocol
 import (
 	"context"
 
-	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/v10/services/browsers"
 )
 
 func (m *Messenger) AddBrowser(ctx context.Context, browser browsers.Browser) error {

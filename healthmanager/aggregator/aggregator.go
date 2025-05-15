@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
+	"github.com/status-im/status-go/v10/healthmanager/rpcstatus"
 )
 
 // Aggregator manages and aggregates the statuses of multiple providers.

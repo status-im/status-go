@@ -6,7 +6,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/waku/types"
 )
 
 func TestSerialization(t *testing.T) {

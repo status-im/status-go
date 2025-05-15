@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/services/connector/commands"
+	"github.com/status-im/status-go/v10/services/connector/commands"
 )
 
 func TestCallRPC(t *testing.T) {

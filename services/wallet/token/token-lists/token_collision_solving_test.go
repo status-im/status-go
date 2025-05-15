@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/token/token-lists/fetcher"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 )
 
 func TestRemoveDuplicates(t *testing.T) {

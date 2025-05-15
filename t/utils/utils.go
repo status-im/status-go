@@ -17,14 +17,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/v10/common"
 
 	_ "github.com/stretchr/testify/suite" // required to register testify flags
 
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/static"
-	"github.com/status-im/status-go/t"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/static"
+	"github.com/status-im/status-go/v10/t"
 )
 
 var (

@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/protocol/requests"
+	"github.com/status-im/status-go/v10/t/utils"
 )
 
 const (

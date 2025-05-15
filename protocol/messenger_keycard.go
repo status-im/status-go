@@ -3,9 +3,9 @@ package protocol
 import (
 	"context"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 func (m *Messenger) prepareSyncKeycardsMessage(keyUID string) (message []*protobuf.SyncKeycard, err error) {

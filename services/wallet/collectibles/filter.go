@@ -9,10 +9,10 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
-	"github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	wcommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/protocol/communities/token"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
+	wcommon "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
 )
 
 func allCollectibleIDsFilter() []thirdparty.CollectibleUniqueID {

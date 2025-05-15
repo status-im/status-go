@@ -11,13 +11,13 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
+	"github.com/status-im/status-go/v10/protocol/tt"
+	"github.com/status-im/status-go/v10/signal"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 func TestMessengerMessagesTrackingSuite(t *testing.T) {

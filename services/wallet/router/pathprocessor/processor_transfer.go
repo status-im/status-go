@@ -9,14 +9,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/contracts/ierc20"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/rpc"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/v10/account"
+	"github.com/status-im/status-go/v10/contracts/ierc20"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/rpc"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/v10/services/wallet/router/pathprocessor/common"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/transactions"
 )
 
 type TransferProcessor struct {

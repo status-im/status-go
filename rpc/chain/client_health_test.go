@@ -14,12 +14,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	healthManager "github.com/status-im/status-go/healthmanager"
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
-	"github.com/status-im/status-go/rpc/chain/ethclient"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
+	healthManager "github.com/status-im/status-go/v10/healthmanager"
+	"github.com/status-im/status-go/v10/healthmanager/rpcstatus"
+	"github.com/status-im/status-go/v10/rpc/chain/ethclient"
+	"github.com/status-im/status-go/v10/rpc/chain/rpclimiter"
 
-	mockEthclient "github.com/status-im/status-go/rpc/chain/ethclient/mock/client/ethclient"
+	mockEthclient "github.com/status-im/status-go/v10/rpc/chain/ethclient/mock/client/ethclient"
 )
 
 type ClientWithFallbackSuite struct {

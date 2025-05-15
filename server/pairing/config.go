@@ -5,9 +5,9 @@ import (
 	"crypto/tls"
 	"net"
 
-	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/v10/api"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/protocol/requests"
 )
 
 type SenderConfig struct {

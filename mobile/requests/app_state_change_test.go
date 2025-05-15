@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/v10/api"
 )
 
 func TestAppStateChange(t *testing.T) {

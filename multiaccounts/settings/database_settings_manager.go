@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/params"
 )
 
 type DatabaseSettingsManager interface {

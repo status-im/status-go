@@ -3,7 +3,7 @@ package requests
 import (
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/status-im/status-go/services/typeddata"
+	"github.com/status-im/status-go/v10/services/typeddata"
 )
 
 // SignTypedData represents a request to sign typed data.

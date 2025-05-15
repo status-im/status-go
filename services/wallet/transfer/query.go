@@ -8,8 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	w_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
+	w_common "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, network_id, base_gas_fee, COALESCE(multi_transaction_id, 0) %s FROM transfers"

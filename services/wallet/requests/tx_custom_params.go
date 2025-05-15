@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/errors"
-	"github.com/status-im/status-go/services/wallet/router/fees"
+	"github.com/status-im/status-go/v10/errors"
+	"github.com/status-im/status-go/v10/services/wallet/router/fees"
 
 	"gopkg.in/go-playground/validator.v9"
 )

@@ -3,8 +3,8 @@ package colorhash
 import (
 	"math/big"
 
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/protocol/identity"
 )
 
 const (

@@ -11,14 +11,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/rpc/network"
-	mock_market "github.com/status-im/status-go/services/wallet/market/mock"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	mock_thirdparty "github.com/status-im/status-go/services/wallet/thirdparty/mock"
-	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/rpc/network"
+	mock_market "github.com/status-im/status-go/v10/services/wallet/market/mock"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
+	mock_thirdparty "github.com/status-im/status-go/v10/services/wallet/thirdparty/mock"
+	"github.com/status-im/status-go/v10/services/wallet/token"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/walletdatabase"
 )
 
 func setupTokenManager(t *testing.T) (*token.Manager, func()) {

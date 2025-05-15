@@ -6,10 +6,10 @@ import (
 
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/rpc/chain"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/rpc/chain"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 var (

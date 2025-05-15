@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/waku/types"
 )
 
 var (

@@ -10,10 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/testutils"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
+	"github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/testutils"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 
 	"github.com/stretchr/testify/require"
 )

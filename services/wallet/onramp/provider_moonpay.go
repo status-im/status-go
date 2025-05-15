@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 const moonpayID = "moonpay"

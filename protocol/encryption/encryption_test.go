@@ -9,14 +9,14 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/protocol/sqlite"
+	"github.com/status-im/status-go/v10/t/helpers"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
 )
 
 var cleartext = []byte("hello")

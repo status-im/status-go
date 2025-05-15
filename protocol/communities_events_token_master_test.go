@@ -5,9 +5,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/communities/token"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 func TestTokenMasterCommunityEventsSuite(t *testing.T) {

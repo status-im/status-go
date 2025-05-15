@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/rpc/chain/rpclimiter"
+	"github.com/status-im/status-go/v10/rpc/chain/rpclimiter"
 )
 
 // ProviderErrorType defines the type of non-RPC error for JSON serialization.

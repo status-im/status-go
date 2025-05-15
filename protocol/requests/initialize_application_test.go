@@ -3,7 +3,7 @@ package requests
 import (
 	"testing"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/v10/common"
 )
 
 func TestInitializeApplication_Validate(t *testing.T) {

@@ -1,7 +1,7 @@
 package tt
 
 import (
-	"github.com/status-im/status-go/protocol/zaputil"
+	"github.com/status-im/status-go/v10/protocol/zaputil"
 
 	"go.uber.org/zap"
 )

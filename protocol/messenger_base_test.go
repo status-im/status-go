@@ -8,13 +8,13 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv2"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/protocol/tt"
+	"github.com/status-im/status-go/v10/wakuv2"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 const DefaultProfileDisplayName = ""

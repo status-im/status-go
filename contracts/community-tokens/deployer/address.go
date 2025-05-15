@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 var errorNotAvailableOnChainID = errors.New("deployer contract not available for chainID")

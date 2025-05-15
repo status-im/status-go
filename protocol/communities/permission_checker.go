@@ -15,10 +15,10 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/protocol/ens"
-	"github.com/status-im/status-go/protocol/protobuf"
-	walletcommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/protocol/ens"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	walletcommon "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
 )
 
 type PermissionChecker interface {

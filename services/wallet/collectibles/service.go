@@ -13,17 +13,17 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/rpc/network"
 
-	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/community"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/transfer"
-	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/v10/services/wallet/async"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/community"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/services/wallet/transfer"
+	"github.com/status-im/status-go/v10/services/wallet/walletevent"
 )
 
 // These events are used to notify the UI of state changes

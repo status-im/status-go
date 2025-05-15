@@ -1,4 +1,4 @@
-module github.com/status-im/status-go
+module github.com/status-im/status-go/v10
 
 go 1.22
 

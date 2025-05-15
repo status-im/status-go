@@ -3,7 +3,7 @@ package rpcfilters
 import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/v10/common"
 )
 
 // Make sure that Service implements node.Lifecycle interface.

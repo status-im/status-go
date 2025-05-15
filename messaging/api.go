@@ -10,12 +10,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/status-im/status-go/connection"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging/adapters"
-	"github.com/status-im/status-go/messaging/layers/transport"
-	"github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/connection"
+	ethtypes "github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/messaging/adapters"
+	"github.com/status-im/status-go/v10/messaging/layers/transport"
+	"github.com/status-im/status-go/v10/messaging/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 )
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/centralizedmetrics/common"
+	"github.com/status-im/status-go/v10/centralizedmetrics/common"
 )
 
 func TestValidateAddCentralizedMetrics(t *testing.T) {

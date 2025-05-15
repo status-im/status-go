@@ -3,7 +3,7 @@ package params_test
 import (
 	"testing"
 
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/params"
 
 	"github.com/stretchr/testify/assert"
 )

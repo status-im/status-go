@@ -1,6 +1,6 @@
 package utils
 
-import "github.com/status-im/status-go/common"
+import "github.com/status-im/status-go/v10/common"
 
 func BridgeChannels[In any, Out any](in <-chan In, convert func(In) Out) <-chan Out {
 	out := make(chan Out)

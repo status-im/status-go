@@ -9,28 +9,28 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
-	"github.com/status-im/status-go/protocol/storenodes"
+	"github.com/status-im/status-go/v10/protocol/storenodes"
 
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/wakuv2"
+	"github.com/status-im/status-go/v10/protocol/communities"
+	"github.com/status-im/status-go/v10/protocol/tt"
+	"github.com/status-im/status-go/v10/wakuv2"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/requests"
+	"github.com/status-im/status-go/v10/protocol/sqlite"
+	"github.com/status-im/status-go/v10/t/helpers"
 
-	mailserversDB "github.com/status-im/status-go/services/mailservers"
-	waku2 "github.com/status-im/status-go/wakuv2"
-	wakuV2common "github.com/status-im/status-go/wakuv2/common"
+	mailserversDB "github.com/status-im/status-go/v10/services/mailservers"
+	waku2 "github.com/status-im/status-go/v10/wakuv2"
+	wakuV2common "github.com/status-im/status-go/v10/wakuv2/common"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 func TestMessengerStoreNodeCommunitySuite(t *testing.T) {

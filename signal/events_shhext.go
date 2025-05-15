@@ -9,8 +9,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/eth-node/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 const (

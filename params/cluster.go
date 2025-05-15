@@ -6,7 +6,7 @@ import (
 
 	pkgerrors "github.com/pkg/errors"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 // Define available fleets.

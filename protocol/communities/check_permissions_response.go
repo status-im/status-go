@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 type CheckPermissionsResponse struct {

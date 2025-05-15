@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 func TestSyncSettingField_MarshalJSON(t *testing.T) {

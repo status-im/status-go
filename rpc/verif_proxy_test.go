@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/params"
 )
 
 type ProxySuite struct {

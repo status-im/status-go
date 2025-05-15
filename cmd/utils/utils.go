@@ -6,8 +6,8 @@ import (
 
 	"golang.org/x/crypto/ssh/terminal"
 
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/params"
 )
 
 func SetupLogging(logLevel *string, logWithoutColors *bool, config *params.NodeConfig) {

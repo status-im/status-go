@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/status-im/status-go/centralizedmetrics/common"
+	"github.com/status-im/status-go/v10/centralizedmetrics/common"
 )
 
 type SQLiteMetricRepository struct {

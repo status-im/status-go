@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/services/typeddata"
+	"github.com/status-im/status-go/v10/services/typeddata"
 )
 
 func TestSignTypedData_Validate(t *testing.T) {

@@ -4,13 +4,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/status-im/status-go/api/common"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/api/common"
+	"github.com/status-im/status-go/v10/params"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/v10/protocol/requests"
 )
 
 func TestBuildDefaultNetworks(t *testing.T) {

@@ -15,14 +15,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/rpc/chain"
-	"github.com/status-im/status-go/services/wallet/market"
-	"github.com/status-im/status-go/services/wallet/token"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/services/wallet/transfer"
-	"github.com/status-im/status-go/services/wallet/walletevent"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/rpc/chain"
+	"github.com/status-im/status-go/v10/services/wallet/market"
+	"github.com/status-im/status-go/v10/services/wallet/token"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/services/wallet/transfer"
+	"github.com/status-im/status-go/v10/services/wallet/walletevent"
 )
 
 // WalletTickReload emitted every 15mn to reload the wallet balance and history

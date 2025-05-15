@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
-	msignal "github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	msignal "github.com/status-im/status-go/v10/signal"
 
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"

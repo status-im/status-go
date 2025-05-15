@@ -3,8 +3,8 @@ package walletdatabase
 import (
 	"database/sql"
 
-	"github.com/status-im/status-go/sqlite"
-	"github.com/status-im/status-go/walletdatabase/migrations"
+	"github.com/status-im/status-go/v10/sqlite"
+	"github.com/status-im/status-go/v10/walletdatabase/migrations"
 )
 
 type DbInitializer struct {

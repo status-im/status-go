@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/centralizedmetrics/common"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/centralizedmetrics/common"
+	"github.com/status-im/status-go/v10/t/helpers"
 )
 
 func openTestDB() (*sql.DB, error) {

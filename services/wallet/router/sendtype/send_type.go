@@ -3,9 +3,9 @@ package sendtype
 import (
 	"math/big"
 
-	"github.com/status-im/status-go/params"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
+	"github.com/status-im/status-go/v10/params"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
+	pathProcessorCommon "github.com/status-im/status-go/v10/services/wallet/router/pathprocessor/common"
 )
 
 type SendType int

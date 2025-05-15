@@ -5,14 +5,14 @@ import (
 
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/typeddata"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/services/personal"
+	"github.com/status-im/status-go/v10/services/typeddata"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
 )
 
 // StatusBackend defines the contract for the Status.im service

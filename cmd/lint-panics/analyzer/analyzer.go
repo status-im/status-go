@@ -17,8 +17,8 @@ import (
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
 
-	"github.com/status-im/status-go/cmd/lint-panics/gopls"
-	"github.com/status-im/status-go/cmd/lint-panics/utils"
+	"github.com/status-im/status-go/v10/cmd/lint-panics/gopls"
+	"github.com/status-im/status-go/v10/cmd/lint-panics/utils"
 )
 
 const Pattern = "LogOnPanic"

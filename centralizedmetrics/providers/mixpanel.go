@@ -10,7 +10,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/centralizedmetrics/common"
+	"github.com/status-im/status-go/v10/centralizedmetrics/common"
 )
 
 const MixpanelBaseURL = "https://api.mixpanel.com"

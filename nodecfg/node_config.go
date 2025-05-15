@@ -7,9 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/sqlite"
 )
 
 const StaticNodes = "static"

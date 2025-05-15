@@ -6,11 +6,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/services/wallet/community"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/v10/rpc/network"
+	"github.com/status-im/status-go/v10/services/wallet/community"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/walletdatabase"
 
 	"github.com/ethereum/go-ethereum/common"
 )

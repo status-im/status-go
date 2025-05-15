@@ -15,19 +15,19 @@ import (
 	"github.com/status-im/mvds/state"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/protocol/datasync"
-	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
-	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
-	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/messaging"
+	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
+	"github.com/status-im/status-go/v10/protocol/datasync"
+	datasyncpeer "github.com/status-im/status-go/v10/protocol/datasync/peer"
+	"github.com/status-im/status-go/v10/protocol/encryption"
+	"github.com/status-im/status-go/v10/protocol/encryption/sharedsecret"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
-	wakuv2 "github.com/status-im/status-go/wakuv2"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
+	wakuv2 "github.com/status-im/status-go/v10/wakuv2"
 )
 
 // Whisper message properties.

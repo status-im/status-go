@@ -8,10 +8,10 @@ import (
 	crypto_rand "crypto/rand"
 
 	eth "github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/transactions"
+	"github.com/status-im/status-go/v10/walletdatabase"
 
 	"github.com/stretchr/testify/require"
 )

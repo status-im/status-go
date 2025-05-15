@@ -3,7 +3,7 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
 )
 
 var ErrCreateCommunityCategoryInvalidCommunityID = errors.New("create-community-category: invalid community id")

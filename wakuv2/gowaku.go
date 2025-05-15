@@ -83,15 +83,15 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/connection"
-	ethtypes "github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/timesource"
-	"github.com/status-im/status-go/wakuv2/common"
-	"github.com/status-im/status-go/wakuv2/persistence"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/connection"
+	ethtypes "github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/timesource"
+	"github.com/status-im/status-go/v10/wakuv2/common"
+	"github.com/status-im/status-go/v10/wakuv2/persistence"
 
-	"github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/waku/types"
 
 	"github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"

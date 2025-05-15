@@ -3,8 +3,8 @@ package testutil
 import (
 	"github.com/stretchr/testify/require"
 
-	api_common "github.com/status-im/status-go/api/common"
-	"github.com/status-im/status-go/params"
+	api_common "github.com/status-im/status-go/v10/api/common"
+	"github.com/status-im/status-go/v10/params"
 )
 
 // Helper function to create a provider

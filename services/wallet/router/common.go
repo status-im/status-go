@@ -1,8 +1,8 @@
 package router
 
 import (
-	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/router/routes"
+	"github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/router/routes"
 )
 
 func removeBestRouteFromAllRouters(allRoutes []routes.Route, best routes.Route) []routes.Route {

@@ -8,10 +8,10 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	tokenlists "github.com/status-im/status-go/services/wallet/token/token-lists"
-	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/token-lists/default-lists"
-	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokenlists "github.com/status-im/status-go/v10/services/wallet/token/token-lists"
+	defaulttokenlists "github.com/status-im/status-go/v10/services/wallet/token/token-lists/default-lists"
+	"github.com/status-im/status-go/v10/services/wallet/token/token-lists/fetcher"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 )
 
 func main() {

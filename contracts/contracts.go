@@ -6,15 +6,15 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/contracts/balancechecker"
-	"github.com/status-im/status-go/contracts/directory"
-	"github.com/status-im/status-go/contracts/ethscan"
-	"github.com/status-im/status-go/contracts/ierc20"
-	"github.com/status-im/status-go/contracts/registrar"
-	"github.com/status-im/status-go/contracts/resolver"
-	"github.com/status-im/status-go/contracts/snt"
-	"github.com/status-im/status-go/contracts/stickers"
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/v10/contracts/balancechecker"
+	"github.com/status-im/status-go/v10/contracts/directory"
+	"github.com/status-im/status-go/v10/contracts/ethscan"
+	"github.com/status-im/status-go/v10/contracts/ierc20"
+	"github.com/status-im/status-go/v10/contracts/registrar"
+	"github.com/status-im/status-go/v10/contracts/resolver"
+	"github.com/status-im/status-go/v10/contracts/snt"
+	"github.com/status-im/status-go/v10/contracts/stickers"
+	"github.com/status-im/status-go/v10/rpc"
 )
 
 type ContractMakerIface interface {

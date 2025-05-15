@@ -9,12 +9,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
-	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/services/wallet/token/token-lists/fetcher"
+	"github.com/status-im/status-go/v10/signal"
+	"github.com/status-im/status-go/v10/t/helpers"
 )
 
 func setupTestAppDB(t *testing.T) (*sql.DB, func()) {

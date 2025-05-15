@@ -3,7 +3,7 @@ package requests
 import (
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/status-im/status-go/server/pairing"
+	"github.com/status-im/status-go/v10/server/pairing"
 )
 
 type InputConnectionStringForBootstrappingAnotherDevice struct {

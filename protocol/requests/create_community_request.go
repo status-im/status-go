@@ -5,9 +5,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 var (

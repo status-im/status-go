@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/multiaccounts/common"
+	"github.com/status-im/status-go/v10/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/v10/protocol/requests"
+	"github.com/status-im/status-go/v10/protocol/tt"
 
 	"github.com/stretchr/testify/suite"
 )

@@ -11,14 +11,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/server/pairing"
-	"github.com/status-im/status-go/timesource"
+	"github.com/status-im/status-go/v10/server/pairing"
+	"github.com/status-im/status-go/v10/timesource"
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/server"
 )
 
 const (

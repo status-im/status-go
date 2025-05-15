@@ -4,10 +4,10 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/errors"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/services/wallet/requests"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/errors"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/services/wallet/requests"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
 )
 
 type SendDetails struct {

@@ -3,7 +3,7 @@ package gif
 import (
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
 )
 
 // Service represents out own implementation of personal sign operations.

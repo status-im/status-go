@@ -9,9 +9,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/protocol/tt"
+	"github.com/status-im/status-go/v10/t/utils"
 )
 
 func TestStatusNodeStart(t *testing.T) {

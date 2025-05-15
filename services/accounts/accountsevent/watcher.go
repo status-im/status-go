@@ -7,9 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/services/wallet/async"
 )
 
 type AccountsChangeCb func(changedAddresses []common.Address, eventType EventType, currentAddresses []common.Address)

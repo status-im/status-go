@@ -408,7 +408,7 @@ build-verif-proxy-wrapper:
 	$(MAKE) -C $(VERIF_PROXY_OUT_PATH) build-verif-proxy-wrapper
 
 test-verif-proxy-wrapper:
-	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)
+	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/v10/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)
 
 run-anvil: SHELL := /bin/sh
 run-anvil:

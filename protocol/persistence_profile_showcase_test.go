@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/v10/protocol/identity"
 )
 
 func TestProfileShowcasePersistenceSuite(t *testing.T) {

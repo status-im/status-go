@@ -1,6 +1,6 @@
 package settingsevent
 
-import "github.com/status-im/status-go/multiaccounts/settings"
+import "github.com/status-im/status-go/v10/multiaccounts/settings"
 
 // EventType type for event types.
 type EventType string

@@ -7,8 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/v10/account/generator"
+	"github.com/status-im/status-go/v10/rpc"
 )
 
 // GethManager represents account manager interface.

@@ -16,11 +16,11 @@ import (
 	"github.com/wealdtech/go-multicodec"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/ens/ensresolver"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/v10/account"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/rpc"
+	"github.com/status-im/status-go/v10/services/ens/ensresolver"
+	"github.com/status-im/status-go/v10/transactions"
 )
 
 func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {

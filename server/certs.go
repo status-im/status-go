@@ -12,7 +12,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/v10/logutils"
 )
 
 var globalMediaCertificate *tls.Certificate = nil

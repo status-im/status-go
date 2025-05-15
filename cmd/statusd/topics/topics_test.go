@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/params"
 )
 
 func TestTopicFlags(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
 )
 
 type BlockRangeDAOer interface {

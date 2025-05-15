@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	types "github.com/status-im/status-go/eth-node/types"
+	types "github.com/status-im/status-go/v10/eth-node/types"
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 )

@@ -7,10 +7,10 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	accountJson "github.com/status-im/status-go/account/json"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/protobuf"
+	accountJson "github.com/status-im/status-go/v10/account/json"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 // EmojiReaction represents an emoji reaction from a user in the application layer, used for persistence, querying and

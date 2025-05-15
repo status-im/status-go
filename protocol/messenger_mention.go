@@ -13,11 +13,11 @@ import (
 
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/logutils"
 
-	"github.com/status-im/status-go/api/multiformat"
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/v10/api/multiformat"
+	"github.com/status-im/status-go/v10/protocol/common"
 )
 
 const (

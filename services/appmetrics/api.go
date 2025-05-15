@@ -5,8 +5,8 @@ import (
 
 	"github.com/pborman/uuid"
 
-	"github.com/status-im/status-go/appmetrics"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/v10/appmetrics"
+	"github.com/status-im/status-go/v10/logutils"
 )
 
 func NewAPI(db *appmetrics.Database) *API {

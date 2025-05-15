@@ -3,11 +3,11 @@ package chat
 import (
 	"context"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/requests"
 )
 
 type GroupChatResponse struct {

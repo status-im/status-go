@@ -3,7 +3,7 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/v10/multiaccounts/common"
 )
 
 var ErrSetCustomizationColorInvalidColor = errors.New("customizationColor: invalid color")

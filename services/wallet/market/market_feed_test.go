@@ -9,9 +9,9 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/event"
-	mock_common "github.com/status-im/status-go/services/wallet/common/mock"
-	mock_market "github.com/status-im/status-go/services/wallet/market/mock"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	mock_common "github.com/status-im/status-go/v10/services/wallet/common/mock"
+	mock_market "github.com/status-im/status-go/v10/services/wallet/market/mock"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
 )
 
 type MarketTestSuite struct {

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	gethParams "github.com/ethereum/go-ethereum/params"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/params"
 )
 
 // ShouldCancel returns true if the context has been cancelled and task should be aborted

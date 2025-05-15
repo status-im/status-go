@@ -7,13 +7,13 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/protobuf"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	multiaccountscommon "github.com/status-im/status-go/v10/multiaccounts/common"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/communities"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 const (

@@ -1,8 +1,8 @@
 package accounts
 
 import (
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/multiaccounts/common"
 )
 
 func GetWatchOnlyAccountsForTest() []*Account {

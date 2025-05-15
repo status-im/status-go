@@ -6,11 +6,11 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
+	localnotifications "github.com/status-im/status-go/v10/services/local-notifications"
 )
 
 func TestEventToSystemMessageSuite(t *testing.T) {

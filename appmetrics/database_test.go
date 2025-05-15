@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/t/helpers"
 
 	"github.com/stretchr/testify/require"
 )

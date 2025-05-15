@@ -16,7 +16,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/v10/common"
 
 	"go.uber.org/zap"
 )

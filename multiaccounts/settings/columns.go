@@ -1,8 +1,8 @@
 package settings
 
 import (
-	"github.com/status-im/status-go/multiaccounts/errors"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/multiaccounts/errors"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 const (

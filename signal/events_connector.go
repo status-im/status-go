@@ -1,7 +1,7 @@
 package signal
 
 import (
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
 )
 
 const (

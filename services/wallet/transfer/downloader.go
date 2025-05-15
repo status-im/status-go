@@ -14,9 +14,9 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/rpc/chain"
-	w_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/rpc/chain"
+	w_common "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 var (

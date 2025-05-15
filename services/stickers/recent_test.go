@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	mock_settings "github.com/status-im/status-go/multiaccounts/settings/mock"
-	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	mock_settings "github.com/status-im/status-go/v10/multiaccounts/settings/mock"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
 )
 
 func SetupAPI(t *testing.T) (*API, *mock_settings.MockDatabaseSettingsManager) {

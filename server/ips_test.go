@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/server/servertest"
+	"github.com/status-im/status-go/v10/server/servertest"
 )
 
 func TestIPsTestingSuite(t *testing.T) {

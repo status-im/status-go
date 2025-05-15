@@ -9,17 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
-	"github.com/status-im/status-go/rpc/network"
-	network_testutil "github.com/status-im/status-go/rpc/network/testutil"
-	persistence "github.com/status-im/status-go/services/connector/database"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/params"
+	mock_rpcclient "github.com/status-im/status-go/v10/rpc/mock/client"
+	"github.com/status-im/status-go/v10/rpc/network"
+	network_testutil "github.com/status-im/status-go/v10/rpc/network/testutil"
+	persistence "github.com/status-im/status-go/v10/services/connector/database"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/signal"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/walletdatabase"
 )
 
 var testDAppData = signal.ConnectorDApp{

@@ -1,8 +1,8 @@
 package adapters
 
 import (
-	"github.com/status-im/status-go/messaging/layers/transport"
-	"github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/v10/messaging/layers/transport"
+	"github.com/status-im/status-go/v10/messaging/types"
 )
 
 type KeysPersistence struct {

@@ -8,7 +8,7 @@ import (
 	"github.com/mmcdole/gofeed"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
 )
 
 type MessengerNewsFeedSuite struct {

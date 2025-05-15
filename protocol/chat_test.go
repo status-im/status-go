@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/common"
 )
 
 type ChatTestSuite struct {

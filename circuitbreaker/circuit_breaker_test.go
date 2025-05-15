@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/healthmanager/provider_errors"
+	"github.com/status-im/status-go/v10/healthmanager/provider_errors"
 )
 
 const success = "Success"

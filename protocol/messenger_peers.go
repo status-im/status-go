@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	wakutypes "github.com/status-im/status-go/waku/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 func (m *Messenger) AddRelayPeer(address multiaddr.Multiaddr) (peer.ID, error) {

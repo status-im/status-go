@@ -1,9 +1,9 @@
 package adapters
 
 import (
-	"github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/messaging/utils"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/messaging/types"
+	"github.com/status-im/status-go/v10/messaging/utils"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 type ConnectionStatusSubscription struct {

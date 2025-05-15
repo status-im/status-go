@@ -1,6 +1,6 @@
 package types
 
-import "github.com/status-im/status-go/eth-node/types"
+import "github.com/status-im/status-go/v10/eth-node/types"
 
 // Envelope represents a clear-text data packet to transmit through the Whisper
 // network. Its contents may or may not be encrypted and signed.

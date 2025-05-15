@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/status-im/status-go/rpc/network"
-	"github.com/status-im/status-go/services/connector/chainutils"
-	persistence "github.com/status-im/status-go/services/connector/database"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/v10/rpc/network"
+	"github.com/status-im/status-go/v10/services/connector/chainutils"
+	persistence "github.com/status-im/status-go/v10/services/connector/database"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 type ChainIDCommand struct {

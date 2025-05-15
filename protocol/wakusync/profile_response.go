@@ -1,9 +1,9 @@
 package wakusync
 
 import (
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/identity"
-	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/protocol/identity"
+	"github.com/status-im/status-go/v10/services/ens"
 )
 
 type BackedUpProfile struct {

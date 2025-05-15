@@ -9,15 +9,15 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/status-im/status-go/errors"
-	"github.com/status-im/status-go/params"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/requests"
-	"github.com/status-im/status-go/services/wallet/router/fees"
-	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
-	"github.com/status-im/status-go/services/wallet/router/routes"
-	"github.com/status-im/status-go/services/wallet/router/sendtype"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/errors"
+	"github.com/status-im/status-go/v10/params"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/requests"
+	"github.com/status-im/status-go/v10/services/wallet/router/fees"
+	pathProcessorCommon "github.com/status-im/status-go/v10/services/wallet/router/pathprocessor/common"
+	"github.com/status-im/status-go/v10/services/wallet/router/routes"
+	"github.com/status-im/status-go/v10/services/wallet/router/sendtype"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 )
 
 const (

@@ -117,7 +117,7 @@ else
 
   # Spawn separate processes to run `protocol` package
   for ((i=1; i<=UNIT_TEST_COUNT; i++)); do
-    run_test_for_packages github.com/status-im/status-go/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
+    run_test_for_packages github.com/status-im/status-go/v10/protocol "${i}" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package" &
   done
 
   wait

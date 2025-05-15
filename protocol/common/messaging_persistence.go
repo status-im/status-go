@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/status-im/status-go/messaging/types"
+	"github.com/status-im/status-go/v10/messaging/types"
 )
 
 const tableName = "wakuv2_keys"

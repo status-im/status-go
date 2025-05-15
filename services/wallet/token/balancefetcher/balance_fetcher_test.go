@@ -14,14 +14,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/contracts/ethscan"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/contracts/ethscan"
+	"github.com/status-im/status-go/v10/params"
 
-	mock_contracts "github.com/status-im/status-go/contracts/mock"
-	"github.com/status-im/status-go/rpc/chain"
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
-	mock_network "github.com/status-im/status-go/rpc/network/mock"
-	w_common "github.com/status-im/status-go/services/wallet/common"
+	mock_contracts "github.com/status-im/status-go/v10/contracts/mock"
+	"github.com/status-im/status-go/v10/rpc/chain"
+	mock_client "github.com/status-im/status-go/v10/rpc/chain/mock/client"
+	mock_network "github.com/status-im/status-go/v10/rpc/network/mock"
+	w_common "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 type FakeBalanceScanner struct {

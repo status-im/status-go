@@ -10,17 +10,17 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/deprecation"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	userimage "github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/services/utils"
+	"github.com/status-im/status-go/v10/deprecation"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	userimage "github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/communities"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/requests"
+	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
+	"github.com/status-im/status-go/v10/services/utils"
 )
 
 var chatColors = []string{

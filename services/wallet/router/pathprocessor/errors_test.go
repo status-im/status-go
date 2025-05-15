@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	s_errors "github.com/status-im/status-go/errors"
+	s_errors "github.com/status-im/status-go/v10/errors"
 
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
+	"github.com/status-im/status-go/v10/services/wallet/router/pathprocessor/common"
 
 	"github.com/stretchr/testify/require"
 )

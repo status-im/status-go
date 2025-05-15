@@ -3,7 +3,7 @@ package defaulttokenlists
 import (
 	"time"
 
-	"github.com/status-im/status-go/services/wallet/token/token-lists/fetcher"
+	"github.com/status-im/status-go/v10/services/wallet/token/token-lists/fetcher"
 )
 
 var StatusTokenList = fetcher.FetchedTokenList{

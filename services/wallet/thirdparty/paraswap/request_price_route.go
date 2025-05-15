@@ -10,7 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
 )
 
 const pricesURL = "https://api.paraswap.io/prices"

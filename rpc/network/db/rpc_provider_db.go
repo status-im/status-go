@@ -6,8 +6,8 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/sqlite"
 )
 
 // Interface for managing RPC providers

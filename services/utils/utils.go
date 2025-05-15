@@ -8,10 +8,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/api/multiformat"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	prot_common "github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/v10/api/multiformat"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	prot_common "github.com/status-im/status-go/v10/protocol/common"
 )
 
 func GetSigner(chainID uint64, from types.Address, privateKey *ecdsa.PrivateKey) bind.SignerFn {

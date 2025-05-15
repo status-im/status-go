@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/status-im/status-go/services/connector/commands"
-	persistence "github.com/status-im/status-go/services/connector/database"
+	"github.com/status-im/status-go/v10/services/connector/commands"
+	persistence "github.com/status-im/status-go/v10/services/connector/database"
 )
 
 var (

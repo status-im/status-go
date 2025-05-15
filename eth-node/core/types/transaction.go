@@ -3,7 +3,7 @@ package types
 import (
 	"math/big"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
 )
 
 type TransactionStatus uint64

@@ -8,7 +8,7 @@ import (
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/logutils/callog"
+	"github.com/status-im/status-go/v10/logutils/callog"
 )
 
 const (

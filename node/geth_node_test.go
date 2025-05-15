@@ -7,8 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/t/utils"
 )
 
 func TestMakeNodeDefaultConfig(t *testing.T) {

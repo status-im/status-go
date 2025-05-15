@@ -10,8 +10,8 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
-	"github.com/status-im/status-go/eth-node/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 var (

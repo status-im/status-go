@@ -4,10 +4,10 @@ import (
 	"math"
 	"testing"
 
-	"github.com/status-im/status-go/messaging"
-	"github.com/status-im/status-go/t/helpers"
-	wakutypes "github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2"
+	"github.com/status-im/status-go/v10/messaging"
+	"github.com/status-im/status-go/v10/t/helpers"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
+	"github.com/status-im/status-go/v10/wakuv2"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
@@ -18,14 +18,14 @@ import (
 
 	datasyncproto "github.com/status-im/mvds/protobuf"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/datasync"
-	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/sqlite"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/protocol/datasync"
+	"github.com/status-im/status-go/v10/protocol/encryption"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/sqlite"
+	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
 
-	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/v10/appdatabase"
 )
 
 func TestMessageSenderSuite(t *testing.T) {

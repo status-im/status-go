@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/status-im/status-go/protocol/communities/token"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/v10/protocol/communities/token"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/sqlite"
 )
 
 type CollectibleDataStorage interface {

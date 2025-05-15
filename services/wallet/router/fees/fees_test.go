@@ -9,8 +9,8 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
+	mock_client "github.com/status-im/status-go/v10/rpc/chain/mock/client"
+	mock_rpcclient "github.com/status-im/status-go/v10/rpc/mock/client"
 )
 
 type testState struct {

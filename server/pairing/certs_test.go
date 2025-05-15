@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/server/servertest"
+	"github.com/status-im/status-go/v10/server/servertest"
 )
 
 func TestCerts(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/v10/rpc"
 )
 
 type API struct {

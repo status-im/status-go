@@ -3,7 +3,7 @@ package images
 import (
 	"errors"
 
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 func GetProtobufImageFormat(buf []byte) protobuf.ImageFormat {

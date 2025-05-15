@@ -8,7 +8,7 @@ import (
 	errors "github.com/pkg/errors"
 	tcp "github.com/status-im/tcp-shaker"
 
-	gocommon "github.com/status-im/status-go/common"
+	gocommon "github.com/status-im/status-go/v10/common"
 )
 
 type Result struct {

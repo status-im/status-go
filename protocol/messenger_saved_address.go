@@ -7,11 +7,11 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	multiAccCommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/services/wallet"
+	multiAccCommon "github.com/status-im/status-go/v10/multiaccounts/common"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
+	"github.com/status-im/status-go/v10/services/wallet"
 )
 
 func (m *Messenger) UpsertSavedAddress(ctx context.Context, sa wallet.SavedAddress) error {

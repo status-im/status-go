@@ -14,15 +14,15 @@ import (
 
 	"github.com/mat/besticon/besticon"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/images"
-	userimage "github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/logutils"
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/logutils"
+	multiaccountscommon "github.com/status-im/status-go/v10/multiaccounts/common"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/images"
+	userimage "github.com/status-im/status-go/v10/images"
 
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/services/browsers"
 )
 
 var (

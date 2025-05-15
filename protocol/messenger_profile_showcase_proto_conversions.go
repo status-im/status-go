@@ -1,8 +1,8 @@
 package protocol
 
 import (
-	"github.com/status-im/status-go/protocol/identity"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/identity"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 func FromProfileShowcaseCommunityPreferenceProto(p *protobuf.ProfileShowcaseCommunityPreference) *identity.ProfileShowcaseCommunityPreference {

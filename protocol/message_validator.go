@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/v1"
+	utils "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/v1"
 )
 
 const maxChatMessageTextLength = 4096

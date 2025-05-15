@@ -1,6 +1,6 @@
 package connector
 
-import "github.com/status-im/status-go/services/connector/commands"
+import "github.com/status-im/status-go/v10/services/connector/commands"
 
 type CommandRegistry struct {
 	commands map[string]commands.RPCCommand

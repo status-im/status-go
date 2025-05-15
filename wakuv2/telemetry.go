@@ -12,7 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
+	gocommon "github.com/status-im/status-go/v10/common"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_store"

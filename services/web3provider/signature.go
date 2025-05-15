@@ -8,11 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/services/rpcfilters"
-	"github.com/status-im/status-go/services/typeddata"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/services/rpcfilters"
+	"github.com/status-im/status-go/v10/services/typeddata"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
 )
 
 // signMessage checks the pwd vs the selected account and signs a message

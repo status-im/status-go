@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/v10/protocol/requests"
 )
 
 func TestMessengerCollapsedCommunityCategoriesSuite(t *testing.T) {

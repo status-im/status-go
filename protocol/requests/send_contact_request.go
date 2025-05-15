@@ -3,7 +3,7 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/api/multiformat"
+	"github.com/status-im/status-go/v10/api/multiformat"
 )
 
 var ErrSendContactRequestInvalidID = errors.New("send-contact-request: invalid id")

@@ -3,7 +3,7 @@ package requests
 import (
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
 )
 
 // SendTransaction represents a request to send a transaction.

@@ -14,10 +14,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/nodecfg"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/nodecfg"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/t/helpers"
 )
 
 func setupTestDB(t *testing.T) (*sql.DB, func()) {

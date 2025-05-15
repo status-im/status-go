@@ -6,8 +6,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/protocol/zaputil"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/protocol/zaputil"
 )
 
 var (

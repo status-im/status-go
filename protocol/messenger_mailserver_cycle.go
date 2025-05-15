@@ -4,10 +4,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/signal"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/signal"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 func (m *Messenger) AllMailservers() ([]wakutypes.Mailserver, error) {

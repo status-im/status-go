@@ -3,7 +3,7 @@ package peers
 import (
 	"crypto/ecdsa"
 
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/v10/server"
 )
 
 var (

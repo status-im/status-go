@@ -3,9 +3,9 @@ package protocol
 import (
 	"context"
 
-	"github.com/status-im/status-go/nodecfg"
-	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/timesource"
+	"github.com/status-im/status-go/v10/nodecfg"
+	"github.com/status-im/status-go/v10/protocol/requests"
+	"github.com/status-im/status-go/v10/timesource"
 )
 
 func (m *Messenger) SetLightClient(request *requests.SetLightClient) error {

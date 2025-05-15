@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/centralizedmetrics/common"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/v10/centralizedmetrics/common"
+	"github.com/status-im/status-go/v10/protocol/tt"
 )
 
 var testMetric = common.Metric{ID: "user-id", EventName: "test-name", EventValue: map[string]interface{}{"test-name": "test-value"}, Platform: "android", AppVersion: "2.30.0"}

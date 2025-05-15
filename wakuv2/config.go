@@ -25,7 +25,7 @@ import (
 
 	ethdisc "github.com/ethereum/go-ethereum/p2p/dnsdisc"
 
-	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/status-im/status-go/v10/wakuv2/common"
 )
 
 var (

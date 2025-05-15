@@ -1,7 +1,7 @@
 package transfer
 
 import (
-	"github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/v10/errors"
 )
 
 // Abbreviation `WT` for the error code stands for Wallet Transfer

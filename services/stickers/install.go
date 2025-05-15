@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
 )
 
 func (api *API) Install(chainID uint64, packID *bigint.BigInt) error {

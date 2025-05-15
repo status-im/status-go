@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	gaspriceproxy "github.com/status-im/status-go/contracts/gas-price-proxy"
-	"github.com/status-im/status-go/services/wallet/common"
+	gaspriceproxy "github.com/status-im/status-go/v10/contracts/gas-price-proxy"
+	"github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 type FeeHistory struct {

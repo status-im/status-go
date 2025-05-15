@@ -3,7 +3,7 @@ package requests
 import (
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/v10/multiaccounts"
 )
 
 // MigrateKeystoreDir represents a request to migrate keystore directory.

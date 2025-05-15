@@ -11,9 +11,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/balance"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/services/wallet/async"
+	"github.com/status-im/status-go/v10/services/wallet/balance"
 )
 
 const (

@@ -5,10 +5,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	encryptmigrations "github.com/status-im/status-go/protocol/encryption/migrations"
-	appmigrations "github.com/status-im/status-go/protocol/migrations"
-	push_notification_client_migrations "github.com/status-im/status-go/protocol/pushnotificationclient/migrations"
-	push_notification_server_migrations "github.com/status-im/status-go/protocol/pushnotificationserver/migrations"
+	encryptmigrations "github.com/status-im/status-go/v10/protocol/encryption/migrations"
+	appmigrations "github.com/status-im/status-go/v10/protocol/migrations"
+	push_notification_client_migrations "github.com/status-im/status-go/v10/protocol/pushnotificationclient/migrations"
+	push_notification_server_migrations "github.com/status-im/status-go/v10/protocol/pushnotificationserver/migrations"
 )
 
 type getter func(string) ([]byte, error)

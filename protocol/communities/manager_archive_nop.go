@@ -6,10 +6,10 @@ package communities
 import (
 	"time"
 
-	"github.com/status-im/status-go/eth-node/types"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/params"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
+	"github.com/status-im/status-go/v10/params"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 type ArchiveManagerNop struct {

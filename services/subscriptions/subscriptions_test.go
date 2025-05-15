@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 const (

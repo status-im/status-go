@@ -7,11 +7,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/server/pairing/peers"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/server"
+	"github.com/status-im/status-go/v10/server/pairing/peers"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 type PeerNotifier struct {

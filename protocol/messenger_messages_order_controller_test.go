@@ -4,8 +4,8 @@ import (
 	"sort"
 	"sync"
 
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 type messagesOrderType int

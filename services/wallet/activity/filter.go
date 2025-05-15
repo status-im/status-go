@@ -8,9 +8,9 @@ import (
 	_ "embed"
 
 	eth "github.com/ethereum/go-ethereum/common"
-	ac "github.com/status-im/status-go/services/wallet/activity/common"
-	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	ac "github.com/status-im/status-go/v10/services/wallet/activity/common"
+	"github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
 )
 
 const NoLimitTimestampForPeriod = 0

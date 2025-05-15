@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/protocol/verification"
+	"github.com/status-im/status-go/v10/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/v10/protocol/tt"
+	"github.com/status-im/status-go/v10/protocol/verification"
 
 	"github.com/stretchr/testify/suite"
 )

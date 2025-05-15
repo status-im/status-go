@@ -5,11 +5,11 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/services/wallet/requests"
-	"github.com/status-im/status-go/services/wallet/router/routes"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/services/wallet/requests"
+	"github.com/status-im/status-go/v10/services/wallet/router/routes"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/sqlite"
 
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 )

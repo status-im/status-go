@@ -7,9 +7,9 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	defaulttokenlists "github.com/status-im/status-go/services/wallet/token/token-lists/default-lists"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
+	defaulttokenlists "github.com/status-im/status-go/v10/services/wallet/token/token-lists/default-lists"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 )
 
 // This is a temporary solution to resolve symbol collisions and tokens decimal issues.

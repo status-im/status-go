@@ -8,22 +8,22 @@ import (
 
 	"go.uber.org/zap"
 
-	d_common "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
+	d_common "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/logutils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/status-im/status-go/appdatabase/migrations"
-	migrationsprevnodecfg "github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
-	"github.com/status-im/status-go/nodecfg"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/v10/appdatabase/migrations"
+	migrationsprevnodecfg "github.com/status-im/status-go/v10/appdatabase/migrationsprevnodecfg"
+	"github.com/status-im/status-go/v10/nodecfg"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
+	w_common "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/sqlite"
 
-	e_types "github.com/status-im/status-go/eth-node/types"
+	e_types "github.com/status-im/status-go/v10/eth-node/types"
 )
 
 const nodeCfgMigrationDate = 1640111208

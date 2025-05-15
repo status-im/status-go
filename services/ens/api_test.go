@@ -11,11 +11,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/appdatabase"
-	statusRPC "github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/transactions/fake"
+	"github.com/status-im/status-go/v10/appdatabase"
+	statusRPC "github.com/status-im/status-go/v10/rpc"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/t/utils"
+	"github.com/status-im/status-go/v10/transactions/fake"
 )
 
 func createDB(t *testing.T) (*sql.DB, func()) {

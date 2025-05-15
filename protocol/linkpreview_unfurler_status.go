@@ -5,12 +5,12 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/api/multiformat"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/wakuv2"
+	"github.com/status-im/status-go/v10/api/multiformat"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/communities"
+	"github.com/status-im/status-go/v10/wakuv2"
 )
 
 type StatusUnfurler struct {

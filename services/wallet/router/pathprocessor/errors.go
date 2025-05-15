@@ -3,9 +3,9 @@ package pathprocessor
 import (
 	"context"
 
-	"github.com/status-im/status-go/errors"
+	"github.com/status-im/status-go/v10/errors"
 
-	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
+	pathProcessorCommon "github.com/status-im/status-go/v10/services/wallet/router/pathprocessor/common"
 )
 
 // Abbreviartion `WPP` for the error code stands for `Wallet Path Processor`

@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/params"
 )
 
 func TestServiceConfigValidate(t *testing.T) {

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/status-im/status-go/params"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/requests"
-	pathProcessorCommon "github.com/status-im/status-go/services/wallet/router/pathprocessor/common"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/params"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/requests"
+	pathProcessorCommon "github.com/status-im/status-go/v10/services/wallet/router/pathprocessor/common"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 
 	"github.com/stretchr/testify/assert"
 )

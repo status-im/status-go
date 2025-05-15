@@ -4,9 +4,9 @@ import (
 	"context"
 	"sync"
 
-	status_common "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/healthmanager/aggregator"
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
+	status_common "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/healthmanager/aggregator"
+	"github.com/status-im/status-go/v10/healthmanager/rpcstatus"
 )
 
 // BlockchainFullStatus contains the full status of the blockchain, including provider statuses.

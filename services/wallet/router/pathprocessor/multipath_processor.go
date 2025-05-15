@@ -3,9 +3,9 @@ package pathprocessor
 import (
 	"math/big"
 
-	"github.com/status-im/status-go/eth-node/types"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
 )
 
 type MultipathProcessorTxArgs struct {

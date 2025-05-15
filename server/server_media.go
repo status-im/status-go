@@ -8,13 +8,13 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/status-im/status-go/ipfs"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/ipfs"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 type MediaServerOption func(*MediaServer)

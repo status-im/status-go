@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/v10/common"
 )
 
 // timeoutManager represents a discrete encapsulation of timeout functionality.

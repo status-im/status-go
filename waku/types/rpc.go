@@ -3,7 +3,7 @@ package types
 import (
 	"context"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
 )
 
 // NewMessage represents a new whisper message that is posted through the RPC.

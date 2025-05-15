@@ -5,8 +5,8 @@ import (
 	crand "crypto/rand"
 	"errors"
 
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 var ErrCipherMessageAutentificationFailed = "cipher: message authentication failed"

@@ -8,7 +8,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 )
 
 type TokenBalancesStorage interface {

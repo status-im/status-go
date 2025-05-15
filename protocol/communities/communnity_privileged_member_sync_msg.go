@@ -7,11 +7,11 @@ import (
 
 	"go.uber.org/zap"
 
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
+	multiaccountscommon "github.com/status-im/status-go/v10/multiaccounts/common"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 var ErrOutdatedSharedRequestToJoinClock = errors.New("outdated clock in shared request to join")

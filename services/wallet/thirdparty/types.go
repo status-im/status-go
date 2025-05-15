@@ -5,7 +5,7 @@ package thirdparty
 import (
 	"errors"
 
-	w_common "github.com/status-im/status-go/services/wallet/common"
+	w_common "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 var (

@@ -19,7 +19,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/status-im/status-go/connection"
+	"github.com/status-im/status-go/v10/connection"
 )
 
 type ConnStatus struct {

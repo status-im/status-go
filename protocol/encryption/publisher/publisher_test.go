@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/v10/protocol/tt"
 )
 
 func TestServiceTestSuite(t *testing.T) {

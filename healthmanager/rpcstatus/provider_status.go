@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/status-im/status-go/healthmanager/provider_errors"
+	"github.com/status-im/status-go/v10/healthmanager/provider_errors"
 )
 
 // StatusType represents the possible status values for a provider.

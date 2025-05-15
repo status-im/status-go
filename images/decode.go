@@ -18,7 +18,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/image/webp"
 
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/v10/logutils"
 )
 
 var (

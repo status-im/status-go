@@ -7,12 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	api_common "github.com/status-im/status-go/api/common"
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/rpc/network/db"
-	"github.com/status-im/status-go/rpc/network/testutil"
-	"github.com/status-im/status-go/t/helpers"
+	api_common "github.com/status-im/status-go/v10/api/common"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/rpc/network/db"
+	"github.com/status-im/status-go/v10/rpc/network/testutil"
+	"github.com/status-im/status-go/v10/t/helpers"
 )
 
 type RpcProviderPersistenceTestSuite struct {

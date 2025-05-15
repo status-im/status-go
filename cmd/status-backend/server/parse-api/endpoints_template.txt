@@ -3,7 +3,7 @@
 
 package server
 
-import statusgo "github.com/status-im/status-go/mobile"
+import statusgo "github.com/status-im/status-go/v10/mobile"
 
 var EndpointsWithRequest = map[string]func(string) string{
 	{{- range .FunctionsWithResp }}

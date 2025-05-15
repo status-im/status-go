@@ -3,7 +3,7 @@ package subscriptions
 import (
 	"fmt"
 
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/v10/rpc"
 )
 
 type whisperFilter struct {

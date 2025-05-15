@@ -3,8 +3,8 @@ package json
 import (
 	"reflect"
 
-	"github.com/status-im/status-go/api/multiformat"
-	"github.com/status-im/status-go/protocol/identity/emojihash"
+	"github.com/status-im/status-go/v10/api/multiformat"
+	"github.com/status-im/status-go/v10/protocol/identity/emojihash"
 )
 
 type PublicKeyData struct {

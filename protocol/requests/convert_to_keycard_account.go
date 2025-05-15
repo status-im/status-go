@@ -1,8 +1,8 @@
 package requests
 
 import (
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
 )
 
 type ConvertToKeycardAccount struct {

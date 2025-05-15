@@ -1,6 +1,6 @@
 package mercuryo
 
-import walletCommon "github.com/status-im/status-go/services/wallet/common"
+import walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
 
 func NetworkToCommonChainID(network string) uint64 {
 	switch network {

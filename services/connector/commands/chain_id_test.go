@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/services/connector/chainutils"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/services/connector/chainutils"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 func TestFailToGetChainIdWithMissingDAppFields(t *testing.T) {

@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/multiaccounts/migrations"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/v10/common/dbsetup"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/multiaccounts/common"
+	"github.com/status-im/status-go/v10/multiaccounts/migrations"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/sqlite"
 )
 
 type ColorHash [][2]int

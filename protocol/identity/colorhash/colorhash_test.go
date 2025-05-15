@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/protocol/identity"
 )
 
 func TestGenerateFor(t *testing.T) {

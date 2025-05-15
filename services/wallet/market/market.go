@@ -12,11 +12,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/circuitbreaker"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/v10/circuitbreaker"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/services/wallet/token"
+	"github.com/status-im/status-go/v10/services/wallet/walletevent"
 )
 
 const (

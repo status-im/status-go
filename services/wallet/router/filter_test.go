@@ -6,8 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/router/routes"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/services/wallet/router/routes"
 
 	"github.com/stretchr/testify/assert"
 )

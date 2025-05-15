@@ -3,11 +3,11 @@ package protocol
 import (
 	"crypto/ecdsa"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/identity/alias"
-	"github.com/status-im/status-go/protocol/identity/identicon"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/identity/alias"
+	"github.com/status-im/status-go/v10/protocol/identity/identicon"
 )
 
 func extendMessageFromChat(message *common.Message, chat *Chat, key *ecdsa.PublicKey, timesource common.TimeSource) error {

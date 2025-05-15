@@ -5,8 +5,8 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 )
 
 const maxTokenCriteriaPerPermission = 5

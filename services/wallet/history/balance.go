@@ -11,7 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/v10/logutils"
 )
 
 const genesisTimestamp = 1438269988

@@ -5,11 +5,11 @@ import (
 
 	"go.uber.org/zap"
 
-	ethtypes "github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/messaging/adapters"
-	"github.com/status-im/status-go/messaging/layers/transport"
-	"github.com/status-im/status-go/messaging/types"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	ethtypes "github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/messaging/adapters"
+	"github.com/status-im/status-go/v10/messaging/layers/transport"
+	"github.com/status-im/status-go/v10/messaging/types"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 type Core struct {

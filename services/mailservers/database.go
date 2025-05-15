@@ -11,8 +11,8 @@ import (
 
 	"github.com/multiformats/go-multiaddr"
 
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-	"github.com/status-im/status-go/waku/types"
+	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
+	"github.com/status-im/status-go/v10/waku/types"
 )
 
 type MailserverRequestGap struct {

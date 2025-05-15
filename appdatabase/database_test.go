@@ -14,14 +14,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/appdatabase/migrations"
-	migrationsprevnodecfg "github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
-	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/nodecfg"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/sqlite"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/v10/appdatabase/migrations"
+	migrationsprevnodecfg "github.com/status-im/status-go/v10/appdatabase/migrationsprevnodecfg"
+	"github.com/status-im/status-go/v10/common/dbsetup"
+	"github.com/status-im/status-go/v10/nodecfg"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
+	w_common "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/sqlite"
+	"github.com/status-im/status-go/v10/t/helpers"
 )
 
 func Test_GetDBFilename(t *testing.T) {

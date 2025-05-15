@@ -3,9 +3,9 @@ package storenodes
 import (
 	"github.com/multiformats/go-multiaddr"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/protobuf"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 // Storenode is a struct that represents a storenode, it is very closely related to `wakutypes.Mailserver`

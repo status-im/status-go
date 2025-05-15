@@ -3,8 +3,8 @@ package stickers
 import (
 	"encoding/json"
 
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
 )
 
 const maxNumberRecentStickers = 24

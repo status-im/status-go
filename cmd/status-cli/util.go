@@ -9,13 +9,13 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/metrics/wakumetrics"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/services/wakuv2ext"
+	"github.com/status-im/status-go/v10/api"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/metrics/wakumetrics"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/protocol/requests"
+	"github.com/status-im/status-go/v10/services/wakuv2ext"
 
 	"github.com/urfave/cli/v2"
 )

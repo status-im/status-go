@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/protocol"
 )
 
 var (

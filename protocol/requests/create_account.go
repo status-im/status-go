@@ -3,8 +3,8 @@ package requests
 import (
 	"github.com/pkg/errors"
 
-	utils "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/params"
+	utils "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/params"
 )
 
 var ErrCreateAccountInvalidDisplayName = errors.New("create-account: invalid display name")

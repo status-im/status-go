@@ -10,12 +10,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/contracts"
-	"github.com/status-im/status-go/contracts/resolver"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/rpc"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/contracts"
+	"github.com/status-im/status-go/v10/contracts/resolver"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/rpc"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 func NewEnsResolver(rpcClient *rpc.Client) *EnsResolver {

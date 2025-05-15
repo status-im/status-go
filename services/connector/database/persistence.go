@@ -3,7 +3,7 @@ package persistence
 import (
 	"database/sql"
 
-	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
 )
 
 const upsertDAppQuery = "INSERT INTO connector_dapps (url, name, icon_url, shared_account, chain_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(url) DO UPDATE SET name = excluded.name, icon_url = excluded.icon_url, shared_account = excluded.shared_account, chain_id = excluded.chain_id"

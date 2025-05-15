@@ -8,8 +8,8 @@ import (
 
 	iso4217 "github.com/ladydascalie/currency"
 
-	"github.com/status-im/status-go/services/wallet/market"
-	tokentypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/services/wallet/market"
+	tokentypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 )
 
 const decimalsCalculationCurrency = "USD"

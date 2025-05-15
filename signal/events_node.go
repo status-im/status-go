@@ -3,8 +3,8 @@ package signal
 import (
 	"encoding/json"
 
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
 )
 
 const (

@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/v10/multiaccounts/common"
 )
 
 func TestIsOwnAccount(t *testing.T) {

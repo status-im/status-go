@@ -14,19 +14,19 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 
 	"go.uber.org/zap"
 
 	eth_common "github.com/ethereum/go-ethereum/common"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/ipfs"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/protocol/identity/colorhash"
-	"github.com/status-im/status-go/protocol/identity/ring"
-	"github.com/status-im/status-go/services/wallet/bigint"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/ipfs"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/protocol/identity/colorhash"
+	"github.com/status-im/status-go/v10/protocol/identity/ring"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
 )
 
 const (

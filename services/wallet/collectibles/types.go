@@ -1,9 +1,9 @@
 package collectibles
 
 import (
-	"github.com/status-im/status-go/protocol/communities/token"
-	w_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/protocol/communities/token"
+	w_common "github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
 )
 
 // Combined Collection+Collectible info, used to display a detailed view of a collectible

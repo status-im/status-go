@@ -9,15 +9,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/rpc/chain"
-	"github.com/status-im/status-go/services/wallet/async"
-	"github.com/status-im/status-go/services/wallet/balance"
-	"github.com/status-im/status-go/services/wallet/blockchainstate"
-	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/rpc/chain"
+	"github.com/status-im/status-go/v10/services/wallet/async"
+	"github.com/status-im/status-go/v10/services/wallet/balance"
+	"github.com/status-im/status-go/v10/services/wallet/blockchainstate"
+	"github.com/status-im/status-go/v10/services/wallet/token"
+	"github.com/status-im/status-go/v10/services/wallet/walletevent"
+	"github.com/status-im/status-go/v10/transactions"
 )
 
 func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, blockRangesSeqDAO *BlockRangeSequentialDAO, accountsDB *accounts.Database, feed *event.Feed,

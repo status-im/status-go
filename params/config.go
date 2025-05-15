@@ -17,12 +17,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/internal/version"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/static"
-	wakuv2common "github.com/status-im/status-go/wakuv2/common"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/internal/version"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/static"
+	wakuv2common "github.com/status-im/status-go/v10/wakuv2/common"
 )
 
 // ----------

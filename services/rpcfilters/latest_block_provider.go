@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/v10/rpc"
 )
 
 type rpcProvider interface {

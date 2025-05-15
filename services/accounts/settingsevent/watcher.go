@@ -6,9 +6,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/services/wallet/async"
 )
 
 type SettingChangeCb func(setting settings.SettingField, value interface{})

@@ -3,7 +3,7 @@ package collectibles
 import (
 	"testing"
 
-	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
 
 	"github.com/stretchr/testify/require"
 )

@@ -14,8 +14,8 @@ import (
 
 	"github.com/status-im/markdown"
 
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/protocol/common"
 )
 
 const UnfurledLinksPerMessageLimit = 5

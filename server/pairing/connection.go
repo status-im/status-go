@@ -13,7 +13,7 @@ import (
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/google/uuid"
 
-	"github.com/status-im/status-go/server/pairing/versioning"
+	"github.com/status-im/status-go/v10/server/pairing/versioning"
 )
 
 const (

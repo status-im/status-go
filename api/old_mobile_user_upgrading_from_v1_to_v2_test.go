@@ -8,19 +8,19 @@ import (
 
 	"go.uber.org/zap"
 
-	d_common "github.com/status-im/status-go/common"
+	d_common "github.com/status-im/status-go/v10/common"
 
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/common/dbsetup"
+	"github.com/status-im/status-go/v10/sqlite"
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/multiaccounts/common"
+	"github.com/status-im/status-go/v10/protocol/tt"
+	"github.com/status-im/status-go/v10/t/utils"
 )
 
 const (

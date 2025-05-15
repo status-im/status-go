@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/contracts/stickers"
+	"github.com/status-im/status-go/v10/contracts/stickers"
 )
 
 func (api *API) StickerMarketAddress(ctx context.Context, chainID uint64) (common.Address, error) {

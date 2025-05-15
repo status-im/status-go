@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/thirdparty/utils"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty/utils"
 )
 
 const baseID = "cryptocompare"

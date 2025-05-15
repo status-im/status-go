@@ -8,16 +8,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/errors"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/params/networkhelper"
-	"github.com/status-im/status-go/services/accounts/settingsevent"
+	"github.com/status-im/status-go/v10/errors"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/params/networkhelper"
+	"github.com/status-im/status-go/v10/services/accounts/settingsevent"
 
-	persistence "github.com/status-im/status-go/rpc/network/db"
-	"github.com/status-im/status-go/rpc/network/networksevent"
+	persistence "github.com/status-im/status-go/v10/rpc/network/db"
+	"github.com/status-im/status-go/v10/rpc/network/networksevent"
 )
 
 //go:generate mockgen -package=mock -source=network.go -destination=mock/network.go

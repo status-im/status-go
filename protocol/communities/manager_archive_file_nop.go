@@ -7,9 +7,9 @@ import (
 	"crypto/ecdsa"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/protobuf"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 type ArchiveFileManagerNop struct{}

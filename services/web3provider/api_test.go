@@ -8,20 +8,20 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/services/permissions"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/transactions/fake"
+	"github.com/status-im/status-go/v10/account"
+	"github.com/status-im/status-go/v10/appdatabase"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/protocol/tt"
+	"github.com/status-im/status-go/v10/services/permissions"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/t/utils"
+	"github.com/status-im/status-go/v10/transactions/fake"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	statusRPC "github.com/status-im/status-go/rpc"
+	statusRPC "github.com/status-im/status-go/v10/rpc"
 )
 
 func createDB(t *testing.T) (*sql.DB, func()) {

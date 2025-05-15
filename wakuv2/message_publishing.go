@@ -11,8 +11,8 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/wakuv2/common"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/wakuv2/common"
 )
 
 // Send injects a message into the waku send queue, to be distributed in the

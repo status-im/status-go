@@ -3,12 +3,12 @@ package accounts
 import (
 	"errors"
 
-	"github.com/status-im/status-go/timesource"
+	"github.com/status-im/status-go/v10/timesource"
 
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/v10/server"
 
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/multiaccounts"
 )
 
 var (

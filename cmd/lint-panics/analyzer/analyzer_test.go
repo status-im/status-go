@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/tools/go/analysis/analysistest"
 
-	"github.com/status-im/status-go/cmd/lint-panics/utils"
+	"github.com/status-im/status-go/v10/cmd/lint-panics/utils"
 )
 
 func TestMethods(t *testing.T) {

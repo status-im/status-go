@@ -8,9 +8,9 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 type testSignalHandler struct {

@@ -12,15 +12,15 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/circuitbreaker"
-	mock_client "github.com/status-im/status-go/rpc/chain/mock/client"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	mock_collectibles "github.com/status-im/status-go/services/wallet/collectibles/mock"
-	walletCommon "github.com/status-im/status-go/services/wallet/common"
-	mock_community "github.com/status-im/status-go/services/wallet/community/mock"
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	mock_thirdparty "github.com/status-im/status-go/services/wallet/thirdparty/mock"
+	"github.com/status-im/status-go/v10/circuitbreaker"
+	mock_client "github.com/status-im/status-go/v10/rpc/chain/mock/client"
+	mock_rpcclient "github.com/status-im/status-go/v10/rpc/mock/client"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
+	mock_collectibles "github.com/status-im/status-go/v10/services/wallet/collectibles/mock"
+	walletCommon "github.com/status-im/status-go/v10/services/wallet/common"
+	mock_community "github.com/status-im/status-go/v10/services/wallet/community/mock"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
+	mock_thirdparty "github.com/status-im/status-go/v10/services/wallet/thirdparty/mock"
 )
 
 type CopyableMockChainClient struct {

@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/p2p/discv5"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/v10/logutils"
 )
 
 // NewDiscV5 creates instances of discovery v5 facade.

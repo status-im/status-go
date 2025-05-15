@@ -9,18 +9,18 @@ import (
 	"runtime"
 	"testing"
 
-	userimage "github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/services/browsers"
+	userimage "github.com/status-im/status-go/v10/images"
+	"github.com/status-im/status-go/v10/server"
+	"github.com/status-im/status-go/v10/services/browsers"
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
-	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/v10/eth-node/crypto"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	multiaccountscommon "github.com/status-im/status-go/v10/multiaccounts/common"
+	"github.com/status-im/status-go/v10/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/v10/protocol/requests"
+	"github.com/status-im/status-go/v10/protocol/tt"
 )
 
 const statusChatID = "status"

@@ -5,7 +5,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/v10/sqlite"
 )
 
 type TrackedTx struct {

@@ -8,12 +8,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/metrics"
 	gethprom "github.com/ethereum/go-ethereum/metrics/prometheus"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/v10/logutils"
 
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/v10/common"
 )
 
 // Server runs and controls a HTTP pprof interface.

@@ -10,13 +10,13 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/v10/protocol/requests"
 
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/eth-node/keystore"
+	"github.com/status-im/status-go/v10/account/generator"
+	"github.com/status-im/status-go/v10/api"
+	"github.com/status-im/status-go/v10/eth-node/keystore"
 )
 
 func newValidate() (*validator.Validate, error) {

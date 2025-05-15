@@ -5,8 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/v10/common/dbsetup"
+	"github.com/status-im/status-go/v10/multiaccounts"
 )
 
 const kdfIterationsNumberForTests = 1

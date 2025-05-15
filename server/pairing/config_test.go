@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/v10/protocol/requests"
 )
 
 func TestConfigTestSuite(t *testing.T) {

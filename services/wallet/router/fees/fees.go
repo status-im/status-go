@@ -5,9 +5,9 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/errors"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/v10/errors"
+	"github.com/status-im/status-go/v10/rpc"
+	"github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 const (

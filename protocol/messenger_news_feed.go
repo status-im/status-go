@@ -7,9 +7,9 @@ import (
 	"github.com/mmcdole/gofeed"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/signal"
 )
 
 func (m *Messenger) HandleFeedItem(feedItem *gofeed.Item) (*MessengerResponse, error) {

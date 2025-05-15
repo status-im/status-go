@@ -3,13 +3,13 @@ package networkhelper_test
 import (
 	"testing"
 
-	"github.com/status-im/status-go/params/networkhelper"
+	"github.com/status-im/status-go/v10/params/networkhelper"
 
 	"github.com/stretchr/testify/require"
 
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/params"
 )
 
 func TestValidation(t *testing.T) {

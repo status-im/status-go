@@ -10,10 +10,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
+	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
 )
 
 func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter messagingtypes.ChatFilter, fromArchive bool) error {

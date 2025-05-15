@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/services/wallet/router/pathprocessor"
+	"github.com/status-im/status-go/v10/services/wallet/router/pathprocessor"
 )
 
 func (tm *TransactionManager) buildTransactions(pathProcessors map[string]pathprocessor.PathProcessor) ([]string, error) {

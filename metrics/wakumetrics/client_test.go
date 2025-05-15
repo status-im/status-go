@@ -14,10 +14,10 @@ import (
 	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
-	messagingtypes "github.com/status-im/status-go/messaging/types"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
-	wakutypes "github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2"
+	messagingtypes "github.com/status-im/status-go/v10/messaging/types"
+	v1protocol "github.com/status-im/status-go/v10/protocol/v1"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
+	"github.com/status-im/status-go/v10/wakuv2"
 )
 
 var (

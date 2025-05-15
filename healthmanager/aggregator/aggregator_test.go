@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
+	"github.com/status-im/status-go/v10/healthmanager/rpcstatus"
 )
 
 // StatusAggregatorTestSuite defines the test suite for Aggregator.

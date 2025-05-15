@@ -1,8 +1,8 @@
 package wakuv2ext
 
 import (
-	"github.com/status-im/status-go/services/ext"
-	wakutypes "github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/services/ext"
+	wakutypes "github.com/status-im/status-go/v10/waku/types"
 )
 
 // PublicAPI extends waku public API.

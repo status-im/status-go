@@ -8,14 +8,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/services/accounts/accountsevent"
+	"github.com/status-im/status-go/v10/account"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	walletsettings "github.com/status-im/status-go/v10/multiaccounts/settings_wallet"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/protocol"
+	"github.com/status-im/status-go/v10/services/accounts/accountsevent"
 )
 
 func NewAccountsAPI(manager *account.GethManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed, messenger **protocol.Messenger) *API {

@@ -7,7 +7,7 @@ import (
 	"github.com/mmcdole/gofeed"
 	"go.uber.org/zap"
 
-	gocommon "github.com/status-im/status-go/common"
+	gocommon "github.com/status-im/status-go/v10/common"
 )
 
 const STATUS_DESKTOP_FEED_URL = "https://status-website-git-add-rss-status-im-web.vercel.app/desktop-news/rss?_vercel_share=IySrfv1xyphlMgEp3rAfrCnzT19yjzG9&x-vercel-protection-bypass=I4euHZRiK3TEnAE5Kw73tQxhmxjBThSS"

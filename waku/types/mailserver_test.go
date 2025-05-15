@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/waku/types"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/waku/types"
 )
 
 func TestMailserver_UnmarshalJSON(t *testing.T) {

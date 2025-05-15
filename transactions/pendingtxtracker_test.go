@@ -17,13 +17,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/rpc/chain/ethclient"
-	mock_rpcclient "github.com/status-im/status-go/rpc/mock/client"
+	"github.com/status-im/status-go/v10/rpc/chain/ethclient"
+	mock_rpcclient "github.com/status-im/status-go/v10/rpc/mock/client"
 
-	"github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/walletevent"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/v10/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/walletevent"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/walletdatabase"
 )
 
 // setupTestTransactionDB will use the default pending check interval if checkInterval is nil

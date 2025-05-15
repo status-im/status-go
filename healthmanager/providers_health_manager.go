@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/status-im/status-go/healthmanager/aggregator"
-	"github.com/status-im/status-go/healthmanager/rpcstatus"
+	"github.com/status-im/status-go/v10/healthmanager/aggregator"
+	"github.com/status-im/status-go/v10/healthmanager/rpcstatus"
 )
 
 type ProvidersHealthManager struct {

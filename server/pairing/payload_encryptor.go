@@ -3,7 +3,7 @@ package pairing
 import (
 	"crypto/rand"
 
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/common"
 )
 
 // EncryptionPayload represents the plain text and encrypted text of payload data

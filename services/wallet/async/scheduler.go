@@ -8,7 +8,7 @@ import (
 
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 
-	"github.com/status-im/status-go/common"
+	"github.com/status-im/status-go/v10/common"
 )
 
 var ErrTaskOverwritten = errors.New("task overwritten")

@@ -3,14 +3,14 @@ package accounts
 import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/server"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/server"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/v10/account"
+	"github.com/status-im/status-go/v10/multiaccounts"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/protocol"
 )
 
 // NewService initializes service instance.

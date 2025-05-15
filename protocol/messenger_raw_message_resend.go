@@ -6,13 +6,13 @@ import (
 	"math"
 	"time"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/protocol/protobuf"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/common"
 )
 
 // watchExpiredMessages regularly checks for expired emojis and invoke their resending

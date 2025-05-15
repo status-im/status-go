@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/common"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	notificationssettings "github.com/status-im/status-go/multiaccounts/settings_notifications"
-	walletsettings "github.com/status-im/status-go/multiaccounts/settings_wallet"
-	"github.com/status-im/status-go/nodecfg"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/eth-node/types"
+	"github.com/status-im/status-go/v10/multiaccounts/common"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	notificationssettings "github.com/status-im/status-go/v10/multiaccounts/settings_notifications"
+	walletsettings "github.com/status-im/status-go/v10/multiaccounts/settings_wallet"
+	"github.com/status-im/status-go/v10/nodecfg"
+	"github.com/status-im/status-go/v10/params"
 )
 
 const (

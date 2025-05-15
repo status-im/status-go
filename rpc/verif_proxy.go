@@ -15,7 +15,7 @@ import (
 
 	proxy "github.com/siphiuel/lc-proxy-wrapper"
 
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/params"
 )
 
 type VerifProxy struct {

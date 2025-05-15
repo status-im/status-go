@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/status-im/status-go/internal/version"
+	"github.com/status-im/status-go/v10/internal/version"
 )
 
 type HealthResponse struct {

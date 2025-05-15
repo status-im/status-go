@@ -8,8 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/logutils"
 )
 
 // All general log messages in this package should be routed through this logger.

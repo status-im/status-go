@@ -9,9 +9,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/wallet/router/fees"
-	tokenTypes "github.com/status-im/status-go/services/wallet/token/types"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/services/wallet/router/fees"
+	tokenTypes "github.com/status-im/status-go/v10/services/wallet/token/types"
 )
 
 func TestCopyPath(t *testing.T) {

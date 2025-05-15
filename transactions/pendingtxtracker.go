@@ -16,17 +16,17 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	ethTypes "github.com/status-im/status-go/eth-node/types"
+	ethTypes "github.com/status-im/status-go/v10/eth-node/types"
 
-	"github.com/status-im/status-go/logutils"
-	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/rpcfilters"
-	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/services/wallet/common"
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/responses"
-	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
-	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/v10/logutils"
+	"github.com/status-im/status-go/v10/rpc"
+	"github.com/status-im/status-go/v10/services/rpcfilters"
+	"github.com/status-im/status-go/v10/services/wallet/bigint"
+	"github.com/status-im/status-go/v10/services/wallet/responses"
+	"github.com/status-im/status-go/v10/services/wallet/routeexecution/storage"
+	"github.com/status-im/status-go/v10/services/wallet/walletevent"
+	"github.com/status-im/status-go/v10/services/wallet/common"
+	wallet_common "github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 const (

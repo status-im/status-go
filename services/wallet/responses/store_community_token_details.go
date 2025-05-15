@@ -1,7 +1,7 @@
 package responses
 
 import (
-	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/v10/protocol/communities/token"
 )
 
 type DeploymentDetails struct {

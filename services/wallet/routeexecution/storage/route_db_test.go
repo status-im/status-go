@@ -3,10 +3,10 @@ package storage_test
 import (
 	"testing"
 
-	"github.com/status-im/status-go/services/wallet/routeexecution/storage"
-	"github.com/status-im/status-go/services/wallet/wallettypes"
-	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/walletdatabase"
+	"github.com/status-im/status-go/v10/services/wallet/routeexecution/storage"
+	"github.com/status-im/status-go/v10/services/wallet/wallettypes"
+	"github.com/status-im/status-go/v10/t/helpers"
+	"github.com/status-im/status-go/v10/walletdatabase"
 
 	"github.com/stretchr/testify/require"
 )

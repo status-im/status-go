@@ -3,7 +3,7 @@ package leaderboard
 import (
 	"time"
 
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/params"
 )
 
 const (

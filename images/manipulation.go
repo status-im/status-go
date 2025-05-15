@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 	xdraw "golang.org/x/image/draw"
 
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/v10/logutils"
 )
 
 type Circle struct {

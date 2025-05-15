@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/v10/services/wallet/common"
 )
 
 type LatestBlockData struct {

@@ -7,10 +7,10 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/protocol/common"
+	"github.com/status-im/status-go/v10/protocol/protobuf"
+	"github.com/status-im/status-go/v10/protocol/requests"
 
 	"go.uber.org/zap"
 )

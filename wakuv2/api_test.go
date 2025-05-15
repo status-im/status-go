@@ -24,8 +24,8 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/status-im/status-go/waku/types"
-	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/status-im/status-go/v10/waku/types"
+	"github.com/status-im/status-go/v10/wakuv2/common"
 )
 
 func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {

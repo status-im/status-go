@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/server/servertest"
+	"github.com/status-im/status-go/v10/server"
+	"github.com/status-im/status-go/v10/server/servertest"
 )
 
 const (

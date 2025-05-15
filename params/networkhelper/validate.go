@@ -3,7 +3,7 @@ package networkhelper
 import (
 	"gopkg.in/go-playground/validator.v9"
 
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/v10/params"
 )
 
 func GetValidator() *validator.Validate {

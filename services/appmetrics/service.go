@@ -3,7 +3,7 @@ package appmetrics
 import (
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/appmetrics"
+	"github.com/status-im/status-go/v10/appmetrics"
 )
 
 func NewService(db *appmetrics.Database) *Service {

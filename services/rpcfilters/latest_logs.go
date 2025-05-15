@@ -11,8 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	getRpc "github.com/ethereum/go-ethereum/rpc"
-	gocommon "github.com/status-im/status-go/common"
-	"github.com/status-im/status-go/logutils"
+	gocommon "github.com/status-im/status-go/v10/common"
+	"github.com/status-im/status-go/v10/logutils"
 )
 
 // ContextCaller provides CallContext method as ethereums rpc.Client.

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/v10/protocol/identity"
 )
 
 // Profile showcase preferences

@@ -7,8 +7,8 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/status-im/status-go/protocol/identity"
-	"github.com/status-im/status-go/static"
+	"github.com/status-im/status-go/v10/protocol/identity"
+	"github.com/status-im/status-go/v10/static"
 )
 
 const (

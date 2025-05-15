@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/nodecfg"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/v10/multiaccounts/accounts"
+	"github.com/status-im/status-go/v10/multiaccounts/settings"
+	"github.com/status-im/status-go/v10/nodecfg"
+	"github.com/status-im/status-go/v10/params"
+	"github.com/status-im/status-go/v10/protocol"
 )
 
 func NewSettingsAPI(messenger **protocol.Messenger, db *accounts.Database, config *params.NodeConfig) *SettingsAPI {

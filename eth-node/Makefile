@@ -2,7 +2,7 @@ GO111MODULE = on
 
 ENABLE_METRICS ?= true
 BUILD_FLAGS ?= $(shell echo "-ldflags '\
-	-X github.com/status-im/status-go/eth-node/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
+	-X github.com/status-im/status-go/v10/eth-node/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
 
 test:
 	go test ./...

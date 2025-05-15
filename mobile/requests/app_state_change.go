@@ -1,8 +1,8 @@
 package requests
 
 import (
-	"github.com/status-im/status-go/api"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/v10/api"
+	"github.com/status-im/status-go/v10/logutils"
 
 	"go.uber.org/zap"
 	"gopkg.in/go-playground/validator.v9"

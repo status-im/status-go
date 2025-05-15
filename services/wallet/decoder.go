@@ -1,9 +1,9 @@
 package wallet
 
 import (
-	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/thirdparty/decoder/fourbyte"
-	"github.com/status-im/status-go/services/wallet/thirdparty/decoder/fourbytegithub"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty/decoder/fourbyte"
+	"github.com/status-im/status-go/v10/services/wallet/thirdparty/decoder/fourbytegithub"
 )
 
 type Decoder struct {

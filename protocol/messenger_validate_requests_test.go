@@ -3,7 +3,7 @@ package protocol
 import (
 	"testing"
 
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/v10/protocol/requests"
 
 	"github.com/stretchr/testify/suite"
 )

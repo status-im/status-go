@@ -3,7 +3,7 @@ package mock_market
 import (
 	"go.uber.org/mock/gomock"
 
-	mock_thirdparty "github.com/status-im/status-go/services/wallet/thirdparty/mock"
+	mock_thirdparty "github.com/status-im/status-go/v10/services/wallet/thirdparty/mock"
 )
 
 type MockPriceProvider struct {
